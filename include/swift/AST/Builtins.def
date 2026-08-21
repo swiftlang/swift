@@ -906,6 +906,18 @@ BUILTIN_MISC_OPERATION(Dereferenceable, "dereferenceable", "n", Special)
 /// Sizeof has type T.Type -> Int
 BUILTIN_MISC_OPERATION_WITH_SILGEN(Sizeof, "sizeof", "n", Special)
 
+/// AllocRawTyped : <T> (Int, Int, T.Type) -> Builtin.RawPointer
+///
+/// The same as AllocRaw except that it also takes the pointee type, which
+/// is used by the runtime to compute a type descriptor for the allocation.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AllocRawTyped, "allocRawTyped", "", Special)
+
+/// DeallocRawTyped : <T> (Builtin.RawPointer, Int, Int, T.Type) -> ()
+///
+/// The same as DeallocRaw except that it also takes the pointee type, which
+/// is used by the runtime to compute a type descriptor for the allocation.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(DeallocRawTyped, "deallocRawTyped", "", Special)
+
 /// Strideof has type T.Type -> Int
 BUILTIN_MISC_OPERATION_WITH_SILGEN(Strideof, "strideof", "n", Special)
 
@@ -1236,6 +1248,13 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddCancellationHandler,
 BUILTIN_MISC_OPERATION(TaskRemoveCancellationHandler,
                        "taskRemoveCancellationHandler", "", Special)
 
+/// Equivalent to calling swift_task_addCancellationHandlerWithReason.
+///
+/// Signature: (handler: (UInt8) -> Void) -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddCancellationHandlerWithReason,
+                                  "taskAddCancellationHandlerWithReason", "",
+                                   Special)
+
 /// Equivalent to calling swift_task_addPriorityEscalationHandler.
 ///
 /// Signature: (handler: (UInt8, UInt8) -> Void) -> UnsafeRawPointer
@@ -1248,6 +1267,31 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddPriorityEscalationHandler,
 /// Signature: (record: UnsafeRawPointer) -> ()
 BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
                        "taskRemovePriorityEscalationHandler", "", Special)
+
+/// Equivalent to calling swift_task_pushDeadline.
+///
+/// Signature: <C, I> (clock: borrowing C, instant: borrowing I)
+///           -> UnsafeRawPointer
+///
+/// The paired `taskPopDeadline` acts as the matching stack deallocation.
+BUILTIN_MISC_OPERATION(TaskPushDeadline, "taskPushDeadline", "", Special)
+
+/// Equivalent to calling swift_task_popDeadline.
+///
+/// Signature: (record: UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(TaskPopDeadline, "taskPopDeadline", "", Special)
+
+/// Equivalent to calling swift_task_pushCancellationScope.
+///
+/// Signature: () -> UnsafeRawPointer
+///
+/// The paired `taskCancellationScopePop` acts as the matching stack deallocation.
+BUILTIN_MISC_OPERATION(TaskCancellationScopePush, "taskCancellationScopePush", "", Special)
+
+/// Equivalent to calling swift_task_popCancellationScope.
+///
+/// Signature: (record: UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(TaskCancellationScopePop, "taskCancellationScopePop", "", Special)
 
 /// Equivalent to calling swift_task_localValuePush. Deprecated because
 /// it doesn't properly pair the allocation and deallocation with a

@@ -24,6 +24,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/STLExtras.h"
 
 using namespace swift;
 
@@ -129,6 +130,7 @@ UNINTERESTING_FEATURE(FlowSensitiveConcurrencyCaptures)
 UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
+UNINTERESTING_FEATURE(SymbolLinkageMarkers)
 UNINTERESTING_FEATURE(LazyImmediate)
 UNINTERESTING_FEATURE(MoveOnlyClasses)
 UNINTERESTING_FEATURE(NoImplicitCopy)
@@ -136,6 +138,7 @@ UNINTERESTING_FEATURE(OldOwnershipOperatorSpellings)
 UNINTERESTING_FEATURE(MoveOnlyEnumDeinits)
 UNINTERESTING_FEATURE(MoveOnlyTuples)
 UNINTERESTING_FEATURE(MoveOnlyPartialReinitialization)
+UNINTERESTING_FEATURE(NoncopyableCasting)
 UNINTERESTING_FEATURE(AccessLevelOnImport)
 UNINTERESTING_FEATURE(AllowNonResilientAccessInPackage)
 UNINTERESTING_FEATURE(ClientBypassResilientAccessInPackage)
@@ -176,7 +179,6 @@ UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
 UNINTERESTING_FEATURE(EmbeddedDynamicExclusivity)
-UNINTERESTING_FEATURE(EmbeddedKeyPaths)
 UNINTERESTING_FEATURE(TypedAllocation)
 UNINTERESTING_FEATURE(MutateAndConsumeInDeinit)
 
@@ -470,6 +472,9 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
 UNINTERESTING_FEATURE(ClosureBodyMacro)
 UNINTERESTING_FEATURE(BuiltinConcurrencyStackNesting)
 UNINTERESTING_FEATURE(BuiltinTaskCancellationShield)
+UNINTERESTING_FEATURE(BuiltinTaskCancellationScope)
+UNINTERESTING_FEATURE(BuiltinTaskDeadline)
+UNINTERESTING_FEATURE(BuiltinCancellationHandlerWithReason)
 UNINTERESTING_FEATURE(BuiltinAddTaskLocalValue)
 UNINTERESTING_FEATURE(BuiltinContinuationNonCopyableSuccess)
 UNINTERESTING_FEATURE(CompileTimeValuesPreview)
@@ -481,6 +486,7 @@ UNINTERESTING_FEATURE(SafeInteropWrappersNullAsEmptySpan)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(ImportCxxMembersLazily)
+UNINTERESTING_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe)
 UNINTERESTING_FEATURE(ForeignReferenceTypeInheritance)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
@@ -618,6 +624,13 @@ static bool usesFeatureInlineAlways(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureAlwaysUnsafeAttribute(Decl *decl) {
+  if (auto *unsafeAttr = decl->getAttrs().getAttribute<UnsafeAttr>()) {
+    return unsafeAttr->isAlways();
+  }
+  return false;
+}
+
 UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
 UNINTERESTING_FEATURE(StandaloneSwiftAvailability)
 
@@ -706,6 +719,45 @@ static bool usesFeatureBorrowInout(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BuiltinDereferenceable)
+
+static bool usesFeatureCalledAttribute(Decl *D) {
+  auto &ctx = D->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::CalledAttribute))
+    return false;
+
+  std::function<bool(Type)> hasCalled = [](Type T) {
+    if (auto F = dyn_cast<AnyFunctionType>(T.getPointer()))
+      return F->isCalledOnce();
+    return false;
+  };
+
+  if (auto *TA = dyn_cast<TypeAliasDecl>(D)) {
+    if (auto type = TA->getUnderlyingType()) {
+      return type.findIf(hasCalled);
+    }
+    return false;
+  }
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (unsigned i = 0, n = PBD->getNumPatternEntries(); i != n; ++i) {
+      auto P = PBD->getCheckedPattern(i);
+      if (!P)
+        continue;
+
+      bool usesCalled = false;
+      P->forEachVariable([&usesCalled](auto *V) {
+        usesCalled |= usesFeatureCalledAttribute(V);
+      });
+
+      if (usesCalled)
+        return true;
+    }
+
+    return false;
+  }
+
+  return usesTypeMatching(D, hasCalled);
+}
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

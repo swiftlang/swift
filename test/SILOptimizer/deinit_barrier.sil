@@ -175,6 +175,80 @@ bb0(%0 : $*C):
   return %r
 }
 
+class D {
+  var f: Int32
+}
+
+// A deinit can write class properties, so the `end_access` of a dynamically enforced access
+// scope is a barrier. Only the `end_access` is - a destroy is moved backwards, so it must not
+// get past the end of the scope.
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_dynamic_access_of_class_property: is_deinit_barrier
+// CHECK:  begin_access [read] [dynamic]
+// CHECK:  false
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on test_dynamic_access_of_class_property: is_deinit_barrier
+// CHECK-LABEL: begin running test 2 of {{[0-9]+}} on test_dynamic_access_of_class_property: is_deinit_barrier
+// CHECK:  end_access
+// CHECK:  true
+// CHECK-LABEL: end running test 2 of {{[0-9]+}} on test_dynamic_access_of_class_property: is_deinit_barrier
+sil [ossa] @test_dynamic_access_of_class_property : $@convention(thin) (@guaranteed D) -> Int32 {
+bb0(%0 : @guaranteed $D):
+  %1 = ref_element_addr %0, #D.f
+  specify_test "is_deinit_barrier @instruction"
+  %2 = begin_access [read] [dynamic] %1
+  %3 = load [trivial] %2
+  specify_test "is_deinit_barrier @instruction"
+  end_access %2
+  return %3
+}
+
+// A statically enforced access is not a barrier by itself. The generic checks still apply,
+// and a class property is neither a pointer nor a global.
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_static_access_of_class_property: is_deinit_barrier
+// CHECK:  end_access
+// CHECK:  false
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on test_static_access_of_class_property: is_deinit_barrier
+sil [ossa] @test_static_access_of_class_property : $@convention(thin) (@guaranteed D) -> Int32 {
+bb0(%0 : @guaranteed $D):
+  %1 = ref_element_addr %0, #D.f
+  %2 = begin_access [read] [static] %1
+  %3 = load [trivial] %2
+  specify_test "is_deinit_barrier @instruction"
+  end_access %2
+  return %3
+}
+
+// A deinit can also write global variables.
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_dynamic_access_of_global: is_deinit_barrier
+// CHECK:  end_access
+// CHECK:  true
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on test_dynamic_access_of_global: is_deinit_barrier
+sil [ossa] @test_dynamic_access_of_global : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = global_addr @global_var : $*Int32
+  %1 = begin_access [read] [dynamic] %0
+  %2 = load [trivial] %1
+  specify_test "is_deinit_barrier @instruction"
+  end_access %1
+  return %2
+}
+
+// Even with static enforcement the access to a global is a barrier, because the generic
+// checks are still applied. Note that `access-enforcement-wmo` can turn accesses to globals
+// into statically enforced accesses.
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_static_access_of_global: is_deinit_barrier
+// CHECK:  end_access
+// CHECK:  true
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on test_static_access_of_global: is_deinit_barrier
+sil [ossa] @test_static_access_of_global : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = global_addr @global_var : $*Int32
+  %1 = begin_access [read] [static] %0
+  %2 = load [trivial] %1
+  specify_test "is_deinit_barrier @instruction"
+  end_access %1
+  return %2
+}
+
 // CHECK-LABEL: begin running test {{.*}} on rdar120656227: is_deinit_barrier
 // CHECK:       builtin "int_memmove_RawPointer_RawPointer_Int64"
 // CHECK:       true

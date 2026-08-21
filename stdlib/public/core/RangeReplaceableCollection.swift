@@ -639,8 +639,9 @@ extension RangeReplaceableCollection {
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     if !keepCapacity {
       self = Self()
-    }
-    else {
+    } else if isEmpty {
+      return
+    } else {
       replaceSubrange(startIndex..<endIndex, with: EmptyCollection())
     }
   }

@@ -2,10 +2,6 @@
 // RUN: %target-build-swift -O -enable-library-evolution %s
 // RUN: %target-build-swift -O -g -enable-library-evolution %s
 
-// rdar://71319547
-
-// REQUIRES: rdar76127287
-
 import _Differentiation
 
 // Assertion failed: (mainPullbackStruct->getType() == pbStructLoweredType), function run, file swift/lib/SILOptimizer/Differentiation/PullbackCloner.cpp, line 1899.

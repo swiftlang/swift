@@ -108,6 +108,26 @@ struct StoredDiagnosticInfo {
                              opts == DiagnosticOptions::NoUsage,
                              groupID) {}
 };
+
+/// Whether a SourceFile could carry a syntactic warning control, and needs
+/// the accurate answer from the SwiftWarningControl region tree rather than the
+/// command-line rules alone.
+static bool fileMayHaveWarningControls(const SourceFile *sf) {
+  // If the swift-syntax tree for this file already exists, consulting it costs
+  // nothing extra, so always take the accurate path.
+  if (sf->getASTContext().evaluator.hasCachedResult(
+          ExportedSourceFileRequest{sf}))
+    return true;
+
+  return sf->hasWarningControlAttr();
+}
+
+/// Whether a given SourceFile qualifies for checking for a syntactic
+/// diagnostic group control
+static bool shouldCheckSyntacticWarningControlInFile(const SourceFile *sf) {
+  return sf && sf->Kind != SourceFileKind::Interface &&
+         fileMayHaveWarningControls(sf) && sf->getExportedSourceFile();
+}
 } // end anonymous namespace
 
 // TODO: categorization
@@ -602,8 +622,10 @@ bool DiagnosticEngine::finishProcessing() {
 
 bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (sf && sf->Kind != SourceFileKind::Interface &&
-      sf->getExportedSourceFile()) {
+  // Consult the syntactic warning control regions only when the file
+  // is known to contain any syntactic controls, to avoid a possible
+  // unnecessary ASTGen re-parse otherwise.
+  if (shouldCheckSyntacticWarningControlInFile(sf)) {
     auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
     return swift_ASTGen_isWarningGroupEnabledInFile(
         sf->getExportedSourceFile(), sf->getASTContext(),
@@ -1363,8 +1385,7 @@ DiagnosticState::determineUserControlledWarningBehavior(
     if (!sourceFiles.empty()) {
       SourceFile *SF = sourceFiles.front();
       // Don't run syntactic @diagnose controls for .swiftinterface files.
-      if (SF && SF->Kind != SourceFileKind::Interface &&
-          SF->getExportedSourceFile()) {
+      if (shouldCheckSyntacticWarningControlInFile(SF)) {
         auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
         WarningGroupBehavior behavior =
             swift_ASTGen_warningGroupBehaviorAtPosition(

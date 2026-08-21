@@ -277,8 +277,12 @@ LANGUAGE_FEATURE(LifetimeDependenceMutableAccessors, 0, "Support mutable accesso
 LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
+LANGUAGE_FEATURE(SymbolLinkageMarkers, 492, "Section placement control (`@section`, `@used`, `objectFormat`)")
 LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
-LANGUAGE_FEATURE(BuiltinTaskCancellationShield, 0, "Task Cancellation Shield Builtins")
+LANGUAGE_FEATURE(BuiltinTaskCancellationShield, 504, "Task Cancellation Shield Builtins")
+LANGUAGE_FEATURE(BuiltinTaskCancellationScope, 0, "Task Cancellation Scope Builtins")
+LANGUAGE_FEATURE(BuiltinTaskDeadline, 526, "Task Deadline Builtins")
+LANGUAGE_FEATURE(BuiltinCancellationHandlerWithReason, 526, "Cancellation Handler With Reason Builtins")
 LANGUAGE_FEATURE(ClosureLifetimes, 0, "Support @_lifetime on function types")
 BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude private initialized properties from memberwise init")
 LANGUAGE_FEATURE(BuiltinMarkDependence, 0, "markDependence Builtin")
@@ -366,6 +370,10 @@ EXPERIMENTAL_FEATURE(MoveOnlyEnumDeinits, true)
 EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
 EXPERIMENTAL_FEATURE(ConsumeSelfInDeinit, true)
+
+// Whether `as?`/`as!`/`is` are permitted from a noncopyable existential
+// value to a concrete type.
+EXPERIMENTAL_FEATURE(NoncopyableCasting, false)
 
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
@@ -595,6 +603,9 @@ LANGUAGE_FEATURE(BorrowingForLoop, 0, "borrowing for-in loops")
 /// Allow use of @inline(always) attribute
 SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
 
+/// Allow use of the @unsafe(always) attribute
+SUPPRESSIBLE_LANGUAGE_FEATURE(AlwaysUnsafeAttribute, 0, "@unsafe(always) attribute")
+
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 
@@ -604,9 +615,6 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
-
-/// Allow enabling dynamic keypaths in Embedded Swift.
-EXPERIMENTAL_FEATURE(EmbeddedKeyPaths, true)
 
 /// Emit typed allocation calls in Embedded Swift.
 EXPERIMENTAL_FEATURE(TypedAllocation, true)
@@ -645,8 +653,15 @@ EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 /// Allow use of macros to derive various conformances
 EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, false)
 
+/// Allow use of `@called(...)` on function types.
+EXPERIMENTAL_FEATURE(CalledAttribute, false)
+
 /// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
 EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
+
+/// Import C++ methods that are hard to use correctly under their original name
+/// as '@unsafe(always)', instead of renaming them to '__<name>Unsafe'.
+EXPERIMENTAL_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

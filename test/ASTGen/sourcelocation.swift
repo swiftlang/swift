@@ -19,11 +19,11 @@ test(arg: 2)
 
 // CHECK:      {{^}}second/foo.swift:102:1: warning: result of call to 'test(arg:)' is unused
 // CHECK-NEXT: {{^}}test(arg: 2)
-// CHECK-NEXT: {{^}}^   ~~~~~~~~
+// CHECK-NEXT: {{^}}^~~~~~~~~~~~
 
 // CHECK:      {{^}}first/foo.swift:100:3: warning: result of call to 'test(arg:)' is unused
 // CHECK-NEXT: {{^}}  test(arg: 1)
-// CHECK-NEXT: {{^}}  ^   ~~~~~~~~
+// CHECK-NEXT: {{^}}  ^~~~~~~~~~~~
 
 // CHECK:      {{^SOURCE_DIR[\//]test[/\\]ASTGen[\//]sourcelocation\.swift}}:4:25: warning: '#sourceLocation' directive produces '#fileID' string of 'MyMod/foo.swift', which conflicts with '#fileID' strings produced by other paths in the module
 // CHECK-NEXT: {{^}}  #sourceLocation(file: "first/foo.swift", line: 100)

@@ -253,9 +253,12 @@ private struct CollectedEffects {
     case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
       break
 
-    case is BeginCOWMutationInst, is IsUniqueInst:
-      // Model reference count reading as "destroy" for now. Although we could introduce a "read-refcount"
-      // effect, it would not give any significant benefit in any of our current optimizations.
+    case is BeginCOWMutationInst:
+      addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
+
+    case is IsUniqueInst:
+      addEffects(.read, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
+      // The destroy effect is required for the non-ossa ARC optimizer
       addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
 
     case isReturnInstruction:

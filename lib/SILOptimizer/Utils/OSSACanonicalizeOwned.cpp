@@ -188,7 +188,7 @@ bool OSSACanonicalizeOwned::computeCanonicalLiveness() {
           // interesting.
           if (liveness->getBlockLiveness(dvi->getParent()) !=
               PrunedLiveBlocks::LiveOut) {
-            recordDebugValue(dvi);
+            recordDebugUse(use);
           }
           continue;
         }
@@ -1366,12 +1366,13 @@ void OSSACanonicalizeOwned::rewriteCopies(
     for (auto *destroy : newDestroys) {
       liveness->updateForUse(destroy, /*lifetimeEnding=*/true);
     }
-    for (auto *dvi : debugValues) {
+    for (auto *use : debugUses) {
+      auto *dvi = cast<DebugValueInst>(use->getUser());
       if (liveness->isWithinBoundary(dvi)) {
         continue;
       }
       LLVM_DEBUG(llvm::dbgs() << "  Killing debug_value: " << *dvi);
-      dvi->killOperand();
+      dvi->killOperand(use->getOperandNumber());
     }
   }
 

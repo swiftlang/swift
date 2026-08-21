@@ -571,7 +571,7 @@ foreach(SDK ${SWIFT_SDKS})
               ${command_upload_swift_reflection_test}
               ${command_clean_test_results_dir}
               COMMAND
-                ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT}
+                ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT} --
                 $<TARGET_FILE:Python3::Interpreter> "${LIT}"
                 ${final_lit_args}
                 "--param" "swift_test_subset=${test_subset}"
@@ -591,7 +591,7 @@ foreach(SDK ${SWIFT_SDKS})
               ${command_upload_swift_reflection_test}
               ${command_clean_test_results_dir}
               COMMAND
-                ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT}
+                ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT} --
                 $<TARGET_FILE:Python3::Interpreter> "${LIT}"
                 ${final_lit_args}
                 "--param" "swift_test_subset=${test_subset}"
@@ -637,7 +637,7 @@ foreach(SDK ${SWIFT_SDKS})
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
-              ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT}
+              ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT} --
               $<TARGET_FILE:Python3::Interpreter> "${LIT}"
               ${embedded_wasm_lit_args}
               "--param" "swift_test_subset=${test_subset}"

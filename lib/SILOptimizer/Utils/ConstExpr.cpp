@@ -1363,7 +1363,7 @@ ConstExprFunctionState::initializeAddressFromSingleWriter(SILValue addr) {
     // Ignore markers, loads, and other things that aren't stores to this stack
     // value.
     if (isa<LoadInst>(user) || isa<DeallocStackInst>(user) ||
-        isa<DestroyAddrInst>(user) || DebugValueInst::hasAddrVal(user))
+        isa<DestroyAddrInst>(user) || isa<DebugValueInst>(user))
       continue;
 
     // TODO: Allow BeginAccess/EndAccess users.

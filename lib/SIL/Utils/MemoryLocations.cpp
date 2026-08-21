@@ -341,9 +341,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         break;
       }
       case SILInstructionKind::DebugValueInst:
-        if (cast<DebugValueInst>(user)->hasAddrVal())
-          break;
-        return false;
+        break;
       case SILInstructionKind::ApplyInst: {
         auto *apply = cast<ApplyInst>(user);
         if (apply->hasAddressResult()) {
@@ -511,6 +509,13 @@ bool MemoryLocations::isTrivial(SILType type, SILFunction *inFunction) {
 }
 
 bool MemoryLocations::computeIsTrivial(SILType type, SILFunction *inFunction) {
+
+  // An opened existential can be a trivial type. In case an optimization found
+  // the concrete type of the existential, it might have removed the
+  // destroy_addr of such a location, but the type is still the opened
+  // archetype.
+  if (type.is<ExistentialArchetypeType>())
+    return true;
 
   if (inFunction->getTypeProperties(type).isInfinite()) {
     return type.isTrivial(*inFunction);

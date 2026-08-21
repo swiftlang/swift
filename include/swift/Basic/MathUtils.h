@@ -39,6 +39,18 @@ static inline size_t roundUpToAlignMask(size_t size, size_t alignMask) {
   return (size + alignMask) & ~alignMask;
 }
 
+/// Round the given value up to the given alignment, expressed as a mask,
+/// writing the result into \p result. Returns false if the rounding carried
+/// past SIZE_MAX.
+static inline bool roundUpToAlignMaskCheckingOverflow(size_t size,
+                                                      size_t alignMask,
+                                                      size_t &result) {
+  if (size > SIZE_MAX - alignMask)
+    return false;
+  result = (size + alignMask) & ~alignMask;
+  return true;
+}
+
 static inline unsigned popcount(unsigned value) {
 #if SWIFT_COMPILER_IS_MSVC && (defined(_M_IX86) || defined(_M_X64))
   // The __popcnt intrinsic is only available when targetting x86{_64} with MSVC.

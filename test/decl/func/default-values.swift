@@ -179,10 +179,10 @@ let fooThing6 = Foo(a: 0, d: 1, e: 2, h: nil) // expected-error {{missing argume
   do {
   func f(x: Int) {}
   func f(line: String = #line) {} // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
-  f()
+  f() // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
 
   class C { init(line: String = #line) {} } // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
-  let _ = C()
+  let _ = C() // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
 }
 
 // https://github.com/apple/swift/issues/54034
@@ -191,6 +191,7 @@ let fooThing6 = Foo(a: 0, d: 1, e: 2, h: nil) // expected-error {{missing argume
 // expected-error@+1 {{default argument value of type 'String' cannot be converted to type 'T'}}
 func badGenericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #function) -> T { x }
 let _: Int = badGenericMagicLiteral()
+// expected-error@-1 {{default argument value of type 'String' cannot be converted to type 'Int'}}
 
 func genericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #line) -> T { x } // expected-note {{where 'T' = 'String'}}
 let _: Int = genericMagicLiteral()

@@ -4,14 +4,14 @@
 
 struct AlwaysAvailable {}
 
-@available(*, unavailable)
-struct NeverAvailable {} // expected-note * {{'NeverAvailable' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note * {{'NeverAvailable' has been explicitly marked unavailable here}}
+struct NeverAvailable {}
 
-@available(swift, obsoleted: 4)
-struct UnavailableInSwift4 {} // expected-note * {{'UnavailableInSwift4' was obsoleted in Swift 4}}
+@available(swift, obsoleted: 4) // expected-note * {{'UnavailableInSwift4' was obsoleted in Swift 4}}
+struct UnavailableInSwift4 {}
 
-@available(swift, introduced: 99)
-struct AvailableInFutureSwift {} // expected-note * {{'AvailableInFutureSwift' was introduced in Swift 99}}
+@available(swift, introduced: 99) // expected-note * {{'AvailableInFutureSwift' was introduced in Swift 99}}
+struct AvailableInFutureSwift {}
 
 @available(*, deprecated)
 struct Deprecated {}
@@ -21,21 +21,21 @@ func always() -> AlwaysAvailable {
   AlwaysAvailable()
 }
 
-@available(*, unavailable)
+@available(*, unavailable) // expected-note * {{'never()' has been explicitly marked unavailable here}}
 @discardableResult
-func never() -> NeverAvailable { // expected-note * {{'never()' has been explicitly marked unavailable here}}
+func never() -> NeverAvailable {
   NeverAvailable()
 }
 
-@available(swift, obsoleted: 4)
+@available(swift, obsoleted: 4) // expected-note * {{'unavailableInSwift4()' was obsoleted in Swift 4}}
 @discardableResult
-func unavailableInSwift4() -> UnavailableInSwift4 { // expected-note * {{'unavailableInSwift4()' was obsoleted in Swift 4}}
+func unavailableInSwift4() -> UnavailableInSwift4 {
   UnavailableInSwift4()
 }
 
-@available(swift, introduced: 99)
+@available(swift, introduced: 99) // expected-note * {{'availableInFutureSwift()' was introduced in Swift 99}}
 @discardableResult
-func availableInFutureSwift() -> AvailableInFutureSwift { // expected-note * {{'availableInFutureSwift()' was introduced in Swift 99}}
+func availableInFutureSwift() -> AvailableInFutureSwift {
   AvailableInFutureSwift()
 }
 
@@ -212,8 +212,8 @@ struct AlwaysAvailableContainer {
   // expected-warning@-1 {{'Deprecated' is deprecated}}
 }
 
-@available(*, unavailable)
-struct NeverAvailableContainer { // expected-note * {{'NeverAvailableContainer' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note * {{'NeverAvailableContainer' has been explicitly marked unavailable here}}
+struct NeverAvailableContainer {
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
   let unavailable_in_swift4_var: UnavailableInSwift4 = unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
@@ -221,8 +221,8 @@ struct NeverAvailableContainer { // expected-note * {{'NeverAvailableContainer' 
   let deprecated_var: Deprecated = deprecated() // expected-warning {{'deprecated()' is deprecated}}
 }
 
-@available(swift, obsoleted: 4)
-struct UnavailableInSwift4Container { // expected-note * {{'UnavailableInSwift4Container' was obsoleted in Swift 4}}
+@available(swift, obsoleted: 4) // expected-note * {{'UnavailableInSwift4Container' was obsoleted in Swift 4}}
+struct UnavailableInSwift4Container {
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
   // expected-error@-1 {{'NeverAvailable' is unavailable}}
@@ -231,8 +231,8 @@ struct UnavailableInSwift4Container { // expected-note * {{'UnavailableInSwift4C
   let deprecated_var: Deprecated = deprecated() // expected-warning {{'deprecated()' is deprecated}}
 }
 
-@available(swift, introduced: 99)
-struct AvailableInFutureSwiftContainer { // expected-note * {{'AvailableInFutureSwiftContainer' was introduced in Swift 99}}
+@available(swift, introduced: 99) // expected-note * {{'AvailableInFutureSwiftContainer' was introduced in Swift 99}}
+struct AvailableInFutureSwiftContainer {
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
   // expected-error@-1 {{'NeverAvailable' is unavailable}}
@@ -309,9 +309,9 @@ struct ExtendMe {}
 
 @available(*, unavailable)
 extension ExtendMe {
-  func never_available_extension_available_method() {} // expected-note * {{has been explicitly marked unavailable here}}
+  func never_available_extension_available_method() {} // expected-note@-2 * {{has been explicitly marked unavailable here}}
 
-  typealias AvailableAliasInNeverAvailableExtension = Self // expected-note * {{'AvailableAliasInNeverAvailableExtension' has been explicitly marked unavailable here}}
+  typealias AvailableAliasInNeverAvailableExtension = Self // expected-note@-4 * {{'AvailableAliasInNeverAvailableExtension' has been explicitly marked unavailable here}}
 
   func never_available_extension_available_method( // expected-note * {{add '@available' attribute to enclosing instance method}}
     _: AlwaysAvailable,
@@ -390,9 +390,9 @@ extension ExtendMe {
 
 @available(swift, obsoleted: 4)
 extension ExtendMe {
-  func unavailable_in_swift4_extension_available_method() {} // expected-note * {{'unavailable_in_swift4_extension_available_method()' was obsoleted in Swift 4}}
+  func unavailable_in_swift4_extension_available_method() {} // expected-note@-2 * {{'unavailable_in_swift4_extension_available_method()' was obsoleted in Swift 4}}
 
-  typealias AvailableAliasInSwift4ObsoletedExtension = Self // expected-note * {{'AvailableAliasInSwift4ObsoletedExtension' was obsoleted in Swift 4}}
+  typealias AvailableAliasInSwift4ObsoletedExtension = Self // expected-note@-4 * {{'AvailableAliasInSwift4ObsoletedExtension' was obsoleted in Swift 4}}
 
   @available(*, unavailable)
   func unavailable_in_swift4_extension_never_available_method(
@@ -412,9 +412,9 @@ extension ExtendMe {
 
 @available(swift, introduced: 99)
 extension ExtendMe {
-  func available_in_future_swift_extension_available_method() {} // expected-note * {{'available_in_future_swift_extension_available_method()' was introduced in Swift 99}}
+  func available_in_future_swift_extension_available_method() {} // expected-note@-2 * {{'available_in_future_swift_extension_available_method()' was introduced in Swift 99}}
 
-  typealias AvailableAliasInSwift99Extension = Self // expected-note * {{'AvailableAliasInSwift99Extension' was introduced in Swift 99}}
+  typealias AvailableAliasInSwift99Extension = Self // expected-note@-4 * {{'AvailableAliasInSwift99Extension' was introduced in Swift 99}}
 
   @available(*, unavailable)
   func available_in_future_swift_extension_never_available_method(

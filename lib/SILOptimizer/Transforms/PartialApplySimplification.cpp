@@ -395,7 +395,7 @@ rewriteKnownCalleeConventionOnly(SILFunction *callee,
       newInst = B.createPartialApply(loc, fr, site.getSubstitutionMap(), args,
                                      pa->getCalleeConvention(),
                                      pa->getResultIsolation(),
-                                     pa->isOnStack(),
+                                     pa->isCalledOnce(), pa->isOnStack(),
                                      pa->isStackAllocationNested());
       break;
     }
@@ -831,6 +831,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
     case ApplySiteKind::PartialApplyInst: {
       auto oldPA = cast<PartialApplyInst>(site.getInstruction());
       auto paIsolation = oldPA->getResultIsolation();
+      auto paCalledOnce = oldPA->isCalledOnce();
       auto paConvention = isNoEscape ? ParameterConvention::Direct_Guaranteed
                                      : contextParam.getConvention();
       auto paOnStack = isNoEscape ? PartialApplyInst::OnStack
@@ -838,13 +839,9 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
       auto paIsNested = (paOnStack && oldPA->isOnStack())
                           ? oldPA->isStackAllocationNested()
                           : StackAllocationIsNested;
-      auto newPA = B.createPartialApply(loc, newFunctionRef,
-                                     site.getSubstitutionMap(),
-                                     newArgs,
-                                     paConvention,
-                                     paIsolation,
-                                     paOnStack,
-                                     paIsNested);
+      auto newPA = B.createPartialApply(
+          loc, newFunctionRef, site.getSubstitutionMap(), newArgs, paConvention,
+          paIsolation, paCalledOnce, paOnStack, paIsNested);
       assert(isSimplePartialApply(newPA)
              && "partial apply wasn't simple after transformation?");
       newInst = newPA;

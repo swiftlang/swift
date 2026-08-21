@@ -201,7 +201,7 @@ matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness);
 
 enum class TypeAdjustment : uint8_t {
-  NoescapeToEscaping, NonsendableToSendable
+  NoescapeToEscaping, NonsendableToSendable, CalledOnceToPlain
 };
 
 /// Perform any necessary adjustments to the inferred associated type to

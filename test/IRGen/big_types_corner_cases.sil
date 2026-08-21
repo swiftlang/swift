@@ -138,9 +138,9 @@ bb0(%funcpointer : $@callee_owned () -> @owned @callee_owned (@owned Builtin.Int
   return %ret : $()
 }
 
-// CHECK-LABEL: define swiftcc { i64, i64 } @ret_pointer_to_mod()
+// CHECK-LABEL: define swiftcc { ptr, ptr } @ret_pointer_to_mod()
 // CHECK-NEXT: entry
-// CHECK-NEXT: ret { i64, i64 } zeroinitializer
+// CHECK-NEXT: ret { ptr, ptr } zeroinitializer
 sil @ret_pointer_to_mod : $@convention(thin) () -> @owned Optional<@callee_owned () -> @owned Optional<BigStruct>> {
 bb0:
   %0 = enum $Optional<@callee_owned () -> @owned Optional<BigStruct>>, #Optional.none!enumelt // user: %1

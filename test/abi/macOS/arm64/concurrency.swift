@@ -462,3 +462,86 @@ Added: _$sSct8_rawTasks06_AsyncB0VvpMV
 
 /// Expose async task name offset in debug header.
 Added: __swift_concurrency_debug_asyncTaskNameOffset
+
+// Task Registry debug symbols
+Added: __swift_concurrency_debug_task_getId
+Added: __swift_concurrency_debug_task_getShardHead
+Added: __swift_concurrency_debug_task_getTaskNext
+Added: __swift_concurrency_debug_task_registryCount
+Added: __swift_concurrency_debug_task_registryWalk
+Added: __swift_concurrency_task_registry
+
+// withDeadline / TaskCancellationScope: structured-concurrency deadlines,
+// scoped cancellation (SPI), and CancellationError.Reason plumbing.
+Added: _$ss12withDeadline_9tolerance5clock9operationx7Instants5ClockPQy0__8DurationAGQy0_Sgq0_xyYaq_YKYCXEtYaq_YKs5ErrorR_s12IdentifiableR0_sAFR0_Ri_zr1_lF
+Added: _$ss12withDeadline_9tolerance5clock9operationx7Instants5ClockPQy0__8DurationAGQy0_Sgq0_xyYaq_YKYCXEtYaq_YKs5ErrorR_s12IdentifiableR0_sAFR0_Ri_zr1_lFTu
+Added: _$ss13SystemClockIDO10continuousyA2BmFWC
+Added: _$ss13SystemClockIDO10suspendingyA2BmFWC
+Added: _$ss13SystemClockIDO8rawValueABSgs5UInt8V_tcfC
+Added: _$ss13SystemClockIDO8rawValues5UInt8Vvg
+Added: _$ss13SystemClockIDO8rawValues5UInt8VvpMV
+Added: _$ss13SystemClockIDOMa
+Added: _$ss13SystemClockIDOMn
+Added: _$ss13SystemClockIDON
+Added: _$ss13SystemClockIDOSHsMc
+Added: _$ss13SystemClockIDOSQsMc
+Added: _$ss13SystemClockIDOSYsMc
+Added: _$ss15ContinuousClockV2ids06SystemB2IDOvg
+Added: _$ss15ContinuousClockV2ids06SystemB2IDOvpMV
+Added: _$ss15ContinuousClockVs12IdentifiablesMc
+Added: _$ss15SuspendingClockV2ids06SystemB2IDOvg
+Added: _$ss15SuspendingClockV2ids06SystemB2IDOvpMV
+Added: _$ss15SuspendingClockVs12IdentifiablesMc
+Added: _$ss20_findNearestDeadline5clock7Instants5ClockPQzSgx_ts12IdentifiableRzsADRzlF
+Added: _$ss21TaskCancellationScopeV6recordABSV_tcfC
+Added: _$ss21TaskCancellationScopeV7_recordSVvg
+Added: _$ss21TaskCancellationScopeVMa
+Added: _$ss21TaskCancellationScopeVMn
+Added: _$ss21TaskCancellationScopeVN
+Added: _$sScE11descriptionSSvg
+Added: _$sScE11descriptionSSvpMV
+Added: _$sScE17_reasonRawStorages5UInt8VvM
+Added: _$sScE17_reasonRawStorages5UInt8Vvg
+Added: _$sScE17_reasonRawStorages5UInt8VvpMV
+Added: _$sScE17_reasonRawStorages5UInt8Vvs
+Added: _$sScE6ReasonO11descriptionSSvg
+Added: _$sScE6ReasonO11descriptionSSvpMV
+Added: _$sScE6ReasonO11unspecifiedyA2BmFWC
+Added: _$sScE6ReasonO15deadlineExpiredyA2BmFWC
+Added: _$sScE6ReasonO16debugDescriptionSSvg
+Added: _$sScE6ReasonO16debugDescriptionSSvpMV
+Added: _$sScE6ReasonO2eeoiySbAB_ABtFZ
+Added: _$sScE6ReasonO4hash4intoys6HasherVz_tF
+Added: _$sScE6ReasonO8allCasesSayABGvgZ
+Added: _$sScE6ReasonO8allCasesSayABGvpZMV
+Added: _$sScE6ReasonO9_rawValues5UInt8VvpMV
+Added: _$sScE6ReasonO9hashValueSivg
+Added: _$sScE6ReasonO9hashValueSivpMV
+Added: _$sScE6ReasonOMa
+Added: _$sScE6ReasonOMn
+Added: _$sScE6ReasonON
+Added: _$sScE6ReasonOSHsMc
+Added: _$sScE6ReasonOSQsMc
+Added: _$sScE6ReasonOs12CaseIterablesMc
+Added: _$sScE6ReasonOs23CustomStringConvertiblesMc
+Added: _$sScE6ReasonOs28CustomDebugStringConvertiblesMc
+Added: _$sScE6reasonScE6ReasonOvpMV
+Added: _$sScEs23CustomStringConvertiblesMc
+Added: _$sSct18cancellationReasonScE0B0OSgvpMV
+Added: _$sScTss5NeverORszABRs_rlE14activeDeadline3for7Instants5ClockPQyd__Sgqd___ts12IdentifiableRd__sAFRd__lFZ
+Added: _$sScTss5NeverORszABRs_rlE17hasActiveDeadlineSbvpZMV
+Added: _$sScTss5NeverORszABRs_rlE18cancellationReasonScE0C0OSgvpZMV
+Added: _swift_task_cancelCancellationScope
+Added: _swift_task_cancellationScopeIsCancelled
+Added: _swift_task_cancelWithFlags
+Added: _swift_task_findNearestDeadlineForClock
+Added: _swift_task_getIsCancelledWithReason
+Added: __swift_task_hasActiveDeadline
+Added: _swift_task_popCancellationScope
+Added: _swift_task_popDeadline
+Added: _swift_task_pushCancellationScope
+Added: _swift_task_pushDeadline
+Added: _swift_taskGroup_cancelAllWithFlags
+
+// Reason-aware withTaskCancellationHandler(operation:onCancel:) overload.
+Added: _swift_task_addCancellationHandlerWithReason

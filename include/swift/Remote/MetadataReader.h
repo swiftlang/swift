@@ -160,6 +160,13 @@ struct RemoteExistential {
       IsBridgedError(IsBridgedError) {}
 };
 
+enum class DemangleFailureReason {
+  None,
+  /// The mangled name contained an accessor-function symbolic reference,
+  /// e.g., a noncopyable stored property built for a pre-macOS 27 runtime.
+  AccessorFunctionReference,
+};
+
 /// A generic reader of metadata.
 ///
 /// BuilderType must implement a particular interface which is currently
@@ -437,6 +444,11 @@ public:
   MetadataReader(const MetadataReader &other) = delete;
   MetadataReader &operator=(const MetadataReader &other) = delete;
 
+  /// Whether this reader is reading an Embedded Swift program.
+  bool isEmbedded() {
+    return Builder.getManglingFlavor() == Mangle::ManglingFlavor::Embedded;
+  }
+
   /// Clear all of the caches in this reader.
   void clear() {
     TypeCache.clear();
@@ -448,7 +460,10 @@ public:
   Demangle::NodePointer demangle(RemoteRef<char> mangledName,
                                  MangledNameKind kind,
                                  Demangler &dem,
-                                 bool useOpaqueTypeSymbolicReferences = false) {
+                                 bool useOpaqueTypeSymbolicReferences = false,
+                                 DemangleFailureReason *failureReason = nullptr) {
+    if (failureReason)
+      *failureReason = DemangleFailureReason::None;
     // Symbolic reference resolver for the demangle operation below.
     auto symbolicReferenceResolver = [&](SymbolicReferenceKind kind,
                                          Directness directness,
@@ -496,6 +511,8 @@ public:
       case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
         // The symbolic reference points at a resolver function, but we can't
         // execute code in the target process to resolve it from here.
+        if (failureReason)
+          *failureReason = DemangleFailureReason::AccessorFunctionReference;
         return nullptr;
       }
       case Demangle::SymbolicReferenceKind::UniqueExtendedExistentialTypeShape: {
@@ -781,8 +798,9 @@ public:
       return std::nullopt;
     auto MetadataAddress =
         RemoteAddress(Container.Type, ExistentialAddress.getAddressSpace());
-    auto Metadata = readMetadata(MetadataAddress);
-    if (!Metadata)
+
+    // This is a sanity check that only makes sense for regular Swift programs.
+    if (!isEmbedded() && !readMetadata(MetadataAddress))
       return std::nullopt;
 
     auto VWT = readValueWitnessTable(MetadataAddress);
@@ -820,8 +838,8 @@ public:
     auto MetadataAddress =
         RemoteAddress(Container.Type, ExistentialAddress.getAddressSpace());
 
-    auto Metadata = readMetadata(MetadataAddress);
-    if (!Metadata)
+    // This is a sanity check that only makes sense for regular Swift programs.
+    if (!isEmbedded() && !readMetadata(MetadataAddress))
       return std::nullopt;
 
     auto VWT = readValueWitnessTable(MetadataAddress);

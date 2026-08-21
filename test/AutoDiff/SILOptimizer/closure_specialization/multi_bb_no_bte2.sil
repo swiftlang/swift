@@ -23,9 +23,135 @@ sil [transparent] [reabstraction_thunk] @$sSa16_DifferentiationAA14Differentiabl
 
 sil [_semantics "array.check_subscript"] @$sSa15_checkSubscript_20wasNativeTypeCheckeds16_DependenceTokenVSi_SbtFSf_Tg5 : $@convention(method) (Int, Bool, @guaranteed Array<Float>) -> _DependenceToken
 
-sil [transparent] [thunk] @$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5 : $@convention(thin) (@in_guaranteed Float, @guaranteed Array<Float>, Int) -> @owned Array<Float>.DifferentiableView
+sil [_semantics "array.end_mutation"] [ossa] @$sSa12_endMutationyyFSf_Tg5 : $@convention(method) (@inout Array<Float>) -> ()
 
-sil [transparent] [thunk] @$s13TangentVector16_Differentiation14DifferentiablePQzSaA2bCRzlE0D4ViewVyAE_GIegno_AeHIegno_AbCRzlTRSf_TG5 : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @owned Array<Float>.DifferentiableView) -> @owned Array<Float>.DifferentiableView
+sil [_semantics "array.get_count"] [ossa] @$sSa5countSivgSf_Tg5 : $@convention(method) (@guaranteed Array<Float>) -> Int
+
+sil [_semantics "array.init"] [ossa] @$sSa9repeating5countSayxGx_SitcfCSf_Tt1g5 : $@convention(thin) (Float, Int) -> @owned Array<Float>
+
+sil [_semantics "array.make_mutable"] [ossa] @$sSa21_makeMutableAndUniqueyyFSf_Tg5 : $@convention(method) (@inout Array<Float>) -> ()
+
+sil [_semantics "array.check_subscript"] [ossa] @$sSa24_checkSubscript_mutatingyySiFSf_Tg5 : $@convention(method) (Int, @guaranteed Array<Float>) -> ()
+
+
+// specialized thunk for @escaping @callee_guaranteed (@in_guaranteed A.Differentiable.TangentVector) -> (@owned [A.Differentiable.TangentVector]<A>.DifferentiableView)
+sil shared [transparent] [thunk] [ossa] @$s13TangentVector16_Differentiation14DifferentiablePQzSaA2bCRzlE0D4ViewVyAE_GIegno_AeHIegno_AbCRzlTRSf_TG5 : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @owned Array<Float>.DifferentiableView) -> @owned Array<Float>.DifferentiableView {
+bb0(%0 : $*Float, %1 : @guaranteed $@callee_guaranteed (@in_guaranteed Float) -> @owned Array<Float>.DifferentiableView):
+  %2 = apply %1(%0) : $@callee_guaranteed (@in_guaranteed Float) -> @owned Array<Float>.DifferentiableView // user: %3
+  return %2                                       // id: %3
+} // end sil function '$s13TangentVector16_Differentiation14DifferentiablePQzSaA2bCRzlE0D4ViewVyAE_GIegno_AeHIegno_AbCRzlTRSf_TG5'
+
+
+// specialized pullback #1 <A>(_:) in Array<A>._vjpSubscript(index:)
+sil shared [ossa] @$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_Tg5 : $@convention(thin) (Float, @guaranteed Array<Float>, Int) -> @owned Array<Float>.DifferentiableView {
+bb0(%0 : $Float, %1 : @closureCapture @guaranteed $Array<Float>, %2 : @closureCapture $Int):
+  %3 = alloc_stack [var_decl] $Array<Float>       // users: %70, %12, %73, %71, %17, %13, %10
+  %4 = float_literal $Builtin.FPIEEE32, 0x0 // 0  // user: %8
+  // function_ref specialized Array.count.getter
+  %5 = function_ref @$sSa5countSivgSf_Tg5 : $@convention(method) (@guaranteed Array<Float>) -> Int // user: %6
+  %6 = apply %5(%1) : $@convention(method) (@guaranteed Array<Float>) -> Int // user: %9
+  // function_ref specialized Array.init(repeating:count:)
+  %7 = function_ref @$sSa9repeating5countSayxGx_SitcfCSf_Tt1g5 : $@convention(thin) (Float, Int) -> @owned Array<Float> // user: %9
+  %8 = struct $Float (%4)                         // user: %9
+  %9 = apply %7(%8, %6) : $@convention(thin) (Float, Int) -> @owned Array<Float> // user: %10
+  store %9 to [init] %3                           // id: %10
+  // function_ref specialized Array._makeMutableAndUnique()
+  %11 = function_ref @$sSa21_makeMutableAndUniqueyyFSf_Tg5 : $@convention(method) (@inout Array<Float>) -> () // user: %12
+  %12 = apply %11(%3) : $@convention(method) (@inout Array<Float>) -> ()
+  %13 = load_borrow %3                            // users: %15, %16
+  // function_ref specialized Array._checkSubscript_mutating(_:)
+  %14 = function_ref @$sSa24_checkSubscript_mutatingyySiFSf_Tg5 : $@convention(method) (Int, @guaranteed Array<Float>) -> () // user: %15
+  %15 = apply %14(%2, %13) : $@convention(method) (Int, @guaranteed Array<Float>) -> ()
+  end_borrow %13                                  // id: %16
+  %17 = struct_element_addr %3, #Array._buffer    // user: %18
+  %18 = struct_element_addr %17, #_ArrayBuffer._storage // user: %19
+  %19 = struct_element_addr %18, #_BridgeStorage.rawValue // user: %20
+  %20 = load_borrow %19                           // users: %60, %58, %83, %63, %41, %32
+  %32 = classify_bridge_object %20                // users: %34, %33
+  %33 = tuple_extract %32, 0                      // user: %35
+  %34 = tuple_extract %32, 1                      // user: %35
+  %35 = builtin "or_Int1"(%33, %34) : $Builtin.Int1 // user: %37
+  %36 = integer_literal $Builtin.Int1, 0          // user: %37
+  %37 = builtin "int_expect_Int1"(%35, %36) : $Builtin.Int1 // user: %38
+  cond_br %37, bb2, bb1                           // id: %38
+
+bb1:                                              // Preds: bb0
+  %39 = integer_literal $Builtin.Int64, 130       // user: %40
+  %41 = bridge_object_to_word %20 to $Builtin.Word // user: %42
+  %42 = builtin "zextOrBitCast_Word_Int64"(%41) : $Builtin.Int64 // user: %44
+  %43 = integer_literal $Builtin.Int64, 8070450532247928839 // user: %44
+  %44 = builtin "and_Int64"(%42, %43) : $Builtin.Int64 // user: %46
+  %45 = integer_literal $Builtin.Int64, 0         // user: %46
+  %46 = builtin "cmp_eq_Int64"(%44, %45) : $Builtin.Int1 // user: %48
+  %47 = integer_literal $Builtin.Int1, -1         // user: %48
+  %48 = builtin "int_expect_Int1"(%46, %47) : $Builtin.Int1 // user: %49
+  cond_br %48, bb3, bb4                           // id: %49
+
+bb2:                                              // Preds: bb0
+  end_borrow %20                                  // id: %58
+  unreachable                                     // id: %59
+
+bb3:                                              // Preds: bb1
+  %60 = unchecked_ref_cast %20 to $__ContiguousArrayStorageBase // user: %61
+  %61 = ref_tail_addr %60, $Float                 // user: %62
+  %62 = address_to_pointer %61 to $Builtin.RawPointer // user: %66
+  end_borrow %20                                  // id: %63
+  %64 = struct_extract %2, #Int._value            // user: %65
+  %65 = builtin "truncOrBitCast_Int64_Word"(%64) : $Builtin.Word // user: %67
+  %66 = pointer_to_address %62 to [strict] $*Float // user: %67
+  %67 = index_addr [stack_protection] %66, %65    // user: %68
+  store %0 to [trivial] %67                       // id: %68
+  // function_ref specialized Array._endMutation()
+  %69 = function_ref @$sSa12_endMutationyyFSf_Tg5 : $@convention(method) (@inout Array<Float>) -> () // user: %70
+  %70 = apply %69(%3) : $@convention(method) (@inout Array<Float>) -> ()
+  %71 = load [take] %3                            // user: %72
+  %72 = struct $Array<Float>.DifferentiableView (%71) // user: %74
+  dealloc_stack %3                                // id: %73
+  return %72                                      // id: %74
+
+bb4:                                              // Preds: bb1
+  end_borrow %20                                  // id: %83
+  unreachable                                     // id: %84
+} // end sil function '$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_Tg5'
+
+
+// specialized pullback #1 <A>(_:) in Array<A>._vjpSubscript(index:)
+sil [transparent] [thunk] [ossa] @$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5 : $@convention(thin) (@in_guaranteed Float, @guaranteed Array<Float>, Int) -> @owned Array<Float>.DifferentiableView {
+bb0(%0 : $*Float, %1 : @closureCapture @guaranteed $Array<Float>, %2 : @closureCapture $Int):
+  %3 = load [trivial] %0                          // user: %5
+  // function_ref specialized pullback #1 <A>(_:) in Array<A>._vjpSubscript(index:)
+  %4 = function_ref @$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_Tg5 : $@convention(thin) (Float, @guaranteed Array<Float>, Int) -> @owned Array<Float>.DifferentiableView // user: %5
+  %5 = apply %4(%3, %1, %2) : $@convention(thin) (Float, @guaranteed Array<Float>, Int) -> @owned Array<Float>.DifferentiableView // user: %6
+  return %5                                       // id: %6
+} // end sil function '$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5'
+
+
+// CHECK: // specialized thunk for @escaping @callee_guaranteed (@in_guaranteed A.Differentiable.TangentVector) -> (@owned [A.Differentiable.TangentVector]<A>.DifferentiableView)
+// CHECK: sil shared [transparent] [thunk] [ossa] @$s13TangentVector16_Differentiation14DifferentiablePQzSaA2bCRzlE0D4ViewVyAE_GIegno_AeHIegno_AbCRzlTRSf_TG507$sSa16_c4AA14d46RzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4e4Vy13ab31Qz_GAIc8pullbacktSi_tFAKL_yAjiaO7FSf_TG5SaySfGSiTf1nE_n : $@convention(thin) (@in_guaranteed Float, @owned Array<Float>, Int) -> @owned Array<Float>.DifferentiableView {
+// CHECK: bb0(%0 : $*Float, %1 : @owned $Array<Float>, %2 : $Int):
+// CHECK:   %3 = function_ref @$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5 : $@convention(thin) (@in_guaranteed Float, @guaranteed Array<Float>, Int) -> @owned Array<Float>.DifferentiableView // user: %4
+// CHECK:   %4 = apply %3(%0, %1, %2) : $@convention(thin) (@in_guaranteed Float, @guaranteed Array<Float>, Int) -> @owned Array<Float>.DifferentiableView // user: %6
+// CHECK:   destroy_value %1 : $Array<Float>                // id: %5
+// CHECK:   return %4 : $Array<Float>.DifferentiableView    // id: %6
+
+// CHECK: // specialized pullback of sum1(_:_:)
+// CHECK: sil private [signature_optimized_thunk] [heuristic_always_inline] [ossa] @$s4test4sum1ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyd8_GIegno_D10AEIegyo_TRSfSa01_F0AE0H0RzlE0hL0VySf_GIegno_Tf1nnc_n037$s13TangentVector16_Differentiation14h12PQzSaA2bCRzlj2D4lm3AE_n12_AeHIegno_AbX8TRSf_TG5SfAIIegno_Tf1nnE_n0ce1_fghi30E13_vjpSubscript5indexx5value_v7A2aBRzljkl4Vy13R48VectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5ACSiTf1nnE_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView) {
+// CHECK: bb0(%0 : $Float, %1 : @owned $@callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), %2 : @owned $Array<Float>, %3 : $Int):
+// CHECK:   %[[#D4:]] = float_literal $Builtin.FPIEEE32, 0x0
+// CHECK:   %[[#D5:]] = struct_extract %0 : $Float, #Float._value
+// CHECK:   %[[#D6:]] = builtin "fadd_FPIEEE32"(%[[#D4]] : $Builtin.FPIEEE32, %[[#D5]] : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %[[#D7:]] = struct $Float (%[[#D6]] : $Builtin.FPIEEE32)
+// CHECK:   %[[#D8:]] = alloc_stack $Float
+// CHECK:   store %[[#D7]] to [trivial] %[[#D8]] : $*Float
+// CHECK:   %[[#D10:]] = function_ref @$s13TangentVector16_Differentiation14DifferentiablePQzSaA2bCRzlE0D4ViewVyAE_GIegno_AeHIegno_AbCRzlTRSf_TG507$sSa16_c4AA14d46RzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4e4Vy13ab31Qz_GAIc8pullbacktSi_tFAKL_yAjiaO7FSf_TG5SaySfGSiTf1nE_n : $@convention(thin) (@in_guaranteed Float, @owned Array<Float>, Int) -> @owned Array<Float>.DifferentiableView
+// CHECK:   %[[#D11:]] = copy_value %2 : $Array<Float>
+// CHECK:   %[[#D12:]] = apply %[[#D10]](%[[#D8]], %[[#D11]], %3) : $@convention(thin) (@in_guaranteed Float, @owned Array<Float>, Int) -> @owned Array<Float>.DifferentiableView
+// CHECK:   dealloc_stack %[[#D8]] : $*Float
+// CHECK:   %[[#D14:]] = apply %1(%[[#D12]]) : $@callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
+// CHECK:   destroy_value %[[#D12]] : $Array<Float>.DifferentiableView
+// CHECK:   destroy_value %1 : $@callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
+// CHECK:   destroy_value %2 : $Array<Float>
+// CHECK:   return %[[#D14]] : $(Array<Float>.DifferentiableView, Array<Float>.DifferentiableView)
 
 // specialized pullback of sum1(_:_:)
 sil private [signature_optimized_thunk] [heuristic_always_inline] [ossa] @$s4test4sum1ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyd8_GIegno_D10AEIegyo_TRSfSa01_F0AE0H0RzlE0hL0VySf_GIegno_Tf1nnc_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned @callee_guaranteed (@in_guaranteed Float) -> @owned Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView) {
@@ -45,35 +171,12 @@ bb0(%0 : $Float, %1 : @owned $@callee_guaranteed (@guaranteed Array<Float>.Diffe
   return %13
 } // end sil function '$s4test4sum1ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyd8_GIegno_D10AEIegyo_TRSfSa01_F0AE0H0RzlE0hL0VySf_GIegno_Tf1nnc_n'
 
+
 // reverse-mode derivative of sum1(_:_:)
 sil hidden [ossa] @$s4test4sum1ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
 bb0(%0 : @guaranteed $Array<Float>, %1 : @guaranteed $Array<Float>):
-  // CHECK:         sil private [signature_optimized_thunk] [heuristic_always_inline] [ossa] @$s4test4sum1ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyd8_GIegno_D10AEIegyo_TRSfSa01_F0AE0H0RzlE0hL0VySf_GIegno_Tf1nnc_n0ce1_fghi39E13_vjpSubscript5indexx5value_SaA2aBRzljkl48Vy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaV7FSf_TG5ACSiTf1nnE_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView) {
-  // CHECK:         bb0(%0 : $Float, %1 : @owned $@callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), %2 : @owned $Array<Float>, %3 : $Int):
-  // CHECK:           %[[#D6:]] = function_ref @$s13TangentVector16_Differentiation14DifferentiablePQzSaA2bCRzlE0D4ViewVyAE_GIegno_AeHIegno_AbCRzlTRSf_TG5 : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @owned Array<Float>.DifferentiableView) -> @owned Array<Float>.DifferentiableView
-  // CHECK:           %[[#D4:]] = function_ref @$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5 : $@convention(thin) (@in_guaranteed Float, @guaranteed Array<Float>, Int) -> @owned Array<Float>.DifferentiableView
-  // CHECK:           %[[#D5:]] = partial_apply [callee_guaranteed] %[[#D4]](%2, %3) : $@convention(thin) (@in_guaranteed Float, @guaranteed Array<Float>, Int) -> @owned Array<Float>.DifferentiableView
-  // CHECK:           store %[[#D11:]] to [trivial] %[[#D12:]] : $*Float
-  // COMBINE:         %[[#D14:]] = apply %[[#D6]](%[[#D12]], %[[#D5]]) : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @owned Array<Float>.DifferentiableView) -> @owned Array<Float>.DifferentiableView
-  // COMBINE:         destroy_value %[[#D5]] : $@callee_guaranteed (@in_guaranteed Float) -> @owned Array<Float>.DifferentiableView
-  // CHECK:           %[[#D17:]] = apply %1(%[[#D14]]) : $@callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
-  // CHECK:           return %[[#D17]] : $(Array<Float>.DifferentiableView, Array<Float>.DifferentiableView)
-
   // CHECK:         sil hidden [ossa] @$s4test4sum1ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
   // CHECK:           (%[[#]], %[[#E42:]]) = destructure_tuple %[[#]] : $(Array<Float>, @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView))
-  // CHECK:         bb8:
-
-
-  // COMBINE-NOT:     function_ref @$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5
-  // COMBINE-NOT:     partial_apply
-  // COMBINE-NOT:     function_ref @$s13TangentVector16_Differentiation14DifferentiablePQzSaA2bCRzlE0D4ViewVyAE_GIegno_AeHIegno_AbCRzlTRSf_TG5
-  // COMBINE-NOT:     partial_apply
-  // COMBINE-NOT:     function_ref @$s4test4sum1ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyd8_GIegno_D10AEIegyo_TRSfSa01_F0AE0H0RzlE0hL0VySf_GIegno_Tf1nnc_n
-
-  // CHECK:           %[[#E52:]] = function_ref @$s4test4sum1ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyd8_GIegno_D10AEIegyo_TRSfSa01_F0AE0H0RzlE0hL0VySf_GIegno_Tf1nnc_n0ce1_fghi39E13_vjpSubscript5indexx5value_SaA2aBRzljkl48Vy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaV7FSf_TG5ACSiTf1nnE_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
-  // CHECK:           %[[#E53:]] = partial_apply [callee_guaranteed] %[[#E52]](%[[#E42]], %[[#]], %[[#]]) : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
-  // CHECK:           %[[#E55:]] = tuple (%[[#]] : $Float, %[[#E53]] : $@callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView))
-  // CHECK:           return %[[#E55]]
 
   %4 = alloc_stack [var_decl] $Array<Float>
   %5 = copy_value %0
@@ -174,6 +277,19 @@ bb7:
   %118 = builtin "cmp_slt_Int64"(%21, %117) : $Builtin.Int1
   %119 = builtin "int_expect_Int1"(%118, %23) : $Builtin.Int1
   cond_br %119, bb8, bb5
+
+  // CHECK:         bb8:
+
+  // COMBINE-NOT:     function_ref @$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5
+  // COMBINE-NOT:     partial_apply
+  // COMBINE-NOT:     function_ref @$s13TangentVector16_Differentiation14DifferentiablePQzSaA2bCRzlE0D4ViewVyAE_GIegno_AeHIegno_AbCRzlTRSf_TG5
+  // COMBINE-NOT:     partial_apply
+  // COMBINE-NOT:     function_ref @$s4test4sum1ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyd8_GIegno_D10AEIegyo_TRSfSa01_F0AE0H0RzlE0hL0VySf_GIegno_Tf1nnc_n
+
+  // CHECK:           %[[#E52:]] = function_ref @$s4test4sum1ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyd8_GIegno_D10AEIegyo_TRSfSa01_F0AE0H0RzlE0hL0VySf_GIegno_Tf1nnc_n037$s13TangentVector16_Differentiation14h12PQzSaA2bCRzlj2D4lm3AE_n12_AeHIegno_AbX8TRSf_TG5SfAIIegno_Tf1nnE_n0ce1_fghi30E13_vjpSubscript5indexx5value_v7A2aBRzljkl4Vy13R48VectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_TG5ACSiTf1nnE_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
+  // CHECK:           %[[#E53:]] = partial_apply [callee_guaranteed] %[[#E52]](%[[#E42]], %[[#]], %[[#]]) : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
+  // CHECK:           %[[#E55:]] = tuple (%[[#]] : $Float, %[[#E53]] : $@callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView))
+  // CHECK:           return %[[#E55]]
 
 bb8:
   %122 = ref_tail_addr [immutable] %75, $Float

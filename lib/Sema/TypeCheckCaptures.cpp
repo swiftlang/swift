@@ -20,17 +20,20 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Initializer.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/Casting.h"
 using namespace swift;
 
 namespace {
@@ -58,24 +61,25 @@ class FindCapturedVars : public ASTWalker {
   SmallVector<CapturedType, 4> CapturedTypes;
   llvm::SmallDenseMap<CanType, unsigned, 4> CapturedTypeEntryNumber;
 
+  /// The values that have consuming uses in the closure.
+  llvm::SmallPtrSet<ValueDecl *, 1> ConsumedValues;
+
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
   DynamicSelfType *DynamicSelf = nullptr;
   OpaqueValueExpr *OpaqueValue = nullptr;
   SourceLoc CaptureLoc;
   DeclContext *CurDC;
-  bool NoEscape, ObjC;
+  bool NoEscape, ObjC, CalledOnce;
   bool HasGenericParamCaptures;
   bool HasUsesOfCurrentIsolation = false;
 
 public:
-  FindCapturedVars(SourceLoc CaptureLoc,
-                   DeclContext *CurDC,
-                   bool NoEscape,
-                   bool ObjC,
-                   bool IsGenericFunction)
+  FindCapturedVars(SourceLoc CaptureLoc, DeclContext *CurDC, bool NoEscape,
+                   bool ObjC, bool IsGenericFunction, bool IsCalledOnce)
       : Context(CurDC->getASTContext()), CaptureLoc(CaptureLoc), CurDC(CurDC),
-        NoEscape(NoEscape), ObjC(ObjC), HasGenericParamCaptures(IsGenericFunction) {}
+        NoEscape(NoEscape), ObjC(ObjC), CalledOnce(IsCalledOnce),
+        HasGenericParamCaptures(IsGenericFunction) {}
 
   CaptureInfo getCaptureInfo() const {
     DynamicSelfType *dynamicSelfToRecord = nullptr;
@@ -249,6 +253,9 @@ public:
       // then the result is escaping.
       auto existing = Captures[entryNumber-1];
       unsigned flags = existing.getFlags() & capture.getFlags();
+      // One consuming use makes the capture consuming.
+      if (existing.isConsumed() || capture.isConsumed())
+        flags |= CapturedValue::IsConsumed;
       capture = CapturedValue(VD, flags, existing.getLoc());
       Captures[entryNumber-1] = capture;
     }
@@ -406,11 +413,17 @@ public:
                                       : AccessKind::Read,
               CurDC->getParentModule(), CurDC->getResilienceExpansion()))
         Flags |= CapturedValue::IsDirect;
+
+      if (CalledOnce && var->isSendingCapture())
+        Flags |= CapturedValue::IsSending;
     }
 
     // If the closure is noescape, then we can capture the decl as noescape.
     if (NoEscape)
       Flags |= CapturedValue::IsNoEscape;
+
+    if (CalledOnce && ConsumedValues.count(D))
+      Flags |= CapturedValue::IsConsumed;
 
     addCapture(CapturedValue(D, Flags, DRE->getStartLoc()));
 
@@ -454,6 +467,13 @@ public:
       if (!NoEscape)
         Flags &= ~CapturedValue::IsNoEscape;
 
+      if (!CalledOnce) {
+        // Regular closures cannot consume their captures.
+        Flags &= ~CapturedValue::IsConsumed;
+        // ... or have `sending` captures.
+        Flags &= ~CapturedValue::IsSending;
+      }
+
       addCapture(capture.mergeFlags(Flags));
     }
 
@@ -493,6 +513,18 @@ public:
     // the local type itself.
     if (isa<NominalTypeDecl>(D))
       return Action::SkipNode();
+
+    if (CalledOnce) {
+      if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+        auto *var = PBD->getSingleVar();
+        if (var && var->hasStorage()) {
+          if (auto *init = var->getParentExecutableInitializer()) {
+            if (auto *V = getReferencedNonCopyableValue(init))
+              recordConsumingUse(V);
+          }
+        }
+      }
+    }
 
     return Action::Continue();
   }
@@ -651,10 +683,121 @@ public:
     return true;
   }
 
+  void recordConsumingUse(ValueDecl *V) {
+    ASSERT(V);
+    ConsumedValues.insert(V);
+  }
+
+  ValueDecl *getReferencedNonCopyableValue(Expr *E) {
+    if (!E)
+      return nullptr;
+
+    E = E->getSemanticsProvidingExpr();
+    if (auto *L = dyn_cast<LoadExpr>(E))
+      return getReferencedNonCopyableValue(L->getSubExpr());
+
+    if (auto *erasure = dyn_cast<ErasureExpr>(E))
+      return getReferencedNonCopyableValue(erasure->getSubExpr());
+
+    if (auto *FCE = dyn_cast<FunctionConversionExpr>(E))
+      return getReferencedNonCopyableValue(FCE->getSubExpr());
+
+    auto *DRE = dyn_cast<DeclRefExpr>(E);
+    if (!DRE)
+      return nullptr;
+
+    auto ref = DRE->getDeclRef();
+    if (!ref)
+      return nullptr;
+
+    auto type = DRE->getType()->getWithoutSpecifierType();
+    return type->isNoncopyable() ? ref.getDecl() : nullptr;
+  }
+
+  /// Check whether the given expression represents a consuming use of some
+  /// non-Copyable value and record the value as "consumed" by the closure.
+  ///
+  /// Consuming uses of non-Copyable values include - use of `consume` operator,
+  /// appearing on right-hand side of an assignment, passing it to `consuming`
+  /// parameter, calling a `consuming` method. For more details see SE-0390.
+  void recordConsumedValues(Expr *E) {
+    // `consume x`
+    if (auto *consume = dyn_cast<ConsumeExpr>(E)) {
+      if (auto *V = getReferencedNonCopyableValue(consume->getSubExpr()))
+        recordConsumingUse(V);
+    }
+
+    // assignments - `... = x`
+    if (auto *assignment = dyn_cast<AssignExpr>(E)) {
+      if (auto *V = getReferencedNonCopyableValue(assignment->getSrc()))
+        recordConsumingUse(V);
+    }
+
+    // consuming get/set
+    if (auto *memberRef = dyn_cast<MemberRefExpr>(E)) {
+      auto member = memberRef->getMember();
+      auto *property = dyn_cast<VarDecl>(member.getDecl());
+      if (property && !property->hasStorage()) {
+        auto *assignment = dyn_cast_or_null<AssignExpr>(Parent.getAsExpr());
+        auto accessorKind = assignment && assignment->getDest() == memberRef
+                                ? AccessorKind::Set
+                                : AccessorKind::Get;
+
+        auto *accessor = property->getAccessor(accessorKind);
+        if (accessor->getAttrs().hasAttribute<ConsumingAttr>()) {
+          if (auto *base = getReferencedNonCopyableValue(memberRef->getBase()))
+            recordConsumingUse(base);
+        }
+      }
+    }
+
+    // Casts are consuming operations.
+    if (auto *cast = dyn_cast<ExplicitCastExpr>(E)) {
+      if (auto *V = getReferencedNonCopyableValue(cast->getSubExpr()))
+        recordConsumingUse(V);
+    }
+
+    // - calling `@called(once)` value
+    // - passing a value to a `consuming` parameter
+    // - calling a `consuming` method ("self" is consumed).
+    if (auto *callSite = dyn_cast<ApplyExpr>(E)) {
+      auto fnTy = callSite->getFn()->getType()->castTo<FunctionType>();
+
+      bool isInitializer = false;
+      if (auto *callee =
+              callSite->getCalledValue(/*skipFunctionConversions=*/true)) {
+        // Calling a `@called(once)` value is a consuming operation.
+        if (fnTy->isCalledOnce())
+          recordConsumingUse(callee);
+
+        isInitializer = isa<ConstructorDecl>(callee);
+      }
+
+      auto *arguments = callSite->getArgs();
+      for (unsigned i : indices(fnTy->getParams())) {
+        const auto &param = fnTy->getParams()[i];
+
+        // Parameter either has to be explicitly `consuming` or,
+        // if this is a call to initializer - not explicitly `borrowing`.
+        if (!(param.isOwned() ||
+              (isInitializer &&
+               param.getParameterFlags().getOwnershipSpecifier() !=
+                   ParamSpecifier::Borrowing)))
+          continue;
+
+        if (auto *V = getReferencedNonCopyableValue(arguments->getExpr(i)))
+          recordConsumingUse(V);
+      }
+    }
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (usesTypeMetadataOfFormalType(E)) {
       checkType(E->getType(), E->getLoc());
     }
+
+    if (CalledOnce)
+      recordConsumedValues(E);
 
     // Some kinds of expression don't really evaluate their subexpression,
     // so we don't need to traverse.
@@ -765,6 +908,15 @@ public:
       }
     }
 
+    // `return` of a non-Copyable value is a consuming use.
+    if (CalledOnce && isa<ReturnStmt>(S)) {
+      auto *returnStmt = cast<ReturnStmt>(S);
+      if (returnStmt->hasResult()) {
+        if (auto *V = getReferencedNonCopyableValue(returnStmt->getResult()))
+          recordConsumingUse(V);
+      }
+    }
+
     return Action::Continue(S);
   }
 
@@ -823,9 +975,11 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
   if (type->is<ErrorType>())
     return CaptureInfo::empty();
 
-  bool isNoEscape = type->castTo<AnyFunctionType>()->isNoEscape();
-  FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape,
-                          AFD->isObjC(), AFD->hasGenericParamList());
+  auto fnType = type->castTo<AnyFunctionType>();
+  bool isNoEscape = fnType->isNoEscape();
+  bool isCalledOnce = fnType->isCalledOnce();
+  FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape, AFD->isObjC(),
+                          AFD->hasGenericParamList(), isCalledOnce);
 
   if (auto *body = AFD->getTypecheckedBody())
     body->walk(finder);
@@ -888,9 +1042,11 @@ void TypeChecker::computeCaptures(AbstractClosureExpr *ACE) {
     return;
   }
 
-  bool isNoEscape = type->castTo<FunctionType>()->isNoEscape();
+  auto fnType = type->castTo<FunctionType>();
+  bool isNoEscape = fnType->isNoEscape();
+  bool isCalledOnce = fnType->isCalledOnce();
   FindCapturedVars finder(ACE->getLoc(), ACE, isNoEscape,
-                          /*isObjC=*/false, /*isGeneric=*/false);
+                          /*isObjC=*/false, /*isGeneric=*/false, isCalledOnce);
   body->walk(finder);
 
   finder.checkType(type, ACE->getLoc());
@@ -910,11 +1066,15 @@ CaptureInfo ParamCaptureInfoRequest::evaluate(Evaluator &evaluator,
   // A generic function always captures outer generic parameters.
   bool isGeneric = DC->isInnermostContextGeneric();
 
-  FindCapturedVars finder(E->getLoc(),
-                          DC,
+  bool isCalledOnce = false;
+  if (auto *closure = dyn_cast<AbstractClosureExpr>(E)) {
+    isCalledOnce = closure->isCalledOnce();
+  }
+
+  FindCapturedVars finder(E->getLoc(), DC,
                           /*isNoEscape=*/false,
                           /*isObjC=*/false,
-                          /*IsGeneric*/isGeneric);
+                          /*IsGeneric*/ isGeneric, isCalledOnce);
   E->walk(finder);
 
   if (!DC->getParent()->isLocalContext() &&
@@ -942,7 +1102,8 @@ CaptureInfo PatternBindingCaptureInfoRequest::evaluate(Evaluator &evaluator,
   FindCapturedVars finder(init->getLoc(), DC,
                           /*NoEscape=*/false,
                           /*ObjC=*/false,
-                          /*IsGenericFunction*/ false);
+                          /*IsGenericFunction*/ false,
+                          /*IsCalledOnce=*/false);
   init->walk(finder);
 
   auto &ctx = DC->getASTContext();

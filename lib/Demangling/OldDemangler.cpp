@@ -2406,6 +2406,9 @@ NodePointer
 swift::Demangle::demangleOldSymbolAsNode(StringRef MangledName,
                                          NodeFactory &Factory) {
   OldDemangler demangler(MangledName, Factory);
-  return demangler.demangleTopLevel();
+  NodePointer result = demangler.demangleTopLevel();
+  if (Factory.isTooComplex())
+    return nullptr;
+  return result;
 }
 

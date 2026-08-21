@@ -1029,6 +1029,34 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability
+  TaskCancellationScopeAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getTaskCancellationScopeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  TaskDeadlineAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getTaskDeadlineAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  CancellationHandlerWithReasonAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getCancellationHandlerWithReasonAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability CoroutineAccessorsAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getCoroutineAccessorsAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
@@ -2353,7 +2381,8 @@ IRGenModule *IRGenerator::getGenModule(SourceFile *SF) {
    // to a function imported from clang module, so it doesn't have a mapping
    // in GenModule. The contents are @_alwaysEmitIntoClient, so for all intents
    // and purposes they belong to the primary module.
-   ASSERT(SF->getParentModule()->findUnderlyingClangModule());
+   const ModuleDecl *M = SF->getParentModule();
+   ASSERT(M->findUnderlyingClangModule() || M->isClangBridgingHeaderImportModule());
    return getPrimaryIGM();
  }
 

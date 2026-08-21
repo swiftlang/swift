@@ -308,6 +308,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_sendable);
   inputArgs.AddLastArg(arguments, options::OPT_check_api_availability_only);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_weak_link_span_compatibility_lib);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);

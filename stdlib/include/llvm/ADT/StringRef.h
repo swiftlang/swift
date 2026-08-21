@@ -18,7 +18,13 @@
 #include <cstddef>
 #include <cstring>
 #include <limits>
+// std::string is not available in freestanding mode with some standard
+// library implementations (e.g. libstdc++), so the std::string interop
+// below is unavailable there too; it's only used by the non-embedded
+// runtime.
+#if __STDC_HOSTED__
 #include <string>
+#endif
 #if __cplusplus > 201402L
 #include <string_view>
 #endif
@@ -111,9 +117,11 @@ namespace llvm {
     /*implicit*/ constexpr StringRef(const char *data, size_t length)
         : Data(data), Length(length) {}
 
+#if __STDC_HOSTED__
     /// Construct a string ref from an std::string.
     /*implicit*/ StringRef(const std::string &Str)
       : Data(Str.data()), Length(Str.length()) {}
+#endif
 
 #if __cplusplus > 201402L
     /// Construct a string ref from an std::string_view.
@@ -218,12 +226,14 @@ namespace llvm {
     [[nodiscard]]
     int compare_numeric(StringRef RHS) const;
 
+#if __STDC_HOSTED__
     /// str - Get the contents as an std::string.
     [[nodiscard]]
     std::string str() const {
       if (!Data) return std::string();
       return std::string(Data, Length);
     }
+#endif
 
     /// @}
     /// @name Operator Overloads
@@ -235,6 +245,7 @@ namespace llvm {
       return Data[Index];
     }
 
+#if __STDC_HOSTED__
     /// Disallow accidental assignment from a temporary std::string.
     ///
     /// The declaration here is extra complicated so that `stringRef = {}`
@@ -242,12 +253,15 @@ namespace llvm {
     template <typename T>
     std::enable_if_t<std::is_same<T, std::string>::value, StringRef> &
     operator=(T &&Str) = delete;
+#endif
 
     /// @}
     /// @name Type Conversions
     /// @{
 
+#if __STDC_HOSTED__
     explicit operator std::string() const { return str(); }
+#endif
 
 #if __cplusplus > 201402L
     operator std::string_view() const {
@@ -543,6 +557,7 @@ namespace llvm {
     /// @name String Operations
     /// @{
 
+#if __STDC_HOSTED__
     // Convert the given ASCII string to lowercase.
     [[nodiscard]]
     std::string lower() const;
@@ -550,6 +565,7 @@ namespace llvm {
     /// Convert the given ASCII string to uppercase.
     [[nodiscard]]
     std::string upper() const;
+#endif
 
     /// @}
     /// @name Substring Operations
@@ -895,9 +911,11 @@ namespace llvm {
     return LHS.compare(RHS) != -1;
   }
 
+#if __STDC_HOSTED__
   inline std::string &operator+=(std::string &buffer, StringRef string) {
     return buffer.append(string.data(), string.size());
   }
+#endif
 
   /// @}
 

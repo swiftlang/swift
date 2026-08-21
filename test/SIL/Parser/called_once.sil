@@ -1,0 +1,63 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all=true %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil [ossa] @take_called_once : $@convention(thin) (@owned @called(once) @callee_guaranteed () -> ()) -> () {
+// CHECK: bb0(%0 : @owned $@called(once) @callee_guaranteed () -> ()):
+// CHECK:   destroy_value %0 : $@called(once) @callee_guaranteed () -> ()
+// CHECK: } // end sil function 'take_called_once'
+sil [ossa] @take_called_once : $@convention(thin) (@owned @called(once) @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @owned $@called(once) @callee_guaranteed () -> ()):
+  destroy_value %0 : $@called(once) @callee_guaranteed () -> ()
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @produce_called_once : $@convention(thin) () -> @owned @called(once) @callee_guaranteed () -> () {
+// CHECK:   [[F:%.*]] = function_ref @thin_callee : $@convention(thin) () -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]]() : $@convention(thin) () -> ()
+// CHECK:   [[R:%.*]] = convert_function [[PA]] : $@callee_guaranteed () -> () to $@called(once) @callee_guaranteed () -> ()
+// CHECK:   return [[R]] : $@called(once) @callee_guaranteed () -> ()
+// CHECK: } // end sil function 'produce_called_once'
+sil [ossa] @produce_called_once : $@convention(thin) () -> @owned @called(once) @callee_guaranteed () -> () {
+bb0:
+  %f = function_ref @thin_callee : $@convention(thin) () -> ()
+  %pa = partial_apply [callee_guaranteed] %f() : $@convention(thin) () -> ()
+  %r = convert_function %pa : $@callee_guaranteed () -> () to $@called(once) @callee_guaranteed () -> ()
+  return %r : $@called(once) @callee_guaranteed () -> ()
+}
+
+// `partial_apply` can directly produce a `@called(once)` result via the
+// `[called_once]` attribute, without a separate `convert_function`.
+// CHECK-LABEL: sil [ossa] @produce_called_once_directly : $@convention(thin) () -> @owned @called(once) @callee_guaranteed () -> () {
+// CHECK:   [[F:%.*]] = function_ref @thin_callee : $@convention(thin) () -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [called_once] [[F]]() : $@convention(thin) () -> ()
+// CHECK:   return [[PA]] : $@called(once) @callee_guaranteed () -> ()
+// CHECK: } // end sil function 'produce_called_once_directly'
+sil [ossa] @produce_called_once_directly : $@convention(thin) () -> @owned @called(once) @callee_guaranteed () -> () {
+bb0:
+  %f = function_ref @thin_callee : $@convention(thin) () -> ()
+  %pa = partial_apply [callee_guaranteed] [called_once] %f() : $@convention(thin) () -> ()
+  return %pa : $@called(once) @callee_guaranteed () -> ()
+}
+
+// The same attribute applied to a `partial_apply` that captures an argument,
+// mirroring how SILGen forms a `@called(once)` closure with a capture.
+// CHECK-LABEL: sil [ossa] @produce_called_once_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> @owned @called(once) @callee_owned () -> () {
+// CHECK: bb0([[ARG:%.*]] : @owned $Builtin.NativeObject):
+// CHECK:   [[F:%.*]] = function_ref @thin_callee_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [called_once] [[F]]([[ARG]]) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+// CHECK:   return [[PA]] : $@called(once) @callee_owned () -> ()
+// CHECK: } // end sil function 'produce_called_once_with_capture'
+sil [ossa] @produce_called_once_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> @owned @called(once) @callee_owned () -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %f = function_ref @thin_callee_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %pa = partial_apply [called_once] %f(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  return %pa : $@called(once) @callee_owned () -> ()
+}
+
+sil @thin_callee : $@convention(thin) () -> ()
+sil @thin_callee_with_capture : $@convention(thin) (@owned Builtin.NativeObject) -> ()

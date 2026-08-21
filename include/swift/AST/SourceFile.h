@@ -256,6 +256,10 @@ private:
   /// Stores all the \c #if source range info in this file.
   mutable IfConfigClauseRangesData IfConfigClauseRanges;
 
+  /// Set when the parser has encountered a `@daiagnose` attribute
+  /// anywhere in this file.
+  bool HasWarningControlAttr = false;
+
   friend class HasImportsMatchingFlagRequest;
 
   /// Indicates which import options have valid caches. Storage for
@@ -317,6 +321,14 @@ public:
   /// Retrieve the \c ExportedSourceFile instance produced by ASTGen, which
   /// includes the SourceFileSyntax node corresponding to this source file.
   void *getExportedSourceFile() const;
+
+  /// Whether the parser saw a `@diagnose` attr in this file.
+  ///
+  /// Used to skip generation of a SwiftWarningControl region tree
+  /// when the source file is known not to contain any such syntactic
+  /// controls at all.
+  bool hasWarningControlAttr() const { return HasWarningControlAttr; }
+  void setHasWarningControlAttr() { HasWarningControlAttr = true; }
 
   /// Defer type checking of `AFD` to the end of `Sema`
   void addDelayedFunction(AbstractFunctionDecl *AFD);

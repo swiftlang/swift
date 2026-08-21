@@ -10,10 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 // The emission of runtime metadata for inverted requirements needs a 5.8+
-// target, so build the test targeting 5.8 and mark the tests as requiring 5.8.
+// target, so build the test targeting 5.8 and only run it against a 5.8+
+// runtime.
 // RUN: %target-run-simple-swift(-target %target-swift-5.8-abi-triple -enable-experimental-feature Lifetimes)
 // REQUIRES: executable_test
+// REQUIRES: stdlib_5_8_runtime
 // REQUIRES: swift_feature_Lifetimes
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 
@@ -63,7 +66,7 @@ extension InlineArray where Element: Hashable & ~Copyable {
   }
 }
 
-NoncopyableHashableTests.test("hashing noncopyables").require(.stdlib_5_8).code {
+NoncopyableHashableTests.test("hashing noncopyables") {
   let a = Noncopyable(wrapping: 1)
   let b = Noncopyable(wrapping: 2)
   let c = Noncopyable(wrapping: 1)
@@ -89,7 +92,7 @@ NoncopyableHashableTests.test("hashing noncopyables").require(.stdlib_5_8).code 
   
 }
 
-NoncopyableHashableTests.test("hashing nonescapables").require(.stdlib_5_8).code {
+NoncopyableHashableTests.test("hashing nonescapables") {
   let nc1 = Noncopyable<Nonescapable>(wrapping: .init(wrapped: 1))
   let nc2 = Noncopyable<Nonescapable>(wrapping: .init(wrapped: 1))
   let nc3 = Noncopyable<Nonescapable>(wrapping: .init(wrapped: 2))

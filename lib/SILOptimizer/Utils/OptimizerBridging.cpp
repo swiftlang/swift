@@ -181,6 +181,20 @@ bool BridgedPassContext::hasClassFixedMetadataLayout(BridgedDeclObj classDecl) c
   return igm->getClassMetadataStrategy(classDecl.getAs<swift::ClassDecl>()) == swift::irgen::ClassMetadataStrategy::Fixed;
 }
 
+bool BridgedPassContext::fitsInOpaqueExistentialPayload(BridgedType type) const {
+  SILPassManager *pm = invocation->getPassManager();
+  auto *igm = pm->getIRGenModule();
+  if (!igm)
+    return false;
+
+  auto &valueTI = igm->getTypeInfo(type.unbridged());
+  if (auto *fixedTI = dyn_cast<irgen::FixedTypeInfo>(&valueTI)) {
+    return fixedTI->getFixedPacking(*igm) == irgen::FixedPacking::OffsetZero;
+  }
+
+  return false;
+}
+
 OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
                                                                BridgedSubstitutionMap substitutions,
                                                                bool convertIndirectToDirect,
@@ -222,6 +236,11 @@ bool BridgedPassContext::specializeClassMethodInst(BridgedInstruction cm) const 
 
 bool BridgedPassContext::specializeWitnessMethodInst(BridgedInstruction wm) const {
   return ::specializeWitnessMethodInst(wm.getAs<WitnessMethodInst>());
+}
+
+bool BridgedPassContext::specializeKeyPathInst(BridgedInstruction kpi) const {
+  return ::specializeKeyPathInst(kpi.getAs<KeyPathInst>(),
+                                 invocation->getTransform());
 }
 
 bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const {
@@ -478,6 +497,10 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   
   for (auto &Attr : original->getSemanticsAttrs())
     specializedApplySiteCallee->addSemanticsAttr(Attr);
+
+  // A specialization of a function goes into the same section as the original
+  // function.
+  specializedApplySiteCallee->setSection(original->section());
 
   return {specializedApplySiteCallee};
 }

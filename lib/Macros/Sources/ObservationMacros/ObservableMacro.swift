@@ -73,7 +73,7 @@ public struct ObservableMacro {
     let memberGeneric = context.makeUniqueName("Member")
     return
       """
-       private nonisolated func shouldNotifyObservers<\(memberGeneric)>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { true }
+       private nonisolated final func shouldNotifyObservers<\(memberGeneric)>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { true }
       """
   }
   
@@ -81,7 +81,7 @@ public struct ObservableMacro {
     let memberGeneric = context.makeUniqueName("Member")
     return
       """
-      private nonisolated func shouldNotifyObservers<\(memberGeneric): Equatable>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { lhs != rhs }
+      private nonisolated final func shouldNotifyObservers<\(memberGeneric): Equatable>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { lhs != rhs }
       """
   }
   
@@ -89,7 +89,7 @@ public struct ObservableMacro {
     let memberGeneric = context.makeUniqueName("Member")
     return
       """
-       private nonisolated func shouldNotifyObservers<\(memberGeneric): AnyObject>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { lhs !== rhs }
+       private nonisolated final func shouldNotifyObservers<\(memberGeneric): AnyObject>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { lhs !== rhs }
       """
   }
 
@@ -97,7 +97,7 @@ public struct ObservableMacro {
     let memberGeneric = context.makeUniqueName("Member")
     return
       """
-      private nonisolated func shouldNotifyObservers<\(memberGeneric): Equatable & AnyObject>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { lhs != rhs }
+      private nonisolated final func shouldNotifyObservers<\(memberGeneric): Equatable & AnyObject>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { lhs != rhs }
       """
   }
 

@@ -47,6 +47,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/bit.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -144,6 +145,11 @@ enum : unsigned {
 enum : unsigned {
   NumNonexhaustiveModeBits = countBitsUsed(
       static_cast<unsigned>(NonexhaustiveMode::Last_NonexhaustiveMode))
+};
+
+enum : unsigned {
+  NumExecutionSemanticsBits = countBitsUsed(
+      static_cast<unsigned>(ExecutionSemantics::Last_ExecutionSemantics))
 };
 
 enum : unsigned { NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1) };
@@ -295,6 +301,10 @@ protected:
 
     SWIFT_INLINE_BITFIELD(COMAttr, DeclAttribute, 3,
       threading : 3
+    );
+
+    SWIFT_INLINE_BITFIELD(CalledAttr, DeclAttribute, NumExecutionSemanticsBits,
+      Semantics : NumExecutionSemanticsBits
     );
   } Bits;
   // clang-format on
@@ -725,15 +735,18 @@ public:
 /// Defines the @section attribute.
 class SectionAttr : public DeclAttribute {
 public:
-  SectionAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+  SectionAttr(std::optional<StringRef> Name, SourceLoc AtLoc, SourceRange Range,
+              bool Implicit)
       : DeclAttribute(DeclAttrKind::Section, AtLoc, Range, Implicit),
         Name(Name) {}
 
-  SectionAttr(StringRef Name, bool Implicit)
+  SectionAttr(std::optional<StringRef> Name, bool Implicit)
     : SectionAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
 
-  /// The section name.
-  const StringRef Name;
+  /// The section name, or std::nullopt if this represents @section(default).
+  const std::optional<StringRef> Name;
+
+  bool isDefault() const { return !Name.has_value(); }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Section;
@@ -1602,6 +1615,37 @@ public:
 
   bool isEquivalent(const ExclusivityAttr *other, Decl *attachedTo) const {
     return getMode() == other->getMode();
+  }
+};
+
+/// Represents the '@unsafe' attribute, which indicates that an entity is
+/// not memory-safe.
+class UnsafeAttr : public DeclAttribute {
+  /// Whether uses must be acknowledged with 'unsafe' even when strict memory
+  /// safety checking is disabled, i.e. whether this is '@unsafe(always)'.
+  bool always;
+
+public:
+  UnsafeAttr(SourceLoc atLoc, SourceRange range, bool always,
+             bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Unsafe, atLoc, range, implicit),
+        always(always) {}
+
+  UnsafeAttr(bool implicit = false)
+      : UnsafeAttr(SourceLoc(), SourceRange(), /*always=*/false, implicit) {}
+
+  bool isAlways() const { return always; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Unsafe;
+  }
+
+  UnsafeAttr *clone(ASTContext &ctx) const {
+    return new (ctx) UnsafeAttr(AtLoc, Range, isAlways(), isImplicit());
+  }
+
+  bool isEquivalent(const UnsafeAttr *other, Decl *attachedTo) const {
+    return isAlways() == other->isAlways();
   }
 };
 
@@ -2763,26 +2807,28 @@ class DerivativeAttr final
   TypeRepr *BaseTypeRepr;
   /// The original function name.
   DeclNameRefWithLoc OriginalFunctionName;
-  /// The original function.
+  /// The list of original functions.
   ///
   /// The states are:
   /// - nullptr:
   ///   The original function is unknown. The typechecker is responsible for
   ///   eventually resolving it.
-  /// - AbstractFunctionDecl:
-  ///   The original function is known to be this `AbstractFunctionDecl`.
-  /// - LazyMemberLoader:
-  ///   This `LazyMemberLoader` knows how to resolve the original function.
-  ///   `ResolverContextData` is an additional piece of data that the
-  ///   `LazyMemberLoader` needs.
+  /// - AbstractFunctionDecl*:
+  ///   Array of original functions that are known to be `AbstractFunctionDecl`.
+  /// - uint64_t:
+  ///   Array of decl ids that `LazyMemberLoader` needs.
+  /// Array sizes are stores in `NumOriginalFunctions`
   // TODO(TF-1235): Making `DerivativeAttr` immutable will simplify this by
   // removing the `AbstractFunctionDecl` state.
-  llvm::PointerUnion<AbstractFunctionDecl *, LazyMemberLoader *> OriginalFunction;
-  /// Data representing the original function declaration. See doc comment for
-  /// `OriginalFunction`.
-  uint64_t ResolverContextData = 0;
+  llvm::PointerUnion<AbstractFunctionDecl **, uint64_t *> OriginalFunctions =
+      nullptr;
+  /// Resolver used to resolve declarations from decl IDs stored in
+  /// OriginalFunctions.
+  LazyMemberLoader *Resolver = nullptr;
+  //  The number of original functions derivative corresponds to.
+  unsigned NumOriginalFunctions : 16;
   /// The number of parsed differentiability parameters specified in 'wrt:'.
-  unsigned NumParsedParameters = 0;
+  unsigned NumParsedParameters : 16;
   /// The differentiability parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
   /// The derivative function kind (JVP or VJP), resolved by the type checker.
@@ -2815,10 +2861,17 @@ public:
   DeclNameRefWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
   }
-  AbstractFunctionDecl *getOriginalFunction(ASTContext &context) const;
-  void setOriginalFunction(AbstractFunctionDecl *decl);
-  void setOriginalFunctionResolver(LazyMemberLoader *resolver,
-                                   uint64_t resolverContextData);
+  /// The resolved original functions for this derivative.
+  /// Note that there might be multiple original functions when
+  /// derivative is registered for a protocol requirement and there
+  /// is a default implementation.
+  TinyPtrVector<AbstractFunctionDecl *>
+  getOriginalFunctions(ASTContext &context) const;
+  void setOriginalFunctions(ASTContext &context,
+                            ArrayRef<AbstractFunctionDecl *> decls);
+  void setOriginalFunctionResolver(ASTContext &context,
+                                   LazyMemberLoader *resolver,
+                                   ArrayRef<uint64_t> resolverContextData);
 
   AutoDiffDerivativeFunctionKind getDerivativeKind() const {
     assert(Kind && "Derivative function kind has not yet been resolved");
@@ -3820,6 +3873,35 @@ public:
   }
 };
 
+class CalledAttr : public DeclAttribute {
+public:
+  CalledAttr(SourceLoc atLoc, SourceRange range, ExecutionSemantics semantics,
+             bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Called, atLoc, range, implicit) {
+    Bits.CalledAttr.Semantics = unsigned(semantics);
+  }
+
+  CalledAttr(ExecutionSemantics semantics)
+      : CalledAttr(SourceLoc(), SourceRange(), semantics) {}
+
+  bool isOnce() const { return getSemantics() == ExecutionSemantics::Once; }
+
+  ExecutionSemantics getSemantics() const {
+    return ExecutionSemantics(Bits.CalledAttr.Semantics);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Called;
+  }
+
+  CalledAttr *clone(ASTContext &ctx) const {
+    return new (ctx) CalledAttr(AtLoc, Range, getSemantics(), isImplicit());
+  }
+
+  bool isEquivalent(const CalledAttr *other, Decl *attachedTo) const {
+    return getSemantics() == other->getSemantics();
+  }
+};
 
 /// The kind of unary operator, if any.
 enum class UnaryOperatorKind : uint8_t { None, Prefix, Postfix };
@@ -4313,6 +4395,10 @@ protected:
     SWIFT_INLINE_BITFIELD_FULL(IsolatedTypeAttr, TypeAttribute, 8,
       Kind : 8
     );
+
+    SWIFT_INLINE_BITFIELD_FULL(CalledTypeAttr, TypeAttribute, 8,
+      Semantics : 8
+    );
   } Bits;
   // clang-format on
 
@@ -4604,6 +4690,35 @@ public:
     return getIsolationKindName(getIsolationKind());
   }
   static const char *getIsolationKindName(IsolationKind kind);
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+class CalledTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Called> {
+public:
+  enum class Semantics : uint8_t { Once };
+
+private:
+  SourceLoc SemanticsLoc;
+
+public:
+  CalledTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
+                 Located<Semantics> semantics)
+      : SimpleTypeAttr(atLoc, kwLoc, parensRange), SemanticsLoc(semantics.Loc) {
+    Bits.CalledTypeAttr.Semantics = uint8_t(semantics.Item);
+  }
+
+  bool isOnce() const { return getSemantics() == Semantics::Once; }
+
+  Semantics getSemantics() const {
+    return Semantics(Bits.CalledTypeAttr.Semantics);
+  }
+  SourceLoc getSemanticsLoc() const { return SemanticsLoc; }
+
+  const char *getSemanticsName() const {
+    return getSemanticsName(getSemantics());
+  }
+  static const char *getSemanticsName(Semantics semantics);
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };

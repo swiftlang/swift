@@ -176,6 +176,8 @@ static bool isBarrier(SILInstruction *inst) {
     // or deinit side effects conservatively.
     case BuiltinValueKind::AllocRaw:
     case BuiltinValueKind::DeallocRaw:
+    case BuiltinValueKind::AllocRawTyped:
+    case BuiltinValueKind::DeallocRawTyped:
     case BuiltinValueKind::Fence:
     case BuiltinValueKind::Ifdef:
     case BuiltinValueKind::AtomicLoad:
@@ -216,6 +218,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
     case BuiltinValueKind::DistributedActorAsAnyActor:
     case BuiltinValueKind::TaskAddCancellationHandler:
+    case BuiltinValueKind::TaskAddCancellationHandlerWithReason:
     case BuiltinValueKind::TaskRemoveCancellationHandler:
     case BuiltinValueKind::TaskAddPriorityEscalationHandler:
     case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
@@ -225,6 +228,10 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::RemoveTaskLocalValue:
     case BuiltinValueKind::TaskCancellationShieldPush:
     case BuiltinValueKind::TaskCancellationShieldPop:
+    case BuiltinValueKind::TaskCancellationScopePush:
+    case BuiltinValueKind::TaskCancellationScopePop:
+    case BuiltinValueKind::TaskPushDeadline:
+    case BuiltinValueKind::TaskPopDeadline:
       return true;
     }
   }

@@ -378,7 +378,8 @@ public:
       SubstitutionMap subs, ParameterConvention calleeConvention,
       SILFunctionTypeIsolation resultIsolation,
       PartialApplyInst::OnStackKind onStack =
-          PartialApplyInst::OnStackKind::NotOnStack);
+          PartialApplyInst::OnStackKind::NotOnStack,
+      bool isCalledOnce = false);
 
   //===--------------------------------------------------------------------===//
   // CFG Manipulation
@@ -591,6 +592,7 @@ public:
       ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
       SILFunctionTypeIsolation ResultIsolation =
           SILFunctionTypeIsolation::forUnknown(),
+      bool IsCalledOnce = false,
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       StackAllocationIsNested_t IsNested = StackAllocationIsNested,
@@ -608,7 +610,8 @@ public:
            "Args");
     return insert(PartialApplyInst::create(
         getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention,
-        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested, ArgLocs));
+        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested,
+        IsCalledOnce, ArgLocs));
   }
 
   BeginApplyInst *createBeginApply(
@@ -1093,6 +1096,10 @@ public:
 
   DebugValueInst *createDebugValue(
       SILLocation Loc, SILValue src, SILDebugVariable Var,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool trace = false, bool overrideLoc = true);
+  DebugValueInst *createDebugValue(
+      SILLocation Loc, ArrayRef<SILValue> operands, SILDebugVariable Var,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false, bool overrideLoc = true);
 
@@ -2019,7 +2026,7 @@ public:
                       ValueOwnershipKind forwardingOwnershipKind) {
     return insert(new (getModule()) StructExtractInst(
         getSILDebugLocation(Loc), Operand, Field, ResultTy,
-        Operand->getOwnershipKind()));
+        forwardingOwnershipKind));
   }
 
   StructElementAddrInst *createStructElementAddr(SILLocation Loc,

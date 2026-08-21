@@ -960,8 +960,8 @@ struct Observable<Value> {
     self.stored = wrappedValue
   }
 
-  @available(*, unavailable, message: "must be in a class")
-  var wrappedValue: Value { // expected-note 2{{'wrappedValue' has been explicitly marked unavailable here}}
+  @available(*, unavailable, message: "must be in a class") // expected-note 2{{'wrappedValue' has been explicitly marked unavailable here}}
+  var wrappedValue: Value {
     get { fatalError("called wrappedValue getter") }
     set { fatalError("called wrappedValue setter") }
   }

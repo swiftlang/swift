@@ -96,7 +96,7 @@ To motivate the concept, let $G$ be this generic signature:
                     τ_0_1 == τ_0_0.[Collection]SubSequence>
 \end{verbatim}
 \end{quote}
-We will also be working with the \texttt{String}, \texttt{Substring}, and \texttt{Character} types from the standard library, and their conformances to \tSequence\ and \tCollection. We already studied these protocols in \ExRef{protocol collection example} and \ExRef{protocol collection graph}. \ListingRef{conformance paths listing} recalls the protocol declarations, and lists the relevant facts about the following normal conformances:
+We will also be working with the \texttt{String}, \texttt{Substring}, and \texttt{Character} types from the standard library, and their conformances to \IndexProto{Sequence}\tSequence\ and \IndexProto{Collection}\tCollection. We already studied these protocols in \ExRef{protocol collection example} and \ExRef{protocol collection graph}. \ListingRef{conformance paths listing} recalls the protocol declarations, and lists the relevant facts about the following normal conformances:
 \begin{gather*}
 \StringCollection\\
 \SubstringCollection\\
@@ -376,7 +376,7 @@ This is our desired principal derivation, so we set $\tTp := \tUp\texttt{.V}$. S
 
 We embarked on our tour of type substitution in \ChapRef{chap:substitution maps}, with the following three algorithms marking key waypoints along the journey:
 \begin{enumerate}
-\item \AlgRef{type subst algo} implements type parameter substitution, handling generic parameter types directly while delegating the \index{dependent member type}dependent member type case.
+\item \AlgRef{alg:substitute type} implements type parameter substitution, handling generic parameter types directly while delegating the \index{dependent member type}dependent member type case.
 \item \AlgRef{dependent member type substitution} implements dependent member type substitution in terms of local conformance lookup.
 \item \AlgRef{local conformance lookup algorithm} implements local conformance lookup, while delegating the finding of the conformance path.
 \end{enumerate}
@@ -477,7 +477,7 @@ The above conformance path graph is finite, but this will not be true in general
 
 To find a conformance path for an abstract conformance, we perform a \index{breadth-first search}breadth-first search of the conformance path graph. We start from our finite set of root vertices, and visit all paths of length $n$ before proceeding to paths of length $n+1$. We stop when we find a path which represents the equivalence class of the given abstract conformance. In fact, this will always find a path of minimum length. However, there may be more than one path of minimum length. Conformance paths appear in the \index{ABI!conformance path}ABI, as part of the symbol \index{mangling!conformance path}mangling scheme, so we need to make a deterministic choice.
 
-We say that two conformance paths are \IndexDefinition{conformance path!equivalence}\emph{equivalent} if they represent equivalent principal abstract conformances---or in other words, if both paths end at the same vertex in the graph. Next, we impose a \index{linear order!conformance path}linear order on \IndexDefinition{conformance path!linear order}conformance paths, similar to the type parameter order of \SecRef{reduced types}. Shorter paths precede longer paths, while two paths with the same length are ordered by comparing their elements. (Just like the type parameter order, the conformance path order is an instance of a \index{shortlex order}shortlex order, which we define in its full generality in \SecRef{rewritesystemintro}.)
+We say that two conformance paths are \IndexDefinition{conformance path!equivalence}\emph{equivalent} if they represent equivalent principal abstract conformances---or in other words, if both paths end at the same vertex in the graph. Next, we impose a \index{linear order!conformance path}linear order on \IndexDefinition{conformance path!linear order}conformance paths, similar to the type parameter order of \SecRef{reduced types}. Shorter paths precede longer paths, while two paths with the same length are ordered by comparing their elements. (Just like the type parameter order, the conformance path order is an instance of a \index{shortlex order}shortlex order, which we define in its full generality in \SecRef{sec:normal form algorithm}.)
 
 \begin{algorithm}[Conformance path order]\label{conformance path order alg}
 \IndexDefinition{conformance path order}Takes two conformance paths as input, denoted $x:=x_m \otimes \cdots \otimes x_1$ and $y:=y_n \otimes \cdots \otimes y_1$, and returns one of ``$<$'', ``$>$'', or ``$=$''.
@@ -558,7 +558,7 @@ func caller<T: M>(_: T.Type) {
 For now at least, we have yet to observe this form of combinatorial explosion in practice. In realistic programs, conformance path graphs tend to be relatively simple, and type parameters tend not to be overly long.
 \end{example}
 
-Now, we pause to take a breather. Our implementation of \AlgRef{type subst algo} is almost completely filled in, except for the \IndexQuery{getReducedType}$\Query{getReducedType}{}$ and \IndexQuery{requiresProtocol}$\Query{requiresProtocol}{}$ generic signature queries, whose implementation is explained in \PartRef{part rqm}. It is worth noting that the pathological protocol~\texttt{M} shown above is quite interesting for other reasons, and it will reappear in \SecRef{monoidsasprotocols}.
+Now, we pause to take a breather. Our implementation of \AlgRef{alg:substitute type} is almost completely filled in, except for the \IndexQuery{getReducedType}$\Query{getReducedType}{}$ and \IndexQuery{requiresProtocol}$\Query{requiresProtocol}{}$ generic signature queries, whose implementation is explained in \PartRef{part:rqm}. It is worth noting that the pathological protocol~\texttt{M} shown above is quite interesting for other reasons, and it will reappear in \SecRef{monoidsasprotocols}.
 
 \section{Recursive Conformances}\label{recursive conformances}
 
@@ -591,7 +591,7 @@ The universe of protocols $\ProtoObj$ is finite, but potentially quite large. Ho
 \end{example}
 
 \begin{example}
-The protocol dependency graph for protocol \tN\ from \ExRef{protocol n example} is just a single vertex with loop:
+The protocol dependency graph for \IndexProto{N}protocol \tN\ from \ExRef{protocol n example} is just a single vertex with loop:
 
 \medskip
 
@@ -738,7 +738,7 @@ Now, suppose we have a simple path $p_i$ which visits vertices $v_1,\,\ldots,\,v
 We can repeat this to generate paths of any length, so the conclusion follows.
 \end{proof}
 
-So if we have an infinite generic signature, we can find a \index{ray}\emph{ray}, or an infinite path, in each of our two graphs associated with this generic signature. Let's look at protocol~\texttt{N}, where the ray is the entire graph. We already saw the type parameter graph of $\GN$ in \ExRef{protocol n graph}. The conformance path graph of $\GN$ is identical, except for labels:
+So if we have an infinite generic signature, we can find a \index{ray}\emph{ray}, or an infinite path, in each of our two graphs associated with this generic signature. Let's look at \IndexProto{N}protocol~\tN, where the ray is the entire graph. We already saw the type parameter graph of $\GN$ in \ExRef{protocol n graph}. The conformance path graph of $\GN$ is identical, except for labels:
 \begin{center}
 \begin{tikzpicture}[node distance=1.7cm]
 \node (T) [root] {\texttt{\rT:~N}};
@@ -775,7 +775,7 @@ The \IndexDefinition{conformance substitution graph}\emph{conformance substituti
 With this construction, \index{local conformance lookup!graph homomorphism}local conformance lookup becomes a \index{graph homomorphism!local conformance lookup}graph homomorphism from the conformance path graph of $G$ to the conformance substitution graph of $\Sigma$. (The conformance substitution graph also explains the instantiation of \index{witness table}witness tables in the Swift runtime. A generic function receives a witness table for each explicit conformance requirement of its generic signature to start. Witness tables then refer to the witness tables for their associated conformances; this is lazily populated with a runtime entry point, so we explore some finite subgraph of the conformance substitution graph.)
 \end{definition}
 
-We now ask, if $\XN$ is a conformance to \tN, what does the conformance substitution graph of $\Sigma_{\XN}$ look like? Another classic result from graph theory tells us that the image of a \index{ray!graph homomorphism}ray under graph homomorphism must be one the following:
+We now ask, if $\XN$ is a conformance to \IndexProto{N}\tN, what does the conformance substitution graph of $\Sigma_{\XN}$ look like? Another classic result from graph theory tells us that the image of a \index{ray!graph homomorphism}ray under graph homomorphism must be one the following:
 \begin{enumerate}
 \item A \index{cycle}cycle.
 \item Another infinite ray.
@@ -905,7 +905,7 @@ Here is the conformance substitution graph for $\Sigma_{\ConfReq{H<H<Toe>>}{N}}$
 \end{center}
 
 \paragraph{Non-terminating substitutions.}
-This example demonstrates a new behavior:
+This \index{non-terminating computation}example demonstrates a new behavior:
 \begin{Verbatim}
 struct S: N {
   typealias A = F<S>
@@ -958,7 +958,7 @@ At the present time, the compiler terminates with a stack overflow if a non-term
 
 \section{The Halting Problem}\label{halting problem}
 
-In the future, the compiler should detect non-terminating type substitution and diagnose the problem, instead of crashing. Two approaches spring to mind:
+In the future, the compiler should \index{termination check}detect non-terminating type substitution and diagnose the problem, instead of crashing. Two approaches spring to mind:
 \begin{enumerate}
 \item We could impose a maximum operation count on every single type substitution, terminating with an error if this count is exceeded.
 \item We could try to detect such behavior ahead of time, by carefully analyzing all substitution maps and conformances in the program, and rejecting those that encode non-terminating computation.
@@ -1009,7 +1009,7 @@ func naughty() {
 If \texttt{halts(naughty)} were to return true, then \texttt{naughty()} would enter an infinite loop and not halt, thus \texttt{halts(naughty)} cannot be true. If \texttt{halts(naughty)} were to return false, then \texttt{naughty()} actually does halt, so \texttt{halts(naughty)} seemingly cannot be false, either. The only remaining possibility is that \texttt{halts(naughty)} runs forever and does not return anything, but this contradicts our assumption that \texttt{halts()} itself can make a decision in a finite number of steps. Every outcome leads to a contradiction, so a correct implementation of \texttt{halts()} cannot exist---the halting problem is \index{undecidable problem!halting problem}\emph{undecidable}.
 \end{proof}
 
-While this is not a rigorous proof, the key intuition is that once our formal system is sufficiently expressive, we can always ``outwit'' any purported termination checking algorithm, no matter how sophisticated, by encoding the termination checker itself within our formalism, and doing the opposite of what it tells us to do.
+While this is not a rigorous proof, the key intuition is that once our formal system is sufficiently expressive, we can always ``outwit'' any purported \index{termination check}termination checking algorithm, no matter how sophisticated, by encoding the termination checker itself within our formalism, and doing the opposite of what it tells us to do.
 
 \paragraph{Tag systems.} We will now demonstrate that the Swift type substitution algebra is also Turing-complete, so a Swift program can ask the compiler to perform arbitrary computation at \emph{compile time}. Rather than attempting a direct encoding of a Turing machine, we consider \emph{tag systems}, a computational formalism first introduced in 1943 by \index{Emil Post}Emil~L.~Post~\cite{posttag}.
 
@@ -1125,48 +1125,8 @@ We also add two more associated types, which we will describe shortly; the first
 \end{Verbatim}
 Finally, we have the nominal types \texttt{AA}, \texttt{BB}, \texttt{CC}, \texttt{End}, and \Halt, shown in \ListingRef{collatz listing}, which all conform to \texttt{Tag}. The \texttt{Tag} protocol is straightforward, so all the action happens in these concrete conformances to \texttt{Tag}. In the following, we will be working with the protocol generic signature $\GTag$, and we denote its generic parameter \rT\ by $\uptau$.
 
-\begin{listing}\captionabove{Concrete types for the Collatz tag system}\label{collatz listing}
-\begin{Verbatim}[fontsize=\small]
-struct AA<T: Tag>: Tag {
-  typealias A = AA<T.A>
-  typealias B = AA<T.B>
-  typealias C = AA<T.C>
-  typealias Del = T
-  typealias Next = Del.Del.B.C.Next
-}
-
-struct BB<T: Tag>: Tag {
-  typealias A = BB<T.A>
-  typealias B = BB<T.B>
-  typealias C = BB<T.C>
-  typealias Del = T
-  typealias Next = Del.Del.A.Next
-}
-
-struct CC<T: Tag>: Tag {
-  typealias A = CC<T.A>
-  typealias B = CC<T.B>
-  typealias C = CC<T.C>
-  typealias Del = T
-  typealias Next = Del.Del.A.A.A.Next
-}
-
-struct End: Tag {
-  typealias A = AA<End>
-  typealias B = BB<End>
-  typealias C = CC<End>
-  typealias Del = Halt
-  typealias Next = Halt
-}
-
-struct Halt: Tag {
-  typealias A = Halt
-  typealias B = Halt
-  typealias C = Halt
-  typealias Del = Halt
-  typealias Next = Halt
-}
-\end{Verbatim}
+\begin{listing}\captionabove{The Collatz tag system implemented in Swift type substitution}\label{collatz listing}
+\VerbatimInput[frame=single,fontsize=\scriptsize]{\currfiledir conformance-paths/collatz.swift}
 \end{listing}
 
 \begin{definition}

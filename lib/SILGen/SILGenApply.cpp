@@ -3917,7 +3917,12 @@ private:
     if (!arg.hasLValueType()) {
       // If the unsubstituted function type has a parameter of tuple type,
       // explode the tuple value.
-      if (origParamType.isTuple()) {
+      //
+      // However, a C++ reference to an aggregate imported as a tuple is passed
+      // as a single indirect value rather than exploded into its elements.
+      bool isClangReference = origParamType.isClangType() &&
+                              origParamType.getClangType()->isReferenceType();
+      if (origParamType.isTuple() && !isClangReference) {
         emitExpanded(std::move(arg), origParamType);
         return;
       }
@@ -5928,6 +5933,10 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     SGF.addEmissionFinalizer([rawResult](SILGenFunction &SGF) {
       SGF.finalizeAddTaskLocalValue(rawResult);
     });
+  } else if (builtinName.is(getBuiltinName(BuiltinValueKind::TaskPushDeadline))) {
+    SGF.addEmissionFinalizer([rawResult](SILGenFunction &SGF) {
+      SGF.finalizeTaskPushDeadline(rawResult);
+    });
   }
 
   if (argScope.has_value())
@@ -6559,6 +6568,12 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
     // can end up here. Since the callee cannot actually throw, emit
     // an unreachable in the error branch.
     ASSERT(silFnType->getErrorResult().getInterfaceType()->isNever());
+    // If direct, the block still needs to have a dummy Never error arg.
+    if (!fnConv.hasIndirectSILErrorResults()) {
+      errorBB->createPhiArgument(
+          fnConv.getSILErrorType(getTypeExpansionContext()),
+          OwnershipKind::Owned);
+    }
     B.emitBlock(errorBB);
     B.createUnreachable(loc);
   } else {

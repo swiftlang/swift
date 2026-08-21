@@ -1816,7 +1816,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
 
   case SIL_DEBUG_VALUE:
-    SILDebugValueLayout::readRecord(scratch, TyCategory, TyCategory2, Attr,
+    SILDebugValueLayout::readRecord(scratch, TyCategory2, Attr,
                                     ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::DebugValueInst;
 
@@ -1835,34 +1835,44 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     llvm_unreachable("not supported");
 
   case SILInstructionKind::DebugValueInst: {
-    assert(ListOfValues.size() >= 2 && "Unexpected number of values");
-    SILValue Value =
-        getLocalValue(Fn, ListOfValues[0],
-                      getSILType(MF->getType(ListOfValues[1]),
-                                 (SILValueCategory)TyCategory, Fn));
-
     bool hasReconstructionBlock = Attr & 0x1;
     auto UsesMoveableValDebugInfo =
         UsesMoveableValueDebugInfo_t((Attr >> 1) & 0x1);
     auto HasTrace = (Attr >> 2) & 0x1;
+
+    // Determine operand count and starting index in ListOfValues.
+    unsigned I = 0;
+    unsigned numOperands = hasReconstructionBlock ? ListOfValues[I++] : 1;
+
+    assert(ListOfValues.size() >= I + numOperands * 3 &&
+           "Unexpected number of values for debug_value operands");
+
+    SmallVector<SILValue, 4> Operands;
+    for (unsigned i = 0; i < numOperands; ++i) {
+      auto op = getLocalValue(
+          Fn, ListOfValues[I],
+          getSILType(MF->getType(ListOfValues[I + 1]),
+                     (SILValueCategory)ListOfValues[I + 2], Fn));
+      Operands.push_back(op);
+      I += 3;
+    }
 
     bool HaveDebugVar = (Attr >> 3) & 0x1;
     bool HasLoc = false;
 
     SILDebugVariable DebugVar;
     if (HaveDebugVar) {
-      assert(ListOfValues.size() >= 4 && "Unexpected number of values");
+      assert(ListOfValues.size() >= I + 2 &&
+             "Unexpected number of values for debug variable info");
       bool IsLet = (Attr >> 4) & 0x1;
       unsigned IsDenseMapSingleton = (Attr >> 5) & 0x3;
       bool HasType = (Attr >> 7) & 0x1;
       bool HasScope = (Attr >> 8) & 0x1;
       HasLoc = (Attr >> 9) & 0x1;
 
-      auto VarName = MF->getIdentifierText(ListOfValues[2]);
-      auto ArgNo = ListOfValues[3];
+      auto VarName = MF->getIdentifierText(ListOfValues[I++]);
+      auto ArgNo = ListOfValues[I++];
       std::optional<SILType> Type;
-
-      unsigned I = 4;
       unsigned Row, Col;
       StringRef FileName;
       std::optional<SILLocation> Loc;
@@ -1924,7 +1934,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     }
 
     ResultInst =
-        Builder.createDebugValue(Loc, Value, DebugVar,
+        Builder.createDebugValue(Loc, Operands, DebugVar,
                                  UsesMoveableValDebugInfo, HasTrace, !HasLoc);
 
     // If the serialized debug_value has a reconstruction block, add it to
@@ -2520,7 +2530,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultInst = Builder.createPartialApply(
         Loc, FnVal, Substitutions, Args, closureTy->getCalleeConvention(),
-        closureTy->getIsolation(), onStack, isNested,
+        closureTy->getIsolation(), closureTy->isCalledOnce(), onStack, isNested,
         /*SpecializationInfo=*/nullptr, argLocsRef);
     break;
   }
@@ -5529,14 +5539,14 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   (void)kind;
 
   DeclID originalNameId, jvpNameId, vjpNameId;
-  unsigned rawLinkage, isDeclaration, isSerialized, rawDiffKind,
+  unsigned rawLinkage, isDeclaration, isSerialized, isDefault, rawDiffKind,
       numParameterIndices, numResultIndices;
   GenericSignatureID derivativeGenSigID;
   ArrayRef<uint64_t> rawParameterAndResultIndices;
 
   DifferentiabilityWitnessLayout::readRecord(
       scratch, originalNameId, rawLinkage, isDeclaration, isSerialized,
-      rawDiffKind, derivativeGenSigID, jvpNameId, vjpNameId,
+      isDefault, rawDiffKind, derivativeGenSigID, jvpNameId, vjpNameId,
       numParameterIndices, numResultIndices, rawParameterAndResultIndices);
 
   if (isDeclaration) {
@@ -5595,7 +5605,7 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   if (!diffWitness)
     diffWitness = SILDifferentiabilityWitness::createDeclaration(
         SILMod, linkage, original, *diffKind, parameterIndices, resultIndices,
-        derivativeGenSig);
+        derivativeGenSig, isDefault);
 
   // If the current differentiability witness is merely a declaration, and the
   // deserialized witness is a definition, upgrade the current differentiability

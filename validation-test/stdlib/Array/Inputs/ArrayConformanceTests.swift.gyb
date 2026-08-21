@@ -4,6 +4,11 @@
 # Run it as follows:
 # cd validation-test/stdlib/Array
 # ../../../utils/gyb --line-directive="" Inputs/ArrayConformanceTests.swift.gyb | ../../../utils/split_file.py
+
+def shard_count_for(conformance):
+  if "Mutable" in conformance:
+    return 4
+  return 1
 }%
 
 % all_array_types = ['ContiguousArray', 'ArraySlice', 'Array', 'ArraySliceWithNonZeroStartIndex']
@@ -17,6 +22,15 @@
 %     collection_or_slice = 'Slice' if 'Slice' in array_type else 'Collection'
 %     test_name = array_type + '_' + conformance
 %     file_name = test_name + '.swift'
+%     shard_count = shard_count_for(conformance)
+%     if shard_count > 1:
+// BEGIN Inputs/${test_name}/main.swift
+//===----------------------------------------------------------------------===//
+// Automatically Generated From validation-test/stdlib/Array/Inputs/ArrayConformanceTests.swift.gyb
+// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+
+%     else:
 // BEGIN ${file_name}
 //===----------------------------------------------------------------------===//
 // Automatically Generated From validation-test/stdlib/Array/Inputs/ArrayConformanceTests.swift.gyb
@@ -27,6 +41,7 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 
+%     end
 import StdlibUnittest
 import StdlibCollectionUnittest
 
@@ -141,5 +156,25 @@ do {
 } // do
 
 runAllTests()
+%     if shard_count > 1:
+%       for shard_index in range(shard_count):
+// BEGIN ${test_name}_shard${shard_index + 1}.swift
+//===----------------------------------------------------------------------===//
+// Automatically Generated From validation-test/stdlib/Array/Inputs/ArrayConformanceTests.swift.gyb
+// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+
+// This file runs one shard of the tests defined in
+// Inputs/${test_name}/main.swift,
+// to limit each shard's running time to a reasonable amount.
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s %S/Inputs/${test_name}/main.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %enable-cow-checking %target-run %t/a.out --stdlib-unittest-shard-count ${shard_count} --stdlib-unittest-shard-index ${shard_index}
+
+// REQUIRES: executable_test
+// REQUIRES: optimized_stdlib
+%       end
+%     end
 
 % end

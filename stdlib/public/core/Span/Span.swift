@@ -54,7 +54,7 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   /// Create an empty span.
   @export(implementation)
   @inline(__always)
-  @lifetime(immortal)
+  @_lifetime(immortal)
   public init() {
     unsafe _pointer = nil
     _count = 0
@@ -76,7 +76,7 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   @unsafe
   @export(implementation)
   @inline(__always)
-  @lifetime(borrow pointer)
+  @_lifetime(borrow pointer)
   @_disfavoredOverload
   internal init(
     _unchecked pointer: UnsafeRawPointer?,
@@ -98,9 +98,9 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized element.
   ///   - count: the number of initialized elements in the span.
-  @lifetime(borrow pointer)
+  @_lifetime(borrow pointer)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal init(
     _unchecked pointer: UnsafePointer<Element>,
@@ -128,7 +128,7 @@ extension Span where Element: ~Copyable {
   /// - Parameters:
   ///   - buffer: an `UnsafeBufferPointer` to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
@@ -157,7 +157,7 @@ extension Span where Element: ~Copyable {
   /// - Parameters:
   ///   - buffer: an `UnsafeMutableBufferPointer` to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
@@ -180,7 +180,7 @@ extension Span where Element: ~Copyable {
   ///   - pointer: a pointer to the first initialized element.
   ///   - count: the number of initialized elements in the span.
   @export(implementation)
-  @lifetime(borrow pointer)
+  @_lifetime(borrow pointer)
   @unsafe
   public init(
     _unsafeStart pointer: UnsafePointer<Element>,
@@ -208,7 +208,7 @@ extension Span /*where Element: Copyable*/ {
   /// - Parameters:
   ///   - buffer: an `UnsafeBufferPointer` to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeElements buffer: borrowing Slice<UnsafeBufferPointer<Element>>
@@ -229,7 +229,7 @@ extension Span /*where Element: Copyable*/ {
   /// - Parameters:
   ///   - buffer: an `UnsafeMutableBufferPointer` to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeElements buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>
@@ -259,7 +259,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeBytes buffer: UnsafeRawBufferPointer
@@ -295,7 +295,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
@@ -322,7 +322,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - pointer: a pointer to the first initialized element.
   ///   - byteCount: the number of bytes in the span.
   @export(implementation)
-  @lifetime(borrow pointer)
+  @_lifetime(borrow pointer)
   @unsafe
   public init(
     _unsafeStart pointer: UnsafeRawPointer,
@@ -351,7 +351,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeRawBufferPointer>
@@ -376,7 +376,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
@@ -395,7 +395,7 @@ extension Span where Element: BitwiseCopyable {
   ///            `Span`'s lifetime and the memory it represents.
   @export(implementation)
   @unsafe
-  @lifetime(copy bytes)
+  @_lifetime(copy bytes)
   public init(_bytes bytes: consuming RawSpan) {
     let rawBuffer = unsafe UnsafeRawBufferPointer(
       start: bytes._pointer, count: bytes.byteCount
@@ -598,21 +598,19 @@ extension Span where Element: ConvertibleToBytes {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `Span`.
-  ///
-  /// - Returns: A `Span` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `Span`.
+  /// - Returns: A `Span` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(_ bounds: Range<Index>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
@@ -624,29 +622,27 @@ extension Span where Element: ~Copyable {
 
   @available(*, deprecated, renamed: "extracting(_:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(_ bounds: Range<Index>) -> Self {
     extracting(bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `Span`.
-  ///
-  /// - Returns: A `Span` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `Span`.
+  /// - Returns: A `Span` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @unsafe
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
@@ -659,26 +655,24 @@ extension Span where Element: ~Copyable {
   @unsafe
   @available(*, deprecated, renamed: "extracting(unchecked:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(unchecked bounds: Range<Index>) -> Self {
     unsafe extracting(unchecked: bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `Span`.
-  ///
-  /// - Returns: A `Span` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `Span`.
+  /// - Returns: A `Span` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(
     _ bounds: some RangeExpression<Index>
   ) -> Self {
@@ -687,29 +681,27 @@ extension Span where Element: ~Copyable {
 
   @available(*, deprecated, renamed: "extracting(_:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(_ bounds: some RangeExpression<Index>) -> Self {
     extracting(bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///     this range must be within the bounds of this `Span`.
-  ///
-  /// - Returns: A `Span` over the items within `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `Span`.
+  /// - Returns: A `Span` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @unsafe
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
@@ -722,29 +714,28 @@ extension Span where Element: ~Copyable {
   @unsafe
   @available(*, deprecated, renamed: "extracting(unchecked:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(unchecked bounds: ClosedRange<Index>) -> Self {
     unsafe extracting(unchecked: bounds)
   }
 
-  /// Constructs a new span over all the items of this span.
+  /// Constructs a new span over all the elements of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
-  /// - Returns: A `Span` over all the items of this span.
+  /// - Returns: A `Span` over all the elements of this span.
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(_: UnboundedRange) -> Self {
     self
   }
 
   @available(*, deprecated, renamed: "extracting(_:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(_: UnboundedRange) -> Self {
     self
   }
@@ -885,17 +876,13 @@ extension Span where Element: ~Copyable {
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the elements.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
@@ -905,27 +892,23 @@ extension Span where Element: ~Copyable {
 
   @available(*, deprecated, renamed: "extracting(first:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(first maxLength: Int) -> Self {
     extracting(first: maxLength)
   }
 
-  /// Returns a span over all but the given number of trailing elements.
+  /// Returns a span over all but the specified number of trailing elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter k: The number of elements to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
-  /// - Returns: A span leaving off the specified number of elements at the end.
+  /// - Returns: A span leaving off the specified number of trailing elements.
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
@@ -935,20 +918,19 @@ extension Span where Element: ~Copyable {
 
   @available(*, deprecated, renamed: "extracting(droppingLast:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(droppingLast k: Int) -> Self {
     extracting(droppingLast: k)
   }
 
-  /// Returns a span containing the trailing elements of the span,
-  /// up to the given maximum length.
+  /// Returns a span containing the trailing elements of this span,
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the elements.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
@@ -956,7 +938,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, count)
@@ -970,19 +952,18 @@ extension Span where Element: ~Copyable {
 
   @available(*, deprecated, renamed: "extracting(last:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(last maxLength: Int) -> Self {
     extracting(last: maxLength)
   }
 
-  /// Returns a span over all but the given number of initial elements.
+  /// Returns a span over all but the specified number of initial elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter k: The number of elements to drop from the beginning of
   ///   the span. `k` must be greater than or equal to zero.
@@ -990,7 +971,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
@@ -1005,7 +986,7 @@ extension Span where Element: ~Copyable {
 
   @available(*, deprecated, renamed: "extracting(droppingFirst:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(droppingFirst k: Int) -> Self {
     extracting(droppingFirst: k)
   }
@@ -1092,7 +1073,7 @@ extension Span: Iterable where Element: ~Copyable {
 
   @available(SwiftStdlib 6.4, *)
   @export(implementation)
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   public func makeBorrowingIterator() -> BorrowingIterator {
     .init(self)
   }

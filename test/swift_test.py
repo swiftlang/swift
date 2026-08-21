@@ -69,6 +69,8 @@ class SwiftTest(lit.formats.ShTest, object):
             # Some of these tests are notoriously slow.
             and not ("Interop" in test.path_in_suite and "Cxx" in test.path_in_suite)
             and not ("swift-dev-utils.test" in test.path_in_suite)
+            # TODO: remove once the number of XFAILs under opaque values is close to zero.
+            and not ("swift_test_mode_optimize_none_with_opaque_values" in test.config.available_features)
         ):
             test.allowed_retries = 5
 

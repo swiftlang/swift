@@ -2,7 +2,7 @@
 
 \begin{document}
 
-\chapter[]{The Property Map}\label{propertymap}
+\chapter[]{The Property Map}\label{chap:property map}
 
 \ifWIP
 
@@ -456,7 +456,7 @@ Applying \AlgRef{symboltotype} to the superclass symbol produces the Swift type:
 \[\namesym{Cache}\langle\genericsym{0}{0}.\namesym{A}\rangle\].
 \end{example}
 \begin{example}
-Consider the computation of the \texttt{getConcreteType()} query on the canonical type term $\genericsym{0}{0}.\assocsym{P}{C}$. Here, the property map entry is associated with the suffix $\assocsym{P}{C}$, which means an adjustment must be performed on the concrete type symbol 
+Consider the computation of the \texttt{getConcreteType()} query on the canonical type term $\genericsym{0}{0}.\assocsym{P}{C}$. Here, the property map entry is associated with the suffix $\assocsym{P}{C}$, which means an adjustment must be performed on the concrete type symbol
 $\concretesym{\namesym{Array}\langle\sigma_0\rangle;\,\sigma_0:=\assocsym{P}{A}}$. The adjusted symbol is
 \[\concretesym{\namesym{Array}\langle\sigma_0\rangle;\,\sigma_0:=\genericsym{0}{0}\assocsym{P}{A}}.\]
 Applying \AlgRef{symboltotype} to the adjusted concrete type symbol produces the Swift type:

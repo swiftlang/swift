@@ -573,33 +573,34 @@ def get_scheme_map(
     return None
 
 
-def _check_missing_clones(
+def check_missing_clones(
     args: CliArguments, config: Dict[str, Any], scheme_map: Dict[str, Any]
-):
+) -> List[str]:
     """
     Verify that all repositories defined in the scheme map are present in the
-    source root directory. If a repository is missing—and not explicitly skipped—
-    the user is prompted to re-run the script with the `--clone` option.
+    source root directory.
 
-    This function also respects per-repository platform restrictions: if the
-    current platform is not listed for a repo, that repo is ignored.
+    This function respects explicitly skipped repositories and platform
+    restrictions: if the repo is skipped or the current platform is not listed
+    for a repo, that repo is ignored.
 
     Args:
         args (CliArguments): Parsed CLI arguments.
         config (Dict[str, Any]): deserialized `update-checkout-config.json`.
-        scheme_map (Dict[str, str] | None): map of repo names to branches to check out.
+        scheme_map (Dict[str, str] | None): map of repo names to branches.
+
+    Returns:
+        List[str]: the names of the scheme's repositories that are not present
+            in the source root.
     """
 
+    missing = []
     for repo in scheme_map:
-        if _should_skip_repo(args, config, repo):
+        if should_skip_repo(args, config, repo):
             continue
-
         if not args.source_root.joinpath(repo).exists():
-            print(
-                "You don't have all swift sources. "
-                "Call this script with --clone to get them."
-            )
-            return
+            missing.append(repo)
+    return missing
 
 
 def _check_git_config(
@@ -621,7 +622,7 @@ def _check_git_config(
     }
 
     for repo in scheme_map:
-        if _should_skip_repo(args, config, repo):
+        if should_skip_repo(args, config, repo):
             continue
 
         repo_path = args.source_root.joinpath(repo)
@@ -645,7 +646,7 @@ def _check_git_config(
                 pass
 
 
-def _should_skip_repo(args: CliArguments, config: Dict[str, Any], repo: str) -> bool:
+def should_skip_repo(args: CliArguments, config: Dict[str, Any], repo: str) -> bool:
     """Check if a repository should be skipped based on platform or skip list."""
     if repo in args.skip_repository_list:
         return True
@@ -847,6 +848,47 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
     Git.run(repo_path, ["submodule", "update", "--recursive"], env=env)
 
 
+def remote_url_for_repo(
+    repo_name: str,
+    remote_repo_info: Dict[str, Any],
+    config: Dict[str, Any],
+    clone_with_ssh: bool,
+) -> str:
+    """Computes the URL to clone the given repository from.
+
+    By default, the URL is interpolated from the top-level clone pattern that
+    matches the requested protocol and the repository's remote "id". A
+    repository can override that URL entirely, either per-protocol
+    ("ssh-url", "https-url") or for both protocols at once ("url"). When both
+    kinds of override are present, the one matching the requested protocol
+    wins; when only the override for the other protocol is present, it is used
+    as a last resort, since an override is always more specific than the
+    interpolated URL.
+    """
+
+    # A configuration that does not provide an https clone pattern only
+    # supports ssh, so pick the ssh overrides in that case as well.
+    use_ssh = clone_with_ssh or "https-clone-pattern" not in config
+
+    if use_ssh:
+        url_keys = ["ssh-url", "url", "https-url"]
+    else:
+        url_keys = ["https-url", "url", "ssh-url"]
+
+    for url_key in url_keys:
+        if url_key in remote_repo_info:
+            return remote_repo_info[url_key]
+
+    if "id" not in remote_repo_info:
+        raise RuntimeError(
+            "'remote' for '{0}' must have an 'id', 'url', 'ssh-url' or "
+            "'https-url' item".format(repo_name)
+        )
+
+    clone_pattern_key = "ssh-clone-pattern" if use_ssh else "https-clone-pattern"
+    return config[clone_pattern_key] % remote_repo_info["id"]
+
+
 def obtain_all_additional_swift_sources(
     args: CliArguments,
     config: Dict[str, Any],
@@ -881,17 +923,9 @@ def obtain_all_additional_swift_sources(
             )
             continue
 
-        # If we have a url override, use that url instead of
-        # interpolating.
-        remote_repo_info = repo_info["remote"]
-        if "url" in remote_repo_info:
-            remote = remote_repo_info["url"]
-        else:
-            remote_repo_id = remote_repo_info["id"]
-            if args.clone_with_ssh is True or "https-clone-pattern" not in config:
-                remote = config["ssh-clone-pattern"] % remote_repo_id
-            else:
-                remote = config["https-clone-pattern"] % remote_repo_id
+        remote = remote_url_for_repo(
+            repo_name, repo_info["remote"], config, args.clone_with_ssh
+        )
 
         repo_branch: Optional[str] = None
         repo_not_in_scheme = False
@@ -1053,6 +1087,28 @@ def validate_config(config: Dict[str, Any]):
                 seen[alias] = scheme_name
 
 
+def load_config(configs: List[str]) -> Dict[str, Any]:
+    """Loads and merges update-checkout configuration files.
+
+    Args:
+        configs (List[str]): configuration file paths. When empty, the
+            update-checkout-config.json shipped alongside update-checkout is
+            used.
+
+    Returns:
+        Dict[str, Any]: the merged, validated configuration.
+    """
+
+    if not configs:
+        configs = [str(SCRIPT_DIR.parent.joinpath("update-checkout-config.json"))]
+    config: Dict[str, Any] = {}
+    for config_path in configs:
+        with open(config_path) as f:
+            config = merge_config(config, json.load(f))
+    validate_config(config)
+    return config
+
+
 def full_target_name(repo_path: Path, remote: str, target: str) -> str:
     branch, _, _ = Git.run(repo_path, ["branch", "--list", target], fatal=True)
     branch = branch.replace("* ", "")
@@ -1118,15 +1174,7 @@ def main() -> int:
             )
             sys.exit(1)
 
-    # Set the default config path if none are specified
-    if not args.configs:
-        default_path = SCRIPT_DIR.parent.joinpath("update-checkout-config.json")
-        args.configs.append(str(default_path))
-    config: Dict[str, Any] = {}
-    for config_path in args.configs:
-        with open(config_path) as f:
-            config = merge_config(config, json.load(f))
-    validate_config(config)
+    config = load_config(args.configs)
 
     cross_repos_pr: Dict[str, str] = {}
     if args.github_comment:
@@ -1185,11 +1233,7 @@ def main() -> int:
                 )
 
                 # Re-read the config after checkout.
-                config = {}
-                for config_path in args.configs:
-                    with open(config_path) as f:
-                        config = merge_config(config, json.load(f))
-                validate_config(config)
+                config = load_config(args.configs)
                 scheme_map = get_scheme_map(config, scheme_name)
 
         if args.dump_hashes:
@@ -1200,7 +1244,11 @@ def main() -> int:
             dump_repo_hashes(args, config, args.dump_hashes_config)
             return 0
 
-        _check_missing_clones(args=args, config=config, scheme_map=scheme_map)
+        if check_missing_clones(args=args, config=config, scheme_map=scheme_map):
+            print(
+                "You don't have all swift sources. "
+                "Call this script with --clone to get them."
+            )
 
         skipped_repositories, update_results = update_all_repositories(
             args, config, scheme_name, scheme_map, cross_repos_pr

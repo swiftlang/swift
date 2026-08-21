@@ -1208,6 +1208,43 @@ bb0(%0 : $Int):
   return %r : $()
 }
 
+// The destroy of the dead closure is on the mark_dependence.
+// CHECK-LABEL: sil [ossa] @test_dead_on_stack_closure_with_mark_dependence :
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     mark_dependence
+// CHECK-LABEL: } // end sil function 'test_dead_on_stack_closure_with_mark_dependence'
+sil [ossa] @test_dead_on_stack_closure_with_mark_dependence : $@convention(thin) (Int, @guaranteed Klass) -> () {
+bb0(%0 : $Int, %1 : @guaranteed $Klass):
+  %2 = function_ref @closure2 : $@convention(thin) (Int) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (Int) -> ()
+  %4 = mark_dependence [nonescaping] %3 : $@noescape @callee_guaranteed () -> () on %1 : $Klass
+  debug_value %4 : $@noescape @callee_guaranteed () -> (), let, name "closure"
+  destroy_value %4 : $@noescape @callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// The closure is the base of the mark_dependence and not its forwarded value.
+// Deleting the mark_dependence would leave %4 without a destroy.
+// CHECK-LABEL: sil [ossa] @test_dead_on_stack_closure_as_mark_dependence_base :
+// CHECK:         partial_apply
+// CHECK:         mark_dependence
+// CHECK-LABEL: } // end sil function 'test_dead_on_stack_closure_as_mark_dependence_base'
+sil [ossa] @test_dead_on_stack_closure_as_mark_dependence_base : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = function_ref @closure2 : $@convention(thin) (Int) -> ()
+  %2 = partial_apply [callee_guaranteed] [on_stack] %1(%0) : $@convention(thin) (Int) -> ()
+  %3 = function_ref @make_klass : $@convention(thin) () -> @owned Klass
+  %4 = apply %3() : $@convention(thin) () -> @owned Klass
+  %5 = mark_dependence %4 : $Klass on %2 : $@noescape @callee_guaranteed () -> ()
+  destroy_value %5 : $Klass
+  destroy_value %2 : $@noescape @callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @make_klass : $@convention(thin) () -> @owned Klass
+
 sil [ossa] @closure2 : $@convention(thin) (Int) -> ()
 
 sil [ossa] @yield1 : $@yield_once(Float) -> (@yields Float) {

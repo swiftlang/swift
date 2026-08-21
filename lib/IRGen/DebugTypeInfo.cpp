@@ -26,36 +26,25 @@
 using namespace swift;
 using namespace irgen;
 
-DebugTypeInfo::DebugTypeInfo(swift::Type Ty, Alignment Align,
-                             bool HasDefaultAlignment, bool IsMetadata,
-                             bool IsFixedBuffer,
+DebugTypeInfo::DebugTypeInfo(swift::Type Ty, std::optional<Alignment> Align,
+                             bool IsMetadata, bool IsFixedBuffer,
                              std::optional<uint32_t> NumExtraInhabitants)
     : Type(Ty.getPointer()), NumExtraInhabitants(NumExtraInhabitants),
-      Align(Align), DefaultAlignment(HasDefaultAlignment),
-      IsMetadataType(IsMetadata), IsFixedBuffer(IsFixedBuffer) {
-  assert(Align.getValue() != 0);
-}
-
-/// Determine whether this type has an attribute specifying a custom alignment.
-static bool hasDefaultAlignment(swift::Type Ty) {
-  if (auto CanTy = Ty->getCanonicalType())
-    if (auto *TyDecl = CanTy.getNominalOrBoundGenericNominal())
-      if (TyDecl->getAttrs().getAttribute<AlignmentAttr>()
-          || TyDecl->getAttrs().getAttribute<RawLayoutAttr>())
-        return false;
-  return true;
+      Align(Align), IsMetadataType(IsMetadata), IsFixedBuffer(IsFixedBuffer) {
+  assert((!Align || Align->getValue() != 0) && "zero alignment");
 }
 
 DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &TI,
                                              IRGenModule &IGM) {
   std::optional<uint32_t> NumExtraInhabitants;
+  std::optional<Alignment> Align;
   if (TI.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&TI);
     NumExtraInhabitants = FixTy.getFixedExtraInhabitantCount(IGM);
+    Align = FixTy.getFixedAlignment();
   }
   assert(TI.getStorageType() && "StorageType is a nullptr");
-  return DebugTypeInfo(Ty.getPointer(), TI.getBestKnownAlignment(),
-                       ::hasDefaultAlignment(Ty),
+  return DebugTypeInfo(Ty.getPointer(), Align,
                        /* IsMetadataType = */ false,
                        /* IsFixedBuffer = */ false, NumExtraInhabitants);
 }
@@ -82,7 +71,6 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
 DebugTypeInfo DebugTypeInfo::getGlobalMetadata(swift::Type Ty, Size size,
                                                Alignment align) {
   DebugTypeInfo DbgTy(Ty.getPointer(), align,
-                      /* HasDefaultAlignment = */ true,
                       /* IsMetadataType = */ false);
   assert(!DbgTy.isContextArchetype() &&
          "type metadata cannot contain an archetype");
@@ -92,7 +80,6 @@ DebugTypeInfo DebugTypeInfo::getGlobalMetadata(swift::Type Ty, Size size,
 DebugTypeInfo DebugTypeInfo::getTypeMetadata(swift::Type Ty, Size size,
                                              Alignment align) {
   DebugTypeInfo DbgTy(Ty.getPointer(), align,
-                      /* HasDefaultAlignment = */ true,
                       /* IsMetadataType = */ true);
   assert(!DbgTy.isContextArchetype() &&
          "type metadata cannot contain an archetype");
@@ -135,7 +122,7 @@ DebugTypeInfo DebugTypeInfo::getGlobalFixedBuffer(SILGlobalVariable *GV,
                                                   Alignment Align,
                                                   IRGenModule &IGM) {
   auto *Type = getTypeForGlobal(GV, IGM);
-  DebugTypeInfo DbgTy(Type, Align, ::hasDefaultAlignment(Type),
+  DebugTypeInfo DbgTy(Type, Align,
                       /* IsMetadataType = */ false, /* IsFixedBuffer = */ true);
   assert(!DbgTy.isContextArchetype() &&
          "type of global variable cannot be an archetype");
@@ -145,7 +132,6 @@ DebugTypeInfo DebugTypeInfo::getGlobalFixedBuffer(SILGlobalVariable *GV,
 DebugTypeInfo DebugTypeInfo::getObjCClass(ClassDecl *theClass, Size SizeInBytes,
                                           Alignment align) {
   DebugTypeInfo DbgTy(theClass->getInterfaceType().getPointer(), align,
-                      /* HasDefaultAlignment = */ true,
                       /* IsMetadataType = */ false);
   assert(!DbgTy.isContextArchetype() &&
          "type of objc class cannot be an archetype");
@@ -175,6 +161,8 @@ TypeDecl *DebugTypeInfo::getDecl() const {
     return UBG->getDecl();
   if (auto *BG = dyn_cast<BoundGenericType>(Type))
     return BG->getDecl();
+  if (auto *PPT = dyn_cast<ParameterizedProtocolType>(Type))
+    return PPT->getProtocol();
   if (auto *E = dyn_cast<ExistentialType>(Type))
     return E->getConstraintType()->getAnyNominal();
   return nullptr;
@@ -185,7 +173,10 @@ LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
   llvm::errs() << "[";
   if (isForwardDecl())
     llvm::errs() << "forward ";
-  llvm::errs() << "Alignment " << Align.getValue() << "] ";
+  if (Align)
+    llvm::errs() << "Alignment " << Align->getValue() << "] ";
+  else
+    llvm::errs() << "Alignment unknown] ";
   if (auto *Type = getType())
     Type->dump(llvm::errs());
 }

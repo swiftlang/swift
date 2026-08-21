@@ -110,3 +110,11 @@ Added: _$s11Distributed26_distributedStubFatalError8functions5NeverOSS_tF
 Added: _$s11Distributed0A5ActorPAAE9whenLocalyqd__Sgqd__xYiYaYbqd_0_YKXEYaqd_0_YKs8SendableRd__s5ErrorRd_0_r0_lF
 // async function pointer to (extension in Distributed):Distributed.DistributedActor.whenLocal<A, B where A1: Swift.Sendable, B1: Swift.Error>(@Sendable (isolated A) async throws(B1) -> A1) async throws(B1) -> A1?
 Added: _$s11Distributed0A5ActorPAAE9whenLocalyqd__Sgqd__xYiYaYbqd_0_YKXEYaqd_0_YKs8SendableRd__s5ErrorRd_0_r0_lFTu
+
+// Distributed.DistributedRemoteActorReferenceExecutor.checkIsolated() -> ()
+Added: _$s11Distributed0A28RemoteActorReferenceExecutorC13checkIsolatedyyF
+
+// Distributed.ExecuteDistributedTargetError.ErrorCode.incompatibleInvocationDecoder
+Added: _$s11Distributed07ExecuteA11TargetErrorV0D4CodeO29incompatibleInvocationDecoderyA2EmFWC
+// Distributed.ExecuteDistributedTargetError.ErrorCode.incompatibleResultHandler
+Added: _$s11Distributed07ExecuteA11TargetErrorV0D4CodeO25incompatibleResultHandleryA2EmFWC

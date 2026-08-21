@@ -73,12 +73,29 @@ public func unqualifiedLookup(
     configuredRegions: configuredRegions
   )
 
-  // Add header to the output
+  // Add header to the output.
+  //
+  // We always call `lookupToken.lookup` with an `identifier` of `nil`,
+  // so we don't filter results by name.
+  //
+  // E.g.
+  //   # | -----> Lookup at token 'B' @ 57:38 (identifier: nil, finishInSequentialScope: false)
+  //   # |      +-------------------------------------------------------------+
+  //   # |      |           ASTScope           |      SwiftLexicalLookup      |
+  //   # |      +------------------------------+------------------------------+
   var consoleOutput =
-    "-----> Lookup started at: \(sourceLocationConverter.location(for: lookupPosition).lineWithColumn) (\"\(lookupToken.text)\") finishInSequentialScope: \(finishInSequentialScope)\n"
+    "-----> Lookup at token '\(lookupToken.text)' @ \(sourceLocationConverter.location(for: lookupPosition).lineWithColumn) (identifier: nil, finishInSequentialScope: \(finishInSequentialScope))\n"
+  let leadingPadding = "     "
   consoleOutput +=
-    "     |" + "ASTScope".addPaddingUpTo(characters: rowCharWidth) + "|"
-    + "SwiftLexicalLookup".addPaddingUpTo(characters: rowCharWidth) + "\n"
+    leadingPadding + "+" + String(repeating: "-", count: rowCharWidth + 1 + rowCharWidth) + "+\n"
+  consoleOutput +=
+    leadingPadding + "|"
+    + "ASTScope".addPaddingUpTo(characters: rowCharWidth) + "|"
+    + "SwiftLexicalLookup".addPaddingUpTo(characters: rowCharWidth) + "|\n"
+  consoleOutput +=
+    leadingPadding + "+"
+    + String(repeating: "-", count: rowCharWidth) + "+"
+    + String(repeating: "-", count: rowCharWidth) + "+\n"
 
   // Flagging pass
   flaggingPass(
@@ -276,7 +293,7 @@ private func sllConsumedResults(
               flags: .placementRearranged
             )
           }
-        } else if let nominalTypeScope = Syntax(parent).asProtocol(SyntaxProtocol.self) as? NominalTypeDeclSyntax,
+        } else if let nominalTypeScope = Syntax(parent).asProtocol(SyntaxProtocol.self) as? NominalTypeDeclScopeSyntax,
           nominalTypeScope.inheritanceClause?.range.contains(lookupToken.position) ?? false
         {
           // If lookup started from nominal type inheritance clause, reverse introduced names.

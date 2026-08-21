@@ -542,3 +542,37 @@ func testEraseAsyncActorIsolatedPartialApplication(a: MyActor) {
 func extractIsolation(fn: @escaping @isolated(any) @Sendable () -> Void) -> (any Actor)? {
   fn.isolation
 }
+
+final class HasIsolatedAnyStorage {
+  var fn: @isolated(any) @Sendable () -> Void = {}
+  var optFn: (@isolated(any) @Sendable () -> Void)?
+}
+
+// The base of an isolation extraction expression has to be loaded first;
+// used to crash in SILGen on an @lvalue operand.
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test30extractIsolationFromMutableVar1cScA_pSgAA21HasIsolatedAnyStorageC_tF
+// CHECK:         [[ADDR:%.*]] = ref_element_addr %0 : $HasIsolatedAnyStorage, #HasIsolatedAnyStorage.fn
+// CHECK-NEXT:    [[ACCESS:%.*]] = begin_access [read] [dynamic] [[ADDR]]
+// CHECK-NEXT:    [[FN:%.*]] = load [copy] [[ACCESS]]
+// CHECK-NEXT:    end_access [[ACCESS]]
+// CHECK-NEXT:    [[FN_BORROW:%.*]] = begin_borrow [[FN]]
+// CHECK-NEXT:    [[ISOLATION:%.*]] = function_extract_isolation [[FN_BORROW]]
+// CHECK-NEXT:    [[RESULT:%.*]] = copy_value [[ISOLATION]] : $Optional<any Actor>
+func extractIsolationFromMutableVar(c: HasIsolatedAnyStorage) -> (any Actor)? {
+  c.fn.isolation
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test36extractIsolationThroughOptionalChain1cScA_pSgAA21HasIsolatedAnyStorageC_tF
+// CHECK:         function_extract_isolation
+func extractIsolationThroughOptionalChain(c: HasIsolatedAnyStorage) -> (any Actor)? {
+  c.optFn?.isolation ?? nil
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test28extractIsolationFromLocalVarScA_pSgyF
+// CHECK:         function_extract_isolation
+func extractIsolationFromLocalVar() -> (any Actor)? {
+  var local: (@isolated(any) @Sendable () -> Void)? = nil
+  defer { local = nil }
+  return local?.isolation ?? nil
+}

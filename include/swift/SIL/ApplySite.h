@@ -468,7 +468,7 @@ public:
   /// function this apply can call, i.e. with at least getNumArguments()
   /// arguments.
   SILArgument *getCalleeArgument(SILFunction *callee, const Operand &op) const {
-    assert(callee->getArguments().size() >= getNumArguments() &&
+    ASSERT(callee->getArguments().size() >= getNumArguments() &&
            "applying more arguments than the callee has");
     unsigned idx = argIndexOfFirstAppliedArg(callee->getConventions()) +
                    getAppliedArgIndex(op);

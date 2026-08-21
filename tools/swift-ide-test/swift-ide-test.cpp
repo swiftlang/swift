@@ -35,6 +35,7 @@
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Config.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Strings.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -3311,6 +3312,28 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   for (StringRef ModuleToPrint : ModulesToPrint) {
     if (ModuleToPrint.empty()) {
       ExitCode = 1;
+      continue;
+    }
+
+    // The declarations imported from a bridging header live in the special
+    // __ObjC module, which cannot be resolved by name. Recognize that name and
+    // map it to the bridging header passed via -import-objc-header.
+    if (ModuleToPrint == CLANG_HEADER_MODULE_NAME) {
+      auto &FEOpts = Invocation.getFrontendOptions();
+      if (FEOpts.ImplicitObjCHeaderPath.empty()) {
+        llvm::errs() << "error: module '" << ModuleToPrint
+                     << "' requires a bridging header passed with "
+                        "-import-objc-header\n";
+        ExitCode = 1;
+        continue;
+      }
+      auto *Importer =
+          static_cast<ClangImporter *>(Context.getClangModuleLoader());
+      Importer->importBridgingHeader(FEOpts.ImplicitObjCHeaderPath,
+                                     CI.getMainModule(), /*diagLoc=*/{},
+                                     /*trackParsedSymbols=*/true);
+      printHeaderInterface(FEOpts.ImplicitObjCHeaderPath, Context, *Printer,
+                           Options);
       continue;
     }
 

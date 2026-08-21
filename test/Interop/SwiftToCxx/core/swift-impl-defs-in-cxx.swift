@@ -223,6 +223,17 @@
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-EMPTY:
+
+// Target-conditional swift::Int/swift::UInt blocks may appear here.
+
+// CHECK:      inline const constexpr bool isUsableInGenericContext<char32_t> = true;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<>
+// CHECK-NEXT: struct TypeMetadataTrait<char32_t> {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$ss7UnicodeO6ScalarVN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK: #pragma clang diagnostic pop
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace swift

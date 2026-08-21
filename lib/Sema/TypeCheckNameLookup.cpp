@@ -1018,7 +1018,7 @@ bool swift::shouldDiagnoseMissingImportForMember(const ValueDecl *decl,
     // to the Clang header import module which should always be implicitly
     // visible. However, that module is not implicitly imported in source files
     // so we need to special case it here and avoid diagnosing.
-    if (definingModule->isClangHeaderImportModule())
+    if (definingModule->isClangBridgingHeaderImportModule())
       return false;
   }
 

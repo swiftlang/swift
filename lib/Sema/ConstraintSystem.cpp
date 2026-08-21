@@ -1442,6 +1442,11 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
+  bool isCalledOnce = false;
+
+  if (auto *called = expr->getAttrs().getAttribute<CalledAttr>()) {
+    isCalledOnce = called->isOnce();
+  }
 
   if (throws || async) {
     if (expr->getThrowsLoc().isValid() && !expr->getExplicitThrownTypeRepr())
@@ -1460,6 +1465,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
       .withThrows(throws, /*FIXME:*/Type())
       .withAsync(async)
       .withSendable(sendable)
+      .withCalledOnce(isCalledOnce)
       .build();
   }
 
@@ -1474,6 +1480,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
       .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
       .withAsync(bool(findAsyncNode(expr)))
       .withSendable(sendable)
+      .withCalledOnce(isCalledOnce)
       .build();
 }
 
@@ -3781,11 +3788,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
       // At this point we should have already found argument expression
       // this attribute belongs to, so we can leave this element in place
       // because it points out exact location useful for diagnostics.
-      break;
-    }
-
-    case ConstraintLocator::ResultBuilderBodyResult: {
-      path = path.slice(1);
       break;
     }
 

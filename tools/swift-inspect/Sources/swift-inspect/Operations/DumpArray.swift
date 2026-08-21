@@ -36,11 +36,11 @@ internal struct DumpArrays: ParsableCommand {
 
         let ReadBytes: RemoteProcess.ReadBytesFunction =
             type(of: process).ReadBytes
-        let this = process.toOpaqueRef()
+        let this = OpaqueRef(process)
 
         let isClass = process.context.isArrayOfClass(swift_reflection_ptr_t(metadata))
         let count = process.context.arrayCount(swift_reflection_ptr_t(allocation),
-                                               { ReadBytes(this, $0, UInt64($1), nil) })
+                                               { ReadBytes(this.pointer, $0, UInt64($1), nil) })
         print("\(hex: swift_reflection_ptr_t(allocation))\t\(size)\t\(count.map(String.init) ?? "<unknown>")\t\(isClass)")
       }
     }

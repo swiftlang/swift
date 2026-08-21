@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -redundant-load-elimination | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -compute-side-effects -redundant-load-elimination | %FileCheck %s
 // TODO : Add a version with semantic-arc-opts when #34971 is landed or DCE is enabled on OSSA
 
 
@@ -1122,6 +1122,32 @@ bb0(%0 : $*MyArray<MyStruct>):
   destroy_value %7 : $MyArray<MyStruct>
   %t = tuple ()
   return %t : $() 
+}
+// CHECK-LABEL: sil [noinline] @refcount_read :
+// CHECK-NEXT:  [%0: read v**, destroy v**]
+// CHECK-NEXT:  [global: ]
+sil [noinline] @refcount_read : $@convention(thin) (@inout Klass) -> Builtin.Int1 {
+bb0(%0 : $*Klass):
+  %1 = is_unique %0 : $*Klass
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil [ossa] @dont_forward_over_refcount_read :
+// CHECK:         [[S:%.*]] = alloc_stack $Klass
+// CHECK:         store %0 to [init] [[S]]
+// CHECK:         apply
+// CHECK:         load [take] [[S]]
+// CHECK:       } // end sil function 'dont_forward_over_refcount_read'
+sil [ossa] @dont_forward_over_refcount_read : $@convention(thin) (@owned Klass) -> Builtin.Int1 {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %3 = function_ref @refcount_read : $@convention(thin) (@inout Klass) -> Builtin.Int1
+  %4 = apply %3(%1) : $@convention(thin) (@inout Klass) -> Builtin.Int1
+  %5 = load [take] %1 : $*Klass
+  destroy_value %5 : $Klass
+  dealloc_stack %1 : $*Klass
+  return %4 : $Builtin.Int1
 }
 
 // CHECK-LABEL: @load_trivial_from_store :

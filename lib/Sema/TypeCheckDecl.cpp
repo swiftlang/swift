@@ -1055,6 +1055,12 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   if (decl->isFinal() || decl->shouldUseObjCDispatch() || decl->hasClangNode())
     return false;
 
+  // Embedded Swift has no unspecialized generic code, so there is no single
+  // implementation to put in a vtable slot for a generic method. Such methods
+  // are dispatched statically instead.
+  if (decl->mustBeStaticallyDispatchedInEmbedded())
+    return false;
+
   auto &ctx = dc->getASTContext();
 
   // Initializers are not normally inherited, but required initializers can
@@ -2225,6 +2231,14 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     return ownershipRepr->getSpecifier();
   }
 
+  // @called(once) implies `consumed`.
+  if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
+    if (auto *calledAttr = attributedTy->get(TypeAttrKind::Called)) {
+      if (cast<CalledTypeAttr>(calledAttr)->isOnce())
+        return ParamSpecifier::Consuming;
+    }
+  }
+
   return ParamSpecifier::Default;
 }
 
@@ -2315,6 +2329,30 @@ static Type validateParameterType(ParamDecl *decl) {
   if (Ty->hasError()) {
     decl->setInvalid();
     return ErrorType::get(ctx);
+  }
+
+  if (auto *F = Ty->getAs<AnyFunctionType>()) {
+    if (F->isCalledOnce()) {
+      switch (ownership) {
+      case ParamSpecifier::Borrowing:
+      case ParamSpecifier::LegacyShared:
+        ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
+                           diag::called_once_cannot_be_used_with_borrowing);
+        return ErrorType::get(ctx);
+
+      case ParamSpecifier::InOut:
+      case ParamSpecifier::Consuming:
+      case ParamSpecifier::LegacyOwned:
+      // used by `sending`
+      case ParamSpecifier::ImplicitlyCopyableConsuming:
+        break;
+      // @called(once) is consuming by default and we don't
+      // require it be to written explicitly.
+      case ParamSpecifier::Default:
+        ownership = ParamSpecifier::Consuming;
+        break;
+      }
+    }
   }
 
   // Validate the presence of ownership for a parameter with an inverse applied.
@@ -2935,19 +2973,22 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     (void)nominal->getDistributedActorSystemProperty();
   }
 
-  // Synthesize the COM identity members -- a @com class's CLSID, a @com
-  // protocol's IID -- so they are always present in getAllMembers/getABIMembers
-  // for vtable emission, code completion, and ABI, not only when name lookup
-  // forces them.  For imported types the request finds the deserialized member.
+  // Synthesize the COM identity members:
+  //  - a @com protocol's IID
+  //  - under Microsoft's model, a @com class's CLSID
+  //
+  // so they are always present in getAllMembers/getABIMembers for vtable
+  // emission, code completion, and ABI, not only when name lookup forces them.
+  // For imported types the request finds the deserialized member.
   if (ctx.LangOpts.EnableCOMInterop) {
     if (auto *PD = dyn_cast_or_null<ProtocolDecl>(nominal)) {
-      if (PD->getAttrs().hasAttribute<COMAttr>())
+      if (PD->isCOMInterface())
         (void)evaluateOrDefault(ctx.evaluator,
                                 SynthesizeCOMInterfaceIDRequest{PD}, nullptr);
     } else if (auto *CD = dyn_cast_or_null<ClassDecl>(nominal)) {
-      if (CD->getAttrs().hasAttribute<COMAttr>())
-        (void)evaluateOrDefault(ctx.evaluator,
-                                SynthesizeCOMImplementationIDRequest{CD}, nullptr);
+      if (CD->isCOMImplementation())
+        (void)evaluateOrDefault(ctx.evaluator, SynthesizeCOMCLSIDRequest{CD},
+                                nullptr);
     }
   }
 

@@ -93,7 +93,7 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 }
 
 // CHECK-LABEL: define swifttailcc void @"$s27move_function_dbginfo_async13varSimpleTestyyxz_xtYalF"(
-// CHECK-SAME:     ptr swiftasync %[[frame_ptr:.*]], ptr %1, ptr noalias %2, ptr %T)
+// CHECK-SAME:     ptr swiftasync %[[frame_ptr:.*]], ptr noalias %1, ptr noalias %2, ptr %T)
 // CHECK:   %[[frame_ptr_alloca:.*]] = alloca ptr,
 // CHECK:   store ptr %[[frame_ptr]], ptr %[[frame_ptr_alloca]]
 // CHECK:   #dbg_value(ptr %[[frame_ptr_alloca]], !{{[0-9]+}}, !DIExpression(DW_OP_deref, DW_OP_plus_uconst, 24, DW_OP_deref, DW_OP_deref)

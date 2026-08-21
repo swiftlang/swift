@@ -19,9 +19,13 @@
 #include "Debug.h"
 #include "TaskGroupPrivate.h"
 #include "TaskPrivate.h"
+// <bitset>/<string> cannot be included at all under -ffreestanding (their
+// own headers hard-error); they're only used below for hosted-only debug
+// status pretty-printing (statusString()/to_string()).
+#if !SWIFT_CONCURRENCY_EMBEDDED
 #include "bitset"
-#include "queue" // TODO: remove and replace with usage of our mpsc queue
 #include "string"
+#endif
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
@@ -36,7 +40,6 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
-#include <deque>
 #include <new>
 
 #if SWIFT_STDLIB_HAS_ASL
@@ -115,9 +118,29 @@ class DiscardingTaskGroup;
 /************************** QUEUE IMPL ***************************************/
 /*****************************************************************************/
 
+// A FIFO queue of the (at most one, for a discarding task group; many, for
+// an accumulating task group) tasks that have completed and are ready to be
+// consumed. Rather than allocating a separate queue node per item, task-
+// backed items are threaded through an intrusive linked list stored in the
+// task itself (AsyncTask::GroupChildFragment's NextReadyTask), since a
+// task-group child task is only ever offered to (and thus only ever
+// enqueued into the ready queue of) its own group, and only once. A
+// discarding task group may additionally hold a single task-less raw error
+// (thrown directly by the group's body); that has no backing task to link
+// through, so it's stored directly in this queue as a scalar instead.
+//
+// T is always ReadyQueueItem; this remains a template only so its body,
+// which is defined ahead of ReadyQueueItem/ReadyStatus (nested inside
+// TaskGroupBase, declared below), can refer to those types indirectly via
+// calls on T (resolved at instantiation) rather than by name.
 template<typename T>
 class NaiveTaskGroupQueue {
-  std::queue<T, std::deque<T, swift::cxx_allocator<T>>> queue;
+  AsyncTask *head = nullptr;
+  AsyncTask *tail = nullptr;
+
+  /// Storage for a discarding task group's at-most-one raw (task-less)
+  /// error, using 0 (matching ReadyStatus::Empty) as the "none" sentinel.
+  uintptr_t rawErrorStorage = 0;
 
 public:
   NaiveTaskGroupQueue() = default;
@@ -127,26 +150,62 @@ public:
   NaiveTaskGroupQueue &operator=(const NaiveTaskGroupQueue<T> &) = delete;
 
   NaiveTaskGroupQueue(NaiveTaskGroupQueue<T> &&other) {
-    queue = std::move(other.queue);
+    head = other.head;
+    tail = other.tail;
+    rawErrorStorage = other.rawErrorStorage;
+    other.head = nullptr;
+    other.tail = nullptr;
+    other.rawErrorStorage = 0;
   }
 
   ~NaiveTaskGroupQueue() {}
 
   bool dequeue(T &output) {
-    if (queue.empty()) {
+    if (rawErrorStorage != 0) {
+      output = T{rawErrorStorage};
+      rawErrorStorage = 0;
+      return true;
+    }
+    if (!head) {
       return false;
     }
-    output = queue.front();
-    queue.pop();
+    AsyncTask *task = head;
+    auto *fragment = task->groupChildFragment();
+    head = fragment->getNextReadyTask();
+    if (!head) {
+      tail = nullptr;
+    }
+    fragment->setNextReadyTask(nullptr);
+    output = T::fromTaskResult(task, fragment->getReadyHadErrorResult());
     return true;
   }
 
   bool isEmpty() const {
-    return queue.empty();
+    return head == nullptr && rawErrorStorage == 0;
   }
 
   void enqueue(const T item) {
-    queue.push(item);
+    if (item.isRawError()) {
+      assert(isEmpty() &&
+             "task group ready queue may only ever hold a single raw "
+             "error, with nothing else enqueued alongside it");
+      rawErrorStorage = item.storage;
+      return;
+    }
+
+    assert(rawErrorStorage == 0 &&
+           "cannot enqueue a task-based ready item while a raw error is "
+           "pending");
+    AsyncTask *task = item.getTask();
+    auto *fragment = task->groupChildFragment();
+    fragment->setNextReadyTask(nullptr);
+    fragment->setReadyHadErrorResult(item.hadErrorResult());
+    if (tail) {
+      tail->groupChildFragment()->setNextReadyTask(task);
+    } else {
+      head = task;
+    }
+    tail = task;
   }
 };
 
@@ -286,6 +345,23 @@ public:
       assert(group && "only a discarding task group uses raw errors in the ready queue");
       return ReadyQueueItem{
           reinterpret_cast<uintptr_t>(error) | static_cast<uintptr_t>(ReadyStatus::RawError)};
+    }
+
+    // The following are used by NaiveTaskGroupQueue, which is defined above
+    // this type (and thus cannot name ReadyStatus/ReadyQueueItem directly),
+    // to store/restore items via the intrusive AsyncTask linked list without
+    // needing to spell out those types there.
+
+    bool isRawError() const {
+      return getStatus() == ReadyStatus::RawError;
+    }
+
+    bool hadErrorResult() const {
+      return getStatus() == ReadyStatus::Error;
+    }
+
+    static ReadyQueueItem fromTaskResult(AsyncTask *task, bool hadErrorResult) {
+      return get(hadErrorResult ? ReadyStatus::Error : ReadyStatus::Success, task);
     }
   };
 
@@ -475,7 +551,7 @@ public:
 
   /// Cancel the group and all of its child tasks recursively.
   /// This also sets the cancelled bit in the group status.
-  bool cancelAll(AsyncTask *task);
+  bool cancelAll(AsyncTask *task, size_t reason);
 };
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
@@ -1394,7 +1470,7 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
     // "All for one, one for all!" - any task failing must cause the group and all sibling tasks to be cancelled,
     // such that the discarding group can exit as soon as possible.
     auto parent = completedTask->childFragment()->getParent();
-    cancelAll(parent);
+    cancelAll(parent, /*unspecified=*/0);
 
     if (afterComplete.hasWaitingTask() && afterComplete.pendingTasks(this) == 0) {
       // We grab the waiting task while holding the group lock, because this
@@ -2037,9 +2113,47 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
 
   // ==== 2) Add to wait queue -------------------------------------------------
 
-  // ---- 2.1) Discarding task group may need to story the bodyError before we park
-  if (bodyError && isDiscardingResults() && readyQueue.isEmpty()) {
+  // ---- 2.1) Discarding task group must store the bodyError before we park
+  if (bodyError && isDiscardingResults()) {
     auto discardingGroup = asDiscardingImpl(this);
+
+    // The body thrown error always "wins" over an error stored by a child task,
+    // so we must discard any error a child had stored before we got here.
+    //
+    // This is not merely an optimization: throwing out of the body cancels the
+    // group, which routinely wakes up a child that then fails as well. Whether
+    // that child's error lands in the readyQueue before or after we get here is
+    // a race, and the body error must win either way.
+    ReadyQueueItem storedErrorItem;
+    while (readyQueue.dequeue(storedErrorItem)) {
+      switch (storedErrorItem.getStatus()) {
+      case ReadyStatus::Error: {
+        // We only kept the failed child task around in order to keep its error
+        // alive; since the body error wins we can detach and release it right
+        // away, balancing the retain performed when it was enqueued.
+        auto storedErrorTask = storedErrorItem.getTask();
+        SWIFT_TASK_GROUP_DEBUG_LOG(this,
+                                   "waitAll, bodyError wins, discard stored "
+                                   "error of child task:%p",
+                                   storedErrorTask);
+        _swift_taskGroup_detachChild(asAbstract(this), storedErrorTask);
+        swift_release(storedErrorTask);
+        break;
+      }
+      case ReadyStatus::RawError:
+        // The only raw error a discarding group ever stores is a body error,
+        // i.e. this very error, which we are about to store again. We do not
+        // own it -- it is kept alive by the task running the group body.
+        assert(storedErrorItem.getRawError(discardingGroup) == bodyError &&
+               "discarding group stored a raw error other than the body error");
+        break;
+      default:
+        swift_Concurrency_fatalError(
+            0, "only errors can be stored by a discarding task group, yet it "
+               "wasn't an error!");
+      }
+    }
+
     auto readyItem = ReadyQueueItem::getRawError(discardingGroup, bodyError);
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "enqueue %#" PRIxPTR, readyItem.storage);
     readyQueue.enqueue(readyItem);
@@ -2116,11 +2230,23 @@ SWIFT_CC(swift)
 static void swift_taskGroup_cancelAllImpl(TaskGroup *group) {
   // TaskGroup is not a Sendable type, so this can only be called from the
   // owning task.
-  asBaseImpl(group)->cancelAll(swift_task_getCurrent());
+  asBaseImpl(group)->cancelAll(swift_task_getCurrent(), /*unspecified=*/0);
 }
 
-bool TaskGroupBase::cancelAll(AsyncTask *owningTask) {
-  SWIFT_TASK_DEBUG_LOG("cancel all tasks in group = %p", this);
+SWIFT_CC(swift)
+static void swift_taskGroup_cancelAllWithFlagsImpl(TaskGroup *group,
+                                                   size_t flags) {
+  // TaskGroup is not a Sendable type, so this can only be called from the
+  // owning task.
+  // The low 3 bits of `flags` carry `CancellationError.Reason`'s raw value;
+  // the remaining bits are reserved for future evolution and ignored here.
+  size_t reason = flags & 0b111;
+  asBaseImpl(group)->cancelAll(swift_task_getCurrent(), reason);
+}
+
+bool TaskGroupBase::cancelAll(AsyncTask *owningTask, size_t reason) {
+  SWIFT_TASK_DEBUG_LOG("cancel all tasks in group = %p (reason=%zu)",
+                       this, reason);
 
   // Flag the task group itself as cancelled.  If this was already
   // done, any existing child tasks should already have been cancelled,
@@ -2134,7 +2260,7 @@ bool TaskGroupBase::cancelAll(AsyncTask *owningTask) {
   // Cancel all the child tasks.  TaskGroup is not a Sendable type,
   // so cancelAll() can only be called from the owning task.  This
   // satisfies the precondition on cancel_unlocked().
-  _swift_taskGroup_cancel_unlocked(asAbstract(this), owningTask);
+  _swift_taskGroup_cancel_unlocked(asAbstract(this), owningTask, reason);
 
   return true;
 }
@@ -2144,7 +2270,8 @@ static void swift_task_cancel_group_child_tasksImpl(TaskGroup *group) {
   // TaskGroup is not a Sendable type, and so this operation (which is not
   // currently exposed in the API) can only be called from the owning
   // task.  This satisfies the precondition on cancel_unlocked().
-  _swift_taskGroup_cancel_unlocked(group, swift_task_getCurrent());
+  _swift_taskGroup_cancel_unlocked(group, swift_task_getCurrent(),
+                                   /*unspecified=*/0);
 }
 
 // =============================================================================

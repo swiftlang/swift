@@ -1602,6 +1602,7 @@ namespace  {
     UNINTERESTING_ATTR(Borrowing)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(COM)
+    UNINTERESTING_ATTR(Called)
     UNINTERESTING_ATTR(Concurrent)
     UNINTERESTING_ATTR(Consuming)
     UNINTERESTING_ATTR(Documentation)
@@ -1842,11 +1843,11 @@ enum class OverrideAvailability {
 
 static std::pair<OverrideAvailability, std::optional<AvailabilityRestriction>>
 getOverrideAvailability(ValueDecl *override, ValueDecl *base) {
+  // FIXME: [availability] Adopt getRequirementMatchAvailabilityRestriction().
   auto &ctx = override->getASTContext();
 
-  // Availability is contravariant so make sure the availability of of an
-  // overridden declaration is fully contained in the availability of the
-  // overriding declaration.
+  // Availability is contravariant so make sure the overriding declaration is
+  // at least as available as the overridden declaration.
   auto baseAvailability = AvailabilityContext::forDeclSignature(base);
 
   // The override is allowed to be less available than the base decl as long as

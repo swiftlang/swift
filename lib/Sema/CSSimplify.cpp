@@ -3261,6 +3261,20 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       increaseScore(SK_SyncInAsync, locator);
   }
 
+  if (func1->isCalledOnce() != func2->isCalledOnce()) {
+    if (func1->isCalledOnce() || kind < ConstraintKind::Subtype) {
+      if (!shouldAttemptFixes())
+        return SolutionKind::Error;
+
+      auto *fix = ExecutionSemanticsMismatch::create(
+          *this, func1, func2, getConstraintLocator(locator));
+      if (recordFix(fix, FixImpact::FunctionTypeMismatch))
+        return SolutionKind::Error;
+    }
+
+    increaseScore(SK_FunctionConversion, locator);
+  }
+
   // Match @Sendable.
   auto sendableResult = matchFunctionSendability(
       func1, func2, kind, TMF_GenerateConstraints,
@@ -7136,17 +7150,6 @@ bool ConstraintSystem::repairFailures(
     return true;
   }
 
-  case ConstraintLocator::ResultBuilderBodyResult: {
-    // If result type of the body couldn't be determined
-    // there is going to be other fix available to diagnose
-    // the underlying issue.
-    if (lhs->isPlaceholder())
-      return true;
-
-    conversionsOrFixes.push_back(ContextualMismatch::create(
-        *this, lhs, rhs, getConstraintLocator(locator)));
-    break;
-  }
   case ConstraintLocator::GlobalActorType: {
     // Drop global actor element as it servers only to indentify the global
     // actor matching.
@@ -16227,6 +16230,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreNonMetatypeDynamicType:
   case FixKind::IgnoreIsolatedConformance:
   case FixKind::IgnoreClassRequirementForDynamicMemberLookup:
+  case FixKind::ExecutionSemanticsMismatch:
     llvm_unreachable("handled elsewhere");
   }
 
@@ -16523,7 +16527,9 @@ void ConstraintSystem::addConstraint(Requirement req,
       }
     }
 
-    conformsToAnyObject = true;
+    // Native classes conform to AnyObject, but foreign reference types do not,
+    // so only imply the AnyObject requirement when the bound isn't an FRT.
+    conformsToAnyObject = !req.getSecondType()->isForeignReferenceType();
     kind = ConstraintKind::Subtype;
     break;
   }

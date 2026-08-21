@@ -51,7 +51,7 @@
 #include <cassert>
 #include <cstring>
 #include <cstdint>
-#include <string>
+#include <iterator>
 #include <tuple>
 #include <utility>
 
@@ -117,11 +117,6 @@ hash_code hash_value(const std::pair<T, U> &arg);
 /// Compute a hash_code for a tuple.
 template <typename... Ts>
 hash_code hash_value(const std::tuple<Ts...> &arg);
-
-/// Compute a hash_code for a standard string.
-template <typename T>
-hash_code hash_value(const std::basic_string<T> &arg);
-
 
 /// Override the execution seed with a fixed value.
 ///
@@ -669,13 +664,6 @@ hash_code hash_value(const std::tuple<Ts...> &arg) {
   // TODO: Use std::apply when LLVM starts using C++17.
   return ::llvm::hashing::detail::hash_value_tuple_helper(
       arg, typename std::index_sequence_for<Ts...>());
-}
-
-// Declared and documented above, but defined here so that any of the hashing
-// infrastructure is available.
-template <typename T>
-hash_code hash_value(const std::basic_string<T> &arg) {
-  return hash_combine_range(arg.begin(), arg.end());
 }
 
 } // namespace llvm

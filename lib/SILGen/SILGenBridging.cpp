@@ -2073,19 +2073,28 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
           }
           
           // For non-error arguments, pass a placeholder.
-          // If the argument type is non-trivial, it must be Optional, and
-          // we pass nil.
+          // If the argument type is non-trivial and Optional, pass nil.
+          // A non-trivial, non-Optional parameter must be _Nonnull as
+          // ClangImporter only imports a non-trivial
+          // completion-handler parameter bare when the header
+          // indicates nonnull. Synthesize and pass nil.
           auto param = completionTy->getParameters()[i];
           auto paramTy = param.getSILStorageInterfaceType();
           if (paramTy.isTrivial(F)) {
             // If it's trivial, pass a zero value of whatever the type is.
             auto zero = B.createZeroInitValue(loc, paramTy);
             completionHandlerArgs.push_back(zero);
-          } else {
-            // If it's not trivial, it must be a nullable class type. Pass
-            // nil.
+          } else if (paramTy.getOptionalObjectType()) {
+            // If it's Optional, pass nil.
             auto none = B.createOptionalNone(loc, paramTy);
             completionHandlerArgs.push_back(none);
+          } else {
+            // Non-trivial, non-optional (_Nonnull): synthesize nil via
+            // Optional<T>.none, bitcast to the bare type.
+            auto optionalTy = paramTy.wrapInOptionalType();
+            auto none = B.createOptionalNone(loc, optionalTy);
+            auto nil = B.createUncheckedBitwiseCast(loc, none, paramTy);
+            completionHandlerArgs.push_back(nil);
           }
         }
         // Pass the bridged error on to the completion handler.

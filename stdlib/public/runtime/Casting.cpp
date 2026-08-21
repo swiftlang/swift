@@ -737,6 +737,9 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
                                      outValue, outType, inoutCanTake, false,
                                      isTargetExistentialMetatype);
     }
+    case ExistentialTypeRepresentation::COM:
+      swift::fatalError(/*flags=*/0,
+                        "A COM interface cannot be bridged to Objective-C without an explicit object-model projection");
     }
   }
 
@@ -849,7 +852,10 @@ swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype,
 static const void *
 _dynamicCastUnknownClassToExistential(const void *object,
                                     const ExistentialTypeMetadata *targetType) {
-  // FIXME: check superclass constraint here.
+  if (auto *superclass = targetType->getSuperclassConstraint()) {
+    if (swift_dynamicCastUnknownClass(object, superclass) == nullptr)
+      return nullptr;
+  }
 
   for (auto protocol : targetType->getProtocols()) {
     switch (protocol.getDispatchStrategy()) {
@@ -1176,6 +1182,9 @@ static void unwrapExistential(OpaqueValue *src,
                               bool &isOutOfLine,
                               bool &canTake) {
   switch (srcType->getRepresentation()) {
+    case ExistentialTypeRepresentation::COM:
+      swift::fatalError(/*flags=*/0,
+                        "A COM interface cannot be bridged to Objective-C without an explicit object-model projection");
     case ExistentialTypeRepresentation::Class: {
       auto classContainer =
         reinterpret_cast<ClassExistentialContainer*>(src);

@@ -254,11 +254,11 @@ private struct FunctionSpecializations {
       case let debugValue as DebugValueInst:
         if debugValue.debugReconstructionBlock != nil {
           // A box cannot be salvaged.
-          debugValue.killOperand()
+          debugValue.killOperand(index: use.index)
         } else {
           // A bare debug_value on an alloc_box describes the box content: repoint it to the alloc_stack with a deref.
-          debugValue.operand.set(to: stack, context)
-          debugValue.prependDeref()
+          use.set(to: stack, context)
+          debugValue.prependDeref(index: use.index)
         }
       case let apply as ApplySite:
         specialize(apply: apply, context)

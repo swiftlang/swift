@@ -37,6 +37,12 @@ internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
   }
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
+  /// A remote distributed actor reference is never isolated to any context,
+  /// since the actual actor instance lives in another process
+  public func checkIsolated() {
+    fatalError("Incorrect actor executor assumption; Cannot be isolated to a remote distributed actor reference!")
+  }
+
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     unsafe UnownedSerialExecutor(ordinary: self)
   }

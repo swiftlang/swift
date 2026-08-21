@@ -133,6 +133,12 @@ void ClangImporter::getBridgingHeaderOptions(
     swiftArgs.push_back(ctx.LangOpts.ClangTarget->str());
   }
 
+  // Inherit Embedded Swift.
+  if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    swiftArgs.push_back("-enable-experimental-feature");
+    swiftArgs.push_back("Embedded");
+  }
+
   // Add args reported by the scanner.
 
   // Round-trip clang args to canonicalize and clear the options that swift

@@ -22,7 +22,14 @@
 #include <memory>
 #include <optional>
 #include <type_traits>
+
+// std::vector is not available in freestanding mode with some standard
+// library implementations (e.g. libstdc++), so the std::vector interop
+// below is unavailable there too; it's only used by the non-embedded
+// runtime.
+#if __STDC_HOSTED__
 #include <vector>
+#endif
 
 inline namespace __swift { inline namespace __runtime {
 namespace llvm {
@@ -92,10 +99,12 @@ namespace llvm {
       : Data(Vec.data()), Length(Vec.size()) {
     }
 
+#if __STDC_HOSTED__
     /// Construct an ArrayRef from a std::vector.
     template<typename A>
     /*implicit*/ ArrayRef(const std::vector<T, A> &Vec)
       : Data(Vec.data()), Length(Vec.size()) {}
+#endif
 
     /// Construct an ArrayRef from a std::array
     template <size_t N>
@@ -139,6 +148,7 @@ namespace llvm {
             nullptr)
         : Data(Vec.data()), Length(Vec.size()) {}
 
+#if __STDC_HOSTED__
     /// Construct an ArrayRef<const T*> from std::vector<T*>. This uses SFINAE
     /// to ensure that only vectors of pointers can be converted.
     template <typename U, typename A>
@@ -146,6 +156,7 @@ namespace llvm {
              std::enable_if_t<std::is_convertible<U *const *, T const *>::value>
                  * = 0)
         : Data(Vec.data()), Length(Vec.size()) {}
+#endif
 
     /// @}
     /// @name Simple Operations
@@ -278,16 +289,20 @@ namespace llvm {
     /// @}
     /// @name Expensive Operations
     /// @{
+#if __STDC_HOSTED__
     std::vector<T> vec() const {
       return std::vector<T>(Data, Data+Length);
     }
+#endif
 
     /// @}
     /// @name Conversion operators
     /// @{
+#if __STDC_HOSTED__
     operator std::vector<T>() const {
       return std::vector<T>(Data, Data+Length);
     }
+#endif
 
     /// @}
   };
@@ -339,9 +354,11 @@ namespace llvm {
     /*implicit*/ MutableArrayRef(SmallVectorImpl<T> &Vec)
     : ArrayRef<T>(Vec) {}
 
+#if __STDC_HOSTED__
     /// Construct a MutableArrayRef from a std::vector.
     /*implicit*/ MutableArrayRef(std::vector<T> &Vec)
     : ArrayRef<T>(Vec) {}
+#endif
 
     /// Construct a MutableArrayRef from a std::array
     template <size_t N>
@@ -480,8 +497,10 @@ namespace llvm {
   ArrayRef(const SmallVectorImpl<T> &Vec) -> ArrayRef<T>;
   template <typename T, unsigned N>
   ArrayRef(const SmallVector<T, N> &Vec) -> ArrayRef<T>;
+#if __STDC_HOSTED__
   template <typename T, typename A>
   ArrayRef(const std::vector<T, A> &) -> ArrayRef<T>;
+#endif
   template <typename T, std::size_t N>
   ArrayRef(const std::array<T, N> &Vec) -> ArrayRef<T>;
   template <typename T>
@@ -525,10 +544,12 @@ namespace llvm {
   }
 
   /// Construct an ArrayRef from a std::vector.
+#if __STDC_HOSTED__
   template<typename T>
   ArrayRef<T> makeArrayRef(const std::vector<T> &Vec) {
     return Vec;
   }
+#endif
 
   /// Construct an ArrayRef from a std::array.
   template <typename T, std::size_t N>

@@ -47,7 +47,7 @@ typedef unsigned long long __swift_typeid_t;
  */
 typedef unsigned long long __swift_options_t;
 
-typedef __swift_ptrdiff_t swift_tls_key_t;
+typedef __swift_ptrdiff_t __swift_tls_key_t;
 
 /**
  * Number of reserved TLS keys used by Embedded Swift runtime components.
@@ -363,7 +363,11 @@ __swift_size_t _swift_writeToStandardOutput(
     __swift_size_t count);
 
 /**
- * Reports a fatal error and terminates the program.
+ * Reports a fatal error before the program is terminated.
+ *
+ * A platform may implement this as an empty function. After returning from this
+ * function the standard library terminates the program using a unique trap
+ * whose debug info also carries the stop reason and source location.
  *
  * - Parameters:
  *   - message: The UTF-8 code points that make up the failure message. It is
@@ -376,10 +380,14 @@ void _swift_reportError(
     const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(messageCount) message,
     __swift_size_t messageCount,
     __swift_options_t flags
-) EMBEDDED_SWIFT_NORETURN;
+);
 
 /**
- * Reports a fatal error at a given file/line and terminates the program.
+ * Reports a fatal error at a given file/line.
+ *
+ * A platform may implement this as an empty function. After returning from
+ * this function the standard library terminates the program using a unique trap
+ * whose debug info also carries the stop reason and source location.
  *
  * - Parameters:
  *   - message: The UTF-8 code points that make up the failure message. It is
@@ -399,7 +407,7 @@ void _swift_reportErrorAt(
     __swift_size_t fileNameCount,
     __swift_size_t line,
     __swift_options_t flags
-) EMBEDDED_SWIFT_NORETURN;
+);
 
 /**
  * Generates random bytes into the given buffer.
@@ -439,42 +447,6 @@ void _swift_generateRandom(void * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SIZED_BY
  * This function can be implemented as a direct call to `arc4random_buf`.
  */
 void _swift_generateRandomHashSeed(void * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SIZED_BY(nbytes) buffer, __swift_size_t nbytes);
-
-/**
- * Retrieve a pointer that will be used to retain information needed for Swift's
- * dynamic exclusivity checking.
- *
- * - Returns: The pointer most recently passed to `_swift_setExclusivityTLS` on
- *   this thread. If `_swift_setExclusivityTLS` has not been called on this
- *   thread, returns NULL.
- *
- * In a single-threaded environment, the `_swift_getExclusivityTLS` and
- * `_swift_setExclusivityTLS` functions can get and set a global variable that
- * is initialized to NULL. In a multi-threaded environment, the variable will
- * need to be in thread-local storage (e.g., using C11 `_Thread_local`) or a
- * similar facility.
- *
- * This function is required when using Swift's dynamic exclusivity checking,
- * which is enabled by the Swift compiler option `-enforce-exclusivity=checked`
- * and required when the compiler cannot statically prove that all accesses to a
- * given variable (such as a global variable or a stored instance property of a
- * class) respect the exclusivity model.
- */
-void * EMBEDDED_SWIFT_NULLABLE _swift_getExclusivityTLS(void);
-
-/**
- * Set the pointer that will be used to retain information needed for Swift's
- * dynamic exclusivity checking.
- *
- * - Parameters:
- *   - ptr: The pointer to set. A subsequent call to
- *     `_swift_getExclusivityTLS` on the same thread (without an intervening
- *     call to `_swift_setExclusivityTLS`) shall return `ptr`.
- *
- * See `_swift_getExclusivityTLS` for more information about dynamic exclusivity
- * checking.
- */
-void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
 
 /**
  * Initializes a mutex.
@@ -576,7 +548,7 @@ void _swift_mutexRecursive_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
  * described by `SWIFT_TLS_KEY_COUNT`. `destructor` may be NULL. This function
  * is called at most once for each key that needs a destructor.
  */
-void _swift_tls_init(swift_tls_key_t key,
+void _swift_tls_init(__swift_tls_key_t key,
                      __swift_tls_dtor_t EMBEDDED_SWIFT_NULLABLE destructor);
 
 /**
@@ -588,7 +560,7 @@ void _swift_tls_init(swift_tls_key_t key,
  *
  * Precondition: `key < SWIFT_TLS_KEY_COUNT`.
  */
-void * EMBEDDED_SWIFT_NULLABLE _swift_tls_get(swift_tls_key_t key);
+void * EMBEDDED_SWIFT_NULLABLE _swift_tls_get(__swift_tls_key_t key);
 
 /**
  * Stores a value for a TLS key in the current execution context.
@@ -598,7 +570,7 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_tls_get(swift_tls_key_t key);
  *
  * Precondition: `key < SWIFT_TLS_KEY_COUNT`.
  */
-void _swift_tls_set(swift_tls_key_t key,
+void _swift_tls_set(__swift_tls_key_t key,
                     void * EMBEDDED_SWIFT_NULLABLE value);
 
 /**
@@ -618,7 +590,7 @@ __swift_ptrdiff_t _swift_thread_isMain(void);
  * This function can be implemented directly with a call to the POSIX exit()
  * function.
  */
-void _swift_exit(__swift_ptrdiff_t code);
+void _swift_exit(int code);
 
 #if defined(__cplusplus)
 }

@@ -8,6 +8,7 @@
 // RUN: %target-run-simple-swift(-O -parse-as-library -enable-builtin-module -Xfrontend -sil-verify-all) | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // CHECK-IR-NOT: @"$sBpWV"
 

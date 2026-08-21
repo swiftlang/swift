@@ -60,6 +60,12 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
     if (method->isFinal())
       return MethodDispatch::Static;
 
+    // Embedded Swift cannot put a generic method in a vtable, so these are
+    // dispatched statically. The type checker rejects the cases where that
+    // would be observable (`open`, or an override).
+    if (method->mustBeStaticallyDispatchedInEmbedded())
+      return MethodDispatch::Static;
+
     // Imported class methods are dynamically dispatched.
     if (method->isObjC() && method->hasClangNode())
       return MethodDispatch::Class;
@@ -1267,27 +1273,7 @@ bool SILDeclRef::declExposedToForeignLanguage(const ValueDecl *decl) {
 }
 
 bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
-  // This function only forces the issue in embedded.
-  if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
-    return false;
-
-  auto module = decl->getModuleContext();
-  auto &ctx = module->getASTContext();
-
-  switch (decl->getEffectiveCodeGenerationModel()) {
-  case CodeGenerationModel::Implementation:
-    /// When deferring all code generation, declarations are emitted as late
-    /// as possible, so they must have non-unique definitions.
-    return true;
-
-  case CodeGenerationModel::Inlinable:
-    // If the declaration is not from the main module, treat its definition as
-    // non-unique.
-    return module != ctx.MainModule && ctx.MainModule;
-
-  case CodeGenerationModel::Interface:
-    return false;
-  }
+  return decl->hasNonUniqueDefinition();
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {

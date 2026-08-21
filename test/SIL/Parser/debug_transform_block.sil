@@ -9,12 +9,12 @@ sil_scope 1 { parent @test_transform_const : $@convention(thin) () -> () }
 // CHECK-LABEL: sil @test_transform_const :
 sil @test_transform_const : $@convention(thin) () -> () {
 bb0:
-  // CHECK: debug_value undef : $Builtin.Int64, let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
+  // CHECK: debug_value (), let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
   // CHECK:   bb0:
   // CHECK:     %0 = integer_literal $Builtin.Int64, 42
   // CHECK:     return %0 : $Builtin.Int64
   // CHECK:   }
-  debug_value undef : $Builtin.Int64, let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
+  debug_value (), let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
   bb0:
     %0 = integer_literal $Builtin.Int64, 42
     return %0 : $Builtin.Int64

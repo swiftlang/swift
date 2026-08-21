@@ -3,7 +3,7 @@
 
 # TODO: Once the migration is completed, we can delete this file
 
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.24)
 
 # Where the standard library lives today
 set(StdlibSources "${CMAKE_CURRENT_LIST_DIR}/../stdlib")
@@ -199,6 +199,7 @@ message(STATUS "Windows modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT
 copy_files(public/Platform Overlay/Windows/clang
   FILES
     ucrt.modulemap
+    WinSDK.apinotes
     winsdk_um.modulemap
     winsdk_shared.modulemap
     vcruntime.modulemap

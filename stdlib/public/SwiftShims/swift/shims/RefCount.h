@@ -667,12 +667,12 @@ class alignas(sizeof(void*) * 2) SideTableRefCountBits : public RefCountBitsT<Re
         : RefCountBitsT<RefCountNotInline>(&newbits), weakBits(1) {}
 
     SWIFT_ALWAYS_INLINE
-    void incrementWeakRefCount() { weakBits++; }
+    void incrementWeakRefCount(uint32_t inc = 1) { weakBits += inc; }
 
     SWIFT_ALWAYS_INLINE
-    bool decrementWeakRefCount() {
-      assert(weakBits > 0);
-      weakBits--;
+    bool decrementWeakRefCount(uint32_t dec = 1) {
+      assert(weakBits >= dec);
+      weakBits -= dec;
       return weakBits == 0;
   }
 
@@ -1282,39 +1282,39 @@ class RefCounts {
   HeapObjectSideTableEntry* formWeakReference();
 
   // Increment the weak reference count.
-  void incrementWeak() {
+  void incrementWeak(uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
     do {
       newbits = oldbits;
       assert(newbits.getWeakRefCount() != 0);
-      newbits.incrementWeakRefCount();
-      
+      newbits.incrementWeakRefCount(inc);
+
       if (newbits.getWeakRefCount() < oldbits.getWeakRefCount())
         swift_abortWeakRetainOverflow();
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
   }
-  
-  bool decrementWeakShouldCleanUp() {
+
+  bool decrementWeakShouldCleanUp(uint32_t dec = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
 
     bool performFree;
     do {
       newbits = oldbits;
-      performFree = newbits.decrementWeakRefCount();
+      performFree = newbits.decrementWeakRefCount(dec);
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
 
     return performFree;
   }
 
-  bool decrementWeakShouldCleanUpNonAtomic() {
+  bool decrementWeakShouldCleanUpNonAtomic(uint32_t dec = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
 
     auto newbits = oldbits;
-    auto performFree = newbits.decrementWeakRefCount();
+    auto performFree = newbits.decrementWeakRefCount(dec);
     refCounts.store(newbits, std::memory_order_relaxed);
 
     return performFree;
@@ -1483,7 +1483,7 @@ class HeapObjectSideTableEntry {
   // WEAK
 
   SWIFT_NODISCARD
-  HeapObjectSideTableEntry* incrementWeak() {
+  HeapObjectSideTableEntry* incrementWeak(uint32_t inc = 1) {
     // incrementWeak need not be atomic w.r.t. concurrent deinit initiation.
     // The client can't actually get a reference to the object without
     // going through tryRetain(). tryRetain is the one that needs to be
@@ -1491,14 +1491,14 @@ class HeapObjectSideTableEntry {
     // The check here is merely an optimization.
     if (refCounts.isDeiniting())
       return nullptr;
-    refCounts.incrementWeak();
+    refCounts.incrementWeak(inc);
     return this;
   }
 
-  void decrementWeak() {
+  void decrementWeak(uint32_t dec = 1) {
     // FIXME: assertions
     // FIXME: optimize barriers
-    bool cleanup = refCounts.decrementWeakShouldCleanUp();
+    bool cleanup = refCounts.decrementWeakShouldCleanUp(dec);
     if (!cleanup)
       return;
 
@@ -1508,10 +1508,10 @@ class HeapObjectSideTableEntry {
     swift_cxx_deleteObject(this);
   }
 
-  void decrementWeakNonAtomic() {
+  void decrementWeakNonAtomic(uint32_t dec = 1) {
     // FIXME: assertions
     // FIXME: optimize barriers
-    bool cleanup = refCounts.decrementWeakShouldCleanUpNonAtomic();
+    bool cleanup = refCounts.decrementWeakShouldCleanUpNonAtomic(dec);
     if (!cleanup)
       return;
 

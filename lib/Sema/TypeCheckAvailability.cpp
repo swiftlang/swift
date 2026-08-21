@@ -847,14 +847,39 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
   if (!Domain.isPlatform())
     return false;
 
+  // Find the innermost enclosing scope that specifies an availability range for
+  // the domain in source. Scopes that don't specify one (such as the
+  // placeholder scopes of declarations in local contexts) are skipped.
+  auto loc = ReferenceRange.Start;
+  if (loc.isInvalid())
+    return false;
+
+  auto *sf =
+      ReferenceDC->getParentModule()->getSourceFileContainingLocation(loc);
+  if (!sf)
+    return false;
+
+  auto *rootScope = AvailabilityScope::getOrBuildForSourceFile(*sf);
+  if (!rootScope)
+    return false;
+
+  llvm::SmallVector<AvailabilityScope *, 8> scopeStack;
+  if (!rootScope->findMostRefinedSubContext(loc, Context, scopeStack))
+    return false;
+
   const AvailabilityScope *scope = nullptr;
-  (void)AvailabilityContext::forLocation(ReferenceRange.Start, ReferenceDC,
-                                         &scope);
+  std::optional<AvailabilityRange> ExplicitAvailability;
+  for (auto candidate : llvm::reverse(scopeStack)) {
+    if (auto range = candidate->getExplicitAvailabilityRange(Domain, Context)) {
+      ExplicitAvailability.emplace(*range);
+      scope = candidate;
+      break;
+    }
+  }
+
   if (!scope)
     return false;
 
-  auto ExplicitAvailability =
-      scope->getExplicitAvailabilityRange(Domain, Context);
   if (ExplicitAvailability && !RequiredAvailability.isAlwaysAvailable() &&
       scope->getReason() != AvailabilityScope::Reason::Root &&
       RequiredAvailability.isContainedIn(*ExplicitAvailability)) {
@@ -1677,8 +1702,9 @@ static void diagnoseIfDeprecated(SourceRange referenceRange,
   auto &ctx = referenceDC->getASTContext();
 
   auto attr = restriction.getAttr();
-  auto domain = attr.getDomain();
-  auto deprecatedRange = attr.getDeprecatedRange(ctx).value();
+  auto domainAndRange = restriction.getDomainAndRange(ctx);
+  auto domain = domainAndRange.getDomain();
+  auto deprecatedRange = domainAndRange.getRange();
   auto message = attr.getMessage();
   auto rawRename = attr.getRename();
   if (message.empty() && rawRename.empty()) {
@@ -1687,7 +1713,7 @@ static void diagnoseIfDeprecated(SourceRange referenceRange,
                   decl, attr.isPlatformSpecific(), domain,
                   deprecatedRange.hasMinimumVersion(), deprecatedRange,
                   /*message*/ StringRef())
-        .highlight(attr.getParsedAttr()->getRange());
+        .highlight(attr.getParsedAttr()->getRangeWithAt());
     return;
   }
 
@@ -1704,7 +1730,7 @@ static void diagnoseIfDeprecated(SourceRange referenceRange,
                   decl, attr.isPlatformSpecific(), domain,
                   deprecatedRange.hasMinimumVersion(), deprecatedRange,
                   EncodedMessage.Message)
-        .highlight(attr.getParsedAttr()->getRange());
+        .highlight(attr.getParsedAttr()->getRangeWithAt());
   } else {
     unsigned rawReplaceKind = static_cast<unsigned>(
         replacementDeclKind.value_or(ReplacementDeclKind::None));
@@ -1713,7 +1739,7 @@ static void diagnoseIfDeprecated(SourceRange referenceRange,
                   decl, attr.isPlatformSpecific(), domain,
                   deprecatedRange.hasMinimumVersion(), deprecatedRange,
                   replacementDeclKind.has_value(), rawReplaceKind, newName)
-        .highlight(attr.getParsedAttr()->getRange());
+        .highlight(attr.getParsedAttr()->getRangeWithAt());
   }
 
   if (!rawRename.empty() && !isa<AccessorDecl>(decl)) {
@@ -1741,8 +1767,9 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
 
   auto attr = restriction.getAttr();
-  auto domain = attr.getDomain();
-  auto deprecatedRange = attr.getDeprecatedRange(ctx).value();
+  auto domainAndRange = restriction.getDomainAndRange(ctx);
+  auto domain = domainAndRange.getDomain();
+  auto deprecatedRange = domainAndRange.getRange();
   auto message = attr.getMessage();
   if (message.empty()) {
     ctx.Diags
@@ -1750,7 +1777,7 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
                   attr.isPlatformSpecific(), domain,
                   deprecatedRange.hasMinimumVersion(), deprecatedRange,
                   /*message*/ StringRef())
-        .highlight(attr.getParsedAttr()->getRange());
+        .highlight(attr.getParsedAttr()->getRangeWithAt());
     return true;
   }
 
@@ -1760,7 +1787,7 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
                 attr.isPlatformSpecific(), domain,
                 deprecatedRange.hasMinimumVersion(), deprecatedRange,
                 encodedMessage.Message)
-      .highlight(attr.getParsedAttr()->getRange());
+      .highlight(attr.getParsedAttr()->getRangeWithAt());
   return true;
 }
 
@@ -1831,30 +1858,6 @@ diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
       });
 }
 
-bool shouldHideDomainNameForRestrictionDiagnostic(
-    const AvailabilityRestriction &restriction) {
-  switch (restriction.getDomain().getKind()) {
-  case AvailabilityDomain::Kind::Universal:
-  case AvailabilityDomain::Kind::Embedded:
-  case AvailabilityDomain::Kind::Custom:
-  case AvailabilityDomain::Kind::PackageDescription:
-    return true;
-  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
-  case AvailabilityDomain::Kind::Platform:
-    return false;
-  case AvailabilityDomain::Kind::SwiftLanguageMode:
-    switch (restriction.getReason()) {
-    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
-    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
-      return false;
-    case AvailabilityRestriction::Reason::Unintroduced:
-    case AvailabilityRestriction::Reason::UnavailableObsolete:
-    case AvailabilityRestriction::Reason::Deprecated:
-      return true;
-    }
-  }
-}
-
 bool diagnoseExplicitUnavailability(SourceLoc loc,
                                     const AvailabilityRestriction &restriction,
                                     const RootProtocolConformance *rootConf,
@@ -1885,34 +1888,13 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
   EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
   diags
       .diagnose(loc, diag::conformance_availability_unavailable, type, proto,
-                shouldHideDomainNameForRestrictionDiagnostic(restriction),
+                restriction.shouldHideDomainNameInDiagnostics(),
                 domainAndRange.getDomain(), EncodedMessage.Message)
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6,
                                LanguageMode::v6);
 
-  switch (restriction.getReason()) {
-  case AvailabilityRestriction::Reason::UnavailableUnconditionally:
-    diags
-        .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
-                  proto)
-        .highlight(attr.getParsedAttr()->getRange());
-    break;
-  case AvailabilityRestriction::Reason::UnavailableUnintroduced:
-    diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
-                   type, proto, domainAndRange.getDomain(),
-                   domainAndRange.getRange());
-    break;
-  case AvailabilityRestriction::Reason::UnavailableObsolete:
-    diags
-        .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
-                  domainAndRange.getDomain(), domainAndRange.getRange())
-        .highlight(attr.getParsedAttr()->getRange());
-    break;
-  case AvailabilityRestriction::Reason::Unintroduced:
-  case AvailabilityRestriction::Reason::Deprecated:
-    llvm_unreachable("unexpected restriction");
-  }
+  restriction.emitNoteForConformance(ext, rootConf);
   return true;
 }
 
@@ -2246,35 +2228,13 @@ bool diagnoseExplicitUnavailability(
     EncodedDiagnosticMessage EncodedMessage(message);
     diags
         .diagnose(Loc, diag::availability_decl_unavailable, D,
-                  shouldHideDomainNameForRestrictionDiagnostic(restriction),
+                  restriction.shouldHideDomainNameInDiagnostics(),
                   domainAndRange.getDomain(), EncodedMessage.Message)
         .highlight(R)
         .limitBehavior(limit);
   }
 
-  auto sourceRange = Attr.getParsedAttr()->getRange();
-  switch (restriction.getReason()) {
-  case AvailabilityRestriction::Reason::UnavailableUnconditionally:
-    diags.diagnose(D, diag::availability_marked_unavailable, D)
-        .highlight(sourceRange);
-    break;
-  case AvailabilityRestriction::Reason::UnavailableUnintroduced:
-    diags
-        .diagnose(D, diag::availability_introduced_in_version, D,
-                  domainAndRange.getDomain(), domainAndRange.getRange())
-        .highlight(sourceRange);
-    break;
-  case AvailabilityRestriction::Reason::UnavailableObsolete:
-    diags
-        .diagnose(D, diag::availability_obsoleted, D,
-                  domainAndRange.getDomain(), domainAndRange.getRange())
-        .highlight(sourceRange);
-    break;
-  case AvailabilityRestriction::Reason::Unintroduced:
-  case AvailabilityRestriction::Reason::Deprecated:
-    llvm_unreachable("unexpected restriction");
-    break;
-  }
+  restriction.emitNoteForDecl(D);
   return true;
 }
 
@@ -3698,4 +3658,26 @@ void swift::checkExplicitAvailability(Decl *decl) {
       diag.fixItInsert(InsertLoc, AttrText);
     }
   }
+}
+
+std::optional<AvailabilityRestriction>
+swift::getRequirementMatchAvailabilityRestriction(
+    const Decl *requirement, const Decl *candidate,
+    AvailabilityRestrictionFlags flags,
+    std::optional<AvailabilityContext> baseAvailability) {
+  auto &ctx = requirement->getASTContext();
+  auto availability = AvailabilityContext::forDeclSignature(requirement);
+
+  if (auto *parent = candidate->parentDeclForAvailability()) {
+    // The candidate cannot be any more available than the decl it is contained
+    // by so only report availability restrictions that are unmet beyond the
+    // parent's availability.
+    auto parentAvailability = AvailabilityContext::forDeclSignature(parent);
+    availability.constrainWithContext(parentAvailability, ctx);
+  }
+
+  if (baseAvailability)
+    availability.constrainWithContext(*baseAvailability, ctx);
+
+  return availability.unsatisfiedRestrictionForDecl(candidate, flags);
 }

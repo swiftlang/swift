@@ -1613,11 +1613,6 @@ public:
 };
 } // end anonymous namespace
 
-SILTransform *swift::createAlwaysInlineInliner() {
-  return new SILPerformanceInlinerPass(InlineSelection::OnlyInlineAlways,
-                                       "InlineAlways Performance Inliner");
-}
-
 /// Create an inliner pass that does not inline functions that are marked with
 /// the @_semantics or @_effects attributes.
 SILTransform *swift::createEarlyPerfInliner() {

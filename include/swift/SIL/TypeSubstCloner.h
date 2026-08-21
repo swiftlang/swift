@@ -184,6 +184,12 @@ protected:
     return Sty;
   }
 
+  /// This cloner's visit methods are needed to clone debug reconstruction
+  /// block content, for its folding of upcast.
+  void cloneDebugReconstructionBlock(SILBasicBlock *SrcBB, SILBasicBlock *NewBB) {
+    this->cloneDebugReconstructionBlockContent(SrcBB, NewBB);
+  }
+
   void visitApplyInst(ApplyInst *Inst) {
     ApplySiteCloningHelper Helper(ApplySite(Inst), *this);
     ApplyInst *N =
@@ -222,8 +228,10 @@ protected:
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
         Helper.getSubstitutions(), Helper.getArguments(),
         Inst->getCalleeConvention(), Inst->getResultIsolation(),
-        Inst->isOnStack(), Inst->isStackAllocationNested(),
-        GenericSpecializationInformation::create(Inst, getBuilder()));
+        Inst->isCalledOnce(), Inst->isOnStack(),
+        Inst->isStackAllocationNested(),
+        GenericSpecializationInformation::create(Inst, getBuilder()),
+        std::nullopt);
     recordClonedInstruction(Inst, N);
   }
 

@@ -158,11 +158,31 @@ namespace {
       super::setSubclassKind((unsigned) kind);
     }
 
+    StructTypeInfoBase(
+        StructTypeInfoKind kind, ArrayRef<FieldInfoType> fields,
+        IRGenModule &IGM,
+        const SerializableLoadableStructTypeInfoRepresentation &representation)
+        : super(fields, IGM, representation) {
+      super::setSubclassKind((unsigned) kind);
+    }
+
+    void populateSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM,
+        SerializableLoadableStructTypeInfoRepresentation &representation) const {
+      super::populateSerializableHiddenTypeInfoRepresentation(IGM,
+                                                               representation);
+    }
+
     using super::asImpl;
+    using super::assertNotDeserialized;
 
   public:
 
     const FieldInfoType &getFieldInfo(VarDecl *field) const {
+      // TypeInfo derived from a hidden representation does not support
+      // AST based operations.
+      assertNotDeserialized("StructTypeInfoBase::getFieldInfo");
+
       // FIXME: cache the physical field index in the VarDecl.
       for (auto &fieldInfo : asImpl().getFields()) {
         if (fieldInfo.Field == field)
@@ -191,6 +211,8 @@ namespace {
     /// single field.
     Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                                 const FieldInfoType &field) const {
+      // We can't access field.Field with deserialized TypeInfo.
+      assertNotDeserialized("StructTypeInfoBase::projectFieldAddress");
       return asImpl().projectFieldAddress(IGF, addr, T, field.Field);
     }
 
@@ -298,6 +320,9 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
                  bool isOutlined) const override {
+      // The code below checks the AST to call a deinit method
+      // which we don't support from hidden representations yet
+      assertNotDeserialized("StructTypeInfoBase::destroy");
 
       // If the struct has a deinit declared, then call it to destroy the
       // value.
@@ -347,6 +372,8 @@ namespace {
             }
           };
 
+          // We can't access field.Field without AST backed TypeInfo
+          assertNotDeserialized("StructTypeInfoBase::verify");
           FindOffsetOfFieldOffsetVector scanner(IGF.IGM, field.Field);
           scanner.layout();
 
@@ -387,11 +414,46 @@ namespace {
   class LoadableClangRecordTypeInfo final
       : public StructTypeInfoBase<LoadableClangRecordTypeInfo, LoadableTypeInfo,
                                   ClangFieldInfo> {
-    const clang::RecordDecl *ClangDecl;
     bool HasReferenceField;
+    std::vector<SwiftAggLowering::StorageEntry> AggLoweringInputs;
+
+    static std::vector<SwiftAggLowering::StorageEntry>
+    computeAggLoweringInputs(IRGenModule &IGM,
+                             const clang::RecordDecl *clangDecl) {
+      assert(clangDecl && "decomposing Clang TypeInfo without a Clang decl");
+      std::vector<SwiftAggLowering::StorageEntry> inputs;
+      SwiftAggLowering decomposer(IGM.getClangCGM());
+      auto appendInput = [&](const SwiftAggLowering::StorageEntry &entry) {
+        inputs.push_back(entry);
+      };
+
+      decomposer.decomposeTypedData(clangDecl, clang::CharUnits::Zero(),
+                                    appendInput);
+      return inputs;
+    }
+
+    void populateSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM,
+        SerializableLoadableClangRecordTypeInfoRepresentation
+            &representation) const {
+      StructTypeInfoBase::populateSerializableHiddenTypeInfoRepresentation(
+          IGM, representation);
+      representation.hasReferenceField = HasReferenceField;
+
+      representation.aggLoweringInputs.clear();
+      for (const auto &entry : AggLoweringInputs) {
+        SerializableAggLoweringInputRepresentation input;
+        input.begin = entry.Begin.getQuantity();
+        input.end = entry.End.getQuantity();
+        if (entry.Type)
+          input.type = serializeLLVMType(entry.Type);
+        representation.aggLoweringInputs.push_back(std::move(input));
+      }
+    }
 
   public:
     LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                                IRGenModule &IGM,
                                 unsigned explosionSize, llvm::Type *storageType,
                                 Size size, SpareBitVector &&spareBits,
                                 Alignment align,
@@ -404,7 +466,36 @@ namespace {
                              storageType, size, std::move(spareBits), align,
                              isTriviallyDestroyable, isCopyable, IsFixedSize,
                              IsABIAccessible),
-          ClangDecl(clangDecl), HasReferenceField(hasReferenceField) {}
+          HasReferenceField(hasReferenceField),
+          AggLoweringInputs(computeAggLoweringInputs(IGM, clangDecl)) {}
+
+    LoadableClangRecordTypeInfo(
+        ArrayRef<ClangFieldInfo> fields, IRGenModule &IGM,
+        const SerializableLoadableClangRecordTypeInfoRepresentation
+            &representation)
+        : StructTypeInfoBase(
+              StructTypeInfoKind::LoadableClangRecordTypeInfo, fields, IGM,
+              static_cast<const SerializableLoadableStructTypeInfoRepresentation
+                              &>(representation)),
+          HasReferenceField(representation.hasReferenceField) {
+      AggLoweringInputs.reserve(representation.aggLoweringInputs.size());
+      for (const auto &input : representation.aggLoweringInputs) {
+        AggLoweringInputs.push_back({
+            clang::CharUnits::fromQuantity(input.begin),
+            clang::CharUnits::fromQuantity(input.end),
+            input.type ? deserializeLLVMType(IGM, input.type) : nullptr,
+        });
+      }
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override {
+      auto representation = std::make_unique<
+          SerializableLoadableClangRecordTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
+    }
 
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
@@ -446,15 +537,11 @@ namespace {
       LoadableClangRecordTypeInfo::initialize(IGF, params, addr, isOutlined);
     }
 
-    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+    void addToAggLowering(IRGenModule &, SwiftAggLowering &lowering,
                           Size offset) const override {
-      if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
-        for (auto base : getBasesAndOffsets(cxxRecordDecl)) {
-          lowering.addTypedData(base.decl, base.offset.asCharUnits());
-        }
+      for (const auto &input : AggLoweringInputs) {
+        lowering.addDecomposedData(input, offset.asCharUnits());
       }
-
-      lowering.addTypedData(ClangDecl, offset.asCharUnits());
     }
 
     std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -676,18 +763,14 @@ namespace {
         ctx.Diags.diagnose(copyConstructorLoc, diag::failed_emit_copy,
                            recordDecl);
 
-        bool hasCopyableIfAttr =
-            recordDecl->hasAttrs() &&
-            llvm::any_of(recordDecl->getAttrs(), [&](clang::Attr *attr) {
-              if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-                StringRef attrStr = swiftAttr->getAttribute();
-                assert(!attrStr.starts_with("~Copyable") &&
-                       "Trying to emit copy of a type annotated with "
-                       "'SWIFT_NONCOPYABLE'?");
-                if (attrStr.starts_with("copyable_if:"))
-                  return true;
-              }
-              return false;
+        bool hasCopyableIfAttr = llvm::any_of(
+            recordDecl->specific_attrs<clang::SwiftAttrAttr>(),
+            [&](const clang::SwiftAttrAttr *swiftAttr) {
+              StringRef attrStr = swiftAttr->getAttribute();
+              assert(!attrStr.starts_with("~Copyable") &&
+                     "Trying to emit copy of a type annotated with "
+                     "'SWIFT_NONCOPYABLE'?");
+              return attrStr.starts_with("copyable_if:");
             });
 
         bool hasRequiresClause =
@@ -1444,7 +1527,7 @@ public:
           ClangDecl);
     }
     return LoadableClangRecordTypeInfo::create(
-        FieldInfos, NextExplosionIndex, llvmType, TotalStride,
+        FieldInfos, IGM, NextExplosionIndex, llvmType, TotalStride,
         std::move(SpareBits), TotalAlignment,
         (SwiftDecl &&
          (SwiftDecl->hasValueTypeDestructor() || hasReferenceField))

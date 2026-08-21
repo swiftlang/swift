@@ -292,22 +292,22 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
   // Handle builtin types by importing them and getting the Swift name.
   if (auto builtinTy = type->getAs<clang::BuiltinType>()) {
     // Names of integer types.
-    static const char *intTypeNames[] = {"UInt8", "UInt16", "UInt32", "UInt64",
-                                         "UInt128"};
+    static constexpr llvm::StringLiteral intTypeNames[] = {
+        "UInt8", "UInt16", "UInt32", "UInt64", "UInt128"};
 
     /// Retrieve the name for an integer type based on its size.
     auto getIntTypeName = [&](bool isSigned) -> StringRef {
       switch (ctx.getTypeSize(builtinTy)) {
       case 8:
-        return StringRef(intTypeNames[0]).substr(isSigned ? 1 : 0);
+        return intTypeNames[0].substr(isSigned ? 1 : 0);
       case 16:
-        return StringRef(intTypeNames[1]).substr(isSigned ? 1 : 0);
+        return intTypeNames[1].substr(isSigned ? 1 : 0);
       case 32:
-        return StringRef(intTypeNames[2]).substr(isSigned ? 1 : 0);
+        return intTypeNames[2].substr(isSigned ? 1 : 0);
       case 64:
-        return StringRef(intTypeNames[3]).substr(isSigned ? 1 : 0);
+        return intTypeNames[3].substr(isSigned ? 1 : 0);
       case 128:
-        return StringRef(intTypeNames[4]).substr(isSigned ? 1 : 0);
+        return intTypeNames[4].substr(isSigned ? 1 : 0);
       default:
         llvm_unreachable("bad integer type size");
       }

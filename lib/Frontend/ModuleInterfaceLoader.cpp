@@ -2046,6 +2046,29 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     GenericArgs.push_back("Embedded");
   }
 
+  // Inherit COM interop and its selected model. Textual interfaces can use
+  // compiler-owned COM model conditions, so both the in-process invocation and
+  // its reproducible build arguments must agree with the importing context.
+  genericSubInvocation.getLangOptions().EnableCOMInterop =
+      langOpts.EnableCOMInterop;
+  genericSubInvocation.getLangOptions().COMModel = langOpts.COMModel;
+  if (langOpts.EnableCOMInterop) {
+    assert(langOpts.COMModel && "enabled COM interop requires a model");
+    GenericArgs.push_back("-enable-experimental-com-interop");
+
+    StringRef modelName;
+    switch (*langOpts.COMModel) {
+    case LangOptions::COMInteropModel::Microsoft:
+      modelName = "microsoft";
+      break;
+    case LangOptions::COMInteropModel::CoreFoundation:
+      modelName = "corefoundation";
+      break;
+    }
+    GenericArgs.push_back(
+        ArgSaver.save((Twine("-com-interop-model=") + modelName).str()));
+  }
+
   if (langOpts.DebuggerSupport) {
     if (clangImporterOpts.DirectClangCC1ModuleBuild) {
       subClangImporterOpts.ExtraArgs.push_back("-dwarf-ext-refs");
@@ -2852,6 +2875,20 @@ std::unique_ptr<ExplicitCASModuleLoader> ExplicitCASModuleLoader::create(
 }
 
 namespace swift::SwiftInterfaceModuleOutputPathResolution {
+static unsigned getCOMInteropCacheState(const LangOptions &langOpts) {
+  if (!langOpts.EnableCOMInterop)
+    return 0;
+
+  assert(langOpts.COMModel && "enabled COM interop requires a model");
+  switch (*langOpts.COMModel) {
+  case LangOptions::COMInteropModel::Microsoft:
+    return 1;
+  case LangOptions::COMInteropModel::CoreFoundation:
+    return 2;
+  }
+  llvm_unreachable("unhandled COM interop model");
+}
+
 /// Construct a key for the .swiftmodule being generated. There is a
 /// balance to be struck here between things that go in the cache key and
 /// things that go in the "up to date" check of the cache entry. We want to
@@ -2930,8 +2967,11 @@ static std::string getContextHash(const CompilerInvocation &CI,
       unsigned(CI.getLangOptions().EnableCXXInterop),
 
       // Is Embedded Swift enabled?
-      unsigned(CI.getLangOptions().hasFeature(Feature::Embedded))
-  );
+      unsigned(CI.getLangOptions().hasFeature(Feature::Embedded)),
+
+      // COM model conditions can select different declarations from the same
+      // textual interface.
+      getCOMInteropCacheState(CI.getLangOptions()));
 
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }

@@ -20,12 +20,18 @@
 #define SWIFT_OWNERSHIP_H
 
 #include "swift/Basic/InlineBitfield.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <assert.h>
 #include <limits.h>
 #include <stdint.h>
+
+// Forward-declared rather than including the full "llvm/ADT/StringRef.h":
+// some standard library implementations (e.g. libstdc++) don't provide the
+// <string> header that StringRef.h pulls in when building freestanding
+// (-ffreestanding), and this header is reachable from freestanding ABI
+// headers.
+namespace llvm { class StringRef; }
 
 namespace swift {
 
@@ -44,31 +50,9 @@ enum class ReferenceOwnership : uint8_t {
 enum : unsigned { NumReferenceOwnershipBits =
   countBitsUsed(static_cast<unsigned>(ReferenceOwnership::Last_Kind)) };
 
-static inline llvm::StringRef keywordOf(ReferenceOwnership ownership) {
-  switch (ownership) {
-  case ReferenceOwnership::Strong:
-    break;
-  case ReferenceOwnership::Weak: return "weak";
-  case ReferenceOwnership::Unowned: return "unowned";
-  case ReferenceOwnership::Unmanaged: return "unowned(unsafe)";
-  }
-  // We cannot use llvm_unreachable() because this is used by the stdlib.
-  assert(false && "impossible");
-  LLVM_BUILTIN_UNREACHABLE;
-}
-
-static inline llvm::StringRef manglingOf(ReferenceOwnership ownership) {
-  switch (ownership) {
-  case ReferenceOwnership::Strong:
-    break;
-  case ReferenceOwnership::Weak: return "Xw";
-  case ReferenceOwnership::Unowned: return "Xo";
-  case ReferenceOwnership::Unmanaged: return "Xu";
-  }
-  // We cannot use llvm_unreachable() because this is used by the stdlib.
-  assert(false && "impossible");
-  LLVM_BUILTIN_UNREACHABLE;
-}
+// Defined out-of-line in lib/Demangling/Ownership.cpp.
+llvm::StringRef keywordOf(ReferenceOwnership ownership);
+llvm::StringRef manglingOf(ReferenceOwnership ownership);
 
 static inline bool isLessStrongThan(ReferenceOwnership left,
                                     ReferenceOwnership right) {
@@ -150,19 +134,9 @@ ParameterOwnership asParameterOwnership(ValueOwnership o);
 /// Map an ABI-stable ownership identifier to a `ValueOwnership`.
 ValueOwnership asValueOwnership(ParameterOwnership o);
 
-static inline llvm::StringRef getOwnershipSpelling(ValueOwnership ownership) {
-  switch (ownership) {
-  case ValueOwnership::Default:
-    return "default";
-  case ValueOwnership::InOut:
-    return "inout";
-  case ValueOwnership::Shared:
-    return "borrowing";
-  case ValueOwnership::Owned:
-    return "consuming";
-  }
-  llvm_unreachable("Invalid ValueOwnership");
-}
+// Defined out-of-line in lib/AST/Ownership.cpp.
+llvm::StringRef getOwnershipSpelling(ValueOwnership ownership);
+
 } // end namespace swift
 
 #endif

@@ -23,6 +23,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 
+#include "ClangExportCompat.h"
 #include "SymbolGraphASTWalker.h"
 
 using namespace swift;
@@ -66,9 +67,9 @@ bool clangModuleExports(const clang::Module *ClangParent, const clang::Module *C
   if (!ClangParent || !CM) return false;
   if (ClangParent == CM) return true;
 
-  for (auto ClangExport : ClangParent->Exports) {
-    auto *ExportedModule = ClangExport.getPointer();
-    if (ClangExport.getInt()) {
+  for (const auto &ClangExport : ClangParent->Exports) {
+    clang::Module *ExportedModule = getExportedClangModule(ClangExport);
+    if (isWildcardClangExport(ClangExport)) {
       if (!ExportedModule && CM->isSubModuleOf(ClangParent)) {
         return true;
       } else if (ExportedModule && CM->isSubModuleOf(ExportedModule)) {

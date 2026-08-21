@@ -54,3 +54,18 @@ public func derive<T : ~Escapable>(_ y: Y<T>) -> Y<T> {
 public func derive<T : ~Escapable>(_ x: X<T>) -> X<T> {
   x
 }
+
+public protocol PublicP: ~Escapable { }
+extension X: PublicP where T == InternalStruct { }
+
+// CHECK:      @available(*, unavailable)
+// CHECK-NEXT: extension Test::X : Test::PublicP where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+
+struct InternalStruct: ~Escapable { }
+protocol InternalP: ~Escapable { }
+
+// CHECK-NOT: extension Test::X
+extension X: InternalP where T == InternalStruct { }
+
+// CHECK:      @usableFromInline
+// CHECK-NEXT: internal protocol _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}

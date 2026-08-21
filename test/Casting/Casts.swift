@@ -1093,4 +1093,109 @@ CastsTests.test("type(of:) should look through __SwiftValue")
   expectEqual(t, "S")  // Fails: currently says `__SwiftValue`
 }
 
+protocol ValueProviding {
+  func value() -> Int
+}
+protocol MetatypeMarker {}
+
+#if _runtime(_ObjC)
+@objc protocol MetatypeObjCMarker {}
+#endif
+
+// A class metatype is an object when ObjC interop is enabled, so it can satisfy
+// a bare `AnyObject` bound, an @objc protocol, or a superclass constraint the
+// class object is actually an instance of. A Swift protocol conformance declared
+// on the class itself describes instances, so it must not be satisfied.
+CastsTests.test("Metatype does not satisfy a constrained class existential") {
+  class C: ValueProviding {
+    var ivar0 = 0x11111111
+    var ivar1 = 0x22222222
+    var ivar2 = 0x33333333
+    var ivar3 = 0x44444444
+    func value() -> Int { ivar0 }
+  }
+
+  expectNil(C.self as Any as? any (ValueProviding & AnyObject))
+  typealias ClassBoundValueProviding = ValueProviding & AnyObject
+  expectNil(runtimeCast(C.self as Any, to: ClassBoundValueProviding.self))
+  expectFalse(C.self as Any is any (ValueProviding & AnyObject))
+
+  expectNil(C.self as Any as? ValueProviding)
+
+  class Base {
+    var b0 = 0x55555555
+    func value() -> Int { b0 }
+  }
+  class Derived: Base, MetatypeMarker {}
+  expectNil(Derived.self as Any as? (Base & MetatypeMarker))
+
+  expectNotNil(C.self as Any as? AnyObject)
+  expectNotNil(runtimeCast(C.self as Any, to: AnyObject.self))
+
+  let instance = C() as Any as? any (ValueProviding & AnyObject)
+  expectNotNil(instance)
+  expectEqual(0x11111111, instance?.value())
+}
+
+#if _runtime(_ObjC)
+// An @objc protocol constraint is answered by the ObjC runtime against the class
+// object itself, so a class metatype can still satisfy one.
+CastsTests.test("Metatype satisfies an @objc protocol existential") {
+  class C: NSObject {}
+
+  let p = C.self as Any as? NSObjectProtocol
+  expectNotNil(p)
+  expectTrue(p?.isKind(of: NSObject.self) ?? false)
+  expectNotNil(runtimeCast(C.self as Any, to: NSObjectProtocol.self))
+}
+
+// A class object is an instance of the root of its metaclass chain, so an
+// `NSObject` superclass constraint is satisfied, while a constraint naming any
+// other class is not.
+CastsTests.test("Metatype satisfies only an NSObject superclass constraint") {
+  class Base: NSObject, MetatypeObjCMarker {}
+  class Derived: Base {}
+
+  expectTrue((Derived.self as AnyObject).isKind(of: NSObject.self))
+  expectNotNil(Derived.self as Any as? (NSObject & MetatypeObjCMarker))
+
+  expectFalse((Derived.self as AnyObject).isKind(of: Base.self))
+  expectNil(Derived.self as Any as? (Base & MetatypeObjCMarker))
+}
+
+// Conformances are looked up on the metaclass, whose chain roots at the class
+// object's own class. A conformance declared on that root describes the class
+// object, so it is satisfied; one declared on the class itself or on an
+// intermediate superclass describes instances, so it is not.
+protocol MetatypeRootConforming {
+  func rootValue() -> Int
+}
+extension NSObject: MetatypeRootConforming {
+  func rootValue() -> Int { return 0x99999999 }
+}
+protocol MetatypeMidConforming {}
+class MetatypeMid: NSObject, MetatypeMidConforming {}
+
+CastsTests.test("Metatype satisfies a conformance declared on its metaclass root") {
+  class Sub: MetatypeMid, ValueProviding {
+    var ivar0 = 0x11111111
+    func value() -> Int { ivar0 }
+  }
+
+  let root = Sub.self as Any as? (NSObject & MetatypeRootConforming)
+  expectNotNil(root)
+  expectEqual(0x99999999, root?.rootValue())
+
+  expectNil(Sub.self as Any as? (NSObject & ValueProviding))
+
+  expectTrue(Sub() is MetatypeMidConforming)
+  expectNil(Sub.self as Any as? (NSObject & MetatypeMidConforming))
+
+  let instance = Sub() as Any as? (NSObject & MetatypeRootConforming)
+  expectNotNil(instance)
+  expectEqual(0x99999999, instance?.rootValue())
+  expectEqual(0x11111111, (Sub() as Any as? ValueProviding)?.value())
+}
+#endif
+
 runAllTests()

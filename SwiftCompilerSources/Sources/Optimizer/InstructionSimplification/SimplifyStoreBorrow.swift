@@ -44,8 +44,8 @@ extension StoreBorrowInst : Simplifiable, SILCombineSimplifiable {
     //   %2 = store_borrow %1
     //   debug_value %1
     // ``
-    for debugValue in uses.users(ofType: DebugValueInst.self) {
-      debugValue.operand.set(to: destination, context)
+    for use in uses where use.instruction is DebugValueInst {
+      use.set(to: destination, context)
     }
 
     context.erase(instructionIncludingAllUsers: self)

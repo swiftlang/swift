@@ -10,18 +10,22 @@ import _Concurrency
 // REQUIRES: SWIFT_STDLIB_ARCH=arm64
 // REQUIRES: OS=macosx
 
-// TAGGED_POINTER: define swiftcc { i64, i64 } @test_cast_implicitactor_to_opaqueisolation(i64 [[WORD1:%.*]], i64 [[WORD2:%.*]])
+// TAGGED_POINTER: define swiftcc { ptr, ptr } @test_cast_implicitactor_to_opaqueisolation(i64 [[WORD1:%.*]], i64 [[WORD2:%.*]])
 // TAGGED_POINTER: [[MASKED_WORD:%.*]] = and i64 [[WORD2]], -4
-// TAGGED_POINTER: [[TUP1:%.*]] = insertvalue { i64, i64 } undef, i64 [[WORD1]], 0
-// TAGGED_POINTER: [[TUP2:%.*]] = insertvalue { i64, i64 } [[TUP1]], i64 [[MASKED_WORD]], 1
-// TAGGED_POINTER: ret { i64, i64 } [[TUP2]]
+// TAGGED_POINTER: [[PTR1:%.*]] = inttoptr i64 [[WORD1]] to ptr
+// TAGGED_POINTER: [[PTR2:%.*]] = inttoptr i64 [[MASKED_WORD]] to ptr
+// TAGGED_POINTER: [[TUP1:%.*]] = insertvalue { ptr, ptr } undef, ptr [[PTR1]], 0
+// TAGGED_POINTER: [[TUP2:%.*]] = insertvalue { ptr, ptr } [[TUP1]], ptr [[PTR2]], 1
+// TAGGED_POINTER: ret { ptr, ptr } [[TUP2]]
 // TAGGED_POINTER-NEXT: }
 
-// TBI: define swiftcc { i64, i64 } @test_cast_implicitactor_to_opaqueisolation(i64 [[WORD1:%.*]], i64 [[WORD2:%.*]])
-// TBI: [[MASKED_WORD:%.*]] = and i64 [[WORD2]], -3458764513820540929 
-// TBI: [[TUP1:%.*]] = insertvalue { i64, i64 } undef, i64 [[WORD1]], 0
-// TBI: [[TUP2:%.*]] = insertvalue { i64, i64 } [[TUP1]], i64 [[MASKED_WORD]], 1
-// TBI: ret { i64, i64 } [[TUP2]]
+// TBI: define swiftcc { ptr, ptr } @test_cast_implicitactor_to_opaqueisolation(i64 [[WORD1:%.*]], i64 [[WORD2:%.*]])
+// TBI: [[MASKED_WORD:%.*]] = and i64 [[WORD2]], -3458764513820540929
+// TBI: [[PTR1:%.*]] = inttoptr i64 [[WORD1]] to ptr
+// TBI: [[PTR2:%.*]] = inttoptr i64 [[MASKED_WORD]] to ptr
+// TBI: [[TUP1:%.*]] = insertvalue { ptr, ptr } undef, ptr [[PTR1]], 0
+// TBI: [[TUP2:%.*]] = insertvalue { ptr, ptr } [[TUP1]], ptr [[PTR2]], 1
+// TBI: ret { ptr, ptr } [[TUP2]]
 // TBI-NEXT: }
 sil @test_cast_implicitactor_to_opaqueisolation : $@convention(thin) (@guaranteed Builtin.ImplicitActor) -> @owned Optional<any Actor> {
 bb0(%0 : $Builtin.ImplicitActor):

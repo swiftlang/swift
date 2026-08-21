@@ -17,26 +17,26 @@ func noArgs() {}
 @available(*) // expected-error {{expected ',' in 'available' attribute}}
 func noKind() {}
 
-@available(badPlatform, unavailable) // expected-warning {{unrecognized platform name 'badPlatform'}}
+@available(badPlatform, unavailable) // expected-warning {{cannot find availability domain 'badPlatform'}}
 func unavailable_bad_platform() {}
 
-@available(macos, unavailable) // expected-warning {{unrecognized platform name 'macos'; did you mean 'macOS'?}} {{12-17=macOS}}
+@available(macos, unavailable) // expected-warning {{cannot find availability domain 'macos'; did you mean 'macOS'?}} {{12-17=macOS}}
 func incorrect_platform_case() {}
 
-@available(mscos, unavailable) // expected-warning {{unrecognized platform name 'mscos'; did you mean 'macOS'?}} {{12-17=macOS}}
+@available(mscos, unavailable) // expected-warning {{cannot find availability domain 'mscos'; did you mean 'macOS'?}} {{12-17=macOS}}
 func incorrect_platform_similar1() {}
 
-@available(macoss, unavailable) // expected-warning {{unrecognized platform name 'macoss'; did you mean 'macOS'?}} {{12-18=macOS}}
+@available(macoss, unavailable) // expected-warning {{cannot find availability domain 'macoss'; did you mean 'macOS'?}} {{12-18=macOS}}
 func incorrect_platform_similar2() {}
 
-@available(mac, unavailable) // expected-warning {{unrecognized platform name 'mac'; did you mean 'macOS'?}} {{12-15=macOS}}
+@available(mac, unavailable) // expected-warning {{cannot find availability domain 'mac'; did you mean 'macOS'?}} {{12-15=macOS}}
 func incorrect_platform_similar3() {}
 
-@available(notValid, unavailable) // expected-warning {{unrecognized platform name 'notValid'}} {{none}}
+@available(notValid, unavailable) // expected-warning {{cannot find availability domain 'notValid'}} {{none}}
 func incorrect_platform_not_similar() {}
 
 // Handle unknown platform.
-@available(HAL9000, unavailable) // expected-warning {{unrecognized platform name 'HAL9000'}}
+@available(HAL9000, unavailable) // expected-warning {{cannot find availability domain 'HAL9000'}}
 func availabilityUnknownPlatform() {}
 
 @available(Swift 6.2, *) // expected-error {{Swift requires '-enable-experimental-feature SwiftRuntimeAvailability'}}
@@ -49,27 +49,27 @@ func swiftLanguageMode6_0() {}
 func anyAppleOS26() {}
 
 // <rdar://problem/17669805> Availability can't appear on a typealias
-@available(*, unavailable, message: "oh no you don't")
-typealias int = Int // expected-note {{'int' has been explicitly marked unavailable here}}
+@available(*, unavailable, message: "oh no you don't") // expected-note {{'int' has been explicitly marked unavailable here}}
+typealias int = Int
 
-@available(*, unavailable, renamed: "Float")
-typealias float = Float // expected-note {{'float' has been explicitly marked unavailable here}}
+@available(*, unavailable, renamed: "Float") // expected-note {{'float' has been explicitly marked unavailable here}}
+typealias float = Float
 
 protocol MyNewerProtocol {}
 
-@available(*, unavailable, renamed: "MyNewerProtocol")
-protocol MyOlderProtocol {} // expected-note {{'MyOlderProtocol' has been explicitly marked unavailable here}}
+@available(*, unavailable, renamed: "MyNewerProtocol") // expected-note {{'MyOlderProtocol' has been explicitly marked unavailable here}}
+protocol MyOlderProtocol {}
 
 extension Int: MyOlderProtocol {} // expected-error {{'MyOlderProtocol' has been renamed to 'MyNewerProtocol'}} 
 
-@available(*, unavailable, renamed: "`class`")
-func keyword_renamed() {} // expected-note {{'keyword_renamed()' has been explicitly marked unavailable here}}
+@available(*, unavailable, renamed: "`class`") // expected-note {{'keyword_renamed()' has been explicitly marked unavailable here}}
+func keyword_renamed() {}
 
-@available(*, unavailable, renamed: "`foo bar`")
-func spaces_renamed() {} // expected-note {{'spaces_renamed()' has been explicitly marked unavailable here}}
+@available(*, unavailable, renamed: "`foo bar`") // expected-note {{'spaces_renamed()' has been explicitly marked unavailable here}}
+func spaces_renamed() {}
 
-@available(*, unavailable, renamed: "foo(`3bar baz`:)")
-func keywords_in_arguments(x: Int) {} // expected-note {{'keywords_in_arguments(x:)' has been explicitly marked unavailable here}}
+@available(*, unavailable, renamed: "foo(`3bar baz`:)") // expected-note {{'keywords_in_arguments(x:)' has been explicitly marked unavailable here}}
+func keywords_in_arguments(x: Int) {}
 
 func testEscapedRenamed() {
   keyword_renamed() // expected-error {{'keyword_renamed()' has been renamed to '`class`'}}
@@ -78,8 +78,8 @@ func testEscapedRenamed() {
 }
 
 struct MyCollection<Element> {
-  @available(*, unavailable, renamed: "Element")
-  typealias T = Element // expected-note 2{{'T' has been explicitly marked unavailable here}}
+  @available(*, unavailable, renamed: "Element") // expected-note 2{{'T' has been explicitly marked unavailable here}}
+  typealias T = Element
 
   func foo(x: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{15-16=Element}}
 }
@@ -88,8 +88,8 @@ extension MyCollection {
   func append(element: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{24-25=Element}}
 }
 
-@available(*, unavailable, renamed: "MyCollection")
-typealias YourCollection<Element> = MyCollection<Element> // expected-note {{'YourCollection' has been explicitly marked unavailable here}}
+@available(*, unavailable, renamed: "MyCollection") // expected-note {{'YourCollection' has been explicitly marked unavailable here}}
+typealias YourCollection<Element> = MyCollection<Element>
 
 var x : YourCollection<Int> // expected-error {{'YourCollection' has been renamed to 'MyCollection'}}{{9-23=MyCollection}}
 
@@ -97,8 +97,8 @@ var y : int // expected-error {{'int' is unavailable: oh no you don't}}
 var z : float // expected-error {{'float' has been renamed to 'Float'}}{{9-14=Float}}
 
 // Encoded message
-@available(*, unavailable, message: "This message has a double quote \"")
-func unavailableWithDoubleQuoteInMessage() {} // expected-note {{'unavailableWithDoubleQuoteInMessage()' has been explicitly marked unavailable here}}
+@available(*, unavailable, message: "This message has a double quote \"") // expected-note {{'unavailableWithDoubleQuoteInMessage()' has been explicitly marked unavailable here}}
+func unavailableWithDoubleQuoteInMessage() {}
 
 func useWithEscapedMessage() {
   unavailableWithDoubleQuoteInMessage() // expected-error {{'unavailableWithDoubleQuoteInMessage()' is unavailable: This message has a double quote \"}}
@@ -272,35 +272,35 @@ func shortFormMissingParen() { // expected-error {{expected ')' in 'available' a
 func shortFormMissingPlatform() {
 }
 
-@available(iOS 8.0, iDishwasherOS 22.0, *) // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
+@available(iOS 8.0, iDishwasherOS 22.0, *) // expected-warning {{cannot find availability domain 'iDishwasherOS'}}
 func shortFormWithUnrecognizedPlatform() {
 }
 
 @available(iOS 8.0, iDishwasherOS 22.0, iRefrigeratorOS 18.0, *)
-// expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
-// expected-warning@-2 {{unrecognized platform name 'iRefrigeratorOS'}}
+// expected-warning@-1 {{cannot find availability domain 'iDishwasherOS'}}
+// expected-warning@-2 {{cannot find availability domain 'iRefrigeratorOS'}}
 func shortFormWithTwoUnrecognizedPlatforms() {
 }
 
 @available(macOS 10.9, iOS 7.0, watchOS 2.0, tvOS 9.0, iDishwasherOS 22.0, visionOS 1.0, *)
-// expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
+// expected-warning@-1 {{cannot find availability domain 'iDishwasherOS'}}
 func shortFormWithInteriorUnrecognizedPlatform() {
 }
 
 @available(ios 8.0, macos 10.12, *)
-// expected-warning@-1 {{unrecognized platform name 'ios'; did you mean 'iOS'?}}
-// expected-warning@-2 {{unrecognized platform name 'macos'; did you mean 'macOS'?}}
+// expected-warning@-1 {{cannot find availability domain 'ios'; did you mean 'iOS'?}}
+// expected-warning@-2 {{cannot find availability domain 'macos'; did you mean 'macOS'?}}
 func shortFormWithTwoPlatformsIncorrectCase() {
 }
 
 @available(os 8.0, *)
-// expected-warning@-1 {{unrecognized platform name 'os'; did you mean 'iOS'?}} {{12-14=iOS}}
+// expected-warning@-1 {{cannot find availability domain 'os'; did you mean 'iOS'?}} {{12-14=iOS}}
 func iosIsClosestThanMacOS() {}
 
 // Make sure that even after the parser hits an unrecognized
 // platform it validates the availability.
 @available(iOS 8.0, iDishwasherOS 22.0, iOS 9.0, *)
-// expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
+// expected-warning@-1 {{cannot find availability domain 'iDishwasherOS'}}
 // expected-error@-2 {{version for iOS already specified}}
 func shortFormWithUnrecognizedPlatformContinueValidating() {
 }
@@ -323,8 +323,8 @@ func someFuncUsingOldAttribute() { }
 
 
 // <rdar://problem/23853709> Compiler crash on call to unavailable "print"
-@available(*, unavailable, message: "Please use the 'to' label for the target stream: 'print((...), to: &...)'")		
-func print<T>(_: T, _: inout TextOutputStream) {} // expected-note {{}}
+@available(*, unavailable, message: "Please use the 'to' label for the target stream: 'print((...), to: &...)'") // expected-note {{}}
+func print<T>(_: T, _: inout TextOutputStream) {}
 func TextOutputStreamTest(message: String, to: inout TextOutputStream) {
   print(message, &to)  // expected-error {{'print' is unavailable: Please use the 'to' label for the target stream: 'print((...), to: &...)'}}
 }
@@ -332,8 +332,8 @@ func TextOutputStreamTest(message: String, to: inout TextOutputStream) {
 
 struct DummyType {}
 
-@available(*, unavailable, renamed: "&+")
-func +(x: DummyType, y: DummyType) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "&+") // expected-note {{here}}
+func +(x: DummyType, y: DummyType) {}
 @available(*, deprecated, renamed: "&-")
 func -(x: DummyType, y: DummyType) {}
 
@@ -342,15 +342,15 @@ func testOperators(x: DummyType, y: DummyType) {
   x - y // expected-warning {{'-' is deprecated: renamed to '&-'}}{{documentation-file=deprecated-declaration}} expected-note {{use '&-' instead}} {{5-6=&-}}
 }
 
-@available(*, unavailable, renamed: "DummyType.foo")
-func unavailableMember() {} // expected-note {{here}}
+@available(*, unavailable, renamed: "DummyType.foo") // expected-note {{here}}
+func unavailableMember() {}
 @available(*, deprecated, renamed: "DummyType.bar")
 func deprecatedMember() {}
-@available(*, unavailable, renamed: "DummyType.Inner.foo")
-func unavailableNestedMember() {} // expected-note {{here}}
+@available(*, unavailable, renamed: "DummyType.Inner.foo") // expected-note {{here}}
+func unavailableNestedMember() {}
 
-@available(*, unavailable, renamed: "DummyType.Foo")
-struct UnavailableType {} // expected-note {{here}}
+@available(*, unavailable, renamed: "DummyType.Foo") // expected-note {{here}}
+struct UnavailableType {}
 @available(*, deprecated, renamed: "DummyType.Bar")
 typealias DeprecatedType = Int
 
@@ -365,46 +365,46 @@ func testGlobalToMembers() {
 }
 
 
-@available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
-func unavailableArgNames(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(example:)") // expected-note {{here}}
+func unavailableArgNames(a: Int) {}
 @available(*, deprecated, renamed: "moreShinyLabeledArguments(example:)")
 func deprecatedArgNames(b: Int) {}
-@available(*, unavailable, renamed: "DummyType.shinyLabeledArguments(example:)")
-func unavailableMemberArgNames(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "DummyType.shinyLabeledArguments(example:)") // expected-note {{here}}
+func unavailableMemberArgNames(a: Int) {}
 @available(*, deprecated, renamed: "DummyType.moreShinyLabeledArguments(example:)")
 func deprecatedMemberArgNames(b: Int) {}
-@available(*, unavailable, renamed: "DummyType.shinyLabeledArguments(example:)", message: "ha")
-func unavailableMemberArgNamesMsg(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "DummyType.shinyLabeledArguments(example:)", message: "ha") // expected-note {{here}}
+func unavailableMemberArgNamesMsg(a: Int) {}
 @available(*, deprecated, renamed: "DummyType.moreShinyLabeledArguments(example:)", message: "ha")
 func deprecatedMemberArgNamesMsg(b: Int) {}
 
-@available(*, unavailable, renamed: "shinyLabeledArguments()")
-func unavailableNoArgs() {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments()") // expected-note {{here}}
+func unavailableNoArgs() {}
 
-@available(*, unavailable, renamed: "shinyLabeledArguments(a:)")
-func unavailableSame(a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
-func unavailableUnnamed(_ a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "shinyLabeledArguments(_:)")
-func unavailableUnnamedSame(_ a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "shinyLabeledArguments(_:)")
-func unavailableNewlyUnnamed(a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "shinyLabeledArguments(veryLongNameToOverflowASmallStringABCDEFGHIJKLMNOPQRSTUVWXYZ:)")
-func unavailableVeryLongArgNames(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(a:)") // expected-note {{here}}
+func unavailableSame(a: Int) {}
+@available(*, unavailable, renamed: "shinyLabeledArguments(example:)") // expected-note {{here}}
+func unavailableUnnamed(_ a: Int) {}
+@available(*, unavailable, renamed: "shinyLabeledArguments(_:)") // expected-note {{here}}
+func unavailableUnnamedSame(_ a: Int) {}
+@available(*, unavailable, renamed: "shinyLabeledArguments(_:)") // expected-note {{here}}
+func unavailableNewlyUnnamed(a: Int) {}
+@available(*, unavailable, renamed: "shinyLabeledArguments(veryLongNameToOverflowASmallStringABCDEFGHIJKLMNOPQRSTUVWXYZ:)") // expected-note {{here}}
+func unavailableVeryLongArgNames(a: Int) {}
 
-@available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)")
-func unavailableMultiSame(a: Int, b: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "shinyLabeledArguments(example:another:)")
-func unavailableMultiUnnamed(_ a: Int, _ b: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)")
-func unavailableMultiUnnamedSame(_ a: Int, _ b: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)")
-func unavailableMultiNewlyUnnamed(a: Int, b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)") // expected-note {{here}}
+func unavailableMultiSame(a: Int, b: Int) {}
+@available(*, unavailable, renamed: "shinyLabeledArguments(example:another:)") // expected-note {{here}}
+func unavailableMultiUnnamed(_ a: Int, _ b: Int) {}
+@available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)") // expected-note {{here}}
+func unavailableMultiUnnamedSame(_ a: Int, _ b: Int) {}
+@available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)") // expected-note {{here}}
+func unavailableMultiNewlyUnnamed(a: Int, b: Int) {}
 
-@available(*, unavailable, renamed: "Int.init(other:)")
-func unavailableInit(a: Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "Foo.Bar.init(other:)")
-func unavailableNestedInit(a: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "Int.init(other:)") // expected-note 2 {{here}}
+func unavailableInit(a: Int) {}
+@available(*, unavailable, renamed: "Foo.Bar.init(other:)") // expected-note 2 {{here}}
+func unavailableNestedInit(a: Int) {}
 
 
 func testArgNames() {
@@ -437,16 +437,16 @@ func testArgNames() {
   fn2(1)
 }
 
-@available(*, unavailable, renamed: "shinyLabeledArguments()")
-func unavailableTooFew(a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "shinyLabeledArguments()")
-func unavailableTooFewUnnamed(_ a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)")
-func unavailableTooMany(a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)")
-func unavailableTooManyUnnamed(_ a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "shinyLabeledArguments(a:)")
-func unavailableNoArgsTooMany() {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments()") // expected-note {{here}}
+func unavailableTooFew(a: Int) {}
+@available(*, unavailable, renamed: "shinyLabeledArguments()") // expected-note {{here}}
+func unavailableTooFewUnnamed(_ a: Int) {}
+@available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)") // expected-note {{here}}
+func unavailableTooMany(a: Int) {}
+@available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)") // expected-note {{here}}
+func unavailableTooManyUnnamed(_ a: Int) {}
+@available(*, unavailable, renamed: "shinyLabeledArguments(a:)") // expected-note {{here}}
+func unavailableNoArgsTooMany() {}
 
 func testRenameArgMismatch() {
   unavailableTooFew(a: 0) // expected-error{{'unavailableTooFew(a:)' has been renamed to 'shinyLabeledArguments()'}} {{3-20=shinyLabeledArguments}}
@@ -456,26 +456,26 @@ func testRenameArgMismatch() {
   unavailableNoArgsTooMany() // expected-error{{'unavailableNoArgsTooMany()' has been renamed to 'shinyLabeledArguments(a:)'}} {{3-27=shinyLabeledArguments}}
 }
 
-@available(*, unavailable, renamed: "Int.foo(self:)")
-func unavailableInstance(a: Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "Int.foo(self:)")
-func unavailableInstanceUnlabeled(_ a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "Int.foo(self:other:)")
-func unavailableInstanceFirst(a: Int, b: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "Int.foo(other:self:)")
-func unavailableInstanceSecond(a: Int, b: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "Int.foo(_:self:c:)")
-func unavailableInstanceSecondOfThree(a: Int, b: Int, c: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.foo(self:)") // expected-note 2 {{here}}
+func unavailableInstance(a: Int) {}
+@available(*, unavailable, renamed: "Int.foo(self:)") // expected-note {{here}}
+func unavailableInstanceUnlabeled(_ a: Int) {}
+@available(*, unavailable, renamed: "Int.foo(self:other:)") // expected-note {{here}}
+func unavailableInstanceFirst(a: Int, b: Int) {}
+@available(*, unavailable, renamed: "Int.foo(other:self:)") // expected-note {{here}}
+func unavailableInstanceSecond(a: Int, b: Int) {}
+@available(*, unavailable, renamed: "Int.foo(_:self:c:)") // expected-note {{here}}
+func unavailableInstanceSecondOfThree(a: Int, b: Int, c: Int) {}
 
-@available(*, unavailable, renamed: "Int.foo(self:)", message: "blah")
-func unavailableInstanceMessage(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.foo(self:)", message: "blah") // expected-note {{here}}
+func unavailableInstanceMessage(a: Int) {}
 @available(*, deprecated, renamed: "Int.foo(self:)")
 func deprecatedInstance(a: Int) {}
 @available(*, deprecated, renamed: "Int.foo(self:)", message: "blah")
 func deprecatedInstanceMessage(a: Int) {}
 
-@available(*, unavailable, renamed: "Foo.Bar.foo(self:)")
-func unavailableNestedInstance(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Foo.Bar.foo(self:)") // expected-note {{here}}
+func unavailableNestedInstance(a: Int) {}
 
 func testRenameInstance() {
   unavailableInstance(a: 0) // expected-error{{'unavailableInstance(a:)' has been replaced by instance method 'Int.foo()'}} {{3-22=0.foo}} {{23-27=}}
@@ -493,16 +493,16 @@ func testRenameInstance() {
   unavailableNestedInstance(a: 0) // expected-error{{'unavailableNestedInstance(a:)' has been replaced by instance method 'Foo.Bar.foo()'}} {{3-28=0.foo}} {{29-33=}}
 }
 
-@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)")
-func unavailableInstanceTooFew(a: Int, b: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)")
-func unavailableInstanceTooFewUnnamed(_ a: Int, _ b: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:b:)")
-func unavailableInstanceTooMany(a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:b:)")
-func unavailableInstanceTooManyUnnamed(_ a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)")
-func unavailableInstanceNoArgsTooMany() {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)") // expected-note {{here}}
+func unavailableInstanceTooFew(a: Int, b: Int) {}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)") // expected-note {{here}}
+func unavailableInstanceTooFewUnnamed(_ a: Int, _ b: Int) {}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:b:)") // expected-note {{here}}
+func unavailableInstanceTooMany(a: Int) {}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:b:)") // expected-note {{here}}
+func unavailableInstanceTooManyUnnamed(_ a: Int) {}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)") // expected-note {{here}}
+func unavailableInstanceNoArgsTooMany() {}
 
 func testRenameInstanceArgMismatch() {
   unavailableInstanceTooFew(a: 0, b: 1) // expected-error{{'unavailableInstanceTooFew(a:b:)' has been replaced by instance method 'Int.shinyLabeledArguments()'}} {{none}}
@@ -512,21 +512,21 @@ func testRenameInstanceArgMismatch() {
   unavailableInstanceNoArgsTooMany() // expected-error{{'unavailableInstanceNoArgsTooMany()' has been replaced by instance method 'Int.shinyLabeledArguments()'}} {{none}}
 }
 
-@available(*, unavailable, renamed: "getter:Int.prop(self:)")
-func unavailableInstanceProperty(a: Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "getter:Int.prop(self:)")
-func unavailableInstancePropertyUnlabeled(_ a: Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "getter:Int.prop()")
-func unavailableClassProperty() {} // expected-note {{here}}
-@available(*, unavailable, renamed: "getter:global()")
-func unavailableGlobalProperty() {} // expected-note {{here}}
+@available(*, unavailable, renamed: "getter:Int.prop(self:)") // expected-note 2 {{here}}
+func unavailableInstanceProperty(a: Int) {}
+@available(*, unavailable, renamed: "getter:Int.prop(self:)") // expected-note 2 {{here}}
+func unavailableInstancePropertyUnlabeled(_ a: Int) {}
+@available(*, unavailable, renamed: "getter:Int.prop()") // expected-note {{here}}
+func unavailableClassProperty() {}
+@available(*, unavailable, renamed: "getter:global()") // expected-note {{here}}
+func unavailableGlobalProperty() {}
 
-@available(*, unavailable, renamed: "getter:Int.prop(self:)", message: "blah")
-func unavailableInstancePropertyMessage(a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "getter:Int.prop()", message: "blah")
-func unavailableClassPropertyMessage() {} // expected-note {{here}}
-@available(*, unavailable, renamed: "getter:global()", message: "blah")
-func unavailableGlobalPropertyMessage() {} // expected-note {{here}}
+@available(*, unavailable, renamed: "getter:Int.prop(self:)", message: "blah") // expected-note {{here}}
+func unavailableInstancePropertyMessage(a: Int) {}
+@available(*, unavailable, renamed: "getter:Int.prop()", message: "blah") // expected-note {{here}}
+func unavailableClassPropertyMessage() {}
+@available(*, unavailable, renamed: "getter:global()", message: "blah") // expected-note {{here}}
+func unavailableGlobalPropertyMessage() {}
 
 @available(*, deprecated, renamed: "getter:Int.prop(self:)")
 func deprecatedInstanceProperty(a: Int) {}
@@ -563,21 +563,21 @@ func testRenameGetters() {
   deprecatedGlobalPropertyMessage() // expected-warning {{'deprecatedGlobalPropertyMessage()' is deprecated: blah}}{{documentation-file=deprecated-declaration}} expected-note{{use 'global' instead}} {{3-34=global}} {{34-36=}}
 }
 
-@available(*, unavailable, renamed: "setter:Int.prop(self:_:)")
-func unavailableSetInstanceProperty(a: Int, b: Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "setter:Int.prop(_:self:)")
-func unavailableSetInstancePropertyReverse(a: Int, b: Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "setter:Int.prop(self:newValue:)")
-func unavailableSetInstancePropertyUnlabeled(_ a: Int, _ b: Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "setter:Int.prop(newValue:self:)")
-func unavailableSetInstancePropertyUnlabeledReverse(_ a: Int, _ b: Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "setter:Int.prop(x:)")
-func unavailableSetClassProperty(a: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "setter:global(_:)")
-func unavailableSetGlobalProperty(_ a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "setter:Int.prop(self:_:)") // expected-note 2 {{here}}
+func unavailableSetInstanceProperty(a: Int, b: Int) {}
+@available(*, unavailable, renamed: "setter:Int.prop(_:self:)") // expected-note 2 {{here}}
+func unavailableSetInstancePropertyReverse(a: Int, b: Int) {}
+@available(*, unavailable, renamed: "setter:Int.prop(self:newValue:)") // expected-note 2 {{here}}
+func unavailableSetInstancePropertyUnlabeled(_ a: Int, _ b: Int) {}
+@available(*, unavailable, renamed: "setter:Int.prop(newValue:self:)") // expected-note 2 {{here}}
+func unavailableSetInstancePropertyUnlabeledReverse(_ a: Int, _ b: Int) {}
+@available(*, unavailable, renamed: "setter:Int.prop(x:)") // expected-note {{here}}
+func unavailableSetClassProperty(a: Int) {}
+@available(*, unavailable, renamed: "setter:global(_:)") // expected-note {{here}}
+func unavailableSetGlobalProperty(_ a: Int) {}
 
-@available(*, unavailable, renamed: "setter:Int.prop(self:_:)")
-func unavailableSetInstancePropertyInout(a: inout Int, b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "setter:Int.prop(self:_:)") // expected-note {{here}}
+func unavailableSetInstancePropertyInout(a: inout Int, b: Int) {}
 
 func testRenameSetters() {
   unavailableSetInstanceProperty(a: 1, b: 2) // expected-error{{'unavailableSetInstanceProperty(a:b:)' has been replaced by property 'Int.prop'}} {{3-33=1.prop}} {{33-43= = }} {{44-45=}}
@@ -595,12 +595,12 @@ func testRenameSetters() {
   unavailableSetInstancePropertyInout(a: &x, b: 2) // expected-error{{'unavailableSetInstancePropertyInout(a:b:)' has been replaced by property 'Int.prop'}} {{3-38=x.prop}} {{38-49= = }} {{50-51=}}
 }
 
-@available(*, unavailable, renamed: "Int.foo(self:execute:)")
-func trailingClosure(_ value: Int, fn: () -> Void) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "Int.foo(self:bar:execute:)")
-func trailingClosureArg(_ value: Int, _ other: Int, fn: () -> Void) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "Int.foo(bar:self:execute:)")
-func trailingClosureArg2(_ value: Int, _ other: Int, fn: () -> Void) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.foo(self:execute:)") // expected-note {{here}}
+func trailingClosure(_ value: Int, fn: () -> Void) {}
+@available(*, unavailable, renamed: "Int.foo(self:bar:execute:)") // expected-note {{here}}
+func trailingClosureArg(_ value: Int, _ other: Int, fn: () -> Void) {}
+@available(*, unavailable, renamed: "Int.foo(bar:self:execute:)") // expected-note {{here}}
+func trailingClosureArg2(_ value: Int, _ other: Int, fn: () -> Void) {}
 
 func testInstanceTrailingClosure() {
   // FIXME: regression in fixit due to noescape-by-default
@@ -609,26 +609,26 @@ func testInstanceTrailingClosure() {
   trailingClosureArg2(0, 1) {} // expected-error {{'trailingClosureArg2(_:_:fn:)' has been replaced by instance method 'Int.foo(bar:execute:)'}} // FIXME: {{3-22=1.foo}} {{23-23=bar: }} {{24-27=}}
 }
 
-@available(*, unavailable, renamed: "+")
-func add(_ value: Int, _ other: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "+") // expected-note {{here}}
+func add(_ value: Int, _ other: Int) {}
 
 infix operator ***
-@available(*, unavailable, renamed: "add")
-func ***(value: (), other: ()) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "Int.foo(self:_:)")
-func ***(value: Int, other: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "add") // expected-note {{here}}
+func ***(value: (), other: ()) {}
+@available(*, unavailable, renamed: "Int.foo(self:_:)") // expected-note {{here}}
+func ***(value: Int, other: Int) {}
 
 prefix operator ***
-@available(*, unavailable, renamed: "add")
-prefix func ***(value: Int?) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "Int.foo(self:)")
-prefix func ***(value: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "add") // expected-note {{here}}
+prefix func ***(value: Int?) {}
+@available(*, unavailable, renamed: "Int.foo(self:)") // expected-note {{here}}
+prefix func ***(value: Int) {}
 
 postfix operator ***
-@available(*, unavailable, renamed: "add")
-postfix func ***(value: Int?) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "Int.foo(self:)")
-postfix func ***(value: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "add") // expected-note {{here}}
+postfix func ***(value: Int?) {}
+@available(*, unavailable, renamed: "Int.foo(self:)") // expected-note {{here}}
+postfix func ***(value: Int) {}
 
 func testOperators() {
   add(0, 1) // expected-error {{'add' has been renamed to '+'}} {{none}}
@@ -643,13 +643,13 @@ func testOperators() {
 }
 
 extension Int {
-  @available(*, unavailable, renamed: "init(other:)")
+  @available(*, unavailable, renamed: "init(other:)") // expected-note 2 {{here}}
   @discardableResult
-  static func factory(other: Int) -> Int { return other } // expected-note 2 {{here}}
+  static func factory(other: Int) -> Int { return other }
 
-  @available(*, unavailable, renamed: "Int.init(other:)")
+  @available(*, unavailable, renamed: "Int.init(other:)") // expected-note 2 {{here}}
   @discardableResult
-  static func factory2(other: Int) -> Int { return other } // expected-note 2 {{here}}
+  static func factory2(other: Int) -> Int { return other }
 
   static func testFactoryMethods() {
     factory(other: 1) // expected-error {{'factory(other:)' has been replaced by 'init(other:)'}} {{none}}
@@ -723,10 +723,10 @@ class Base {
   func bad() {} // expected-note {{here}}
   @available(*, unavailable, message: "it was smelly")
   func smelly() {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "new")
-  func old() {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "new", message: "it was smelly")
-  func oldAndSmelly() {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "new") // expected-note {{here}}
+  func old() {}
+  @available(*, unavailable, renamed: "new", message: "it was smelly") // expected-note {{here}}
+  func oldAndSmelly() {}
   @available(*, unavailable)
   func expendable() {}
 
@@ -734,66 +734,66 @@ class Base {
   var badProp: Int { return 0 } // expected-note {{here}}
   @available(*, unavailable, message: "it was smelly")
   var smellyProp: Int { return 0 } // expected-note {{here}}
-  @available(*, unavailable, renamed: "new")
-  var oldProp: Int { return 0 } // expected-note {{here}}
-  @available(*, unavailable, renamed: "new", message: "it was smelly")
-  var oldAndSmellyProp: Int { return 0 } // expected-note {{here}}
+  @available(*, unavailable, renamed: "new") // expected-note {{here}}
+  var oldProp: Int { return 0 }
+  @available(*, unavailable, renamed: "new", message: "it was smelly") // expected-note {{here}}
+  var oldAndSmellyProp: Int { return 0 }
   @available(*, unavailable)
   var expendableProp: Int { return 0 }
 
-  @available(*, unavailable, renamed: "init")
-  func nowAnInitializer() {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "init()")
-  func nowAnInitializer2() {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "init") // expected-note {{here}}
+  func nowAnInitializer() {}
+  @available(*, unavailable, renamed: "init()") // expected-note {{here}}
+  func nowAnInitializer2() {}
 
-  @available(*, unavailable, renamed: "foo")
-  init(nowAFunction: Int) {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "foo(_:)")
-  init(nowAFunction2: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "foo") // expected-note {{here}}
+  init(nowAFunction: Int) {}
+  @available(*, unavailable, renamed: "foo(_:)") // expected-note {{here}}
+  init(nowAFunction2: Int) {}
 
-  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
-  func unavailableArgNames(a: Int) {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
-  func unavailableArgRenamed(a: Int) {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments()")
-  func unavailableNoArgs() {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(a:)")
-  func unavailableSame(a: Int) {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
-  func unavailableUnnamed(_ a: Int) {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(_:)")
-  func unavailableUnnamedSame(_ a: Int) {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(_:)")
-  func unavailableNewlyUnnamed(a: Int) {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)")
-  func unavailableMultiSame(a: Int, b: Int) {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(example:another:)")
-  func unavailableMultiUnnamed(_ a: Int, _ b: Int) {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)")
-  func unavailableMultiUnnamedSame(_ a: Int, _ b: Int) {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)")
-  func unavailableMultiNewlyUnnamed(a: Int, b: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)") // expected-note {{here}}
+  func unavailableArgNames(a: Int) {}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)") // expected-note {{here}}
+  func unavailableArgRenamed(a: Int) {}
+  @available(*, unavailable, renamed: "shinyLabeledArguments()") // expected-note {{here}}
+  func unavailableNoArgs() {}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(a:)") // expected-note {{here}}
+  func unavailableSame(a: Int) {}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)") // expected-note {{here}}
+  func unavailableUnnamed(_ a: Int) {}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(_:)") // expected-note {{here}}
+  func unavailableUnnamedSame(_ a: Int) {}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(_:)") // expected-note {{here}}
+  func unavailableNewlyUnnamed(a: Int) {}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)") // expected-note {{here}}
+  func unavailableMultiSame(a: Int, b: Int) {}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(example:another:)") // expected-note {{here}}
+  func unavailableMultiUnnamed(_ a: Int, _ b: Int) {}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)") // expected-note {{here}}
+  func unavailableMultiUnnamedSame(_ a: Int, _ b: Int) {}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)") // expected-note {{here}}
+  func unavailableMultiNewlyUnnamed(a: Int, b: Int) {}
 
-  @available(*, unavailable, renamed: "init(shinyNewName:)")
-  init(unavailableArgNames: Int) {} // expected-note{{here}}
-  @available(*, unavailable, renamed: "init(a:)")
-  init(_ unavailableUnnamed: Int) {} // expected-note{{here}}
-  @available(*, unavailable, renamed: "init(_:)")
-  init(unavailableNewlyUnnamed: Int) {} // expected-note{{here}}
-  @available(*, unavailable, renamed: "init(a:b:)")
-  init(_ unavailableMultiUnnamed: Int, _ b: Int) {} // expected-note{{here}}
-  @available(*, unavailable, renamed: "init(_:_:)")
-  init(unavailableMultiNewlyUnnamed a: Int, b: Int) {} // expected-note{{here}}
+  @available(*, unavailable, renamed: "init(shinyNewName:)") // expected-note{{here}}
+  init(unavailableArgNames: Int) {}
+  @available(*, unavailable, renamed: "init(a:)") // expected-note{{here}}
+  init(_ unavailableUnnamed: Int) {}
+  @available(*, unavailable, renamed: "init(_:)") // expected-note{{here}}
+  init(unavailableNewlyUnnamed: Int) {}
+  @available(*, unavailable, renamed: "init(a:b:)") // expected-note{{here}}
+  init(_ unavailableMultiUnnamed: Int, _ b: Int) {}
+  @available(*, unavailable, renamed: "init(_:_:)") // expected-note{{here}}
+  init(unavailableMultiNewlyUnnamed a: Int, b: Int) {}
 
-  @available(*, unavailable, renamed: "shinyLabeledArguments(x:)")
-  func unavailableTooFew(a: Int, b: Int) {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(x:b:)")
-  func unavailableTooMany(a: Int) {} // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(x:)")
-  func unavailableNoArgsTooMany() {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(x:)") // expected-note {{here}}
+  func unavailableTooFew(a: Int, b: Int) {}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(x:b:)") // expected-note {{here}}
+  func unavailableTooMany(a: Int) {}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(x:)") // expected-note {{here}}
+  func unavailableNoArgsTooMany() {}
 
-  @available(*, unavailable, renamed: "Base.shinyLabeledArguments()")
-  func unavailableHasType() {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "Base.shinyLabeledArguments()") // expected-note {{here}}
+  func unavailableHasType() {}
 
   @available(*, deprecated)
   func deprecated() {}
@@ -849,30 +849,30 @@ class Sub : Base {
 }
 
 // U: Unnamed, L: Labeled
-@available(*, unavailable, renamed: "after(fn:)")
-func closure_U_L(_ x: () -> Int) {} // expected-note 3 {{here}}
-@available(*, unavailable, renamed: "after(fn:)")
-func closure_L_L(x: () -> Int) {} // expected-note 3 {{here}}
-@available(*, unavailable, renamed: "after(_:)")
-func closure_L_U(x: () -> Int) {} // expected-note 3 {{here}}
+@available(*, unavailable, renamed: "after(fn:)") // expected-note 3 {{here}}
+func closure_U_L(_ x: () -> Int) {}
+@available(*, unavailable, renamed: "after(fn:)") // expected-note 3 {{here}}
+func closure_L_L(x: () -> Int) {}
+@available(*, unavailable, renamed: "after(_:)") // expected-note 3 {{here}}
+func closure_L_U(x: () -> Int) {}
 
-@available(*, unavailable, renamed: "after(arg:fn:)")
-func closure_UU_LL(_ x: Int, _ y: () -> Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "after(arg:fn:)")
-func closure_LU_LL(x: Int, _ y: () -> Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "after(arg:fn:)")
-func closure_LL_LL(x: Int, y: () -> Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "after(arg:fn:)")
-func closure_UU_LL_ne(_ x: Int, _ y: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:fn:)") // expected-note 2 {{here}}
+func closure_UU_LL(_ x: Int, _ y: () -> Int) {}
+@available(*, unavailable, renamed: "after(arg:fn:)") // expected-note 2 {{here}}
+func closure_LU_LL(x: Int, _ y: () -> Int) {}
+@available(*, unavailable, renamed: "after(arg:fn:)") // expected-note 2 {{here}}
+func closure_LL_LL(x: Int, y: () -> Int) {}
+@available(*, unavailable, renamed: "after(arg:fn:)") // expected-note 2 {{here}}
+func closure_UU_LL_ne(_ x: Int, _ y: () -> Int) {}
 
-@available(*, unavailable, renamed: "after(arg:_:)")
-func closure_UU_LU(_ x: Int, _ closure: () -> Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "after(arg:_:)")
-func closure_LU_LU(x: Int, _ closure: () -> Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "after(arg:_:)")
-func closure_LL_LU(x: Int, y: () -> Int) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "after(arg:_:)")
-func closure_UU_LU_ne(_ x: Int, _ y: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:_:)") // expected-note 2 {{here}}
+func closure_UU_LU(_ x: Int, _ closure: () -> Int) {}
+@available(*, unavailable, renamed: "after(arg:_:)") // expected-note 2 {{here}}
+func closure_LU_LU(x: Int, _ closure: () -> Int) {}
+@available(*, unavailable, renamed: "after(arg:_:)") // expected-note 2 {{here}}
+func closure_LL_LU(x: Int, y: () -> Int) {}
+@available(*, unavailable, renamed: "after(arg:_:)") // expected-note 2 {{here}}
+func closure_UU_LU_ne(_ x: Int, _ y: () -> Int) {}
 
 func testTrailingClosure() {
   closure_U_L { 0 } // expected-error {{'closure_U_L' has been renamed to 'after(fn:)'}} {{3-14=after}} {{none}}
@@ -912,12 +912,12 @@ func testTrailingClosure() {
   closure_UU_LU_ne(1, { 0 }) // expected-error {{'closure_UU_LU_ne' has been renamed to 'after(arg:_:)'}} {{3-19=after}} {{20-20=arg: }} {{none}}
 }
 
-@available(*, unavailable, renamed: "after(x:)")
-func defaultUnnamed(_ a: Int = 1) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "after(x:y:)")
-func defaultBeforeRequired(a: Int = 1, b: Int) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "after(x:y:z:)")
-func defaultPlusTrailingClosure(a: Int = 1, b: Int = 2, c: () -> Void) {} // expected-note 3 {{here}}
+@available(*, unavailable, renamed: "after(x:)") // expected-note 2 {{here}}
+func defaultUnnamed(_ a: Int = 1) {}
+@available(*, unavailable, renamed: "after(x:y:)") // expected-note {{here}}
+func defaultBeforeRequired(a: Int = 1, b: Int) {}
+@available(*, unavailable, renamed: "after(x:y:z:)") // expected-note 3 {{here}}
+func defaultPlusTrailingClosure(a: Int = 1, b: Int = 2, c: () -> Void) {}
 
 func testDefaults() {
   defaultUnnamed() // expected-error {{'defaultUnnamed' has been renamed to 'after(x:)'}} {{3-17=after}} {{none}}
@@ -928,12 +928,12 @@ func testDefaults() {
   defaultPlusTrailingClosure(a: 1) {} // expected-error {{'defaultPlusTrailingClosure(a:b:c:)' has been renamed to 'after(x:y:z:)'}} {{3-29=after}} {{30-31=x}} {{none}}
 }
 
-@available(*, unavailable, renamed: "after(x:y:)")
-func variadic1(a: Int ..., b: Int = 0) {} // expected-note 2 {{here}}
-@available(*, unavailable, renamed: "after(x:y:)")
-func variadic2(a: Int, _ b: Int ...) {} // expected-note {{here}}
-@available(*, unavailable, renamed: "after(x:_:y:z:)")
-func variadic3(_ a: Int, b: Int ..., c: String = "", d: String) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(x:y:)") // expected-note 2 {{here}}
+func variadic1(a: Int ..., b: Int = 0) {}
+@available(*, unavailable, renamed: "after(x:y:)") // expected-note {{here}}
+func variadic2(a: Int, _ b: Int ...) {}
+@available(*, unavailable, renamed: "after(x:_:y:z:)") // expected-note 2 {{here}}
+func variadic3(_ a: Int, b: Int ..., c: String = "", d: String) {}
 
 func testVariadic() {
   variadic1(a: 1, 2) // expected-error {{'variadic1(a:b:)' has been renamed to 'after(x:y:)'}} {{3-12=after}} {{13-14=x}} {{none}}
@@ -950,18 +950,18 @@ enum E_32526620 {
   func set() {}
 }
 
-@available(*, unavailable, renamed: "E_32526620.set(self:)")
-func rdar32526620_1(a: E_32526620) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "E_32526620.set(self:)") // expected-note {{here}}
+func rdar32526620_1(a: E_32526620) {}
 rdar32526620_1(a: .foo)
 // expected-error@-1 {{'rdar32526620_1(a:)' has been replaced by instance method 'E_32526620.set()'}} {{1-15=E_32526620.foo.set}} {{16-23=}}
 
-@available(*, unavailable, renamed: "E_32526620.set(a:self:)")
-func rdar32526620_2(a: Int, b: E_32526620) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "E_32526620.set(a:self:)") // expected-note {{here}}
+func rdar32526620_2(a: Int, b: E_32526620) {}
 rdar32526620_2(a: 42, b: .bar)
 // expected-error@-1 {{'rdar32526620_2(a:b:)' has been replaced by instance method 'E_32526620.set(a:)'}} {{1-15=E_32526620.bar.set}} {{21-30=}}
 
-@available(*, unavailable, renamed: "E_32526620.set(a:self:c:)")
-func rdar32526620_3(a: Int, b: E_32526620, c: String) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "E_32526620.set(a:self:c:)") // expected-note {{here}}
+func rdar32526620_3(a: Int, b: E_32526620, c: String) {}
 rdar32526620_3(a: 42, b: .bar, c: "question")
 // expected-error@-1 {{'rdar32526620_3(a:b:c:)' has been replaced by instance method 'E_32526620.set(a:c:)'}} {{1-15=E_32526620.bar.set}} {{23-32=}}
 
@@ -1044,8 +1044,8 @@ var unavailableRename: Int {
   @available(*, unavailable, renamed: "betterThing()") get { return 0 } // expected-note * {{here}}
   @available(*, unavailable, renamed: "setBetterThing(_:)") set {} // expected-note * {{here}}
 }
-@available(*, unavailable, message: "bad variable")
-var unavailableProperty: Int { // expected-note * {{here}}
+@available(*, unavailable, message: "bad variable") // expected-note * {{here}}
+var unavailableProperty: Int {
   @available(*, unavailable, message: "bad getter") get { return 0 }
   @available(*, unavailable, message: "bad setter") set {}
 }
@@ -1142,8 +1142,8 @@ struct UnavailableAccessors {
     @available(*, unavailable, message: "bad setter") set {} // expected-note * {{here}}
   }
 
-  @available(*, unavailable, message: "bad property")
-  var unavailableProperty: Int { // expected-note * {{here}}
+  @available(*, unavailable, message: "bad property") // expected-note * {{here}}
+  var unavailableProperty: Int {
     @available(*, unavailable, message: "bad getter") get { return 0 }
     @available(*, unavailable, message: "bad setter") set {}
   }
@@ -1153,8 +1153,8 @@ struct UnavailableAccessors {
     @available(*, unavailable, message: "bad subscript setter") set {} // expected-note * {{here}}
   }
 
-  @available(*, unavailable, message: "bad subscript!")
-  subscript(alsoUnavailable _: Int) -> Int { // expected-note * {{here}}
+  @available(*, unavailable, message: "bad subscript!") // expected-note * {{here}}
+  subscript(alsoUnavailable _: Int) -> Int {
     @available(*, unavailable, message: "bad subscript getter") get { return 0 }
     @available(*, unavailable, message: "bad subscript setter") set {}
   }
@@ -1244,8 +1244,8 @@ struct BadRename {
 
 func log(message: String) { }
 
-@available(*, unavailable, renamed: "log(message:)")
-func log(format: String, _ args: Any...) { fatalError() } // expected-note {{'log(format:_:)' has been explicitly marked unavailable here}}
+@available(*, unavailable, renamed: "log(message:)") // expected-note {{'log(format:_:)' has been explicitly marked unavailable here}}
+func log(format: String, _ args: Any...) { fatalError() }
 
 func testBadRename() {
   _ = BadRename(from: 5, to: 17) // expected-warning{{'init(from:to:step:)' is deprecated: renamed to 'init(range:step:)'}}{{documentation-file=deprecated-declaration}}
@@ -1310,19 +1310,19 @@ func testMultipleTrailingClosures(_ x: TypeWithTrailingClosures) {
 }
 
 struct UnavailableSubscripts { 
-  @available(*, unavailable, renamed: "subscript(new:)")
-  subscript(old index: Int) -> Int { 3 } // expected-note * {{'subscript(old:)' has been explicitly marked unavailable here}}
-  @available(*, unavailable, renamed: "subscript(new:)")
-  func getValue(old: Int) -> Int { 3 } // expected-note * {{'getValue(old:)' has been explicitly marked unavailable here}}
+  @available(*, unavailable, renamed: "subscript(new:)") // expected-note * {{'subscript(old:)' has been explicitly marked unavailable here}}
+  subscript(old index: Int) -> Int { 3 }
+  @available(*, unavailable, renamed: "subscript(new:)") // expected-note * {{'getValue(old:)' has been explicitly marked unavailable here}}
+  func getValue(old: Int) -> Int { 3 }
 
   subscript(new index: Int) -> Int { 3 }
 
-  @available(*, unavailable, renamed: "getAValue(new:)")
-  subscript(getAValue index: Int) -> Int { 3 } // expected-note * {{'subscript(getAValue:)' has been explicitly marked unavailable here}}
+  @available(*, unavailable, renamed: "getAValue(new:)") // expected-note * {{'subscript(getAValue:)' has been explicitly marked unavailable here}}
+  subscript(getAValue index: Int) -> Int { 3 }
   func getAValue(new: Int) -> Int { 3 }
 
-  @available(*, unavailable, renamed: "subscript(arg1:arg2:arg3:)")
-  subscript(_ argg1: Int, _ argg2: Int, _ argg3: Int) -> Int { 3 } // expected-note * {{'subscript(_:_:_:)' has been explicitly marked unavailable here}}
+  @available(*, unavailable, renamed: "subscript(arg1:arg2:arg3:)") // expected-note * {{'subscript(_:_:_:)' has been explicitly marked unavailable here}}
+  subscript(_ argg1: Int, _ argg2: Int, _ argg3: Int) -> Int { 3 }
 
   @available(*, deprecated, renamed: "subscript(arg1:arg2:arg3:)")
   subscript(argg1 argg1: Int, argg2 argg2: Int, argg3 argg3: Int) -> Int { 3 }

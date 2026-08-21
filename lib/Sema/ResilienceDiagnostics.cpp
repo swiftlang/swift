@@ -161,7 +161,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                            problematicImport->accessLevel,
                            problematicImport->module.importedModule,
                            problematicImport->module.importedModule
-                             ->isClangHeaderImportModule());
+                             ->isClangBridgingHeaderImportModule());
   }
 
   return (downgradeToWarning == DowngradeToWarning::No);
@@ -247,7 +247,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                        limitImport->accessLevel,
                        limitImport->module.importedModule,
                        limitImport->module.importedModule
-                         ->isClangHeaderImportModule());
+                         ->isClangBridgingHeaderImportModule());
   }
 
   return true;
@@ -454,7 +454,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                        import->accessLevel,
                        import->module.importedModule,
                        import->module.importedModule
-                         ->isClangHeaderImportModule());
+                         ->isClangBridgingHeaderImportModule());
   }
 
   return true;
@@ -546,7 +546,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                        limitImport->accessLevel,
                        limitImport->module.importedModule,
                        limitImport->module.importedModule
-                         ->isClangHeaderImportModule());
+                         ->isClangBridgingHeaderImportModule());
   }
 
   return true;

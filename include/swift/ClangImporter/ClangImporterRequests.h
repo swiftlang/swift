@@ -309,19 +309,22 @@ class ForeignReferenceTypeInfo {
     FlagIsValid = 1 << 0,
     /// This type is a foreign reference type
     FlagIsRef = 1 << 1,
+    /// This reference type is immortal (has no custom retain/release)
+    FlagIsImmortal = 1 << 2,
   };
 
-  llvm::PointerIntPair<const clang::RecordDecl *, 2> BaseAndFlags;
+  llvm::PointerIntPair<const clang::RecordDecl *, 3> BaseAndFlags;
 
   const clang::CXXRecordDecl *primarySuperclass = nullptr;
 
   ForeignReferenceTypeInfo(const clang::RecordDecl *decl,
                            const clang::CXXRecordDecl *primarySuperclass,
-                           bool isValid, bool isRef)
+                           bool isValid, bool isRef, bool isImmortal)
       : BaseAndFlags{decl}, primarySuperclass(primarySuperclass) {
     unsigned int flags = 0;
     flags |= isValid ? FlagIsValid : 0;
     flags |= isRef ? FlagIsRef : 0;
+    flags |= isImmortal ? FlagIsImmortal : 0;
     BaseAndFlags.setInt(flags);
   }
 
@@ -331,7 +334,7 @@ public:
 
   /// Not a reference type
   static ForeignReferenceTypeInfo Value(bool isValid = true) {
-    return {nullptr, nullptr, isValid, /*isRef=*/false};
+    return {nullptr, nullptr, isValid, /*isRef=*/false, /*isImmortal=*/false};
   }
 
   /// A shared reference type using the retain/release functions from \a decl.
@@ -339,17 +342,28 @@ public:
   Shared(const clang::RecordDecl *decl,
          const clang::CXXRecordDecl *primarySuperclass, bool isValid = true) {
     ASSERT(decl && "shared reference must have a non-null base decl");
-    return {decl, primarySuperclass, isValid, /*isRef=*/true};
+    return {decl, primarySuperclass, isValid, /*isRef=*/true,
+            /*isImmortal=*/false};
+  }
+
+  /// An immortal reference type, which has no custom retain/release. \a decl
+  /// is the base that carries the immortal annotation.
+  static ForeignReferenceTypeInfo
+  Immortal(const clang::RecordDecl *decl,
+           const clang::CXXRecordDecl *primarySuperclass, bool isValid = true) {
+    ASSERT(decl && "immortal reference must have a non-null base decl");
+    return {decl, primarySuperclass, isValid, /*isRef=*/true,
+            /*isImmortal=*/true};
   }
 
   /// The base decl that is annotated with the retain/release functions that
-  /// this reference type uses.
+  /// this reference type uses (or the base carrying the immortal annotation).
   ///
   /// If this is an invalid reference type, this returns an arbitrary FRT base
   /// (there may be multiple FRT bases that cause this to be invalid due to
   /// ambiguity about which retain/release values to use).
   ///
-  /// Returns \c nullptr for non-shared references.
+  /// Returns \c nullptr for non-reference (value) types.
   const clang::RecordDecl *getDecl() const { return BaseAndFlags.getPointer(); }
 
   /// All of its (and its bases') foreign reference type attributes (if any)
@@ -364,6 +378,10 @@ public:
   ///
   /// This is independent of whether those attributes are actually valid.
   bool isReference() const { return BaseAndFlags.getInt() & FlagIsRef; }
+
+  /// Whether this is an immortal reference type: a reference type with no
+  /// custom retain/release operations (all of its ops are "immortal").
+  bool isImmortal() const { return BaseAndFlags.getInt() & FlagIsImmortal; }
 
   /// The single FRT base that is the primary (first) direct base of this
   /// type, suitable for use as the Swift superclass. Returns nullptr if there
@@ -494,116 +512,6 @@ private:
   friend SimpleRequest;
 
   ValueDecl *evaluate(Evaluator &evaluator, CxxRecordSemanticsDescriptor) const;
-};
-
-struct SafeUseOfCxxDeclDescriptor final {
-  const clang::Decl *decl;
-  ASTContext& ctx;
-
-  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl, ASTContext &ctx)
-      : decl(decl), ctx(ctx) {}
-
-  friend llvm::hash_code hash_value(const SafeUseOfCxxDeclDescriptor &desc) {
-    return llvm::hash_combine(desc.decl);
-  }
-
-  friend bool operator==(const SafeUseOfCxxDeclDescriptor &lhs,
-                         const SafeUseOfCxxDeclDescriptor &rhs) {
-    return lhs.decl == rhs.decl;
-  }
-
-  friend bool operator!=(const SafeUseOfCxxDeclDescriptor &lhs,
-                         const SafeUseOfCxxDeclDescriptor &rhs) {
-    return !(lhs == rhs);
-  }
-};
-
-void simple_display(llvm::raw_ostream &out, SafeUseOfCxxDeclDescriptor desc);
-SourceLoc extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc);
-
-class IsSafeUseOfCxxDecl
-    : public SimpleRequest<IsSafeUseOfCxxDecl, bool(SafeUseOfCxxDeclDescriptor),
-                           RequestFlags::Uncached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-  // Source location
-  SourceLoc getNearestLoc() const { return SourceLoc(); };
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, SafeUseOfCxxDeclDescriptor desc) const;
-};
-
-enum class CustomRefCountingOperationKind { retain, release };
-
-struct CustomRefCountingOperationDescriptor final {
-  const ClassDecl *decl;
-  CustomRefCountingOperationKind kind;
-
-  CustomRefCountingOperationDescriptor(const ClassDecl *decl,
-                                       CustomRefCountingOperationKind kind)
-      : decl(decl), kind(kind) {}
-
-  friend llvm::hash_code
-  hash_value(const CustomRefCountingOperationDescriptor &desc) {
-    return llvm::hash_combine(desc.decl, desc.kind);
-  }
-
-  friend bool operator==(const CustomRefCountingOperationDescriptor &lhs,
-                         const CustomRefCountingOperationDescriptor &rhs) {
-    return lhs.decl == rhs.decl && lhs.kind == rhs.kind;
-  }
-
-  friend bool operator!=(const CustomRefCountingOperationDescriptor &lhs,
-                         const CustomRefCountingOperationDescriptor &rhs) {
-    return !(lhs == rhs);
-  }
-};
-
-void simple_display(llvm::raw_ostream &out,
-                    CustomRefCountingOperationDescriptor desc);
-SourceLoc extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc);
-
-struct CustomRefCountingOperationResult {
-  enum CustomRefCountingOperationResultKind {
-    noAttribute,
-    tooManyAttributes,
-    immortal,
-    notFound,
-    tooManyFound,
-    unreachable,
-    foundOperation
-  };
-
-  CustomRefCountingOperationResultKind kind;
-  ValueDecl *operation;
-  StringRef name;
-};
-
-class CustomRefCountingOperation
-    : public SimpleRequest<CustomRefCountingOperation,
-                           CustomRefCountingOperationResult(
-                               CustomRefCountingOperationDescriptor),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-  // Caching
-  bool isCached() const { return true; }
-
-  // Source location
-  SourceLoc getNearestLoc() const { return SourceLoc(); };
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  CustomRefCountingOperationResult
-  evaluate(Evaluator &evaluator,
-           CustomRefCountingOperationDescriptor desc) const;
 };
 
 enum class CxxEscapability { Escapable, NonEscapable, Unknown };

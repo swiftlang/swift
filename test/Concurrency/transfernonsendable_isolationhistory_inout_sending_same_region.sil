@@ -1,0 +1,127 @@
+// RUN: %target-sil-opt -send-non-sendable -sil-region-isolation-emit-isolation-history -strict-concurrency=complete %s -o /dev/null -verify
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// SIL coverage for isolation-history notes on the
+// InOutSendingParametersInSameRegion diagnostic, which fires at a function exit
+// when two or more 'inout sending' parameters share a region. See the companion
+// transfernonsendable_isolationhistory_inout_sending_same_region.swift for the
+// source-level shapes.
+//
+// Both parameters are disconnected, so the request is a connect one: every link
+// reads as a plain "'a' is connected to 'b'" and there is no isolated terminus.
+// This diagnostic is the one whose wording maps most directly onto what a chain
+// says.
+//
+// This is also the only error whose emitter is not constructed by the X-macro:
+// one error reports several pairs, each with its own emitter and its own chain,
+// which is why each pair is handed a copy of the partition rather than the
+// error's. The three-parameter case below is what catches a regression to
+// moving it -- the walk consumes the partition it rewinds.
+//
+// Primary diagnostics use empty-body matchers; chain notes have their full text
+// matched.
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+class NonSendableKlass {}
+
+sil @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
+// MARK: One hop — the two 'inout sending' parameters are merged directly.
+sil [ossa] @same_region_one_hop : $@convention(thin) (@sil_sending @inout NonSendableKlass, @sil_sending @inout NonSendableKlass) -> () {
+bb0(%a : $*NonSendableKlass, %b : $*NonSendableKlass):
+  debug_value %a : $*NonSendableKlass, var, name "a", argno 1, expr op_deref
+  debug_value %b : $*NonSendableKlass, var, name "b", argno 2, expr op_deref
+
+  %bv = load [copy] %b : $*NonSendableKlass
+  %acc = begin_access [modify] [unknown] %a : $*NonSendableKlass
+  store %bv to [assign] %acc : $*NonSendableKlass // expected-note {{'a' is connected to 'b'}}
+  end_access %acc : $*NonSendableKlass
+
+  %r = tuple ()
+  return %r : $() // expected-warning {{}} expected-note {{}}
+}
+
+// MARK: Two hops — the two parameters reach each other through a named local.
+sil [ossa] @same_region_two_hop : $@convention(thin) (@sil_sending @inout NonSendableKlass, @sil_sending @inout NonSendableKlass) -> () {
+bb0(%a : $*NonSendableKlass, %b : $*NonSendableKlass):
+  debug_value %a : $*NonSendableKlass, var, name "a", argno 1, expr op_deref
+  debug_value %b : $*NonSendableKlass, var, name "b", argno 2, expr op_deref
+
+  %bv = load [copy] %b : $*NonSendableKlass
+  %z = move_value [lexical] [var_decl] %bv : $NonSendableKlass // expected-note {{'z' is connected to 'b'}}
+  debug_value %z : $NonSendableKlass, let, name "z"
+
+  %c = copy_value %z : $NonSendableKlass
+  %acc = begin_access [modify] [unknown] %a : $*NonSendableKlass
+  store %c to [assign] %acc : $*NonSendableKlass // expected-note {{'a' is connected to 'z'}}
+  end_access %acc : $*NonSendableKlass
+
+  destroy_value %z : $NonSendableKlass
+  %r = tuple ()
+  return %r : $() // expected-warning {{}} expected-note {{}}
+}
+
+// MARK: Three parameters in one region — the multi-pair case. One chain per
+// reported pair, each rewinding its own copy of the partition. If the partition
+// were moved instead, only the first pair would get a chain; the note counts
+// here are what would catch that.
+sil [ossa] @same_region_three_params : $@convention(thin) (@sil_sending @inout NonSendableKlass, @sil_sending @inout NonSendableKlass, @sil_sending @inout NonSendableKlass) -> () {
+bb0(%a : $*NonSendableKlass, %b : $*NonSendableKlass, %c : $*NonSendableKlass):
+  debug_value %a : $*NonSendableKlass, var, name "a", argno 1, expr op_deref
+  debug_value %b : $*NonSendableKlass, var, name "b", argno 2, expr op_deref
+  debug_value %c : $*NonSendableKlass, var, name "c", argno 3, expr op_deref
+
+  %bv1 = load [copy] %b : $*NonSendableKlass
+  %acc1 = begin_access [modify] [unknown] %a : $*NonSendableKlass
+  store %bv1 to [assign] %acc1 : $*NonSendableKlass // expected-note 2 {{'a' is connected to 'b'}}
+  end_access %acc1 : $*NonSendableKlass
+
+  %bv2 = load [copy] %b : $*NonSendableKlass
+  %acc2 = begin_access [modify] [unknown] %c : $*NonSendableKlass
+  store %bv2 to [assign] %acc2 : $*NonSendableKlass // expected-note 2 {{'b' is connected to 'c'}}
+  end_access %acc2 : $*NonSendableKlass
+
+  %r = tuple ()
+  return %r : $() // expected-warning 3 {{}} expected-note 3 {{}}
+}
+
+// MARK: CFG diamond — only bb1 joins the two parameters; bb2's fresh value must
+// produce no note.
+sil [ossa] @same_region_diamond : $@convention(thin) (@sil_sending @inout NonSendableKlass, @sil_sending @inout NonSendableKlass, Builtin.Int1) -> () {
+bb0(%a : $*NonSendableKlass, %b : $*NonSendableKlass, %cond : $Builtin.Int1):
+  debug_value %a : $*NonSendableKlass, var, name "a", argno 1, expr op_deref
+  debug_value %b : $*NonSendableKlass, var, name "b", argno 2, expr op_deref
+  cond_br %cond, bb1, bb2
+
+// The joining arm.
+bb1:
+  %bv = load [copy] %b : $*NonSendableKlass
+  %acc1 = begin_access [modify] [unknown] %a : $*NonSendableKlass
+  store %bv to [assign] %acc1 : $*NonSendableKlass // expected-note {{'a' is connected to 'b'}}
+  end_access %acc1 : $*NonSendableKlass
+  br bb3
+
+// The unrelated arm: a fresh value stored into 'a', which must not be reported.
+bb2:
+  %mk = function_ref @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
+  %fresh = apply %mk() : $@convention(thin) () -> @owned NonSendableKlass
+  %acc2 = begin_access [modify] [unknown] %a : $*NonSendableKlass
+  store %fresh to [assign] %acc2 : $*NonSendableKlass
+  end_access %acc2 : $*NonSendableKlass
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $() // expected-warning {{}} expected-note {{}}
+}

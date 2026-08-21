@@ -1074,10 +1074,19 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   if (!begin || !end)
     return;
 
-  ASSERT(begin->getBaseName() == "__beginUnsafe" &&
-         "begin() should always be __Unsafe");
-  ASSERT(end->getBaseName() == "__endUnsafe" &&
-         "end() should always be __Unsafe");
+  // Without ImportUnsafeCxxMethodsAsAlwaysUnsafe, begin() and end() are always
+  // renamed; with it they keep their original names and the renamed spellings
+  // become migration stubs.
+  if (ctx.LangOpts.hasFeature(
+          Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe)) {
+    ASSERT(begin->getBaseName() == "begin" && end->getBaseName() == "end" &&
+           "begin() and end() should keep their names");
+  } else {
+    ASSERT(begin->getBaseName() == "__beginUnsafe" &&
+           "begin() should always be __Unsafe");
+    ASSERT(end->getBaseName() == "__endUnsafe" &&
+           "end() should always be __Unsafe");
+  }
   ASSERT(!begin->isMutating() && !end->isMutating() &&
          "begin() and end() should not be mutating");
 
@@ -1587,6 +1596,13 @@ void swift::deriveAutomaticCxxConformances(
     const clang::CXXRecordDecl *clangDecl) {
 
   ASSERT(result && clangDecl && "this should not be called with nullptrs");
+
+  // A foreign reference type is imported even when it is only declared, so
+  // this can be reached without a definition. Every conformance below is
+  // derived from members, which an incomplete type does not have, and the
+  // requests used to look them up require a definition.
+  if (!clangDecl->isCompleteDefinition())
+    return;
 
   // Skip synthesizing conformances if the associated Clang node is from
   // a module that doesn't require cplusplus, to prevent us from accidentally

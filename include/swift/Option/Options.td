@@ -582,7 +582,7 @@ def require_explicit_sendable : Flag<["-"], "require-explicit-sendable">,
   HelpText<"Require explicit Sendable annotations on public declarations">;
 
 def define_availability : Separate<["-"], "define-availability">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[HelpHidden, FrontendOption, NoInteractiveOption]>,
   HelpText<"Define an availability macro in the format 'macroName : iOS 13.0, macOS 10.15'">,
   MetaVarName<"<macro>">;
 
@@ -592,7 +592,7 @@ def check_api_availability_only : Flag<["-"], "check-api-availability-only">,
 
 def unavailable_decl_optimization_EQ : Joined<["-"], "unavailable-decl-optimization=">,
   MetaVarName<"<complete,none>">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[HelpHidden, FrontendOption, NoInteractiveOption]>,
   HelpText<"Specify the optimization mode for unavailable declarations. The "
            "value may be 'none' (no optimization) or 'complete' (code is not "
            "generated at all unavailable declarations)">;
@@ -621,7 +621,7 @@ def define_dynamic_availability_domain : Separate<["-"], "define-dynamic-availab
     MetaVarName<"<domain>">;
 
 def experimental_package_bypass_resilience : Flag<["-"], "experimental-package-bypass-resilience">,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Deprecated; has no effect">;
 
 def experimental_allow_non_resilient_access : Flag<["-"], "experimental-allow-non-resilient-access">,
@@ -629,7 +629,7 @@ def experimental_allow_non_resilient_access : Flag<["-"], "experimental-allow-no
   HelpText<"Deprecated; use -allow-non-resilient-access instead">;
 
 def allow_non_resilient_access : Flag<["-"], "allow-non-resilient-access">,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Ensures all contents are generated besides exportable decls in the binary module, so non-resilient access can be allowed">;
 
 def library_level : Separate<["-"], "library-level">,
@@ -1233,11 +1233,11 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
 def ExperimentalPackageCMOAbortOnDeserializationFail : Flag<["-"], "experimental-package-cmo-abort-on-deserialization-fail">,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Abort if a deserialization error is found while package optimization is enabled">;
 
 def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Deprecated; use -package-cmo instead">;
 
 def PackageCMO : Flag<["-"], "package-cmo">,
@@ -1893,6 +1893,14 @@ def enable_autolinking_runtime_compatibility_bytecode_layouts
       HelpText<"Enable autolinking for the bytecode layouts runtime "
                "compatibility library">;
 
+def weak_link_span_compatibility_lib
+    : Flag<[ "-" ], "weak-link-span-compatibility-lib">,
+      Flags<[ FrontendOption ]>,
+      HelpText<"Weakly link the symbols that are back deployed by the Span "
+               "compatibility library instead of strongly linking them, when "
+               "the deployment target predates the OS release that introduced "
+               "them">;
+
 def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph">;
@@ -1946,12 +1954,12 @@ def omit_extension_block_symbols: Flag<["-"], "omit-extension-block-symbols">,
   HelpText<"Directly associate members and conformances with the extended nominal when generating symbol graphs instead of emitting 'swift.extension' symbols for extensions to external types">;
 
 def allow_availability_platforms: Separate<["-"], "allow-availability-platforms">,
-  Flags<[SwiftSymbolGraphExtractOption]>,
+  Flags<[SwiftSymbolGraphExtractOption, HelpHidden]>,
   HelpText<"Restrict availability metadata to the given platforms, e.g. 'macOS,Swift'">,
   MetaVarName<"<platforms>">;
 
 def block_availability_platforms: Separate<["-"], "block-availability-platforms">,
-  Flags<[SwiftSymbolGraphExtractOption]>,
+  Flags<[SwiftSymbolGraphExtractOption, HelpHidden]>,
   HelpText<"Remove the given platforms from symbol graph availability metadata, e.g. 'macOS,Swift'">,
   MetaVarName<"<platforms>">;
 
@@ -2399,6 +2407,14 @@ def cas_plugin_path: Separate<["-"], "cas-plugin-path">,
 def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Option pass to CAS Plugin">, MetaVarName<"<name>=<option>">;
+
+def scanner_cas_fs: Separate<["-"], "scanner-cas-fs">,
+  Flags<[NewDriverOnlyOption, CacheInvariant]>,
+  HelpText<"Configure the filesystem to read from the provided CAS tree during dep-scanning">;
+
+def cas_fs_escape: Separate<["-"], "cas-fs-escape">,
+  Flags<[NewDriverOnlyOption, CacheInvariant]>,
+  HelpText<"Path for using the underlying file system instead of CASFS">, MetaVarName<"<path>">;
 
 def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, CacheInvariant]>,

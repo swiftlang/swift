@@ -12,9 +12,9 @@
 
 /// Performs a traditional C-style assert with an optional message.
 ///
-/// Use this function for internal consistency checks that are active during testing
-/// but do not impact performance of shipping code. To check for invalid usage
-/// in Release builds, see `precondition(_:_:file:line:)`.
+/// Use this function for internal consistency checks that are active during
+/// testing but do not impact performance of shipping code. To check for invalid
+/// usage in Release builds, see `precondition(_:_:file:line:)`.
 ///
 /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
 ///   configuration): If `condition` evaluates to `false`, stop program
@@ -136,8 +136,7 @@ public func precondition(
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
-    Builtin.condfail_message(error._value,
-      StaticString("precondition failure").unsafeRawPointer)
+    Builtin.condfail_message(error._value, message().unsafeRawPointer)
   }
 }
 #endif
@@ -172,8 +171,9 @@ public func assertionFailure(
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailure(kind: .fatal(), message(), file: file, line: line,
-      flags: _fatalErrorFlags())
+    _opaqueAssertionFailure(
+      kind: .fatal(), message(), file: file, line: line, flags: _fatalErrorFlags()
+    )
   }
   else if _isFastAssertConfiguration() {
     _conditionallyUnreachable()
@@ -187,8 +187,9 @@ public func assertionFailure(
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailure(kind: .fatal(), message(), file: file, line: line,
-      flags: _fatalErrorFlags())
+    _assertionFailure(
+      kind: .fatal(), message(), file: file, line: line, flags: _fatalErrorFlags()
+    )
   }
   else if _isFastAssertConfiguration() {
     _conditionallyUnreachable()
@@ -253,8 +254,7 @@ public func preconditionFailure(
     _assertionFailure(kind: .fatal(), message(), file: file, line: line,
       flags: _fatalErrorFlags())
   } else if _isReleaseAssertConfiguration() {
-    Builtin.condfail_message(true._value,
-      StaticString("precondition failure").unsafeRawPointer)
+    Builtin.condfail_message(true._value, message().unsafeRawPointer)
   }
   _conditionallyUnreachable()
 }
@@ -301,8 +301,7 @@ public func fatalError(
     _assertionFailure(kind: .fatal(), message(), file: file, line: line,
       flags: _fatalErrorFlags())
   } else {
-    Builtin.condfail_message(true._value,
-      StaticString("fatal error").unsafeRawPointer)
+    Builtin.condfail_message(true._value, message().unsafeRawPointer)
     Builtin.unreachable()
   }
 }

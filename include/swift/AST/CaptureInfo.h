@@ -54,16 +54,17 @@ class Type;
 class CapturedValue {
   friend class Lowering::TypeConverter;
 
-public:
-  using Storage =
-      llvm::PointerIntPair<llvm::PointerUnion<ValueDecl *, Expr *>, 2,
-                           unsigned>;
-
 private:
-  Storage Value;
+  llvm::PointerUnion<ValueDecl *, Expr *> Value;
+  // This is really unfortunate but we cannot use PointerIntPair here
+  // since flags need 4 bits and only two are available because union
+  // needs an extra bit for its discriminator.
+  unsigned Flags;
   SourceLoc Loc;
 
-  explicit CapturedValue(Storage V, SourceLoc Loc) : Value(V), Loc(Loc) {}
+  explicit CapturedValue(llvm::PointerUnion<ValueDecl *, Expr *> V,
+                         unsigned Flags, SourceLoc Loc)
+      : Value(V), Flags(Flags), Loc(Loc) {}
 
 public:
   friend struct llvm::DenseMapInfo<CapturedValue>;
@@ -76,11 +77,22 @@ public:
     /// IsNoEscape is set when a vardecl is captured by a noescape closure, and
     /// thus has its lifetime guaranteed.  It can be closed over by a fixed
     /// address if it has storage.
-    IsNoEscape = 1 << 1
+    IsNoEscape = 1 << 1,
+
+    /// IsConsumed is set when a VarDecl is consumed by the closure. One example
+    /// of this would be an explicit capture like `_ = { [v] in ... }` since
+    /// explicit captures are emitted as fresh variables and initialized with an
+    /// owned r-value.
+    IsConsumed = 1 << 2,
+
+    /// IsSending is set when the vardecl is declared as a `sending` capture
+    /// i.e. `[sending x]`. Such captures are only valid in a `@called(once)`
+    /// closure.
+    IsSending = 1 << 3,
   };
 
   CapturedValue(ValueDecl *Val, unsigned Flags, SourceLoc Loc)
-      : Value(Val, Flags), Loc(Loc) {}
+      : Value(Val), Flags(Flags), Loc(Loc) {}
 
   CapturedValue(Expr *Val, unsigned Flags);
 
@@ -89,14 +101,14 @@ public:
     return CapturedValue((ValueDecl *)nullptr, 0, SourceLoc());
   }
 
-  bool isDirect() const { return Value.getInt() & IsDirect; }
-  bool isNoEscape() const { return Value.getInt() & IsNoEscape; }
+  bool isDirect() const { return Flags & IsDirect; }
+  bool isNoEscape() const { return Flags & IsNoEscape; }
+  bool isConsumed() const { return Flags & IsConsumed; }
+  bool isSending() const { return Flags & IsSending; }
 
-  bool isDynamicSelfMetadata() const { return !Value.getPointer(); }
+  bool isDynamicSelfMetadata() const { return !Value; }
 
-  bool isExpr() const {
-    return Value.getPointer().dyn_cast<Expr *>();
-  }
+  bool isExpr() const { return Value.dyn_cast<Expr *>(); }
 
   bool isPackElement() const;
   bool isOpaqueValue() const;
@@ -108,16 +120,12 @@ public:
   bool isLocalCapture() const;
 
   CapturedValue mergeFlags(unsigned flags) const {
-    return CapturedValue(Storage(Value.getPointer(), getFlags() & flags), Loc);
+    return CapturedValue(Value, getFlags() & flags, Loc);
   }
 
-  ValueDecl *getDecl() const {
-    return Value.getPointer().dyn_cast<ValueDecl *>();
-  }
+  ValueDecl *getDecl() const { return Value.dyn_cast<ValueDecl *>(); }
 
-  Expr *getExpr() const {
-    return Value.getPointer().dyn_cast<Expr *>();
-  }
+  Expr *getExpr() const { return Value.dyn_cast<Expr *>(); }
 
   OpaqueValueExpr *getOpaqueValue() const;
 
@@ -127,7 +135,7 @@ public:
 
   SourceLoc getLoc() const { return Loc; }
 
-  unsigned getFlags() const { return Value.getInt(); }
+  unsigned getFlags() const { return Flags; }
 };
 
 /// Describes a type that has been captured by a closure or local function.

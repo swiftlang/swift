@@ -35,7 +35,7 @@ bb0(%0 : $Builtin.Int64):
 
 // CHECK-LABEL: sil @test_salvage_enum_no_payload
 // CHECK:       bb0:
-// CHECK:         debug_value undef : $Optional<Int64>, let, name "empty", transform {
+// CHECK:         debug_value (), let, name "empty", transform {
 // CHECK:           bb0:
 // CHECK:             [[NONE:%[0-9]+]] = enum $Optional<Int64>, #Optional.none!enumelt
 // CHECK:             return [[NONE]] : $Optional<Int64>

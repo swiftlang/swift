@@ -25,7 +25,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/PrefixMap.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/TargetParser/Host.h"
+#include "llvm/Support/SwapByteOrder.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <climits>
 

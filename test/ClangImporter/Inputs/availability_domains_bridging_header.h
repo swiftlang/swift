@@ -30,6 +30,13 @@ __attribute__((availability(domain:BayBridge, UNAVAIL)))
 
 @end
 
+@interface ImplementMe2 : NSObject
+- (instancetype)init;
+- (void)availableInBayBridge __attribute__((availability(domain:BayBridge, AVAIL)));
+- (void)unavailableInBayBridge
+    __attribute__((availability(domain:BayBridge, UNAVAIL)));
+@end
+
 __attribute__((availability(domain:BayBridge, AVAIL)))
 @interface ImplementMeBayBridgeAvailable : NSObject
 - (instancetype)init;

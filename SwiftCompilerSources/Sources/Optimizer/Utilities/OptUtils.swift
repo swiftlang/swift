@@ -316,6 +316,7 @@ extension ApplySite {
                                                 hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
                                                 isOnStack: partialAp.isOnStack,
                                                 isNested:  partialAp.isNested,
+                                                isCalledOnce: partialAp.isCalledOnce,
                                                 argumentLocationsFrom: self)
       partialAp.replace(with: newApply, context)
 
@@ -591,22 +592,6 @@ extension Instruction {
       return true
     default:
       return false
-    }
-  }
-
-  /// Returns true if `otherInst` is in the same block and is strictly dominated by this instruction or
-  /// the parent block of the instruction dominates parent block of `otherInst`.
-  func dominates(
-    _ otherInst: Instruction,
-    _ domTree: DominatorTree
-  ) -> Bool {
-    if parentBlock == otherInst.parentBlock {
-      return dominatesInBlock(otherInst)
-    } else {
-      return parentBlock.dominates(
-        otherInst.parentBlock,
-        domTree
-      )
     }
   }
 

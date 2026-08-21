@@ -65,6 +65,17 @@ public struct Sunavailable {
   public func munavailable(x: Int) -> Int { return x }
 }
 
+public class Base {
+  public func foo() {}
+  public class func foo() {}
+  public func bar() {}
+}
+public class Derived: Base {
+  override public func foo() {}
+  override public class func foo() {}
+  public override func bar() {}
+}
+
 //--- out.expected
 import Test
 
@@ -107,19 +118,47 @@ public func call_qux(_ func: inout Swift::MutableSpan<Swift::CInt>) {
 
 #endif
 #endif
-  public func call_pub(_ self: S, _ x: Swift::Int) -> Swift::Int {
-  return self.pub(x)
+public extension S {
+  func call_pub_S(_ x: Swift::Int) -> Swift::Int {
+    return pub(x)
+  }
 }
 
-  public func call_pub(_ self: C, _ x: Swift::Int) -> Swift::Int {
-  return self.pub(x)
+public extension C {
+  final func call_pub_C(_ x: Swift::Int) -> Swift::Int {
+    return pub(x)
+  }
+  final func call_ope_C(_ x: Swift::Int) -> Swift::Int {
+    return ope(x)
+  }
+  final func call_clas_C_classmethod(x: Swift::Int) -> Swift::Int {
+    return C.clas(x: x)
+  }
+  final func call_clas2_C_classmethod(x: Swift::Int) -> Swift::Int {
+    return C.clas2(x: x)
+  }
 }
-func call_ope(_ self: C, _ x: Swift::Int) -> Swift::Int {
-  return self.ope(x)
+
+public extension Base {
+  final func call_foo_Base() {
+    return foo()
+  }
+  final func call_foo_Base_classmethod() {
+    return Base.foo()
+  }
+  final func call_bar_Base() {
+    return bar()
+  }
 }
-public func call_clas(x: Swift::Int) -> Swift::Int {
-  return C.clas(x: x)
-}
-func call_clas2(x: Swift::Int) -> Swift::Int {
-  return C.clas2(x: x)
+
+public extension Derived {
+  final func call_foo_Derived() {
+    return foo()
+  }
+  final func call_foo_Derived_classmethod() {
+    return Derived.foo()
+  }
+  final func call_bar_Derived() {
+    return bar()
+  }
 }

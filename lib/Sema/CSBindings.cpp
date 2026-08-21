@@ -53,6 +53,41 @@ static bool isDirectRequirement(ConstraintSystem &cs,
   return false;
 }
 
+/// Check for a situation like this:
+///
+/// Array<(Int, String)> conv $T0
+/// $T0.Element bind (x: Int, y: String)
+///
+/// Or this:
+///
+/// Set<Int> conv $T0
+/// $T0.Element bind AnyHashable
+///
+/// When the element type of the collection is fixed via a bind constraint
+/// in this way, we must replace the element type of the collection with a
+/// fresh type variable, eg:
+///
+/// Array<$T1> conv $T0
+///
+/// Once we attempt this binding, the element type constraint can then be
+/// simplified immediately:
+///
+/// $T1 bind (x: Int, y: String)
+static Type applyElementTypeToBinding(Type containerTy, Type elementTy) {
+  auto *boundTy = containerTy->getAs<BoundGenericStructType>();
+  if (!boundTy)
+    return containerTy;
+
+  auto &ctx = boundTy->getASTContext();
+  auto *decl = boundTy->getDecl();
+  if (decl == ctx.getArrayDecl())
+    return ArraySliceType::get(elementTy);
+  else if (decl == ctx.getSetDecl())
+    return BoundGenericType::get(decl, /*parent=*/Type(), {elementTy});
+
+  return containerTy;
+}
+
 BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
     : CS(CS), TypeVar(TypeVar), Info(info) {
@@ -79,9 +114,28 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
       Protocols.insert(literal.getProtocol());
   }
 
+  Type elementType;
+  if (Info.ElementTypes.size() == 1) {
+    // We must unwrap LValueType here, because those cannot appear in
+    // structural position.
+    elementType = Info.ElementTypes[0].first->getRValueType();
+    if (elementType->hasTypeVariable()) {
+      elementType = Type();
+    }
+  }
+
   // Now, the subtype and supertype bindings.
-  for (const auto &binding : info.Bindings)
+  for (const auto &binding : info.Bindings) {
+    if (elementType &&
+        (binding.Kind == AllowedBindingKind::Subtypes ||
+         binding.Kind == AllowedBindingKind::Supertypes)) {
+      addBinding(binding.withType(
+        applyElementTypeToBinding(binding.BindingType, elementType)));
+      continue;
+    }
+
     addBinding(binding);
+  }
 
   // Finally, the defaults.
   for (auto *constraint : info.Defaults) {
@@ -90,9 +144,6 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
   }
 
   computeJoinsAndMeets();
-
-  for (auto &entry : info.AdjacentVars)
-    AdjacentVars.insert(entry.first);
 
   ASSERT(!IsDirty);
 }
@@ -585,12 +636,19 @@ bool BindingSet::involvesTypeVariables() const {
       TypeVar->getImpl().canBindToPack())
     return true;
 
+  if (!Info.AdjacentVars.empty() ||
+      !Info.SubtypeOf.empty() ||
+      !Info.SubtypeDelay.empty() ||
+      !Info.SupertypeOf.empty() ||
+      !Info.SupertypeDelay.empty())
+    return true;
+
   // This is effectively a no-op right now since bindings are re-computed
   // on each step of the solver and fixed types won't appear in AdjancentVars,
   // but once bindings are computed incrementally it becomes important
   // to double-check that any adjacent type variables found previously are
   // still unresolved.
-  return llvm::any_of(AdjacentVars, [](TypeVariableType *typeVar) {
+  return llvm::any_of(ReferencedVars, [](TypeVariableType *typeVar) {
     return !typeVar->getImpl().getFixedType(/*record=*/nullptr);
   });
 }
@@ -711,8 +769,8 @@ void BindingSet::inferTransitiveProtocolRequirements() {
 
   auto propagateProtocolsTo =
       [&protocols](TypeVariableType *dstVar,
-                   const ArrayRef<Constraint *> &direct,
-                   const SmallPtrSetImpl<Constraint *> &transitive) {
+                   ArrayRef<Constraint *> direct,
+                   SmallPtrSet<Constraint *, 4> transitive) {
         auto &destination = protocols[dstVar];
 
         if (direct.size() > 0)
@@ -789,7 +847,7 @@ void BindingSet::inferTransitiveProtocolRequirements() {
       auto conformanceReqs =
           node.getPotentialBindings().getConformanceRequirements();
 
-      llvm::SmallPtrSet<Constraint *, 2> placeholder;
+      llvm::SmallPtrSet<Constraint *, 4> placeholder;
       // Add any direct protocols from members of the
       // equivalence class, so they could be propagated
       // to all of the members.
@@ -943,9 +1001,9 @@ void BindingSet::inferTransitiveKeyPathBindingFrom(
     // Make a note that the key path root is transitively adjacent
     // to contextual root type variable and all of its variables.
     // This is important for ranking.
-    AdjacentVars.insert(contextualRootVar);
-    AdjacentVars.insert(contextualRootBindings.AdjacentVars.begin(),
-                        contextualRootBindings.AdjacentVars.end());
+    ReferencedVars.insert(contextualRootVar);
+    ReferencedVars.insert(contextualRootBindings.ReferencedVars.begin(),
+                          contextualRootBindings.ReferencedVars.end());
   } else {
     // We have a concrete root type. Add a binding for it to our binding set.
     auto newBinding = binding.withSameSource(inferredRootTy, inferredRootKind);
@@ -1946,7 +2004,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
         SmallPtrSet<TypeVariableType *, 4> referencedVars;
         existing->BindingType->getTypeVariables(referencedVars);
         for (auto *var : referencedVars)
-          AdjacentVars.erase(var);
+          ReferencedVars.erase(var);
       }
 
       // Remove the existing binding.
@@ -1961,8 +2019,8 @@ void BindingSet::addBinding(PotentialBinding binding) {
 
   // The new binding was not in conflict with or subsumed by anything else, so
   // record it.
-  for (auto *adjacentVar : referencedTypeVars)
-    AdjacentVars.insert(adjacentVar);
+  for (auto *var : referencedTypeVars)
+    ReferencedVars.insert(var);
 
   DEBUG_ASSERT(std::find(Bindings.begin(), Bindings.end(), binding)
                == Bindings.end());
@@ -2088,7 +2146,7 @@ void PotentialBindings::inferFromLiteral(Constraint *constraint,
 }
 
 bool BindingSet::operator==(const BindingSet &other) const {
-  if (AdjacentVars != other.AdjacentVars)
+  if (ReferencedVars != other.ReferencedVars)
     return false;
 
   if (Bindings.size() != other.Bindings.size())
@@ -2210,20 +2268,28 @@ bool BindingSet::operator<(const BindingSet &other) {
   return isPotentiallyIncomplete() < other.isPotentiallyIncomplete();
 }
 
-#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+#define BINDING_CONSTRAINT_ADDITION(PropertyName, Storage)            \
   void PotentialBindings::record##PropertyName(Constraint *constraint) {       \
     if (CS.solverState)                                                        \
       CS.recordChange(                                                         \
           SolverTrail::Change::Added##PropertyName(TypeVar, constraint));      \
     Storage.push_back(constraint);                                             \
   }
-#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+#define BINDING_VAR_RELATION_ADDITION(RelationName, Storage)                   \
   void PotentialBindings::record##RelationName(TypeVariableType *typeVar,      \
                                                Constraint *originator) {       \
     if (CS.solverState)                                                        \
       CS.recordChange(SolverTrail::Change::Added##RelationName(                \
           TypeVar, typeVar, originator));                                      \
     Storage.emplace_back(typeVar, originator);                                 \
+  }
+#define BINDING_TYPE_RELATION_ADDITION(RelationName, Storage)                  \
+  void PotentialBindings::record##RelationName(Type type,                      \
+                                               Constraint *originator) {       \
+    if (CS.solverState)                                                        \
+      CS.recordChange(SolverTrail::Change::Added##RelationName(                \
+          TypeVar, type, originator));                                         \
+    Storage.emplace_back(type, originator);                                    \
   }
 #include "swift/Sema/CSTrail.def"
 
@@ -2372,39 +2438,6 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
   }
 
   return bestBindings;
-}
-
-/// Find the set of type variables that are inferable from the given type.
-///
-/// \param type The type to search.
-/// \param typeVars Collects the type variables that are inferable from the
-/// given type. This set is not cleared, so that multiple types can be explored
-/// and introduce their results into the same set.
-static void
-findInferableTypeVars(Type type,
-                      SmallPtrSetImpl<TypeVariableType *> &typeVars) {
-  type = type->getCanonicalType();
-  if (!type->hasTypeVariable())
-    return;
-
-  class Walker : public TypeWalker {
-    SmallPtrSetImpl<TypeVariableType *> &typeVars;
-
-  public:
-    explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVars)
-        : typeVars(typeVars) {}
-
-    Action walkToTypePre(Type ty) override {
-      if (ty->is<DependentMemberType>())
-        return Action::SkipNode;
-
-      if (auto typeVar = ty->getAs<TypeVariableType>())
-        typeVars.insert(typeVar);
-      return Action::Continue;
-    }
-  };
-
-  type.walk(Walker(typeVars));
 }
 
 void BindingSet::addDefault(Constraint *constraint) {
@@ -2725,6 +2758,35 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
   return bindings;
 }
 
+/// Check whether this is a dependent member type T.[P]Element where P is some
+/// protocol inheriting from Sequence, or T.[P]ArrayLiteralElement where P is
+/// some protocol inheriting from ExpressibleByArrayLiteral.
+static bool isInterestingElementType(Type type, TypeVariableType *forBase) {
+  auto *memberTy = type->getAs<DependentMemberType>();
+  if (!memberTy)
+    return false;
+
+  if (memberTy->getBase()->getAs<TypeVariableType>() != forBase)
+    return false;
+
+  auto *assocTypeDecl = memberTy->getAssocType();
+  if (!assocTypeDecl)
+    return false;
+
+  auto &ctx = memberTy->getASTContext();
+  KnownProtocolKind kind;
+  if (assocTypeDecl->getName() == ctx.Id_Element) {
+    kind = KnownProtocolKind::Sequence;
+  } else if (assocTypeDecl->getName() == ctx.Id_ArrayLiteralElement) {
+    kind = KnownProtocolKind::ExpressibleByArrayLiteral;
+  } else {
+    return false;
+  }
+
+  auto *proto = assocTypeDecl->getAssociatedTypeAnchor()->getProtocol();
+  return proto->isSpecificProtocol(kind);
+}
+
 std::optional<PotentialBinding>
 PotentialBindings::inferFromRelational(Constraint *constraint) {
   ASSERT(TypeVar);
@@ -2759,14 +2821,33 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   Type type;
   AllowedBindingKind kind;
   if (first->getAs<TypeVariableType>() == TypeVar) {
-    // Upper bound for this type variable.
+    // Upper bound for this type variable:
+    //
+    // $T0 conv Foo
     type = second;
     kind = AllowedBindingKind::Subtypes;
   } else if (second->getAs<TypeVariableType>() == TypeVar) {
-    // Lower bound for this type variable.
+    // Lower bound for this type variable:
+    //
+    // Foo conv $T0
     type = first;
     kind = AllowedBindingKind::Supertypes;
   } else {
+    // Infer a binding from `inout $T <convertible to> Unsafe*Pointer<...>?`.
+    //
+    // This has to be a Fallback binding, because if $T is later bound to
+    // an Array type, more conversion possibilities appear.
+    if (first->is<InOutType>() &&
+        first->getInOutObjectType()->getAs<TypeVariableType>() == TypeVar) {
+      if (auto pointeeTy = second->lookThroughAllOptionalTypes()
+                               ->getAnyPointerElementType()) {
+        if (!pointeeTy->isTypeVariableOrMember()) {
+          return PotentialBinding(pointeeTy, AllowedBindingKind::Fallback,
+                                  constraint);
+        }
+      }
+    }
+
     // If the left-hand side of a relational constraint is a
     // type variable representing a closure type, let's delay
     // attempting any bindings related to any type variables
@@ -2781,31 +2862,75 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       }
     }
 
-    // Check whether both this type and another type variable are
-    // inferable.
-    SmallPtrSet<TypeVariableType *, 4> typeVars;
-    findInferableTypeVars(first, typeVars);
-    findInferableTypeVars(second, typeVars);
+    // Now, consider constraints of the form:
+    //
+    // $T.A conv ...
+    // ... conv $T.A
+    auto *firstTypeVar = first->getDependentMemberRoot()->getAs<TypeVariableType>();
+    auto *secondTypeVar = second->getDependentMemberRoot()->getAs<TypeVariableType>();
 
-    if (typeVars.erase(TypeVar)) {
-      for (auto *typeVar : typeVars) {
-        recordAdjacentVar(typeVar, constraint);
-      }
+    if (!firstTypeVar && !secondTypeVar) {
+      // This constraint will simplify into smaller constraints.
+      // Don't record anything.
+      DEBUG_BAILOUT("Neither side has a type variable root");
+      return std::nullopt;
     }
 
-    // Infer a binding from `inout $T <convertible to> Unsafe*Pointer<...>?`.
+    // The remaining case is that our type variable appears somewhere
+    // inside the constraint.
     //
-    // This has to be a Fallback binding, because if $T is later bound to
-    // an Array type, more conversion possibilities appear.
-    if (first->is<InOutType>() &&
-        first->getInOutObjectType()->isEqual(TypeVar)) {
-      if (auto pointeeTy = second->lookThroughAllOptionalTypes()
-                               ->getAnyPointerElementType()) {
-        if (!pointeeTy->isTypeVariableOrMember()) {
-          return PotentialBinding(pointeeTy, AllowedBindingKind::Fallback,
-                                  constraint);
-        }
-      }
+    // Eg, if we're currently looking at $T0, we must record adjacency to $T1
+    // because once $T1 is bound, we might get a more precise supertype bound
+    // for $T0:
+    //
+    // $T1 conv [$T0]
+    // $T1.A conv [$T0]
+    //
+    // Note that if we have this, where we're looking at $T0, we do not
+    // record anything, because binding $T1 does not generate new bindings
+    // for $T0:
+    //
+    // $T1 conv [$T0.A]
+    if (firstTypeVar) {
+      TypeVarOccurrences result;
+      getTypeVariablesWithVariance(&result, second, TypePosition::Contravariant);
+
+      if (result.invariant.count(TypeVar))
+        recordAdjacentVar(firstTypeVar, constraint);
+      if (result.covariant.count(TypeVar))
+        recordSubtypeDelay(firstTypeVar, constraint);
+      if (result.contravariant.count(TypeVar))
+        recordSupertypeDelay(firstTypeVar, constraint);
+
+    // The other direction:
+    //
+    // [$T0] conv $T1
+    // [$T0] conv $T1.A
+    } else if (secondTypeVar) {
+      TypeVarOccurrences result;
+      getTypeVariablesWithVariance(&result, first, TypePosition::Covariant);
+
+      if (result.invariant.count(TypeVar))
+        recordAdjacentVar(secondTypeVar, constraint);
+      if (result.covariant.count(TypeVar))
+        recordSubtypeDelay(secondTypeVar, constraint);
+      if (result.contravariant.count(TypeVar))
+        recordSupertypeDelay(secondTypeVar, constraint);
+    }
+
+    // If we have a constraint that looks like this, record an element type:
+    //
+    // $T0.Element bind X
+    if (firstTypeVar == TypeVar &&
+        isInterestingElementType(first, TypeVar)) {
+      recordElementType(second, constraint);
+
+    // And the other direction:
+    //
+    // X bind $T0.Element
+    } else if (secondTypeVar == TypeVar &&
+               isInterestingElementType(second, TypeVar)) {
+      recordElementType(first, constraint);
     }
 
     return std::nullopt;
@@ -2939,7 +3064,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
         recordSupertypeOf(bindingTypeVar, constraint);
       }
 
-      recordAdjacentVar(bindingTypeVar, constraint);
       break;
     }
 
@@ -3130,10 +3254,11 @@ void PotentialBindings::infer(Constraint *constraint) {
     // application constraint. This ensures we try to bind the key path type
     // first, which can allow us to discover additional bindings for the result
     // type.
-    SmallPtrSet<TypeVariableType *, 4> typeVars;
-    findInferableTypeVars(CS.simplifyType(constraint->getThirdType()),
-                          typeVars);
-    if (typeVars.count(TypeVar)) {
+    auto third = CS.simplifyType(constraint->getThirdType());
+
+    TypeVarOccurrences result;
+    getTypeVariablesWithVariance(&result, third, TypePosition::Invariant);
+    if (result.invariant.count(TypeVar)) {
       recordDelayedBy(constraint);
     }
 
@@ -3303,9 +3428,11 @@ void PotentialBindings::retract(Constraint *constraint) {
 
   LLVM_DEBUG(
     llvm::dbgs() << Constraints.size() << " " << Bindings.size() << " "
-                 << AdjacentVars.size() << " " << DelayedBy.size() << " "
+                 << AdjacentVars.size() << " " << SubtypeDelay.size() << " "
+                 << SupertypeDelay.size() << " " << DelayedBy.size() << " "
                  << LValueOf.size() << " " << SubtypeOf.size() << " "
-                 << SupertypeOf.size() << " " << EquivalentTo.size() << "\n");
+                 << SupertypeOf.size() << " " << EquivalentTo.size() << " "
+                 << ElementTypes.size() << "\n");
 
   Bindings.erase(
       llvm::remove_if(Bindings,
@@ -3335,7 +3462,7 @@ void PotentialBindings::retract(Constraint *constraint) {
                       }),
       Literals.end());
 
-#define COMMON_BINDING_INFORMATION_RETRACTION(PropertyName, Storage)           \
+#define BINDING_CONSTRAINT_RETRACTION(PropertyName, Storage)                   \
   Storage.erase(                                                               \
       llvm::remove_if(Storage,                                                 \
                       [&](Constraint *other) {                                 \
@@ -3351,10 +3478,26 @@ void PotentialBindings::retract(Constraint *constraint) {
                       }),                                                      \
       Storage.end());
 
-#define BINDING_RELATION_RETRACTION(RelationName, Storage)                     \
+#define BINDING_VAR_RELATION_RETRACTION(RelationName, Storage)                 \
   Storage.erase(                                                               \
       llvm::remove_if(Storage,                                                 \
                       [&](std::pair<TypeVariableType *, Constraint *> pair) {  \
+                        if (pair.second == constraint) {                       \
+                          if (CS.solverState) {                                \
+                            CS.recordChange(                                   \
+                                SolverTrail::Change::Retracted##RelationName(  \
+                                    TypeVar, pair.first, pair.second));        \
+                          }                                                    \
+                          return true;                                         \
+                        }                                                      \
+                        return false;                                          \
+                      }),                                                      \
+      Storage.end());
+
+#define BINDING_TYPE_RELATION_RETRACTION(RelationName, Storage)                \
+  Storage.erase(                                                               \
+      llvm::remove_if(Storage,                                                 \
+                      [&](std::pair<Type, Constraint *> pair) {                \
                         if (pair.second == constraint) {                       \
                           if (CS.solverState) {                                \
                             CS.recordChange(                                   \
@@ -3375,10 +3518,13 @@ void PotentialBindings::reset() {
     ASSERT(Bindings.empty());
     ASSERT(DelayedBy.empty());
     ASSERT(AdjacentVars.empty());
+    ASSERT(EquivalentTo.empty());
     ASSERT(LValueOf.empty());
     ASSERT(SubtypeOf.empty());
+    ASSERT(SubtypeDelay.empty());
     ASSERT(SupertypeOf.empty());
-    ASSERT(EquivalentTo.empty());
+    ASSERT(SupertypeDelay.empty());
+    ASSERT(ElementTypes.empty());
   }
 
   TypeVar = nullptr;
@@ -3387,11 +3533,13 @@ void PotentialBindings::reset() {
 
 void PotentialBindings::printVars(llvm::raw_ostream &out, unsigned indent,
                                   bool showVia) const {
+  auto PO = PrintOptions::forDebugging();
+
   auto printVars = [&](ArrayRef<std::pair<TypeVariableType *, Constraint *>> pairs) {
     interleave(
         pairs,
         [&](std::pair<TypeVariableType *, Constraint *> pair) {
-          out << pair.first->getString(PrintOptions::forDebugging());
+          out << pair.first->getString(PO);
           if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
             out << " (fixed)";
           if (showVia) {
@@ -3402,6 +3550,12 @@ void PotentialBindings::printVars(llvm::raw_ostream &out, unsigned indent,
         },
         [&out]() { out << ", "; });
   };
+
+  if (!EquivalentTo.empty()) {
+    out << "[equivalent to: ";
+    printVars(EquivalentTo);
+    out << "] ";
+  }
 
   if (!AdjacentVars.empty()) {
     out << "[adjacent to: ";
@@ -3415,15 +3569,32 @@ void PotentialBindings::printVars(llvm::raw_ostream &out, unsigned indent,
     out << "] ";
   }
 
+  if (!SupertypeDelay.empty()) {
+    out << "[supertype delayed by: ";
+    printVars(SupertypeDelay);
+    out << "] ";
+  }
+
   if (!SubtypeOf.empty()) {
     out << "[subtype of: ";
     printVars(SubtypeOf);
     out << "] ";
   }
 
-  if (!EquivalentTo.empty()) {
-    out << "[equivalent to: ";
-    printVars(SubtypeOf);
+  if (!SubtypeDelay.empty()) {
+    out << "[subtype delayed by: ";
+    printVars(SubtypeDelay);
+    out << "] ";
+  }
+
+  if (!ElementTypes.empty()) {
+    out << "[element types: ";
+    interleave(
+        ElementTypes,
+        [&](std::pair<Type, Constraint *> pair) {
+          out << pair.first.getString(PO);
+        },
+        [&out]() { out << ", "; });
     out << "] ";
   }
 }
@@ -3602,15 +3773,26 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   if (!attributes.empty())
     out << "] ";
 
-  if (!AdjacentVars.empty()) {
-    out << "[adjacent to: ";
-    SmallVector<TypeVariableType *> adjacentVars(AdjacentVars.begin(),
-                                                 AdjacentVars.end());
-    llvm::sort(adjacentVars,
-               [](const TypeVariableType *lhs, const TypeVariableType *rhs) {
-                   return lhs->getID() < rhs->getID();
+  if (!Protocols.empty()) {
+    out << "[protocols: ";
+    SmallVector<ProtocolDecl *, 2> protocols(Protocols.begin(), Protocols.end());
+    llvm::sort(protocols,
+               [](const ProtocolDecl *lhs, const ProtocolDecl *rhs) {
+                 return TypeDecl::compare(lhs, rhs) < 0;
                });
-    interleave(adjacentVars,
+    interleave(protocols,
+               [&](const ProtocolDecl *proto) {
+                 out << proto->getName();
+               },
+               [&out]() { out << ", "; });
+    out << "] ";
+  }
+
+  Info.printVars(out, indent, /*showVia=*/false);
+
+  if (!ReferencedVars.empty()) {
+    out << "[references: ";
+    interleave(ReferencedVars,
                [&](auto *typeVar) {
                  out << typeVar->getString(PO);
                  if (typeVar->getImpl().getFixedType(/*record=*/nullptr))

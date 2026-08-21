@@ -39,6 +39,7 @@
 #include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
@@ -432,10 +433,6 @@ getConcreteValueOfExistentialBoxAddr(SILValue addr, SILInstruction *ignoreUser) 
     case SILInstructionKind::LoadInst:
       break;
     case SILInstructionKind::DebugValueInst:
-      if (!DebugValueInst::hasAddrVal(stackUser)) {
-        if (stackUser != ignoreUser)
-          return SILValue();
-      }
       break;
     case SILInstructionKind::StoreInst: {
       auto *store = cast<StoreInst>(stackUser);
@@ -1005,14 +1002,29 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
   emitDestroyOperation(builder, loc, arg, callbacks);
 }
 
+/// Returns true if \p user is a user of an on-stack closure which can be
+/// deleted together with the closure.
+static bool isDeadOnStackClosureUser(SILInstruction *user) {
+  return isa<DeallocStackInst>(user) || isa<DebugValueInst>(user) ||
+         isa<DestroyValueInst>(user);
+}
+
 static bool
-deadMarkDependenceUser(SILInstruction *inst,
+deadMarkDependenceUser(Operand *use,
                        SmallVectorImpl<SILInstruction *> &deleteInsts) {
-  if (!isa<MarkDependenceInst>(inst))
+  auto *mdi = dyn_cast<MarkDependenceInst>(use->getUser());
+  // If the closure is the base operand, another value depends on it. Deleting
+  // the mark_dependence and the destroys of its result would leak that value.
+  if (!mdi || use->getOperandNumber() != MarkDependenceInst::Dependent)
     return false;
-  deleteInsts.push_back(inst);
-  for (auto *use : cast<SingleValueInstruction>(inst)->getUses()) {
-    if (!deadMarkDependenceUser(use->getUser(), deleteInsts))
+  deleteInsts.push_back(mdi);
+  for (auto *mdiUse : mdi->getUses()) {
+    // In OSSA the closure is destroyed via the forwarding mark_dependence.
+    if (isDeadOnStackClosureUser(mdiUse->getUser())) {
+      deleteInsts.push_back(mdiUse->getUser());
+      continue;
+    }
+    if (!deadMarkDependenceUser(mdiUse, deleteInsts))
       return false;
   }
   return true;
@@ -1132,16 +1144,14 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     return false;
 
   // A stack allocated partial apply does not have any release users. Delete it
-  // if the only users are the dealloc_stack and mark_dependence instructions.
+  // if the only users are the dealloc_stack, debug_value and destroy_value
+  // instructions, either directly or forwarded through mark_dependence.
   if (pa && pa->isOnStack()) {
     SmallVector<SILInstruction *, 8> deleteInsts;
     for (auto *use : pa->getUses()) {
-      SILInstruction *user = use->getUser();
-      if (isa<DeallocStackInst>(user)
-          || isa<DebugValueInst>(user)
-          || isa<DestroyValueInst>(user)) {
-        deleteInsts.push_back(user);
-      } else if (!deadMarkDependenceUser(user, deleteInsts)) {
+      if (isDeadOnStackClosureUser(use->getUser())) {
+        deleteInsts.push_back(use->getUser());
+      } else if (!deadMarkDependenceUser(use, deleteInsts)) {
         return false;
       }
     }
@@ -1828,6 +1838,7 @@ bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
   }
 
   SmallVector<Operand *, 32> worklist(getNonDebugUses(forwardingInst));
+  SmallVector<SILInstruction *, 4> forwardingUsers;
   while (!worklist.empty()) {
     auto *use = worklist.pop_back_val();
     auto *user = use->getUser();
@@ -1837,6 +1848,7 @@ bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
       continue;
 
     if (isa<CopyValueInst>(user) || isa<BeginBorrowInst>(user)) {
+      forwardingUsers.push_back(user);
       for (auto result : user->getResults())
         for (auto *resultUse : getNonDebugUses(result))
           worklist.push_back(resultUse);
@@ -1846,9 +1858,12 @@ bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
     return false;
   }
 
-  // Rewrite debug uses separately (they might need salvaging logic).
-  // Note: We know that `forwardingInst` is salvageable as this function is
-  // only called with convert_function instructions.
+  // Rewrite all debug uses separately (they might need salvaging logic).
+  // Note: We know that `forwardingInst` and its users are salvageable as this
+  // function is only called with convert_function instructions, and
+  // begin_borrow and copy_value are salvageable as well.
+  for (auto *inst : llvm::reverse(forwardingUsers))
+    salvageDebugInfo(inst);
   salvageDebugInfo(forwardingInst);
 
   // Now that we know we can perform our transform, set all uses of
@@ -1900,11 +1915,11 @@ static void salvageNullaryInst(SingleValueInstruction *inst) {
   SmallVector<Operand *> debugUses(getDebugUses(inst));
   for (Operand *U : debugUses) {
     auto *DbgInst = cast<DebugValueInst>(U->getUser());
+    unsigned opIdx = U->getOperandNumber();
     SILBasicBlock *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
     SILValue cloned = inst->clone(&*debugBB->begin());
-    debugBB->getArgument(0)->replaceAllUsesWith(cloned);
-    debugBB->eraseArgument(0);
-    DbgInst->setOperand(SILUndef::get(DbgInst->getOperand()));
+    debugBB->getArgument(opIdx)->replaceAllUsesWith(cloned);
+    DbgInst->killOperand(opIdx);
   }
 }
 
@@ -1913,12 +1928,21 @@ static void salvageNullaryInst(SingleValueInstruction *inst) {
 static void salvageUnaryInst(SingleValueInstruction *SVI) {
   assert(SVI->getNumOperands() == 1 &&
          "salvageUnaryInst expects a single operand");
+  // Having an opened existential type salvaged into the debug reconstruction
+  // block is a problem: when the instruction defining the archetype is
+  // removed, it would leave an undef with a dangling opened existential type,
+  // which would trip the SIL verifier.
+  // There should be no debug use if the operand is null, but bail early.
+  if (!SVI->getOperand(0) || SVI->getOperand(0)->getType().hasOpenedExistential()) {
+    return;
+  }
   SmallVector<Operand *> debugUses(getDebugUses(SVI));
   for (Operand *U : debugUses) {
     auto *DbgInst = cast<DebugValueInst>(U->getUser());
+    unsigned opIdx = U->getOperandNumber();
     SILBasicBlock *debugBB =
         DbgInst->getOrCreateDebugReconstructionBlock();
-    SILArgument *oldArg = debugBB->getArgument(0);
+    SILArgument *oldArg = debugBB->getArgument(opIdx);
 
     // Clone the instruction into the debug BB. TrivialCloner keeps
     // original operands, which we fix up below.
@@ -1929,9 +1953,9 @@ static void salvageUnaryInst(SingleValueInstruction *SVI) {
     // Replace the block arg type with the input operand type.
     SILValue operand = SVI->getOperand(0);
     auto *newArg =
-        debugBB->replacePhiArgument(0, operand->getType(), OwnershipKind::None);
+        debugBB->replacePhiArgument(opIdx, operand->getType(), OwnershipKind::None);
     cloned->setOperand(0, newArg);
-    DbgInst->setOperand(operand);
+    U->set(operand);
   }
 }
 
@@ -1954,15 +1978,16 @@ static void salvageBinaryInst(SingleValueInstruction *SVI) {
   SmallVector<Operand *> debugUses(getDebugUses(SVI));
   for (Operand *U : debugUses) {
     auto *DbgInst = cast<DebugValueInst>(U->getUser());
+    unsigned opIdx = U->getOperandNumber();
 
     if (!lhsNullary && !rhsNullary) {
       // Debug values cannot currently have multiple operands.
-      DbgInst->killOperand();
+      DbgInst->killOperand(opIdx);
       continue;
     }
 
     SILBasicBlock *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
-    SILArgument *oldArg = debugBB->getArgument(0);
+    SILArgument *oldArg = debugBB->getArgument(opIdx);
 
     auto *cloned = cast<SingleValueInstruction>(SVI->clone(&*debugBB->begin()));
     oldArg->replaceAllUsesWith(cloned);
@@ -1978,21 +2003,54 @@ static void salvageBinaryInst(SingleValueInstruction *SVI) {
       // Both nullary, no operand remains.
       cloned->setOperand(0, clonedLhs);
       cloned->setOperand(1, clonedRhs);
-      DbgInst->killOperand();
+      DbgInst->killOperand(opIdx);
     } else if (rhsNullary) {
       auto *newArg =
-          debugBB->replacePhiArgument(0, lhs->getType(), OwnershipKind::None);
+          debugBB->replacePhiArgument(opIdx, lhs->getType(), OwnershipKind::None);
       cloned->setOperand(0, newArg);
       cloned->setOperand(1, clonedRhs);
-      DbgInst->setOperand(lhs);
+      U->set(lhs);
     } else {
       auto *newArg =
-          debugBB->replacePhiArgument(0, rhs->getType(), OwnershipKind::None);
+          debugBB->replacePhiArgument(opIdx, rhs->getType(), OwnershipKind::None);
       cloned->setOperand(0, clonedLhs);
       cloned->setOperand(1, newArg);
-      DbgInst->setOperand(rhs);
+      U->set(rhs);
     }
   }
+}
+
+/// Salvage a checked truncation from Builtin.IntLiteral by constant folding
+/// the builtin and cloning the result into debug reconstruction blocks.
+/// These builtins create branches at IRGen which are not supported in debug BBs.
+static void salvageCheckedTruncFromLiteral(BuiltinInst *builtin) {
+  // Constant fold the builtin. This produces a tuple (result, overflow) of
+  // integer literals inserted before the builtin. Returns nullptr on overflow
+  // or if the operand is not a constant.
+  std::optional<bool> ResultsInError;
+  SILValue folded = constantFoldBuiltin(builtin, ResultsInError);
+  if (!folded)
+    return;
+
+  auto *tupleFolded = cast<SingleValueInstruction>(folded);
+
+  // Redirect debug uses from the builtin to the folded tuple, then salvage
+  // the tuple as a binary instruction (both operands are integer literals).
+  SmallVector<Operand *, 4> debugUses(getDebugUses(builtin));
+  for (Operand *U : debugUses)
+    U->set(folded);
+
+  salvageBinaryInst(tupleFolded);
+
+  // Erase the temporary folded instructions from the real function.
+  SmallVector<SingleValueInstruction *, 2> tupleOperands;
+  for (auto &op : tupleFolded->getAllOperands())
+    if (auto *inst = dyn_cast<SingleValueInstruction>(op.get()))
+      tupleOperands.push_back(inst);
+  tupleFolded->eraseFromParent();
+  for (auto *inst : tupleOperands)
+    if (inst->use_empty())
+      inst->eraseFromParent();
 }
 
 /// Salvage debug info for identity-like instructions (copy_value, move_value).
@@ -2002,8 +2060,7 @@ static void salvageIdentityInst(SingleValueInstruction *SVI) {
          "salvageIdentityInst expects an operand");
   SmallVector<Operand *> debugUses(getDebugUses(SVI));
   for (Operand *U : debugUses) {
-    auto *DbgInst = cast<DebugValueInst>(U->getUser());
-    DbgInst->setOperand(SVI->getOperand(0));
+    U->set(SVI->getOperand(0));
   }
 }
 
@@ -2021,9 +2078,10 @@ static void salvageDestructureInst(SILInstruction *I) {
     SmallVector<Operand *> debugUses(getDebugUses(result));
     for (Operand *U : debugUses) {
       auto *DbgInst = cast<DebugValueInst>(U->getUser());
+      unsigned opIdx = U->getOperandNumber();
       SILBasicBlock *debugBB =
           DbgInst->getOrCreateDebugReconstructionBlock();
-      SILArgument *oldArg = debugBB->getArgument(0);
+      SILArgument *oldArg = debugBB->getArgument(opIdx);
 
       // Create the equivalent extract instruction in the debug BB.
       SILBuilder builder(&*debugBB->begin());
@@ -2041,9 +2099,9 @@ static void salvageDestructureInst(SILInstruction *I) {
 
       // Replace the block arg type with the struct/tuple operand type.
       auto *newArg = debugBB->replacePhiArgument(
-          0, structOrTupleOperand->getType(), OwnershipKind::None);
+          opIdx, structOrTupleOperand->getType(), OwnershipKind::None);
       extractInst->setOperand(0, newArg);
-      DbgInst->setOperand(structOrTupleOperand);
+      U->set(structOrTupleOperand);
     }
   }
 }
@@ -2065,7 +2123,7 @@ static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
   if (auto *srcDVI = dyn_cast<DebugValueInst>(*DefiningInst))
     newDVI->cloneReconstructionBlockFrom(srcDVI);
 
-  newDVI->stripDeref();
+  newDVI->stripDeref(0);
 }
 
 void swift::salvageStoreDebugInfo(SILInstruction *SI,
@@ -2180,6 +2238,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       SmallVector<Operand *> debugUses(getDebugUses(STVal));
       for (Operand *U : debugUses) {
         auto *DbgInst = cast<DebugValueInst>(U->getUser());
+        unsigned opIdx = U->getOperandNumber();
         auto VarInfo = DbgInst->getCompleteVarInfo();
         if (SILBasicBlock *debugBB = DbgInst->getDebugReconstructionBlock()) {
           // Cannot combine debug reconstruction blocks and fragments.
@@ -2187,7 +2246,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
           // single operand, only salvage one field (the first one).
           SILValue fieldVal = STI->getOperand(0);
           SILType structTy = STVal->getType();
-          SILArgument *oldArg = debugBB->getArgument(0);
+          SILArgument *oldArg = debugBB->getArgument(opIdx);
 
           // Create an all-undef struct instruction.
           SILBuilder builder(debugBB->begin());
@@ -2200,9 +2259,9 @@ void swift::salvageDebugInfo(SILInstruction *I) {
 
           // Replace the block arg and wire the operand.
           auto *newArg = debugBB->replacePhiArgument(
-            0, fieldVal->getType(), OwnershipKind::None);
+            opIdx, fieldVal->getType(), OwnershipKind::None);
           newStructInst->setOperand(0, newArg);
-          DbgInst->setOperand(fieldVal);
+          U->set(fieldVal);
         } else {
           // Fragments are the only way to use multiple operands to reconstruct
           // a variable, as debug values can only have a single operand.
@@ -2233,13 +2292,14 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       SmallVector<Operand *> debugUses(getDebugUses(TTVal));
       for (Operand *U : debugUses) {
         auto *DbgInst = cast<DebugValueInst>(U->getUser());
+        unsigned opIdx = U->getOperandNumber();
         auto VarInfo = DbgInst->getCompleteVarInfo();
         if (SILBasicBlock *debugBB = DbgInst->getDebugReconstructionBlock()) {
           // Cannot combine debug reconstruction blocks and fragments.
           // Only salvage one element (the first one).
           SILValue eltVal = TTI->getOperand(0);
           SILType tupleTy = TTVal->getType();
-          SILArgument *oldArg = debugBB->getArgument(0);
+          SILArgument *oldArg = debugBB->getArgument(opIdx);
 
           // Create an all-undef tuple instruction.
           SILBuilder builder(debugBB->begin());
@@ -2252,10 +2312,9 @@ void swift::salvageDebugInfo(SILInstruction *I) {
 
           // Replace the block arg and wire the operand.
           auto *newArg = debugBB->replacePhiArgument(
-            0, eltVal->getType(), OwnershipKind::None);
+            opIdx, eltVal->getType(), OwnershipKind::None);
           tupleInst->setOperand(0, newArg);
-          // Update the debug_value operand.
-          DbgInst->setOperand(eltVal);
+          U->set(eltVal);
         } else {
           TupleType *TT = TTI->getTupleType();
           for (auto i : indices(TT->getElements())) {
@@ -2306,7 +2365,8 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   if (isa<IndexAddrInst>(I) || isa<IndexRawPointerInst>(I))
     salvageBinaryInst(cast<SingleValueInstruction>(I));
 
-  if (isa<CopyValueInst>(I) || isa<MoveValueInst>(I))
+  if (isa<CopyValueInst>(I) || isa<MoveValueInst>(I) ||
+      isa<BeginBorrowInst>(I))
     salvageIdentityInst(cast<SingleValueInstruction>(I));
 
   if (auto *builtin = dyn_cast<BuiltinInst>(I)) {
@@ -2317,11 +2377,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
            info.ID == BuiltinValueKind::UToUCheckedTrunc ||
            info.ID == BuiltinValueKind::SToUCheckedTrunc) &&
           info.Types[0]->is<BuiltinIntegerLiteralType>())
-        // This special case creates a branch at IRGen, which is not supported
-        // for debug reconstruction blocks.
-        // As this is for integer literals only, we should be able to salvage
-        // it to a constant, but for now, skip.
-        return;
+        return salvageCheckedTruncFromLiteral(builtin);
 
       // assumeNonNegative and assumeAlignment just returns its first operand
       if (info.ID == BuiltinValueKind::AssumeNonNegative ||
@@ -2349,8 +2405,8 @@ void swift::salvageLoadDebugInfo(LoadOperation load) {
     // The debug_value must be "hoisted" to the load to ensure that the
     // address is still valid.
     debugInst->moveBefore(load.getLoadInst());
-    debugInst->setOperand(load.getOperand());
-    debugInst->prependDeref();
+    debugUse->set(load.getOperand());
+    debugInst->prependDeref(debugUse->getOperandNumber());
   }
 }
 

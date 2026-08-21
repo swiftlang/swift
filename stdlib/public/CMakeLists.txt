@@ -32,6 +32,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND
   list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS ${shared_cache_link_flags})
 endif()
 
+if(SWIFT_STDLIB_ENABLE_LAZY_LINK)
+  list(APPEND SWIFT_RUNTIME_CXX_FLAGS "-DSWIFT_STDLIB_ENABLE_LAZY_LINK")
+
+  # We lazy link these libraries to avoid loading them unnecessarily, and upward
+  # link to indicate that this shouldn't be considered part of a dependency
+  # cycle.
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-lazy_framework,CoreFoundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-upward_framework,CoreFoundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-lazy_framework,Foundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-upward_framework,Foundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-lazy-lswiftObjectiveC")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-upward-lswiftObjectiveC")
+endif()
+
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
 if(SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -83,6 +97,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   # we cannot use `target_sources` and thus must resort to list manipulations to
   # adjust the source list.
   set(swiftDemanglingSources
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Ownership.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Context.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
@@ -91,9 +106,6 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/DemanglingErrorHandling.cpp")
-  set(swiftDemanglingCRSources
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/CrashReporter.cpp")
-
   set(swift_demangling_cflags)
 
   if(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT)
@@ -124,13 +136,6 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
       -DswiftCore_EXPORTS
       ${swift_demangling_cflags}
     C_COMPILE_FLAGS_LINUX -fno-lto
-    INSTALL_IN_COMPONENT never_install)
-
-  add_swift_target_library(swiftDemanglingCR OBJECT_LIBRARY
-    ${swiftDemanglingCRSources}
-    C_COMPILE_FLAGS
-      -DswiftCore_EXPORTS
-      ${swift_demangling_cflags}
     INSTALL_IN_COMPONENT never_install)
 endif()
 

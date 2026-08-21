@@ -43,16 +43,6 @@ static inline __swift_uint32_t _swift_stdlib_wasilibc_use_busy_futex_get() {
 #include <sys/syscall.h>
 #include <unistd.h>
 
-static inline __swift_uint32_t _swift_stdlib_gettid() {
-  static __thread __swift_uint32_t tid = 0;
-
-  if (tid == 0) {
-    tid = syscall(SYS_gettid);
-  }
-
-  return tid;
-}
-
 // Plain-futex wait: sleeps if *addr == expected. Returns 0 on success
 // (woken by FUTEX_WAKE) or the errno value (EAGAIN=11, EINTR=4 are the
 // expected retryable cases).

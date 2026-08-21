@@ -727,6 +727,8 @@ private:
                                    TypeResolutionOptions options);
   NeverNullType resolveTupleType(TupleTypeRepr *repr,
                                  TypeResolutionOptions options);
+  NeverNullType validateCOMExistential(Type constraintType, TypeRepr *repr,
+                                       TypeResolutionOptions options);
   NeverNullType resolveCompositionType(CompositionTypeRepr *repr,
                                        TypeResolutionOptions options);
   NeverNullType resolveExistentialType(ExistentialTypeRepr *repr,
@@ -3535,6 +3537,7 @@ static bool isFunctionAttribute(const TypeAttribute *attr) {
       TypeAttrKind::YieldMany,
       TypeAttrKind::Async,
       TypeAttrKind::Isolated,
+      TypeAttrKind::Called,
   };
   return llvm::any_of(FunctionAttrs,
                       [attrKind = attr->getKind()](TypeAttrKind functionAttr) {
@@ -4265,6 +4268,31 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       }
     }
 
+    if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
+      if (fnTy->isCalledOnce()) {
+      switch (ownership) {
+      case ParamSpecifier::Borrowing:
+      case ParamSpecifier::LegacyShared:
+        diagnose(eltTypeRepr->getLoc(),
+                 diag::called_once_cannot_be_used_with_borrowing);
+        elements.emplace_back(ErrorType::get(getASTContext()));
+        continue;
+
+      case ParamSpecifier::InOut:
+      case ParamSpecifier::Consuming:
+      case ParamSpecifier::LegacyOwned:
+      // used by `sending`
+      case ParamSpecifier::ImplicitlyCopyableConsuming:
+        break;
+      // @called(once) is consuming by default and we don't
+      // require it be to written explicitly.
+      case ParamSpecifier::Default:
+        ownership = ParamSpecifier::Consuming;
+        break;
+      }
+      }
+    }
+
     // Validate the presence of ownership for a noncopyable parameter.
     // FIXME: This won't diagnose if the type contains unbound generics.
     if (inStage(TypeResolutionStage::Interface)
@@ -4742,10 +4770,30 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   // TODO: maybe make this the place that claims @escaping.
   bool noescape = isDefaultNoEscapeContext(parentOptions);
 
+  bool isCalledOnce = false;
+  if (auto called = claim<CalledTypeAttr>(attrs)) {
+    if (ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
+      if (representation != FunctionTypeRepresentation::Swift) {
+        diagnoseInvalid(repr, conventionAttr->getAtLoc(),
+                        diag::invalid_called_and_attr_attributes,
+                        conventionAttr);
+        representation = FunctionType::Representation::Swift;
+        parsedClangFunctionType = nullptr;
+      }
+
+      if (!repr->isInvalid() && called->isOnce())
+        isCalledOnce = true;
+    } else {
+      diagnoseInvalid(repr, called->getAttrLoc(),
+                      diag::requires_experimental_feature, "@called", false,
+                      Feature::CalledAttribute.getName());
+    }
+  }
+
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      /*LifetimeDependenceInfo*/ {}, hasSendingResult);
+      /*LifetimeDependenceInfo*/ {}, hasSendingResult, isCalledOnce);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4994,9 +5042,14 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
+  bool isCalledOnce = false;
+  if (auto *called = claim<CalledTypeAttr>(attrs)) {
+    isCalledOnce = called->isOnce();
+  }
+
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      isolation, diffKind, clangFnType,
+      isCalledOnce, isolation, diffKind, clangFnType,
       /*LifetimeDependenceInfo*/ {});
 
   // Resolve parameter and result types using the function's generic
@@ -5567,6 +5620,9 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
 
   if (result->isConstraintType() &&
       options.isConstraintImplicitExistential()) {
+    result = validateCOMExistential(result, repr, options);
+    if (result->hasError())
+      return result;
     return ExistentialType::get(result);
   }
 
@@ -5674,6 +5730,11 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {
+        // `@called(once)` functions always have consuming semantics
+        // regardless of whether they are @escaping or not.
+        if (fnTy->isCalledOnce())
+          break;
+
         diagnoseInvalid(ownershipRepr, ownershipRepr->getLoc(),
                         diag::ownership_specifier_nonescaping_closure,
                         ownershipRepr->getSpecifierSpelling());
@@ -6499,6 +6560,53 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 }
 
 NeverNullType
+TypeResolver::validateCOMExistential(Type constraintType, TypeRepr *repr,
+                                     TypeResolutionOptions options) {
+  auto &ctx = getASTContext();
+  if (!ctx.LangOpts.EnableCOMInterop ||
+      options.contains(TypeResolutionFlags::SilenceDiagnostics))
+    return constraintType;
+
+  if (auto existential = constraintType->getAs<ExistentialType>())
+    constraintType = existential->getConstraintType();
+  if (!constraintType->isConstraintType())
+    return constraintType;
+
+  auto layout = constraintType->getExistentialLayout();
+  auto resolution = layout.resolveCOMInterface();
+  if (resolution.containsCOMInterfaceProtocol) {
+    diagnose(repr->getLoc(), diag::com_cominterface_existential);
+    repr->setInvalid();
+    return ErrorType::get(ctx);
+  }
+
+  auto *interface = resolution.interface;
+  if (!interface)
+    return constraintType;
+
+  if (resolution.firstIncomparableInterface) {
+    diagnose(repr->getLoc(), diag::com_existential_multiple_interfaces,
+             interface->getName(),
+             resolution.firstIncomparableInterface->getName());
+  } else if (resolution.firstNonMarkerProtocol) {
+    diagnose(repr->getLoc(), diag::com_existential_non_marker_protocol,
+             interface->getName(),
+             resolution.firstNonMarkerProtocol->getName());
+  } else if (layout.hasExplicitAnyObject) {
+    diagnose(repr->getLoc(), diag::com_existential_anyobject,
+             interface->getName());
+  } else if (layout.explicitSuperclass) {
+    diagnose(repr->getLoc(), diag::com_existential_superclass,
+             interface->getName(), layout.explicitSuperclass);
+  } else {
+    return constraintType;
+  }
+
+  repr->setInvalid();
+  return ErrorType::get(ctx);
+}
+
+NeverNullType
 TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
                                      TypeResolutionOptions options) {
 
@@ -6637,6 +6745,9 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   }
 
   if (options.isConstraintImplicitExistential()) {
+    composition = validateCOMExistential(composition, repr, options);
+    if (composition->hasError())
+      return composition;
     return ExistentialType::get(composition);
   }
 
@@ -6656,6 +6767,9 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
     return ErrorType::get(getASTContext());
 
   if (constraintType->isConstraintType()) {
+    constraintType = validateCOMExistential(constraintType, repr, options);
+    if (constraintType->hasError())
+      return constraintType;
     return ExistentialType::get(constraintType);
   }
 

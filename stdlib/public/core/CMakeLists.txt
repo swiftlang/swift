@@ -227,7 +227,6 @@ split_embedded_sources(
   EMBEDDED SwiftNativeNSArray.swift
   EMBEDDED SwiftifyImport.swift
   EMBEDDED TemporaryAllocation.swift
-    NORMAL ThreadLocalStorage.swift
   EMBEDDED UInt128.swift
   EMBEDDED UIntBuffer.swift
 

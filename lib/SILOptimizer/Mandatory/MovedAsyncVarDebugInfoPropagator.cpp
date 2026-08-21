@@ -438,6 +438,17 @@ void DebugInfoPropagator::performInitialLocalDataflow() {
         continue;
       }
 
+      if (debugInst.hasDebugReconstructionBlock()) {
+        // Ideally those should be handled, but this seems to only happen
+        // in embedded swift, when the optimized stdlib is inlined into
+        // unoptimized async code.
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "    Found a debug value with a debug reconstruction block..."
+                   "continuing!\n");
+        continue;
+      }
+
       LLVM_DEBUG(llvm::dbgs() << "Found DebugValueInst!\n");
 
       // ... and we have a non-empty SILDebugVariable.

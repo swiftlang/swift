@@ -30,6 +30,23 @@ namespace swift {
   class ProtocolType;
   class ProtocolCompositionType;
 
+struct COMExistentialInterfaceResolution {
+  ProtocolDecl *interface = nullptr;
+
+  /// The first interface incomparable with \c interface in canonical order.
+  ///
+  /// Two interfaces are incomparable when neither refines the other and
+  /// therefore require distinct physical interface pointers.
+  ProtocolDecl *firstIncomparableInterface = nullptr;
+
+  /// The first non-marker Swift protocol, retained for diagnostics.
+  ProtocolDecl *firstNonMarkerProtocol = nullptr;
+
+  /// Whether the composition contains the compiler-managed \c COMInterface
+  /// protocol itself.
+  bool containsCOMInterfaceProtocol = false;
+};
+
 struct ExistentialLayout {
   enum Kind { Class, Error, Opaque };
 
@@ -105,6 +122,13 @@ struct ExistentialLayout {
   /// Does this existential consist of an Error protocol only with no other
   /// constraints?
   bool isErrorExistential() const;
+
+  /// Resolve the most-dervied COM interface and any protocols that prevent this
+  /// existential layout from representing a single COM interface.
+  COMExistentialInterfaceResolution resolveCOMInterface() const;
+
+  /// Retrieve the single COM interface represented by a valid layout.
+  ProtocolDecl *getCOMInterface() const;
 
   ArrayRef<ProtocolDecl*> getProtocols() const & {
     return protocols;

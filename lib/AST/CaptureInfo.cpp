@@ -21,7 +21,7 @@
 using namespace swift;
 
 CapturedValue::CapturedValue(Expr *Val, unsigned Flags)
-    : Value(Val, Flags), Loc(SourceLoc()) {
+    : Value(Val), Flags(Flags), Loc(SourceLoc()) {
   assert(isa<OpaqueValueExpr>(Val) || isa<PackElementExpr>(Val));
 }
 
@@ -187,6 +187,10 @@ void CaptureInfo::print(raw_ostream &OS) const {
                  OS << "<direct>";
                if (capture.isNoEscape())
                  OS << "<noescape>";
+               if (capture.isConsumed())
+                 OS << "<consumed>";
+               if (capture.isSending())
+                 OS << "<sending>";
              },
              [&] { OS << ", "; });
 
@@ -210,6 +214,6 @@ void CaptureInfo::print(raw_ostream &OS) const {
 //===----------------------------------------------------------------------===//
 
 bool CapturedValue::isLocalCapture() const {
-  auto *decl = Value.getPointer().dyn_cast<ValueDecl *>();
+  auto *decl = Value.dyn_cast<ValueDecl *>();
   return decl && decl->isLocalCapture();
 }

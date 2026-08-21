@@ -22,6 +22,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-cleanup"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -32,6 +34,10 @@
 #include "swift/Strings.h"
 
 using namespace swift;
+
+/// The message a `cond_fail` gets when the `Builtin.condfail_message` it came
+/// from had no statically known message.
+static const StringRef DefaultCondFailMessage = "unknown program error";
 
 // Print the message string of encountered `cond_fail` instructions the first
 // time the message string is encountered.
@@ -44,6 +50,38 @@ static llvm::cl::opt<bool> IncludeCondFailMessagesFunction(
                  "the current SIL function name"));
 
 static llvm::DenseSet<StringRef> CondFailMessages;
+
+/// Warn that the message of \p condFailInst is about to be replaced by
+/// `DefaultCondFailMessage`, and point at the value that stands in for the
+/// message the programmer wrote.
+static void diagnoseMissingMessage(SILFunction &fn, BuiltinInst *condFailInst) {
+  SILValue message = condFailInst->getOperand(1);
+
+  // If the message did resolve to a literal, ConstantFolding or SILCombine
+  // would have folded this builtin into a cond_fail carrying it. Nothing is
+  // lost, so there is nothing to diagnose.
+  if (auto *sli = dyn_cast<StringLiteralInst>(message))
+    if (sli->getEncoding() == StringLiteralInst::Encoding::UTF8)
+      return;
+
+  ASTContext &ctx = fn.getModule().getASTContext();
+  SourceLoc failureLoc = condFailInst->getLoc().getSourceLoc();
+
+  // Compiler-generated code has no location to point at. Only diagnose
+  // actionable warnings.
+  if (failureLoc.isInvalid())
+    return;
+
+  ctx.Diags.diagnose(failureLoc, diag::runtime_failure_message_not_literal,
+                     DefaultCondFailMessage);
+
+  // Point at the source location of the message.
+  if (auto *def = message->getDefiningInstruction()) {
+    SourceLoc defLoc = def->getLoc().getSourceLoc();
+    if (defLoc.isValid() && defLoc != failureLoc)
+      ctx.Diags.diagnose(defLoc, diag::runtime_failure_message_produced_here);
+  }
+}
 
 static bool cleanFunction(SILFunction &fn) {
   bool madeChange = false;
@@ -87,9 +125,10 @@ static bool cleanFunction(SILFunction &fn) {
 
       switch (bi->getBuiltinInfo().ID) {
         case BuiltinValueKind::CondFailMessage: {
+          diagnoseMissingMessage(fn, bi);
           SILBuilderWithScope Builder(bi);
           Builder.createCondFail(bi->getLoc(), bi->getOperand(0),
-            "unknown program error");
+            DefaultCondFailMessage);
           LLVM_FALLTHROUGH;
         }
         case BuiltinValueKind::PoundAssert:

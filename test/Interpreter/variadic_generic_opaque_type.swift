@@ -12,6 +12,7 @@
 
 // This test needs a Swift 5.9 runtime or newer.
 // UNSUPPORTED: back_deployment_runtime
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import variadic_generic_opaque_type_other
 import StdlibUnittest

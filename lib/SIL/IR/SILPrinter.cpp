@@ -1874,6 +1874,9 @@ public:
       if (!CI->isStackAllocationNested())
         *this << "[non_nested] ";
     }
+    if (CI->isCalledOnce()) {
+      *this << "[called_once] ";
+    }
     visitApplyInstBase(CI);
   }
 
@@ -2213,11 +2216,21 @@ public:
 
   void visitDebugValueInst(DebugValueInst *DVI) {
     if (DVI->usesMoveableValueDebugInfo() &&
-        !DVI->getOperand()->getType().isMoveOnly())
+        DVI->getAllOperands().size() == 1 &&
+        !DVI->getAllOperands()[0].get()->getType().isMoveOnly())
       *this << "[moveable_value_debuginfo] ";
     if (DVI->hasTrace())
       *this << "[trace] ";
-    *this << getIDAndType(DVI->getOperand());
+    auto operands = DVI->getAllOperands();
+    if (operands.size() == 1) {
+      *this << getIDAndType(operands[0].get());
+    } else {
+      *this << "(";
+      llvm::interleave(
+          operands, [&](const Operand &op) { *this << getIDAndType(op.get()); },
+          [&] { *this << ", "; });
+      *this << ")";
+    }
     printDebugVar(DVI->getVarInfo(false),
                   &DVI->getModule().getASTContext().SourceMgr);
     if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
@@ -4824,6 +4837,9 @@ void SILDifferentiabilityWitness::print(llvm::raw_ostream &OS,
   // ([serialized])?
   if (isSerialized())
     OS << "[serialized] ";
+  // ([default])?
+  if (isDefault())
+    OS << "[default] ";
   // Kind
   OS << '[';
   switch (getKind()) {

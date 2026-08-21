@@ -29,6 +29,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/TrailingObjects.h"
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
 
@@ -39,6 +40,7 @@ class PostOrderFunctionInfo;
 class ReversePostOrderInfo;
 class Operand;
 class SILInstruction;
+class SILModule;
 class SILArgument;
 class SILLocation;
 class DeadEndBlocks;

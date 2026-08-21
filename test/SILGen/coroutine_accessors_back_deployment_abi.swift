@@ -19,6 +19,12 @@
 
 // REQUIRES: swift_feature_CoroutineAccessors
 
+// This test asserts that the old ABI is additively emitted for resilient
+// public storage, which only holds on an ABI-stable platform (elsewhere there
+// is no prebuilt binary to stay compatible with, so only the new ABI is
+// emitted).
+// REQUIRES: swift_stable_abi
+
 // UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: OS=freebsd
 

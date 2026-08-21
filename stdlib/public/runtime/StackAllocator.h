@@ -35,6 +35,14 @@
 
 namespace swift {
 
+/// Used as the default UnderlyingAllocator below; only ever instantiated in
+/// hosted builds (Embedded Swift always supplies an explicit allocator that
+/// goes through the platform abstraction layer instead, e.g. TaskPrivate.h's
+/// SwiftGlobalAllocator), so it's fine for this to remain incomplete when
+/// __STDC_HOSTED__ is false.
+class MallocFreeAllocator;
+
+#if __STDC_HOSTED__
 /// malloc/free-based allocator to be used with the StackAllocator to allocate
 /// the slabs themselves.
 class MallocFreeAllocator {
@@ -47,6 +55,7 @@ public:
     free(ptr);
   }
 };
+#endif
 
 /// A bump-pointer allocator that obeys a stack discipline.
 ///

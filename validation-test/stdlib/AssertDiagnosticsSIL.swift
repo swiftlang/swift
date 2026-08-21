@@ -1,10 +1,17 @@
-// RUN: %target-swift-frontend %s -emit-sil -verify
+// RUN: %target-swift-frontend -emit-sil -verify -O -assert-config Debug       %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -verify -O -assert-config Release     %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -verify -Onone -assert-config Debug   %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -verify -Onone -assert-config Release %s -o /dev/null
 
-// assertionFailure() is now @_transparent (previously @inlinable), so the
-// compiler can see that it never returns, eliminating the "missing return" error.
-func assertionFailure_isNoreturn() -> Int {
-  _ = 0
+func assertionFailure_isNotNoreturn() -> Int {
+  _ = 0 // Don't implicitly return the assertionFailure call.
   assertionFailure("")
-  // No error expected - assertionFailure() is recognized as Never-returning
-}
+} // expected-error {{missing return in global function expected to return 'Int'}}
 
+func rdar183643880Reproducer(item: String?) {
+  guard let item else {
+    assertionFailure("")
+  } // expected-error {{'guard' body must not fall through}}
+
+  print(".some: \(item)")
+}

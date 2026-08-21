@@ -28,6 +28,11 @@ struct Mixed {
   var i: Int
 }
 
+struct IntPair {
+  var a: Int
+  var b: Int
+}
+
 enum E {
   case a(T)
   case b(T)
@@ -976,3 +981,102 @@ bb0(%0 : $*GenWrapper<T>):
   return %4
 }
 
+sil [ossa] @read_int_pair_a : $@convention(thin) (@inout IntPair) -> () {
+[%0: read s0.v**]
+}
+
+// CHECK: SIL memory lifetime failure in @callee_reads_completely_uninitialized: argument memory is not initialized, but should be
+// CHECK: memory location:   %0 = alloc_stack $IntPair
+// CHECK: at instruction:   %2 = apply %1(%0) : $@convention(thin) (@inout IntPair) -> ()
+sil [ossa] @callee_reads_completely_uninitialized : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $IntPair
+  %1 = function_ref @read_int_pair_a : $@convention(thin) (@inout IntPair) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout IntPair) -> ()
+  dealloc_stack %0
+  %4 = tuple ()
+  return %4
+}
+
+sil @read_write_in : $@convention(thin) (@in Int) -> () {
+[%0: read v**, write v**]
+[global: ]
+}
+
+// CHECK: SIL memory lifetime failure in @call_read_write_in: memory is not initialized, but should be
+sil [ossa] @call_read_write_in : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = struct_extract %1, #Int._value
+  %5 = integer_literal $Builtin.Int64, 0
+  %6 = builtin "cmp_eq_Int64"(%4, %5) : $Builtin.Int1
+  cond_br %6, bb5, bb1
+
+bb1:
+  %8 = alloc_stack $Int
+  store %0 to [trivial] %8
+  %11 = function_ref @read_write_in : $@convention(thin) (@in Int) -> ()
+  br bb2(%5)
+
+bb2(%13 : $Builtin.Int64):
+  %16 = apply %11(%8) : $@convention(thin) (@in Int) -> ()
+  %18 = builtin "sadd_with_overflow_Int64"(%13, %2, %3) : $(Builtin.Int64, Builtin.Int1)
+  %19 = tuple_extract %18, 0
+  %20 = builtin "cmp_eq_Int64"(%19, %4) : $Builtin.Int1
+  cond_br %20, bb4, bb3
+
+bb3:
+  br bb2(%19)
+
+bb4:
+  dealloc_stack %8
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %26 = tuple ()
+  return %26
+}
+
+sil @unknown_in : $@convention(thin) (@in Int) -> ()
+
+// CHECK: SIL memory lifetime failure in @call_unknown_in: memory is not initialized, but should be
+sil [ossa] @call_unknown_in : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = struct_extract %1, #Int._value
+  %5 = integer_literal $Builtin.Int64, 0
+  %6 = builtin "cmp_eq_Int64"(%4, %5) : $Builtin.Int1
+  cond_br %6, bb5, bb1
+
+bb1:
+  %8 = alloc_stack $Int
+  store %0 to [trivial] %8
+  %11 = function_ref @unknown_in : $@convention(thin) (@in Int) -> ()
+  br bb2(%5)
+
+bb2(%13 : $Builtin.Int64):
+  %16 = apply %11(%8) : $@convention(thin) (@in Int) -> ()
+  %18 = builtin "sadd_with_overflow_Int64"(%13, %2, %3) : $(Builtin.Int64, Builtin.Int1)
+  %19 = tuple_extract %18, 0
+  %20 = builtin "cmp_eq_Int64"(%19, %4) : $Builtin.Int1
+  cond_br %20, bb4, bb3
+
+bb3:
+  br bb2(%19)
+
+bb4:
+  dealloc_stack %8
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %26 = tuple ()
+  return %26
+}

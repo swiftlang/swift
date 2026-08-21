@@ -20,6 +20,7 @@ add_library(swift_Concurrency
   TaskAlloc.cpp
   TaskGroup.cpp
   TaskLocal.cpp
+  TaskRegistry.cpp
   TaskStatus.cpp
   ThreadingError.cpp
   "${PROJECT_SOURCE_DIR}/CompatibilityOverride/CompatibilityOverride.cpp"
@@ -91,7 +92,9 @@ add_library(swift_Concurrency
   Task.swift
   Task+PriorityEscalation.swift
   Task+TaskExecutor.swift
+  Task+Deadline.swift
   TaskCancellation.swift
+  TaskCancellationScope.swift
   TaskGroup.swift
   TaskLocal.swift
   TaskSleep.swift
@@ -121,7 +124,8 @@ target_compile_definitions(swift_Concurrency PRIVATE
   # NOTE: VS2017 <15.8 would round clamp alignment to alignof(max_align_t) which
   # was non-conformant. Indicate that we wish to use extended alignment.
   $<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:C,CXX>>:-D_ENABLE_EXTENDED_ALIGNED_STORAGE=1>
-  $<$<COMPILE_LANGUAGE:C,CXX>:-D__STDC_WANT_LIB_EXT1__=1>)
+  $<$<COMPILE_LANGUAGE:C,CXX>:-D__STDC_WANT_LIB_EXT1__=1>
+  $<$<AND:$<BOOL:${SwiftCore_ENABLE_STDLIB_LAZY_LINK}>,$<COMPILE_LANGUAGE:Swift>>:-DSWIFT_STDLIB_ENABLE_LAZY_LINK>)
 target_compile_options(swift_Concurrency PRIVATE
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   # NOTE: do not remove until `IsolatedAny` is on by default in all supported

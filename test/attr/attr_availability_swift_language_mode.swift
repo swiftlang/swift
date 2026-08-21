@@ -43,13 +43,13 @@ struct TestStruct {}
 
 @available(macOS 10.11, *)
 extension TestStruct {
-  @available(swift 400)
-  func doTheThing() {} // expected-note {{'doTheThing()' was introduced in Swift 400}}
+  @available(swift 400) // expected-note {{'doTheThing()' was introduced in Swift 400}}
+  func doTheThing() {}
 }
 
-@available(swift 400)
+@available(swift 400) // expected-note {{'doAnotherThing()' was introduced in Swift 400}}
 extension TestStruct {
-  func doAnotherThing() {} // expected-note {{'doAnotherThing()' was introduced in Swift 400}}
+  func doAnotherThing() {}
 }
 
 @available(macOS 10.11, *)

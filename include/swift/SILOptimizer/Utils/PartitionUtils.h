@@ -262,6 +262,15 @@ private:
 /// Partition must have no sends to use this. NOTE: There is a method that
 /// takes a Partition and produces a new Partition that does not have any
 /// sends.
+///
+/// Recording is opt-in per function. Only one client rewinds this history --
+/// the isolation-history notes on a sent-non-Sendable error -- and those notes
+/// are off unless the function asks for them (\c
+/// swift::shouldEmitIsolationHistoryFor). Recording anyway would push a node
+/// per PartitionOp per dataflow iteration for every function the region
+/// analysis runs on, so a Factory built with recording off makes every push a
+/// no-op and the history stays empty. Anything that rewinds asserts that
+/// recording was on, so the two gates cannot silently drift apart.
 class IsolationHistory {
 public:
   class Factory;
@@ -293,13 +302,22 @@ public:
 
   Node *getHead() const { return head; }
 
+  /// True when the Factory backing this history records nodes. Every push is a
+  /// no-op when this is false.
+  bool isEnabled() const;
+
   /// Push a node that signals the end of a new sequence of history nodes that
   /// should execute together. Must be explicitly ended by a push sequence
   /// end. Is non-rentrant, so one cannot have multiple sequence starts.
   ///
   /// \p loc the SILLocation that identifies the instruction that the "package"
   /// of history nodes that this sequence boundary ends is associated with.
-  Node *pushHistorySequenceBoundary(SILLocation loc);
+  ///
+  /// \p inst the instruction whose PartitionOp produced that package, when the
+  /// boundary is pushed on behalf of one. Retained so that a client rewinding
+  /// the history can report which instruction it is undoing.
+  Node *pushHistorySequenceBoundary(SILLocation loc,
+                                    SILInstruction *inst = nullptr);
 
   /// Push onto the history list that \p value should be added into its own
   /// independent region.
@@ -389,6 +407,18 @@ private:
   /// The next pointer of the linked list.
   Node *next;
 
+  /// The payload of a SequenceBoundary node: the location the "package" of
+  /// history nodes this boundary ends is attributed to, plus the instruction
+  /// the PartitionOp that produced the package came from.
+  ///
+  /// The location is tracked separately from the instruction because for
+  /// PartitionOps sourced from a specific apply argument it is that argument's
+  /// per-argument location rather than the instruction's own location.
+  struct SequenceBoundaryInfo {
+    SILLocation loc;
+    SILInstruction *inst;
+  };
+
   /// Contains:
   ///
   /// 1. A SILBasicBlock * if we have a CFGHistoryJoin — the predecessor block
@@ -396,9 +426,9 @@ private:
   ///    not stored; it is recovered on demand as the head of that block's exit
   ///    partition (from RegionAnalysis), which also gives the full partition to
   ///    keep rewinding across the join.
-  /// 2. A SILLocation if we have a SequenceBoundary.
+  /// 2. A SequenceBoundaryInfo if we have a SequenceBoundary.
   /// 3. An element otherwise.
-  std::variant<Element, SILBasicBlock *, SILLocation> data;
+  std::variant<Element, SILBasicBlock *, SequenceBoundaryInfo> data;
 
   /// Number of additional element arguments stored in the tail allocated array.
   unsigned numAdditionalElements;
@@ -409,8 +439,8 @@ private:
   }
 
   Node(Kind kind, Node *next) : kind(kind), next(next), data(nullptr) {}
-  Node(Kind kind, Node *next, SILLocation loc)
-      : kind(kind), next(next), data(loc) {}
+  Node(Kind kind, Node *next, SILLocation loc, SILInstruction *inst)
+      : kind(kind), next(next), data(SequenceBoundaryInfo{loc, inst}) {}
   Node(Kind kind, Node *next, Element value)
       : kind(kind), next(next), data(value), numAdditionalElements(0) {}
   Node(Kind kind, Node *next, Element primaryElement,
@@ -491,7 +521,34 @@ public:
   std::optional<SILLocation> getHistoryBoundaryLoc() const {
     if (kind != SequenceBoundary)
       return {};
-    return std::get<SILLocation>(data);
+    return std::get<SequenceBoundaryInfo>(data).loc;
+  }
+
+  /// If this node is a sequence boundary, the instruction whose PartitionOp
+  /// produced the package of history nodes it ends. Null when the boundary was
+  /// not pushed on behalf of a specific instruction (e.g. the initial partition
+  /// built by \c Partition::singleRegion).
+  SILInstruction *getHistoryBoundaryInst() const {
+    if (kind != SequenceBoundary)
+      return nullptr;
+    return std::get<SequenceBoundaryInfo>(data).inst;
+  }
+
+  /// Returns true if rewinding this node changes the partition it is popped
+  /// from. Sequence boundaries and CFG joins are pure markers: rewinding them
+  /// leaves the element-to-region mapping alone.
+  bool doesRewindingMutatePartition() const {
+    switch (kind) {
+    case AddNewRegionForElement:
+    case RemoveLastElementFromRegion:
+    case RemoveElementFromRegion:
+    case MergeElementRegions:
+      return true;
+    case CFGHistoryJoin:
+    case SequenceBoundary:
+      return false;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
   }
 
   void print(ASTContext &ctx, llvm::raw_ostream &os,
@@ -500,6 +557,10 @@ public:
     print(ctx, os, 0);
   }
   SWIFT_DEBUG_DUMPER(dump(ASTContext &ctx)) { print(ctx, llvm::dbgs()); }
+
+  /// Print this node on a single line without a trailing newline.
+  void printOneLine(llvm::raw_ostream &os,
+                    const SourceManager &sourceMgr) const;
 };
 
 class IsolationHistory::Factory {
@@ -508,17 +569,32 @@ class IsolationHistory::Factory {
 
   llvm::BumpPtrAllocator &allocator;
 
+  /// Whether the histories this hands out record anything. See the note on
+  /// \c IsolationHistory for why this is opt-in.
+  bool enabled;
+
 public:
-  Factory(llvm::BumpPtrAllocator &allocator) : allocator(allocator) {}
+  /// \p enabled whether the histories this hands out record nodes. Pass
+  /// \c swift::shouldEmitIsolationHistoryFor(fn) for the function being
+  /// analyzed; pass true only when the client is going to rewind the history
+  /// regardless, as the unit tests do.
+  Factory(llvm::BumpPtrAllocator &allocator, bool enabled)
+      : allocator(allocator), enabled(enabled) {}
 
   Factory(IsolationHistory::Factory &&other) = delete;
   Factory &operator=(IsolationHistory::Factory &&other) = delete;
   Factory(const IsolationHistory::Factory &other) = delete;
   Factory &operator=(const IsolationHistory::Factory &other) = delete;
 
+  bool isEnabled() const { return enabled; }
+
   /// Returns a new isolation history without any history.
   IsolationHistory get() { return IsolationHistory(this); }
 };
+
+inline bool IsolationHistory::isEnabled() const {
+  return factory && factory->enabled;
+}
 
 /// A struct that represents a specific "sending" operand of an ApplySite.
 struct SendingOperandState {
@@ -1009,7 +1085,7 @@ public:
   /// then comparing for exact equality.
   ///
   /// Runs in linear time.
-  static bool equals(Partition &fst, Partition &snd) {
+  static bool equals(const Partition &fst, const Partition &snd) {
     fst.canonicalize();
     snd.canonicalize();
 
@@ -1046,21 +1122,24 @@ public:
   /// Assigns \p oldElt to the region associated with \p newElt.
   void assignElement(Element oldElt, Element newElt, bool updateHistory = true);
 
-  bool areElementsInSameRegion(Element firstElt, Element secondElt) {
+  bool areElementsInSameRegion(Element firstElt, Element secondElt) const {
     canonicalize();
     return elementToRegionMap.at(firstElt) == elementToRegionMap.at(secondElt);
   }
 
-  Region getRegion(Element elt) {
+  Region getRegion(Element elt) const {
     canonicalize();
     return elementToRegionMap.at(elt);
   }
 
   using iterator = std::map<Element, Region>::iterator;
+  using const_iterator = std::map<Element, Region>::const_iterator;
 
 private:
   iterator begin() { return elementToRegionMap.begin(); }
   iterator end() { return elementToRegionMap.end(); }
+  const_iterator begin() const { return elementToRegionMap.begin(); }
+  const_iterator end() const { return elementToRegionMap.end(); }
 
 public:
   /// Return an iterator over the element/range in this partition. Will
@@ -1070,7 +1149,7 @@ public:
   /// NOTE: To work with iterators without canonicalizing, please use begin/end
   /// directly. This should only be done internally to the Partition
   /// implementation. We never want to expose
-  llvm::iterator_range<iterator> range() {
+  llvm::iterator_range<const_iterator> range() const {
     canonicalize();
     return {begin(), end()};
   }
@@ -1102,6 +1181,13 @@ public:
 
   /// Returns true if this value has any isolation history stored.
   bool hasHistory() const { return bool(history.getHead()); }
+
+  /// True when this partition's history is being recorded, and so when it is
+  /// worth snapshotting the partition for a later isolation-history walk.
+  ///
+  /// Distinct from \c hasHistory(): a partition can be recording and not have
+  /// pushed anything yet.
+  bool isRecordingIsolationHistory() const { return history.isEnabled(); }
 
   /// Returns the number of nodes of stored history.
   ///
@@ -1168,13 +1254,17 @@ public:
   void printHistory(llvm::raw_ostream &os) const;
 
   /// See docs on \p history.pushHistorySequenceBoundary().
-  IsolationHistoryNode *pushHistorySequenceBoundary(SILLocation loc) {
-    return history.pushHistorySequenceBoundary(loc);
+  IsolationHistoryNode *
+  pushHistorySequenceBoundary(SILLocation loc, SILInstruction *inst = nullptr) {
+    return history.pushHistorySequenceBoundary(loc, inst);
   }
 
 private:
+  /// The non-const body behind \c canonicalize.
+  void canonicalizeImpl();
+
   /// Return region if we have it. Will canonicalize the partition b
-  std::optional<Region> maybeGetRegion(Element elt) {
+  std::optional<Region> maybeGetRegion(Element elt) const {
     canonicalize();
     auto iter = elementToRegionMap.find(elt);
     if (iter == elementToRegionMap.end())
@@ -1237,7 +1327,13 @@ private:
   /// partition state to restore this property.
   ///
   /// This runs in linear time.
-  void canonicalize();
+  ///
+  /// Const because canonicalization only relabels regions: it never changes
+  /// which elements share a region, so it does not change what this partition
+  /// means. Being callable on a const partition lets a read-only query run
+  /// against a partition the caller does not own, instead of copying it first
+  /// just to be allowed to ask.
+  void canonicalize() const;
 
   /// Walk the elementToRegionMap updating all elements in the region of \p
   /// targetElement will be changed to now point at \p newRegion.
@@ -1362,15 +1458,15 @@ public:
     Element sentElement;
     SILDynamicMergedIsolationInfo isolationRegionInfo;
 
-    /// The partition at the point where the error was emitted. Used for
-    /// isolation history rewinding.
-    Partition partition;
+    /// The partition at the point where the error was emitted, for isolation
+    /// history rewinding. None when history recording is off for this function.
+    std::optional<Partition> partition;
 
     SentNeverSendableError(const PartitionOp &op, Element sentElement,
                            SILDynamicMergedIsolationInfo isolationRegionInfo,
-                           const Partition &p)
+                           std::optional<Partition> &&p)
         : op(&op), sentElement(sentElement),
-          isolationRegionInfo(isolationRegionInfo), partition(p) {}
+          isolationRegionInfo(isolationRegionInfo), partition(std::move(p)) {}
 
     SentNeverSendableError(SentNeverSendableError &&other) = default;
     SentNeverSendableError &operator=(SentNeverSendableError &&other) = default;
@@ -1390,13 +1486,19 @@ public:
     SILValue srcValue;
     SILDynamicMergedIsolationInfo srcIsolationRegionInfo;
 
+    /// The partition at the assignment, for isolation history rewinding. None
+    /// when history recording is off for this function.
+    std::optional<Partition> partition;
+
     AssignNeverSendableIntoSendingResultError(
         const PartitionOp &op, Element destElement,
         SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
-        SILDynamicMergedIsolationInfo srcIsolationRegionInfo)
+        SILDynamicMergedIsolationInfo srcIsolationRegionInfo,
+        std::optional<Partition> &&p)
         : op(&op), destElement(destElement), destValue(destValue),
           srcElement(srcElement), srcValue(srcValue),
-          srcIsolationRegionInfo(srcIsolationRegionInfo) {}
+          srcIsolationRegionInfo(srcIsolationRegionInfo),
+          partition(std::move(p)) {}
 
     AssignNeverSendableIntoSendingResultError(
         AssignNeverSendableIntoSendingResultError &&other) = default;
@@ -1436,10 +1538,15 @@ public:
     Element inoutSendingElement;
     SILDynamicMergedIsolationInfo isolationInfo;
 
+    /// The partition at the exiting terminator, for isolation history
+    /// rewinding. None when history recording is off for this function.
+    std::optional<Partition> partition;
+
     InOutSendingNotDisconnectedAtExitError(
         const PartitionOp &op, Element elt,
-        SILDynamicMergedIsolationInfo isolation)
-        : op(&op), inoutSendingElement(elt), isolationInfo(isolation) {}
+        SILDynamicMergedIsolationInfo isolation, std::optional<Partition> &&p)
+        : op(&op), inoutSendingElement(elt), isolationInfo(isolation),
+          partition(std::move(p)) {}
 
     InOutSendingNotDisconnectedAtExitError(
         InOutSendingNotDisconnectedAtExitError &&other) = default;
@@ -1470,18 +1577,26 @@ public:
     /// If set, the emitter should downgrade this error to a warning.
     bool downgradeToWarning = false;
 
-    InOutSendingReturnedError(const PartitionOp &op,
-                              Element inoutSendingElement,
-                              Element returnedValue,
-                              SILDynamicMergedIsolationInfo isolationInfo = {})
-        : op(&op), inoutSendingElement(inoutSendingElement),
-          returnedValue(returnedValue), isolationInfo(isolationInfo) {}
+    /// The partition at the exiting terminator, for isolation history
+    /// rewinding. None when history recording is off for this function.
+    std::optional<Partition> partition;
 
     InOutSendingReturnedError(const PartitionOp &op,
                               Element inoutSendingElement,
-                              SILDynamicMergedIsolationInfo isolationInfo = {})
+                              Element returnedValue,
+                              SILDynamicMergedIsolationInfo isolationInfo = {},
+                              std::optional<Partition> &&p = {})
+        : op(&op), inoutSendingElement(inoutSendingElement),
+          returnedValue(returnedValue), isolationInfo(isolationInfo),
+          partition(std::move(p)) {}
+
+    InOutSendingReturnedError(const PartitionOp &op,
+                              Element inoutSendingElement,
+                              SILDynamicMergedIsolationInfo isolationInfo = {},
+                              std::optional<Partition> &&p = {})
         : InOutSendingReturnedError(op, inoutSendingElement,
-                                    inoutSendingElement, isolationInfo) {}
+                                    inoutSendingElement, isolationInfo,
+                                    std::move(p)) {}
 
     InOutSendingReturnedError(InOutSendingReturnedError &&other) = default;
     InOutSendingReturnedError &
@@ -1499,11 +1614,17 @@ public:
     Element firstInoutSendingParam;
     SmallVector<Element, 1> otherInOutSendingParams;
 
+    /// The partition at the exiting terminator, for isolation history
+    /// rewinding. None when history recording is off for this function.
+    std::optional<Partition> partition;
+
     InOutSendingParametersInSameRegionError(
         const PartitionOp &op, Element firstInoutSendingParam,
-        SmallVector<Element, 1> &&otherInOutSendingParams)
+        SmallVector<Element, 1> &&otherInOutSendingParams,
+        std::optional<Partition> &&p)
         : op(&op), firstInoutSendingParam(firstInoutSendingParam),
-          otherInOutSendingParams(std::move(otherInOutSendingParams)) {}
+          otherInOutSendingParams(std::move(otherInOutSendingParams)),
+          partition(std::move(p)) {}
 
     InOutSendingParametersInSameRegionError(
         InOutSendingParametersInSameRegionError &&other) = default;
@@ -1565,16 +1686,24 @@ public:
     SILDynamicMergedIsolationInfo dstIsolationRegionInfo;
     Reason reason;
 
+    /// The partition *before* the failed merge, for isolation history
+    /// rewinding. The two regions are still separate here -- the error is
+    /// raised before assignElement/merge runs -- which is what lets each side
+    /// be explained by its own independent walk. None when history recording is
+    /// off.
+    std::optional<Partition> partition;
+
     IncompatibleRegionMergeError(
         const PartitionOp &op, Element srcRegionElt,
         SILDynamicMergedIsolationInfo srcIsolationRegionInfo,
         Element dstRegionElt,
         SILDynamicMergedIsolationInfo dstIsolationRegionInfo,
-        Reason reason = Reason::Unknown)
+        Reason reason = Reason::Unknown, std::optional<Partition> &&p = {})
         : op(&op), srcRegionElt(srcRegionElt),
           srcIsolationRegionInfo(srcIsolationRegionInfo),
           dstRegionElt(dstRegionElt),
-          dstIsolationRegionInfo(dstIsolationRegionInfo), reason(reason) {}
+          dstIsolationRegionInfo(dstIsolationRegionInfo), reason(reason),
+          partition(std::move(p)) {}
 
     IncompatibleRegionMergeError(IncompatibleRegionMergeError &&other) =
         default;
@@ -1890,6 +2019,8 @@ public:
   /// Some evaluators pass in mock operands that one cannot call getUser()
   /// upon. So to allow for this, provide a routine that our impl can override
   /// if they need to.
+  static SILInstruction *getUser(Operand *op) { return Impl::getUser(op); }
+
   static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
     return Impl::getIsolationInfo(partitionOp);
   }
@@ -1953,7 +2084,8 @@ public:
     }
 
     handleError(AssignNeverSendableIntoSendingResultError(
-        op, op.getOpArg1(), fArg, op.getOpArg2(), rep, dynamicRegionIsolation));
+        op, op.getOpArg1(), fArg, op.getOpArg2(), rep, dynamicRegionIsolation,
+        getSnapshotForIsolationHistory()));
   }
 
   /// Apply \p op to the partition op.
@@ -1999,12 +2131,15 @@ public:
     // the apply's anchor location, so behavior is unchanged for functions
     // that haven't opted in to isolation-history.
     SILLocation loc = SILLocation::invalid();
+    SILInstruction *boundaryInst = nullptr;
     if (op.hasSourceInst()) {
-      loc = getLoc(op.getSourceInst());
+      boundaryInst = op.getSourceInst();
+      loc = getLoc(boundaryInst);
     } else if (Operand *srcOp = op.getSourceOp()) {
+      boundaryInst = getUser(srcOp);
       loc = getLoc(srcOp);
     }
-    p.pushHistorySequenceBoundary(loc);
+    p.pushHistorySequenceBoundary(loc, boundaryInst);
 
     switch (op.getKind()) {
     case PartitionOpKind::AssignDirect: {
@@ -2045,7 +2180,7 @@ public:
         }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destIsolation,
-            RegionMergeReason::Assign));
+            RegionMergeReason::Assign, getSnapshotForIsolationHistory()));
       }
 
       // Then perform the actual assignment.
@@ -2088,7 +2223,7 @@ public:
         }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destIsolation,
-            RegionMergeReason::Assign));
+            RegionMergeReason::Assign, getSnapshotForIsolationHistory()));
       }
 
       // Create extra region for our dest and merge it into dest's region.
@@ -2229,7 +2364,7 @@ public:
         }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destRegIsolation,
-            op.getRegionMergeReason()));
+            op.getRegionMergeReason(), getSnapshotForIsolationHistory()));
       }
 
       // Then perform the actual merge.
@@ -2294,15 +2429,17 @@ public:
           // determining element identity. When that changes, this code will
           // need to be updated to look through loads.
           if (*elt == op.getOpArg1()) {
-            handleError(InOutSendingReturnedError(op, op.getOpArg1(),
-                                                  dynamicRegionIsolation));
+            handleError(InOutSendingReturnedError(
+                op, op.getOpArg1(), dynamicRegionIsolation,
+                getSnapshotForIsolationHistory()));
             continue;
           }
 
           // Otherwise, we need to refer to a different value in the same region
           // as the 'inout sending' parameter. Emit a special error. For that.
-          handleError(InOutSendingReturnedError(op, op.getOpArg1(), *elt,
-                                                dynamicRegionIsolation));
+          handleError(InOutSendingReturnedError(
+              op, op.getOpArg1(), *elt, dynamicRegionIsolation,
+              getSnapshotForIsolationHistory()));
         }
 
         return emittedDiagnostic;
@@ -2318,9 +2455,9 @@ public:
         // This handles task-isolated captures.
         if (auto outParam =
                 findNonDisconnectedOutParameterInRegion(inoutSendingRegion)) {
-          handleError(InOutSendingReturnedError(op, op.getOpArg1(),
-                                                getElement(outParam).value(),
-                                                dynamicRegionIsolation));
+          handleError(InOutSendingReturnedError(
+              op, op.getOpArg1(), getElement(outParam).value(),
+              dynamicRegionIsolation, getSnapshotForIsolationHistory()));
           return;
         }
 
@@ -2331,7 +2468,8 @@ public:
 
         // Otherwise, we emit the normal not disconnected at exit error.
         handleError(InOutSendingNotDisconnectedAtExitError(
-            op, op.getOpArg1(), dynamicRegionIsolation));
+            op, op.getOpArg1(), dynamicRegionIsolation,
+            getSnapshotForIsolationHistory()));
         return;
       }
 
@@ -2342,7 +2480,8 @@ public:
       if (findOtherInOutSendingParameters(inoutSendingRegion, op.getOpArg1(),
                                           foundInOutSendingElts)) {
         handleError(InOutSendingParametersInSameRegionError(
-            op, op.getOpArg1(), std::move(foundInOutSendingElts)));
+            op, op.getOpArg1(), std::move(foundInOutSendingElts),
+            getSnapshotForIsolationHistory()));
         return;
       }
 
@@ -2370,7 +2509,8 @@ public:
       if (auto outParam =
           findSendingOutParameterInRegion(inoutSendingRegion)) {
         InOutSendingReturnedError error(op, op.getOpArg1(), outParam.value(),
-                                       dynamicRegionIsolation);
+                                        dynamicRegionIsolation,
+                                        getSnapshotForIsolationHistory());
         error.downgradeToWarning = true;
         handleError(std::move(error));
         return;
@@ -2422,6 +2562,18 @@ public:
   }
 
 private:
+  /// A snapshot of the working partition for a later isolation-history walk, or
+  /// None when history recording is off for this function.
+  ///
+  /// Copying a Partition copies its element-to-region map, so an error that
+  /// will never have its history rewound should not pay for one. The immutable
+  /// history node chain itself is shared, not copied.
+  std::optional<Partition> getSnapshotForIsolationHistory() const {
+    if (!p.isRecordingIsolationHistory())
+      return {};
+    return p;
+  }
+
   /// To work around not having isolation in interface types, the type checker
   /// inserts casts and other AST nodes that are used to enrich the AST with
   /// isolation information. This results in Sendable functions being
@@ -2570,8 +2722,8 @@ private:
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleError(
-        SentNeverSendableError(op, elt, dynamicMergedIsolationInfo, p));
+    return handleError(SentNeverSendableError(
+        op, elt, dynamicMergedIsolationInfo, getSnapshotForIsolationHistory()));
   }
 };
 
@@ -2664,6 +2816,7 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
       return as.getArgumentLoc(op);
     return op->getUser()->getLoc();
   }
+  static SILInstruction *getUser(Operand *op) { return op->getUser(); }
   static SILInstruction *getSourceInst(const PartitionOp &partitionOp) {
     return partitionOp.getSourceInst();
   }

@@ -462,14 +462,14 @@ static void noteLimitingImport(const Decl *userDecl, ASTContext &ctx,
                          limitImport->accessLevel,
                          limitImport->module.importedModule,
                          limitImport->module.importedModule
-                           ->isClangHeaderImportModule());
+                           ->isClangBridgingHeaderImportModule());
 
     if (limitImport->importLoc.isValid())
       ctx.Diags.diagnose(limitImport->importLoc, diag::decl_import_via_here,
                          complainDecl, limitImport->accessLevel,
                          limitImport->module.importedModule,
                          limitImport->module.importedModule
-                           ->isClangHeaderImportModule());
+                           ->isClangBridgingHeaderImportModule());
   } else if (limitImport->importLoc.isValid()) {
     ctx.Diags.diagnose(limitImport->importLoc, diag::module_imported_here,
                        limitImport->module.importedModule,
@@ -2192,7 +2192,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
   auto importSource = decl->getImportAccessFrom(where.getDeclContext());
   if (importSource.has_value() &&
       importSource->accessLevel < AccessLevel::Public) {
-    return importSource->module.importedModule->isClangHeaderImportModule()
+    return importSource->module.importedModule->isClangBridgingHeaderImportModule()
       ? DisallowedOriginKind::InternalBridgingHeaderImport
       : DisallowedOriginKind::NonPublicImport;
   }

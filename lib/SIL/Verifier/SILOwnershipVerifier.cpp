@@ -563,6 +563,25 @@ bool SILValueOwnershipChecker::checkDeadEnds(
   return allWithinBoundary;
 }
 
+/// Returns true if \p f's entire body has been reduced to a single
+/// `unreachable` instruction, e.g. by DiagnosticDeadFunctionElimination
+/// stubbing out a dead function. Such a stub can never execute, so missing
+/// lifetime ending uses for its `@owned` parameters can't leak anything.
+static bool isStubbedDeadFunctionBody(const SILFunction *F) {
+  if (!F->hasSemanticsAttr(semantics::DELETE_IF_UNUSED))
+    return false;
+
+  if (std::next(F->begin()) != F->end())
+    return false;
+
+  auto &BB = *F->begin();
+  if (BB.empty())
+    return false;
+
+  return &BB.front() == BB.getTerminator() &&
+         isa<UnreachableInst>(BB.getTerminator());
+}
+
 bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
     SILFunctionArgument *arg, ArrayRef<Operand *> regularUses,
     ArrayRef<Operand *> extendLifetimeUses) {
@@ -574,6 +593,13 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
   case OwnershipKind::None:
     return true;
   case OwnershipKind::Owned:
+    // `@called(once)` closures, in contrast to regular closures, can have
+    // `@owned` parameters. DiagnosticDeadFunctionElimination pass replaces
+    // whole body with an `unreachable` instruction which needs to be handled
+    // specifically here because it removes lifetime ending uses for such
+    // parameters.
+    if (isStubbedDeadFunctionBody(arg->getFunction()))
+      return true;
     break;
   }
 

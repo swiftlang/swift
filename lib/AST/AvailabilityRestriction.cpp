@@ -14,6 +14,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ProtocolConformance.h"
 
 using namespace swift;
 
@@ -61,6 +63,107 @@ bool AvailabilityRestriction::isActiveForRuntimeQueries(
   return swift::isPlatformActive(getAttr().getPlatform(), ctx.LangOpts,
                                  /*forTargetVariant=*/false,
                                  /*forRuntimeQuery=*/true);
+}
+
+bool AvailabilityRestriction::emitNoteForDecl(const Decl *decl) const {
+  auto &ctx = decl->getASTContext();
+  auto &diags = ctx.Diags;
+  auto parsedAttr = getAttr().getParsedAttr();
+  auto sourceRange = parsedAttr->getRangeWithAt();
+  auto domainAndRange = getDomainAndRange(ctx);
+
+  // Point at the attribute so that the reason for the restriction is always
+  // rendered. Implicit attributes, like the ones on imported or synthesized
+  // declarations, have no location; refer to the declaration instead.
+  auto loc = parsedAttr->AtLoc;
+  auto diagnose = [&](const Diagnostic &diag) {
+    return loc.isValid() ? diags.diagnose(loc, diag)
+                         : diags.diagnose(decl, diag);
+  };
+
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+    diagnose({diag::availability_marked_unavailable, decl})
+        .highlight(sourceRange);
+    break;
+  case Reason::UnavailableUnintroduced:
+    diagnose({diag::availability_introduced_in_version, decl,
+              domainAndRange.getDomain(), domainAndRange.getRange()})
+        .highlight(sourceRange);
+    break;
+  case Reason::UnavailableObsolete:
+    diagnose({diag::availability_obsoleted, decl, domainAndRange.getDomain(),
+              domainAndRange.getRange()})
+        .highlight(sourceRange);
+    break;
+  case Reason::Unintroduced:
+  case Reason::Deprecated:
+    return false;
+  }
+  return true;
+}
+
+bool AvailabilityRestriction::emitNoteForConformance(
+    const ExtensionDecl *ext, const RootProtocolConformance *rootConf) const {
+  auto &ctx = ext->getASTContext();
+  auto &diags = ctx.Diags;
+  auto parsedAttr = getAttr().getParsedAttr();
+  auto sourceRange = parsedAttr->getRangeWithAt();
+  auto type = rootConf->getType();
+  auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
+  auto domainAndRange = getDomainAndRange(ctx);
+
+  // Point at the attribute so that the reason for the restriction is always
+  // rendered. Implicit attributes, like the ones on imported or synthesized
+  // extensions, have no location; refer to the extension instead.
+  auto loc = parsedAttr->AtLoc;
+  auto diagnose = [&](const Diagnostic &diag) {
+    return loc.isValid() ? diags.diagnose(loc, diag)
+                         : diags.diagnose(ext, diag);
+  };
+
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+    diagnose({diag::conformance_availability_marked_unavailable, type, proto})
+        .highlight(sourceRange);
+    break;
+  case Reason::UnavailableUnintroduced:
+    diagnose({diag::conformance_availability_introduced_in_version, type, proto,
+              domainAndRange.getDomain(), domainAndRange.getRange()});
+    break;
+  case Reason::UnavailableObsolete:
+    diagnose({diag::conformance_availability_obsoleted, type, proto,
+              domainAndRange.getDomain(), domainAndRange.getRange()})
+        .highlight(sourceRange);
+    break;
+  case Reason::Unintroduced:
+  case Reason::Deprecated:
+    return false;
+  }
+  return true;
+}
+
+bool AvailabilityRestriction::shouldHideDomainNameInDiagnostics() const {
+  switch (getDomain().getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::Custom:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return true;
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::Platform:
+    return false;
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+    switch (getReason()) {
+    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
+      return false;
+    case AvailabilityRestriction::Reason::Unintroduced:
+    case AvailabilityRestriction::Reason::UnavailableObsolete:
+    case AvailabilityRestriction::Reason::Deprecated:
+      return true;
+    }
+  }
 }
 
 void AvailabilityRestriction::print(llvm::raw_ostream &os) const {

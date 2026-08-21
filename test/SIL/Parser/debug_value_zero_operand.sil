@@ -1,0 +1,65 @@
+// RUN: %target-sil-opt -sil-print-types %s | %target-sil-opt -sil-print-types | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+protocol P {}
+
+// A debug_value with no operand describes a variable whose value is entirely
+// reconstructed by its transform block.
+
+// CHECK-LABEL: sil @test_zero_operand_transform :
+sil @test_zero_operand_transform : $@convention(thin) () -> () {
+bb0:
+  // CHECK: debug_value (), let, name "const", transform {
+  // CHECK:   bb0:
+  // CHECK:     %0 = integer_literal $Builtin.Int64, 42
+  // CHECK:     return %0 : $Builtin.Int64
+  // CHECK:   }
+  debug_value (), let, name "const", transform {
+  bb0:
+    %0 = integer_literal $Builtin.Int64, 42
+    return %0 : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+// CHECK: } // end sil function 'test_zero_operand_transform'
+
+// The variable type can also be stored explicitly, along with a fragment.
+// CHECK-LABEL: sil @test_zero_operand_fragment :
+sil @test_zero_operand_fragment : $@convention(thin) () -> () {
+bb0:
+  // CHECK: debug_value (), let, name "const", type $Int64, expr op_fragment:#Int64._value, transform {
+  // CHECK:   bb0:
+  // CHECK:     %0 = integer_literal $Builtin.Int64, 42
+  // CHECK:     return %0 : $Builtin.Int64
+  // CHECK:   }
+  debug_value (), let, name "const", type $Int64, expr op_fragment:#Int64._value, transform {
+  bb0:
+    %0 = integer_literal $Builtin.Int64, 42
+    return %0 : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+// CHECK: } // end sil function 'test_zero_operand_fragment'
+
+// With no operand, an op_deref applies to the transform block's return value,
+// which must then be address-only.
+// CHECK-LABEL: sil @test_zero_operand_deref :
+sil @test_zero_operand_deref : $@convention(thin) () -> () {
+bb0:
+  // CHECK: debug_value (), let, name "x", type $any P, expr op_deref, transform {
+  // CHECK:   bb0:
+  // CHECK:     return undef : $*any P
+  // CHECK:   }
+  debug_value (), let, name "x", type $any P, expr op_deref, transform {
+  bb0:
+    return undef : $*any P
+  }
+  %r = tuple ()
+  return %r : $()
+}
+// CHECK: } // end sil function 'test_zero_operand_deref'

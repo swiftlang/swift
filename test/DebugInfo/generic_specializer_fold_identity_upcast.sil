@@ -1,0 +1,39 @@
+// RUN: %target-sil-opt %s -generic-specializer -enable-sil-verify-all | %FileCheck %s
+
+// Test that specializing a generic function folds away identity upcasts in
+// debug reconstruction blocks.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Animal {}
+
+
+// Specialization with T=Animal. The upcast from Animal to Animal must be folded away.
+
+// CHECK-LABEL: sil shared @$s19generic_with_upcast4main6AnimalC_Tg5
+// CHECK:         debug_value %0, let, name "self", argno 1, transform {
+// CHECK:         bb0(%0 : $Animal):
+// CHECK-NEXT:      return %0
+// CHECK-NEXT:    }
+// CHECK-LABEL: } // end sil function '$s19generic_with_upcast4main6AnimalC_Tg5'
+
+sil @generic_with_upcast : $@convention(thin) <T where T : Animal> (@guaranteed T) -> Builtin.Int64 {
+bb0(%0 : $T):
+  debug_value %0 : $T, let, name "self", argno 1, transform {
+  bb0(%0 : $T):
+    %1 = upcast %0 : $T to $Animal
+    return %1 : $Animal
+  }
+  %lit = integer_literal $Builtin.Int64, 10
+  return %lit : $Builtin.Int64
+}
+
+sil @caller : $@convention(thin) (@guaranteed Animal) -> Builtin.Int64 {
+bb0(%0 : $Animal):
+  %fn = function_ref @generic_with_upcast : $@convention(thin) <T where T : Animal> (@guaranteed T) -> Builtin.Int64
+  %result = apply %fn<Animal>(%0) : $@convention(thin) <T where T : Animal> (@guaranteed T) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}

@@ -155,10 +155,21 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: extension {{.*}}::Moptional : Swift::Copyable where Wrapped : Swift::Copyable, Wrapped : ~Escapable {
 // CHECK-MISC: extension {{.*}}::Moptional : Swift::Escapable where Wrapped : Swift::Escapable, Wrapped : ~Copyable {
 
+// CHECK-MISC: public struct GenericNCContainer<Element> : ~Swift::Copyable where Element : ~Copyable {
+// CHECK-MISC-NEXT: }
+
 // CHECK-MISC-NOT:  ~
 
 // NOTE: below are extensions emitted at the end of NoncopyableGenerics_Misc::swift
 // CHECK-MISC: extension {{.*}}::VeryNested : {{.*}}::Publik {}
+
+// CHECK-MISC:      @available(*, unavailable)
+// CHECK-MISC-NEXT: extension {{.*}}::GenericNCContainer : {{.*}}::Publik where Element : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+
+// CHECK-MISC-NOT: extension {{.*}}::GenericNCContainer
+
+// CHECK-MISC:      @usableFromInline
+// CHECK-MISC-NEXT: internal protocol _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 
 import Swiftskell
 

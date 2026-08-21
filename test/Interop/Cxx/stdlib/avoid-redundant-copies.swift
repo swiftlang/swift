@@ -4,6 +4,7 @@
 
 // https://github.com/apple/swift/issues/70226
 // UNSUPPORTED: OS=windows-msvc
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import StdUniquePtr

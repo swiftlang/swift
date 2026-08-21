@@ -2,8 +2,13 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
-// Too complex with Xcode 16.2 SDK
-// REQUIRES: rdar141262107
+// With the Xcode 16.2 macOS SDK (macOS15.4) this gives the wrong diagnostic
+// ("the compiler is unable to type-check this expression in reasonable time")
+// As a result, I'm leaving this test disabled until we have upgraded Xcode on the CI nodes
+// so this test will pass.
+
+// REQUIRES: rdar183544672
+
 
 import SwiftUI
 

@@ -2731,6 +2731,11 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   // diagnostic this can be used for better error presentation.
   SourceRange AttrRange;
 
+  auto attrRangeWithAt = [&]() -> SourceRange {
+    SourceLoc end = AttrRange.End.isValid() ? AttrRange.End : Loc;
+    return SourceRange(AtLoc.isValid() ? AtLoc : Loc, end);
+  };
+
   ParserStatus Status;
 
   switch (DK) {
@@ -2910,6 +2915,20 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Unsafe: {
+    // Handle '@unsafe' and '@unsafe(always)'.
+    auto always = parseSingleAttrOption<bool>(
+        *this, Loc, AttrRange, AttrName, DK, {{Context.Id_always, true}},
+        /*valueIfOmitted=*/false);
+    if (!always.has_value())
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) UnsafeAttr(AtLoc, AttrRange, *always));
+
+    break;
+  }
+
   case DeclAttrKind::ReferenceOwnership: {
     // Handle weak/unowned/unowned(unsafe).
     auto Kind = AttrName == "weak" ? ReferenceOwnership::Weak
@@ -2979,10 +2998,10 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       // this declaration with a different access level.
       if (access != cast<AccessControlAttr>(DuplicateAttribute)->getAccess()) {
         diagnose(Loc, diag::multiple_access_level_modifiers)
-            .highlight(AttrRange);
+            .highlight(attrRangeWithAt());
         diagnose(DuplicateAttribute->getLocation(),
                  diag::previous_access_level_modifier)
-            .highlight(DuplicateAttribute->getRange());
+            .highlight(DuplicateAttribute->getRangeWithAt());
 
         // Remove the reference to the duplicate attribute
         // to avoid the extra diagnostic.
@@ -3055,10 +3074,10 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     // this declaration with a different access level.
     if (access != cast<SetterAccessAttr>(DuplicateAttribute)->getAccess()) {
       diagnose(Loc, diag::multiple_access_level_modifiers)
-        .highlight(AttrRange);
+          .highlight(attrRangeWithAt());
       diagnose(DuplicateAttribute->getLocation(),
                diag::previous_access_level_modifier)
-          .highlight(DuplicateAttribute->getRange());
+          .highlight(DuplicateAttribute->getRangeWithAt());
 
       // Remove the reference to the duplicate attribute
       // to avoid the extra diagnostic.
@@ -3263,20 +3282,25 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    if (Tok.isNot(tok::string_literal)) {
+    std::optional<StringRef> Name;
+    if (consumeIf(tok::kw_default)) {
+      // Leave the name empty to signal '@section(default)'.
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    } else if (Tok.isNot(tok::string_literal)) {
       diagnose(Loc, diag::attr_expected_string_literal, AttrName);
       return makeParserSuccess();
+    } else {
+      // Parse the name as a string literal.
+      Name = getStringLiteralIfNotInterpolated(
+          Loc, ("'" + AttrName + "'").str());
+
+      consumeToken(tok::string_literal);
+
+      if (Name.has_value())
+        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+      else
+        DiscardAttribute = true;
     }
-
-    auto Name = getStringLiteralIfNotInterpolated(
-        Loc, ("'" + AttrName + "'").str());
-
-    consumeToken(tok::string_literal);
-
-    if (Name.has_value())
-      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-    else
-      DiscardAttribute = true;
 
     if (!consumeIf(tok::r_paren)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName,
@@ -3284,19 +3308,19 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    // @section in a local scope is not allowed.
-    if (CurDeclContext->isLocalContext()) {
-      diagnose(Loc, diag::attr_name_only_at_non_local_scope, AttrName);
-    }
-
+    // @section in a local scope is only allowed on functions and closures,
+    // which is checked in Sema.
     if (!DiscardAttribute)
-      Attributes.add(new (Context) SectionAttr(Name.value(), AtLoc,
+      Attributes.add(new (Context) SectionAttr(Name, AtLoc,
                                                AttrRange, /*Implicit=*/false));
 
     break;
   }
 
   case DeclAttrKind::Diagnose: {
+    // Record that this file carries a syntactic warning control.
+    SF.setHasWarningControlAttr();
+
     if (!consumeIfAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -4345,15 +4369,28 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     break;
   }
+
+  case DeclAttrKind::Called: {
+    auto semantics = parseSingleAttrOption<ExecutionSemantics>(
+        *this, Loc, AttrRange, AttrName, DK,
+        {{Context.Id_once, ExecutionSemantics::Once}});
+    if (!semantics)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) CalledAttr(AtLoc, AttrRange, *semantics));
+
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
     diagnose(Loc, diag::duplicate_attribute, DeclAttribute::isDeclModifier(DK))
-      .highlight(AttrRange);
+        .highlight(attrRangeWithAt());
     diagnose(DuplicateAttribute->getLocation(),
              diag::previous_attribute,
              DeclAttribute::isDeclModifier(DK))
-      .highlight(DuplicateAttribute->getRange());
+        .highlight(DuplicateAttribute->getRangeWithAt());
   }
 
   // If this is a decl modifier spelled with an @, emit an error and remove it
@@ -5300,6 +5337,46 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                                         {beginLoc, endLoc},
                                                         {mangling, manglingLoc},
                                                         {index, indexLoc});
+    }
+    return makeParserSuccess();
+  }
+
+  case TypeAttrKind::Called: {
+    SourceLoc lpLoc = Tok.getLoc(), semanticsLoc, rpLoc;
+    if (!consumeIfAttributeLParen()) {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_expected_lparen);
+      }
+      return makeParserError();
+    }
+
+    bool invalid = false;
+    std::optional<CalledTypeAttr::Semantics> semantics;
+    if (isIdentifier(Tok, "once")) {
+      semanticsLoc = consumeToken(tok::identifier);
+      semantics = CalledTypeAttr::Semantics::Once;
+    } else {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_called_expected_semantics)
+            .fixItReplace(Tok.getLoc(), "once");
+      }
+      invalid = true;
+      consumeIf(tok::identifier);
+    }
+
+    if (justChecking && !Tok.is(tok::r_paren))
+      return makeParserError();
+    if (parseMatchingToken(tok::r_paren, rpLoc,
+                           diag::attr_called_expected_rparen, lpLoc))
+      return makeParserError();
+
+    if (invalid)
+      return makeParserError();
+    assert(semantics);
+
+    if (!justChecking) {
+      result = new (Context) CalledTypeAttr(AtLoc, attrLoc, {lpLoc, rpLoc},
+                                            {*semantics, semanticsLoc});
     }
     return makeParserSuccess();
   }
@@ -8409,7 +8486,7 @@ bool Parser::parseAccessorAfterIntroducer(
       !Context.LangOpts.hasFeature(Feature::CoroutineAccessors)) {
     diagnose(Tok, diag::accessor_requires_coroutine_accessors,
              getAccessorNameForDiagnostic(Kind, /*article*/ false,
-                                          /*underscored*/ false));
+                                          /*legacy*/ false));
   }
 
   if (Kind == AccessorKind::Borrow || Kind == AccessorKind::Mutate) {
@@ -8418,7 +8495,7 @@ bool Parser::parseAccessorAfterIntroducer(
         !Flags.contains(PD_InProtocol)) {
       diagnose(Tok, diag::borrow_mutate_accessor_not_supported_in_decl,
                getAccessorNameForDiagnostic(Kind, /*article*/ true,
-                                            /*underscored*/ false));
+                                            /*legacy*/ false));
     }
   }
 
@@ -8428,7 +8505,7 @@ bool Parser::parseAccessorAfterIntroducer(
     if (Tok.is(tok::l_brace))
       diagnose(Tok, diag::unexpected_getset_implementation_in_protocol,
                getAccessorNameForDiagnostic(Kind, /*article*/ false,
-                                            /*underscored*/ false));
+                                            /*legacy*/ false));
     return false;
   }
 
@@ -8859,11 +8936,40 @@ AccessorDecl *Parser::ParsedAccessors::add(AccessorDecl *accessor) {
 void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      bool invalid) {
   classify(P, storage, invalid);
+
+  // When the CoroutineAccessors feature is enabled, in *surface source* the
+  // keywords `_read`/`_modify` and `yielding borrow`/`yielding mutate` are just
+  // two spellings of the same coroutine accessor.  Now that classify() has run
+  // its spelling-aware conflict diagnostics on the distinct kinds, rewrite a
+  // written `_read`/`_modify` to its yielding counterpart, remembering the
+  // underscored spelling for later diagnostics.
+  //
+  // The point is to make the accessor's *representation* independent of the
+  // source spelling.  The ABI -- in particular whether the old yield_once
+  // (`_read`/`_modify`) accessor is also emitted for backwards compatibility --
+  // is then determined by a consistent set of rules that do not depend on how
+  // the accessor was spelled; the rewrite does not itself dictate the ABI.
+  //
+  // This applies only to surface source.  In a .swiftinterface or .sil file,
+  // `_read`/`_modify` are ABI-level declarations -- synonyms for the yield_once
+  // accessor -- not surface spellings, so they already denote the correct
+  // accessor and must be taken literally.  (Post-parse, this leaves
+  // AccessorKind::Read/Modify uniformly meaning "the yield_once ABI accessor".)
+  if (P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors) &&
+      P.SF.Kind != SourceFileKind::Interface &&
+      P.SF.Kind != SourceFileKind::SIL) {
+    for (auto *accessor : Accessors) {
+      auto kind = accessor->getAccessorKind();
+      if (kind == AccessorKind::Read || kind == AccessorKind::Modify)
+        accessor->changeLegacyCoroutineAccessorToYielding();
+    }
+  }
+
   storage->setAccessors(LBLoc, Accessors, RBLoc);
 }
 
 static std::optional<AccessorKind>
-getCorrespondingUnderscoredAccessorKind(AccessorKind kind) {
+getCorrespondingLegacyAccessorKind(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::YieldingBorrow:
     return {AccessorKind::Read};
@@ -8888,20 +8994,20 @@ getCorrespondingUnderscoredAccessorKind(AccessorKind kind) {
 static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,
                                          AccessorDecl *&second) {
   if (!second) return;
-  bool underscored =
-      (getCorrespondingUnderscoredAccessorKind(first->getAccessorKind()) ==
+  bool legacy =
+      (getCorrespondingLegacyAccessorKind(first->getAccessorKind()) ==
        second->getAccessorKind()) ||
-      (getCorrespondingUnderscoredAccessorKind(second->getAccessorKind()) ==
+      (getCorrespondingLegacyAccessorKind(second->getAccessorKind()) ==
        first->getAccessorKind()) ||
       first->getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors);
   P.diagnose(
       second->getLoc(), diag::conflicting_accessor,
       isa<SubscriptDecl>(first->getStorage()),
-      getAccessorNameForDiagnostic(second, /*article*/ true, underscored),
-      getAccessorNameForDiagnostic(first, /*article*/ true, underscored));
+      getAccessorNameForDiagnostic(second, /*article*/ true, legacy),
+      getAccessorNameForDiagnostic(first, /*article*/ true, legacy));
   P.diagnose(
       first->getLoc(), diag::previous_accessor,
-      getAccessorNameForDiagnostic(first, /*article*/ false, underscored),
+      getAccessorNameForDiagnostic(first, /*article*/ false, legacy),
       /*already*/ false);
   second->setInvalid();
 }

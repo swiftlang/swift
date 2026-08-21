@@ -6,6 +6,7 @@
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Needed due to limitations of autoclosures and noncopyable types.
 func eagerAssert(_ b: Bool, _ line: Int = #line) {

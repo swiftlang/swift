@@ -4156,6 +4156,9 @@ public:
   /// Whether this closure is Sendable.
   bool isSendable() const;
 
+  /// Whether this closure could be called at most once.
+  bool isCalledOnce() const;
+
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
 
@@ -4186,6 +4189,13 @@ public:
   void setActorIsolation(ActorIsolation actorIsolation) {
     this->actorIsolation = actorIsolation;
   }
+
+  /// Determine the section into which this closure should be placed, based on
+  /// an explicit `@section` attribute or the inference rules for `@section`.
+  ///
+  /// \returns the name of the section, or \c std::nullopt if this closure
+  /// belongs in the platform-appropriate default section.
+  std::optional<StringRef> getSection() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_AbstractClosureExpr &&
@@ -4642,10 +4652,12 @@ struct CaptureListEntry {
 
   explicit CaptureListEntry(PatternBindingDecl *PBD);
 
-  static CaptureListEntry
-  createParsed(ASTContext &Ctx, ReferenceOwnership ownershipKind,
-               SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
-               SourceLoc equalLoc, Expr *initializer, DeclContext *DC);
+  static CaptureListEntry createParsed(ASTContext &Ctx,
+                                       ReferenceOwnership ownershipKind,
+                                       SourceRange ownershipRange,
+                                       bool isSending, Identifier name,
+                                       SourceLoc nameLoc, SourceLoc equalLoc,
+                                       Expr *initializer, DeclContext *DC);
 
   VarDecl *getVar() const;
   bool isSimpleSelfCapture(bool excludeWeakCaptures = true) const;
@@ -6781,8 +6793,16 @@ void simple_display(llvm::raw_ostream &out, const ClosureExpr *CE);
 void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
 void simple_display(llvm::raw_ostream &out, const Expr *expr);
 
+/// Disambiguate between the \c Expr and \c DeclContext overloads, both of
+/// which \c AbstractClosureExpr inherits.
+void simple_display(llvm::raw_ostream &out, const AbstractClosureExpr *CE);
+
 SourceLoc extractNearestSourceLoc(const ClosureExpr *expr);
 SourceLoc extractNearestSourceLoc(const Expr *expr);
+
+/// Disambiguate between the \c Expr and \c DeclContext overloads, both of
+/// which \c AbstractClosureExpr inherits.
+SourceLoc extractNearestSourceLoc(const AbstractClosureExpr *expr);
 
 } // end namespace swift
 

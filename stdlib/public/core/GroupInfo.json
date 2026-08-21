@@ -257,7 +257,6 @@
     "RuntimeFunctionCounters.swift",
     "Shims.swift",
     "StaticPrint.swift",
-    "ThreadLocalStorage.swift",
     "Unmanaged.swift",
     "Availability.swift",
     "CommandLine.swift",

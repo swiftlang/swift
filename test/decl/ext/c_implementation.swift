@@ -50,6 +50,34 @@ func CImplFuncNameMismatch2(_: Int32) {
   // FIXME: Improve diagnostic for a partial match.
 }
 
+
+@implementation @c
+func CImplFuncUnavailable1(_: Int32) { }
+// expected-error@-1 {{global function 'CImplFuncUnavailable1' does not match the declaration in the header because it must be unavailable}}
+
+@available(*, unavailable)
+@implementation @c
+func CImplFuncUnavailable2(_: Int32) { }
+
+// FIXME: There is no way to satisfy this diagnostic, since 'unavailable' cannot
+// be used in an '@available' attribute for the 'swift' domain.
+@implementation @c
+func CImplFuncUnavailableInSwift1(_: Int32) { }
+// expected-error@-1 {{global function 'CImplFuncUnavailableInSwift1' does not match the declaration in the header because it must be unavailable in Swift}} {{none}}
+
+@implementation @c
+func CImplFuncDeprecated1(_: Int32) { }
+
+@available(*, unavailable)
+@implementation @c
+func CImplFuncAvailable1(_: Int32) { }
+// expected-error@-1 {{global function 'CImplFuncAvailable1' does not match the declaration in the header because it is unavailable}}
+// expected-note@-4 {{'CImplFuncAvailable1' has been explicitly marked unavailable here}}
+
+@available(*, deprecated, message: "use something else")
+@implementation @c
+func CImplFuncAvailable2(_: Int32) { }
+
 //
 // TODO: @c for global functions imported as computed vars
 //

@@ -1,0 +1,126 @@
+// RUN: %target-sil-opt -send-non-sendable -sil-region-isolation-emit-isolation-history -strict-concurrency=complete %s -o /dev/null -verify
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// SIL coverage for isolation-history notes on the
+// AssignNeverSendableIntoSendingResult diagnostic, which fires when a value
+// whose region is not disconnected is assigned into an indirect 'sending'
+// result. See the companion
+// transfernonsendable_isolationhistory_sending_result.swift for the same shapes
+// at source level.
+//
+// The diagnostic needs an indirect result, so every function is generic and
+// takes '@in_guaranteed T' -> '@sil_sending @out T'; the signature is lifted
+// from SILGen output for 'func f<T>(_ t: T) -> sending T'. The task-isolated
+// parameter is the isolated source. 'alloc_stack [var_decl] ... name' and
+// 'debug_value' supply the user-visible names the notes need, since an unnamed
+// link is silently dropped.
+//
+// Primary diagnostics use empty-body matchers; the chain notes have their full
+// text matched.
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+sil @makeFresh : $@convention(thin) <T> () -> @out T
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
+// MARK: Suppression — the value assigned into the result is the task-isolated
+// parameter itself, not something merged into its region, so there is no chain
+// and no history note.
+sil [ossa] @sending_result_suppress_direct : $@convention(thin) <T> (@in_guaranteed T) -> @sil_sending @out T {
+bb0(%out : $*T, %t : $*T):
+  debug_value %t : $*T, let, name "t", argno 1, expr op_deref
+  copy_addr %t to [init] %out : $*T // expected-warning {{}} expected-note {{}}
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: One hop — a named local picks up the task-isolated parameter's region
+// and is then copied into the result. One terminal note.
+sil [ossa] @sending_result_one_hop : $@convention(thin) <T> (@in_guaranteed T) -> @sil_sending @out T {
+bb0(%out : $*T, %t : $*T):
+  debug_value %t : $*T, let, name "t", argno 1, expr op_deref
+  %y = alloc_stack [lexical] [var_decl] $T, let, name "y"
+  // expected-note@+1 {{'y' is connected to 't' which is accessible to code in the current isolation context}}
+  copy_addr %t to [init] %y : $*T
+  copy_addr %y to [init] %out : $*T // expected-warning {{}} expected-note {{}}
+  destroy_addr %y : $*T
+  dealloc_stack %y : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: Two hops — through a second named local. Both links are reported.
+sil [ossa] @sending_result_two_hop : $@convention(thin) <T> (@in_guaranteed T) -> @sil_sending @out T {
+bb0(%out : $*T, %t : $*T):
+  debug_value %t : $*T, let, name "t", argno 1, expr op_deref
+  %y = alloc_stack [lexical] [var_decl] $T, let, name "y"
+  // expected-note@+1 {{'y' is connected to 't' which is accessible to code in the current isolation context}}
+  copy_addr %t to [init] %y : $*T
+  %z = alloc_stack [lexical] [var_decl] $T, let, name "z"
+  copy_addr %y to [init] %z : $*T // expected-note {{'z' is connected to 'y'}}
+  copy_addr %z to [init] %out : $*T // expected-warning {{}} expected-note {{}}
+  destroy_addr %z : $*T
+  dealloc_stack %z : $*T
+  destroy_addr %y : $*T
+  dealloc_stack %y : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: CFG diamond — only bb1 merges the local into the task-isolated region;
+// bb2 initializes it from a fresh value.
+//
+// FIXME: This pins a mislocated note. It requires the dataflow join and so is
+// absent from the straight-line cases above.
+//
+// The note is attributed to bb2, which never touched 't', rather than to bb1's
+// 'copy_addr %t to [init] %y'. A join-performed merge has no sequence boundary
+// in the joining block, so its notes stay pending and are located when the walk
+// enters a predecessor -- without requiring that predecessor to be the one that
+// answered the question. That is prepareStatesForPredecessors' candidate filter,
+// which README.md §5 flags as the part of the walk most likely to misbehave on a
+// non-apply anchor.
+//
+// The note also degrades to the unnamed "value was merged into ... region here"
+// wording, because the far end of the terminal link is the indirect result,
+// which a hand-written SIL function gives no name. On SILGen output that
+// argument is named '$return_value' and the note prints it -- a SIL-internal
+// name reaching a user-facing diagnostic, which is a second defect. The
+// companion .swift file pins that spelling.
+//
+// When fixed, the note should instead land on bb1's copy_addr and read:
+//   'y' is connected to 't' which is accessible to code in the current isolation context
+sil [ossa] @sending_result_diamond : $@convention(thin) <T> (@in_guaranteed T, Builtin.Int1) -> @sil_sending @out T {
+bb0(%out : $*T, %t : $*T, %cond : $Builtin.Int1):
+  debug_value %t : $*T, let, name "t", argno 1, expr op_deref
+  %y = alloc_stack [lexical] [var_decl] $T, let, name "y"
+  cond_br %cond, bb1, bb2
+
+// The merging arm.
+bb1:
+  copy_addr %t to [init] %y : $*T
+  br bb3
+
+// The unrelated arm: a fresh value, which must not be reported.
+bb2:
+  %mk = function_ref @makeFresh : $@convention(thin) <T> () -> @out T
+  // expected-note@+1 {{value was merged into code in the current isolation context region here}}
+  apply %mk<T>(%y) : $@convention(thin) <T> () -> @out T
+  br bb3
+
+bb3:
+  copy_addr %y to [init] %out : $*T // expected-warning {{}} expected-note {{}}
+  destroy_addr %y : $*T
+  dealloc_stack %y : $*T
+  %r = tuple ()
+  return %r : $()
+}

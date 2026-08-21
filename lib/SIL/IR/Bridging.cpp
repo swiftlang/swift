@@ -100,10 +100,9 @@ clang::CXXRecordDecl *Lowering::getBridgedSmartPtr(AbstractionPattern pattern) {
 
   auto ty = pattern.getClangType();
   if (auto rd = ty->getAsCXXRecordDecl())
-    for (auto attr : rd->getAttrs())
-      if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-        if (swiftAttr->getAttribute().starts_with("@_refCountedPtr"))
-          return rd;
+    for (auto *swiftAttr : rd->specific_attrs<clang::SwiftAttrAttr>())
+      if (swiftAttr->getAttribute().starts_with("@_refCountedPtr"))
+        return rd;
 
   return nullptr;
 }

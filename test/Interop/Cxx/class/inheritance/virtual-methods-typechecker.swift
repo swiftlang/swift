@@ -3,9 +3,11 @@
 import VirtualMethods
 
 let _ = Base() // expected-error {{'init()' is unavailable: constructors of abstract C++ classes are unavailable in Swift}}
+// expected-warning@-1 {{'Base' is deprecated: abstract C++ classes cannot be used as values in Swift}}
 let _ = DerivedInt()
 
 let _ = Base2() // expected-error {{'init()' is unavailable: constructors of abstract C++ classes are unavailable in Swift}}
+// expected-warning@-1 {{'Base2' is deprecated: abstract C++ classes cannot be used as values in Swift}}
 
 let _ = Derived2()
 let _ = Derived3()
@@ -22,11 +24,11 @@ let vro = VirtualRenamedOverridden()
 let _ = vro.cxxName() // expected-error {{has no member 'cxxName'}}
 let _ = vro.swiftName()
 
-func check(pvrb: PureVirtualRenamedBase) {
+func check(pvrb: PureVirtualRenamedBase) { // expected-warning {{'PureVirtualRenamedBase' is deprecated: abstract C++ classes cannot be used as values in Swift}}
   let _ = pvrb.cxxName() // expected-error {{has no member 'cxxName'}}
   let _ = pvrb.swiftName() // expected-error {{virtual function is not available in Swift because it is pure}}
 }
-func check(pvri: PureVirtualRenamedInherited) {
+func check(pvri: PureVirtualRenamedInherited) { // expected-warning {{'PureVirtualRenamedInherited' is deprecated: abstract C++ classes cannot be used as values in Swift}}
   let _ = pvri.cxxName() // expected-error {{has no member 'cxxName'}}
   let _ = pvri.swiftName() // expected-error {{virtual function is not available in Swift because it is pure}}
 }

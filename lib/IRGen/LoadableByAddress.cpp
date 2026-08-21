@@ -624,9 +624,9 @@ struct StructLoweringState {
   SmallVector<MakeBorrowInst *, 16> makeBorrowInstsToMod;
   // All dereference_borrow instrs that should be converted to dereference_addr_borrow
   SmallVector<DereferenceBorrowInst *, 16> dereferenceBorrowInstsToMod;
-  // All debug instructions.
+  // All debug uses.
   // to be modified *only if* the operands are used in "real" instructions
-  SmallVector<DebugValueInst *, 16> debugInstsToMod;
+  SmallVector<Operand *, 16> debugUsesToMod;
 
   StructLoweringState(SILFunction *F, irgen::IRGenModule &Mod,
                       LargeSILTypeMapper &Mapper)
@@ -1024,7 +1024,7 @@ void LargeValueVisitor::visitDebugValueInst(DebugValueInst *instr) {
   for (Operand &operand : instr->getAllOperands()) {
     if (std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
                   operand.get()) != pass.largeLoadableArgs.end()) {
-      pass.debugInstsToMod.push_back(instr);
+      pass.debugUsesToMod.push_back(&operand);
     }
   }
 }
@@ -1267,8 +1267,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
       break;
     }
     case SILInstructionKind::DebugValueInst: {
-      auto *insToInsert = cast<DebugValueInst>(userIns);
-      pass.debugInstsToMod.push_back(insToInsert);
+      pass.debugUsesToMod.push_back(user);
       break;
     }
     case SILInstructionKind::DestroyValueInst: {
@@ -1430,8 +1429,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
       break;
     }
     case SILInstructionKind::DebugValueInst: {
-      auto *insToInsert = cast<DebugValueInst>(userIns);
-      pass.debugInstsToMod.push_back(insToInsert);
+      pass.debugUsesToMod.push_back(use);
       usesToMod.push_back(use);
       break;
     }
@@ -1900,8 +1898,8 @@ static void rewriteUsesOfScalar(StructLoweringState &pass, SILValue address,
       storeUser->eraseFromParent();
     } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
       // Update the debug_value to point to the variable in the alloca.
-      dbgInst->setOperand(address);
-      dbgInst->prependDeref();
+      scalarUse->set(address);
+      dbgInst->prependDeref(scalarUse->getOperandNumber());
     }
   }
 }
@@ -2409,22 +2407,19 @@ static void rewriteFunction(StructLoweringState &pass,
     instr->getParent()->erase(instr);
   }
 
-  for (DebugValueInst *instr : pass.debugInstsToMod) {
-    assert(instr->getAllOperands().size() == 1 &&
-           "Debug instructions have one operand");
-    for (Operand &operand : instr->getAllOperands()) {
-      auto currOperand = operand.get();
-      if (pass.argsToLoadedValueMap.find(currOperand) !=
-          pass.argsToLoadedValueMap.end()) {
-        SILValue newOperand = pass.argsToLoadedValueMap[currOperand];
-        assert(newOperand != currOperand &&
-               "Did not allocate storage and convert operand");
-        operand.set(newOperand);
-      } else {
-        assert(currOperand->getType().isAddress() &&
-               "Expected an address type");
-        instr->prependDeref();
-      }
+  for (Operand *operand : pass.debugUsesToMod) {
+    auto *instr = cast<DebugValueInst>(operand->getUser());
+    auto currOperand = operand->get();
+    if (pass.argsToLoadedValueMap.find(currOperand) !=
+        pass.argsToLoadedValueMap.end()) {
+      SILValue newOperand = pass.argsToLoadedValueMap[currOperand];
+      assert(newOperand != currOperand &&
+             "Did not allocate storage and convert operand");
+      operand->set(newOperand);
+    } else {
+      assert(currOperand->getType().isAddress() &&
+             "Expected an address type");
+      instr->prependDeref(operand->getOperandNumber());
     }
   }
 
@@ -2970,8 +2965,8 @@ void LoadableByAddress::recreateSingleApply(
     }
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
-        partialApplyConvention, resultIsolation, castedApply->isOnStack(),
-        castedApply->isStackAllocationNested());
+        partialApplyConvention, resultIsolation, castedApply->isCalledOnce(),
+        castedApply->isOnStack(), castedApply->isStackAllocationNested());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }
@@ -4249,8 +4244,9 @@ void AddressAssignment::finish(DominanceInfo *dominance,
     SmallVector<SILBasicBlock *, 8> boundary;
     computeDominatedBoundaryBlocks(stackLoc->getParent(), dominance, boundary);
     for (auto *block : boundary) {
-      if (deadEnds->isDeadEnd(block))
+      if (DeadEndBlocks::triviallyEndsInUnreachable(block)) {
         continue;
+      }
       auto builder = getBuilder(block->back().getIterator());
       builder.createDeallocStack(getAutoLoc(), stackLoc);
     }
@@ -4285,6 +4281,47 @@ static bool isSoleUserOf(LoadInst *load, SILInstruction *next) {
     return false;
   return true;
 }
+
+/// Returns true if the address which is assigned to \p inst's result is a
+/// projection of (or an alias for) the address which is assigned to \p inst's
+/// operand - as opposed to a new stack location the value is copied into.
+/// Must be kept in sync with the AssignAddressToDef visitors below.
+static bool resultAliasesOperandAddress(AddressAssignment &assignment,
+                                        SILInstruction *inst) {
+  switch (inst->getKind()) {
+  case SILInstructionKind::TupleExtractInst:
+  case SILInstructionKind::StructExtractInst:
+  case SILInstructionKind::UncheckedTrivialBitCastInst:
+  case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::EndCOWMutationInst:
+    return assignment.isLargeLoadableType(
+        cast<SingleValueInstruction>(inst)->getType());
+  default:
+    return false;
+  }
+}
+
+/// Returns true if \p inst forwards the address of its operand - possibly via a
+/// chain of such instructions - to a result which is used somewhere else than
+/// in the immediately following instruction.
+///
+/// In this case the operand's address needs to stay valid until those uses,
+/// which is not guaranteed. For example, the address can be a stack location
+/// which is deallocated right after \p inst.
+static bool forwardsAddressBeyondNextInstruction(AddressAssignment &assignment,
+                                                 SILInstruction *inst) {
+  while (resultAliasesOperandAddress(assignment, inst)) {
+    auto *result = cast<SingleValueInstruction>(inst);
+    // Terminators are never address forwarding, so there is a next instruction.
+    auto *next = &*std::next(inst->getIterator());
+    if (!result->hasOneUse() || result->getSingleUse()->getUser() != next)
+      return true;
+    inst = next;
+  }
+  return false;
+}
+
 namespace {
 class AssignAddressToDef : SILInstructionVisitor<AssignAddressToDef> {
   friend SILVisitorBase<AssignAddressToDef>;
@@ -4395,9 +4432,15 @@ protected:
 
   void visitLoadInst(LoadInst *load) {
     auto *defInst = load->getOperand()->getDefiningInstruction();
+    auto *nextInst = &*std::next(load->getIterator());
     // Forward the address of the load if its sole user immediately follows the
     // load instructions and if it was not the result of a coroutine.
-    if (isSoleUserOf(load, &*++load->getIterator()) &&
+    // Don't do this if the user forwards the address to a result which is used
+    // beyond the following instruction, because then the address would be
+    // needed at those uses. For example after the load's source location is
+    // deallocated.
+    if (isSoleUserOf(load, nextInst) &&
+        !forwardsAddressBeyondNextInstruction(assignment, nextInst) &&
         (!defInst || !isa<BeginApplyInst>(defInst))) {
       assignment.markForDeletion(load);
       assignment.mapValueToAddress(origValue, load->getOperand());
@@ -4748,6 +4791,14 @@ protected:
     assignment.markForDeletion(m);
   }
 
+  void visitMarkDependenceAddrInst(MarkDependenceAddrInst *m) {
+    auto builder = assignment.getBuilder(m->getIterator());
+    auto opdAddr = assignment.getAddressForValue(m->getBase());
+    builder.createMarkDependenceAddr(m->getLoc(), m->getAddress(), opdAddr,
+                                     m->dependenceKind());
+    assignment.markForDeletion(m);
+  }
+
   void visitStoreInst(StoreInst *store) {
     auto builder = assignment.getBuilder(store->getIterator());
     SILValue addr = assignment.getAddressForValue(store->getSrc());
@@ -4772,20 +4823,29 @@ protected:
   }
 
   void visitDebugValueInst(DebugValueInst *dbg) {
-    // Undef debug values have a special meaning. Don't allocate stack space
-    // for those.
-    // Rewriting them would also break nullary debug reconstruction blocks.
-    if (isa<SILUndef>(dbg->getOperand()))
-      return;
-    if (!dbg->hasAddrVal() &&
-        (assignment.isPotentiallyCArray(dbg->getOperand()->getType()) ||
-         overlapsWithOnStackDebugLoc(dbg->getOperand()))) {
-      assignment.markForDeletion(dbg);
-      return;
+    for (auto &operand : dbg->getAllOperands()) {
+      SILValue operandVal = operand.get();
+      // The same conditions as in `AddressAssignment::assign` need to be
+      // done for each operand: rewrite all operands that need rewriting.
+      if (!operandVal->getType().isObject())
+        continue;
+      if (!assignment.isLargeLoadableType(operandVal->getType()))
+        continue;
+      // Undef debug values have a special meaning. Don't allocate stack space
+      // for those.
+      // Rewriting them would also break nullary debug reconstruction blocks.
+      if (isa<SILUndef>(operandVal))
+        continue;
+      if (!operandVal->getType().isAddress() &&
+          (assignment.isPotentiallyCArray(operandVal->getType()) ||
+           overlapsWithOnStackDebugLoc(operandVal))) {
+        assignment.markForDeletion(dbg);
+        return;
+      }
+      SILValue addr = assignment.getAddressForValue(operandVal);
+      operand.set(addr);
+      dbg->prependDeref(operand.getOperandNumber());
     }
-    SILValue addr = assignment.getAddressForValue(dbg->getOperand());
-    dbg->setOperand(addr);
-    dbg->prependDeref();
   }
 
   void visitRetainValueInst(RetainValueInst *r) {

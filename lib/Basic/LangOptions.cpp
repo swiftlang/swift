@@ -33,6 +33,23 @@
 
 using namespace swift;
 
+StringRef LangOptions::getCOMInteropModelConditionalCompilationFlag() const {
+  if (!EnableCOMInterop || !COMModel)
+    return {};
+
+  switch (*COMModel) {
+  case COMInteropModel::Microsoft:
+    return "$_MicrosoftCOM";
+  case COMInteropModel::CoreFoundation:
+    return "$_CoreFoundationCOM";
+  }
+  llvm_unreachable("unhandled COM interop model");
+}
+
+bool LangOptions::isCOMInteropModelConditionalCompilationFlag(StringRef Name) {
+  return Name == "$_MicrosoftCOM" || Name == "$_CoreFoundationCOM";
+}
+
 LangOptions::LangOptions() {
   // Add all promoted language features
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \

@@ -1807,6 +1807,21 @@ public:
     return sharedUInt32().InstructionBaseWithTrailingOperands.numOperands;
   }
 
+protected:
+  /// Removes the last operand, shrinking the tail allocated operand list.
+  /// The other, previous, operands, remain fully valid.
+  /// If there are any OtherTrailingTypes, they need to be moved separately by
+  /// the callee.
+  void eraseLastOperandInPlace() {
+    auto operands = getAllOperands();
+    ASSERT(!operands.empty() && "no operand to erase");
+
+    operands.back().~Operand();
+    sharedUInt32().InstructionBaseWithTrailingOperands.numOperands =
+        operands.size() - 1;
+  }
+
+public:
   ArrayRef<Operand> getAllOperands() const {
     return this->template getTrailingObjectsNonStrict<Operand>(
         sharedUInt32().InstructionBaseWithTrailingOperands.numOperands);
@@ -3427,6 +3442,7 @@ private:
          SILFunctionTypeIsolation ResultIsolation, SILFunction &F,
          const GenericSpecializationInformation *SpecializationInfo,
          OnStackKind onStack, StackAllocationIsNested_t isNested,
+         bool isCalledOnce,
          std::optional<ArrayRef<SILLocation>> ArgLocs = std::nullopt);
 
 public:
@@ -3444,6 +3460,10 @@ public:
     return getFunctionType()->getIsolation();
   }
 
+  bool isCalledOnce() const {
+    return getFunctionType()->isCalledOnce();
+  }
+  
   OnStackKind isOnStack() const {
     return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
   }
@@ -4447,12 +4467,22 @@ public:
 
   SubstitutionMap getSubstitutions() const { return Substitutions; }
 
-  /// If this `keypath_inst` can be emitted as a statically-instantiated
-  /// immortal instance in Embedded Swift, returns the concrete key path
-  /// class SILType (e.g. `$KeyPath<Foo, Bar>`, `$WritableKeyPath<Foo,
-  /// Bar>`, or `$ReferenceWritableKeyPath<Foo, Bar>`) that IRGen would use
-  /// as the object's isa.  Returns an invalid SILType otherwise.
+  /// If this `keypath_inst` can be described entirely at compile time in
+  /// Embedded Swift, returns the concrete key path class SILType (e.g.
+  /// `$KeyPath<Foo, Bar>`, `$WritableKeyPath<Foo, Bar>`, or
+  /// `$ReferenceWritableKeyPath<Foo, Bar>`) that IRGen would use as the
+  /// object's isa.  Returns an invalid SILType otherwise.
+  ///
+  /// A result here does not by itself mean the instance is a constant: if the
+  /// key path captures values, IRGen emits a template plus code to fill the
+  /// captures in.  See `needsRuntimeInstantiation`.
   SILType getStaticInstanceClassType() const;
+
+  /// Whether an Embedded Swift instance of this key path has to be allocated
+  /// and populated at runtime rather than referenced as an immortal constant.
+  /// True exactly when the key path captures values, i.e. when some component
+  /// has subscript arguments.
+  bool needsRuntimeInstantiation() const { return !getAllOperands().empty(); }
 
   void dropReferencedPattern();
   
@@ -5735,12 +5765,11 @@ public:
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
 class DebugValueInst final
-    : public UnaryInstructionBase<SILInstructionKind::DebugValueInst,
-                                  NonValueInstruction>,
-      private SILDebugVariableSupplement,
-      private llvm::TrailingObjects<DebugValueInst, SILType, SILLocation,
-                                    const SILDebugScope *, SILDIExprElement,
-                                    char> {
+    : public InstructionBaseWithTrailingOperands<
+          SILInstructionKind::DebugValueInst, DebugValueInst,
+          NonValueInstruction, SILType, SILLocation, const SILDebugScope *,
+          SILDIExprElement, char>,
+      private SILDebugVariableSupplement {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -5750,20 +5779,36 @@ class DebugValueInst final
   /// Optional debug basic block holding reconstruction instructions.
   SILBasicBlock *ReconstructionBlock = nullptr;
 
-  DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 SILDebugVariable Var,
+  DebugValueInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> Operands,
+                 SILModule &M, SILDebugVariable Var,
                  UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
                  bool prependDeref);
-  static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
-                                SILModule &M, SILDebugVariable Var,
+  static DebugValueInst *create(SILDebugLocation DebugLoc,
+                                ArrayRef<SILValue> Operands, SILModule &M,
+                                SILDebugVariable Var,
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
 
+  using InstructionBaseWithTrailingOperands::numTrailingObjects;
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
-  size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
+  /// Removes the last operand, shrinking the tail allocated operand list.
+  /// Only the last operand can be removed, to avoid invalidating other
+  /// existing Operand pointers. Pointers to this last operand are invalidated.
+  void eraseLastOperand();
 
 public:
+  /// Returns the single operand, asserting that there is exactly one.
+  /// Should only be used in contexts where it is known that there is no
+  /// debug reconstruction block.
+  SILValue getSingleOperand() const {
+    ASSERT(getAllOperands().size() == 1);
+    return getAllOperands()[0].get();
+  }
+
+  ArrayRef<Operand> getTypeDependentOperands() const { return {}; }
+  MutableArrayRef<Operand> getTypeDependentOperands() { return {}; }
+
   /// Sets a bool that states this debug_value is supposed to use the
   void setUsesMoveableValueDebugInfo() {
     sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo =
@@ -5861,19 +5906,6 @@ public:
       *getTrailingObjects<const SILDebugScope *>() = NewDS;
   }
 
-  /// Whether the SSA value associated with the current debug_value
-  /// instruction has an address type.
-  bool hasAddrVal() const {
-    return getOperand()->getType().isAddress();
-  }
-
-  /// An utility to check if \p I is DebugValueInst and
-  /// whether it's associated with address type SSA value.
-  static DebugValueInst *hasAddrVal(SILInstruction *I) {
-    auto *DVI = dyn_cast_or_null<DebugValueInst>(I);
-    return DVI && DVI->hasAddrVal()? DVI : nullptr;
-  }
-
   /// Whether this debug value has a DIExpr with a deref.
   /// For address-only types with a debug reconstruction block, the deref
   /// applies after the BB's result. Otherwise, this is incompatible with
@@ -5893,7 +5925,7 @@ public:
   /// an address type (when moved to the stack, for example).
   /// If a reconstruction block exists, a load is added at the beginning.
   /// Otherwise, it will be prepended to the DIExpr.
-  void prependDeref();
+  void prependDeref(unsigned operandIdx);
 
   /// Removes a deref operator to this debug_value in place.
   /// This must be called when the operand is changed from an address type to
@@ -5902,7 +5934,7 @@ public:
   /// If a reconstruction block exists, a load is removed at the beginning. If
   /// there is no load at the beginning, the operand is killed, marking the
   /// variable as optimized away.
-  void stripDeref();
+  void stripDeref(unsigned operandIdx);
 
   /// Validates the type chain of the DIExpr.
   /// Starting from VarType, narrows through fragments (outermost first)
@@ -5919,13 +5951,12 @@ public:
     return ReconstructionBlock;
   }
 
-  /// Sets the debug-only basic block for this instruction.
+  /// Sets the debug-only basic block for this instruction. If one is already
+  /// attached, it is freed.
   /// This should not be called by optimization passes. Optimization passes
   /// and debug information salvage operations should append to existing
   /// blocks using getOrCreateDebugReconstructionBlock.
-  void setDebugReconstructionBlock(SILBasicBlock *BB) {
-    ReconstructionBlock = BB;
-  }
+  void setDebugReconstructionBlock(SILBasicBlock *BB);
 
   /// Clones the reconstruction block from \p src onto this debug value.
   void cloneReconstructionBlockFrom(DebugValueInst *src);
@@ -5936,17 +5967,18 @@ public:
   /// The newly created basic block will be well-formed, returning the SSA
   /// value of this debug_value directly.
   /// If this debug_value has an undef operand, the reconstruction block
-  /// has no arguments and returns undef directly.
+  /// has no arguments and returns undef directly, and the operand is dropped.
   SILBasicBlock *getOrCreateDebugReconstructionBlock();
 
-  /// Drops the operand from this debug value.
+  /// Kills the operand from this debug value.
   /// This function must be called by passes whenever the operand of this debug
   /// value is no longer valid and cannot be salvaged.
-  /// This will replace the operand with an undef, and clear any DIExpr or debug
-  /// reconstruction block.
-  /// If \p varType is specified, the undef will use that type (in the
+  /// Uses inside a debug reconstruction block are replaced with undef. If this
+  /// is the last operand, the operand list is shrunk.
+  /// Any pointers to the killed Operand are invalidated.
+  /// If \p operandType is specified, that undef will use that type (in the
   /// appropriate address/object form) instead of the current operand's type.
-  void killOperand(SILType operandType = SILType());
+  void killOperand(unsigned operandIdx, SILType operandType = SILType());
 
   bool hasTrace() const { return sharedUInt8().DebugValueInst.trace; }
 

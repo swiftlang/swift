@@ -1848,6 +1848,12 @@ ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
 ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
       "expected an original function name", ())
 
+// called
+ERROR(attr_called_expected_rparen,none,
+      "expected ')' after execution semantics", ())
+ERROR(attr_called_expected_semantics,none,
+      "expected 'once' as the `@called` execution semantics", ())
+
 // SIL autodiff
 ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
       "expected '[' to start the %0", (StringRef))

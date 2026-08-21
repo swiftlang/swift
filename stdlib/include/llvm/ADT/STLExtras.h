@@ -23,8 +23,6 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
-#include <functional>
 #include <initializer_list>
 #include <iterator>
 #include <limits>
@@ -33,10 +31,6 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
-
-#ifdef EXPENSIVE_CHECKS
-#include <random> // for std::mt19937
-#endif
 
 inline namespace __swift { inline namespace __runtime {
 namespace llvm {
@@ -1387,133 +1381,6 @@ constexpr inline size_t array_lengthof(T (&)[N]) {
   return N;
 }
 
-/// Adapt std::less<T> for array_pod_sort.
-template<typename T>
-inline int array_pod_sort_comparator(const void *P1, const void *P2) {
-  if (std::less<T>()(*reinterpret_cast<const T*>(P1),
-                     *reinterpret_cast<const T*>(P2)))
-    return -1;
-  if (std::less<T>()(*reinterpret_cast<const T*>(P2),
-                     *reinterpret_cast<const T*>(P1)))
-    return 1;
-  return 0;
-}
-
-/// get_array_pod_sort_comparator - This is an internal helper function used to
-/// get type deduction of T right.
-template<typename T>
-inline int (*get_array_pod_sort_comparator(const T &))
-             (const void*, const void*) {
-  return array_pod_sort_comparator<T>;
-}
-
-#ifdef EXPENSIVE_CHECKS
-namespace detail {
-
-inline unsigned presortShuffleEntropy() {
-  static unsigned Result(std::random_device{}());
-  return Result;
-}
-
-template <class IteratorTy>
-inline void presortShuffle(IteratorTy Start, IteratorTy End) {
-  std::mt19937 Generator(presortShuffleEntropy());
-  llvm::shuffle(Start, End, Generator);
-}
-
-} // end namespace detail
-#endif
-
-/// array_pod_sort - This sorts an array with the specified start and end
-/// extent.  This is just like std::sort, except that it calls qsort instead of
-/// using an inlined template.  qsort is slightly slower than std::sort, but
-/// most sorts are not performance critical in LLVM and std::sort has to be
-/// template instantiated for each type, leading to significant measured code
-/// bloat.  This function should generally be used instead of std::sort where
-/// possible.
-///
-/// This function assumes that you have simple POD-like types that can be
-/// compared with std::less and can be moved with memcpy.  If this isn't true,
-/// you should use std::sort.
-///
-/// NOTE: If qsort_r were portable, we could allow a custom comparator and
-/// default to std::less.
-template<class IteratorTy>
-inline void array_pod_sort(IteratorTy Start, IteratorTy End) {
-  // Don't inefficiently call qsort with one element or trigger undefined
-  // behavior with an empty sequence.
-  auto NElts = End - Start;
-  if (NElts <= 1) return;
-#ifdef EXPENSIVE_CHECKS
-  detail::presortShuffle<IteratorTy>(Start, End);
-#endif
-  qsort(&*Start, NElts, sizeof(*Start), get_array_pod_sort_comparator(*Start));
-}
-
-template <class IteratorTy>
-inline void array_pod_sort(
-    IteratorTy Start, IteratorTy End,
-    int (*Compare)(
-        const typename std::iterator_traits<IteratorTy>::value_type *,
-        const typename std::iterator_traits<IteratorTy>::value_type *)) {
-  // Don't inefficiently call qsort with one element or trigger undefined
-  // behavior with an empty sequence.
-  auto NElts = End - Start;
-  if (NElts <= 1) return;
-#ifdef EXPENSIVE_CHECKS
-  detail::presortShuffle<IteratorTy>(Start, End);
-#endif
-  qsort(&*Start, NElts, sizeof(*Start),
-        reinterpret_cast<int (*)(const void *, const void *)>(Compare));
-}
-
-namespace detail {
-template <typename T>
-// We can use qsort if the iterator type is a pointer and the underlying value
-// is trivially copyable.
-using sort_trivially_copyable = conjunction<
-    std::is_pointer<T>,
-    std::is_trivially_copyable<typename std::iterator_traits<T>::value_type>>;
-} // namespace detail
-
-// Provide wrappers to std::sort which shuffle the elements before sorting
-// to help uncover non-deterministic behavior (PR35135).
-template <typename IteratorTy,
-          std::enable_if_t<!detail::sort_trivially_copyable<IteratorTy>::value,
-                           int> = 0>
-inline void sort(IteratorTy Start, IteratorTy End) {
-#ifdef EXPENSIVE_CHECKS
-  detail::presortShuffle<IteratorTy>(Start, End);
-#endif
-  std::sort(Start, End);
-}
-
-// Forward trivially copyable types to array_pod_sort. This avoids a large
-// amount of code bloat for a minor performance hit.
-template <typename IteratorTy,
-          std::enable_if_t<detail::sort_trivially_copyable<IteratorTy>::value,
-                           int> = 0>
-inline void sort(IteratorTy Start, IteratorTy End) {
-  array_pod_sort(Start, End);
-}
-
-template <typename Container> inline void sort(Container &&C) {
-  llvm::sort(adl_begin(C), adl_end(C));
-}
-
-template <typename IteratorTy, typename Compare>
-inline void sort(IteratorTy Start, IteratorTy End, Compare Comp) {
-#ifdef EXPENSIVE_CHECKS
-  detail::presortShuffle<IteratorTy>(Start, End);
-#endif
-  std::sort(Start, End, Comp);
-}
-
-template <typename Container, typename Compare>
-inline void sort(Container &&C, Compare Comp) {
-  llvm::sort(adl_begin(C), adl_end(C), Comp);
-}
-
 //===----------------------------------------------------------------------===//
 //     Extra additions to <algorithm>
 //===----------------------------------------------------------------------===//
@@ -1827,19 +1694,6 @@ inline void interleaveComma(const Container &c, StreamT &os) {
 //===----------------------------------------------------------------------===//
 //     Extra additions to <memory>
 //===----------------------------------------------------------------------===//
-
-struct FreeDeleter {
-  void operator()(void* v) {
-    ::free(v);
-  }
-};
-
-template<typename First, typename Second>
-struct pair_hash {
-  size_t operator()(const std::pair<First, Second> &P) const {
-    return std::hash<First>()(P.first) * 31 + std::hash<Second>()(P.second);
-  }
-};
 
 /// Binary functor that adapts to any other binary functor after dereferencing
 /// operands.

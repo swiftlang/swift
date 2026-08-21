@@ -42,21 +42,21 @@ public class SelfCasts {
     return s as! T
   }
 
-  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc {{i32|i64}} @"$s17dynamic_self_cast9SelfCastsC02toD11ConditionalyACXDSgACFZ"(ptr %0, ptr swiftself %1)
+  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc ptr @"$s17dynamic_self_cast9SelfCastsC02toD11ConditionalyACXDSgACFZ"(ptr %0, ptr swiftself %1)
   // CHECK: call ptr @swift_dynamicCastClass(ptr %0, ptr %1)
   // CHECK: ret
   public static func toSelfConditional(_ s: SelfCasts) -> Self? {
     return s as? Self
   }
 
-  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc {{i32|i64}} @"$s17dynamic_self_cast9SelfCastsC09genericToD11ConditionalyACXDSgxlFZ"(ptr noalias %0, ptr %T, ptr swiftself %1)
+  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc ptr @"$s17dynamic_self_cast9SelfCastsC09genericToD11ConditionalyACXDSgxlFZ"(ptr noalias %0, ptr %T, ptr swiftself %1)
   // CHECK: call zeroext i1 @swift_dynamicCast(ptr {{%.*}}, ptr {{%.*}}, ptr %T, ptr %1, {{.*}})
   // CHECK: ret
   public static func genericToSelfConditional<T>(_ s: T) -> Self? {
     return s as? Self
   }
 
-  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc {{i32|i64}} @"$s17dynamic_self_cast9SelfCastsC014classGenericToD11ConditionalyACXDSgxRlzClFZ"(ptr %0, ptr %T, ptr swiftself %1)
+  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc ptr @"$s17dynamic_self_cast9SelfCastsC014classGenericToD11ConditionalyACXDSgxRlzClFZ"(ptr %0, ptr %T, ptr swiftself %1)
   // CHECK: call ptr @swift_dynamicCastClass(ptr %0, ptr %1)
   // CHECK: ret
   public static func classGenericToSelfConditional<T : AnyObject>(_ s: T) -> Self? {
@@ -71,7 +71,7 @@ public class SelfCasts {
     return s as? T
   }
 
-  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc {{i32|i64}} @"$s17dynamic_self_cast9SelfCastsC016classGenericFromD11ConditionalxSgyRlzClFZ"(ptr %T, ptr swiftself %0)
+  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc ptr @"$s17dynamic_self_cast9SelfCastsC016classGenericFromD11ConditionalxSgyRlzClFZ"(ptr %T, ptr swiftself %0)
   // CHECK: call ptr @swift_dynamicCastUnknownClass(ptr {{%.*}}, ptr %T)
   // CHECK: ret
   public static func classGenericFromSelfConditional<T : AnyObject>() -> T? {

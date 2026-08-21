@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -disable-availability-checking -parse-as-library -enable-experimental-feature Embedded %t/test.swift -c -o %t/a.o
-// RUN: %target-embedded-link -nostdlib -lSystem %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos -lswift_Concurrency -dead_strip -Wl,-undefined,dynamic_lookup
+// RUN: %target-embedded-link -nostdlib -lSystem %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos -lswift_Concurrency %target-embedded-concurrency-threading-shim -dead_strip -Wl,-undefined,dynamic_lookup
 
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.out | sort | tee %t/actual-dependencies.txt
 
@@ -22,6 +22,16 @@ _memmove
 _memset
 _memset_s
 _posix_memalign
+_pthread_getspecific
+_pthread_main_np
+_pthread_mutex_destroy
+_pthread_mutex_init
+_pthread_mutex_lock
+_pthread_mutex_unlock
+_pthread_mutexattr_destroy
+_pthread_mutexattr_init
+_pthread_mutexattr_settype
+_pthread_setspecific
 _putchar
 _puts
 _strlen

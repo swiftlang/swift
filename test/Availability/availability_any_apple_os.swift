@@ -14,11 +14,11 @@ func deprecatedInAnyAppleOS26() { }
 
 @available(anyAppleOS, obsoleted: 26)
 func obsoletedInAnyAppleOS26() { }
-// expected-macos-note@-1 {{'obsoletedInAnyAppleOS26()' was obsoleted in macOS 26}}
-// expected-ios-note@-2 {{'obsoletedInAnyAppleOS26()' was obsoleted in iOS 26}}
-// expected-watchos-note@-3 {{'obsoletedInAnyAppleOS26()' was obsoleted in watchOS 26}}
-// expected-tvos-note@-4 {{'obsoletedInAnyAppleOS26()' was obsoleted in tvOS 26}}
-// expected-visionos-note@-5 {{'obsoletedInAnyAppleOS26()' was obsoleted in visionOS 26}}
+// expected-macos-note@-2 {{'obsoletedInAnyAppleOS26()' was obsoleted in macOS 26}}
+// expected-ios-note@-3 {{'obsoletedInAnyAppleOS26()' was obsoleted in iOS 26}}
+// expected-watchos-note@-4 {{'obsoletedInAnyAppleOS26()' was obsoleted in watchOS 26}}
+// expected-tvos-note@-5 {{'obsoletedInAnyAppleOS26()' was obsoleted in tvOS 26}}
+// expected-visionos-note@-6 {{'obsoletedInAnyAppleOS26()' was obsoleted in visionOS 26}}
 
 @available(anyAppleOS 26, macOS 26.1, *)
 func availableInAnyAppleOS26AndMacOS26_1() { }
@@ -41,8 +41,8 @@ func unavailableInEveryAppleOS() {
   unavailableInAnyAppleOS()
 }
 
-@available(anyAppleOS, unavailable)
-func unavailableInAnyAppleOS() { // expected-apple-note {{'unavailableInAnyAppleOS()' has been explicitly marked unavailable here}}
+@available(anyAppleOS, unavailable) // expected-apple-note {{'unavailableInAnyAppleOS()' has been explicitly marked unavailable here}}
+func unavailableInAnyAppleOS() {
   availableInAnyAppleOS26_1()
   availableInMacOS26_1AndAnyAppleOS26()
   availableInEveryAppleOS26_1()
@@ -61,9 +61,12 @@ func availableAtDeploymentTarget() {
   // expected-visionos-error@-5 {{'availableInAnyAppleOS26_1()' is only available in visionOS 26.1 or newer}}
   // expected-apple-note@-6 {{add 'if #available' version check}}{{3-30=if #available(anyAppleOS 26.1, *) {\n      availableInAnyAppleOS26_1()\n  \} else {\n      // Fallback on earlier versions\n  \}}}
 
-  // FIXME: [availability] Remap domain/version in deprecation diagnostics
   deprecatedInAnyAppleOS26()
-  // expected-apple-warning@-1 {{'deprecatedInAnyAppleOS26()' was deprecated in any Apple OS 26}}
+  // expected-macos-warning@-1 {{'deprecatedInAnyAppleOS26()' was deprecated in macOS 26}}
+  // expected-ios-warning@-2 {{'deprecatedInAnyAppleOS26()' was deprecated in iOS 26}}
+  // expected-watchos-warning@-3 {{'deprecatedInAnyAppleOS26()' was deprecated in watchOS 26}}
+  // expected-tvos-warning@-4 {{'deprecatedInAnyAppleOS26()' was deprecated in tvOS 26}}
+  // expected-visionos-warning@-5 {{'deprecatedInAnyAppleOS26()' was deprecated in visionOS 26}}
 
   obsoletedInAnyAppleOS26()
   // expected-macos-error@-1 {{'obsoletedInAnyAppleOS26()' is unavailable in macOS}}

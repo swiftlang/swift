@@ -1005,7 +1005,7 @@ public:
     // Do not clone if our inst argument is one of our cloned arguments. In such
     // a case, we are going to handle the debug_value when we visit a post
     // dominating consuming reinit.
-    if (oldArgSet.count(inst->getOperand())) {
+    if (oldArgSet.count(inst->getSingleOperand())) {
       LLVM_DEBUG(llvm::dbgs()
                  << "    Visiting debug value that is in the old arg set!\n");
       return;

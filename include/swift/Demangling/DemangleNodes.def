@@ -137,6 +137,7 @@ NODE(ImplConvention)
 NODE(ImplDifferentiabilityKind)
 NODE(ImplNonisolatedNonsendingIsolation)
 NODE(ImplErasedIsolation)
+NODE(ImplCalledOnceFunction)
 NODE(ImplSendingResult)
 NODE(ImplParameterResultDifferentiability)
 NODE(ImplParameterSending)
@@ -426,6 +427,7 @@ NODE(ConstValue)
 // Added in Swift 6.TBD
 CONTEXT_NODE(BorrowAccessor)
 CONTEXT_NODE(MutateAccessor)
+NODE(CalledOnceFunctionType)
 
 #undef CONTEXT_NODE
 #undef NODE

@@ -84,8 +84,8 @@ public func _swift_writeToStandardOutput(
 
 @export(interface)
 @implementation @c
-public func _swift_exit(_ code: Int) {
-  exit(CInt(code))
+public func _swift_exit(_ code: CInt) {
+  exit(code)
 }
 
 /// The human-readable prefix that precedes an error message, chosen by the
@@ -144,12 +144,11 @@ public func _swift_reportError(
   _ message: UnsafePointer<UInt8>?,
   _ messageCount: Int,
   _ flags: UInt64
-) -> Never {
+) {
   unsafe _reportError(
     prefix: _reportErrorPrefix(flags),
     fileName: nil, fileNameCount: 0, line: 0,
     message: message, messageCount: messageCount)
-  Builtin.int_trap()
 }
 
 @export(interface)
@@ -161,12 +160,11 @@ public func _swift_reportErrorAt(
   _ fileNameCount: Int,
   _ line: Int,
   _ flags: UInt64
-) -> Never {
+) {
   unsafe _reportError(
     prefix: _reportErrorPrefix(flags),
     fileName: fileName, fileNameCount: fileNameCount, line: line,
     message: message, messageCount: messageCount)
-  Builtin.int_trap()
 }
 
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
@@ -198,9 +196,11 @@ public func _swift_typedAllocate(_ size: Int, _ alignMask: Int, _ flags: SwiftAl
 
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
   if _isMallocTypeOSVersionAtLeast() {
-    // This check also forces "default" alignment to use malloc_memalign().
+    // This check also forces "default" alignment (alignMask == -1) to use
+    // malloc_type_posix_memalign(). Note we need to check the signedness of
+    // alignMask because it's signed unlike in swift_slowAllocTyped.
     let MALLOC_ALIGN_MASK = 15
-    if (alignMask <= MALLOC_ALIGN_MASK) {
+    if (alignMask >= 0 && alignMask <= MALLOC_ALIGN_MASK) {
       return unsafe malloc_type_malloc(size, typeId);
     } else {
       var alignment: Int

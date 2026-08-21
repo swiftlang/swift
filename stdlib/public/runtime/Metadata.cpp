@@ -43,13 +43,18 @@
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/ThreadSanitizer.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/MathExtras.h"
 #include <algorithm>
 #include <cctype>
 #include <cinttypes>
 #include <condition_variable>
+#include <limits>
 #include <new>
 #include <unordered_set>
 #include <vector>
+#if defined(__APPLE__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
+#include <malloc/malloc.h>
+#endif
 #if SWIFT_PTRAUTH
 #include <ptrauth.h>
 #endif
@@ -1765,11 +1770,10 @@ vector_destroy(OpaqueValue *dest, const Metadata *metatype) {
   
   auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
   auto destBytes = (char*)dest;
-  
-  for (unsigned i = 0, end = vectorType->getRealizedCount(),
-                stride = vectorType->Element->vw_stride();
-       i < end;
-       ++i, destBytes += stride) {
+
+  const intptr_t end = vectorType->getRealizedCount();
+  const size_t stride = vectorType->Element->vw_stride();
+  for (intptr_t i = 0; i < end; ++i, destBytes += stride) {
     vectorType->Element->vw_destroy((OpaqueValue*)destBytes);
   }
 }
@@ -1788,11 +1792,10 @@ vector_elementwise_transfer(OpaqueValue *dest, OpaqueValue *src,
   auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
   auto destBytes = (char*)dest;
   auto srcBytes = (char*)src;
-  
-  for (unsigned i = 0, end = vectorType->getRealizedCount(),
-                stride = vectorType->Element->vw_stride();
-       i < end;
-       ++i, destBytes += stride, srcBytes += stride) {
+
+  const intptr_t end = vectorType->getRealizedCount();
+  const size_t stride = vectorType->Element->vw_stride();
+  for (intptr_t i = 0; i < end; ++i, destBytes += stride, srcBytes += stride) {
     elementFn(
       (OpaqueValue*)destBytes,
       (OpaqueValue*)srcBytes,
@@ -1902,8 +1905,19 @@ FixedArrayCacheEntry::tryInitialize(Metadata *metadata,
   assert(count > 0);
   Data.ValueWitnesses = &Witnesses;
   auto eltWitnesses = element->getValueWitnesses();
-  auto arraySize
-    = Witnesses.size = Witnesses.stride = eltWitnesses->stride * count;
+  size_t arraySize;
+  {
+    bool overflowed = false;
+    arraySize = llvm::SaturatingMultiply((size_t)eltWitnesses->stride,
+                                         (size_t)count, &overflowed);
+    if (SWIFT_UNLIKELY(overflowed)) {
+      swift::fatalError(0,
+                        "Builtin.FixedArray of %zd elements with stride %zu "
+                        "is too large to be representable\n",
+                        count, (size_t)eltWitnesses->stride);
+    }
+  }
+  Witnesses.size = Witnesses.stride = arraySize;
   // We take on most of the properties of the element type, except that an array
   // of elements might end up larger than an inline buffer, and the array is
   // always addressable for dependencies.
@@ -2608,17 +2622,20 @@ static constexpr TypeLayout getInitialLayoutForHeapObject() {
 /// calling a functor with the offset of each field, and returning the
 /// final layout characteristics of the type.
 ///
+/// Returns false if the running size overflows size_t, leaving \p layout
+/// untouched. \p setOffset will already have run for the elements preceding the
+/// overflow.
+///
 /// GetLayoutFn should have signature:
 ///   const TypeLayout *(ElementType &type);
 ///
 /// SetOffsetFn should have signature:
 ///   void (size_t index, ElementType &type, size_t offset)
-template<typename ElementType, typename GetLayoutFn, typename SetOffsetFn>
-static void performBasicLayout(TypeLayout &layout,
-                               ElementType *elements,
-                               size_t numElements,
-                               GetLayoutFn &&getLayout,
-                               SetOffsetFn &&setOffset) {
+template <typename ElementType, typename GetLayoutFn, typename SetOffsetFn>
+[[nodiscard]] static bool
+performBasicLayout(TypeLayout &layout, ElementType *elements,
+                   size_t numElements, GetLayoutFn &&getLayout,
+                   SetOffsetFn &&setOffset) {
   size_t size = layout.size;
   size_t alignMask = layout.flags.getAlignmentMask();
   bool isPOD = layout.flags.isPOD();
@@ -2631,13 +2648,18 @@ static void performBasicLayout(TypeLayout &layout,
 
     // Lay out this element.
     const TypeLayout *eltLayout = getLayout(i, elt);
-    size = roundUpToAlignMask(size, eltLayout->flags.getAlignmentMask());
+    if (SWIFT_UNLIKELY(!roundUpToAlignMaskCheckingOverflow(
+            size, eltLayout->flags.getAlignmentMask(), size)))
+      return false;
 
     // Report this record to the functor.
     setOffset(i, elt, size);
 
     // Update the size and alignment of the aggregate..
-    size += eltLayout->size;
+    bool overflowed = false;
+    size = llvm::SaturatingAdd(size, (size_t)eltLayout->size, &overflowed);
+    if (SWIFT_UNLIKELY(overflowed))
+      return false;
     alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
     if (!eltLayout->flags.isPOD()) isPOD = false;
     if (!eltLayout->flags.isCopyable()) isCopyable = false;
@@ -2649,6 +2671,13 @@ static void performBasicLayout(TypeLayout &layout,
   bool isInline =
       ValueWitnessTable::isValueInline(isBitwiseTakable, size, alignMask + 1);
 
+  // The stride rounds the size up again, which can carry even when the size
+  // itself did not.
+  size_t stride;
+  if (SWIFT_UNLIKELY(
+          !roundUpToAlignMaskCheckingOverflow(size, alignMask, stride)))
+    return false;
+
   layout.size = size;
   layout.flags = ValueWitnessFlags()
                      .withAlignmentMask(alignMask)
@@ -2659,16 +2688,95 @@ static void performBasicLayout(TypeLayout &layout,
                      .withAddressableForDependencies(isAddressableForDependencies)
                      .withInlineStorage(isInline);
   layout.extraInhabitantCount = 0;
-  layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
+  layout.stride = std::max(size_t(1), stride);
+  return true;
+}
+
+/// Report that a type's layout size is not representable and halt.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE static void
+fatalLayoutOverflow(const char *kind, const char *name) {
+  swift::fatalError(
+      0, "%s %s has a layout size that is too large to be representable\n",
+      kind, name);
+}
+
+/// Report that a field offset doesn't fit the field offset vector and halt.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE static void
+fatalFieldOffsetOverflow(const char *kind, const char *name) {
+  swift::fatalError(0,
+                    "%s %s has a field offset that does not fit in the 32-bit "
+                    "field offset vector\n",
+                    kind, name);
+}
+
+/// Report that a tuple's layout size is not representable and halt. Tuples are
+/// structural, so there is no name to report.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE static void
+fatalTupleLayoutOverflow() {
+  swift::fatalError(
+      0, "tuple has a layout size that is too large to be representable\n");
+}
+
+/// Report that a tuple element offset doesn't fit the field it's published in
+/// and halt.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE static void
+fatalTupleElementOffsetOverflow() {
+  swift::fatalError(0, "tuple has an element offset that does not fit in the "
+                       "32-bit element offset field\n");
+}
+
+/// Report that a class instance size doesn't fit the 32-bit field it's
+/// published in and halt.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE static void
+fatalInstanceSizeOverflow(const char *name, size_t size) {
+  swift::fatalError(0,
+                    "class %s has an instance size of %zu bytes, which exceeds "
+                    "the 32-bit InstanceSize field\n",
+                    name, size);
+}
+
+/// Lay out a tuple, writing each element offset into \p elementOffsets, which
+/// may be null. Halts if the layout size is not representable, or if an element
+/// offset does not fit in \p OffsetTy.
+template <typename OffsetTy>
+static void getTupleTypeLayoutImpl(TypeLayout *result, OffsetTy *elementOffsets,
+                                   size_t numElements,
+                                   const TypeLayout *const *elements) {
+  *result = TypeLayout();
+  unsigned numExtraInhabitants = 0;
+  bool offsetTruncated = false;
+  if (SWIFT_UNLIKELY(!performBasicLayout(
+          *result, elements, numElements,
+          [](size_t i, const TypeLayout *elt) { return elt; },
+          [elementOffsets, &numExtraInhabitants,
+           &offsetTruncated](size_t i, const TypeLayout *elt, size_t offset) {
+            if (elementOffsets) {
+              if (SWIFT_UNLIKELY(offset >
+                                 (size_t)std::numeric_limits<OffsetTy>::max()))
+                offsetTruncated = true;
+              elementOffsets[i] = OffsetTy(offset);
+            }
+            numExtraInhabitants =
+                std::max(numExtraInhabitants, elt->getNumExtraInhabitants());
+          }))) {
+    fatalTupleLayoutOverflow();
+  }
+
+  if (SWIFT_UNLIKELY(offsetTruncated))
+    fatalTupleElementOffsetOverflow();
+
+  if (numExtraInhabitants > 0) {
+    *result = TypeLayout(result->size, result->stride, result->flags,
+                         numExtraInhabitants);
+  }
 }
 
 size_t swift::swift_getTupleTypeLayout2(TypeLayout *result,
                                         const TypeLayout *elt0,
                                         const TypeLayout *elt1) {
   const TypeLayout *elts[] = { elt0, elt1 };
-  uint32_t offsets[2];
-  swift_getTupleTypeLayout(result, offsets,
-                           TupleTypeFlags().withNumElements(2), elts);
+  size_t offsets[2];
+  getTupleTypeLayoutImpl(result, offsets, 2, elts);
   assert(offsets[0] == 0);
   return offsets[1];
 }
@@ -2678,9 +2786,8 @@ OffsetPair swift::swift_getTupleTypeLayout3(TypeLayout *result,
                                             const TypeLayout *elt1,
                                             const TypeLayout *elt2) {
   const TypeLayout *elts[] = { elt0, elt1, elt2 };
-  uint32_t offsets[3];
-  swift_getTupleTypeLayout(result, offsets,
-                           TupleTypeFlags().withNumElements(3), elts);
+  size_t offsets[3];
+  getTupleTypeLayoutImpl(result, offsets, 3, elts);
   assert(offsets[0] == 0);
   return {offsets[1], offsets[2]};
 }
@@ -2689,24 +2796,8 @@ void swift::swift_getTupleTypeLayout(TypeLayout *result,
                                      uint32_t *elementOffsets,
                                      TupleTypeFlags flags,
                                      const TypeLayout * const *elements) {
-  *result = TypeLayout();
-  unsigned numExtraInhabitants = 0;
-  performBasicLayout(*result, elements, flags.getNumElements(),
-    [](size_t i, const TypeLayout *elt) { return elt; },
-    [elementOffsets, &numExtraInhabitants]
-    (size_t i, const TypeLayout *elt, size_t offset) {
-      if (elementOffsets)
-        elementOffsets[i] = uint32_t(offset);
-      numExtraInhabitants = std::max(numExtraInhabitants,
-                                     elt->getNumExtraInhabitants());
-    });
-  
-  if (numExtraInhabitants > 0) {
-    *result = TypeLayout(result->size,
-                         result->stride,
-                         result->flags,
-                         numExtraInhabitants);
-  }
+  getTupleTypeLayoutImpl(result, elementOffsets, flags.getNumElements(),
+                         elements);
 }
 
 MetadataResponse
@@ -2826,13 +2917,25 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
 
   // Perform basic layout on the tuple.
   auto layout = getInitialLayoutForValueType();
-  performBasicLayout(layout, Data.getElements(), Data.NumElements,
-    [](size_t i, const TupleTypeMetadata::Element &elt) {
-      return elt.getTypeLayout();
-    },
-    [](size_t i, TupleTypeMetadata::Element &elt, size_t offset) {
-      elt.Offset = offset;
-    });
+  // Element::Offset is StoredSize on Apple platforms but uint32_t elsewhere.
+  bool offsetTruncated = false;
+  if (SWIFT_UNLIKELY(!performBasicLayout(
+          layout, Data.getElements(), Data.NumElements,
+          [](size_t i, const TupleTypeMetadata::Element &elt) {
+            return elt.getTypeLayout();
+          },
+          [&offsetTruncated](size_t i, TupleTypeMetadata::Element &elt,
+                             size_t offset) {
+            using OffsetTy = decltype(elt.Offset);
+            if (SWIFT_UNLIKELY(offset >
+                               (size_t)std::numeric_limits<OffsetTy>::max()))
+              offsetTruncated = true;
+            elt.Offset = offset;
+          }))) {
+    fatalTupleLayoutOverflow();
+  }
+  if (SWIFT_UNLIKELY(offsetTruncated))
+    fatalTupleElementOffsetOverflow();
 
   Witnesses.size = layout.size;
   Witnesses.flags = layout.flags;
@@ -3230,12 +3333,20 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
                                      const TypeLayout *const *fieldTypes,
                                      uint32_t *fieldOffsets) {
   auto layout = getInitialLayoutForValueType();
-  performBasicLayout(
-      layout, fieldTypes, numFields,
-      [&](size_t i, const TypeLayout *fieldType) { return fieldType; },
-      [&](size_t i, const TypeLayout *fieldType, uint32_t offset) {
-        assignUnlessEqual(fieldOffsets[i], offset);
-      });
+  bool offsetTruncated = false;
+  if (SWIFT_UNLIKELY(!performBasicLayout(
+          layout, fieldTypes, numFields,
+          [&](size_t i, const TypeLayout *fieldType) { return fieldType; },
+          [&](size_t i, const TypeLayout *fieldType, size_t offset) {
+            if (SWIFT_UNLIKELY(offset > (size_t)UINT32_MAX))
+              offsetTruncated = true;
+            assignUnlessEqual(fieldOffsets[i], uint32_t(offset));
+          }))) {
+    fatalLayoutOverflow("struct", structType->getDescription()->Name.get());
+  }
+  if (SWIFT_UNLIKELY(offsetTruncated))
+    fatalFieldOffsetOverflow("struct",
+                             structType->getDescription()->Name.get());
 
   // If the struct is always noncopyable, we must honor that.
   if (structType->getDescription()->isUnconditionallySuppressing(
@@ -3274,17 +3385,26 @@ static void swift_cvw_initStructMetadataWithLayoutStringImpl(
   assert(structType->hasLayoutString());
 
   auto layout = getInitialLayoutForValueType();
-  performBasicLayout(
-      layout, fieldTypes, numFields,
-      [&](size_t i, const uint8_t *fieldType) {
-        if (fieldTags[i]) {
-          return (const TypeLayout*)fieldType;
-        }
-        return ((const Metadata*)fieldType)->getTypeLayout();
-      },
-      [&](size_t i, const uint8_t *fieldType, uint32_t offset) {
-        assignUnlessEqual(fieldOffsets[i], offset);
-      });
+  // The field offset vector is 32 bits wide.
+  bool offsetTruncated = false;
+  if (SWIFT_UNLIKELY(!performBasicLayout(
+          layout, fieldTypes, numFields,
+          [&](size_t i, const uint8_t *fieldType) {
+            if (fieldTags[i]) {
+              return (const TypeLayout *)fieldType;
+            }
+            return ((const Metadata *)fieldType)->getTypeLayout();
+          },
+          [&](size_t i, const uint8_t *fieldType, size_t offset) {
+            if (SWIFT_UNLIKELY(offset > (size_t)UINT32_MAX))
+              offsetTruncated = true;
+            assignUnlessEqual(fieldOffsets[i], uint32_t(offset));
+          }))) {
+    fatalLayoutOverflow("struct", structType->getDescription()->Name.get());
+  }
+  if (SWIFT_UNLIKELY(offsetTruncated))
+    fatalFieldOffsetOverflow("struct",
+                             structType->getDescription()->Name.get());
 
   // If the struct is always noncopyable, we must honor that.
   if (layout.flags.isCopyable() &&
@@ -4142,15 +4262,23 @@ static void initClassFieldOffsetVector(ClassMetadata *self,
     // Skip empty fields.
     if (fieldOffsets[i] == 0 && eltLayout->size == 0)
       continue;
-    auto offset = roundUpToAlignMask(size,
-                                     eltLayout->flags.getAlignmentMask());
+    size_t offset;
+    if (SWIFT_UNLIKELY(!roundUpToAlignMaskCheckingOverflow(
+            size, eltLayout->flags.getAlignmentMask(), offset)))
+      fatalLayoutOverflow("class", self->getDescription()->Name.get());
     fieldOffsets[i] = offset;
-    size = offset + eltLayout->size;
+    bool overflowed = false;
+    size = llvm::SaturatingAdd(offset, (size_t)eltLayout->size, &overflowed);
+    if (SWIFT_UNLIKELY(overflowed))
+      fatalLayoutOverflow("class", self->getDescription()->Name.get());
     alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
   }
 
   // Save the final size and alignment into the metadata record.
   assert(self->isTypeMetadata());
+  // InstanceSize is 32 bits. Ensure we don't overflow it.
+  if (SWIFT_UNLIKELY(size > (size_t)UINT32_MAX))
+    fatalInstanceSizeOverflow(self->getDescription()->Name.get(), size);
   self->setInstanceSize(size);
   self->setInstanceAlignMask(alignMask);
 
@@ -4662,8 +4790,13 @@ swift::swift_updatePureObjCClassMetadata(Class cls,
 
     // Skip empty fields.
     if (offset != 0 || eltLayout->size != 0) {
-      offset = roundUpToAlignMask(size, eltLayout->flags.getAlignmentMask());
-      size = offset + eltLayout->size;
+      if (SWIFT_UNLIKELY(!roundUpToAlignMaskCheckingOverflow(
+              size, eltLayout->flags.getAlignmentMask(), offset)))
+        fatalLayoutOverflow("class", rodata->Name);
+      bool overflowed = false;
+      size = llvm::SaturatingAdd(offset, (size_t)eltLayout->size, &overflowed);
+      if (SWIFT_UNLIKELY(overflowed))
+        fatalLayoutOverflow("class", rodata->Name);
       alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
 
       // Fill in the field offset global, if this ivar has one.
@@ -4696,7 +4829,10 @@ swift::swift_updatePureObjCClassMetadata(Class cls,
     }
   }
 
-  // Save the size into the Objective-C metadata.
+  // Save the size into the Objective-C metadata. Ensure we don't overflow the
+  // 32-bit size field.
+  if (SWIFT_UNLIKELY(size > (size_t)UINT32_MAX))
+    fatalInstanceSizeOverflow(rodata->Name, size);
   if (rodata->InstanceSize != size)
     rodata->InstanceSize = size;
 
@@ -5125,6 +5261,8 @@ OpaqueExistentialValueWitnesses_0 =
 static const ValueWitnessTable
 OpaqueExistentialValueWitnesses_1 =
   ValueWitnessTableForBox<OpaqueExistentialBox<1>>::table;
+static const ValueWitnessTable COMExistentialValueWitnesses =
+  ValueWitnessTableForBox<COMExistentialBox>::table;
 
 /// The standard metadata for Any.
 const FullMetadata<ExistentialTypeMetadata> swift::
@@ -5289,7 +5427,10 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
     // Without ObjC interop, Error is native-refcounted.
     return &VALUE_WITNESS_SYM(Bo);
 #endif
-      
+
+  case SpecialProtocol::COM:
+    return &COMExistentialValueWitnesses;
+
   // Other existentials use standard representation.
   case SpecialProtocol::None:
     break;
@@ -5313,6 +5454,8 @@ ExistentialTypeMetadata::getRepresentation() const {
   switch (Flags.getSpecialProtocol()) {
   case SpecialProtocol::Error:
     return ExistentialTypeRepresentation::Error;
+  case SpecialProtocol::COM:
+    return ExistentialTypeRepresentation::COM;
   case SpecialProtocol::None:
     break;
   }
@@ -5347,6 +5490,8 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->isPureNSError();
   }
+  case ExistentialTypeRepresentation::COM:
+    return true;
   }
 
   swift_unreachable(
@@ -5370,6 +5515,10 @@ const {
   case ExistentialTypeRepresentation::Error:
     // TODO: If we were able to claim the value from a uniquely-owned
     // existential box, we would want to deallocError here.
+    break;
+
+  case ExistentialTypeRepresentation::COM:
+    // Taking the interface pointer leaves no auxiliary container state.
     break;
   }
 }
@@ -5396,6 +5545,9 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
       return container;
     return errorBox->getValue();
   }
+  case ExistentialTypeRepresentation::COM:
+    // The interface pointer is the existential value.
+    return container;
   }
 
   swift_unreachable(
@@ -5421,6 +5573,8 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getType();
   }
+  case ExistentialTypeRepresentation::COM:
+    swift_unreachable("the dynamic Swift type of a COM existential is not directly projectable");
   }
 
   swift_unreachable(
@@ -5457,6 +5611,8 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getErrorConformance();
   }
+  case ExistentialTypeRepresentation::COM:
+    swift_unreachable("COM existentials do not store Swift witness tables");
   }
 
   // The return type here describes extra structure for the protocol
@@ -5526,19 +5682,30 @@ swift::swift_getExistentialTypeMetadata(
 }
 
 ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
-  // Calculate the class constraint and number of witness tables for the
-  // protocol set.
-  unsigned numWitnessTables = 0;
-  for (auto p : make_range(key.Protocols, key.Protocols + key.NumProtocols)) {
-    if (p.needsWitnessTable())
-      ++numWitnessTables;
-  }
-
-  // Get the special protocol kind for an uncomposed protocol existential.
-  // Protocol compositions are currently never special.
+  // Get the special protocol kind. Marker protocols are omitted before this
+  // runtime entry is called. A refined COM-interface chain may contain more
+  // than one descriptor, but every remaining protocol still has the same COM
+  // representation.
   auto special = SpecialProtocol::None;
   if (key.NumProtocols == 1)
     special = key.Protocols[0].getSpecialProtocol();
+  else if (key.NumProtocols > 1 &&
+           llvm::all_of(
+               make_range(key.Protocols, key.Protocols + key.NumProtocols),
+               [](ProtocolDescriptorRef protocol) {
+                 return protocol.getSpecialProtocol() == SpecialProtocol::COM;
+               }))
+    special = SpecialProtocol::COM;
+
+  // Calculate the class constraint and number of witness tables for the
+  // protocol set.
+  unsigned numWitnessTables = 0;
+  if (special != SpecialProtocol::COM) {
+    for (auto p : make_range(key.Protocols, key.Protocols + key.NumProtocols)) {
+      if (p.needsWitnessTable())
+        ++numWitnessTables;
+    }
+  }
 
   Data.setKind(MetadataKind::Existential);
   Data.ValueWitnesses = getExistentialValueWitnesses(key.ClassConstraint,
@@ -8313,6 +8480,31 @@ static void checkAllocatorDebugEnvironmentVariables(void *context) {
   _swift_debug_allocationPoolBackPointerOffset = PoolRange::PageSize - sizeof(PoolTrailer);
 }
 
+// Used to allocate new pages for the allocator, or for metadata allocations
+// larger than the pool allocation size.
+static void *allocateRawMetadataMemory(size_t size, size_t alignMask) {
+#ifdef MALLOC_ZONE_MALLOC_DEFAULT_ALIGN
+  // ObjC classes (and thus Swift classes) need to be allocated with the
+  // canonical tag, because the ObjC runtime uses the high bits of the isa field
+  // for other purposes. For now, force all Swift metadata to be allocated with
+  // the canonical tag. In the future, we should be able to refine this so that
+  // only classes use the canonical tag, and maybe only NSObject subclasses.
+  //
+  // Match the value of MALLOC_ZONE_MALLOC_OPTION_CANONICAL_TAG without
+  // referencing it, so we can build against SDKs that don't have it.
+  auto canonicalTag = (malloc_zone_malloc_options_t)(1u << 1);
+  size_t alignment = alignMask + 1;
+  if (alignment < sizeof(void *))
+    alignment = sizeof(void *);
+  size = roundUpToAlignment(size, alignment);
+
+  if (__builtin_available(macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0,
+                          visionOS 26.0, *))
+    return malloc_zone_malloc_with_options(NULL, alignment, size, canonicalTag);
+#endif
+  return swift_slowAlloc(size, alignMask);
+}
+
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   assert(Tag != 0);
   assert(alignment <= alignof(void*));
@@ -8323,7 +8515,7 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
 
   // If the size is larger than the maximum, just do a normal heap allocation.
   if (size > PoolRange::MaxPoolAllocationSize) {
-    void *allocation = swift_slowAlloc(size, alignment - 1);
+    void *allocation = allocateRawMetadataMemory(size, alignment - 1);
     memsetScribble(allocation, size);
     return allocation;
   }
@@ -8346,8 +8538,8 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
                            curState.Remaining - sizeWithHeader};
     } else {
       allocatedNewPage = true;
-      allocation = reinterpret_cast<char *>(swift_slowAlloc(PoolRange::PageSize,
-                                                            alignof(char) - 1));
+      allocation = reinterpret_cast<char *>(
+          allocateRawMetadataMemory(PoolRange::PageSize, alignof(char) - 1));
       memsetScribble(allocation, PoolRange::PageSize);
 
       auto poolSize = PoolRange::PageSize;

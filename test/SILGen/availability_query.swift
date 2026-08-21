@@ -178,3 +178,24 @@ func testUnreachablePlatformAvailableGuard() {
 
   doThing() // no-warning
 }
+
+// CHECK-LABEL: sil hidden{{.*}} @$s18availability_query25testQueryInSwitchCaseBody1xySi_tF
+// CHECK: [[FUNC:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF
+// CHECK: apply [[FUNC]]
+func testQueryInSwitchCaseBody(x: Int) {
+  switch x {
+  default:
+    if #available(OSX 10.53, *) {
+    }
+  }
+}
+
+// CHECK-LABEL: sil hidden{{.*}} @$s18availability_query25testGuardInSwitchCaseBody1xySi_tF
+// CHECK: [[FUNC:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF
+// CHECK: apply [[FUNC]]
+func testGuardInSwitchCaseBody(x: Int) {
+  switch x {
+  default:
+    guard #available(OSX 10.53, *) else { return }
+  }
+}

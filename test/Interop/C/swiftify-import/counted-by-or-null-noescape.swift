@@ -364,187 +364,31 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature Lifetimes -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: 847748c9e70920d8eab1e64135c9178f418c0de85b3bedde96563a04d64417bf
+// GENERATED-HASH: af7be31152619e22cda33e9809902630827157be6fc9cd9ba1ce46afe34a5cf0
 import Test
 
 func call_simple(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!) {
   return unsafe simple(len, p)
 }
 
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(p: copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ p: inout MutableSpan<CInt>) {
+  return simple(&p)
+}
+
 func call_swiftAttr(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!) {
   return unsafe swiftAttr(len, p)
 }
 
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(p: copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_swiftAttr(_ p: inout MutableSpan<CInt>) {
+  return swiftAttr(&p)
+}
+
 func call_shared(_ len: CInt, _ p1: UnsafeMutablePointer<CInt>!, _ p2: UnsafeMutablePointer<CInt>!) {
   return unsafe shared(len, p1, p2)
-}
-
-func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutablePointer<CInt>!) {
-  return unsafe complexExpr(len, offset, p)
-}
-
-func call_nullUnspecified(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!) {
-  return unsafe nullUnspecified(len, p)
-}
-
-func call_nonnull(_ len: CInt, _ p: UnsafeMutablePointer<CInt>) {
-  return unsafe nonnull(len, p)
-}
-
-func call_nullable(_ len: CInt, _ p: UnsafeMutablePointer<CInt>?) {
-  return unsafe nullable(len, p)
-}
-
-func call_returnPointer(_ len: CInt) -> UnsafeMutablePointer<CInt>! {
-  return unsafe returnPointer(len)
-}
-
-func call_anonymous(_ len: CInt, _ _anonymous_param1: UnsafeMutablePointer<CInt>?) {
-  return unsafe anonymous(len,  _anonymous_param1)
-}
-
-func call_keyword(_ len: CInt, _ func: UnsafeMutablePointer<CInt>?, _ extension: CInt, _ init: CInt, _ open: CInt, _ var: CInt, _ is: CInt, _ as: CInt, _ in: CInt, _ guard: CInt, _ where: CInt) {
-  return unsafe keyword(len, `func`, `extension`, `init`, open, `var`, `is`, `as`, `in`, `guard`, `where`)
-}
-
-func call_pointerName(_ len: CInt, _  _pointerName_param1: UnsafeMutablePointer<CInt>?) {
-  return unsafe pointerName(len,  _pointerName_param1)
-}
-
-func call_lenName(_  _lenName_param0: CInt, _ size: CInt, _ p: UnsafeMutablePointer<CInt>?) {
-  return unsafe lenName( _lenName_param0, size, p)
-}
-
-func call_func(_ len: CInt, _  _func_param1: UnsafeMutablePointer<CInt>?) {
-  return unsafe `func`(len,  _func_param1)
-}
-
-func call_funcRenamed(len: CInt, func: UnsafeMutablePointer<CInt>?, extension: CInt, init: CInt, open: CInt, `var`: CInt, is: CInt, as: CInt, in: CInt, guard: CInt, where: CInt) -> UnsafeMutableRawPointer! {
-  return unsafe funcRenamed(len: len, func: `func`, extension: `extension`, init: `init`, open: open, var: `var`, is: `is`, as: `as`, in: `in`, guard: `guard`, where: `where`)
-}
-
-func call_funcRenamedAnon(len: CInt, func  _funcRenamedAnon_param1: UnsafeMutablePointer<CInt>?, extension  _funcRenamedAnon_param2: CInt, init  _funcRenamedAnon_param3: CInt, open  _funcRenamedAnon_param4: CInt, `var`  _funcRenamedAnon_param5: CInt, is  _funcRenamedAnon_param6: CInt, as  _funcRenamedAnon_param7: CInt, in  _funcRenamedAnon_param8: CInt, guard  _funcRenamedAnon_param9: CInt, where  _funcRenamedAnon_param10: CInt) -> UnsafeMutableRawPointer! {
-  return unsafe funcRenamedAnon(len: len, func:  _funcRenamedAnon_param1, extension:  _funcRenamedAnon_param2, init:  _funcRenamedAnon_param3, open:  _funcRenamedAnon_param4, var:  _funcRenamedAnon_param5, is:  _funcRenamedAnon_param6, as:  _funcRenamedAnon_param7, in:  _funcRenamedAnon_param8, guard:  _funcRenamedAnon_param9, where:  _funcRenamedAnon_param10)
-}
-
-func call_clash(len: CInt, func: UnsafeMutablePointer<CInt>?, clash where: CInt) {
-  return unsafe clash(len: len, func: `func`, clash: `where`)
-}
-
-func call_open(len: CInt, func: UnsafeMutablePointer<CInt>?, open where: CInt) {
-  return unsafe open(len: len, func: `func`, open: `where`)
-}
-
-func call_clash2(len: CInt, func: UnsafeMutablePointer<CInt>?, clash2  _clash2_param2: CInt) {
-  return unsafe clash2(len: len, func: `func`, clash2:  _clash2_param2)
-}
-
-func call_in(len: CInt, func: UnsafeMutablePointer<CInt>?, in  _in_param2: CInt) {
-  return unsafe `in`(len: len, func: `func`, in:  _in_param2)
-}
-
-func call_keywordType(_ len: CInt, _ p: UnsafeMutablePointer<actor?>!, _ p2: OpaquePointer) -> actor {
-  return unsafe keywordType(len, p, p2)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(_anonymous_param1: copy _anonymous_param1)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_anonymous(_ _anonymous_param1: inout MutableSpan<CInt>?) {
-  return anonymous(&_anonymous_param1)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(`func`: copy `func`)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_clash(func: inout MutableSpan<CInt>?, clash where: CInt) {
-  return clash(func: &`func`, clash: `where`)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(_clash2_param1: copy _clash2_param1)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_clash2(func _clash2_param1: inout MutableSpan<CInt>?, clash2 _clash2_param2: CInt) {
-  return clash2(func: &_clash2_param1, clash2: _clash2_param2)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: inout MutableSpan<CInt>) {
-  return complexExpr(len, offset, &p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(_func_param1: copy _func_param1)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_func(_ _func_param1: inout MutableSpan<CInt>?) {
-  return `func`(&_func_param1)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(`func`: copy `func`)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_funcRenamed(func: inout MutableSpan<CInt>?, extension: CInt, init: CInt, open: CInt, `var`: CInt, is: CInt, as: CInt, in: CInt, guard: CInt, where: CInt) -> UnsafeMutableRawPointer! {
-  return unsafe funcRenamed(func: &`func`, extension: `extension`, init: `init`, open: open, var: `var`, is: `is`, as: `as`, in: `in`, guard: `guard`, where: `where`)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(_funcRenamedAnon_param1: copy _funcRenamedAnon_param1)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_funcRenamedAnon(func _funcRenamedAnon_param1: inout MutableSpan<CInt>?, extension _funcRenamedAnon_param2: CInt, init _funcRenamedAnon_param3: CInt, open _funcRenamedAnon_param4: CInt, `var` _funcRenamedAnon_param5: CInt, is _funcRenamedAnon_param6: CInt, as _funcRenamedAnon_param7: CInt, in _funcRenamedAnon_param8: CInt, guard _funcRenamedAnon_param9: CInt, where _funcRenamedAnon_param10: CInt) -> UnsafeMutableRawPointer! {
-  return unsafe funcRenamedAnon(func: &_funcRenamedAnon_param1, extension: _funcRenamedAnon_param2, init: _funcRenamedAnon_param3, open: _funcRenamedAnon_param4, var: _funcRenamedAnon_param5, is: _funcRenamedAnon_param6, as: _funcRenamedAnon_param7, in: _funcRenamedAnon_param8, guard: _funcRenamedAnon_param9, where: _funcRenamedAnon_param10)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(_in_param1: copy _in_param1)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_in(func _in_param1: inout MutableSpan<CInt>?, in _in_param2: CInt) {
-  return `in`(func: &_in_param1, in: _in_param2)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(`func`: copy `func`)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_keyword(_ func: inout MutableSpan<CInt>?, _ extension: CInt, _ init: CInt, _ open: CInt, _ var: CInt, _ is: CInt, _ as: CInt, _ in: CInt, _ guard: CInt, _ where: CInt) {
-  return keyword(&`func`, `extension`, `init`, open, `var`, `is`, `as`, `in`, `guard`, `where`)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_keywordType(_ p: inout MutableSpan<actor?>, _ p2: OpaquePointer) -> actor {
-  return unsafe keywordType(&p, p2)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(_lenName_param2: copy _lenName_param2)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_lenName(_ _lenName_param0: CInt, _ _lenName_param1: CInt, _ _lenName_param2: inout MutableSpan<CInt>?) {
-  return lenName(_lenName_param0, _lenName_param1, &_lenName_param2)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: inout MutableSpan<CInt>) {
-  return nonnull(&p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ p: inout MutableSpan<CInt>) {
-  return nullUnspecified(&p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: inout MutableSpan<CInt>?) {
-  return nullable(&p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(`func`: copy `func`)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_open(func: inout MutableSpan<CInt>?, open where: CInt) {
-  return open(func: &`func`, open: `where`)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(_pointerName_param1: copy _pointerName_param1)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_pointerName(_ _pointerName_param1: inout MutableSpan<CInt>?) {
-  return pointerName(&_pointerName_param1)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_returnPointer(_ len: CInt) -> UnsafeMutableBufferPointer<CInt> {
-  return unsafe returnPointer(len)
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -554,14 +398,170 @@ func call_keywordType(_ len: CInt, _ p: UnsafeMutablePointer<actor?>!, _ p2: Opa
   return shared(&p1, &p2)
 }
 
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ p: inout MutableSpan<CInt>) {
-  return simple(&p)
+func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutablePointer<CInt>!) {
+  return unsafe complexExpr(len, offset, p)
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_swiftAttr(_ p: inout MutableSpan<CInt>) {
-  return swiftAttr(&p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: inout MutableSpan<CInt>) {
+  return complexExpr(len, offset, &p)
+}
+
+func call_nullUnspecified(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!) {
+  return unsafe nullUnspecified(len, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(p: copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ p: inout MutableSpan<CInt>) {
+  return nullUnspecified(&p)
+}
+
+func call_nonnull(_ len: CInt, _ p: UnsafeMutablePointer<CInt>) {
+  return unsafe nonnull(len, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(p: copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: inout MutableSpan<CInt>) {
+  return nonnull(&p)
+}
+
+func call_nullable(_ len: CInt, _ p: UnsafeMutablePointer<CInt>?) {
+  return unsafe nullable(len, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(p: copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: inout MutableSpan<CInt>?) {
+  return nullable(&p)
+}
+
+func call_returnPointer(_ len: CInt) -> UnsafeMutablePointer<CInt>! {
+  return unsafe returnPointer(len)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_returnPointer(_ len: CInt) -> UnsafeMutableBufferPointer<CInt> {
+  return unsafe returnPointer(len)
+}
+
+func call_anonymous(_ len: CInt, _ _anonymous_param1: UnsafeMutablePointer<CInt>?) {
+  return unsafe anonymous(len,  _anonymous_param1)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(_anonymous_param1: copy _anonymous_param1)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_anonymous(_ _anonymous_param1: inout MutableSpan<CInt>?) {
+  return anonymous(&_anonymous_param1)
+}
+
+func call_keyword(_ len: CInt, _ func: UnsafeMutablePointer<CInt>?, _ extension: CInt, _ init: CInt, _ open: CInt, _ var: CInt, _ is: CInt, _ as: CInt, _ in: CInt, _ guard: CInt, _ where: CInt) {
+  return unsafe keyword(len, `func`, `extension`, `init`, open, `var`, `is`, `as`, `in`, `guard`, `where`)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(`func`: copy `func`)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_keyword(_ func: inout MutableSpan<CInt>?, _ extension: CInt, _ init: CInt, _ open: CInt, _ var: CInt, _ is: CInt, _ as: CInt, _ in: CInt, _ guard: CInt, _ where: CInt) {
+  return keyword(&`func`, `extension`, `init`, open, `var`, `is`, `as`, `in`, `guard`, `where`)
+}
+
+func call_pointerName(_ len: CInt, _  _pointerName_param1: UnsafeMutablePointer<CInt>?) {
+  return unsafe pointerName(len,  _pointerName_param1)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(_pointerName_param1: copy _pointerName_param1)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_pointerName(_ _pointerName_param1: inout MutableSpan<CInt>?) {
+  return pointerName(&_pointerName_param1)
+}
+
+func call_lenName(_  _lenName_param0: CInt, _ size: CInt, _ p: UnsafeMutablePointer<CInt>?) {
+  return unsafe lenName( _lenName_param0, size, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(_lenName_param2: copy _lenName_param2)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_lenName(_ _lenName_param0: CInt, _ _lenName_param1: CInt, _ _lenName_param2: inout MutableSpan<CInt>?) {
+  return lenName(_lenName_param0, _lenName_param1, &_lenName_param2)
+}
+
+func call_func(_ len: CInt, _  _func_param1: UnsafeMutablePointer<CInt>?) {
+  return unsafe `func`(len,  _func_param1)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(_func_param1: copy _func_param1)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_func(_ _func_param1: inout MutableSpan<CInt>?) {
+  return `func`(&_func_param1)
+}
+
+func call_funcRenamed(len: CInt, func: UnsafeMutablePointer<CInt>?, extension: CInt, init: CInt, open: CInt, `var`: CInt, is: CInt, as: CInt, in: CInt, guard: CInt, where: CInt) -> UnsafeMutableRawPointer! {
+  return unsafe funcRenamed(len: len, func: `func`, extension: `extension`, init: `init`, open: open, var: `var`, is: `is`, as: `as`, in: `in`, guard: `guard`, where: `where`)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(`func`: copy `func`)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_funcRenamed(func: inout MutableSpan<CInt>?, extension: CInt, init: CInt, open: CInt, `var`: CInt, is: CInt, as: CInt, in: CInt, guard: CInt, where: CInt) -> UnsafeMutableRawPointer! {
+  return unsafe funcRenamed(func: &`func`, extension: `extension`, init: `init`, open: open, var: `var`, is: `is`, as: `as`, in: `in`, guard: `guard`, where: `where`)
+}
+
+func call_funcRenamedAnon(len: CInt, func  _funcRenamedAnon_param1: UnsafeMutablePointer<CInt>?, extension  _funcRenamedAnon_param2: CInt, init  _funcRenamedAnon_param3: CInt, open  _funcRenamedAnon_param4: CInt, `var`  _funcRenamedAnon_param5: CInt, is  _funcRenamedAnon_param6: CInt, as  _funcRenamedAnon_param7: CInt, in  _funcRenamedAnon_param8: CInt, guard  _funcRenamedAnon_param9: CInt, where  _funcRenamedAnon_param10: CInt) -> UnsafeMutableRawPointer! {
+  return unsafe funcRenamedAnon(len: len, func:  _funcRenamedAnon_param1, extension:  _funcRenamedAnon_param2, init:  _funcRenamedAnon_param3, open:  _funcRenamedAnon_param4, var:  _funcRenamedAnon_param5, is:  _funcRenamedAnon_param6, as:  _funcRenamedAnon_param7, in:  _funcRenamedAnon_param8, guard:  _funcRenamedAnon_param9, where:  _funcRenamedAnon_param10)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(_funcRenamedAnon_param1: copy _funcRenamedAnon_param1)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_funcRenamedAnon(func _funcRenamedAnon_param1: inout MutableSpan<CInt>?, extension _funcRenamedAnon_param2: CInt, init _funcRenamedAnon_param3: CInt, open _funcRenamedAnon_param4: CInt, `var` _funcRenamedAnon_param5: CInt, is _funcRenamedAnon_param6: CInt, as _funcRenamedAnon_param7: CInt, in _funcRenamedAnon_param8: CInt, guard _funcRenamedAnon_param9: CInt, where _funcRenamedAnon_param10: CInt) -> UnsafeMutableRawPointer! {
+  return unsafe funcRenamedAnon(func: &_funcRenamedAnon_param1, extension: _funcRenamedAnon_param2, init: _funcRenamedAnon_param3, open: _funcRenamedAnon_param4, var: _funcRenamedAnon_param5, is: _funcRenamedAnon_param6, as: _funcRenamedAnon_param7, in: _funcRenamedAnon_param8, guard: _funcRenamedAnon_param9, where: _funcRenamedAnon_param10)
+}
+
+func call_clash(len: CInt, func: UnsafeMutablePointer<CInt>?, clash where: CInt) {
+  return unsafe clash(len: len, func: `func`, clash: `where`)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(`func`: copy `func`)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_clash(func: inout MutableSpan<CInt>?, clash where: CInt) {
+  return clash(func: &`func`, clash: `where`)
+}
+
+func call_open(len: CInt, func: UnsafeMutablePointer<CInt>?, open where: CInt) {
+  return unsafe open(len: len, func: `func`, open: `where`)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(`func`: copy `func`)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_open(func: inout MutableSpan<CInt>?, open where: CInt) {
+  return open(func: &`func`, open: `where`)
+}
+
+func call_clash2(len: CInt, func: UnsafeMutablePointer<CInt>?, clash2  _clash2_param2: CInt) {
+  return unsafe clash2(len: len, func: `func`, clash2:  _clash2_param2)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(_clash2_param1: copy _clash2_param1)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_clash2(func _clash2_param1: inout MutableSpan<CInt>?, clash2 _clash2_param2: CInt) {
+  return clash2(func: &_clash2_param1, clash2: _clash2_param2)
+}
+
+func call_in(len: CInt, func: UnsafeMutablePointer<CInt>?, in  _in_param2: CInt) {
+  return unsafe `in`(len: len, func: `func`, in:  _in_param2)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(_in_param1: copy _in_param1)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_in(func _in_param1: inout MutableSpan<CInt>?, in _in_param2: CInt) {
+  return `in`(func: &_in_param1, in: _in_param2)
+}
+
+func call_keywordType(_ len: CInt, _ p: UnsafeMutablePointer<actor?>!, _ p2: OpaquePointer) -> actor {
+  return unsafe keywordType(len, p, p2)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(p: copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_keywordType(_ p: inout MutableSpan<actor?>, _ p2: OpaquePointer) -> actor {
+  return unsafe keywordType(&p, p2)
 }

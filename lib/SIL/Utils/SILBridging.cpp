@@ -595,18 +595,6 @@ BridgedOwnedString BridgedInstruction::getDebugDescription() const {
   return BridgedOwnedString(str);
 }
 
-bool BridgedInstruction::mayAccessPointer() const {
-  return ::mayAccessPointer(unbridged());
-}
-
-bool BridgedInstruction::mayLoadWeakOrUnowned() const {
-  return ::mayLoadWeakOrUnowned(unbridged());
-}
-
-bool BridgedInstruction::maySynchronize() const {
-  return ::maySynchronize(unbridged());
-}
-
 BridgedType
 BridgedInstruction::KeyPathInst_getStaticInstanceClassType() const {
   return getAs<swift::KeyPathInst>()->getStaticInstanceClassType();
@@ -685,10 +673,10 @@ public:
       hasFixedLocation(true),
       fixedLocation(ArtificialUnreachableLocation(), nullptr) {}
 
-  BridgedClonerImpl(SILInstruction *insertionPoint)
+  BridgedClonerImpl(SILInstruction *insertionPoint, SILDebugLocation loc)
     : SILCloner<BridgedClonerImpl>(*insertionPoint->getFunction()),
       hasFixedLocation(true),
-      fixedLocation(insertionPoint->getDebugLocation()) {
+      fixedLocation(loc) {
     Builder.setInsertionPoint(insertionPoint);
   }
 
@@ -786,9 +774,9 @@ BridgedCloner::BridgedCloner(BridgedGlobalVar var, BridgedContext context)
   context.context->notifyNewCloner();
 }
 
-BridgedCloner::BridgedCloner(BridgedInstruction inst,
+BridgedCloner::BridgedCloner(BridgedInstruction inst, BridgedLocation loc,
                              BridgedContext context)
-    : cloner(new BridgedClonerImpl(inst.unbridged())) {
+    : cloner(new BridgedClonerImpl(inst.unbridged(), loc.getLoc())) {
   context.context->notifyNewCloner();
 }
 

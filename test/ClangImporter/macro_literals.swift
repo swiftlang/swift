@@ -2,6 +2,9 @@
 
 // REQUIRES: optimized_stdlib
 
+// Failing for Android since #91256
+// XFAIL: OS=linux-android, OS=linux-androideabi
+
 import macros
 
 // CHECK-LABEL: // testBitwiseOperations()
@@ -129,6 +132,14 @@ func testCStyleIntegerCasts() {
   // CHECK: %[[P2:.*]] = integer_literal $Builtin.Int32, -1, loc {{.*}}
   // CHECK: %{{.*}} = struct $UInt32 (%[[P2]] : $Builtin.Int32), loc {{.*}}
   _ = CAST_TYPEDEF_UNSIGNED_MINUS_ONE as TEST_DWORD
+
+  // CHECK: %[[P3:.*]] = integer_literal $Builtin.Int{{[0-9]+}}, -1, loc {{.*}}
+  // CHECK: %{{.*}} = struct $Int (%[[P3]] : $Builtin.Int{{[0-9]+}}), loc {{.*}}
+  _ = CAST_SIZE_T_MINUS_ONE as Int
+
+  // CHECK: %[[P4:.*]] = integer_literal $Builtin.Int{{[0-9]+}}, -1, loc {{.*}}
+  // CHECK: %{{.*}} = struct $Int (%[[P4]] : $Builtin.Int{{[0-9]+}}), loc {{.*}}
+  _ = CAST_NSUINTEGER_MINUS_ONE as Int
 }
 
 // CHECK-LABEL: // testIntegerComparisons()

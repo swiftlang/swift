@@ -85,7 +85,25 @@ class MemoryLifetimeVerifier {
 
   void requireBitsSetForArgument(const Bits &bits, Operand *argOp);
 
+  void clearBitsForInArgument(Bits &bits, Operand *argOp, SILValue addr);
+
+  /// Iterate the callees of the apply that owns \p argOp and OR the results
+  /// of `hasArgumentEffect(callee, argOp, addr)`. Handles cases where callee
+  /// info is unavailable:
+  ///   - partial_apply                          → \p partialApplyResult
+  ///   - callee list unknown/incomplete         → \p unknownCalleesResult
+  ///   - \p addr is null                        → \p noAddressResult
+  ///   - callee has no argument effects computed → skipped
+  bool anyCalleeHasArgumentEffect(
+      Operand *argOp, SILValue addr, bool partialApplyResult,
+      bool unknownCalleesResult, bool noAddressResult,
+      llvm::function_ref<bool(SILFunction *, Operand *, SILValue)>
+          hasArgumentEffect);
+
   bool applyMayRead(Operand *argOp, SILValue addr);
+  /// Returns true if apply has known memory effects that indicate it cannot
+  /// write to addr.
+  bool applyMayNotWrite(Operand *argOp, SILValue addr);
 
   bool isStoreBorrowLocation(SILValue addr) {
     auto *loc = locations.getLocation(addr);
@@ -139,6 +157,23 @@ class MemoryLifetimeVerifier {
 
   void killBits(BitDataflow::BlockState &blockState, SILValue addr) {
     locations.killBits(blockState.genSet, blockState.killSet, addr);
+  }
+
+  bool isTrivialIndirectApplyArgumentNotWritten(Operand *argOp, SILValue addr) {
+    if (!ApplySite::classof(argOp->getUser())) {
+      // Not an apply
+      return false;
+    }
+    return addr->getType().isTrivial(function) && applyMayNotWrite(argOp, addr);
+  }
+
+  void killBitsForInArgument(BitDataflow::BlockState &blockState,
+                             Operand &argOp) {
+    SILValue addr = argOp.get();
+    if (isTrivialIndirectApplyArgumentNotWritten(&argOp, addr)) {
+      return;
+    }
+    killBits(blockState, addr);
   }
 
 public:
@@ -298,11 +333,18 @@ void MemoryLifetimeVerifier::requireBitsSetForArgument(const Bits &bits, Operand
        errorLocIdx = missingBits.find_next(errorLocIdx)) {
     auto *errorLoc = locations.getLocation(errorLocIdx);
 
-    // We only have a valid address if this is not the "self" bit which represents
-    // unknown sub-fields.
+    // We only have a valid address if this is not the "self" bit of a
+    // partially covered location. In that case the "self" bit represents the
+    // untracked fields, but the representative value is the address of the
+    // whole location - which is too imprecise to check if the callee reads
+    // from the untracked fields.
     SILValue addr;
-    if (errorLocIdx != locIdx || !errorLoc->selfBitRepresentsUnknownSubFields())
+    if (!errorLoc->selfBitRepresentsUnknownSubFields() ||
+        // If the location has no sub-locations at all, its "self" bit represents
+        // the whole location and the representative value is its exact address.
+        !locations.hasSubLocations(errorLocIdx)) {
       addr = errorLoc->representativeValue;
+    }
 
     if (applyMayRead(argOp, addr)) {
       reportError("argument memory is not initialized, but should be",
@@ -311,36 +353,74 @@ void MemoryLifetimeVerifier::requireBitsSetForArgument(const Bits &bits, Operand
   }
 }
 
-bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
-  // Conservatively assume that a partial_apply does _not_ read an argument.
+void MemoryLifetimeVerifier::clearBitsForInArgument(Bits &bits, Operand *argOp,
+                                                    SILValue addr) {
+  // If a trivial type is passed as @in and the memory effects indicate that the
+  // address is not written to, then we can consider the address to still be
+  // initialised.
+  if (isTrivialIndirectApplyArgumentNotWritten(argOp, addr)) {
+    return;
+  }
+
+  locations.clearBits(bits, addr);
+}
+
+bool MemoryLifetimeVerifier::anyCalleeHasArgumentEffect(
+    Operand *argOp, SILValue addr, bool partialApplyResult,
+    bool unknownCalleesResult, bool noAddressResult,
+    llvm::function_ref<bool(SILFunction *, Operand *, SILValue)>
+        hasArgumentEffect) {
   if (isa<PartialApplyInst>(argOp->getUser()))
-    return false;
-  
+    return partialApplyResult;
+
   FullApplySite as(argOp->getUser());
   CalleeList callees;
   if (calleeCache) {
     callees = calleeCache->getCalleeList(as);
     if (callees.isIncomplete())
-      return true;
+      return unknownCalleesResult;
   } else if (auto *callee = as.getReferencedFunctionOrNull()) {
     callees = CalleeList(callee);
   } else {
-    return false;
+    return unknownCalleesResult;
   }
 
   if (!addr)
-    return false;
+    return noAddressResult;
 
   for (SILFunction *callee : callees) {
-    // If the callee has no side-effects computed, yet, ignore it.
-    // This can happen if a store to an unused inout has been eliminated at a call site
-    // and afterwards the callee is specialized and therefore doesn't have the required
-    // side-effects computed, yet.
-    if (callee->hasArgumentEffects() && callee->argumentMayRead(argOp, addr)) {
+    if (hasArgumentEffect(callee, argOp, addr))
       return true;
-    }
   }
   return false;
+}
+
+bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
+  return anyCalleeHasArgumentEffect(
+      argOp, addr,
+      /*partialApplyResult=*/false,
+      /*unknownCalleesResult=*/true,
+      /*noAddressResult=*/false,
+      [](SILFunction *callee, Operand *op, SILValue a) {
+        // If the callee has no side-effects computed, yet, ignore it.
+        // This can happen if a store to an unused inout has been eliminated at
+        // a call site and afterwards the callee is specialized and therefore
+        // doesn't have the required side-effects computed, yet.
+        return callee->hasArgumentEffects() && callee->argumentMayRead(op, a);
+      });
+}
+
+bool MemoryLifetimeVerifier::applyMayNotWrite(Operand *argOp, SILValue addr) {
+  // Conservative direction is flipped: any uncertainty means we cannot prove
+  // the apply does *not* write, so we must return false in those cases.
+  return !anyCalleeHasArgumentEffect(
+      argOp, addr,
+      /*partialApplyResult=*/true,
+      /*unknownCalleesResult=*/true,
+      /*noAddressResult=*/true,
+      [](SILFunction *callee, Operand *op, SILValue a) {
+        return !callee->hasArgumentEffects() || callee->argumentMayWrite(op, a);
+      });
 }
 
 void MemoryLifetimeVerifier::requireNoStoreBorrowLocation(
@@ -591,7 +671,7 @@ void MemoryLifetimeVerifier::setFuncOperandBits(BlockState &state, Operand &op,
   switch (convention) {
     case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
-      killBits(state, op.get());
+      killBitsForInArgument(state, op);
       break;
     case SILArgumentConvention::Indirect_Out:
       // An `apply [nothrow]` does not initialize the indirect error result.
@@ -786,13 +866,6 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         requireBitsSet(bits, I.getOperand(0), &I);
         break;
       case SILInstructionKind::DebugValueInst:
-        // We don't want to check `debug_value` instructions that
-        // are used to mark variable declarations (e.g. its SSA value is
-        // an alloc_stack), which don't have any `op_deref` in its
-        // di-expression, because that memory doesn't need to be initialized
-        // when `debug_value` is referencing it.
-        if (!DebugValueInst::hasAddrVal(&I))
-          requireBitsSet(bits, I.getOperand(0), &I);
         break;
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
         auto enumInst = cast<UncheckedTakeEnumDataAddrInst>(&I);
@@ -942,7 +1015,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
     case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
       requireBitsSet(bits, argumentOp.get(), applyInst);
-      locations.clearBits(bits, argumentOp.get());
+      clearBitsForInArgument(bits, &argumentOp, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_Out:
       requireBitsClear(bits & locations.getNonTrivialLocations(),

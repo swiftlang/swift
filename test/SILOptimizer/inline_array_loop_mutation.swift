@@ -4,6 +4,7 @@
 // REQUIRES: executable_test
 
 // UNSUPPORTED: back_deployment_runtime || use_os_stdlib
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Regression test for a miscompile where TBAA failed to recurse into
 // `Builtin.FixedArray`'s element type, allowing LICM to hoist a load out

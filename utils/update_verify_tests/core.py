@@ -47,18 +47,62 @@ def parse_error_category(s, prefix):
 class Line:
     def __init__(self, content, line_n):
         self.content = content
-        self.diag = None
+        # Every `expected-*` directive on this line, in source order. A line
+        # may carry several: the verifier scans the buffer for `expected-`,
+        # so `// expected-error{{a}} expected-note{{b}}` is two directives
+        # sharing one comment, and `// expected-error{{a}} //
+        # expected-note{{b}}` is two directives each with their own. `content`
+        # holds one `{{DIAG}}` placeholder per entry.
+        self.diags = []
         self.line_n = line_n
         self.targeting_diags = []
+
+    @property
+    def diag(self):
+        """The line's first directive, or None. Most of the pipeline deals with
+        one directive per line; multi-directive lines are handled explicitly by
+        iterating `diags`."""
+        return self.diags[0] if self.diags else None
+
+    @diag.setter
+    def diag(self, value):
+        self.diags = [value] if value is not None else []
 
     def update_line_n(self, n):
         self.line_n = n
 
     def render(self):
-        if not self.diag:
+        if not self.diags:
             return self.content
-        assert "{{DIAG}}" in self.content
-        res = self.content.replace("{{DIAG}}", self.diag.render())
+        parts = self.content.split("{{DIAG}}")
+        assert len(parts) == len(self.diags) + 1
+        res = parts[0]
+        # The `//` of a comment belongs to the first directive in it; the
+        # ones packed after it render bare. If that first directive is being
+        # removed, its `//` must be handed to whichever directive in the
+        # comment survives, otherwise the survivor would render as code.
+        pending_slash = None
+        for diag, tail in zip(self.diags, parts[1:]):
+            rendered = diag.render()
+            owns_slashes = getattr(diag, "has_slashes", True)
+            if rendered:
+                if not owns_slashes and pending_slash is not None:
+                    # The survivor renders its own leading whitespace, so only
+                    # borrow the removed directive's when it has none.
+                    own_ws = (
+                        getattr(diag, "whitespace_strings", None)
+                        or DEFAULT_WHITESPACE
+                    ).slash
+                    borrowed = "" if own_ws else pending_slash
+                    rendered = "//" + borrowed + rendered
+                pending_slash = None
+            elif owns_slashes:
+                ws = (
+                    getattr(diag, "whitespace_strings", None)
+                    or DEFAULT_WHITESPACE
+                )
+                pending_slash = ws.slash
+            res += rendered + tail
         if not res.strip():
             return ""
         return res.rstrip() + "\n"
@@ -85,6 +129,8 @@ class Diag:
         had_none_fixit_marker=False,
         preserved_markers=None,
         had_absolute_line_in_source=False,
+        has_slashes=True,
+        source_span=None,
     ):
         self.prefix = prefix
         self.diag_content = diag_content
@@ -137,10 +183,24 @@ class Diag:
         self.children_closer = None
         self.is_child_note = False
         self.child_of = None
+        # False for a directive packed onto a comment opened by an earlier
+        # directive on the same line (`// expected-error{{a}}
+        # expected-note{{b}}`): it renders without a leading `//`.
+        self.has_slashes = has_slashes
+        # 1-based, inclusive column range this directive occupies in its source
+        # line, fix-it run included. A verifier error always points somewhere
+        # inside this range, which is what tells sibling directives on one line
+        # apart. None for synthesized directives (they own their whole line).
+        self.source_span = source_span
 
     def decrement_count(self):
+        if self.count <= 0:
+            raise KnownException(
+                f"more diagnostics reported against "
+                f"'expected-{self.category}{{{{{self.diag_content}}}}}' than it "
+                f"expects. Aborting to avoid corrupting the test."
+            )
         self.count -= 1
-        assert self.count >= 0
 
     def increment_count(self):
         assert self.count >= 0
@@ -271,8 +331,9 @@ class Diag:
         ws_count = ws.count
         if count_s and not ws_count and self.original_count_str is None:
             ws_count = " "
+        slashes_s = "//" if self.has_slashes else ""
         base_s = (
-            f"//{ws.slash}expected-{self.prefix}{self.category}{re_s}"
+            f"{slashes_s}{ws.slash}expected-{self.prefix}{self.category}{re_s}"
             f"{ws.at}{line_location_s}{col_s}{ws_count}{count_s}{ws.braces}"
         )
         if self.category == "expansion":
@@ -305,6 +366,17 @@ class ExpansionDiagClose:
 
 expected_diag_re = re.compile(
     r"//(\s*)expected-([a-zA-Z0-9-]*)(note|warning|error|remark)(-re)?(\s*?)(@[+-]?\d+|@(?=:))?(:\d+)?(\s*)(\d+)?(\s*)\{\{(.*?)\}\}"
+)
+# Same as `expected_diag_re` minus the `//`, for a directive packed onto a
+# comment an earlier directive on the same line already opened. Only ever
+# matched anchored directly after that directive, never searched for: the
+# verifier finds directives by scanning for `expected-` anywhere in the buffer,
+# but matching a bare `expected-` at an arbitrary position would also hit
+# ordinary code and string literals. Group layout is identical so both regexes
+# share the group-extraction code, with group 1 holding the whitespace before
+# `expected-` instead of the whitespace after `//`.
+continuation_diag_re = re.compile(
+    r"(\s*)expected-([a-zA-Z0-9-]*)(note|warning|error|remark)(-re)?(\s*?)(@[+-]?\d+|@(?=:))?(:\d+)?(\s*)(\d+)?(\s*)\{\{(.*?)\}\}"
 )
 expected_expansion_diag_re = re.compile(
     r"//(\s*)expected-([a-zA-Z0-9-]*)(expansion)(-re)?(\s*?)(@[+-]?\d+|@(?=:))(:\d+)(\s*)(\d+)?(\s*)\{\{(.*?)"
@@ -454,109 +526,202 @@ def split_fixit_markers(s):
     return results
 
 
-def parse_diag(line, filename, prefix, all_prefixes=False):
+def _consumed_end(s, m):
+    """End offset in *s* of the directive *m* matched, fix-it run included."""
+    if m.re is expected_expansion_diag_re:
+        return m.end()
+    fixits_raw_str, _, _ = consume_trailing_fixits(s[m.end() :])
+    return m.end() + len(fixits_raw_str)
+
+
+def _find_diag_matches(s):
+    """Every `expected-*` directive match on the line, in source order.
+
+    The first directive of a comment carries the `//`; any further directives
+    packed onto that same comment are matched as continuations, anchored right
+    after the previous directive's message (and fix-it run) so a bare
+    `expected-` elsewhere on the line is never mistaken for a directive.
+    """
+    matches = []
+    pos = 0
+    while True:
+        m = expected_diag_re.search(s, pos)
+        if not m:
+            return matches
+        matches.append(m)
+        pos = _consumed_end(s, m)
+        while c := continuation_diag_re.match(s, pos):
+            matches.append(c)
+            pos = _consumed_end(s, c)
+
+
+def parse_diags(line, filename, prefix, all_prefixes=False):
+    """Parse every directive on *line*, replacing each with a `{{DIAG}}`
+    placeholder in `line.content`, and return them in source order. Directives
+    whose prefix doesn't match are left in the content verbatim."""
     s = line.content
-    matches = list(expected_diag_re.finditer(s))
-    matched_re = expected_diag_re
+    matches = _find_diag_matches(s)
     if not matches:
         matches = list(expected_expansion_diag_re.finditer(s))
-        matched_re = expected_expansion_diag_re
+        if len(matches) > 1:
+            raise KnownException(
+                f"multiple expansions on line {filename}:{line.line_n}. Aborting due to missing implementation."
+            )
     if not matches:
         ms = expected_expansion_close_re.findall(s)
         if not ms:
-            return None
+            return []
         if len(ms) > 1:
             raise KnownException(
                 f"multiple closed scopes on line {filename}:{line.line_n}. Aborting due to missing implementation."
             )
         line.content = expected_expansion_close_re.sub("{{DIAG}}", s)
-        return ExpansionDiagClose(ms[0], line)
-    if len(matches) > 1:
-        raise KnownException(
-            f"multiple diags on line {filename}:{line.line_n}. Aborting due to missing implementation."
-        )
-    m = matches[0]
-    [
-        ws_slash,
-        check_prefix,
-        category_s,
-        re_s,
-        ws_at,
-        target_line_s,
-        target_col_s,
-        ws_count,
-        count_s,
-        ws_braces,
-        diag_s,
-    ] = m.groups()
-    if check_prefix != prefix and check_prefix != "" and not all_prefixes:
-        return None
-    if not target_line_s or target_line_s == "@":
-        target_line_n = 0
-        is_absolute = False
-    elif target_line_s.startswith("@+"):
-        target_line_n = int(target_line_s[2:])
-        is_absolute = False
-    elif target_line_s.startswith("@-"):
-        target_line_n = int(target_line_s[1:])
-        is_absolute = False
-    else:
-        target_line_n = int(target_line_s[1:])
-        is_absolute = True
-    col = int(target_col_s[1:]) if target_col_s else None
-    count = int(count_s) if count_s else 1
-    if matched_re is expected_diag_re:
-        fixits_raw_str, has_none_marker, preserved_markers = (
-            consume_trailing_fixits(s[m.end() :])
-        )
-        # Detect whether any source-side fix-it marker carries an absolute
-        # `<line>:<col>` position; if so, future updates preserve absolute
-        # form, otherwise actual fix-its are rewritten as relative offsets.
-        had_absolute_line = False
-        for marker in split_fixit_markers(fixits_raw_str):
-            fm = fixit_marker_re.match(marker)
-            if not fm:
-                continue
-            content = fm.group("content")
-            if (
-                content == "none"
-                or content.startswith("documentation-file=")
-                or content.startswith("group-name=")
-            ):
-                continue
-            if _fixit_content_has_absolute_line(content):
-                had_absolute_line = True
-                break
-    else:
-        fixits_raw_str, has_none_marker, preserved_markers = "", False, []
-        had_absolute_line = False
-    line.content = (
-        s[: m.start()] + "{{DIAG}}" + s[m.end() + len(fixits_raw_str) :]
-    )
+        return [ExpansionDiagClose(ms[0], line)]
 
-    unescaped_diag_s = decode(
-        encode(diag_s, "utf-8", "backslashreplace"), "unicode-escape"
-    )
-    return Diag(
-        check_prefix,
-        unescaped_diag_s,
-        category_s,
-        target_line_n,
-        is_absolute,
-        col,
-        count,
-        line,
-        bool(re_s),
-        Whitespace(slash=ws_slash, at=ws_at, count=ws_count, braces=ws_braces),
-        True,
-        [],
-        diag_content_raw=diag_s,
-        original_count_str=count_s if count_s else None,
-        fixits_raw_str=fixits_raw_str,
-        had_none_fixit_marker=has_none_marker,
-        preserved_markers=preserved_markers,
-        had_absolute_line_in_source=had_absolute_line,
-    )
+    diags = []
+    new_content = ""
+    last_end = 0
+    for m in matches:
+        [
+            ws_slash,
+            check_prefix,
+            category_s,
+            re_s,
+            ws_at,
+            target_line_s,
+            target_col_s,
+            ws_count,
+            count_s,
+            ws_braces,
+            diag_s,
+        ] = m.groups()
+        if check_prefix != prefix and check_prefix != "" and not all_prefixes:
+            # Leave it in the content verbatim, as if it weren't a directive.
+            continue
+        if not target_line_s or target_line_s == "@":
+            target_line_n = 0
+            is_absolute = False
+        elif target_line_s.startswith("@+"):
+            target_line_n = int(target_line_s[2:])
+            is_absolute = False
+        elif target_line_s.startswith("@-"):
+            target_line_n = int(target_line_s[1:])
+            is_absolute = False
+        else:
+            target_line_n = int(target_line_s[1:])
+            is_absolute = True
+        col = int(target_col_s[1:]) if target_col_s else None
+        count = int(count_s) if count_s else 1
+        consumed_end = _consumed_end(s, m)
+        if m.re is not expected_expansion_diag_re:
+            fixits_raw_str, has_none_marker, preserved_markers = (
+                consume_trailing_fixits(s[m.end() :])
+            )
+            # Detect whether any source-side fix-it marker carries an absolute
+            # `<line>:<col>` position; if so, future updates preserve absolute
+            # form, otherwise actual fix-its are rewritten as relative offsets.
+            had_absolute_line = False
+            for marker in split_fixit_markers(fixits_raw_str):
+                fm = fixit_marker_re.match(marker)
+                if not fm:
+                    continue
+                content = fm.group("content")
+                if (
+                    content == "none"
+                    or content.startswith("documentation-file=")
+                    or content.startswith("group-name=")
+                ):
+                    continue
+                if _fixit_content_has_absolute_line(content):
+                    had_absolute_line = True
+                    break
+        else:
+            fixits_raw_str, has_none_marker, preserved_markers = "", False, []
+            had_absolute_line = False
+
+        new_content += s[last_end : m.start()] + "{{DIAG}}"
+        last_end = consumed_end
+
+        unescaped_diag_s = decode(
+            encode(diag_s, "utf-8", "backslashreplace"), "unicode-escape"
+        )
+        diags.append(
+            Diag(
+                check_prefix,
+                unescaped_diag_s,
+                category_s,
+                target_line_n,
+                is_absolute,
+                col,
+                count,
+                line,
+                bool(re_s),
+                Whitespace(
+                    slash=ws_slash, at=ws_at, count=ws_count, braces=ws_braces
+                ),
+                True,
+                [],
+                diag_content_raw=diag_s,
+                original_count_str=count_s if count_s else None,
+                fixits_raw_str=fixits_raw_str,
+                had_none_fixit_marker=has_none_marker,
+                preserved_markers=preserved_markers,
+                had_absolute_line_in_source=had_absolute_line,
+                has_slashes=m.re is not continuation_diag_re,
+                source_span=(m.start() + 1, consumed_end),
+            )
+        )
+    new_content += s[last_end:]
+    line.content = new_content
+    return diags
+
+
+def parse_diag(line, filename, prefix, all_prefixes=False, col=None):
+    """The single directive on *line*, or None. When the line carries several
+    and *col* is given, the one the column points into is returned."""
+    diags = parse_diags(line, filename, prefix, all_prefixes)
+    if not diags:
+        return None
+    if col is not None:
+        for diag in diags:
+            span = getattr(diag, "source_span", None)
+            if span and span[0] <= col <= span[1]:
+                return diag
+    return diags[0]
+
+
+def find_diag_on_line(line, col, category=None, content=None):
+    """Pick the directive on *line* that a verifier error at column *col*
+    refers to. Every error the verifier reports against a directive points
+    inside it, so the column is what tells sibling directives on one line
+    apart. Falls back to a content/category match, and then to the last
+    directive starting at or before the column, for the error kinds whose
+    location sits just outside the directive (e.g. a `{{children:` marker)."""
+    if not line.diags:
+        return None
+    if col:
+        for diag in line.diags:
+            span = getattr(diag, "source_span", None)
+            if span and span[0] <= col <= span[1]:
+                return diag
+    if content is not None:
+        for diag in line.diags:
+            if (
+                getattr(diag, "diag_content", None) == content
+                and diag.category == category
+                and getattr(diag, "count", 0) > 0
+            ):
+                return diag
+    if col:
+        before = [
+            diag
+            for diag in line.diags
+            if getattr(diag, "source_span", None)
+            and diag.source_span[0] <= col
+        ]
+        if before:
+            return before[-1]
+    return line.diags[0]
 
 
 def add_line(new_line, lines):
@@ -894,90 +1059,103 @@ def remove_dead_diags(lines, prefix):
         if line not in lines:
             # Already removed by an earlier take(); skip.
             continue
-        if not line.diag:
+        if not line.diags:
             continue
-        if getattr(line.diag, "children", None) or (
-            getattr(line.diag, "children_closer", None) is not None
-        ):
-            _collapse_dead_children(line.diag, prefix)
-        if line.diag.category == "expansion":
-            if not line.diag.prefix or line.diag.prefix == prefix:
-                # Whether the verifier already reported this expansion as
-                # missing (parent count was decremented to 0 in update_lines).
-                was_reported_missing = line.diag.count == 0
-                remove_dead_diags(line.diag.nested_lines, prefix)
-                if (
-                    was_reported_missing
-                    and _split_dead_expansion_for_foreign_prefixes(
-                        line, lines, prefix
-                    )
-                ):
-                    # The dead expansion has been replaced with one new
-                    # expansion directive per foreign prefix. Drop the original
-                    # so the cleanup at the bottom of the loop removes it.
-                    line.diag.nested_lines = []
-                    line.diag.closer = None
-                    line.diag.count = 0
-                elif line.diag.nested_lines:
-                    line.diag.count = 1
-                else:
-                    line.diag.count = 0
-        if line.diag.count != 0:
-            continue
-        # Try absorbing a same-category sibling first so the dead diag's
-        # formatting (whitespace, original_count_str) survives a content
-        # rewrite. Nested expansion diags have no target, so skip.
-        took = False
-        if line.diag.target is not None and not getattr(
-            line.diag, "is_child_note", False
-        ):
-            for other_diag in line.diag.target.targeting_diags:
-                if (
-                    other_diag.is_from_source_file
-                    or other_diag.count == 0
-                    or other_diag.category != line.diag.category
-                    or getattr(other_diag, "is_child_note", False)
-                ):
-                    continue
-                if other_diag.is_re or line.diag.is_re:
-                    continue
-                assert line.diag.is_from_source_file
-                line.diag.take(other_diag)
-                remove_line(other_diag.line, lines)
-                took = True
+        # A line can carry several directives; each is retired on its own, and
+        # the line itself only goes away once nothing is left to render on it.
+        for diag in list(line.diags):
+            if line not in lines:
                 break
-        if took:
-            continue
-        # Even if take() didn't merge (e.g. because the synthesized sibling
-        # has a different category, as in the wrong-category-with-fix-it
-        # case), transfer the dead diag's fix-it state to a live sibling on
-        # the same target. The fix-it was reported by the verifier against
-        # this source location, so it logically belongs to whichever diag
-        # ends up rendering at this location.
-        if (
-            line.diag.actual_fixits is not None
-            and line.diag.target is not None
-        ):
-            for other_diag in line.diag.target.targeting_diags:
-                if (
-                    other_diag is line.diag
-                    or other_diag.is_from_source_file
-                    or other_diag.count == 0
-                    or other_diag.actual_fixits is not None
-                    or getattr(other_diag, "is_child_note", False)
-                ):
-                    continue
-                other_diag.actual_fixits = line.diag.actual_fixits
-                other_diag.had_none_fixit_marker = (
-                    line.diag.had_none_fixit_marker
-                )
-                other_diag.preserved_markers = line.diag.preserved_markers
-                other_diag.had_absolute_line_in_source = (
-                    line.diag.had_absolute_line_in_source
-                )
-                break
-        if line.render() == "":
+            _retire_diag_if_dead(diag, line, lines, prefix)
+        if line in lines and line.render() == "":
             remove_line(line, lines)
+
+
+def _retire_diag_if_dead(diag, line, lines, prefix):
+    if getattr(diag, "children", None) or (
+        getattr(diag, "children_closer", None) is not None
+    ):
+        _collapse_dead_children(diag, prefix)
+    if diag.category == "expansion":
+        if not diag.prefix or diag.prefix == prefix:
+            # Whether the verifier already reported this expansion as
+            # missing (parent count was decremented to 0 in update_lines).
+            was_reported_missing = diag.count == 0
+            remove_dead_diags(diag.nested_lines, prefix)
+            if (
+                was_reported_missing
+                and _split_dead_expansion_for_foreign_prefixes(
+                    line, lines, prefix
+                )
+            ):
+                # The dead expansion has been replaced with one new
+                # expansion directive per foreign prefix. Drop the original
+                # so the cleanup in remove_dead_diags removes it.
+                diag.nested_lines = []
+                diag.closer = None
+                diag.count = 0
+            elif diag.nested_lines:
+                diag.count = 1
+            else:
+                diag.count = 0
+    if diag.count != 0:
+        return
+    # Try absorbing a same-category sibling first so the dead diag's
+    # formatting (whitespace, original_count_str) survives a content
+    # rewrite. Nested expansion diags have no target, so skip.
+    #
+    # Expansion directives never absorb a sibling. take() transfers a
+    # diagnostic's *message* state, but an expansion directive carries no
+    # message: what identifies it is its anchor column, and what it renders
+    # is its nested_lines plus its closer, none of which take() moves. So
+    # absorbing a live sibling expansion would keep this directive's stale
+    # column while dropping the sibling's nested diagnostics along with its
+    # line, leaving an empty `expected-expansion` anchored at the wrong
+    # column. That is worse than simply deleting the dead directive and
+    # letting the live sibling render itself, and it does not converge:
+    # re-running on the mangled output reproduces the same shape forever.
+    if (
+        diag.target is not None
+        and diag.category != "expansion"
+        and not getattr(diag, "is_child_note", False)
+    ):
+        for other_diag in diag.target.targeting_diags:
+            if (
+                other_diag.is_from_source_file
+                or other_diag.count == 0
+                or other_diag.category != diag.category
+                or getattr(other_diag, "is_child_note", False)
+            ):
+                continue
+            if other_diag.is_re or diag.is_re:
+                continue
+            assert diag.is_from_source_file
+            diag.take(other_diag)
+            remove_line(other_diag.line, lines)
+            return
+    # Even if take() didn't merge (e.g. because the synthesized sibling
+    # has a different category, as in the wrong-category-with-fix-it
+    # case), transfer the dead diag's fix-it state to a live sibling on
+    # the same target. The fix-it was reported by the verifier against
+    # this source location, so it logically belongs to whichever diag
+    # ends up rendering at this location.
+    if diag.actual_fixits is not None and diag.target is not None:
+        for other_diag in diag.target.targeting_diags:
+            if (
+                other_diag is diag
+                or other_diag.is_from_source_file
+                or other_diag.count == 0
+                or other_diag.actual_fixits is not None
+                or getattr(other_diag, "is_child_note", False)
+            ):
+                continue
+            other_diag.actual_fixits = diag.actual_fixits
+            other_diag.had_none_fixit_marker = diag.had_none_fixit_marker
+            other_diag.preserved_markers = diag.preserved_markers
+            other_diag.had_absolute_line_in_source = (
+                diag.had_absolute_line_in_source
+            )
+            break
 
 
 def fold_expansions(lines):
@@ -1013,8 +1191,8 @@ def _child_parent_of(line):
     block, or None. Set for both parsed child-note lines (via the note diag's
     `child_of`) and for literal lines inside the block (via `_children_literal`,
     e.g. `@#marker` child notes we don't parse structurally)."""
-    if line.diag is not None:
-        parent = getattr(line.diag, "child_of", None)
+    for diag in line.diags:
+        parent = getattr(diag, "child_of", None)
         if parent is not None:
             return parent
     return getattr(line, "_children_literal", None)
@@ -1045,13 +1223,16 @@ def expand_children(lines):
     i = 0
     while i < len(lines):
         line = lines[i]
-        d = line.diag
-        if d is None or not getattr(d, "children", None):
+        block = []
+        for d in line.diags:
+            if not getattr(d, "children", None):
+                continue
+            block.extend(d.children)
+            if d.children_closer is not None:
+                block.append(d.children_closer)
+        if not block:
             i += 1
             continue
-        block = list(d.children)
-        if d.children_closer is not None:
-            block.append(d.children_closer)
         for j, nested in enumerate(block):
             nested.line_n = line.line_n + j + 1
             add_line(nested, lines)
@@ -1074,11 +1255,12 @@ def error_refers_to_diag(diag_error, diag, target_line_n):
 def find_other_targeting(lines, orig_lines, is_nested, diag_error, prefix):
     if is_nested:
         other_diags = [
-            line.diag
+            diag
             for line in lines
-            if line.diag
-            and (not line.diag.prefix or line.diag.prefix == prefix)
-            and error_refers_to_diag(diag_error, line.diag, diag_error.line)
+            for diag in line.diags
+            if isinstance(diag, Diag)
+            and (not diag.prefix or diag.prefix == prefix)
+            and error_refers_to_diag(diag_error, diag, diag_error.line)
         ]
     else:
         target = orig_lines[diag_error.line - 1]
@@ -1089,6 +1271,39 @@ def find_other_targeting(lines, orig_lines, is_nested, diag_error, prefix):
             and error_refers_to_diag(diag_error, d, target.line_n)
         ]
     return other_diags
+
+
+def find_last_expansion_left_of(orig_lines, is_nested, diag_error, prefix):
+    """Return the source-order-last `expected-expansion` directive targeting
+    `diag_error`'s line at a strictly lower anchor column, or None.
+
+    Expansion anchors are identified by (line, column), so one target line can
+    carry several unrelated expansion directives. Laying a new directive out
+    below every directive whose anchor column precedes its own keeps expansion
+    directives that share a target line sorted by ascending column, matching the
+    left-to-right order of the anchors on the line they describe.
+
+    The comparison is strict so that siblings at the *same* anchor are left to
+    the expansion-index layout rules instead.
+    """
+    # `insert_after` is only honoured for top-level directives; inside a nested
+    # expansion `add_diag` places directives by target line within the expansion
+    # buffer. `diag_error.line` also indexes that buffer rather than orig_lines.
+    if is_nested or not diag_error.col:
+        return None
+    target = orig_lines[diag_error.line - 1]
+    to_the_left = [
+        d
+        for d in target.targeting_diags
+        if d.category == "expansion"
+        and (not d.prefix or d.prefix == prefix)
+        and d.col()
+        and d.col() < diag_error.col
+    ]
+    if not to_the_left:
+        return None
+    # targeting_diags is in creation order, not source order.
+    return max(to_the_left, key=lambda d: d.line.line_n)
 
 
 def update_lines(
@@ -1106,16 +1321,20 @@ def update_lines(
             continue
         line_n = diag_error.line
         line = orig_lines[line_n - 1]
-        assert line.diag or nested_context
-        if not line.diag or diag_error.content != line.diag.diag_content:
+        assert line.diags or nested_context
+        # The line may hold several directives; the reported column says which.
+        diag = find_diag_on_line(
+            line, diag_error.col, diag_error.category, diag_error.content
+        )
+        if diag is None or diag_error.content != diag.diag_content:
             raise KnownException(
-                f"{filename}:{line_n} - found diag {line.diag.diag_content} but expected {diag_error.content}"
+                f"{filename}:{line_n} - found diag {diag.diag_content if diag else None} but expected {diag_error.content}"
             )
-        if diag_error.category != line.diag.category:
+        if diag_error.category != diag.category:
             raise KnownException(
-                f"{filename}:{line_n} - found {line.diag.category} diag but expected {diag_error.category}"
+                f"{filename}:{line_n} - found {diag.category} diag but expected {diag_error.category}"
             )
-        line.diag.decrement_count()
+        diag.decrement_count()
 
     # Group FixitErrors by their target diag. When count > 1 and the verifier
     # produces distinct actual fix-it sets per occurrence (e.g.
@@ -1129,11 +1348,12 @@ def update_lines(
             continue
         line_n = diag_error.line
         line = orig_lines[line_n - 1]
-        if not line.diag:
+        diag = find_diag_on_line(line, diag_error.col)
+        if diag is None:
             raise KnownException(
                 f"{filename}:{line_n} - fix-it mismatch reported, but no expected-* directive parsed on that line"
             )
-        bucket = fixit_errors_by_diag.setdefault(id(line.diag), (line.diag, []))
+        bucket = fixit_errors_by_diag.setdefault(id(diag), (diag, []))
         bucket[1].append(diag_error.actual_fixits)
 
     for diag, actuals_list in fixit_errors_by_diag.values():
@@ -1186,22 +1406,31 @@ def update_lines(
     diag_errors.sort(reverse=True, key=_sort_key)
 
     # Snapshot the sibling expected-expansion directives already present at
-    # each expansion target line, in source order, before synthesizing any new
+    # each expansion anchor, in source order, before synthesizing any new
     # ones. The verifier's expansion index is positional in this order, so
     # capturing it up front keeps index->directive routing stable even as we
     # add missing siblings during this pass. `synthesized_expansions` records
-    # siblings we create here, keyed by (target line, index), so a later nested
-    # diag for a different index at the same location reuses or extends the set
-    # instead of mis-filing into an existing sibling.
+    # siblings we create here, so a later nested diag for a different index at
+    # the same anchor reuses or extends the set instead of mis-filing into an
+    # existing sibling.
+    #
+    # Both maps are keyed by (line, column), not by line alone: a single source
+    # line can be the site of several unrelated expansions distinguished only
+    # by column (e.g. a Clang declaration whose synthesized macro attribute
+    # expands at column 1 while the macro's own output is anchored at the end
+    # of the declaration). The verifier numbers expansions per anchor, so each
+    # column has its own index-0 expansion, and keying by line alone would
+    # collapse those distinct expansions into one directive.
     preexisting_expansions = {}
     synthesized_expansions = {}
     for diag_error in diag_errors:
+        anchor = (diag_error.line, diag_error.col)
         if (
             isinstance(diag_error, NestedDiag)
             and diag_error.expansion_index is not None
-            and diag_error.line not in preexisting_expansions
+            and anchor not in preexisting_expansions
         ):
-            preexisting_expansions[diag_error.line] = find_other_targeting(
+            preexisting_expansions[anchor] = find_other_targeting(
                 lines, orig_lines, bool(nested_context), diag_error, prefix
             )
 
@@ -1214,27 +1443,45 @@ def update_lines(
         is_indexed_expansion = (
             isinstance(diag_error, NestedDiag) and expansion_index is not None
         )
+        anchor = (diag_error.line, diag_error.col)
         sibling_anchor = None
         if is_indexed_expansion and expansion_index is not None:
             # Route the nested diag to the specific sibling expansion the
             # verifier reported by its expansion index. Indices below the count
             # of pre-existing siblings map positionally onto them; higher
             # indices belong to siblings we synthesize during this pass.
-            preexisting = preexisting_expansions.get(diag_error.line, [])
+            preexisting = preexisting_expansions.get(anchor, [])
             if expansion_index < len(preexisting):
                 diag = preexisting[expansion_index]
             else:
-                diag = synthesized_expansions.get(
-                    (diag_error.line, expansion_index)
-                )
+                diag = synthesized_expansions.get(anchor + (expansion_index,))
                 # A synthesized sibling has a higher index than every
-                # pre-existing sibling, so it must be laid out after them for
-                # source order to match expansion-index order. Anchor it below
-                # the last pre-existing sibling instead of stacking it above.
-                # Siblings are processed highest-index-first, so anchoring each
-                # to the same line still lays them out in ascending order.
+                # pre-existing sibling at this anchor, so it must be laid out
+                # after them for source order to match expansion-index order.
+                # It must also be laid out after every expansion directive
+                # anchored further left on the same line, so that directives
+                # sharing a target line read in ascending column order. Anchor
+                # to whichever of those candidates sits lowest in the file
+                # instead of stacking above them.
+                #
+                # Siblings at one anchor are processed highest-index-first, and
+                # each is anchored to the same line, so they still end up in
+                # ascending index order. Distinct anchors resolve independently
+                # of processing order: whichever column is handled first, a
+                # later lower column stacks above it and a later higher column
+                # anchors below it.
+                anchor_candidates = []
                 if preexisting:
-                    sibling_anchor = preexisting[-1].line
+                    anchor_candidates.append(preexisting[-1].line)
+                left = find_last_expansion_left_of(
+                    orig_lines, bool(nested_context), diag_error, prefix
+                )
+                if left is not None:
+                    anchor_candidates.append(left.line)
+                if anchor_candidates:
+                    sibling_anchor = max(
+                        anchor_candidates, key=lambda line: line.line_n
+                    )
         else:
             other_diags = find_other_targeting(
                 lines, orig_lines, bool(nested_context), diag_error, prefix
@@ -1255,9 +1502,7 @@ def update_lines(
                 insert_after=sibling_anchor,
             )
             if is_indexed_expansion:
-                synthesized_expansions[
-                    (diag_error.line, expansion_index)
-                ] = diag
+                synthesized_expansions[anchor + (expansion_index,)] = diag
         if isinstance(diag_error, NestedDiag):
             if not diag.closer:
                 whitespace = (
@@ -1347,7 +1592,7 @@ def update_lines(
                 f"{diag_error.file}:{diag_error.line} for unexpected child note"
             )
         parent_line = orig_lines[diag_error.line - 1]
-        parent_diag = parent_line.diag
+        parent_diag = find_diag_on_line(parent_line, diag_error.col)
         if parent_diag is None or parent_diag.category in (
             "closing",
             "expansion",
@@ -1440,7 +1685,9 @@ def update_lines(
             continue
         if not (1 <= diag_error.line <= len(orig_lines)):
             continue
-        parent_diag = orig_lines[diag_error.line - 1].diag
+        parent_diag = find_diag_on_line(
+            orig_lines[diag_error.line - 1], diag_error.col
+        )
         if parent_diag is None or parent_diag.category in (
             "closing",
             "expansion",
@@ -1475,21 +1722,24 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
 
     expansion_context = []
     children_context = None
+    unmatched_closers = []
     for line in lines:
         dprint(f"parsing line {line.render()}")
-        diag = parse_diag(line, filename, prefix, all_prefixes=True)
+        diags = parse_diags(line, filename, prefix, all_prefixes=True)
+        diag = diags[0] if diags else None
         if children_context is not None:
             # Inside a `{{children:...}}` block: route the closer and the
             # child-note (or literal) lines to the owning parent rather than
             # treating them as top-level diags/expansions.
             if diag and diag.category == "closing":
-                line.diag = diag
+                line.diags = diags
                 diag.child_of = children_context
                 children_context = None
             elif diag:
-                line.diag = diag
-                diag.is_child_note = True
-                diag.child_of = children_context
+                line.diags = diags
+                for d in diags:
+                    d.is_child_note = True
+                    d.child_of = children_context
             elif line.content.lstrip().startswith("}}"):
                 # A `}}`-first line that didn't parse as a `// }}` closer
                 # (e.g. a C-comment `}}*/` block terminator): treat it as a
@@ -1499,28 +1749,50 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
             else:
                 line._children_literal = children_context
             continue
+        if diag and diag.category == "closing":
+            if not expansion_context:
+                # A `// }}` with no matching `expected-expansion` opener above
+                # it. The verifier ignores such a stray closer, so it is
+                # punctuation left over from an expansion directive that is no
+                # longer there. Drop the whole line. `lines` is being iterated,
+                # so defer the removal until the file has been fully parsed.
+                dprint(f"  unmatched closer, dropping line")
+                unmatched_closers.append(line)
+                continue
+            dprint(f"  parsed closer {diag.render()}")
+            line.diag = diag
+            diag.parent = expansion_context.pop()
+            continue
         if diag:
             dprint(f"  parsed diag {diag.render()}")
-            line.diag = diag
-            if expansion_context:
-                diag.parent = expansion_context[-1]
-            else:
-                target_idx = diag.absolute_target() - 1
-                if 0 <= target_idx < len(lines):
-                    diag.set_target(lines[target_idx])
-                # Otherwise the directive points outside the file (e.g. the code
-                # it targeted was deleted, leaving the offset dangling past the
-                # end). Leave it targetless: the verifier reports its expansion
-                # as "not produced", so it is dropped as a dead directive rather
-                # than crashing here on an out-of-range line index.
-            if diag.category == "expansion":
-                expansion_context.append(diag)
-            elif diag.category == "closing":
+            line.diags = diags
+            for d in diags:
+                if expansion_context:
+                    d.parent = expansion_context[-1]
+                else:
+                    target_idx = d.absolute_target() - 1
+                    if 0 <= target_idx < len(lines):
+                        d.set_target(lines[target_idx])
+                    # Otherwise the directive points outside the file (e.g. the
+                    # code it targeted was deleted, leaving the offset dangling
+                    # past the end). Leave it targetless: the verifier reports
+                    # its expansion as "not produced", so it is dropped as a
+                    # dead directive rather than crashing here on an
+                    # out-of-range line index.
+            last = diags[-1]
+            if last.category == "expansion":
+                expansion_context.append(last)
+            elif last.category == "closing":
                 expansion_context.pop()
             elif _opens_children_block(line.content):
-                children_context = diag
+                # The opener is glued to the end of the line, so the block
+                # belongs to the last directive on it.
+                children_context = last
         else:
             dprint(f"  no diag")
+
+    for closer_line in unmatched_closers:
+        remove_line(closer_line, lines)
 
     # Fold `{{children:...}}` blocks before expansions so that child notes
     # nested inside an `expected-expansion` are pulled onto their parent nested
@@ -1909,7 +2181,10 @@ def check_expectations(tool_output, prefix):
                 extra_lines = tool_output[i + 1 : i + 3]
                 dprint(f"extra lines: {extra_lines}")
                 diag = parse_diag(
-                    Line(extra_lines[0], int(m.group(2))), m.group(1), prefix
+                    Line(extra_lines[0], int(m.group(2))),
+                    m.group(1),
+                    prefix,
+                    col=int(m.group(3)),
                 )
                 curr.append(
                     NotFoundDiag(
@@ -2012,7 +2287,10 @@ def check_expectations(tool_output, prefix):
                 extra_lines = tool_output[i + 1 : i + 4]
                 dprint(f"extra lines: {extra_lines}")
                 diag = parse_diag(
-                    Line(extra_lines[0], int(m.group(2))), m.group(1), prefix
+                    Line(extra_lines[0], int(m.group(2))),
+                    m.group(1),
+                    prefix,
+                    col=int(m.group(3)),
                 )
                 curr.append(
                     NotFoundDiag(
@@ -2039,7 +2317,10 @@ def check_expectations(tool_output, prefix):
                 extra_lines = tool_output[i + 1 : i + 4]
                 dprint(f"extra lines: {extra_lines}")
                 diag = parse_diag(
-                    Line(extra_lines[0], int(m.group(2))), m.group(1), prefix
+                    Line(extra_lines[0], int(m.group(2))),
+                    m.group(1),
+                    prefix,
+                    col=int(m.group(3)),
                 )
                 assert diag.category == m.group(4)
                 assert extra_lines[2].strip() == m.group(5)
@@ -2167,3 +2448,457 @@ def check_expectations(tool_output, prefix):
         return update_test_files(top_level, prefix, unparsed_files)
     else:
         return ("no mismatching diagnostics found", None)
+
+
+# ---------------------------------------------------------------------------
+# minimize-verify-tests: merge redundant prefixed expected-* directives
+# ---------------------------------------------------------------------------
+
+# Regex to extract `-verify-additional-prefix <prefix>` from a RUN command.
+_additional_prefix_re = re.compile(r"-verify-additional-prefix\s+(\S+)")
+
+# Detects that a RUN command involves the diagnostic verifier.  Matches
+# `-verify` as a standalone flag (not part of `-verify-additional-prefix`,
+# `-verify-ignore-unrelated`, etc.) or known lit substitutions that imply it.
+_verify_flag_re = re.compile(
+    r"(?:-verify(?![-\w])|%-*target-typecheck-verify-swift\b|"
+    r"%-*target-swift-frontend-verify\b)"
+)
+
+
+def _parse_run_lines(raw_lines):
+    """Return a list of full RUN-line command strings with continuations
+    joined.  Each entry is a single logical RUN command."""
+    runs = []
+    current = None
+    for raw in raw_lines:
+        text = raw.rstrip("\n")
+        m = re.match(r"^\s*//\s*RUN:\s*(.*)", text)
+        if m:
+            part = m.group(1)
+            if current is not None:
+                current += " " + part
+            else:
+                current = part
+            if current.endswith("\\"):
+                current = current[:-1]
+            else:
+                runs.append(current)
+                current = None
+        else:
+            if current is not None:
+                runs.append(current)
+                current = None
+    if current is not None:
+        runs.append(current)
+    return runs
+
+
+def _collect_verify_prefixes(raw_lines):
+    """Parse every verify-RUN line and return two structures:
+
+    * ``run_prefixes``: a list of ``frozenset`` where each element is the
+      set of active prefixes for that verify-RUN line (always includes the
+      default ``""``).
+    * ``prefix_to_runs``: a dict mapping each prefix to the
+      ``frozenset`` of verify-RUN indices where it is active.
+
+    Non-verify RUN lines are silently skipped.
+    """
+    commands = _parse_run_lines(raw_lines)
+    run_prefixes = []
+    for cmd in commands:
+        if not _verify_flag_re.search(cmd):
+            continue
+        prefixes = {""}
+        for m in _additional_prefix_re.finditer(cmd):
+            prefixes.add(m.group(1))
+        run_prefixes.append(frozenset(prefixes))
+
+    prefix_to_runs = {}
+    for run_idx, pset in enumerate(run_prefixes):
+        for p in pset:
+            prefix_to_runs.setdefault(p, set()).add(run_idx)
+    # Freeze the sets so they are hashable / easily comparable.
+    prefix_to_runs = {p: frozenset(s) for p, s in prefix_to_runs.items()}
+    return run_prefixes, prefix_to_runs
+
+
+def _trailing_content(diag):
+    """Return the portion of the line content after the ``{{DIAG}}``
+    placeholder.  This captures ``{{children:...}}`` blocks and any other
+    trailing text that is semantically part of the directive."""
+    marker = "{{DIAG}}"
+    idx = diag.line.content.find(marker)
+    if idx < 0:
+        return ""
+    return diag.line.content[idx + len(marker):]
+
+
+# Matches `@-N` or `@+N` that follow an `expected-*` directive prefix
+# inside a ``{{children:...}}`` block.
+_children_ref_re = re.compile(
+    r"(expected-[a-zA-Z0-9-]*(?:note|warning|error|remark)(?:-re)?\s*)@([+-])(\d+)"
+)
+
+
+def _normalized_trailing(diag):
+    """Like ``_trailing_content`` but with relative ``@-N`` / ``@+N``
+    references inside ``{{children:...}}`` blocks resolved to absolute
+    line numbers.  This allows two directives on different lines to be
+    recognised as overlapping when their children blocks reference the
+    same target lines."""
+    trailing = _trailing_content(diag)
+    line_n = diag.line.line_n
+
+    def _resolve(m):
+        prefix = m.group(1)
+        sign = m.group(2)
+        offset = int(m.group(3))
+        abs_n = line_n + (-offset if sign == "-" else offset)
+        return f"{prefix}@={abs_n}"
+
+    return _children_ref_re.sub(_resolve, trailing)
+
+
+def _overlap_key(diag):
+    """Return a hashable key that groups directives which could potentially
+    be merged: same target line, same category, same content, same count,
+    same regex flag, same fix-it annotations, and same trailing content
+    (which includes ``{{children:...}}`` blocks with offsets normalised
+    to absolute line numbers).
+
+    For multi-line ``{{children:`` blocks the continuation lines have been
+    folded into ``nested_lines``; those are included as a content
+    fingerprint so that blocks with different child notes stay separate."""
+    nested_key = ()
+    if diag.nested_lines:
+        parts = []
+        for nl in diag.nested_lines:
+            nd = nl.diag
+            if nd:
+                parts.append((nd.absolute_target(), nd.category,
+                              nd.diag_content, nd.count, nd.is_re,
+                              nd.fixits_raw_str))
+        nested_key = tuple(parts)
+    return (
+        diag.absolute_target(),
+        diag.category,
+        diag.diag_content,
+        diag.count,
+        diag.is_re,
+        diag.fixits_raw_str,
+        _normalized_trailing(diag),
+        nested_key,
+    )
+
+
+def _pick_keeper(diags):
+    """From a list of mergeable ``Diag`` objects choose the one to keep.
+
+    Preference order:
+    1. On the same line as the target (relative offset 0) — avoids ``@+N``.
+    2. Closest to the target (smallest absolute relative offset).
+    3. Earliest in the file (smallest ``line.line_n``).
+    """
+    def sort_key(d):
+        rel = abs(d.relative_target())
+        return (rel != 0, rel, d.line.line_n)
+
+    return min(diags, key=sort_key)
+
+
+def _find_merge_prefix(prefixes, prefix_to_runs, runs_to_prefixes):
+    """Given a list of prefixes, compute their combined RUN-line coverage
+    and return a single prefix that covers exactly that set, or ``None``
+    if no such prefix exists.  Prefers the default (empty) prefix."""
+    coverage = set()
+    for p in prefixes:
+        rset = prefix_to_runs.get(p)
+        if rset is None:
+            return None
+        coverage |= rset
+    candidates = runs_to_prefixes.get(frozenset(coverage))
+    if not candidates:
+        return None
+    if "" in candidates:
+        return ""
+    return min(candidates, key=lambda p: (len(p), p))
+
+
+def _nested_diag_key(nd):
+    """Overlap key for a directive nested inside an expansion block."""
+    return (
+        nd.absolute_target(),
+        nd.category,
+        nd.diag_content,
+        nd.count,
+        nd.is_re,
+        nd.fixits_raw_str,
+        _trailing_content(nd),
+    )
+
+
+def _merge_nested_diags(keeper, exp_list, prefix_to_runs, runs_to_prefixes):
+    """Merge the directives nested inside the expansion blocks in
+    *exp_list*, installing the result as *keeper*'s nested lines.
+
+    Directives from every block in the group are pooled, so one that
+    appears in several blocks collapses into a single directive whose
+    prefix covers all of their runs.  Directives that appear only once, or
+    whose prefixes have no single replacement, are kept as they are.
+
+    Returns True if any directives were actually merged.
+    """
+    all_nested = []
+    for d in exp_list:
+        all_nested.extend(d.nested_lines)
+
+    # Group nested diags by overlap key within the expansion.
+    nested_groups = {}
+    for nl in all_nested:
+        nested_groups.setdefault(_nested_diag_key(nl.diag), []).append(nl)
+
+    merged = False
+    merged_nested = []
+    for nl_list in nested_groups.values():
+        if len(nl_list) > 1:
+            np = _find_merge_prefix(
+                [nl.diag.prefix for nl in nl_list],
+                prefix_to_runs, runs_to_prefixes)
+            if np is not None:
+                nl_list[0].diag.prefix = np
+                merged_nested.append(nl_list[0])
+                merged = True
+                continue
+        # Single diag or unmergeable — keep all.
+        merged_nested.extend(nl_list)
+
+    if not merged and len(exp_list) == 1:
+        # Nothing changed, so leave the block's nested lines alone rather
+        # than reordering them gratuitously.
+        return False
+
+    # Sort by target line within expansion, then by category for
+    # stability.
+    merged_nested.sort(
+        key=lambda nl: (nl.diag.absolute_target(), nl.diag.category))
+
+    keeper.nested_lines = merged_nested
+    for i, nl in enumerate(keeper.nested_lines):
+        nl.line_n = i + 1
+    return merged
+
+
+def _merge_expansion_groups(expansion_diags, prefix_to_runs,
+                            runs_to_prefixes, lines):
+    """Merge expansion blocks that target the same source location.
+
+    Two expansion blocks at the same ``(absolute_target, column)`` are
+    combined into one whose prefix covers the union of runs.  Their
+    nested directives are individually merged where an appropriate prefix
+    exists; non-overlapping nested directives are kept with their original
+    prefix.
+
+    Blocks that stay separate — because a location has only one block, or
+    because the group's prefixes have no single replacement — still get
+    their own contents minimized.
+    """
+    # Group by (absolute_target, col).
+    groups = {}
+    for d in expansion_diags:
+        key = (d.absolute_target(), d.col())
+        groups.setdefault(key, []).append(d)
+
+    changed = False
+    for exp_list in groups.values():
+        # Find a prefix for the merged expansion block.
+        exp_prefix = None
+        if len(exp_list) > 1:
+            exp_prefix = _find_merge_prefix(
+                [d.prefix for d in exp_list], prefix_to_runs,
+                runs_to_prefixes)
+
+        if exp_prefix is None:
+            # The blocks stay separate, so pooling their contents would
+            # move directives from one block into another.  Minimize each
+            # block's own contents instead.
+            for d in exp_list:
+                changed |= _merge_nested_diags(
+                    d, [d], prefix_to_runs, runs_to_prefixes)
+            continue
+
+        keeper = _pick_keeper(exp_list)
+        _merge_nested_diags(keeper, exp_list, prefix_to_runs,
+                            runs_to_prefixes)
+        keeper.prefix = exp_prefix
+
+        # Remove the other expansion blocks from `lines`.
+        for d in exp_list:
+            if d is keeper:
+                continue
+            if d.target is not None:
+                d.unset_target()
+            remove_line(d.line, lines)
+        changed = True
+
+    return changed
+
+
+def _has_multiline_children_open(diag):
+    """Return True if *diag*'s line opens a multi-line ``{{children:``
+    block (the block continues on subsequent lines rather than closing
+    on the same line)."""
+    trailing = _trailing_content(diag)
+    # Look for {{children: that is NOT closed by }} on the same line.
+    idx = trailing.find("{{children:")
+    if idx < 0:
+        return False
+    after = trailing[idx:]
+    # Count braces: the block is multi-line if we never see the matching }}.
+    depth = 0
+    i = 0
+    while i < len(after):
+        if after[i:i+2] == "{{":
+            depth += 1
+            i += 2
+        elif after[i:i+2] == "}}":
+            depth -= 1
+            if depth == 0:
+                return False  # closed on the same line
+            i += 2
+        else:
+            i += 1
+    return True  # never closed — multi-line
+
+
+def minimize_verify_test(filename):
+    """Read *filename*, merge redundant prefixed expected-* directives where
+    a single prefix can replace a set of overlapping ones, and write the
+    result back.  Returns an error string on failure, or ``None`` on
+    success."""
+    with open(filename, "r") as f:
+        raw_lines = f.readlines()
+
+    run_prefixes, prefix_to_runs = _collect_verify_prefixes(raw_lines)
+    if not run_prefixes:
+        return None  # no verify-RUN lines — nothing to do
+
+    # Build the inverse mapping: frozenset-of-runs → list of prefixes that
+    # cover exactly that set.
+    runs_to_prefixes = {}
+    for pfx, rset in prefix_to_runs.items():
+        runs_to_prefixes.setdefault(rset, []).append(pfx)
+
+    lines = [Line(line, i + 1) for i, line in enumerate(raw_lines + [""])]
+    orig_lines = list(lines)
+
+    # Parse every expected-* directive (all prefixes).
+    # Both expansion_context (for expected-expansion blocks) and
+    # children_context (for multi-line {{children: blocks) track nesting
+    # so that continuation lines get a parent reference and are later
+    # folded out of the main line list.
+    expansion_context = []
+    children_context = []
+    for line in lines:
+        diag = parse_diag(line, filename, "", all_prefixes=True)
+        if diag:
+            line.diag = diag
+            # Pick the innermost active context.
+            parent_ctx = (children_context or expansion_context)
+            if isinstance(diag, ExpansionDiagClose):
+                if children_context:
+                    diag.parent = children_context[-1]
+                    children_context.pop()
+                elif expansion_context:
+                    diag.parent = expansion_context[-1]
+                    expansion_context.pop()
+            elif diag.category == "expansion":
+                if parent_ctx:
+                    diag.parent = parent_ctx[-1]
+                else:
+                    diag.set_target(lines[diag.absolute_target() - 1])
+                expansion_context.append(diag)
+            else:
+                if parent_ctx:
+                    diag.parent = parent_ctx[-1]
+                    # Notes inside multi-line {{children: blocks still
+                    # need their target resolved before folding, so that
+                    # absolute_target() works after line renumbering.
+                    if children_context:
+                        diag.set_target(
+                            lines[diag.absolute_target() - 1])
+                else:
+                    diag.set_target(lines[diag.absolute_target() - 1])
+                # Check if this diag opens a multi-line children block.
+                if (not parent_ctx
+                        and not isinstance(diag, ExpansionDiagClose)
+                        and _has_multiline_children_open(diag)):
+                    children_context.append(diag)
+
+    # Fold expansion blocks *and* multi-line children blocks so nested
+    # lines live inside the parent diag.
+    fold_expansions(lines)
+
+    # Separate expansion and regular diags.
+    expansion_diags = []
+    regular_diags = []
+    for line in lines:
+        if line.diag and not isinstance(line.diag, ExpansionDiagClose):
+            if line.diag.category == "expansion":
+                expansion_diags.append(line.diag)
+            else:
+                regular_diags.append(line.diag)
+
+    changed = False
+
+    # --- Pass 1: merge expansion blocks at the same location. ---
+    changed |= _merge_expansion_groups(
+        expansion_diags, prefix_to_runs, runs_to_prefixes, lines)
+
+    # --- Pass 2: merge regular (non-expansion) diags. ---
+    groups = {}
+    for diag in regular_diags:
+        key = _overlap_key(diag)
+        groups.setdefault(key, []).append(diag)
+
+    for key, diag_list in groups.items():
+        if len(diag_list) < 2:
+            continue
+
+        merge_prefix = _find_merge_prefix(
+            [d.prefix for d in diag_list], prefix_to_runs, runs_to_prefixes)
+        if merge_prefix is None:
+            continue
+
+        keeper = _pick_keeper(diag_list)
+        keeper.prefix = merge_prefix
+        for d in diag_list:
+            if d is keeper:
+                continue
+            if d.target is not None:
+                d.unset_target()
+            remove_line(d.line, lines)
+        changed = True
+
+    if changed:
+        # Re-insert nested lines for both expansion blocks and multi-line
+        # children blocks.
+        expand_expansions(lines)
+        # Also expand children-block nested lines on non-expansion diags.
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if (line.diag
+                    and not isinstance(line.diag, ExpansionDiagClose)
+                    and line.diag.category != "expansion"
+                    and line.diag.nested_lines):
+                for j, nested in enumerate(
+                        line.diag.nested_lines + [line.diag.closer]):
+                    nested.line_n = line.line_n + j + 1
+                    add_line(nested, lines)
+            i += 1
+        with open(filename, "w") as f:
+            for line in lines:
+                f.write(line.render())
+    return None

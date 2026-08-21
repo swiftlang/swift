@@ -1056,7 +1056,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     if (Mod->isSystemModule())
       continue;
     // FIXME: Setup dependencies on the included headers.
-    if (Mod->isClangHeaderImportModule())
+    if (Mod->isClangBridgingHeaderImportModule())
       continue;
     bool NewVisit = Visited.insert(Mod).second;
     if (!NewVisit)

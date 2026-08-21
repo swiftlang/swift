@@ -1,0 +1,140 @@
+// RUN: %target-sil-opt -dead-debug-variable-elimination %s | %FileCheck %s
+// RUN: %target-sil-opt -dead-debug-variable-elimination -sil-stats-lost-variables %s 2>&1 | %FileCheck %s --check-prefix=LOSTVARS --allow-empty
+// LOSTVARS-NOT: lostvars
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @caller : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+sil @mid : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+sil @leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+sil @dead_callee : $@convention(thin) () -> ()
+
+// Test 1: basic live vs dead inlined scopes
+//
+//   scope 1 - LIVE: attached to return
+//   scope 2 - LIVE: attached to builtin
+//   scope 3 - DEAD: inlined callee, no live insts
+//   scope 4 - DEAD: child of 3
+//   scope 5 - DEAD: non-inlined child of 1, no live insts
+
+sil_scope 1 { loc "caller.swift":10:1 parent @test_basic : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 }
+sil_scope 2 { loc "live.swift":1:1 parent @mid : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 inlined_at 1 }
+sil_scope 3 { loc "dead.swift":1:1 parent @dead_callee : $@convention(thin) () -> () inlined_at 1 }
+sil_scope 4 { loc "dead.swift":5:3 parent 3 inlined_at 1 }
+sil_scope 5 { loc "caller.swift":12:1 parent 1 }
+
+// CHECK-LABEL: sil @test_basic :
+// CHECK:         builtin "add_Int64"
+// CHECK-NEXT:    debug_value %1, let, name "live_var"
+// CHECK-NEXT:    debug_value undef : $Builtin.Int64, let, name "live_undef"
+// CHECK-NEXT:    return %1
+// CHECK-NEXT:  } // end sil function 'test_basic'
+sil @test_basic : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin "add_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64, scope 2
+  debug_value %1, let, name "live_var", scope 2
+  debug_value undef : $Builtin.Int64, let, name "live_undef", scope 2
+  debug_value %1, let, name "dead_var", scope 3
+  debug_value undef : $Builtin.Int64, let, name "dead_undef", scope 3
+  debug_value %1, let, name "dead_nested_var", scope 4
+  debug_value undef : $Builtin.Int64, let, name "dead_nested_undef", scope 4
+  debug_value %1, let, name "dead_non_inlined", scope 5
+  return %1 : $Builtin.Int64, scope 1
+}
+
+// Test 2: deep inlining chain (caller -> mid -> leaf)
+//
+//   scope 10 - LIVE: attached to return
+//   scope 11 - LIVE: mid inlined at caller, ancestor of live scope 14
+//   scope 12 - LIVE: child of 11, ancestor of live scope 14
+//   scope 13 - LIVE: leaf inlined at 12, parent of live scope 14
+//   scope 14 - LIVE: child of 13, attached to builtin
+//   scope 15 - DEAD: dead_callee inlined at 11, no live insts
+//   scope 16 - DEAD: child of 15
+
+sil_scope 10 { loc "caller.swift":1:1 parent @test_deep : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 }
+sil_scope 11 { loc "mid.swift":1:1 parent @mid : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 inlined_at 10 }
+sil_scope 12 { loc "mid.swift":5:3 parent 11 inlined_at 10 }
+sil_scope 13 { loc "leaf.swift":1:1 parent @leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 inlined_at 12 }
+sil_scope 14 { loc "leaf.swift":3:5 parent 13 inlined_at 12 }
+sil_scope 15 { loc "dead.swift":1:1 parent @dead_callee : $@convention(thin) () -> () inlined_at 11 }
+sil_scope 16 { loc "dead.swift":4:3 parent 15 inlined_at 11 }
+
+// CHECK-LABEL: sil @test_deep :
+// CHECK:         builtin "add_Int64"
+// CHECK-NEXT:    debug_value %1, let, name "leaf_child"
+// CHECK-NEXT:    debug_value undef : $Builtin.Int64, let, name "leaf_undef"
+// CHECK-NEXT:    debug_value %1, let, name "leaf_root"
+// CHECK-NEXT:    debug_value %1, let, name "mid_child"
+// CHECK-NEXT:    debug_value %1, let, name "mid_root"
+// CHECK-NEXT:    return %1
+// CHECK-NEXT:  } // end sil function 'test_deep'
+sil @test_deep : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin "add_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64, scope 14
+  debug_value %1, let, name "leaf_child", scope 14
+  debug_value undef : $Builtin.Int64, let, name "leaf_undef", scope 14
+  debug_value %1, let, name "leaf_root", scope 13
+  debug_value %1, let, name "mid_child", scope 12
+  debug_value %1, let, name "mid_root", scope 11
+  debug_value %1, let, name "dead_deep", scope 15
+  debug_value undef : $Builtin.Int64, let, name "dead_deep_undef", scope 15
+  debug_value %1, let, name "dead_deep_child", scope 16
+  return %1 : $Builtin.Int64, scope 10
+}
+
+// Test 3: live instruction in mid makes mid live but not leaf
+//
+//   scope 20 - LIVE: attached to return
+//   scope 21 - LIVE: mid inlined at caller, parent of live scope 22
+//   scope 22 - LIVE: child of 21, attached to builtin
+//   scope 23 - DEAD: leaf inlined at 22, no live insts
+//   scope 24 - DEAD: child of 23
+
+sil_scope 20 { loc "caller.swift":1:1 parent @test_partial : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 }
+sil_scope 21 { loc "mid.swift":1:1 parent @mid : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 inlined_at 20 }
+sil_scope 22 { loc "mid.swift":5:3 parent 21 inlined_at 20 }
+sil_scope 23 { loc "leaf.swift":1:1 parent @leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 inlined_at 22 }
+sil_scope 24 { loc "leaf.swift":3:5 parent 23 inlined_at 22 }
+
+// CHECK-LABEL: sil @test_partial :
+// CHECK:         builtin "add_Int64"
+// CHECK-NEXT:    debug_value %1, let, name "mid_child"
+// CHECK-NEXT:    debug_value %1, let, name "mid_root"
+// CHECK-NEXT:    return %1
+// CHECK-NEXT:  } // end sil function 'test_partial'
+sil @test_partial : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin "add_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64, scope 22
+  debug_value %1, let, name "mid_child", scope 22
+  debug_value %1, let, name "mid_root", scope 21
+  debug_value %1, let, name "dead_leaf_root", scope 23
+  debug_value %1, let, name "dead_leaf_child", scope 24
+  return %1 : $Builtin.Int64, scope 20
+}
+
+// Test 4: variable scope differs from instruction scope: only the var scope matters
+//
+//   scope 30 - LIVE: attached to return
+//   scope 31 - LIVE: attached to builtin
+//   scope 32 - DEAD: child of 31, no live insts
+
+sil_scope 30 { loc "caller.swift":1:1 parent @test_var_scope : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 }
+sil_scope 31 { loc "callee.swift":1:1 parent @mid : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 inlined_at 30 }
+sil_scope 32 { loc "callee.swift":5:3 parent 31 inlined_at 30 }
+
+// CHECK-LABEL: sil @test_var_scope :
+// CHECK:         builtin "add_Int64"
+// CHECK-NEXT:    debug_value %1, let, name "kept_var"
+// CHECK-NEXT:    return %1
+// CHECK-NEXT:  } // end sil function 'test_var_scope'
+sil @test_var_scope : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin "add_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64, scope 31
+  debug_value %1, let, (name "kept_var", scope 31), scope 32
+  debug_value %1, let, (name "dead_var", scope 32), scope 32
+  return %1 : $Builtin.Int64, scope 30
+}

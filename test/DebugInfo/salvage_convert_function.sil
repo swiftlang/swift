@@ -27,3 +27,73 @@ bb0(%0 : $@callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error an
   %r = tuple ()
   return %r : $()
 }
+
+// Test that when the debug_value is on a begin_borrow of the convert_function,
+// it still gets salvaged.
+// This is reduced SIL from the standard library that was causing a crash.
+//
+// Here and in the test below the closure is a function argument and not an
+// on-stack partial_apply, so that SILCombine cannot delete it as a dead
+// closure. Otherwise the debug_value would be deleted along with it.
+
+// CHECK-LABEL: sil [ossa] @test_salvage_convert_function_through_borrow
+// CHECK:   debug_value %{{[0-9]+}}, let, name "body", argno 1, transform {
+// CHECK:   bb0(%0 : $@noescape @callee_guaranteed (Int) -> Int):
+// CHECK:     %1 = convert_function %0 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+// CHECK:     return %1
+// CHECK:   }
+// CHECK: } // end sil function 'test_salvage_convert_function_through_borrow'
+sil [ossa] @test_salvage_convert_function_through_borrow : $@convention(thin) (@owned @noescape @callee_guaranteed (Int) -> Int, @guaranteed Array<Int>) -> () {
+bb0(%closure : @owned $@noescape @callee_guaranteed (Int) -> Int, %0 : @guaranteed $Array<Int>):
+  %alloc = alloc_stack $Array<Int>
+  %sb = store_borrow %0 to %alloc : $*Array<Int>
+
+  %md = mark_dependence [nonescaping] %closure : $@noescape @callee_guaranteed (Int) -> Int on %sb : $*Array<Int>
+  %cf = convert_function %md : $@noescape @callee_guaranteed (Int) -> Int to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+  %bb = begin_borrow %cf : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+
+  debug_value %bb : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>, let, name "body", argno 1, transform {
+  bb0(%d0 : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>):
+    return %d0 : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+  }
+
+  end_borrow %bb : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+  destroy_value %cf : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+  end_borrow %sb : $*Array<Int>
+  dealloc_stack %alloc : $*Array<Int>
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test multiple levels, with both a begin_borrow and a copy_value.
+
+// CHECK-LABEL: sil [ossa] @test_salvage_convert_function_multilevel
+// CHECK:   debug_value %{{[0-9]+}}, let, name "body", argno 1, transform {
+// CHECK:   bb0(%0 : $@noescape @callee_guaranteed (Int) -> Int):
+// CHECK:     %1 = convert_function %0 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+// CHECK:     return %1
+// CHECK:   }
+// CHECK: } // end sil function 'test_salvage_convert_function_multilevel'
+sil [ossa] @test_salvage_convert_function_multilevel : $@convention(thin) (@owned @noescape @callee_guaranteed (Int) -> Int, @guaranteed Array<Int>) -> () {
+bb0(%closure : @owned $@noescape @callee_guaranteed (Int) -> Int, %0 : @guaranteed $Array<Int>):
+  %alloc = alloc_stack $Array<Int>
+  %sb = store_borrow %0 to %alloc : $*Array<Int>
+
+  %md = mark_dependence [nonescaping] %closure : $@noescape @callee_guaranteed (Int) -> Int on %sb : $*Array<Int>
+  %cf = convert_function %md : $@noescape @callee_guaranteed (Int) -> Int to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+  %bb = begin_borrow %cf : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+  %cp = copy_value %bb : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+
+  debug_value %cp : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>, let, name "body", argno 1, transform {
+  bb0(%d0 : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>):
+    return %d0 : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+  }
+
+  destroy_value %cp : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+  end_borrow %bb : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+  destroy_value %cf : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (τ_0_0) -> τ_0_1 for <Int, Int>
+  end_borrow %sb : $*Array<Int>
+  dealloc_stack %alloc : $*Array<Int>
+  %r = tuple ()
+  return %r : $()
+}

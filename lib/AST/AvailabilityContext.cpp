@@ -432,6 +432,73 @@ bool AvailabilityContext::isContainedIn(const AvailabilityContext other) const {
   return true;
 }
 
+/// Returns an implicit `@available` attribute that describes the restriction
+/// that \p domainInfo represents, or `nullptr` if the restriction cannot be
+/// expressed as an attribute.
+static AvailableAttr *
+createImplicitAvailableAttr(AvailabilityContext::DomainInfo domainInfo,
+                            ASTContext &ctx) {
+  auto domain = domainInfo.getDomain();
+  auto kind = AvailableAttr::Kind::Default;
+  llvm::VersionTuple introduced;
+
+  if (domainInfo.isUnavailable()) {
+    // FIXME: [availability] Disambiguate effective vs explicit unavailability.
+    // Regions that are @available(..., unavailable) need to be modeled
+    // separately from regions that are "known unreachable" in order to
+    // determine whether it is appropriate to add @available(..., unavailable)
+    // for a versioned domain.
+    if (domain.isVersioned())
+      return nullptr;
+
+    kind = AvailableAttr::Kind::Unavailable;
+  } else if (domain.isVersioned()) {
+    introduced = domainInfo.getRange().getRawMinimumVersion();
+  }
+
+  return new (ctx) AvailableAttr(
+      SourceLoc(), SourceRange(), domain, SourceLoc(), kind, /*Message=*/"",
+      /*Rename=*/"", introduced, /*IntroducedRange=*/SourceRange(),
+      /*Deprecated=*/{}, /*DeprecatedRange=*/SourceRange(),
+      /*Obsoleted=*/{}, /*ObsoletedRange=*/SourceRange(),
+      /*Implicit=*/true, /*IsSPI=*/false);
+}
+
+void AvailabilityContext::createImplicitAvailableAttrs(
+    const AvailabilityContext &other, ASTContext &ctx,
+    llvm::SmallVectorImpl<AvailableAttr *> &attrs) const {
+  auto platform = targetPlatform(ctx.LangOpts);
+  if (platform != PlatformKind::none) {
+    // Only describe the platform range if it is strictly narrower than the
+    // range that is already implied by `other`.
+    if (other.storage->platformRange.isSupersetOf(storage->platformRange)) {
+      if (auto *attr = createImplicitAvailableAttr(
+              DomainInfo(AvailabilityDomain::forPlatform(platform),
+                         storage->platformRange),
+              ctx))
+        attrs.push_back(attr);
+    }
+  }
+
+  for (auto domainInfo : storage->getDomainInfos()) {
+    auto domain = domainInfo.getDomain();
+    auto constrained = other;
+    // FIXME: [availability] This is inefficient.
+    if (domainInfo.isUnavailable()) {
+      constrained.constrainWithUnavailableDomain(domain, ctx);
+    } else {
+      constrained.constrainWithAvailabilityRange(domainInfo.getRange(), domain,
+                                                 ctx);
+    }
+
+    if (constrained == other)
+      continue;
+
+    if (auto *attr = createImplicitAvailableAttr(domainInfo, ctx))
+      attrs.push_back(attr);
+  }
+}
+
 std::optional<AvailabilityRestriction>
 AvailabilityContext::restrictionForDecl(const Decl *decl,
                                         AvailabilityRestrictionFlags flags) {

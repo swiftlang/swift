@@ -9,6 +9,7 @@
 // REQUIRES: swift_feature_Lifetimes
 
 // UNSUPPORTED: back_deployment_runtime || use_os_stdlib
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 /// MARK: IterProto
 public protocol IterProto<Element>: ~Copyable {

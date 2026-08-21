@@ -476,6 +476,8 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
       orig->getEffectsKind(), orig, orig->getDebugScope());
   for (auto &attr : orig->getSemanticsAttrs())
     fn->addSemanticsAttr(attr);
+  // The cloned closure goes into the same section as the original closure.
+  fn->setSection(orig->section());
   return fn;
 }
 
@@ -586,22 +588,21 @@ SILValue ClosureCloner::getProjectBoxMappedVal(SILValue operandValue) {
 /// if its operand is the promoted address argument then lower it to
 /// another debug_value, otherwise it is handled normally.
 void ClosureCloner::visitDebugValueInst(DebugValueInst *inst) {
-  if (inst->hasAddrVal())
-    if (SILValue value = getProjectBoxMappedVal(inst->getOperand())) {
-      getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
-      auto varInfo = *inst->getVarInfo();
-      if (varInfo.Scope)
-        varInfo.Scope = getOpScope(inst->getDebugScope());
-      // The operand is promoted from a project_box (address), to an object
-      // type: strip the leading op_deref.
-      ASSERT(!inst->getDebugReconstructionBlock() &&
-             "Unexpected debug reconstruction block in Diagnostic Pass");
-      ASSERT(varInfo.DIExpr.startsWithDeref() &&
-             "Address value debug_value must start with op_deref");
-      varInfo.DIExpr.eraseElement(varInfo.DIExpr.element_begin());
-      getBuilder().createDebugValue(inst->getLoc(), value, varInfo);
-      return;
-    }
+  if (SILValue value = getProjectBoxMappedVal(inst->getSingleOperand())) {
+    getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
+    auto varInfo = *inst->getVarInfo();
+    if (varInfo.Scope)
+      varInfo.Scope = getOpScope(inst->getDebugScope());
+    // The operand is promoted from a project_box (address), to an object
+    // type: strip the leading op_deref.
+    ASSERT(!inst->getDebugReconstructionBlock() &&
+           "Unexpected debug reconstruction block in Diagnostic Pass");
+    ASSERT(varInfo.DIExpr.startsWithDeref() &&
+           "Address value debug_value must start with op_deref");
+    varInfo.DIExpr.eraseElement(varInfo.DIExpr.element_begin());
+    getBuilder().createDebugValue(inst->getLoc(), value, varInfo);
+    return;
+  }
   SILCloner<ClosureCloner>::visitDebugValueInst(inst);
 }
 
@@ -898,7 +899,7 @@ getPartialApplyArgMutationsAndEscapes(PartialApplyInst *pai,
       return false;
     }
 
-    if (DebugValueInst::hasAddrVal(addrUser) ||
+    if (isa<DebugValueInst>(addrUser) ||
         isa<MarkFunctionEscapeInst>(addrUser) || isa<EndAccessInst>(addrUser)) {
       return false;
     }
@@ -1497,12 +1498,11 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
     assert(!w->getJVP() && !w->getVJP() && "does not expect custom derivatives here");
     auto linkage = stripExternalFromLinkage(clonedFn->getLinkage());
     SILDifferentiabilityWitness::createDefinition(
-      mod, linkage, clonedFn,
-      w->getKind(), w->getParameterIndices(), w->getResultIndices(),
-      w->getDerivativeGenericSignature(),
-      /*jvp*/ nullptr, /*vjp*/ nullptr,
-      /*isSerialized*/ hasPublicVisibility(clonedFn->getLinkage()),
-      w->getAttribute());
+        mod, linkage, clonedFn, w->getKind(), w->getParameterIndices(),
+        w->getResultIndices(), w->getDerivativeGenericSignature(),
+        /*jvp*/ nullptr, /*vjp*/ nullptr,
+        /*isSerialized*/ hasPublicVisibility(clonedFn->getLinkage()),
+        w->isDefault(), w->getAttribute());
   }
 
   // Mark the original partial apply function as deletable if it doesn't have
@@ -1581,8 +1581,8 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   // in debug builds if the sizes ever diverge from this 1:1 invariant.
   auto *newPAI = builder.createPartialApply(
       pai->getLoc(), fnVal, pai->getSubstitutionMap(), args,
-      pai->getCalleeConvention(), pai->getResultIsolation(), pai->isOnStack(),
-      pai->isStackAllocationNested(),
+      pai->getCalleeConvention(), pai->getResultIsolation(),
+      pai->isCalledOnce(), pai->isOnStack(), pai->isStackAllocationNested(),
       /*SpecializationInfo=*/nullptr, ApplySite(pai).getArgumentLocs());
   pai->replaceAllUsesWith(newPAI);
   pai->eraseFromParent();

@@ -21,6 +21,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckCOM.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckEmbedded.h"
@@ -1845,7 +1846,7 @@ static void diagnoseRetroactiveConformances(
   ModuleDecl *extTypeModule = extendedNominalDecl->getParentModule();
 
   // If the type comes from the __ObjC clang header module, don't warn.
-  if (extTypeModule->getName().is(CLANG_HEADER_MODULE_NAME))
+  if (extTypeModule->isClangBridgingHeaderImportModule())
     return;
 
   // At this point, we know we're extending a type declared outside this module.
@@ -2231,14 +2232,11 @@ static void dumpGenericSignature(ASTContext &ctx, GenericContext *GC) {
 
 namespace {
 
-/// A metatype extension is a COM construct when it extends a COM interface
-/// — a protocol marked @com. The @com marker, not derivation from IUnknown,
-/// is the key: COM-model frameworks like IOKit use QI/AddRef/Release without
-/// deriving from a shared IUnknown, so keying on the marker (which the Clang
-/// importer can also apply to imported interfaces) is what makes this correct.
+/// A metatype extension is a COM construct when it extends a declaration
+/// canonically classified as a COM interface.
 static bool isCOMMetatypeExtension(const ExtensionDecl *ED) {
   auto *proto = dyn_cast_or_null<ProtocolDecl>(ED->getExtendedNominal());
-  return proto && proto->getAttrs().hasAttribute<COMAttr>();
+  return proto && proto->isCOMInterface();
 }
 
 class DeclChecker : public DeclVisitor<DeclChecker> {
@@ -3586,6 +3584,8 @@ public:
     }
 
     checkInheritanceClause(CD);
+    if (Ctx.LangOpts.EnableCOMInterop)
+      com::validateImplementation(CD);
     diagnoseMissingExplicitSendable(CD);
 
     checkAccessControl(CD);
@@ -3611,6 +3611,13 @@ public:
       (void) PD->getPrimaryAssociatedTypes();
 
     checkInheritanceClause(PD);
+
+    // Validate COM inheritance only after ordinary inherited types have been
+    // resolved. Keep this out of the early declaration-classification query
+    // used by name lookup and identity synthesis.
+    if (Ctx.LangOpts.EnableCOMInterop && !PD->hasCircularInheritedProtocols())
+      (void)evaluateOrDefault(Ctx.evaluator, COMInterfaceHierarchyRequest{PD},
+                              nullptr);
 
     // Explicitly compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if

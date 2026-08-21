@@ -5,7 +5,7 @@
 @com(interface: "00000000-0000-0000-0000-000000000000")
 protocol IInterface1: IUnknown { }
 
-@com(interface: "00000000-0000-0000-0000-000000000000")
+@com(interface: "00000000-0000-0000-0000-000000000002")
 protocol IInterface2: IInterface1 { }
 
 @com(interface: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")
@@ -61,6 +61,16 @@ protocol IInterface6: IUnknown { }
 protocol IInterface7: IUnknown { }
 // expected-error@-2 {{'@com' on a protocol requires 'interface:' argument}}
 
+@com(interface: "00000000-0000-0000-0000-000000000008",
+     implementation: "00000000-0000-0000-0000-000000000009")
+protocol IInterface8: IUnknown { }
+// expected-error@-3 {{'@com' on a protocol must only have 'interface:'; 'CLSID' is not allowed}}
+
+@com(interface: "00000000-0000-0000-0000-000000000010",
+     implementation: "")
+protocol IInterface9: IUnknown { }
+// expected-error@-3 {{'@com' on a protocol must only have 'interface:'; 'CLSID' is not allowed}}
+
 @com(interface: "00000000-0000-0000-0000-000000000000")
 class CClass10 { }
 // expected-error@-2 {{'@com' on a class must not have 'interface:'; use 'implementation:' instead}}
@@ -72,3 +82,12 @@ class CClass11 { }
 @com(implementation: "")
 class CClass12 { }
 // expected-error@-2 {{'' is not a valid GUID}}
+
+// Declaration classification admits only a valid @com(interface:) protocol.
+// In particular, the presence of a malformed attribute must not unlock the
+// otherwise-reserved protocol metatype extension feature.
+extension IInterface1.Protocol {}
+extension IInterface4.Protocol {}
+// expected-error@-1 {{protocol metatype extensions are reserved for COM interop}}
+extension IInterface8.Protocol {}
+// expected-error@-1 {{protocol metatype extensions are reserved for COM interop}}

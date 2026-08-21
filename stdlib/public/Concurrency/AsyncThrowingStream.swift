@@ -145,7 +145,9 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       /// The stream finished as a result of cancellation.
       case cancelled
     }
-    
+
+    internal typealias Storage = _AsyncStreamStorage<Element, Failure, Termination>
+
     /// A type that indicates the result of yielding a value to a client, by
     /// way of the continuation.
     ///
@@ -205,7 +207,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       case bufferingNewest(Int)
     }
 
-    let storage: _AsyncStreamStorage<Element, Failure>
+    let storage: Storage
 
     /// Resume the task awaiting the next iteration point by having it return
     /// normally from its suspension point with a given element.
@@ -255,20 +257,20 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// ``withTaskCancellationHandler(operation:onCancel:)``.
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
-        return adaptToStreamTerminationHandler(storage.getOnTermination())
+        return unbox(storage.getOnTermination())
       }
       nonmutating set {
-        storage.setOnTermination(adaptToStorageTerminationHandler(newValue))
+        storage.setOnTermination(box(newValue))
       }
     }
   }
 
   final class _Context {
-    let storage: _AsyncStreamStorage<Element, Failure>?
+    let storage: Continuation.Storage?
     let produce: () async throws(Failure) -> Element?
 
     init(
-      storage: _AsyncStreamStorage<Element, Failure>? = nil,
+      storage: Continuation.Storage? = nil,
       produce: @escaping () async throws(Failure) -> Element?
     ) {
       self.storage = storage
@@ -341,7 +343,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
     _ build: (Continuation) -> Void
   ) where Failure == Error {
-    let storage: _AsyncStreamStorage<Element, Failure> = .init(
+    let storage: Continuation.Storage = .init(
       bufferingPolicy: limit.asStorageBufferingPolicy()
     )
     context = _Context(storage: storage, produce: storage.next)

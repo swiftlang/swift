@@ -13,7 +13,7 @@ enum MacOSVersions {
 }
 
 @available(macOS 11, *)
-func annotatedFunc( // expected-note 3 {{enclosing scope here}}
+func annotatedFunc( // expected-note 5 {{enclosing scope here}}
   _ e: MacOSVersions,
 ) {
   if #available(macOS 10, *) { } // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}} {{group-name=UselessAvailabilityCheck}}
@@ -31,9 +31,9 @@ func annotatedFunc( // expected-note 3 {{enclosing scope here}}
 
   switch e {
   case .macOS_10:
-    if #available(macOS 10, *) { _ = 1 } // FIXME: [availability] Should be diagnosed
+    if #available(macOS 10, *) { _ = 1 } // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
   case .macOS_11:
-    if #available(macOS 11, *) { _ = 1 } // FIXME: [availability] Should be diagnosed
+    if #available(macOS 11, *) { _ = 1 } // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
   case .macOS_12:
     if #available(macOS 12, *) { _ = 1 }
   case .macOS_13:

@@ -1593,8 +1593,18 @@ public:
   
   bool shouldSkip(Decl *D) {
     if (!Walker.shouldWalkMacroArgumentsAndExpansion().second &&
-        Walker.isDeclInMacroExpansion(D) && !Walker.Parent.isNull())
-      return true;
+        !Walker.Parent.isNull()) {
+      if (Walker.isDeclInMacroExpansion(D))
+        return true;
+
+      // Legacy traversal presents accessors as peers of their storage.
+      // Preserve the storage's macro expansion boundary when deciding whether
+      // to walk them.
+      if (Walker.shouldWalkAccessorsTheOldWay())
+        if (auto *accessor = dyn_cast<AccessorDecl>(D))
+          if (Walker.isDeclInMacroExpansion(accessor->getStorage()))
+            return true;
+    }
 
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       // VarDecls are walked via their NamedPattern, ignore them if we encounter

@@ -215,8 +215,14 @@ class HostSpecificConfiguration(object):
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize_none_with_implicit_dynamic-{}"
                         .format(subset_suffix, name))
+                # TODO: restricted to the major platforms during opaque values
+                # bring-up; widen as coverage stabilizes.
                 if args.test_optimize_none_with_opaque_values and \
-                        not test_host_only:
+                        not test_host_only and \
+                        deployment_platform in [
+                            StdlibDeploymentTarget.OSX,
+                            StdlibDeploymentTarget.Linux,
+                            StdlibDeploymentTarget.Windows]:
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize_none_with_opaque_values-{}"
                         .format(subset_suffix, name))

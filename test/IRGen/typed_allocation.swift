@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=UNSAFEMUTABLEPOINTERALLOC
 
 // REQUIRES: OS=macosx
 // REQUIRES: SWIFT_STDLIB_ARCH=arm64
@@ -102,3 +103,210 @@ public func makeEnum(x: Int, y: Int, b: Bool) -> Indirect {
 
   return .y(x, y)
 }
+
+@inline(never)
+public func allocateInts(_ count: Int) -> UnsafeMutablePointer<Int> {
+  return UnsafeMutablePointer<Int>.allocate(capacity: count)
+}
+
+@inline(never)
+public func deallocateInts(_ ptr: UnsafeMutablePointer<Int>) {
+  ptr.deallocate()
+}
+
+@inline(never)
+public func allocateMyClasses(_ count: Int) -> UnsafeMutablePointer<MyClass> {
+  return UnsafeMutablePointer<MyClass>.allocate(capacity: count)
+}
+
+@inline(never)
+public func deallocateMyClasses(_ ptr: UnsafeMutablePointer<MyClass>) {
+  ptr.deallocate()
+}
+
+// UNSAFEMUTABLEPOINTERALLOC-DAG: define {{.*}}swiftcc ptr @"$eSp8allocate8capacitySpyxGSi_tFZ16typed_allocation7MyClassC_Tt0g5"
+// UNSAFEMUTABLEPOINTERALLOC-DAG:   call noalias ptr @swift_allocRawTyped(i64 {{.*}}, i64 {{.*}}, i64 [[MYCLASS_ARRAY_TYPEID:.*]])
+
+// UNSAFEMUTABLEPOINTERALLOC-DAG: define {{.*}}swiftcc ptr @"$eSp8allocate8capacitySpyxGSi_tFZSi_Tt0g5"
+// UNSAFEMUTABLEPOINTERALLOC-DAG:   call noalias ptr @swift_allocRawTyped(i64 {{.*}}, i64 {{.*}}, i64 [[INT_ARRAY_TYPEID:.*]])
+
+// UNSAFEMUTABLEPOINTERALLOC-DAG: define {{.*}}swiftcc void @"$eSp10deallocateyyF16typed_allocation7MyClassC_Tg5"
+// UNSAFEMUTABLEPOINTERALLOC-DAG:   call void @swift_deallocRawTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[MYCLASS_ARRAY_TYPEID]])
+
+// UNSAFEMUTABLEPOINTERALLOC-DAG: define {{.*}}swiftcc void @"$eSp10deallocateyyFSi_Tg5"
+// UNSAFEMUTABLEPOINTERALLOC-DAG:   call void @swift_deallocRawTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[INT_ARRAY_TYPEID]])
+
+
+// --- Boxed opaque existential cases (typed alloc_box) ---
+
+public protocol Existential {}
+
+// Bigger than the 3-word inline existential buffer, so boxing is required.
+public struct NotInlineFixed: Existential {
+  var x1: Double
+  var x2: Double
+  var x3: Double
+  var x4: Double
+}
+
+public struct NotInlineFixed2: Existential {
+  var y1: Double
+  var y2: Double
+  var y3: Double
+  var y4: Double
+}
+
+public protocol SelfReturningThrows {
+  func upgrade() throws -> Self
+}
+
+extension NotInlineFixed: SelfReturningThrows {
+  public func upgrade() throws -> NotInlineFixed { self }
+}
+
+@inline(never)
+public func useSelfReturningThrows(_ p: any SelfReturningThrows) {}
+
+
+// emitAllocateBoxedOpaqueExistentialBuffer.
+@inline(never)
+public func abandonGeneric<T: SelfReturningThrows>(_ v: T) throws {
+  try useSelfReturningThrows(v.upgrade())
+}
+
+@inline(never)
+public func runAbandonGeneric() throws {
+  try abandonGeneric(NotInlineFixed(x1: 1, x2: 2, x3: 3, x4: 4))
+}
+// CHECK-LABEL: define {{.*}} @"$e{{[0-9]+}}typed_allocation14abandonGeneric{{.*}}"
+// CHECK:   [[CALL:%[0-9]+]] = call swiftcc { ptr, ptr } @swift_allocBoxTyped(ptr {{.*}}, i64 [[TYPEID:[0-9]+]])
+// CHECK:   [[BOX:%[0-9]+]] = extractvalue { ptr, ptr } [[CALL]], 0
+// CHECK:   store ptr [[BOX]], ptr [[BUFFER:%[0-9]+]]
+// CHECK:   [[DESCRIPTOR_SLOT:%[0-9]+]] = getelementptr inbounds{{.*}} i8, ptr [[BUFFER]], {{i64|i32}} 8
+// CHECK:   store i64 [[TYPEID]], ptr [[DESCRIPTOR_SLOT]]
+// CHECK:   br i1 {{%[0-9]+}}, label %[[ERRBB:[0-9]+]], label %[[OKBB:[0-9]+]]
+//
+// CHECK: [[OKBB]]:
+// CHECK:   call void @__swift_destroy_boxed_opaque_existential_1(ptr {{%[0-9]+}})
+//
+// CHECK: [[ERRBB]]:
+// CHECK:   call void @__swift_deallocate_boxed_opaque_existential_1(ptr {{%[0-9]+}})
+
+
+// getAllocateBoxedOpaqueExistentialBufferFunction.
+@inline(never)
+public func abandonExistential(_ p: any SelfReturningThrows) throws {
+  try useSelfReturningThrows(p.upgrade())
+}
+// CHECK-LABEL: define {{.*}} @"$e{{[0-9]+}}typed_allocation18abandonExistential{{.*}}"
+// CHECK:   call ptr @__swift_allocate_boxed_opaque_existential_1(ptr {{%[0-9]+}})
+// CHECK-LABEL: define {{.*}} @__swift_allocate_boxed_opaque_existential_1(ptr %0)
+// CHECK: allocateBox:
+// CHECK:   call swiftcc { ptr, ptr } @swift_allocBoxTyped(ptr {{.*}}, i64 [[HEADERID:[0-9]+]])
+// CHECK:   store i64 [[HEADERID]], ptr {{.*}}
+
+
+// getDeallocateBoxedOpaqueExistentialBufferFunction.
+
+// CHECK-LABEL: define {{.*}} @__swift_deallocate_boxed_opaque_existential_1(ptr %0)
+// CHECK: deallocateBox:
+// CHECK:   [[REFERENCE:%[0-9]+]] = load ptr, ptr {{.*}}
+// CHECK:   [[DESCRIPTOR3:%[0-9]+]] = load i64, ptr {{.*}}
+// CHECK:   call void @swift_deallocRawTyped(ptr [[REFERENCE]], {{i64|i32}} {{.*}}, {{i64|i32}} {{.*}}, i64 [[DESCRIPTOR3]])
+
+
+// getDestroyBoxedOpaqueExistentialBufferFunction.
+
+// CHECK-LABEL: define {{.*}} @__swift_destroy_boxed_opaque_existential_1(ptr %0)
+// CHECK: outline:
+// CHECK:   [[REF2:%[0-9]+]] = load ptr, ptr {{.*}}
+// CHECK:   [[DESCRIPTOR4:%[0-9]+]] = load i64, ptr {{.*}}
+// CHECK:   call void @swift_releaseBoxTyped(ptr [[REF2]], i64 [[DESCRIPTOR4]])
+
+
+// initializeWithCopy (OpaqueExistentialTypeInfo).
+@inline(never)
+public func copyExistential() -> any Existential {
+  let x: any Existential = NotInlineFixed(x1: 1, x2: 2, x3: 3, x4: 4)
+  let y = x
+  return y
+}
+// CHECK-LABEL: define {{.*}} @"$e{{[0-9]+}}typed_allocation11Existential_pWOc"(ptr %0, ptr %1)
+// CHECK:   [[SRC_BUFFER:%[0-9]+]] = getelementptr inbounds{{.*}} %T{{[0-9]+}}typed_allocation11ExistentialP, ptr %0, i32 0, i32 0
+// CHECK:   [[DEST_BUFFER:%[0-9]+]] = getelementptr inbounds{{.*}} %T{{[0-9]+}}typed_allocation11ExistentialP, ptr %1, i32 0, i32 0
+// CHECK:   {{%[0-9]+}} = call ptr {{%.*}}(ptr noalias [[DEST_BUFFER]], ptr noalias [[SRC_BUFFER]], ptr {{%[0-9]+}})
+// CHECK:   [[SRC_DESCRIPTOR_SLOT:%[0-9]+]] = getelementptr inbounds{{.*}} i8, ptr [[SRC_BUFFER]], {{i64|i32}} 8
+// CHECK:   [[DESCRIPTOR:%[0-9]+]] = load i64, ptr [[SRC_DESCRIPTOR_SLOT]]
+// CHECK:   [[DEST_DESCRIPTOR_SLOT:%[0-9]+]] = getelementptr inbounds{{.*}} i8, ptr [[DEST_BUFFER]], {{i64|i32}} 8
+// CHECK:   store i64 [[DESCRIPTOR]], ptr [[DEST_DESCRIPTOR_SLOT]]
+
+// getProjectBoxedOpaqueExistentialFunction.
+public protocol MutableSelfSized {
+  mutating func bump()
+  var value: Double { get }
+}
+extension NotInlineFixed: MutableSelfSized {
+  public mutating func bump() { x1 += 1 }
+  public var value: Double { x1 }
+}
+@inline(never)
+public func mutateSharedExistential() -> Double {
+  var x: any MutableSelfSized = NotInlineFixed(x1: 1, x2: 2, x3: 3, x4: 4)
+  let y = x
+  x.bump()
+  return x.value + y.value
+}
+// CHECK-LABEL: define {{.*}} @__swift_mutable_project_boxed_opaque_existential_1(ptr %0, ptr %1)
+// CHECK: boxed:
+// CHECK:   [[DESCRIPTOR_SLOT7:%[0-9]+]] = getelementptr inbounds{{.*}} i8, ptr %0, {{i64|i32}} 8
+// CHECK:   [[DESCRIPTOR7:%[0-9]+]] = load i64, ptr [[DESCRIPTOR_SLOT7]]
+// CHECK:   {{%[0-9]+}} = call swiftcc { ptr, ptr } @swift_makeBoxUniqueTyped(ptr %0, ptr %1, i64 {{.*}}, i64 [[DESCRIPTOR7]])
+
+
+// getAssignBoxedOpaqueExistentialBufferFunction (match-outline).
+@inline(never)
+func genericAssign<T>(_ dest: inout T, _ value: T) {
+  dest = value
+}
+@inline(never)
+public func reassignSameType() -> any Existential {
+  var y: any Existential = NotInlineFixed(x1: 1, x2: 2, x3: 3, x4: 4)
+  genericAssign(&y, NotInlineFixed(x1: 5, x2: 6, x3: 7, x4: 8))
+  return y
+}
+// CHECK-LABEL: define {{.*}} @__swift_assign_boxed_opaque_existential_1(ptr %0, ptr %1)
+// CHECK: match-outline:
+// CHECK:   [[OLD_DEST_REF:%[0-9]+]] = load ptr, ptr [[DEST_BUFFER4:%[0-9]+]]
+// CHECK:   [[SRC_REF:%[0-9]+]] = load ptr, ptr [[SRC_BUFFER4:%[0-9]+]]
+// CHECK:   call ptr @swift_retain(ptr returned [[SRC_REF]])
+// CHECK:   [[OLD_DESCRIPTOR_SLOT:%[0-9]+]] = getelementptr inbounds{{.*}} i8, ptr [[DEST_BUFFER4]], {{i64|i32}} 8
+// CHECK:   [[OLD_DESCRIPTOR:%[0-9]+]] = load i64, ptr [[OLD_DESCRIPTOR_SLOT]]
+// CHECK:   call void @swift_releaseBoxTyped(ptr [[OLD_DEST_REF]], i64 [[OLD_DESCRIPTOR]])
+// CHECK:   store ptr [[SRC_REF]], ptr [[DEST_BUFFER4]]
+// CHECK:   [[SRC_DESCRIPTOR_SLOT:%[0-9]+]] = getelementptr inbounds{{.*}} i8, ptr [[SRC_BUFFER4]], {{i64|i32}} 8
+// CHECK:   [[NEW_DESCRIPTOR:%[0-9]+]] = load i64, ptr [[SRC_DESCRIPTOR_SLOT]]
+// CHECK:   [[NEW_DESCRIPTOR_SLOT:%[0-9]+]] = getelementptr inbounds{{.*}} i8, ptr [[DEST_BUFFER4]], {{i64|i32}} 8
+// CHECK:   store i64 [[NEW_DESCRIPTOR]], ptr [[NEW_DESCRIPTOR_SLOT]]
+
+
+// getAssignBoxedOpaqueExistentialBufferFunction (no-match/dest-outline)
+@inline(never)
+public func reassignDifferentType() -> any Existential {
+  var y: any Existential = NotInlineFixed(x1: 1, x2: 2, x3: 3, x4: 4)
+  genericAssign(&y, NotInlineFixed2(y1: 5, y2: 6, y3: 7, y4: 8))
+  return y
+}
+// CHECK: dest-outline:
+// CHECK:   [[OLD_DEST_REF2:%[0-9]+]] = load ptr, ptr [[DEST_BUFFER5:%[0-9]+]]
+// CHECK:   [[OLD_DESCRIPTOR_SLOT2:%[0-9]+]] = getelementptr inbounds{{.*}} i8, ptr [[DEST_BUFFER5]], {{i64|i32}} 8
+// CHECK:   [[OLD_DESCRIPTOR2:%[0-9]+]] = load i64, ptr [[OLD_DESCRIPTOR_SLOT2]]
+// CHECK: dest-outline-src-outline:
+// CHECK:   [[SRC_REF2:%[0-9]+]] = load ptr, ptr [[SRC_BUFFER5:%[0-9]+]]
+// CHECK:   call ptr @swift_retain(ptr returned [[SRC_REF2]])
+// CHECK:   store ptr [[SRC_REF2]], ptr [[DEST_BUFFER5]]
+// CHECK:   [[SRC_DESCRIPTOR_SLOT2:%[0-9]+]] = getelementptr inbounds{{.*}} i8, ptr [[SRC_BUFFER5]], {{i64|i32}} 8
+// CHECK:   [[NEW_DESCRIPTOR2:%[0-9]+]] = load i64, ptr [[SRC_DESCRIPTOR_SLOT2]]
+// CHECK:   [[NEW_DESCRIPTOR_SLOT2:%[0-9]+]] = getelementptr inbounds{{.*}} i8, ptr [[DEST_BUFFER5]], {{i64|i32}} 8
+// CHECK:   store i64 [[NEW_DESCRIPTOR2]], ptr [[NEW_DESCRIPTOR_SLOT2]]
+// CHECK: dest-outline-cont:
+// CHECK:   call void @swift_releaseBoxTyped(ptr [[OLD_DEST_REF2]], i64 [[OLD_DESCRIPTOR2]])

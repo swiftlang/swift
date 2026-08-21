@@ -88,7 +88,7 @@ func $declareWithDollar() { // expected-error{{cannot declare entity named '$dec
   @$dollar case _: // expected-error {{unknown attribute '$dollar'}}
     break
   }
-  if #available($Dummy 9999, *) {} // expected-warning {{unrecognized platform name '$Dummy'}}
+  if #available($Dummy 9999, *) {} // expected-warning {{cannot find availability domain '$Dummy'}}
   @_swift_native_objc_runtime_base($Dollar)
   class $Class {} // expected-error{{cannot declare entity named '$Class'; the '$' prefix is reserved}}
   enum $Enum {} // expected-error{{cannot declare entity named '$Enum'; the '$' prefix is reserved}}

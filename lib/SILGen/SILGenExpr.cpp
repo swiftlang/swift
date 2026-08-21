@@ -1209,7 +1209,7 @@ SILGenFunction::ForceTryEmission::ForceTryEmission(SILGenFunction &SGF,
 
   SILValue indirectError;
   auto &errorTL = SGF.getTypeLowering(loc->getThrownError());
-  if (!errorTL.isAddressOnly()) {
+  if (!errorTL.isAddress()) {
     (void) catchBB->createPhiArgument(errorTL.getLoweredType(),
                                       OwnershipKind::Owned);
   } else {
@@ -1265,8 +1265,8 @@ void SILGenFunction::ForceTryEmission::finish() {
               return error.getType().getObjectType().getASTType();
             }, LookUpConformanceInModule());
 
-        // Generic errors are passed indirectly.
-        if (!error.getType().isAddress()) {
+        // If lowering addresses, the error must be passed indirectly.
+        if (SGF.silConv.useLoweredAddresses() && !error.getType().isAddress()) {
           auto *tmp = SGF.B.createAllocStack(
               Loc, error.getType().getObjectType(), std::nullopt);
           error.forwardInto(SGF, Loc, tmp);
@@ -3688,8 +3688,14 @@ static AccessorDecl *
 getRepresentativeAccessorForKeyPath(AbstractStorageDecl *storage) {
   if (storage->requiresOpaqueGetter())
     return storage->getOpaqueAccessor(AccessorKind::Get);
-  assert(storage->requiresOpaqueReadCoroutine());
-  return storage->getOpaqueAccessor(AccessorKind::Read);
+  // Prefer the old read coroutine when it exists (so key paths for storage that
+  // predates the CoroutineAccessors feature keep referring to it); otherwise use
+  // the new yielding-borrow coroutine, which is the only read accessor a
+  // new-only property has.
+  if (storage->requiresOpaqueReadCoroutine())
+    return storage->getOpaqueAccessor(AccessorKind::Read);
+  assert(storage->requiresOpaqueYieldingBorrowCoroutine());
+  return storage->getOpaqueAccessor(AccessorKind::YieldingBorrow);
 }
 
 static CanType buildKeyPathIndicesTuple(ASTContext &C,
@@ -4838,6 +4844,12 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
     /// Returns true if a key path component for the given property or
     /// subscript should be externally referenced.
     auto shouldUseExternalKeyPathComponent = [&]() -> bool {
+      // Embedded Swift does not emit property descriptors, and it can't need
+      // them because there is no resilience.
+      if (getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+        return false;
+      }
+
       // The property descriptor has the canonical key path component
       // information so doesn't have to refer to another external descriptor.
       if (forPropertyDescriptor) {
@@ -7459,7 +7471,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
         SGF.emitLValue(li->getSubExpr(), SGFAccessKind::BorrowedAddressRead);
     auto address = SGF.emitAddressOfLValue(subExpr, std::move(lv));
 
-    if (subType.isLoadable(SGF.F)) {
+    if (subType.isLoadableOrOpaque(SGF.F)) {
       // Trivial types don't undergo any lifetime analysis, so simply load
       // the value.
       if (subType.isTrivial(SGF.F)

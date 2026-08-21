@@ -122,8 +122,6 @@ ${SelfName}TestSuite.test("rebasing") {
 ${SelfName}TestSuite.test("_checkBounds(_: Range) helper")
 .require(.minimumStdlib(.stdlib_6_4))
 .code {
-  guard #available(SwiftStdlib 6.4, *) else { return }
-
 %   if IsRaw:
   let allocated = UnsafeMutableRawBufferPointer.allocate(byteCount: 20, alignment: 8)
   let buffer = ${SelfType}(allocated)
@@ -173,8 +171,6 @@ ${SelfName}TestSuite.test("rebasingInvalidMutableSlice")
 .require(.minimumStdlib(.stdlib_6_4))
 .require(.crashTesting)
 .code {
-  guard #available(SwiftStdlib 6.4, *) else { return }
-
   let rawBuffer = UnsafeMutableRawBufferPointer.allocate(
     byteCount: 32, alignment: 8
   )
@@ -421,6 +417,11 @@ ${SelfName}TestSuite.test("extracting() functions")
   expectEqual(sub3[capacity - 1], ${Element}(capacity - 1))
   expectEqual(sub4[0], ${Element}(2))
   expectEqual(sub5[0], ${Element}(1))
+
+  let empty1 = buffer.extracting(0..<0)
+  expectEqual(empty1.count, 0)
+  let empty2 = buffer.extracting(capacity..<capacity)
+  expectEqual(empty2.count, 0)
 }
 
 ${SelfName}TestSuite.test("extracting() bounds checking")
@@ -437,6 +438,7 @@ ${SelfName}TestSuite.test("extracting() bounds checking")
 
 ${SelfName}TestSuite.test("extracting(unchecked:) functions")
 .require(.stdlib_6_5)
+.skip(.custom({ _isStdlibInternalChecksEnabled() }, reason: "Requires a release stdlib."))
 .code {
   let capacity = 32
 %   if IsRaw:
@@ -463,11 +465,6 @@ ${SelfName}TestSuite.test("extracting(unchecked:) functions")
   let beyondClosed = prefix.extracting(unchecked: 16...23)
   expectEqual(beyondClosed.count, 8)
   expectEqual(beyondClosed[0], ${Element}(16))
-
-  let empty1 = buffer.extracting(unchecked: 0..<0)
-  expectEqual(empty1.count, 0)
-  let empty2 = buffer.extracting(unchecked: capacity..<capacity)
-  expectEqual(empty2.count, 0)
 }
 
 ${SelfName}TestSuite.test("prefix extracting() functions")

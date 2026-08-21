@@ -30,6 +30,9 @@ namespace swift {
 class ASTContext;
 class AvailabilityContext;
 class Decl;
+class ExtensionDecl;
+class ValueDecl;
+class RootProtocolConformance;
 
 /// Represents the reason a declaration is considered not available in a
 /// specific `AvailabilityContext`.
@@ -198,6 +201,17 @@ public:
   /// Some availability restrictions are active for type-checking but cannot
   /// be translated directly into an `if #available(...)` runtime query.
   bool isActiveForRuntimeQueries(const ASTContext &ctx) const;
+
+  /// Emit a note indicating the source of availability restriction.
+  bool emitNoteForDecl(const Decl *decl) const;
+
+  /// Emit a note indicating the source of availability restriction.
+  bool emitNoteForConformance(const ExtensionDecl *ext,
+                              const RootProtocolConformance *rootConf) const;
+
+  /// Returns true if the name of the domain of \p restriction should be omitted
+  /// from diagnostics describing the restriction.
+  bool shouldHideDomainNameInDiagnostics() const;
 
   void print(raw_ostream &os) const;
 };

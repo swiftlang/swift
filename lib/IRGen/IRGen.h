@@ -22,6 +22,7 @@
 #include "clang/AST/CharUnits.h"
 #include "clang/CodeGen/ConstantInitFuture.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/AST/TypeInfoStorage.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include <cassert>
 
@@ -31,7 +32,6 @@ namespace llvm {
 
 namespace swift {
   class CanType;
-  class ClusteredBitVector;
   enum ForDefinition_t : bool;
 
 namespace irgen {
@@ -39,10 +39,6 @@ namespace irgen {
   class ConstantInitBuilder;
   using clang::CodeGen::ConstantInitFuture;
   class IRGenFunction;
-
-/// In IRGen, we use Swift's ClusteredBitVector data structure to
-/// store vectors of spare bits.
-using SpareBitVector = ClusteredBitVector;
 
 enum class StackProtectorMode : bool { NoStackProtector, StackProtector };
 

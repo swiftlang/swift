@@ -83,6 +83,10 @@ list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature"
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "Extern")
 
+if(SWIFT_STDLIB_ENABLE_LAZY_LINK)
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-DSWIFT_STDLIB_ENABLE_LAZY_LINK")
+endif()
+
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
 
@@ -102,6 +106,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   TaskStatus.cpp
   TaskGroup.cpp
   TaskLocal.cpp
+  TaskRegistry.cpp
   ThreadingError.cpp
   TracingSignpost.cpp
   AsyncStream.cpp
@@ -142,7 +147,9 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Task.swift
   Task+PriorityEscalation.swift
   Task+TaskExecutor.swift
+  Task+Deadline.swift
   TaskCancellation.swift
+  TaskCancellationScope.swift
   TaskGroup.swift
   DiscardingTaskGroup.swift
   TaskLocal.swift
@@ -298,11 +305,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
   add_dependencies(embedded-concurrency embedded-concurrency-default-executor)
 
   set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
-  set(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY TRUE)
   set(SWIFT_STDLIB_TRACING FALSE)
   set(SWIFT_STDLIB_HAS_ENVIRON FALSE)
   set(SWIFT_STDLIB_HAS_ASL FALSE)
-  set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
+  set(SWIFT_SDK_embedded_THREADING_PACKAGE embedded)
   list(APPEND LLVM_OPTIONAL_SOURCES ExecutorImpl.cpp)
 
   set(_concurrency_all_triples "${EMBEDDED_STDLIB_TARGET_TRIPLES}")
@@ -378,6 +384,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     # the triple list visible to add_embedded_swift_target_library.
     set(EMBEDDED_STDLIB_TARGET_TRIPLES "${entry}")
 
+    # Record that embedded Concurrency is available for this triple, so that
+    # libraries built on top of it (e.g. Observation) can build for exactly the
+    # same set of triples instead of duplicating the filtering above.
+    set_property(GLOBAL APPEND PROPERTY
+      SWIFT_EMBEDDED_CONCURRENCY_TARGET_TRIPLES "${entry}")
+
     # lib/swift/embedded/_Concurrency.swiftmodule
     # lib/swift/embedded/<triple>/libswift_Concurrency.a
     add_embedded_swift_target_library(
@@ -385,7 +397,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       swift_Concurrency
       IS_STDLIB
       INSTALL_BINARY
-      NO_FREESTANDING_CXX
 
       ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
@@ -409,11 +420,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       embedded-concurrency-default-executor
       swift_ConcurrencyDefaultExecutor
       INSTALL_BINARY
-      NO_FREESTANDING_CXX
 
       CooperativeGlobalExecutor.cpp
 
-      C_COMPILE_FLAGS ${extra_c_compile_flags}
+      C_COMPILE_FLAGS
+        ${extra_c_compile_flags}
+        -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
       INSTALL_IN_COMPONENT stdlib
       )
   endforeach()

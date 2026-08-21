@@ -114,6 +114,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       c[#Func Attribute#]; name=c
 // KEYWORD2-NEXT:             Keyword/None:                       usableFromInline[#Func Attribute#]; name=usableFromInline
 // KEYWORD2-NEXT:             Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
+// KEYWORD2-NEXT:             Keyword/None:                       implementation[#Func Attribute#]; name=implementation
 // KEYWORD2-NEXT:             Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
 // KEYWORD2-NEXT:             Keyword/None:                       IBSegueAction[#Func Attribute#]; name=IBSegueAction{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       derivative[#Func Attribute#]; name=derivative
@@ -123,9 +124,14 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NEXT:             Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
 // KEYWORD2-NEXT:             Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
+// KEYWORD2-NEXT:             Keyword/None:                       used[#Func Attribute#]; name=used
+// KEYWORD2-NEXT:             Keyword/None:                       section[#Func Attribute#]; name=section
+// KEYWORD2-NEXT:             Keyword/None:                       unsafe[#Func Attribute#]; name=unsafe
 // KEYWORD2-NEXT:             Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
-// KEYWORD2-NEXT:             Keyword/None:                       abi[#Func Attribute#]; name=abi{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       safe[#Func Attribute#]; name=safe
+// KEYWORD2-NEXT:             Keyword/None:                       abi[#Func Attribute#]; name=abi
 // KEYWORD2-NEXT:             Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
+// KEYWORD2-NEXT:             Keyword/None:                       specialized[#Func Attribute#]; name=specialized
 // KEYWORD2-NEXT:             Keyword/None:                       diagnose[#Func Attribute#]; name=diagnose
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct

@@ -25,6 +25,6 @@ struct V: View {
       }
     }
     .#^COMPLETE^#
-    // COMPLETE: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: foo()[#View#]; name=foo()
+    // COMPLETE: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: foo()[#View#]; name=foo()
   }
 }

@@ -280,7 +280,8 @@ static Address emitDefaultAllocateBuffer(IRGenFunction &IGF, Address buffer,
   case FixedPacking::Allocate: {
     llvm::Value *box, *address;
     auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-    IGF.emitAllocBoxCall(metadata, box, address);
+    IGF.emitAllocBoxCall(metadata, /*mallocTypeId*/ std::nullopt, box,
+                         address);
     IGF.Builder.CreateStore(
         box,
         Address(IGF.Builder.CreateBitCast(buffer.getAddress(), IGF.IGM.PtrTy),

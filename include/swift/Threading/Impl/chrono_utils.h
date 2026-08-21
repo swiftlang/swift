@@ -14,6 +14,11 @@
 // C++17, and we need to build with C++14, so... include a version of the
 // necesary code here.
 //
+// Note that this header, and <chrono> itself, are hosted-only; some standard
+// library implementations (e.g. libstdc++) reject <chrono> outright under
+// -ffreestanding, because its clocks need operating system support.  Threading
+// implementations that freestanding builds select must not include this.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_THREADING_IMPL_CHRONO_UTILS_H

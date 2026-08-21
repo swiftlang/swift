@@ -2688,6 +2688,37 @@ public:
       builder.addAssignFresh(lookupResult->value);
   }
 
+  void translateSILCalledOncePartialApply(PartialApplyInst *pai) {
+    ApplySite applySite(pai);
+    REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                             << "Translating `@called(once)` Partial Apply!\n");
+
+    SmallVector<Operand *> operandsToMerge;
+    for (auto &op : applySite.getArgumentOperands()) {
+      auto lookupResult = tryToTrackValue(op.get());
+      if (!lookupResult)
+        continue;
+
+      auto info = applySite.getParamInfoForOperand(op);
+      // If this is an argument to a `sending` parameter, let's mark it as sent.
+      if (info.hasOption(SILParameterInfo::Flag::Sending)) {
+        builder.addRequire(*lookupResult);
+        builder.addSend(lookupResult->value, &op);
+      } else {
+        // Otherwise, it would have to be merged just like in a regular closure.
+        operandsToMerge.push_back(&op);
+      }
+    }
+
+    SmallVector<SILValue, 8> directResults;
+    getApplyResults(pai, directResults);
+    translateSILMultiAssign(
+        directResults,
+        ArrayRef<Operand *>(), // No indirect results for a partial_apply.
+        operandsToMerge,
+        RegionMergeReason::NonisolatedClosure);
+  }
+
   /// Handles the semantics for SIL applies that cross isolation.
   ///
   /// Semantically this causes all arguments of the applysite to be sent.
@@ -2759,6 +2790,12 @@ public:
     if (auto isolationRegionInfo = SILIsolationInfo::get(pai);
         isolationRegionInfo && !isolationRegionInfo.isDisconnected()) {
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
+    }
+
+    // `@called(once)` closures are allowed to have `sending` captures which
+    // need special handling.
+    if (pai->isCalledOnce()) {
+      return translateSILCalledOncePartialApply(pai);
     }
 
     SmallVector<SILValue, 8> directResults;
@@ -4774,7 +4811,7 @@ static bool canComputeRegionsForFunction(SILFunction *fn) {
 RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
     SILFunction *fn, PostOrderFunctionInfo *pofi)
     : allocator(), fn(fn), valueMap(fn), translator(), ptrSetFactory(allocator),
-      isolationHistoryFactory(allocator),
+      isolationHistoryFactory(allocator, shouldEmitIsolationHistoryFor(fn)),
       sendingOperandToStateMap(isolationHistoryFactory), blockStates(),
       pofi(pofi), solved(false), supportedFunction(true) {
   // Before we do anything, make sure that we support processing this function.
@@ -4923,7 +4960,7 @@ static FunctionTest PartitionOpsTest(
     "sil_regionanalysis_partitionoptranslation",
     [](auto &function, auto &arguments, auto &test) {
       llvm::BumpPtrAllocator allocator;
-      IsolationHistory::Factory historyFactory(allocator);
+      IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
       RegionAnalysisValueMap valueMap(&function);
       PartitionOpTranslator translator(
           &function,
@@ -4950,7 +4987,7 @@ static FunctionTest PartitionOpsBlockLoweringTest(
     "sil_regionanalysis_partitionoptranslation_block",
     [](auto &function, auto &arguments, auto &test) {
       llvm::BumpPtrAllocator allocator;
-      IsolationHistory::Factory historyFactory(allocator);
+      IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
       RegionAnalysisValueMap valueMap(&function);
       PartitionOpTranslator translator(
           &function,

@@ -4,7 +4,6 @@ add_library(swiftStdlibStubs OBJECT
   LibcShims.cpp
   Random.cpp
   Stubs.cpp
-  ThreadLocalStorage.cpp
   MathStubs.cpp
   Unicode/UnicodeData.cpp
   Unicode/UnicodeEmoji.cpp
@@ -30,7 +29,8 @@ endif()
 target_compile_definitions(swiftStdlibStubs PRIVATE
   $<$<BOOL:${BUILD_SHARED_LIBS}>:-DswiftCore_EXPORTS>
   $<$<BOOL:${SwiftCore_ENABLE_UNICODE_DATA}>:-DSWIFT_STDLIB_ENABLE_UNICODE_DATA>
-  $<$<BOOL:${SwiftCore_HAS_LOCALE}>:-DSWIFT_STDLIB_HAS_LOCALE>)
+  $<$<BOOL:${SwiftCore_HAS_LOCALE}>:-DSWIFT_STDLIB_HAS_LOCALE>
+  $<$<BOOL:${SwiftCore_ENABLE_STDLIB_LAZY_LINK}>:-DSWIFT_STDLIB_ENABLE_LAZY_LINK>)
 
 target_link_libraries(swiftStdlibStubs PRIVATE
   swiftShims)

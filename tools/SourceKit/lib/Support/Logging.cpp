@@ -37,11 +37,6 @@ Logger &Logger::operator<<(UIdent UID) {
   return *this;
 }
 
-Logger &Logger::operator<<(const llvm::format_object_base &Fmt) {
-  LogOS << Fmt;
-  return *this;
-}
-
 Logger::~Logger() {
   llvm::sys::ScopedLock L(LoggingMutex);
 

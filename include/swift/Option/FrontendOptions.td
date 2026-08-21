@@ -230,6 +230,22 @@ def disable_clang_spi :
   Flag<["-"], "disable-clang-spi">,
   HelpText<"Don't import Clang SPIs as Swift SPIs">;
 
+def enable_objc_msgsend_selector_stubs :
+  Flag<["-"], "enable-objc-msgsend-selector-stubs">,
+  HelpText<"Allow use of magic 'objc_msgSend$selector:name:' stubs (default: depends on target and linker version)">;
+
+def disable_objc_msgsend_selector_stubs :
+  Flag<["-"], "disable-objc-msgsend-selector-stubs">,
+  HelpText<"Don't allow use of magic 'objc_msgSend$selector:name:' stubs (default: depends on target and linker version)">;
+
+def enable_objc_msgsend_class_selector_stubs :
+  Flag<["-"], "enable-objc-msgsend-class-selector-stubs">,
+  HelpText<"Allow use of magic 'objc_msgSendClass$selector:name:$classSymbol' stubs (default: depends on target and linker version)">;
+
+def disable_objc_msgsend_class_selector_stubs :
+  Flag<["-"], "disable-objc-msgsend-class-selector-stubs">,
+  HelpText<"Don't allow use of magic 'objc_msgSendClass$selector:name:$classSymbol' stubs (default: depends on target and linker version)">;
+
 def enable_target_os_checking :
   Flag<["-"], "enable-target-os-checking">,
   HelpText<"Enable checking the target OS of serialized modules">;
@@ -982,6 +998,11 @@ def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
 def downgrade_typecheck_interface_error : Flag<["-"], "downgrade-typecheck-interface-error">,
   HelpText<"Downgrade error to warning when typechecking emitted module interfaces">;
 
+def no_downgrade_typecheck_interface_error
+    : Flag<["-"], "no-downgrade-typecheck-interface-error">,
+      HelpText<"Report errors when typechecking emitted module interfaces, "
+               "even for a module blocklisted as having a broken interface">;
+
 def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
   HelpText<"Load Swift modules in memory">;
 
@@ -1315,6 +1336,10 @@ def emit_singleton_metadata_pointer : Flag<["-"], "emit-singleton-metadata-point
    HelpText<"Emit a pointer to the corresponding type metadata into non-public "
             "non-generic type descriptors.">;
 
+def disable_emit_singleton_metadata_pointer : Flag<["-"], "disable-emit-singleton-metadata-pointer">,
+   HelpText<"Do not emit a pointer to the corresponding type metadata into "
+            "non-public non-generic type descriptors.">;
+
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;
 
@@ -1532,6 +1557,13 @@ def enable_lifetime_dependence_diagnostics :
 def disable_lifetime_dependence_diagnostics :
   Flag<["-"], "disable-lifetime-dependence-diagnostics">,
   HelpText<"Disable lifetime dependence diagnostics for Nonescapable types.">;
+
+def enable_lifetime_resolution :
+  Flag<["-"], "enable-lifetime-resolution">,
+  HelpText<"Enable lifetime resolution in SIL.">;
+def disable_lifetime_resolution :
+  Flag<["-"], "disable-lifetime-resolution">,
+  HelpText<"Disable lifetime resolution in SIL.">;
 
 def enable_aggressive_reg2mem :
   Flag<["-"], "enable-aggressive-reg2mem">,

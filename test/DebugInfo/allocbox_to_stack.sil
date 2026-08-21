@@ -14,7 +14,7 @@ enum Nat {
 // CHECK-LABEL: sil [ossa] @box_with_debug_reconstruction_block_indirect_enum
 // CHECK: alloc_stack
 // CHECK-NOT: alloc_box
-// CHECK: debug_value undef : {{.*}}, var, name "x", type $Nat, transform
+// CHECK: debug_value (), var, name "x", type $Nat, transform
 sil [ossa] @box_with_debug_reconstruction_block_indirect_enum : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_box ${ var Nat }

@@ -175,6 +175,15 @@ void BridgedLangOptions_enumerateBuildConfigurationEntries(
     callback(cLangOpts, callbackContext, BCKFeature, StringRef(#FeatureName));
 #include "swift/Basic/Features.def"
 
+  // Compiler-owned COM model conditions use the same `$Name` source syntax as
+  // language features, but are derived exclusively from COMModel rather than
+  // Features.def or an independently-enableable feature flag.
+  if (auto condition = langOpts.getCOMInteropModelConditionalCompilationFlag();
+      !condition.empty()) {
+    assert(condition.starts_with("$"));
+    callback(cLangOpts, callbackContext, BCKFeature, condition.drop_front());
+  }
+
   // Enumerate attributes that are available.
 #define DECL_ATTR(SPELLING, CLASS, REQUIREMENTS, BEHAVIORS, CODE)              \
   if ((BEHAVIORS) == 0) \

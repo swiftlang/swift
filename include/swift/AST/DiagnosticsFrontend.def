@@ -95,6 +95,10 @@ WARNING(warning_option_requires_specific_sanitizer, none,
       "option '%0' has no effect when '%1' sanitizer is disabled. Use -sanitize=%1 to "
       "enable the sanitizer", (StringRef, StringRef))
 
+WARNING(warning_reflection_metadata_disabled_with_debug_info, none,
+      "debug info is requested with option '%0' but option '%1' will prevent "
+      "variable inspection in the debugger", (StringRef, StringRef))
+
 ERROR(error_option_missing_required_argument, none,
       "option '%0' is missing a required argument (%1)", (StringRef, StringRef))
 ERROR(error_option_missing_required_output_kind, none,

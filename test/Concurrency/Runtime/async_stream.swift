@@ -16,7 +16,7 @@ import _Concurrency
 import StdlibUnittest
 
 struct SomeError: Error, Equatable {
-  var value = Int.random(in: 0..<100)
+  var value: Int = 0
 }
 
 class NotSendable {}
@@ -436,6 +436,97 @@ class NotSendable {}
         scopedLifetime(expectation)
 
         expectTrue(expectation.fulfilled)
+      }
+
+      tests.test("finish(throwing:) from onTermination on cancellation throws the error passed to finish") {
+        let thrownError = SomeError()
+
+        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
+        var controlIterator = controlStream.makeAsyncIterator()
+
+        let task = Task { () -> Error? in
+          let stream = AsyncThrowingStream<Int, Error> { continuation in
+            continuation.onTermination = { @Sendable termination in
+              if case .cancelled = termination {
+                continuation.finish(throwing: thrownError)
+              }
+            }
+          }
+          controlContinuation.yield(1)
+          do {
+            for try await _ in stream {}
+            return nil
+          } catch {
+            return error
+          }
+        }
+
+        expectEqual(await controlIterator.next(), 1)
+        task.cancel()
+
+        let caught = await task.value
+        if let failure = caught as? SomeError {
+          expectEqual(failure, thrownError)
+        } else {
+          expectUnreachable("expected SomeError, got \(String(describing: caught))")
+        }
+      }
+
+      tests.test("finish(throwing:) from onTermination keeps the first error when called twice") {
+        let firstError = SomeError(value: 1)
+        let secondError = SomeError(value: 2)
+
+        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
+        var controlIterator = controlStream.makeAsyncIterator()
+
+        let task = Task { () -> Error? in
+          let stream = AsyncThrowingStream<Int, Error> { continuation in
+            continuation.onTermination = { @Sendable termination in
+              if case .cancelled = termination {
+                // Only the first finish(throwing:) should decide the outcome
+                continuation.finish(throwing: firstError)
+                continuation.finish(throwing: secondError)
+              }
+            }
+          }
+          controlContinuation.yield(1)
+          do {
+            for try await _ in stream {}
+            return nil
+          } catch {
+            return error
+          }
+        }
+
+        expectEqual(await controlIterator.next(), 1)
+        task.cancel()
+
+        let caught = await task.value
+        if let failure = caught as? SomeError {
+          expectEqual(failure, firstError)
+        } else {
+          expectUnreachable("expected SomeError, got \(String(describing: caught))")
+        }
+      }
+
+      tests.test("onTermination handler is released after the stream terminates") {
+        let (stream, continuation) = AsyncStream<Int>.makeStream()
+
+        // Terminate the stream first
+        continuation.finish()
+
+        // Setting the handler now stores it in the terminal state, but never calls it
+        continuation.onTermination = { @Sendable _ in
+          fatalError("Unexpectedly triggered termination handler")
+        }
+
+        var iterator = stream.makeAsyncIterator()
+        let value = await iterator.next()
+        expectNil(value)
+
+        // Per the documented `onTermination` contract, the handler is released
+        // once the stream has reached its terminal state
+        expectTrue(continuation.onTermination == nil)
       }
 
       tests.test("continuation equality") {

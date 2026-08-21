@@ -2247,15 +2247,14 @@ static void populateMembersForLazyName(DeclName name, NominalTypeDecl *decl,
   if (ctx.LangOpts.EnableCOMInterop) {
     if (auto *PD = dyn_cast<ProtocolDecl>(decl)) {
       if (name.isSimpleName(ctx.Id_IID) &&
-          PD->getAttrs().hasAttribute<COMAttr>() && PD->isInSwiftSourceFile()) {
+          PD->isCOMInterface() && PD->isInSwiftSourceFile()) {
         evaluateOrDefault(ctx.evaluator, SynthesizeCOMInterfaceIDRequest{PD},
                           nullptr);
       }
     } else if (auto *CD = dyn_cast<ClassDecl>(decl)) {
       if (name.isSimpleName(ctx.Id_CLSID) &&
-          CD->getAttrs().hasAttribute<COMAttr>() && CD->isInSwiftSourceFile()) {
-        evaluateOrDefault(ctx.evaluator,
-                          SynthesizeCOMImplementationIDRequest{CD}, nullptr);
+          CD->isCOMImplementation() && CD->isInSwiftSourceFile()) {
+        evaluateOrDefault(ctx.evaluator, SynthesizeCOMCLSIDRequest{CD}, nullptr);
       }
     }
   }
@@ -2405,15 +2404,15 @@ shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
   auto newDeclModuleName = newDecl->getModuleContext()->getName();
   auto newDeclPrivateModuleName = newDecl->getASTContext().getIdentifier(
                      (llvm::Twine(newDeclModuleName.str()) + "_Private").str());
-  auto bridgingHeaderModuleName = newDecl->getASTContext().getIdentifier(
-                                                     CLANG_HEADER_MODULE_NAME);
   if (llvm::all_of(vec, [&](AbstractFunctionDecl *oldDecl) {
     if (!oldDecl->hasClangNode())
       return false;
-    auto oldDeclModuleName = oldDecl->getModuleContext()->getName();
+    auto oldDeclModule = oldDecl->getModuleContext();
+    if (oldDeclModule->isClangBridgingHeaderImportModule())
+      return true;
+    auto oldDeclModuleName = oldDeclModule->getName();
     return oldDeclModuleName == newDeclModuleName
-               || oldDeclModuleName == newDeclPrivateModuleName
-               || oldDeclModuleName == bridgingHeaderModuleName;
+               || oldDeclModuleName == newDeclPrivateModuleName;
   }))
     return false;
 

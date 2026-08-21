@@ -9,6 +9,8 @@
 // RUN: %target-run %t/a.out %t/%target-library-name(deinit_lib) | %FileCheck %s
 
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // Verifies that runtime metadata initialization does not optimize away
 // the user-defined deinit for a ~Copyable struct which is determined to be POD

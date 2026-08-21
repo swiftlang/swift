@@ -10,11 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <algorithm>
+#include <cstdint>
 #include <functional>
 
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "llvm/ADT/bit.h"
+#include "llvm/Support/MathExtras.h"
 #include "gtest/gtest.h"
 
 #ifdef __APPLE__
@@ -126,24 +130,95 @@ static TestObject *allocTestObject(size_t *addr, size_t value) {
 // Max strong retain count and overflow checking //
 ///////////////////////////////////////////////////
 
+// Perform most of a range with a single _n operation, switching to individual
+// operations within this many steps of a power of two. Inline counts overflow
+// into the side table near a power of two.
+static const uint64_t singleStepWindow = 4;
+
+// Operation indices count from 1. The indices within singleStepWindow of a
+// power of two are performed one at a time; the rest are performed in bulk.
+static bool isSingleStep(uint64_t index) {
+  return index - llvm::bit_floor(index) <= singleStepWindow ||
+         llvm::NextPowerOf2(index) - index <= singleStepWindow;
+}
+
+// The smallest single-step index greater than `index`, which must not itself be
+// a single-step index.
+static uint64_t nextSingleStep(uint64_t index) {
+  assert(!isSingleStep(index));
+  return llvm::NextPowerOf2(index) - singleStepWindow;
+}
+
+// The largest single-step index less than `index`, which must not itself be a
+// single-step index.
+static uint64_t previousSingleStep(uint64_t index) {
+  assert(!isSingleStep(index));
+  return llvm::bit_floor(index) + singleStepWindow;
+}
+
+// Perform `count` operations on `object`, counting upwards. `single` performs
+// one operation and `bulk` performs n at once. `check` runs after each of them.
+template <typename Object, typename SingleOp, typename BulkOp, typename CheckOp>
+static void runUpward(Object *object, uint64_t count,
+                      SingleOp single, BulkOp bulk, CheckOp check) {
+  for (uint64_t done = 0; done < count; ) {
+    uint64_t n = 1;
+    if (!isSingleStep(done + 1))
+      n = std::min(nextSingleStep(done + 1) - 1, count) - done;
+
+    if (n == 1)
+      single(object);
+    else
+      bulk(object, static_cast<uint32_t>(n));
+    check(object);
+
+    done += n;
+  }
+}
+
+// Perform `count` operations on `object`, counting downwards, covering the same
+// indices one at a time as runUpward does.
+template <typename Object, typename SingleOp, typename BulkOp, typename CheckOp>
+static void runDownward(Object *object, uint64_t count,
+                        SingleOp single, BulkOp bulk, CheckOp check) {
+  for (uint64_t remaining = count; remaining > 0; ) {
+    uint64_t n = 1;
+    if (!isSingleStep(remaining))
+      n = remaining - previousSingleStep(remaining);
+
+    if (n == 1)
+      single(object);
+    else
+      bulk(object, static_cast<uint32_t>(n));
+    check(object);
+
+    remaining -= n;
+  }
+}
+
+// A `check` for run{Upward,Downward} that checks nothing.
+static void checkNothing(const void *) {}
+
 template <bool atomic>
 static void retainALot(TestObject *object, size_t &deinited,
                        uint64_t count) {
-  for (uint64_t i = 0; i < count; i++) {
-    if (atomic) swift_retain(object);
-    else swift_nonatomic_retain(object);
-    EXPECT_EQ(0u, deinited);
-  }
+  auto check = [&](TestObject *) { EXPECT_EQ(0u, deinited); };
+  if (atomic)
+    runUpward(object, count, swift_retain, swift_retain_n, check);
+  else
+    runUpward(object, count, swift_nonatomic_retain, swift_nonatomic_retain_n,
+              check);
 }
 
 template <bool atomic>
 static void releaseALot(TestObject *object, size_t &deinited,
                         uint64_t count) {
-  for (uint64_t i = 0; i < count; i++) {
-    if (atomic) swift_release(object);
-    else swift_nonatomic_release(object);
-    EXPECT_EQ(0u, deinited);
-  }
+  auto check = [&](TestObject *) { EXPECT_EQ(0u, deinited); };
+  if (atomic)
+    runDownward(object, count, swift_release, swift_release_n, check);
+  else
+    runDownward(object, count, swift_nonatomic_release,
+                swift_nonatomic_release_n, check);
 }
 
 // Maximum legal retain count.
@@ -221,22 +296,28 @@ TEST(LongRefcountingTest, nonatomic_retain_overflow_DeathTest) {
 // Max unowned retain count and overflow checking //
 ///////////////////////////////////////////////////
 
+static void checkAllocated(TestObject *object) {
+  EXPECT_ALLOCATED(object);
+}
+
 template <bool atomic>
 static void unownedRetainALot(TestObject *object, uint64_t count) {
-  for (uint64_t i = 0; i < count; i++) {
-    if (atomic) swift_unownedRetain(object);
-    else swift_nonatomic_unownedRetain(object);
-    EXPECT_ALLOCATED(object);
-  }
+  if (atomic)
+    runUpward(object, count, swift_unownedRetain, swift_unownedRetain_n,
+              checkAllocated);
+  else
+    runUpward(object, count, swift_nonatomic_unownedRetain,
+              swift_nonatomic_unownedRetain_n, checkAllocated);
 }
 
 template <bool atomic>
 static void unownedReleaseALot(TestObject *object, uint64_t count) {
-  for (uint64_t i = 0; i < count; i++) {
-    if (atomic) swift_unownedRelease(object);
-    else swift_nonatomic_unownedRelease(object);
-    EXPECT_ALLOCATED(object);
-  }
+  if (atomic)
+    runDownward(object, count, swift_unownedRelease, swift_unownedRelease_n,
+                checkAllocated);
+  else
+    runDownward(object, count, swift_nonatomic_unownedRelease,
+                swift_nonatomic_unownedRelease_n, checkAllocated);
 }
 
 // Maximum legal unowned retain count. 31 bits minus one with no implicit +1.
@@ -341,23 +422,46 @@ TEST(LongRefcountingTest, nonatomic_unowned_retain_overflow_DeathTest) {
 // Max weak retain count and overflow checking //
 /////////////////////////////////////////////////
 
+static void weakRetain(HeapObjectSideTableEntry *side) {
+  (void)side->incrementWeak();
+}
+
+static void weakRetain_n(HeapObjectSideTableEntry *side, uint32_t n) {
+  (void)side->incrementWeak(n);
+}
+
+static void weakRelease(HeapObjectSideTableEntry *side) {
+  side->decrementWeak();
+}
+
+static void weakRelease_n(HeapObjectSideTableEntry *side, uint32_t n) {
+  side->decrementWeak(n);
+}
+
+static void weakReleaseNonAtomic(HeapObjectSideTableEntry *side) {
+  side->decrementWeakNonAtomic();
+}
+
+static void weakReleaseNonAtomic_n(HeapObjectSideTableEntry *side, uint32_t n) {
+  side->decrementWeakNonAtomic(n);
+}
+
 static HeapObjectSideTableEntry *weakRetainALot(TestObject *object, uint64_t count) {
   if (count == 0) return nullptr;
-  
+
   auto side = object->refCounts.formWeakReference();
-  for (uint64_t i = 1; i < count; i++) {
-    side = side->incrementWeak();
-    EXPECT_ALLOCATED(object);
-  }
+  runUpward(side, count - 1, weakRetain, weakRetain_n,
+            [&](HeapObjectSideTableEntry *) { EXPECT_ALLOCATED(object); });
   return side;
 }
 
 template <bool atomic>
 static void weakReleaseALot(HeapObjectSideTableEntry *side, uint64_t count) {
-  for (uint64_t i = 0; i < count; i++) {
-    if (atomic) side->decrementWeak();
-    else side->decrementWeakNonAtomic();
-  }
+  if (atomic)
+    runDownward(side, count, weakRelease, weakRelease_n, checkNothing);
+  else
+    runDownward(side, count, weakReleaseNonAtomic, weakReleaseNonAtomic_n,
+                checkNothing);
 }
 
 // Maximum legal weak retain count. 32 bits with no implicit +1.

@@ -16,11 +16,16 @@
 #include "llvm/Support/Compiler.h"
 #include <cassert>
 #include <climits>
-#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <type_traits>
+// <cmath> is only needed for Log2(double) below, which is unused by the
+// embedded runtime; GCC's libstdc++ hard-errors on it under -ffreestanding,
+// so keep it hosted-only.
+#if __STDC_HOSTED__
+#include <cmath>
+#endif
 
 #ifdef __ANDROID_NDK__
 #include <android/api-level.h>
@@ -582,6 +587,9 @@ template <size_t kValue> constexpr inline size_t CTLog2() {
 
 template <> constexpr inline size_t CTLog2<1>() { return 0; }
 
+// Log2(double) is unused by the embedded runtime and requires <cmath>,
+// which is hosted-only under GCC's libstdc++ freestanding mode.
+#if __STDC_HOSTED__
 /// Return the log base 2 of the specified value.
 inline double Log2(double Value) {
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 18
@@ -590,6 +598,7 @@ inline double Log2(double Value) {
   return log2(Value);
 #endif
 }
+#endif
 
 /// Return the floor log base 2 of the specified value, -1 if the value is zero.
 /// (32 bit edition.)

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/COM.swiftmodule -module-name COM -enable-experimental-com-interop %S/../Inputs/COM.swift
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-com-interop -disable-implicit-com-module-import -I %t -primary-file %s %S/Inputs/com_importer.swift
+// RUN: %target-swift-frontend -emit-module-path %t/COM.swiftmodule -module-name COM -enable-experimental-com-interop -com-interop-model=microsoft %S/../Inputs/COM.swift
+// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-com-interop -com-interop-model=microsoft -disable-implicit-com-module-import -I %t -primary-file %s %S/Inputs/com_importer.swift
 
 // `@com` ID synthesis references the COM module's `CLSID`/`IID` types, so it
 // must require that COM is imported by *this* file -- not merely loaded because

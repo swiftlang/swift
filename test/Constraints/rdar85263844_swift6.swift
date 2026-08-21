@@ -3,7 +3,7 @@
 // rdar://85263844 - initializer 'init(_:)' requires the types be equivalent
 func rdar85263844(arr: [(q: String, a: Int)]) -> AnySequence<(question: String, answer: Int)> {
   AnySequence(arr.map { $0 })
-  // expected-error@-1 {{initializer 'init(_:)' requires the types '(question: String, answer: Int)' and '(q: String, a: Int)' be equivalent}}
+  // expected-warning@-1 {{tuple conversion from '(q: String, a: Int)' to '(question: String, answer: Int)' mismatches labels; this will be an error in a future Swift language mode}}
 }
 
 // Another case for rdar://85263844

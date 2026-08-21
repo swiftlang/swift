@@ -3683,7 +3683,7 @@ namespace {
       case OverloadChoiceKind::ExtractFunctionIsolation: {
         auto isolationType = solution.getResolvedType(expr);
         auto *extractExpr = new (ctx)
-          ExtractFunctionIsolationExpr(base,
+          ExtractFunctionIsolationExpr(cs.coerceToRValue(base),
                                        expr->getEndLoc(),
                                        isolationType);
         return cs.cacheType(extractExpr);
@@ -7862,6 +7862,21 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         auto newExpr =
             cs.cacheType(new (ctx) FunctionConversionExpr(expr, toFunc));
         return newExpr;
+      }
+    }
+
+    // If we have a ClosureExpr, then we can safely propagate the
+    // '@called(once)' bit to the closure without invalidating prior analysis.
+    fromEI = fromFunc->getExtInfo();
+    if (toEI.isCalledOnce() && !fromEI.isCalledOnce()) {
+      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withCalledOnce());
+      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+
+        // Propagating '@called(once)' might have satisfied the entire
+        // conversion. If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
       }
     }
 

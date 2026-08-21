@@ -50,6 +50,7 @@
 //
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_BuiltinModule
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // CHECK-NOT: Type verification
 

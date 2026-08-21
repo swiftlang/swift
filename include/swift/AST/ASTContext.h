@@ -187,6 +187,16 @@ std::optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
 /// "NS" prefix stripping will apply under omit-needless-words.
 StringRef getSwiftName(KnownFoundationEntity kind);
 
+// We explicitly define the BumpPtrAllocator template parameters here since the
+// solver memory limit is based on the total number of bytes allocated for the
+// slabs, so can be affected by the values chosen. Currently these values match
+// what is used in LLVM for stable/23.x.
+struct ConstraintSolverAllocator
+    : public llvm::BumpPtrAllocatorImpl<llvm::MallocAllocator,
+                                        /*SlabSize*/ 4096,
+                                        /*SizeThreshold*/ 4096,
+                                        /*GrowthDelay*/ 128> {};
+
 /// Introduces a new constraint checker arena, whose lifetime is
 /// tied to the lifetime of this RAII object.
 class ConstraintCheckerArenaRAII {
@@ -203,7 +213,7 @@ public:
   /// \param allocator The allocator used for allocating any data that
   /// goes into the constraint checker arena.
   ConstraintCheckerArenaRAII(ASTContext &self,
-                             llvm::BumpPtrAllocator &allocator);
+                             ConstraintSolverAllocator &allocator);
 
   ConstraintCheckerArenaRAII(const ConstraintCheckerArenaRAII &) = delete;
   ConstraintCheckerArenaRAII(ConstraintCheckerArenaRAII &&) = delete;
@@ -925,17 +935,26 @@ public:
 
   /// Get the availability of features introduced in the specified version
   /// of the Swift compiler for the target platform.
-  AvailabilityRange getSwiftAvailability(unsigned major, unsigned minor) const;
+  ///
+  /// Some targets have a minimum supported OS version that postdates the
+  /// introduction of an older Swift runtime, and features from that runtime are
+  /// therefore reported as being always available. Pass \p ignoreMinOS to get
+  /// the OS version in which the features actually appeared instead.
+  AvailabilityRange getSwiftAvailability(unsigned major, unsigned minor,
+                                         bool ignoreMinOS = false) const;
 
   // For each feature defined in FeatureAvailability, define two functions;
   // the latter, with the suffix RuntimeAvailability, is for use with
   // AvailabilityRange::forRuntimeTarget(), and only looks at the Swift
   // runtime version.
 #define FEATURE(N, V)                                                          \
-  inline AvailabilityRange get##N##Availability() const {                      \
+  inline AvailabilityRange get##N##Availability(bool ignoreMinOS = false)      \
+      const {                                                                  \
     if (LangOpts.hasFeature(Feature::Embedded))                                \
       return AvailabilityRange::alwaysAvailable();                             \
-    return getSwiftAvailability V;                                             \
+    auto version = llvm::VersionTuple V;                                       \
+    return getSwiftAvailability(version.getMajor(), *version.getMinor(),       \
+                                ignoreMinOS);                                  \
   }                                                                            \
   inline AvailabilityRange get##N##RuntimeAvailability() const {               \
     return AvailabilityRange(VersionRange::allGTE(llvm::VersionTuple V));      \

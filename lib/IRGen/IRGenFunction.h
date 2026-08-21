@@ -39,6 +39,10 @@ namespace llvm {
   class Function;
 }
 
+namespace clang {
+  class FunctionDecl;
+}
+
 namespace swift {
   class ArchetypeType;
   class IRGenOptions;
@@ -483,14 +487,33 @@ public:
                                 const llvm::Twine &name ="");
   void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size,
                           llvm::Value *alignMask);
-  
+  llvm::Value *emitAllocRawTypedCall(llvm::Value *size,
+                                     llvm::Value *alignMask,
+                                     llvm::Value *typeDescriptor,
+                                     const llvm::Twine &name = "");
+  void emitDeallocRawTypedCall(llvm::Value *pointer, llvm::Value *size,
+                               llvm::Value *alignMask,
+                               llvm::Value *typeDescriptor);
+
   void emitAllocBoxCall(llvm::Value *typeMetadata,
+                         std::optional<uint64_t> mallocTypeId,
                          llvm::Value *&box,
                          llvm::Value *&valueAddress);
+
+  void emitAllocBoxTypedCall(llvm::Value *typeMetadata,
+                             llvm::Value *typeDescriptor,
+                             llvm::Value *&box,
+                             llvm::Value *&valueAddress);
 
   void emitMakeBoxUniqueCall(llvm::Value *box, llvm::Value *typeMetadata,
                              llvm::Value *alignMask, llvm::Value *&outBox,
                              llvm::Value *&outValueAddress);
+
+  void emitMakeBoxUniqueTypedCall(llvm::Value *box, llvm::Value *typeMetadata,
+                                  llvm::Value *alignMask,
+                                  llvm::Value *typeDescriptor,
+                                  llvm::Value *&outBox,
+                                  llvm::Value *&outValueAddress);
 
   void emitDeallocBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
@@ -740,6 +763,7 @@ public:
 
   // Routines to deal with box (embedded) runtime calls.
   void emitReleaseBox(llvm::Value *value);
+  void emitReleaseBoxTyped(llvm::Value *value, llvm::Value *typeDescriptor);
 
   // Routines for the ObjC reference-counting style.
   void emitObjCStrongRetain(llvm::Value *value);
@@ -750,7 +774,7 @@ public:
   llvm::Value *emitBlockCopyCall(llvm::Value *value);
   void emitBlockRelease(llvm::Value *value);
 
-  void emitForeignReferenceTypeLifetimeOperation(ValueDecl *fn,
+  void emitForeignReferenceTypeLifetimeOperation(const clang::FunctionDecl *fn,
                                                  llvm::Value *value,
                                                  bool needsNullCheck = false);
 

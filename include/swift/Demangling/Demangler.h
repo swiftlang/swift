@@ -20,8 +20,10 @@
 #define SWIFT_DEMANGLING_DEMANGLER_H
 
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/Errors.h"
 #include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/NamespaceMacros.h"
+#include "llvm/Support/Alignment.h"
 
 //#define NODE_FACTORY_DEBUGGING
 
@@ -61,12 +63,6 @@ class NodeFactory {
   /// This initial size is good enough to fit most de-manglings.
   size_t SlabSize = 100 * sizeof(Node);
 
-  static char *align(char *Ptr, size_t Alignment) {
-    assert(Alignment > 0);
-    return (char*)(((uintptr_t)Ptr + Alignment - 1)
-                     & ~((uintptr_t)Alignment - 1));
-  }
-
   static void freeSlabs(AllocatedSlab *slab);
 
   /// If not null, the NodeFactory from which this factory borrowed free memory.
@@ -74,6 +70,10 @@ class NodeFactory {
 
   /// True if some other NodeFactory borrowed free memory from this factory.
   bool isBorrowed = false;
+
+  /// Set when a size limit was exceeded and the demangling or remangling
+  /// cannot be completed.
+  bool TooComplex = false;
 
 #ifdef NODE_FACTORY_DEBUGGING
   size_t allocatedMemory = 0;
@@ -86,6 +86,13 @@ public:
   /// Enabled only by the unit tests to test the failure paths.
   bool disableAssertionsForUnitTest = false;
 #endif
+
+  /// True if a size limit was exceeded. Once set, the result of the operation
+  /// in progress is incomplete and must be discarded.
+  bool isTooComplex() const { return TooComplex; }
+
+  /// Record that a size limit was exceeded.
+  void setTooComplex() { TooComplex = true; }
 
   NodeFactory() {
 #ifdef NODE_FACTORY_DEBUGGING
@@ -138,33 +145,49 @@ public:
   /// Allocates an object of type T or an array of objects of type T.
   template<typename T> T *Allocate(size_t NumObjects = 1) {
     assert(!isBorrowed);
+    if (NumObjects > SIZE_MAX / sizeof(T))
+      fatal(0, "too many objects requested from demangler allocator\n");
     size_t ObjectSize = NumObjects * sizeof(T);
-    CurPtr = align(CurPtr, alignof(T));
+    // Don't move CurPtr past End when aligning, which would make the space
+    // computation below wrap around.
+    size_t Padding = llvm::offsetToAlignedAddr(CurPtr, llvm::Align::Of<T>());
+    size_t Available = CurPtr ? (size_t)(End - CurPtr) : 0;
 #ifdef NODE_FACTORY_DEBUGGING
     fprintf(stderr, "%salloc %zu, CurPtr = %p\n", indent().c_str(), ObjectSize, (void *)CurPtr)
     allocatedMemory += ObjectSize;
 #endif
 
     // Do we have enough space in the current slab?
-    if (!CurPtr || CurPtr + ObjectSize > End) {
+    if (!CurPtr || Available < Padding || Available - Padding < ObjectSize) {
       // No. We have to malloc a new slab.
+      size_t MaxSlabSize = SIZE_MAX - sizeof(AllocatedSlab);
+      if (ObjectSize > MaxSlabSize - alignof(T))
+        fatal(0, "demangling allocation of %zu bytes is too large\n",
+              ObjectSize);
+      size_t MinSize = ObjectSize + alignof(T);
       // We double the slab size for each allocated slab.
-      SlabSize = std::max(SlabSize * 2, ObjectSize + alignof(T));
+      SlabSize = std::max(SlabSize <= MaxSlabSize / 2 ? SlabSize * 2
+                                                      : MaxSlabSize,
+                          MinSize);
       size_t AllocSize = sizeof(AllocatedSlab) + SlabSize;
       AllocatedSlab *newSlab = (AllocatedSlab *)malloc(AllocSize);
+      if (!newSlab)
+        fatal(0, "unable to allocate %zu bytes for demangling\n", AllocSize);
 
       // Insert the new slab in the single-linked list of slabs.
       newSlab->Previous = CurrentSlab;
       CurrentSlab = newSlab;
 
       // Initialize the pointers to the new slab.
-      CurPtr = align((char *)(newSlab + 1), alignof(T));
+      CurPtr = (char *)llvm::alignAddr(newSlab + 1, llvm::Align::Of<T>());
       End = (char *)newSlab + AllocSize;
       assert(CurPtr + ObjectSize <= End);
 #ifdef NODE_FACTORY_DEBUGGING
       fprintf(stderr, "%s** new slab %p, allocsize = %zu, CurPtr = %p, End = %p\n",
             indent().c_str(), newSlab, AllocSize, (void *)CurPtr, (void *)End);
 #endif
+    } else {
+      CurPtr += Padding;
     }
     T *AllocatedObj = (T *)CurPtr;
     CurPtr += ObjectSize;
@@ -180,10 +203,23 @@ public:
   /// new memory address.
   /// The \p Capacity is enlarged at least by \p MinGrowth, but can also be
   /// enlarged by a bigger value.
-  template<typename T> void Reallocate(T *&Objects, uint32_t &Capacity,
+  ///
+  /// Returns false if the new capacity or its byte size is not representable,
+  /// in which case \p Objects and \p Capacity are left unchanged.
+  template<typename T> bool Reallocate(T *&Objects, uint32_t &Capacity,
                                        size_t MinGrowth) {
     assert(!isBorrowed);
-    size_t OldAllocSize = Capacity * sizeof(T);
+
+    // The largest number of objects whose count fits in Capacity and whose
+    // byte size fits in size_t. Compute in uint64_t: Capacity is 32 bits, so
+    // the sums and products below cannot wrap on either a 32- or 64-bit
+    // target.
+    const uint64_t MaxObjects =
+        std::min((uint64_t)UINT32_MAX, (uint64_t)(SIZE_MAX / sizeof(T)));
+    if ((uint64_t)Capacity + MinGrowth > MaxObjects)
+      return false;
+
+    size_t OldAllocSize = (size_t)Capacity * sizeof(T);
     size_t AdditionalAlloc = MinGrowth * sizeof(T);
 
 #ifdef NODE_FACTORY_DEBUGGING
@@ -191,7 +227,7 @@ public:
           indent().c_str(), Capacity, OldAllocSize, MinGrowth, AdditionalAlloc);
 #endif
     if ((char *)Objects + OldAllocSize == CurPtr
-        && CurPtr + AdditionalAlloc <= End) {
+        && (size_t)(End - CurPtr) >= AdditionalAlloc) {
       // The existing array is at the end of the current slab and there is
       // enough space. So we are fine.
       CurPtr += AdditionalAlloc;
@@ -200,17 +236,24 @@ public:
       fprintf(stderr, "%s** can grow: %p\n", indent().c_str(), (void *)CurPtr);
       allocatedMemory += AdditionalAlloc;
 #endif
-      return;
+      return true;
     }
     // We need a new allocation.
-    size_t Growth = (MinGrowth >= 4 ? MinGrowth : 4);
-    if (Growth < Capacity * 2)
-      Growth = Capacity * 2;
-    T *NewObjects = Allocate<T>(Capacity + Growth);
+    uint64_t Growth = std::max<uint64_t>(MinGrowth, 4);
+    Growth = std::max(Growth, (uint64_t)Capacity * 2);
+    // Clamp the doubling so the new capacity stays representable. MinGrowth
+    // was already checked above.
+    if (Capacity + Growth > MaxObjects)
+      Growth = MaxObjects - Capacity;
+    // The clamp above bounds this by MaxObjects, so it fits in both size_t and
+    // Capacity.
+    size_t NewCapacity = (size_t)(Capacity + Growth);
+    T *NewObjects = Allocate<T>(NewCapacity);
     if (OldAllocSize)
       memcpy(NewObjects, Objects, OldAllocSize);
     Objects = NewObjects;
-    Capacity += Growth;
+    Capacity = (uint32_t)NewCapacity;
+    return true;
   }
 
   /// Copy a std::string to memory managed by the NodeFactory, returning a
@@ -304,9 +347,10 @@ public:
 
   /// Clears the content and re-allocates the buffer with an initial capacity.
   void init(NodeFactory &Factory, size_t InitialCapacity) {
+    assert(InitialCapacity <= UINT32_MAX && "capacity is not representable");
     Elems = Factory.Allocate<T>(InitialCapacity);
     NumElems = 0;
-    Capacity = InitialCapacity;
+    Capacity = (uint32_t)InitialCapacity;
   }
   
   void free() {
@@ -343,8 +387,12 @@ public:
   }
 
   void push_back(const T &NewElem, NodeFactory &Factory) {
-    if (NumElems >= Capacity)
-      Factory.Reallocate(Elems, Capacity, /*Growth*/ 1);
+    if (NumElems >= Capacity) {
+      if (!Factory.Reallocate(Elems, Capacity, /*Growth*/ 1)) {
+        Factory.setTooComplex();
+        return;
+      }
+    }
     assert(NumElems < Capacity);
     Elems[NumElems++] = NewElem;
   }
@@ -420,7 +468,15 @@ protected:
   static const int MaxNumWords = 26;
   StringRef Words[MaxNumWords];
   int NumWords = 0;
-  
+
+  /// Upper bound on the length of a single demangled identifier.
+  ///
+  /// Word substitution lets a short mangled name expand enormously, as each
+  /// one-letter reference re-appends a whole previously-seen word. The longest
+  /// mangled name in the demangler's test corpus is under 1 KB, so this leaves
+  /// ample headroom for real symbols.
+  static const size_t MaxIdentifierLength = 4 * 1024 * 1024;
+
   std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
 
   bool nextIf(StringRef str) {

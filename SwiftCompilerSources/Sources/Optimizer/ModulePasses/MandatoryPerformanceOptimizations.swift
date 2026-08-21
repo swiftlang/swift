@@ -131,6 +131,14 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       case let cast as UncheckedRefCastInst:
         specializeVTable(for: cast.type, instruction: cast)
       case let kpi as KeyPathInst:
+        // In Embedded Swift, specialize the functions that are referenced
+        // by the key path.
+        if context.options.enableEmbeddedSwift,
+           context.specializeKeyPathInst(kpi) {
+          // `kpi` has been replaced and erased; the replacement is visited on
+          // the next simplification round.
+          return
+        }
         // In embedded Swift, IRGen may emit a `keypath` inst as an immortal
         // static object of a specific concrete `KeyPath` subclass (chosen
         // per the pattern's mutability/root kind).  IRGen requests the
@@ -550,6 +558,16 @@ extension FunctionWorklist {
       case let apply as ApplySite:
         if let callee = apply.referencedFunction {
           pushIfNotVisited(callee)
+        }
+      case let kpi as KeyPathInst:
+        // A key path pattern's accessor thunks are referenced by the pattern
+        // rather than by a `function_ref`, so they are invisible to the cases
+        // above. In embedded Swift they must still be optimized: after
+        // `specializeKeyPathInst` folds the substitutions into the pattern, the
+        // specialized thunk bodies can contain calls to the still-generic
+        // accessors they wrap, and those have to be specialized before IRGen.
+        if context.options.enableEmbeddedSwift {
+          kpi.visitReferencedFunctions { pushIfNotVisited($0) }
         }
       case let bi as BuiltinInst:
         switch bi.id {

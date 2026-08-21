@@ -5846,7 +5846,8 @@ static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
     SGF.B.createPartialApply(loc, thunkValue,
                              interfaceSubs, thunkArgs,
                              toType->getCalleeConvention(),
-                             toType->getIsolation());
+                             toType->getIsolation(),
+                             toType->isCalledOnce());
 }
 
 static ManagedValue createDifferentiableFunctionThunk(
@@ -6661,11 +6662,16 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
   auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature().getGenericEnvironment();
 
+  bool isDefaultDerivative =
+      isa<ProtocolDecl>(originalAFD->getDeclContext()) &&
+      !originalAFD->getAttrs().hasAttribute<DifferentiableAttr>();
   auto origFnTy = originalFn->getLoweredFunctionType();
   auto derivativeCanGenSig = config.derivativeGenericSignature.getCanonicalSignature();
   auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices, kind, Types,
-      LookUpConformanceInModule(), derivativeCanGenSig);
+      LookUpConformanceInModule(), derivativeCanGenSig,
+      /*isReabstractionThunk*/ false, /* origTypeOfAbstraction */ CanType(),
+      isDefaultDerivative);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
   Mangle::ASTMangler mangler(getASTContext());
@@ -7618,32 +7624,42 @@ void SILGenFunction::emitProtocolWitness(
   if (enterIsolation) {
     // If we are supposed to enter the actor, do so now by hopping to the
     // actor.
-    std::optional<ManagedValue> actorSelf;
+    std::optional<ManagedValue> actor;
 
-    // For an instance actor, get the actor 'self'.
-    if (*enterIsolation == ActorIsolation::ActorInstance) {
-      assert(enterIsolation->isActorInstanceForSelfParameter() && "Not self?");
-      auto actorSelfVal = origParams.back();
+    // If the requirement is isolated to an actor instance it could be either
+    // `self` or an `isolated` parameter.
+    if (enterIsolation->isActorInstanceIsolated()) {
+      ManagedValue actorParamVal;
+      if (enterIsolation->isActorInstanceForSelfParameter()) {
+        // Get the actor 'self'.
+        actorParamVal = origParams.back();
+      } else {
+        // Or `isolated` parameter.
+        unsigned formalIndex = enterIsolation->getActorInstanceParameterIndex();
+        actorParamVal =
+            origParams[reqtOrigTy.getLoweredParamIndex(formalIndex)];
+      }
 
-      if (actorSelfVal.getType().isAddress()) {
-        auto &actorSelfTL = getTypeLowering(actorSelfVal.getType());
-        if (!actorSelfTL.isAddressOnly()) {
-          actorSelfVal = emitManagedLoad(
-              *this, loc, actorSelfVal, actorSelfTL);
+      // Load the actor instance if necessary.
+      if (actorParamVal.getType().isAddress()) {
+        auto &actorInstanceTL = getTypeLowering(actorParamVal.getType());
+        if (!actorInstanceTL.isAddressOnly()) {
+          actorParamVal =
+              emitManagedLoad(*this, loc, actorParamVal, actorInstanceTL);
         }
       }
 
-      actorSelf = actorSelfVal;
+      actor = actorParamVal;
     }
 
     if (!F.isAsync()) {
       assert(isPreconcurrency);
 
       if (getASTContext().LangOpts.isDynamicActorIsolationCheckingEnabled()) {
-        emitPreconditionCheckExpectedExecutor(loc, *enterIsolation, actorSelf);
+        emitPreconditionCheckExpectedExecutor(loc, *enterIsolation, actor);
       }
     } else {
-      emitHopToTargetActor(loc, enterIsolation, actorSelf);
+      emitHopToTargetActor(loc, enterIsolation, actor);
     }
   }
 

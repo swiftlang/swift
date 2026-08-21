@@ -42,7 +42,9 @@
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
@@ -605,6 +607,10 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
       NewF->addSemanticsAttr(Attr);
   }
 
+  // The optimized function, which takes over the body of the original
+  // function, goes into the same section as the original function.
+  NewF->setSection(F->section());
+
   // Do the last bit of work to the newly created optimized function.
   DeadArgumentFinalizeOptimizedFunction();
   ArgumentExplosionFinalizeOptimizedFunction();
@@ -948,6 +954,15 @@ public:
     assert(F->isThunk() && "Old function should have been turned into a thunk");
 
     invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    // The thunk body was built from scratch after transferring the original
+    // blocks to the specialized function. If the thunk is no-return, it was
+    // terminated with an `unreachable`, which may require completing
+    // lifetimes and breaking infinite loops before the pass finishes.
+    if (F->needBreakInfiniteLoops())
+      breakInfiniteLoops(getPassManager(), F);
+    if (F->needCompleteLifetimes())
+      completeAllLifetimes(getPassManager(), F);
 
     // Make sure the PM knows about this function. This will also help us
     // with self-recursion.

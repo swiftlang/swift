@@ -918,7 +918,7 @@ llvm::Constant *getCoroAllocFn(AllocationKind kind, IRGenModule &IGM) {
             auto *alloca =
                 IGF.Builder.IRBuilderBase::CreateAlloca(IGF.IGM.Int8Ty, size);
             alloca->setAlignment(llvm::Align(MaximumAlignment));
-            auto *retPopless = IGF.Builder.CreateIntrinsic(
+            auto *retPopless = IGF.Builder.CreateIntrinsicWithoutFolding(
                 IGF.IGM.VoidTy, llvm::Intrinsic::ret_popless, {});
             retPopless->setTailCallKind(
                 llvm::CallInst::TailCallKind::TCK_MustTail);

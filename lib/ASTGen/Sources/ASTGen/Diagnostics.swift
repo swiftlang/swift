@@ -171,6 +171,20 @@ extension ASTGenDiagnostic {
       message: "unexpected arguments in '\(attribute.attributeName.trimmedDescription)' attribute"
     )
   }
+
+  static func expectedStringLiteralArgument(_ node: some SyntaxProtocol) -> Self {
+    Self(
+      node: node,
+      message: "expected string literal"
+    )
+  }
+
+  static func forbiddenInterpolatedStringArgument(_ node: some SyntaxProtocol) -> Self {
+    Self(
+      node: node,
+      message: "argument cannot be an interpolated string literal"
+    )
+  }
 }
 
 extension ASTGenDiagnostic {

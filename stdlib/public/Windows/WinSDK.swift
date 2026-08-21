@@ -16,42 +16,8 @@
 
 // WinBase.h
 @inlinable
-public var HANDLE_FLAG_INHERIT: DWORD {
-  0x00000001
-}
-
-// WinBase.h
-@inlinable
-public var STARTF_USESTDHANDLES: DWORD {
-  0x00000100
-}
-
-// WinBase.h
-@inlinable
-public var INFINITE: DWORD {
-  DWORD(bitPattern: -1)
-}
-
-// WinBase.h
-@inlinable
 public var WAIT_OBJECT_0: DWORD {
   0
-}
-
-// WinBase.h
-@inlinable
-public var STD_INPUT_HANDLE: DWORD {
-  DWORD(bitPattern: -10)
-}
-
-@inlinable
-public var STD_OUTPUT_HANDLE: DWORD {
-  DWORD(bitPattern: -11)
-}
-
-@inlinable
-public var STD_ERROR_HANDLE: DWORD {
-  DWORD(bitPattern: -12)
 }
 
 // handleapi.h
@@ -93,17 +59,6 @@ public var FIONBIO: Int32 {
   Int32(bitPattern: 0x8004667e)
 }
 
-// WinUser.h
-@inlinable
-public var CW_USEDEFAULT: Int32 {
-  Int32(bitPattern: 2147483648)
-}
-
-@inlinable
-public var QS_MOUSE: UINT {
-  UINT(QS_MOUSEMOVE | QS_MOUSEBUTTON)
-}
-
 @inlinable
 public var QS_INPUT: UINT {
   QS_MOUSE | UINT(QS_KEY | QS_RAWINPUT | QS_TOUCH | QS_POINTER)
@@ -127,12 +82,6 @@ public var WS_OVERLAPPEDWINDOW: UINT {
 @inlinable
 public var WS_POPUPWINDOW: UINT {
   UINT(numericCast(WS_POPUP) | WS_BORDER | WS_SYSMENU)
-}
-
-// fileapi.h
-@inlinable
-public var INVALID_FILE_ATTRIBUTES: DWORD {
-  DWORD(bitPattern: -1)
 }
 
 // CommCtrl.h

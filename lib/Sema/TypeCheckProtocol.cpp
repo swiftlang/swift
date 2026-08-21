@@ -22,6 +22,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckBitwise.h"
+#include "TypeCheckCOM.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckEffects.h"
@@ -118,8 +119,16 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
     // function type not in a parameter is, more or less, implicitly @escaping.
     // For Sendable, we want to behave as though it was not necessary because
     // function types that aren't in a parameter can be Sendable or not.
+    // For `@called(once)`, we want to behave as though it was not necessary
+    // because function types that aren't in a parameter can be called once
+    // or not.
+    // For `@called(once)`, we want to behave as though it was necessary, just
+    // like noescape, because a plain function type can always satisfy a
+    // `@called(once)` requirement but a `@called(once)` function type cannot
+    // satisfy a plain one.
     // FIXME: Should we check for a Sendable bound on the requirement type?
-    bool inRequirement = (adjustment != TypeAdjustment::NoescapeToEscaping);
+    bool inRequirement = (adjustment != TypeAdjustment::NoescapeToEscaping &&
+                          adjustment != TypeAdjustment::CalledOnceToPlain);
     Type adjustedReqtType =
       adjustInferredAssociatedType(adjustment, reqtType, inRequirement);
 
@@ -143,6 +152,7 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
 
   applyAdjustment(TypeAdjustment::NoescapeToEscaping);
   applyAdjustment(TypeAdjustment::NonsendableToSendable);
+  applyAdjustment(TypeAdjustment::CalledOnceToPlain);
 
   // For @objc protocols, deal with differences in the optionality.
   // FIXME: It probably makes sense to extend this to non-@objc
@@ -2014,6 +2024,8 @@ checkWitnessAvailability(const ValueDecl *requirement, const ValueDecl *witness,
   assert(dc->getSelfNominalTypeDecl() &&
          "Must have a nominal or extension context");
 
+  // FIXME: [availability] Adopt getRequirementMatchAvailabilityRestriction().
+
   auto requirementAvailability =
       AvailabilityContext::forDeclSignature(requirement);
   requiredContext.constrainWithContext(requirementAvailability, ctx);
@@ -2598,26 +2610,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
                            ProtoType);
     conformance->setInvalid();
     return;
-  }
-
-  if (T->isActorType()) {
-    if (auto globalActor = Proto->getGlobalActorAttr()) {
-      Context.Diags.diagnose(ComplainLoc,
-                             diag::actor_cannot_conform_to_global_actor_protocol, T,
-                             ProtoType);
-
-      CustomAttr *attr;
-      NominalTypeDecl *actor;
-
-      std::tie(attr, actor) = *globalActor;
-
-      Context.Diags.diagnose(attr->getLocation(),
-                             diag::protocol_isolated_to_global_actor_here, ProtoType,
-                             actor->getDeclaredInterfaceType());
-
-      conformance->setInvalid();
-      return;
-    }
   }
 
   if (Proto->isObjC()) {
@@ -6889,6 +6881,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   bool hasDeprecatedUnsafeSendable = false;
   bool sendableConformancePreconcurrency = false;
   for (auto conformance : conformances) {
+    if (Context.LangOpts.EnableCOMInterop)
+      com::validateConformance(conformance);
+
     // Check and record normal conformances.
     if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
       groupChecker.addConformance(normal);

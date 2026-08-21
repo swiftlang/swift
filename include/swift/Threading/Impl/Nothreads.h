@@ -22,8 +22,6 @@
 
 #include <optional>
 
-#include "chrono_utils.h"
-
 namespace swift {
 namespace threading_impl {
 
@@ -84,13 +82,22 @@ inline void cond_unlock(cond_handle &handle) {}
 inline void cond_signal(cond_handle &handle) {}
 inline void cond_broadcast(cond_handle &handle) {}
 inline void cond_wait(cond_handle &handle) {}
-template <class Rep, class Period>
-inline bool cond_wait(cond_handle &handle,
-                      std::chrono::duration<Rep, Period> duration) {
-  return true;
-}
-inline bool cond_wait(cond_handle &handle,
-                      std::chrono::system_clock::time_point deadline) {
+
+// Wait with a timeout or until a deadline.
+//
+// With no threads, nobody can ever signal the condition variable, so there's
+// nothing to wait for; this always reports that the wait timed out, whatever
+// the timeout was.  Since the timeout is never consulted, it's taken as a
+// deduced template parameter (which also covers both the duration and the
+// deadline forms of the call).  Spelling it as std::chrono::duration would
+// mean pulling in <chrono>, which some standard library implementations treat
+// as hosted-only -- libstdc++ hard-errors on it under -ffreestanding, because
+// its clocks need operating system support -- and this is the threading
+// implementation that freestanding builds use.  Freestanding Swift measures
+// time with the runtime's own clock functions (swift_get_time() and friends),
+// which deal in plain second/nanosecond counts rather than std::chrono types.
+template <class Timeout>
+inline bool cond_wait(cond_handle &handle, Timeout timeout) {
   return true;
 }
 

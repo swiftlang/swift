@@ -36,6 +36,11 @@ class EnumPayloadSchema {
   // A size in bits less than 0 indicates that the payload size is
   // dynamic.
   const int64_t BitSize;
+  // If non-empty, the payload is represented by exactly these LLVM element
+  // types instead of the generic width-chunked representation. This lets an
+  // enum carry a payload with a specific scalar type (e.g. `ptr` for a
+  // `.none == null` optional reference) rather than opaque integer words.
+  SmallVector<llvm::Type *, 2> ExplicitTypes;
 public:
   /// Create a new schema with a dynamic size.
   EnumPayloadSchema() : BitSize(-1) {}
@@ -43,6 +48,14 @@ public:
   /// Create a new schema with the given fixed size in bits.
   explicit EnumPayloadSchema(unsigned bits)
     : BitSize(static_cast<int64_t>(bits)) {}
+
+  /// Create a new fixed-size schema described by an explicit list of LLVM
+  /// element types.
+  static EnumPayloadSchema withExplicitTypes(ArrayRef<llvm::Type *> types) {
+    EnumPayloadSchema result(0);
+    result.ExplicitTypes.append(types.begin(), types.end());
+    return result;
+  }
 
   /// Report whether the schema has a fixed size.
   explicit operator bool() const {
@@ -53,6 +66,13 @@ public:
   template<typename TypeFn /* void(llvm::Type *schemaType) */>
   void forEachType(IRGenModule &IGM, TypeFn &&fn) const {
     assert(BitSize >= 0 && "payload size must not be dynamic");
+
+    // If the schema names its element types explicitly, use them as-is.
+    if (!ExplicitTypes.empty()) {
+      for (llvm::Type *type : ExplicitTypes)
+        fn(type);
+      return;
+    }
 
     // Chunk into pointer-sized integer values.
     int64_t bitSize = BitSize;

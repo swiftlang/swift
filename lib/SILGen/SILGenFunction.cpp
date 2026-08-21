@@ -673,6 +673,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       auto captureKind = SGM.Types.getDeclCaptureKind(capture, expansion);
       switch (captureKind) {
       case CaptureKind::Constant:
+      case CaptureKind::Consuming:
         capturedArgs.push_back(emitUndef(getLoweredType(type)));
         break;
       case CaptureKind::Immutable:
@@ -837,6 +838,28 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       if (interfaceType->is<ReferenceStorageType>())
         val = emitConversionFromSemanticValue(loc, val, getLoweredType(type));
 
+      capturedArgs.push_back(emitManagedRValueWithCleanup(val));
+      break;
+    }
+    case CaptureKind::Consuming: {
+      assert(!isPack);
+      assert(val->getType().isAddress() &&
+             "@called(once) values are bound as local boxed storage");
+
+      auto &tl = getTypeLowering(valueType);
+
+      // Consuming a capture means taking the original value out of its local
+      // storage and moving it into the closure. Any further use of the outer
+      // variable afterward is then caught by the move checker as a double
+      // consumption, same as any other noncopyable local.
+      if (val->getType().isMoveOnly()) {
+        val = B.createMarkUnresolvedNonCopyableValueInst(
+            loc, val,
+            MarkUnresolvedNonCopyableValueInst::CheckKind::
+                ConsumableAndAssignable);
+      }
+
+      val = emitLoad(loc, val, tl, SGFContext(), IsTake).forward(*this);
       capturedArgs.push_back(emitManagedRValueWithCleanup(val));
       break;
     }
@@ -1086,14 +1109,24 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     for (auto capture : capturedArgs)
       forwardedArgs.push_back(capture.forward(*this));
 
-    auto calleeConvention = ParameterConvention::Direct_Guaranteed;
+    // A `@called(once)` closure value's callee convention must be
+    // `Direct_Owned` to match DefaultCalledOnceConventions, or the
+    // ABI-difference check treats it as needing a reabstraction thunk
+    // (which then fails: thunks are always Thin, and Thin + CalledOnce
+    // is an invalid combination).
+    auto calleeConvention = typeContext.ExpectedLoweredType->isCalledOnce()
+                                ? ParameterConvention::Direct_Owned
+                                : ParameterConvention::Direct_Guaranteed;
 
     auto resultIsolation =
         (hasErasedIsolation ? SILFunctionTypeIsolation::forErased()
                             : SILFunctionTypeIsolation::forUnknown());
     auto toClosure =
       B.createPartialApply(loc, functionRef, subs, forwardedArgs,
-                           calleeConvention, resultIsolation);
+                           calleeConvention, resultIsolation,
+                           PartialApplyInst::OnStackKind::NotOnStack,
+                           StackAllocationIsNested, nullptr,
+                           typeContext.ExpectedLoweredType->isCalledOnce());
     result = emitManagedRValueWithCleanup(toClosure);
   }
 

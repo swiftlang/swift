@@ -86,6 +86,7 @@ class DeclContext;
 class DiagnosticEngine;
 class EffectiveClangContext;
 class EnumDecl;
+class Evaluator;
 class FuncDecl;
 class ImportDecl;
 class IRGenOptions;
@@ -742,6 +743,9 @@ public:
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
+  std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
+  getForeignReferenceTypeOperations(const clang::RecordDecl *decl) override;
+
   void checkCalledClangFunction(const ValueDecl *funcDecl,
                                 SourceLoc callSiteLoc) override;
 
@@ -777,10 +781,6 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 bool isCompletionHandlerParamName(StringRef paramName);
 
 namespace importer {
-/// Returns true if the given C/C++ reference type uses "immortal"
-/// retain/release functions.
-bool hasAnyImmortalAttr(const clang::RecordDecl *decl);
-
 struct ReturnOwnershipInfo {
   ReturnOwnershipInfo(const clang::NamedDecl *decl);
 
@@ -819,6 +819,19 @@ bool isCxxConstReferenceType(const clang::Type *type);
 /// Determine whether the given Clang record declaration has an attribute that
 /// makes it import as a reference types. Does not check its bases, if any.
 bool hasImportReferenceAttr(const clang::RecordDecl *decl);
+
+/// Whether any declaration of \p decl carries one of the given swift_attrs.
+/// A swift_attr propagates to later redeclarations only, and Clang carries just
+/// the first one, so an attribute is not necessarily visible on the declaration
+/// at hand.
+bool hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
+                                  ArrayRef<StringRef> attrs);
+
+/// Whether the given Clang record is imported as a foreign reference type,
+/// including when it has no definition. Accounts for inherited reference-ness
+/// when a definition is available, and for an annotation on any declaration in
+/// the chain when it is not.
+bool isForeignReferenceRecord(const clang::RecordDecl *decl, Evaluator &eval);
 
 /// Determine whether the given Clang record declaration has the
 /// swift_attr("import_opaque_pointer") attribute, which causes any pointer

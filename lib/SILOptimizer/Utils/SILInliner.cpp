@@ -157,7 +157,6 @@ public:
         if (!mdi) {
           continue;
         }
-        assert(mdi.isNonEscaping());
         if (auto *valueMDI = dyn_cast<MarkDependenceInst>(*mdi)) {
           valueMDI->replaceAllUsesWith(valueMDI->getValue());
         }

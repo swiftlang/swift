@@ -103,7 +103,7 @@ const void * __sized_by_or_null(len - offset) complexExpr(int len, int offset, i
 // }}
 const void * __sized_by_or_null(len) _Null_unspecified nullUnspecified(int len, int len2, const void * _Null_unspecified p __sized_by_or_null(len2) __lifetimebound);
 
-// expected-experimental-warning@+14{{combining '__sized_by_or_null' and '_Nonnull'; did you mean '__sized_by' instead?}}
+// expected-experimental-warning@+14 2 {{combining '__sized_by_or_null' and '_Nonnull'; did you mean '__sized_by' instead?}}
 // expected-experimental-expansion@+13:97{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func nonnull(_ len: CInt, _ p: RawSpan) -> RawSpan {|}}
@@ -221,7 +221,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: 3ed369e458a494f8ed6a65c32a5a1b77f5d58e8ee26e1b29016ac8adff771740
+// GENERATED-HASH: bc828f607531ee66a74238439370c9f68f62fac068c6e4294af725c6056d2cab
 import Test
 
 
@@ -230,114 +230,17 @@ func call_simple(_ len: CInt, _ len2: CInt, _ p: UnsafeRawPointer!) -> UnsafeRaw
   return unsafe simple(len, len2, p)
 }
 
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ len: CInt, _ p: RawSpan) -> RawSpan {
+  // expected-stable-error@+3{{missing argument for parameter #3 in call}}
+  // expected-stable-error@+2{{cannot convert value of type 'RawSpan' to expected argument type 'CInt' (aka 'Int32')}}
+  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeRawPointer?' to return type 'RawSpan'}}
+  return simple(len, p)
+}
+
 func call_shared(_ len: CInt, _ p: UnsafeRawPointer!) -> UnsafeRawPointer! {
   return unsafe shared(len, p)
-}
-
-func call_complexExpr(_ len: CInt, _ offset: CInt, _ len2: CInt, _ p: UnsafeRawPointer!) -> UnsafeRawPointer! {
-  return unsafe complexExpr(len, offset, len2, p)
-}
-
-func call_nullUnspecified(_ len: CInt, _ len2: CInt, _ p: UnsafeRawPointer!) -> UnsafeRawPointer! {
-  return unsafe nullUnspecified(len, len2, p)
-}
-
-func call_nonnull(_ len: CInt, _ len2: CInt, _ p: UnsafeRawPointer) -> UnsafeRawPointer {
-  return unsafe nonnull(len, len2, p)
-}
-
-func call_nullable(_ len: CInt, _ len2: CInt, _ p: UnsafeRawPointer?) -> UnsafeRawPointer? {
-  return unsafe nullable(len, len2, p)
-}
-
-func call_opaque(_ len: CInt, _ len2: CInt, _ p: OpaquePointer!) -> OpaquePointer! {
-  return unsafe opaque(len, len2, p)
-}
-
-func call_nonsizedLifetime(_ len: CInt, _ p: UnsafeRawPointer!) -> UnsafeRawPointer! {
-  return unsafe nonsizedLifetime(len, p)
-}
-
-func call_bytesized(_ size: CInt, _ p: UnsafePointer<UInt8>!) -> UnsafeMutablePointer<UInt8>! {
-  return unsafe bytesized(size, p)
-}
-
-func call_charsized(_ p: UnsafeMutablePointer<CChar>!, _ size: CInt) -> UnsafeMutablePointer<CChar>! {
-  return unsafe charsized(p, size)
-}
-
-func call_doublebytesized(_ p: UnsafeMutablePointer<UInt16>!, _ size: CInt) -> UnsafePointer<UInt16>! {
-  return unsafe doublebytesized(p, size)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_bytesized(_ p: RawSpan) -> MutableRawSpan {
-  // expected-stable-error@+3{{missing argument for parameter #2 in call}}
-  // expected-stable-error@+2{{cannot convert value of type 'RawSpan' to expected argument type 'CInt' (aka 'Int32')}}
-  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<UInt8>?' to return type 'MutableRawSpan'}}
-  return bytesized(p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(copy p)
-@_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_charsized(_ p: inout MutableRawSpan) -> MutableRawSpan {
-  // expected-stable-error@+2{{missing argument for parameter #2 in call}}
-  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<CChar>?' (aka 'Optional<UnsafeMutablePointer<Int8>>') to return type 'MutableRawSpan'}}
-  return charsized(&p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: RawSpan) -> RawSpan {
-  // expected-stable-error@+3{{missing argument for parameter #4 in call}}
-  // expected-stable-error@+2{{cannot convert value of type 'RawSpan' to expected argument type 'CInt' (aka 'Int32')}}
-  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeRawPointer?' to return type 'RawSpan'}}
-  return complexExpr(len, offset, p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ len: CInt, _ p: RawSpan) -> RawSpan {
-  // expected-stable-error@+3{{missing argument for parameter #3 in call}}
-  // expected-stable-error@+2{{cannot convert value of type 'RawSpan' to expected argument type 'CInt' (aka 'Int32')}}
-  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeRawPointer' to return type 'RawSpan'}}
-  return nonnull(len, p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(borrow p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonsizedLifetime(_ len: CInt, _ p: UnsafeRawPointer!) -> RawSpan {
-  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeRawPointer?' to return type 'RawSpan'}}
-  return unsafe nonsizedLifetime(len, p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ len: CInt, _ p: RawSpan) -> RawSpan {
-  // expected-stable-error@+3{{missing argument for parameter #3 in call}}
-  // expected-stable-error@+2{{cannot convert value of type 'RawSpan' to expected argument type 'CInt' (aka 'Int32')}}
-  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeRawPointer?' to return type 'RawSpan'}}
-  return nullUnspecified(len, p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ len: CInt, _ p: RawSpan?) -> RawSpan? {
-  // expected-stable-error@+3{{missing argument for parameter #3 in call}}
-  // expected-stable-error@+2{{cannot convert value of type 'RawSpan?' to expected argument type 'CInt' (aka 'Int32')}}
-  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeRawPointer?' to return type 'RawSpan?'}}
-  return nullable(len, p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_opaque(_ len: CInt, _ p: RawSpan) -> RawSpan {
-  // expected-stable-error@+3{{missing argument for parameter #3 in call}}
-  // expected-stable-error@+2{{cannot convert value of type 'RawSpan' to expected argument type 'CInt' (aka 'Int32')}}
-  // expected-stable-error@+1{{cannot convert return expression of type 'OpaquePointer?' to return type 'RawSpan'}}
-  return opaque(len, p)
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -349,11 +252,108 @@ func call_doublebytesized(_ p: UnsafeMutablePointer<UInt16>!, _ size: CInt) -> U
   return shared(p)
 }
 
+func call_complexExpr(_ len: CInt, _ offset: CInt, _ len2: CInt, _ p: UnsafeRawPointer!) -> UnsafeRawPointer! {
+  return unsafe complexExpr(len, offset, len2, p)
+}
+
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @_lifetime(copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ len: CInt, _ p: RawSpan) -> RawSpan {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: RawSpan) -> RawSpan {
+  // expected-stable-error@+3{{missing argument for parameter #4 in call}}
+  // expected-stable-error@+2{{cannot convert value of type 'RawSpan' to expected argument type 'CInt' (aka 'Int32')}}
+  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeRawPointer?' to return type 'RawSpan'}}
+  return complexExpr(len, offset, p)
+}
+
+func call_nullUnspecified(_ len: CInt, _ len2: CInt, _ p: UnsafeRawPointer!) -> UnsafeRawPointer! {
+  return unsafe nullUnspecified(len, len2, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ len: CInt, _ p: RawSpan) -> RawSpan {
   // expected-stable-error@+3{{missing argument for parameter #3 in call}}
   // expected-stable-error@+2{{cannot convert value of type 'RawSpan' to expected argument type 'CInt' (aka 'Int32')}}
   // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeRawPointer?' to return type 'RawSpan'}}
-  return simple(len, p)
+  return nullUnspecified(len, p)
+}
+
+func call_nonnull(_ len: CInt, _ len2: CInt, _ p: UnsafeRawPointer) -> UnsafeRawPointer {
+  return unsafe nonnull(len, len2, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ len: CInt, _ p: RawSpan) -> RawSpan {
+  // expected-stable-error@+3{{missing argument for parameter #3 in call}}
+  // expected-stable-error@+2{{cannot convert value of type 'RawSpan' to expected argument type 'CInt' (aka 'Int32')}}
+  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeRawPointer' to return type 'RawSpan'}}
+  return nonnull(len, p)
+}
+
+func call_nullable(_ len: CInt, _ len2: CInt, _ p: UnsafeRawPointer?) -> UnsafeRawPointer? {
+  return unsafe nullable(len, len2, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ len: CInt, _ p: RawSpan?) -> RawSpan? {
+  // expected-stable-error@+3{{missing argument for parameter #3 in call}}
+  // expected-stable-error@+2{{cannot convert value of type 'RawSpan?' to expected argument type 'CInt' (aka 'Int32')}}
+  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeRawPointer?' to return type 'RawSpan?'}}
+  return nullable(len, p)
+}
+
+func call_opaque(_ len: CInt, _ len2: CInt, _ p: OpaquePointer!) -> OpaquePointer! {
+  return unsafe opaque(len, len2, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_opaque(_ len: CInt, _ p: RawSpan) -> RawSpan {
+  // expected-stable-error@+3{{missing argument for parameter #3 in call}}
+  // expected-stable-error@+2{{cannot convert value of type 'RawSpan' to expected argument type 'CInt' (aka 'Int32')}}
+  // expected-stable-error@+1{{cannot convert return expression of type 'OpaquePointer?' to return type 'RawSpan'}}
+  return opaque(len, p)
+}
+
+func call_nonsizedLifetime(_ len: CInt, _ p: UnsafeRawPointer!) -> UnsafeRawPointer! {
+  return unsafe nonsizedLifetime(len, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(borrow p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonsizedLifetime(_ len: CInt, _ p: UnsafeRawPointer!) -> RawSpan {
+  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeRawPointer?' to return type 'RawSpan'}}
+  return unsafe nonsizedLifetime(len, p)
+}
+
+func call_bytesized(_ size: CInt, _ p: UnsafePointer<UInt8>!) -> UnsafeMutablePointer<UInt8>! {
+  return unsafe bytesized(size, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_bytesized(_ p: RawSpan) -> MutableRawSpan {
+  // expected-stable-error@+3{{missing argument for parameter #2 in call}}
+  // expected-stable-error@+2{{cannot convert value of type 'RawSpan' to expected argument type 'CInt' (aka 'Int32')}}
+  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<UInt8>?' to return type 'MutableRawSpan'}}
+  return bytesized(p)
+}
+
+func call_charsized(_ p: UnsafeMutablePointer<CChar>!, _ size: CInt) -> UnsafeMutablePointer<CChar>! {
+  return unsafe charsized(p, size)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_lifetime(copy p)
+@_lifetime(p: copy p)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_charsized(_ p: inout MutableRawSpan) -> MutableRawSpan {
+  // expected-stable-error@+2{{missing argument for parameter #2 in call}}
+  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<CChar>?' (aka 'Optional<UnsafeMutablePointer<Int8>>') to return type 'MutableRawSpan'}}
+  return charsized(&p)
+}
+
+func call_doublebytesized(_ p: UnsafeMutablePointer<UInt16>!, _ size: CInt) -> UnsafePointer<UInt16>! {
+  return unsafe doublebytesized(p, size)
 }

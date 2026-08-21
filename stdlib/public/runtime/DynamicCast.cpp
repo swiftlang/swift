@@ -1563,7 +1563,27 @@ tryCastToClassExistential(
     auto metatype = *metatypePtr;
     if (auto tmp = swift_dynamicCastMetatypeToObjectConditional(metatype)) {
       auto value = reinterpret_cast<OpaqueValue *>(&tmp);
-      auto type = reinterpret_cast<const Metadata *>(tmp);
+
+      // When ObjC interop is enabled, metatypes may be able to fulfill a
+      // superclass constraint, since a class is also an instance of its root
+      // class.
+      if (auto *superclass = destExistentialType->getSuperclassConstraint()) {
+        auto *superclassObjC = superclass->getClassObject();
+        if (superclassObjC == nullptr ||
+            swift_dynamicCastObjCClass(tmp, superclassObjC) == nullptr) {
+          return DynamicCastResult::Failure;
+        }
+      }
+
+      // Conformances have to be looked up on the metaclass, which is the class
+      // object's type. Reinterpreting the class object as metadata would find
+      // the instance type's conformances instead, producing a witness table
+      // that expects an instance. Walking the metaclass chain finds only
+      // conformances declared on a class the class object is an instance of,
+      // i.e. its root class.
+      auto *type = swift_getObjCClassMetadata(
+          reinterpret_cast<const ClassMetadata *>(object_getClass((id)tmp)));
+
       if (_conformsToProtocols(value, type, destExistentialType,
                                destExistentialLocation->getWitnessTables(),
                                prohibitIsolatedConformances)) {
@@ -1819,14 +1839,45 @@ tryCastUnwrappingExistentialSource(
     srcInnerValue = const_cast<OpaqueValue *>(srcErrorValue);
     break;
   }
+  case ExistentialTypeRepresentation::COM:
+    // QueryInterface-backed COM casts are supplied by the COM runtime. Until
+    // that path is connected, do not reinterpret an interface pointer as a
+    // Swift existential payload.
+    srcFailureType = srcType;
+    destFailureType = destType;
+    return DynamicCastResult::Failure;
   }
 
   srcFailureType = srcInnerType;
-  return tryCast(destLocation, destType,
-                 srcInnerValue, srcInnerType,
-                 destFailureType, srcFailureType,
-                 takeOnSuccess && (srcInnerValue == srcValue),
-                 mayDeferChecks, prohibitIsolatedConformances);
+
+  // If the source is non-copyable, then we must try to take/move it
+  bool srcInnerIsNoncopyable =
+      !srcInnerType->getValueWitnesses()->flags.isCopyable();
+  // If the value is boxed, there might be another reference, but
+  // if it's inline, we can optimize by using take/move semantics:
+  bool srcIsInline = (srcInnerValue == srcValue);
+  bool takeInnerValue =
+      takeOnSuccess && (srcInnerIsNoncopyable || srcIsInline);
+
+  auto result = tryCast(destLocation, destType,
+                        srcInnerValue, srcInnerType,
+                        destFailureType, srcFailureType,
+                        takeInnerValue,
+                        mayDeferChecks, prohibitIsolatedConformances);
+
+  // If we (a) moved the payload out of a (b) boxed (out-of-line) (c) opaque
+  // existential container, the box itself still needs to be freed.
+  if (result == DynamicCastResult::SuccessViaTake && // (a)
+      !srcIsInline && // (b)
+      srcExistentialType->getRepresentation() ==
+      ExistentialTypeRepresentation::Opaque) // (c)
+  {
+    auto *vwt = srcInnerType->getValueWitnesses();
+    auto *box = *reinterpret_cast<HeapObject **>(srcValue);
+    swift_deallocUninitializedObject(box, vwt->size, vwt->getAlignmentMask());
+  }
+
+  return result;
 }
 
 static DynamicCastResult tryCastUnwrappingExtendedExistentialSource(
@@ -1871,10 +1922,33 @@ static DynamicCastResult tryCastUnwrappingExtendedExistentialSource(
   }
 
   srcFailureType = srcInnerType;
-  return tryCast(destLocation, destType, srcInnerValue, srcInnerType,
-                 destFailureType, srcFailureType,
-                 takeOnSuccess && (srcInnerValue == srcValue), mayDeferChecks,
-                 prohibitIsolatedConformances);
+
+  // Noncopyable payload must be moved, not copied.
+  bool srcInnerIsNoncopyable =
+      !srcInnerType->getValueWitnesses()->flags.isCopyable();
+  // If the value is boxed, there might be another reference, but
+  // if it's inline, we can optimize by using take/move semantics:
+  bool srcIsInline = (srcInnerValue == srcValue);
+  bool takeInnerValue =
+      takeOnSuccess && (srcInnerIsNoncopyable || srcIsInline);
+
+  auto result = tryCast(destLocation, destType, srcInnerValue, srcInnerType,
+                        destFailureType, srcFailureType,
+                        takeInnerValue, mayDeferChecks,
+                        prohibitIsolatedConformances);
+
+  if (result == DynamicCastResult::SuccessViaTake &&
+      !srcIsInline &&
+      srcExistentialType->Shape->Flags.getSpecialKind() ==
+          ExtendedExistentialTypeShape::SpecialKind::None) {
+    // Value was moved out of a heap-allocated box, so we
+    // need to free the empty box:
+    auto *vwt = srcInnerType->getValueWitnesses();
+    auto *box = *reinterpret_cast<HeapObject **>(srcValue);
+    swift_deallocUninitializedObject(box, vwt->size, vwt->getAlignmentMask());
+  }
+
+  return result;
 }
 
 static DynamicCastResult
@@ -2249,6 +2323,20 @@ tryCastToExistentialMetatype(
   }
 }
 
+static DynamicCastResult
+tryCastToCOMExistential(OpaqueValue *destLocation, const Metadata *destType,
+                        OpaqueValue *srcValue, const Metadata *srcType,
+                        const Metadata *&destFailureType,
+                        const Metadata *&srcFailureType,
+                        bool takeOnSuccess, bool mayDeferChecks,
+                        bool prohibitIsolatedConformances) {
+  // The representation alone cannot implement a COM cast: doing so requires
+  // the interface IID and QueryInterface entry point.
+  srcFailureType = srcType;
+  destFailureType = destType;
+  return DynamicCastResult::Failure;
+}
+
 /******************************************************************************/
 /********************************** Dispatch **********************************/
 /******************************************************************************/
@@ -2320,6 +2408,8 @@ static tryCastFunctionType *selectCasterForDest(const Metadata *destType) {
       return tryCastToClassExistential; // => AnyObject, with or without protocol constraints
     case ExistentialTypeRepresentation::Error: // => Error existential
       return tryCastToErrorExistential;
+    case ExistentialTypeRepresentation::COM:
+      return tryCastToCOMExistential;
     }
     swift_unreachable(
       "Unknown existential type representation in dynamic cast dispatch");

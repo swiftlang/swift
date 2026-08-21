@@ -79,31 +79,7 @@ public:
 /// of aggregate structure.
 class ElementLayout {
 public:
-  enum class Kind {
-    /// The element is known to require no storage in the aggregate.
-    /// Its offset in the aggregate is always statically zero.
-    Empty,
-
-    /// The element is known to require no storage in the aggregate.
-    /// But it has an offset in the aggregate. This is to support getting the
-    /// offset of tail allocated storage using MemoryLayout<>.offset(of:).
-    EmptyTailAllocatedCType,
-
-    /// The element can be positioned at a fixed offset within the
-    /// aggregate.
-    Fixed,
-
-    /// The element cannot be positioned at a fixed offset within the
-    /// aggregate.
-    NonFixed,
-
-    /// The element is an object lacking a fixed size but located at
-    /// offset zero.  This is necessary because LLVM forbids even a
-    /// 'gep 0' on an unsized type.
-    InitialNonFixedSize
-
-    // IncompleteKind comes here
-  };
+  using Kind = ElementLayoutKind;
 
 private:
   enum : unsigned { IncompleteKind  = unsigned(Kind::InitialNonFixedSize) + 1 };
@@ -111,33 +87,13 @@ private:
   /// The swift type information for this element's layout.
   const TypeInfo *Type;
 
-  /// The offset in bytes from the start of the struct.
-  unsigned ByteOffset;
-
-  /// The offset in bytes from the start of the struct, except EmptyFields are
-  /// placed at the current byte offset instead of 0. For the purpose of the
-  /// final layout empty fields are placed at offset 0, that however creates a
-  /// whole slew of special cases to deal with. Instead of dealing with these
-  /// special cases during layout, we pretend that empty fields are placed
-  /// just like any other field at the current offset.
-  unsigned ByteOffsetForLayout;
-
-  /// The index of this element, either in the LLVM struct (if fixed)
-  /// or in the non-fixed elements array (if non-fixed).
-  unsigned Index : 28;
-
-  /// Whether this element is known to be trivially destructible in the local
-  /// resilience domain.
-  unsigned IsTriviallyDestroyable : 1;
-
-  /// The kind of layout performed for this element.
-  unsigned TheKind : 3;
+  ElementLayoutStorage Storage;
 
   explicit ElementLayout(const TypeInfo &type)
-    : Type(&type), TheKind(IncompleteKind) {}
+    : Type(&type) {}
 
   bool isCompleted() const {
-    return (TheKind != IncompleteKind);
+    return (Storage.TheKind != IncompleteKind);
   }
 
 public:
@@ -147,45 +103,41 @@ public:
 
   void completeFrom(const ElementLayout &other) {
     assert(!isCompleted());
-    TheKind = other.TheKind;
-    IsTriviallyDestroyable = other.IsTriviallyDestroyable;
-    ByteOffset = other.ByteOffset;
-    ByteOffsetForLayout = other.ByteOffsetForLayout;
-    Index = other.Index;
+    Storage = other.Storage;
   }
 
   void completeEmpty(IsTriviallyDestroyable_t isTriviallyDestroyable, Size byteOffset) {
-    TheKind = unsigned(Kind::Empty);
-    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
-    ByteOffset = 0;
-    ByteOffsetForLayout = byteOffset.getValue();
-    Index = 0; // make a complete write of the bitfield
+    Storage.TheKind = unsigned(Kind::Empty);
+    Storage.IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
+    Storage.ByteOffset = 0;
+    Storage.ByteOffsetForLayout = byteOffset.getValue();
+    Storage.Index = 0; // make a complete write of the bitfield
   }
 
   void completeInitialNonFixedSize(IsTriviallyDestroyable_t isTriviallyDestroyable) {
-    TheKind = unsigned(Kind::InitialNonFixedSize);
-    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
-    ByteOffset = 0;
-    ByteOffsetForLayout = ByteOffset;
-    Index = 0; // make a complete write of the bitfield
+    Storage.TheKind = unsigned(Kind::InitialNonFixedSize);
+    Storage.IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
+    Storage.ByteOffset = 0;
+    Storage.ByteOffsetForLayout = Storage.ByteOffset;
+    Storage.Index = 0; // make a complete write of the bitfield
   }
 
   void completeFixed(IsTriviallyDestroyable_t isTriviallyDestroyable, Size byteOffset, unsigned structIndex) {
-    TheKind = unsigned(Kind::Fixed);
-    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
-    ByteOffset = byteOffset.getValue();
-    ByteOffsetForLayout = ByteOffset;
-    Index = structIndex;
+    Storage.TheKind = unsigned(Kind::Fixed);
+    Storage.IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
+    Storage.ByteOffset = byteOffset.getValue();
+    Storage.ByteOffsetForLayout = Storage.ByteOffset;
+    Storage.Index = structIndex;
 
     assert(getByteOffset() == byteOffset);
   }
 
   void completeEmptyTailAllocatedCType(IsTriviallyDestroyable_t isTriviallyDestroyable, Size byteOffset) {
-    TheKind = unsigned(Kind::EmptyTailAllocatedCType);
-    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
-    ByteOffset = byteOffset.getValue();
-    ByteOffsetForLayout = ByteOffset;
-    Index = 0;
+    Storage.TheKind = unsigned(Kind::EmptyTailAllocatedCType);
+    Storage.IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
+    Storage.ByteOffset = byteOffset.getValue();
+    Storage.ByteOffsetForLayout = Storage.ByteOffset;
+    Storage.Index = 0;
 
     assert(getByteOffset() == byteOffset);
   }
@@ -194,16 +146,21 @@ public:
   ///
   /// \param nonFixedElementIndex - the index into the elements array
   void completeNonFixed(IsTriviallyDestroyable_t isTriviallyDestroyable, unsigned nonFixedElementIndex) {
-    TheKind = unsigned(Kind::NonFixed);
-    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
-    Index = nonFixedElementIndex;
+    Storage.TheKind = unsigned(Kind::NonFixed);
+    Storage.IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
+    Storage.Index = nonFixedElementIndex;
   }
 
   const TypeInfo &getType() const { return *Type; }
 
+  const ElementLayoutStorage &getStorage() const {
+    assert(isCompleted());
+    return Storage;
+  }
+
   Kind getKind() const {
     assert(isCompleted());
-    return Kind(TheKind);
+    return Kind(Storage.TheKind);
   }
 
   /// Is this element known to be empty?
@@ -215,7 +172,7 @@ public:
   /// Is this element known to be POD?
   IsTriviallyDestroyable_t isTriviallyDestroyable() const {
     assert(isCompleted());
-    return IsTriviallyDestroyable_t(IsTriviallyDestroyable);
+    return IsTriviallyDestroyable_t(Storage.IsTriviallyDestroyable);
   }
 
   /// Can we access this element at a static offset?
@@ -238,7 +195,7 @@ public:
   /// Given that this element has a fixed offset, return that offset in bytes.
   Size getByteOffset() const {
     assert(isCompleted() && hasByteOffset());
-    return Size(ByteOffset);
+    return Size(Storage.ByteOffset);
   }
 
   /// The offset in bytes from the start of the struct, except EmptyFields are
@@ -249,21 +206,21 @@ public:
   /// just like any other field at the current offset.
   Size getByteOffsetDuringLayout() const {
     assert(isCompleted() && hasByteOffset());
-    return Size(ByteOffsetForLayout);
+    return Size(Storage.ByteOffsetForLayout);
   }
 
   /// Given that this element has a fixed offset, return the index in
   /// the LLVM struct.
   unsigned getStructIndex() const {
     assert(isCompleted() && getKind() == Kind::Fixed);
-    return Index;
+    return Storage.Index;
   }
 
   /// Given that this element does not have a fixed offset, return its
   /// index in the nonfixed-elements array.
   unsigned getNonFixedElementIndex() const {
     assert(isCompleted() && getKind() == Kind::NonFixed);
-    return Index;
+    return Storage.Index;
   }
 
   Address project(IRGenFunction &IGF, Address addr,

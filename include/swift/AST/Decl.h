@@ -496,12 +496,16 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 2,
 
     /// Whether this declaration captures the 'self' param under the same name.
     IsSelfParamCapture : 1,
+
+    /// Whether this declaration represents a `sending` capture i.e.
+    /// `[sending x]` where `x` is this declaration.
+    IsSendingCapture : 1,
 
     /// Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
@@ -1151,6 +1155,14 @@ public:
   CodeGenerationModel
   getEffectiveCodeGenerationModel() const;
 
+  /// Determine the section into which this declaration should be placed,
+  /// based on an explicit `@section` attribute or the inference rules for
+  /// `@section`.
+  ///
+  /// \returns the name of the section, or \c std::nullopt if this declaration
+  /// belongs in the platform-appropriate default section.
+  std::optional<StringRef> getSection() const;
+
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
   /// Iterate over the auxiliary declarations for this declaration,
@@ -1320,6 +1332,11 @@ public:
   /// Query whether this declaration was explicitly declared to be safe or
   /// unsafe.
   ExplicitSafety getExplicitSafety() const;
+
+  /// Whether uses of this declaration must be acknowledged with the 'unsafe'
+  /// keyword even when strict memory safety checking is disabled, i.e. whether
+  /// it was marked '@unsafe(always)'.
+  bool isAlwaysUnsafe() const;
 
 private:
   bool isUnsafeComputed() const {
@@ -3395,6 +3412,15 @@ public:
   /// Is this declaration 'final'?
   bool isFinal() const;
 
+  /// True if this declaration should have a non-unique definition based on
+  /// the Embedded Swift linkage model (i.e. its type metadata / code may be
+  /// emitted redundantly in every module that references it, rather than
+  /// having a single unique definition). Returns false outside Embedded Swift.
+  ///
+  /// This is the AST-level source of truth consulted by
+  /// `SILDeclRef::declHasNonUniqueDefinition`.
+  bool hasNonUniqueDefinition() const;
+
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
 
@@ -4413,6 +4439,137 @@ enum KeyPathTypeKind : unsigned char {
   KPTK_ReferenceWritableKeyPath
 };
 
+/// The validated inheritance hierarchy of a COM interface.
+///
+/// COM interface inheritance contributes at most one ABI-bearing base chain.
+/// Marker protocols can refine the interface without contributing to that
+/// chain.
+class COMInterfaceHierarchy {
+  ArrayRef<ProtocolDecl *> MarkerProtocols;
+  ArrayRef<ProtocolDecl *> ABIChain;
+
+  COMInterfaceHierarchy() = default;
+
+public:
+  COMInterfaceHierarchy(ArrayRef<ProtocolDecl *> markers,
+                        ArrayRef<ProtocolDecl *> chain)
+      : MarkerProtocols(markers), ABIChain(chain) {
+    assert(!chain.empty());
+  }
+
+  static COMInterfaceHierarchy invalid() { return {}; }
+
+  bool isInvalid() const { return ABIChain.empty(); }
+
+  /// The most-derived directly inherited COM interface, or null for a root
+  /// interface.
+  ProtocolDecl *getABIBase() const {
+    assert(!isInvalid());
+    return ABIChain.size() > 1 ? ABIChain[ABIChain.size() - 2] : nullptr;
+  }
+
+  /// Marker protocols inherited by this interface or its COM ABI bases.
+  ArrayRef<ProtocolDecl *> getMarkerProtocols() const {
+    assert(!isInvalid());
+    return MarkerProtocols;
+  }
+
+  /// The COM ABI inheritance chain in base-most-to-derived order, including
+  /// this interface as its final element.
+  ArrayRef<ProtocolDecl *> getABIChain() const {
+    assert(!isInvalid());
+    return ABIChain;
+  }
+};
+
+/// The COM role and associated declaration information for a nominal type.
+///
+/// A protocol can declare an interface, while a class can provide an
+/// implementation. Other nominal declarations have no COM declaration info.
+class COMDeclInfo {
+public:
+  enum class Kind : uint8_t {
+    Interface,
+    Implementation,
+  };
+
+private:
+  Kind DeclKind;
+  StringRef ID;
+  std::optional<COMThreadingModel> ThreadingModel;
+  ProtocolDecl *RootInterface;
+  ArrayRef<ProtocolDecl *> Interfaces;
+  ArrayRef<ProtocolDecl *> Slots;
+
+  COMDeclInfo(Kind kind, StringRef id, std::optional<COMThreadingModel> model,
+              ProtocolDecl *root, ArrayRef<ProtocolDecl *> interfaces,
+              ArrayRef<ProtocolDecl *> slots)
+      : DeclKind(kind), ID(id), ThreadingModel(model), RootInterface(root),
+        Interfaces(interfaces), Slots(slots) {}
+
+public:
+  static COMDeclInfo forInterface(StringRef iid) {
+    return {Kind::Interface, iid, std::nullopt, nullptr, {}, {}};
+  }
+
+  static COMDeclInfo
+  forImplementation(StringRef clsid, std::optional<COMThreadingModel> model,
+                    ProtocolDecl *root, ArrayRef<ProtocolDecl *> interfaces,
+                    ArrayRef<ProtocolDecl *> slots) {
+    return {Kind::Implementation, clsid, model, root, interfaces, slots};
+  }
+
+  Kind getKind() const { return DeclKind; }
+  bool isInterface() const { return DeclKind == Kind::Interface; }
+  bool isImplementation() const {
+    return DeclKind == Kind::Implementation;
+  }
+
+  StringRef getInterfaceID() const {
+    assert(isInterface());
+    return ID;
+  }
+
+  std::optional<StringRef> getImplementationID() const {
+    assert(isImplementation());
+    if (ID.empty())
+      return std::nullopt;
+    return ID;
+  }
+
+  /// The effective threading model for an \c \@com implementation
+  /// declaration. This is absent when the implementation is classified solely
+  /// from its COM interface conformances.
+  std::optional<COMThreadingModel> getThreadingModel() const {
+    assert(isImplementation());
+    return ThreadingModel;
+  }
+
+  ProtocolDecl *getRootInterface() const {
+    assert(isImplementation());
+    return RootInterface;
+  }
+
+  /// The COM interfaces to which this implementation conforms.
+  ArrayRef<ProtocolDecl *> getInterfaces() const {
+    assert(isImplementation());
+    return Interfaces;
+  }
+
+  /// The elements defining the maximal set for the implementation's COM
+  /// refinement order.
+  ///
+  /// The compiler-managed \c ISwiftObject interface is first. It is followed by
+  /// the maximal user interface from each independent refinement chain; their
+  /// ABI-base closures cover every supported interface. Subclasses preserve
+  /// inherited positions, replacing an entry only when they add a more-derived
+  /// interface in the same chain.
+  ArrayRef<ProtocolDecl *> getInterfaceSlots() const {
+    assert(isImplementation());
+    return Slots;
+  }
+};
+
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.
 class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   SourceRange Braces;
@@ -4684,6 +4841,10 @@ public:
   ///
   /// \param sorted Whether to sort the protocols in canonical order.
   SmallVector<ProtocolDecl *, 2> getAllProtocols(bool sorted = false) const;
+
+  /// Retrieve this nominal declaration's COM role and associated information,
+  /// or \c nullptr when it is not a COM interface or implementation.
+  const COMDeclInfo *getCOMDeclInfo() const;
 
   /// Retrieve all of the protocol conformances for this nominal type.
   SmallVector<ProtocolConformance *, 2> getAllConformances(
@@ -5428,13 +5589,13 @@ public:
   /// allocation, etc.), the Swift model, or has no reference counting at all.
   ReferenceCounting getObjectModel() const;
 
-  /// Whether this class participates in the COM object model, i.e. it conforms
-  /// to a COM interface (a protocol marked \c \@com).
+  /// Whether this class provides a COM implementation.
   ///
-  /// Keying on the \c \@com marker rather than a shared root such as
-  /// \c IUnknown covers rootless COM frameworks such as IOKit; keying on
-  /// conformance rather than the class's own attribute covers subclasses.
-  bool isCOMObject() const;
+  /// This includes both explicitly \c \@com classes and classes that conform to
+  /// a COM interface.
+  bool isCOMImplementation() const {
+    return getCOMDeclInfo() != nullptr;
+  }
 
   LayoutConstraintKind getLayoutConstraintKind() const {
     if (getObjectModel() == ReferenceCounting::ObjC)
@@ -5740,6 +5901,18 @@ public:
 
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
+
+  /// Whether this protocol declares a COM interface.
+  bool isCOMInterface() const {
+    return getCOMDeclInfo() != nullptr;
+  }
+
+  /// Retrieve this COM interface's validated inheritance hierarchy.
+  ///
+  /// Returns null for a protocol that does not declare a COM interface. An
+  /// invalid COM interface has a non-null hierarchy whose \c isInvalid() is
+  /// true.
+  const COMInterfaceHierarchy *getCOMInterfaceHierarchy() const;
 
   /// Retrieve the ClassDecl for the superclass of this protocol, or null if there
   /// is no superclass.
@@ -6446,7 +6619,7 @@ public:
 
   /// Given that CoroutineAccessors is enabled, is _read/_modify required for
   /// ABI stability?
-  bool requiresCorrespondingUnderscoredCoroutineAccessor(
+  bool requiresCorrespondingLegacyCoroutineAccessor(
       AccessorKind kind, AccessorDecl const *decl = nullptr) const;
 
   /// Does this storage require a 'mutate' accessor in its opaque-accessors set?
@@ -6880,6 +7053,11 @@ public:
   bool isSelfParamCapture() const { return Bits.VarDecl.IsSelfParamCapture; }
   void setIsSelfParamCapture(bool IsSelfParamCapture = true) {
       Bits.VarDecl.IsSelfParamCapture = IsSelfParamCapture;
+  }
+
+  bool isSendingCapture() const { return Bits.VarDecl.IsSendingCapture; }
+  void setIsSendingCapture(bool isSending = true) {
+    Bits.VarDecl.IsSendingCapture = isSending;
   }
 
   /// Check whether this capture of the self param is actor-isolated.
@@ -8430,6 +8608,20 @@ public:
   /// vtable.
   bool needsNewVTableEntry() const;
 
+  /// Whether this is a generic method of a class that Embedded Swift must
+  /// dispatch statically, because it cannot be given a vtable entry.
+  ///
+  /// Embedded Swift has no unspecialized generic code, so a generic method
+  /// cannot appear in a vtable: there is no single implementation to put there.
+  /// Rather than reject such methods outright, they are dispatched statically
+  /// and kept out of the vtable entirely. The type checker makes that sound by
+  /// rejecting the two ways a static dispatch could be wrong -- an `open`
+  /// generic method, which a subclass in another module could override, and an
+  /// `override` of a generic method within this module.
+  ///
+  /// Returns false outside of Embedded Swift.
+  bool mustBeStaticallyDispatchedInEmbedded() const;
+
   /// True if the decl is a method which introduces a new witness table entry.
   bool requiresNewWitnessTableEntry() const {
     return getOverriddenDecls().empty();
@@ -8525,6 +8717,20 @@ public:
 
   /// Whether the function is a non-static method.
   bool isInstanceMethod() const { return hasImplicitSelfDecl() && !isStatic(); }
+
+  /// Whether 'self' occupies an index in this function's lifetime dependence
+  /// index space, which consists of the parameters, optionally followed by
+  /// 'self', followed by the result.
+  ///
+  /// An imported C++ constructor's implicit metatype 'self' is dropped when
+  /// lowering to SIL (see TypeConverter::getLoweredFormalTypes()), so, unlike
+  /// the 'self' of an importer-synthesized value constructor, it does not
+  /// occupy an index.
+  bool hasSelfInLifetimeDependenceIndices() const;
+
+  /// The index representing this function's result in its lifetime dependence
+  /// index space. See hasSelfInLifetimeDependenceIndices().
+  unsigned getLifetimeDependenceResultIndex() const;
 
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const {
@@ -8857,6 +9063,11 @@ class AccessorDecl final : public FuncDecl {
 
   AbstractStorageDecl *Storage;
 
+  /// Whether a yield_once_2 coroutine accessor (yielding borrow/mutate) was
+  /// written by the user with the legacy spelling (_read/_modify).  This
+  /// only affects diagnostics; it has no ABI or type-system effect.
+  bool SpelledWithLegacyCoroutineSyntax = false;
+
   AccessorDecl(SourceLoc declLoc, SourceLoc accessorKeywordLoc,
                AccessorKind accessorKind, AbstractStorageDecl *storage,
                bool async, SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
@@ -8932,6 +9143,23 @@ public:
 
   AccessorKind getAccessorKind() const {
     return AccessorKind(Bits.AccessorDecl.AccessorKind);
+  }
+
+  /// When the CoroutineAccessors feature is enabled, a `_read`/`_modify`
+  /// accessor is represented as a `yielding borrow`/`yielding mutate`
+  /// (yield_once_2) accessor so that it uses the same ABI, remembering here that
+  /// the user wrote the legacy spelling.  This only affects diagnostics.
+  ///
+  /// Rewrites this accessor's kind from the legacy coroutine accessor
+  /// (Read/Modify) to its official counterpart (YieldingBorrow/YieldingMutate),
+  /// recording that it was spelled with the legacy keyword.
+  void changeLegacyCoroutineAccessorToYielding();
+
+  /// Whether this yield_once_2 coroutine accessor was written by the user with
+  /// the `_read`/`_modify` spelling rather than the
+  /// `yielding borrow`/`yielding mutate` spelling.
+  bool isSpelledWithLegacyCoroutineSyntax() const {
+    return SpelledWithLegacyCoroutineSyntax;
   }
 
   bool isGetter() const { return getAccessorKind() == AccessorKind::Get; }
@@ -9355,6 +9583,10 @@ public:
   bool isRequired() const {
     return getAttrs().hasAttribute<RequiredAttr>();
   }
+
+  /// Retrieve the initializer kind if it has been computed, \c nullopt
+  /// otherwise. Should only be used by the ASTDumper.
+  std::optional<CtorInitializerKind> getCachedInitKind() const;
 
   /// Determine the kind of initializer this is.
   CtorInitializerKind getInitKind() const;
@@ -10428,11 +10660,10 @@ public:
 template<typename SpecificDecl>
 ABIRoleInfo(const SpecificDecl *decl) -> ABIRoleInfo<SpecificDecl>;
 
-StringRef
-getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article,
-                             std::optional<bool> underscored = std::nullopt);
+StringRef getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article,
+                             std::optional<bool> legacy = std::nullopt);
 StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind, bool article,
-                                       bool underscored);
+                                       bool legacy);
 
 inline void simple_display(llvm::raw_ostream &out,
                            MemberwiseInitKind initKind) {

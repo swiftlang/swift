@@ -6,7 +6,7 @@
 // RUN: %target-interop-build-clangxx -std=gnu++20 -fobjc-arc -c -x objective-c++-header %t/UseSIMD.h -o %t/o.o
 
 // REQUIRES: objc_interop
-// REQUIRES: rdar157848231
+// REQUIRES: sdk_min_version_26
 
 import simd
 

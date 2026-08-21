@@ -27,6 +27,18 @@ struct S3 {
   @_hasStorage let ci: (Int, C)
 }
 
+// Large enough that destructuring would create more than `maxNumDestroysToCreate` destroys.
+struct SLarge {
+  @_hasStorage let c1: C
+  @_hasStorage let c2: C
+  @_hasStorage let c3: C
+  @_hasStorage let c4: C
+  @_hasStorage let c5: C
+  @_hasStorage let c6: C
+  @_hasStorage let c7: C
+  @_hasStorage let c8: C
+}
+
 sil @takeOwnedC : $@convention(thin) (@owned C) -> ()
 
 // CHECK-LABEL: sil [ossa] @remove_copy :
@@ -113,6 +125,24 @@ bb0(%0 : @owned $S2):
   return %3
 }
 
+// Large struct: destructuring would replace the single aggregate destroy_value with 7
+// element-wise destroys, which costs far more code than the removed copy saves.
+// The copy must be kept.
+//
+// CHECK-LABEL: sil [ossa] @projected_copy_large_struct :
+// CHECK:         copy_value
+// CHECK-NOT:     destructure_struct
+// CHECK:       } // end sil function 'projected_copy_large_struct'
+sil [ossa] @projected_copy_large_struct : $@convention(thin) (@owned SLarge) -> @owned C {
+bb0(%0 : @owned $SLarge):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #SLarge.c1
+  %3 = copy_value %2
+  end_borrow %1
+  destroy_value %0
+  return %3
+}
+
 // Tuple with two class elements: copy_value extracts element 0; element 1 is destroyed.
 //
 // CHECK-LABEL: sil [ossa] @projected_copy_tuple_element :
@@ -173,6 +203,52 @@ bb0(%0 : @owned $S1):
   %3 = copy_value %2
   %4 = upcast %3 to $B
   %5 = unchecked_ref_cast %4 to $C
+  end_borrow %1
+  destroy_value %0
+  return %5
+}
+
+// A debug_value of the copy inside the owned value's liverange must not block the
+// optimization. It is moved out of the liverange together with the copy.
+//
+// CHECK-LABEL: sil [ossa] @projected_copy_with_debug_value :
+// CHECK:         end_borrow
+// CHECK:         [[C:%.*]] = destructure_struct %0
+// CHECK:         debug_value [[C]]
+// CHECK-NOT:     copy_value
+// CHECK:         return [[C]]
+// CHECK:       } // end sil function 'projected_copy_with_debug_value'
+sil [ossa] @projected_copy_with_debug_value : $@convention(thin) (@owned S1) -> @owned C {
+bb0(%0 : @owned $S1):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S1.c
+  %3 = copy_value %2
+  debug_value %3, let, name "x"
+  end_borrow %1
+  destroy_value %0
+  return %3
+}
+
+// Same as above, but the debug_value is a use of a forwarding instruction in the
+// chain. Both the forwarding instructions and the debug_value are moved.
+//
+// CHECK-LABEL: sil [ossa] @projected_copy_debug_value_of_forwarded_value :
+// CHECK:         end_borrow
+// CHECK:         [[C:%.*]] = destructure_struct %0
+// CHECK:         [[B:%.*]] = upcast [[C]] to $B
+// CHECK:         debug_value [[B]]
+// CHECK:         [[D:%.*]] = unchecked_ref_cast [[B]]
+// CHECK-NOT:     copy_value
+// CHECK:         return [[D]]
+// CHECK:       } // end sil function 'projected_copy_debug_value_of_forwarded_value'
+sil [ossa] @projected_copy_debug_value_of_forwarded_value : $@convention(thin) (@owned S1) -> @owned C {
+bb0(%0 : @owned $S1):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S1.c
+  %3 = copy_value %2
+  %4 = upcast %3 to $B
+  %5 = unchecked_ref_cast %4 to $C
+  debug_value %4, let, name "x"
   end_borrow %1
   destroy_value %0
   return %5

@@ -50,6 +50,20 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
 
+  /// The module which defines this function, or nil if it's not known.
+  ///
+  /// This is nil for functions which are created by the optimizer from a function of another module,
+  /// e.g. for a specialization of a standard library function.
+  public var parentModule: ModuleDecl? { bridged.getParentModule().getAs(ModuleDecl.self) }
+
+  /// True if this function is defined in the module which is currently compiled.
+  ///
+  /// This is false for functions which are de-serialized from another module - e.g. from the
+  /// standard library - and for specializations of such functions.
+  public func isInCurrentModule(_ context: some Context) -> Bool {
+    parentModule == context.currentModuleContext
+  }
+
   public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
 
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }
@@ -406,6 +420,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       fatalError("unknown enum case")
     }
   }
+
+  public var isAutodiffSubsetParametersThunk: Bool {
+    bridged.isAutodiffSubsetParametersThunk()
+  }
 }
 
 public func == (lhs: Function, rhs: Function) -> Bool { lhs === rhs }
@@ -687,6 +705,23 @@ extension Function {
                                                 atIndex: calleeArgIdx,
                                                 withConvention: convention)
         return effects.memory.read
+      },
+      // argumentMayWrite  (used by the MemoryLifetimeVerifier)
+      { (f: BridgedFunction, bridgedArgOp: BridgedOperand, bridgedAddr: BridgedValue) -> Bool in
+        let argOp = Operand(bridged: bridgedArgOp)
+        let addr = bridgedAddr.value
+        let applySite = argOp.instruction as! FullApplySite
+        let addrPath = addr.accessPath
+        let calleeArgIdx = applySite.calleeArgumentIndex(of: argOp)!
+        let convention = applySite.convention(of: argOp)!
+        assert(convention.isIndirectIn || convention.isInout)
+        let argPath = argOp.value.accessPath
+        assert(!argPath.isDistinct(from: addrPath))
+        let path = argPath.getProjection(to: addrPath) ?? SmallProjectionPath()
+        let effects = f.function.getSideEffects(forArgument: argOp.value.at(path),
+                                                atIndex: calleeArgIdx,
+                                                withConvention: convention)
+        return effects.memory.write
       },
       // isDeinitBarrier
       { (f: BridgedFunction) -> Bool in

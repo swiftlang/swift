@@ -342,26 +342,46 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: d2d43a5938957e3dab89c039becb367e20865af0ed9f2dd5162c48824e3b6c58
+// GENERATED-HASH: 2345b283478afbabfc9da1374ea49c8ab9ad1ad6fe1a54d54411a995aff0dc02
 import Test
 
 func call_simple(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!) {
   return unsafe simple(len, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe simple(p)
+}
+
 func call_simpleFlipped(_ p: UnsafeMutablePointer<CInt>!, _ len: CInt) {
   return unsafe simpleFlipped(p, len)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_simpleFlipped(_ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe simpleFlipped(p)
 }
 
 func call_swiftAttr(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!) {
   return unsafe swiftAttr(len, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_swiftAttr(_ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe swiftAttr(p)
+}
+
 func call_shared(_ len: CInt, _ p1: UnsafeMutablePointer<CInt>!, _ p2: UnsafeMutablePointer<CInt>!) {
   return unsafe shared(len, p1, p2)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_shared(_ p1: UnsafeMutableBufferPointer<CInt>, _ p2: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe shared(p1, p2)
+}
+
 func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutablePointer<CInt>!) {
+  return unsafe complexExpr(len, offset, p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
   return unsafe complexExpr(len, offset, p)
 }
 
@@ -369,15 +389,31 @@ func call_nullUnspecified(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!) {
   return unsafe nullUnspecified(len, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe nullUnspecified(p)
+}
+
 func call_nonnull(_ len: CInt, _ p: UnsafeMutablePointer<CInt>) {
   return unsafe nonnull(len, p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe nonnull(p)
 }
 
 func call_nullable(_ len: CInt, _ p: UnsafeMutablePointer<CInt>?) {
   return unsafe nullable(len, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: UnsafeMutableBufferPointer<CInt>?) {
+  return unsafe nullable(p)
+}
+
 func call_returnPointer(_ len: CInt) -> UnsafeMutablePointer<CInt>! {
+  return unsafe returnPointer(len)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_returnPointer(_ len: CInt) -> UnsafeMutableBufferPointer<CInt> {
   return unsafe returnPointer(len)
 }
 
@@ -385,7 +421,15 @@ func call_offByOne(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!) {
   return unsafe offByOne(len, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_offByOne(_ len: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe offByOne(len, p)
+}
+
 func call_offBySome(_ len: CInt, _ offset: CInt, _ p: UnsafeMutablePointer<CInt>!) {
+  return unsafe offBySome(len, offset, p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_offBySome(_ len: CInt, _ offset: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
   return unsafe offBySome(len, offset, p)
 }
 
@@ -393,7 +437,15 @@ func call_scalar(_ m: CInt, _ n: CInt, _ p: UnsafeMutablePointer<CInt>!) {
   return unsafe scalar(m, n, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_scalar(_ m: CInt, _ n: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe scalar(m, n, p)
+}
+
 func call_bitwise(_ m: CInt, _ n: CInt, _ o: CInt, _ p: UnsafeMutablePointer<CInt>!) {
+  return unsafe bitwise(m, n, o, p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_bitwise(_ m: CInt, _ n: CInt, _ o: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
   return unsafe bitwise(m, n, o, p)
 }
 
@@ -401,7 +453,15 @@ func call_bitshift(_ m: CInt, _ n: CInt, _ o: CInt, _ p: UnsafeMutablePointer<CI
   return unsafe bitshift(m, n, o, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_bitshift(_ m: CInt, _ n: CInt, _ o: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe bitshift(m, n, o, p)
+}
+
 func call_constInt(_ p: UnsafeMutablePointer<CInt>!) {
+  return unsafe constInt(p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_constInt(_ p: UnsafeMutableBufferPointer<CInt>) {
   return unsafe constInt(p)
 }
 
@@ -409,11 +469,23 @@ func call_constFloatCastedToInt(_ p: UnsafeMutablePointer<CInt>!) {
   return unsafe constFloatCastedToInt(p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_constFloatCastedToInt(_ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe constFloatCastedToInt(p)
+}
+
 func call_sizeofType(_ p: UnsafeMutablePointer<CInt>!) {
   return unsafe sizeofType(p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_sizeofType(_ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe sizeofType(p)
+}
+
 func call_sizeofParam(_ p: UnsafeMutablePointer<CChar>!) {
+  return unsafe sizeofParam(p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_sizeofParam(_ p: UnsafeMutableBufferPointer<CChar>) {
   return unsafe sizeofParam(p)
 }
 
@@ -437,6 +509,10 @@ func call_floatCastToInt(_ meters: CFloat, _ p: UnsafeMutablePointer<CInt>!) {
   return unsafe floatCastToInt(meters, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_floatCastToInt(_ meters: CFloat, _ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe floatCastToInt(meters, p)
+}
+
 func call_pointerCastToInt(_ square: UnsafeMutablePointer<CInt>!, _ p: UnsafeMutablePointer<CInt>!) {
   return unsafe pointerCastToInt(square, p)
 }
@@ -445,7 +521,15 @@ func call_nanAsInt(_ p: UnsafeMutablePointer<CInt>!) {
   return unsafe nanAsInt(p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nanAsInt(_ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe nanAsInt(p)
+}
+
 func call_unsignedLiteral(_ p: UnsafeMutablePointer<CInt>!) {
+  return unsafe unsignedLiteral(p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_unsignedLiteral(_ p: UnsafeMutableBufferPointer<CInt>) {
   return unsafe unsignedLiteral(p)
 }
 
@@ -453,7 +537,15 @@ func call_longLiteral(_ p: UnsafeMutablePointer<CInt>!) {
   return unsafe longLiteral(p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_longLiteral(_ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe longLiteral(p)
+}
+
 func call_hexLiteral(_ p: UnsafeMutablePointer<CInt>!) {
+  return unsafe hexLiteral(p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_hexLiteral(_ p: UnsafeMutableBufferPointer<CInt>) {
   return unsafe hexLiteral(p)
 }
 
@@ -461,7 +553,15 @@ func call_binaryLiteral(_ p: UnsafeMutablePointer<CInt>!) {
   return unsafe binaryLiteral(p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_binaryLiteral(_ p: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe binaryLiteral(p)
+}
+
 func call_octalLiteral(_ p: UnsafeMutablePointer<CInt>!) {
+  return unsafe octalLiteral(p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_octalLiteral(_ p: UnsafeMutableBufferPointer<CInt>) {
   return unsafe octalLiteral(p)
 }
 
@@ -469,8 +569,16 @@ func call_mixedShared(_ len: CInt, _ p1: UnsafeMutablePointer<CInt>?, _ p2: Unsa
   return unsafe mixedShared(len, p1, p2)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_mixedShared(_ p1: UnsafeMutableBufferPointer<CInt>?, _ p2: UnsafeMutableBufferPointer<CInt>) {
+  return unsafe mixedShared(p1, p2)
+}
+
 func call_mixedThree(_ len: CInt, _ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeMutablePointer<CInt>!, _ p3: UnsafeMutablePointer<CInt>?) {
   return unsafe mixedThree(len, p1, p2, p3)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_mixedThree(_ p1: UnsafeMutableBufferPointer<CInt>?, _ p2: UnsafeMutableBufferPointer<CInt>, _ p3: UnsafeMutableBufferPointer<CInt>?) {
+  return unsafe mixedThree(p1, p2, p3)
 }
 
 func call_allOrNull(_ len: CInt, _ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeMutablePointer<CInt>?) {
@@ -479,112 +587,4 @@ func call_allOrNull(_ len: CInt, _ p1: UnsafeMutablePointer<CInt>?, _ p2: Unsafe
 
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_allOrNull(_ p1: UnsafeMutableBufferPointer<CInt>?, _ p2: UnsafeMutableBufferPointer<CInt>?) {
   return unsafe allOrNull(p1, p2)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_binaryLiteral(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe binaryLiteral(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_bitshift(_ m: CInt, _ n: CInt, _ o: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe bitshift(m, n, o, p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_bitwise(_ m: CInt, _ n: CInt, _ o: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe bitwise(m, n, o, p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe complexExpr(len, offset, p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_constFloatCastedToInt(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe constFloatCastedToInt(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_constInt(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe constInt(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_floatCastToInt(_ meters: CFloat, _ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe floatCastToInt(meters, p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_hexLiteral(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe hexLiteral(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_longLiteral(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe longLiteral(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_mixedShared(_ p1: UnsafeMutableBufferPointer<CInt>?, _ p2: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe mixedShared(p1, p2)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_mixedThree(_ p1: UnsafeMutableBufferPointer<CInt>?, _ p2: UnsafeMutableBufferPointer<CInt>, _ p3: UnsafeMutableBufferPointer<CInt>?) {
-  return unsafe mixedThree(p1, p2, p3)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nanAsInt(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe nanAsInt(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe nonnull(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe nullUnspecified(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: UnsafeMutableBufferPointer<CInt>?) {
-  return unsafe nullable(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_octalLiteral(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe octalLiteral(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_offByOne(_ len: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe offByOne(len, p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_offBySome(_ len: CInt, _ offset: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe offBySome(len, offset, p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_returnPointer(_ len: CInt) -> UnsafeMutableBufferPointer<CInt> {
-  return unsafe returnPointer(len)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_scalar(_ m: CInt, _ n: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe scalar(m, n, p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_shared(_ p1: UnsafeMutableBufferPointer<CInt>, _ p2: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe shared(p1, p2)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe simple(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_simpleFlipped(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe simpleFlipped(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_sizeofParam(_ p: UnsafeMutableBufferPointer<CChar>) {
-  return unsafe sizeofParam(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_sizeofType(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe sizeofType(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_swiftAttr(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe swiftAttr(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_unsignedLiteral(_ p: UnsafeMutableBufferPointer<CInt>) {
-  return unsafe unsignedLiteral(p)
 }

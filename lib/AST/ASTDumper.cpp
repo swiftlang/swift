@@ -682,6 +682,12 @@ static StringRef getDumpString(ExplicitSafety safety) {
     return "unsafe";
   }
 }
+static StringRef getDumpString(ExecutionSemantics semantics) {
+  switch (semantics) {
+  case ExecutionSemantics::Once:
+    return "once";
+  }
+}
 static StringRef getDumpString(ConformanceEntryKind kind) {
   switch (kind) {
   case ConformanceEntryKind::Inherited:
@@ -2225,6 +2231,7 @@ namespace {
           UD->getSpecifiedAttributes(),
           [&](auto *attr, Label label) { printRec(attr, Ctx, DC, label); },
           Label::optional("specified_attrs"));
+      printFoot();
     }
 
     void visitExtensionDecl(ExtensionDecl *ED, Label label) {
@@ -2951,7 +2958,10 @@ namespace {
     void visitConstructorDecl(ConstructorDecl *CD, Label label) {
       printCommonAFD(CD, "constructor_decl", label);
       printFlag(CD->isRequired(), "required", DeclModifierColor);
-      printFlag(getDumpString(CD->getInitKind()), DeclModifierColor);
+      if (auto initKind =
+              isTypeChecked() ? CD->getInitKind() : CD->getCachedInitKind()) {
+        printFlag(getDumpString(*initKind), DeclModifierColor);
+      }
       if (CD->isFailable())
         printField((CD->isImplicitlyUnwrappedOptional()
                          ? "ImplicitlyUnwrappedOptional"
@@ -4742,6 +4752,7 @@ public:
     printCommon("type_error", label);
     if (auto *originalExpr = T->getOriginalExpr())
       printRec(originalExpr, Label::optional("original_expr"));
+    printFoot();
   }
 
   void visitAttributedTypeRepr(AttributedTypeRepr *T, Label label) {
@@ -4749,6 +4760,7 @@ public:
     printFieldQuotedRaw([&](raw_ostream &OS) { T->printAttrs(OS); },
                         Label::always("attrs"));
     printRec(T->getTypeRepr(), Label::optional("type_repr"));
+    printFoot();
   }
 
   void visitDeclRefTypeRepr(DeclRefTypeRepr *T, Label label) {
@@ -5181,7 +5193,6 @@ public:
   TRIVIAL_ATTR_PRINTER(Testable, testable)
   TRIVIAL_ATTR_PRINTER(Transparent, transparent)
   TRIVIAL_ATTR_PRINTER(UIApplicationMain, ui_application_main)
-  TRIVIAL_ATTR_PRINTER(Unsafe, unsafe)
   TRIVIAL_ATTR_PRINTER(UnsafeInheritExecutor, unsafe_inherit_executor)
   TRIVIAL_ATTR_PRINTER(UnsafeNoObjCTaggedPointer, unsafe_no_objc_tagged_pointer)
   TRIVIAL_ATTR_PRINTER(UnsafeNonEscapableResult, unsafe_non_escapable_result)
@@ -5345,6 +5356,11 @@ public:
   void visitExclusivityAttr(ExclusivityAttr *Attr, Label label) {
     printCommon(Attr, "exclusivity_attr", label);
     printField(Attr->getMode(), Label::always("mode"));
+    printFoot();
+  }
+  void visitUnsafeAttr(UnsafeAttr *Attr, Label label) {
+    printCommon(Attr, "unsafe_attr", label);
+    printFlag(Attr->isAlways(), "always");
     printFoot();
   }
   void visitExposeAttr(ExposeAttr *Attr, Label label) {
@@ -5573,7 +5589,10 @@ public:
   }
   void visitSectionAttr(SectionAttr *Attr, Label label) {
     printCommon(Attr, "section_attr", label);
-    printFieldQuoted(Attr->Name, Label::always("name"));
+    if (auto sectionName = Attr->Name)
+      printFieldQuoted(*sectionName, Label::always("name"));
+    else
+      printFlag("default");
     printFoot();
   }
   void visitSemanticsAttr(SemanticsAttr *Attr, Label label) {
@@ -5719,6 +5738,12 @@ public:
       break;
     }
     printField(StringRef{Model}, Label::always("threading"));
+    printFoot();
+  }
+
+  void visitCalledAttr(CalledAttr *Attr, Label label) {
+    printCommon(Attr, "called_attr", label);
+    printField(Attr->getSemantics(), Label::always("semantics"));
     printFoot();
   }
 };
@@ -6707,6 +6732,7 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
+        printFlag(T->isCalledOnce(), "called_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {
           default:

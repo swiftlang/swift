@@ -321,27 +321,14 @@ namespace {
 
 struct SILMoveOnlyWrappedTypeEliminator {
   SILFunction *fn;
-  bool trivialOnly;
 
-  SILMoveOnlyWrappedTypeEliminator(SILFunction *fn, bool trivialOnly)
-      : fn(fn), trivialOnly(trivialOnly) {}
+  SILMoveOnlyWrappedTypeEliminator(SILFunction *fn)
+      : fn(fn) {}
 
   bool process();
 };
 
 } // namespace
-
-/// Returns true if this is a moveonlywrapped type whose underlying type is a
-/// trivial type /or/ if this is a boxed type of that sort.
-static bool isMoveOnlyWrappedTrivial(SILValue value) {
-  auto *fn = value->getFunction();
-  SILType type = value->getType();
-  if (type.removingMoveOnlyWrapper().isTrivial(fn))
-    return true;
-  if (type.isBoxedMoveOnlyWrappedType(fn))
-    return type.getSILBoxFieldType(fn).removingMoveOnlyWrapper().isTrivial(fn);
-  return false;
-}
 
 bool SILMoveOnlyWrappedTypeEliminator::process() {
   bool madeChange = false;
@@ -351,13 +338,8 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
   // For each value whose type is move-only wrapped:
   // - rewrite the value's type
   // - record its users for later visitation
-  auto visitValue = [&touchedInsts, fn = fn,
-                     trivialOnly = trivialOnly](SILValue value) -> bool {
+  auto visitValue = [&touchedInsts, fn = fn](SILValue value) -> bool {
     if (!value->getType().hasAnyMoveOnlyWrapping(fn))
-      return false;
-
-    // If we are looking at trivial only, skip non-trivial function args.
-    if (trivialOnly && !isMoveOnlyWrappedTrivial(value))
       return false;
 
     for (auto *use : value->getNonTypeDependentUses())
@@ -444,10 +426,8 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
 namespace {
 
 struct SILMoveOnlyWrappedTypeEliminatorPass : SILFunctionTransform {
-  bool trivialOnly;
-
-  SILMoveOnlyWrappedTypeEliminatorPass(bool trivialOnly)
-      : SILFunctionTransform(), trivialOnly(trivialOnly) {}
+  SILMoveOnlyWrappedTypeEliminatorPass()
+      : SILFunctionTransform() {}
 
   void run() override {
     auto *fn = getFunction();
@@ -460,7 +440,7 @@ struct SILMoveOnlyWrappedTypeEliminatorPass : SILFunctionTransform {
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
-    if (SILMoveOnlyWrappedTypeEliminator(getFunction(), trivialOnly)
+    if (SILMoveOnlyWrappedTypeEliminator(getFunction())
             .process()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
@@ -469,10 +449,6 @@ struct SILMoveOnlyWrappedTypeEliminatorPass : SILFunctionTransform {
 
 } // anonymous namespace
 
-SILTransform *swift::createTrivialMoveOnlyTypeEliminator() {
-  return new SILMoveOnlyWrappedTypeEliminatorPass(true /*trivial only*/);
-}
-
 SILTransform *swift::createMoveOnlyTypeEliminator() {
-  return new SILMoveOnlyWrappedTypeEliminatorPass(false /*trivial only*/);
+  return new SILMoveOnlyWrappedTypeEliminatorPass();
 }

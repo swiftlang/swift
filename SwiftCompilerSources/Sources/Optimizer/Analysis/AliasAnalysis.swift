@@ -338,12 +338,13 @@ struct AliasAnalysis {
       return defaultEffects(of: endBorrow, on: memLoc)
 
     case let debugValue as DebugValueInst:
-      let v = debugValue.operand.value
-      if v.type.isAddress, !(v is Undef), memLoc.mayAlias(with: v, self) {
-        return .init(read: true)
-      } else {
-        return .noEffects
+      for operand in debugValue.operands {
+        let v = operand.value
+        if v.type.isAddress, !(v is Undef), memLoc.mayAlias(with: v, self) {
+          return .init(read: true)
+        }
       }
+      return .noEffects
 
     case let destroy as DestroyValueInst:
       if destroy.destroyedValue.type.isNoEscapeFunction {

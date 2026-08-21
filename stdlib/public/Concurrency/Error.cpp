@@ -11,7 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Threading/Errors.h"
+
+#if !SWIFT_CONCURRENCY_EMBEDDED
+// <cstdio> is only needed for the vfprintf() below, which is only used in
+// non-embedded builds; it's a hosted-only header in some standard library
+// implementations, and embedded Concurrency is built as freestanding.
 #include <cstdio>
+#endif
 
 #include "Error.h"
 

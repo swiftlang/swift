@@ -222,6 +222,7 @@ public struct Job: Sendable, ~Copyable {
     self.context = job.context
   }
 
+  @diagnose(UselessAvailabilityCheck, as: ignored)
   public var priority: JobPriority {
     let raw: UInt8
     if #available(StdlibDeploymentTarget 6.3, *) {
@@ -296,6 +297,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
     self.context = job.context
   }
 
+  @diagnose(UselessAvailabilityCheck, as: ignored)
   internal(set) public var priority: JobPriority {
     get {
       let raw: UInt8

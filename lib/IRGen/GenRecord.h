@@ -27,6 +27,7 @@
 #include "LoadableTypeInfo.h"
 #include "Outlining.h"
 #include "TypeInfo.h"
+#include "swift/AST/SerializableHiddenTypeInfoRepresentation.h"
 #include "StructLayout.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -40,12 +41,9 @@ template <class, class, class> class RecordTypeBuilder;
 /// A field of a record type.
 template <class FieldImpl> class RecordField {
   ElementLayout Layout;
+  RecordFieldStorage Storage;
 
   template <class, class, class> friend class RecordTypeBuilder;
-
-  /// Begin/End - the range of explosion indexes for this element
-  unsigned Begin;
-  unsigned End;
 
 protected:
   explicit RecordField(const TypeInfo &elementTI)
@@ -53,7 +51,7 @@ protected:
 
   explicit RecordField(const ElementLayout &layout,
                        unsigned begin, unsigned end)
-    : Layout(layout), Begin(begin), End(end) {}
+    : Layout(layout), Storage{begin, end} {}
 
   const FieldImpl *asImpl() const {
     return static_cast<const FieldImpl*>(this);
@@ -94,6 +92,10 @@ public:
     return Layout.getByteOffset();
   }
 
+  Size getByteOffsetDuringLayout() const {
+    return Layout.getByteOffsetDuringLayout();
+  }
+
   unsigned getStructIndex() const { return Layout.getStructIndex(); }
 
   unsigned getNonFixedElementIndex() const {
@@ -101,7 +103,11 @@ public:
   }
 
   std::pair<unsigned, unsigned> getProjectionRange() const {
-    return {Begin, End};
+    return {Storage.Begin, Storage.End};
+  }
+
+  const ElementLayoutStorage &getLayoutStorage() const {
+    return Layout.getStorage();
   }
 };
 
@@ -129,6 +135,27 @@ private:
 
 protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
+
+  void populateSerializableRecordTypeInfoRepresentation(
+      IRGenModule &IGM, 
+      SerializableLoadableRecordTypeInfoRepresentation &representation) const {
+    Base::populateSerializableHiddenTypeInfoRepresentation(IGM, representation);
+    representation.fieldsAreABIAccessible = areFieldsABIAccessible();
+    representation.fields.clear();
+    representation.fields.reserve(NumFields);
+
+    for (const auto &field : getFields()) {
+      SerializableRecordFieldRepresentation fieldRepresentation;
+      fieldRepresentation.typeInfo = field.getTypeInfo()
+                                         .createSerializableHiddenTypeInfoRepresentation(
+                                             IGM);
+      fieldRepresentation.layout = field.getLayoutStorage();
+      auto projectionRange = field.getProjectionRange();
+      fieldRepresentation.storage.Begin = projectionRange.first;
+      fieldRepresentation.storage.End = projectionRange.second;
+      representation.fields.push_back(std::move(fieldRepresentation));
+    }
+  }
 
   template <class... As> 
   RecordTypeInfoImpl(ArrayRef<FieldImpl> fields,
@@ -299,6 +326,12 @@ public:
       fillWithZerosIfSensitive(IGF, src, T);
   }
 
+  /// Run \p body over the value(s) stored in a \c @_rawLayout type that moves
+  /// as its like type.
+  ///
+  /// \p dest is optional. Operations that have no destination, such as
+  /// destroy, pass an invalid address, in which case \p body receives an
+  /// invalid destination address as well.
   void handleRawLayout(IRGenFunction &IGF, Address dest, Address src, SILType T,
                        bool isOutlined, RawLayoutAttr *rawLayout,
                        std::function<void
@@ -313,8 +346,10 @@ public:
       // the like type's concrete storage type.
       src = Address(src.getAddress(), likeTypeInfo.getStorageType(),
                     src.getAlignment());
-      dest = Address(dest.getAddress(), likeTypeInfo.getStorageType(),
-                     dest.getAlignment());
+      if (dest.isValid()) {
+        dest = Address(dest.getAddress(), likeTypeInfo.getStorageType(),
+                       dest.getAlignment());
+      }
 
       // If we're a scalar, then we only need to run the body once.
       if (rawLayout->getScalarLikeType()) {
@@ -780,12 +815,39 @@ class RecordTypeInfo<Impl, Base, FieldImpl,
 protected:
   using super::asImpl;
 
+  // We intentionally construct RecordTypeInfo and derived TypeInfo classes
+  // from both a serialized representation, and a separately provided set of
+  // field information. Clients may have more or less information about dependent
+  // field types and constructor their representation. If the native AST based definition
+  // of a type is available, they are free to use that instead of the serialized hidden
+  // representation.
+  RecordTypeInfo(
+      ArrayRef<FieldImpl> fields, IRGenModule &IGM,
+      const SerializableLoadableRecordTypeInfoRepresentation &representation)
+      : super(fields,
+              representation.fieldsAreABIAccessible
+                  ? FieldsAreABIAccessible
+                  : FieldsAreNotABIAccessible,
+              IGM, representation),
+        ExplosionSize(representation.explosionSize) {
+    assert(representation.fields.size() == fields.size());
+    assert(ExplosionSize == representation.explosionSize && "truncation");
+  }
+
   template <class... As> 
   RecordTypeInfo(ArrayRef<FieldImpl> fields,
                  unsigned explosionSize,
                  As &&...args)
     : super(fields, std::forward<As>(args)...),
       ExplosionSize(explosionSize) {}
+
+  void populateSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &IGM,
+      SerializableLoadableRecordTypeInfoRepresentation &representation) const {
+    super::populateSerializableRecordTypeInfoRepresentation(IGM,
+                                                             representation);
+    representation.explosionSize = ExplosionSize;
+  }
 
 private:
   template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF,
@@ -847,6 +909,14 @@ private:
 
 public:
   using super::getFields;
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const override {
+    auto representation =
+        std::make_unique<SerializableLoadableRecordTypeInfoRepresentation>();
+    populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+    return representation;
+  }
 
   void loadAsCopy(IRGenFunction &IGF, Address addr,
                   Explosion &out) const override {
@@ -970,14 +1040,14 @@ public:
       }
 
       auto &fieldInfo = fields.back();
-      fieldInfo.Begin = explosionSize;
+      fieldInfo.Storage.Begin = explosionSize;
       bool overflow = false;
       explosionSize = llvm::SaturatingAdd(explosionSize, loadableFieldTI->getExplosionSize(), &overflow);
       if (overflow) {
         IGM.Context.Diags.diagnose(SourceLoc(), diag::explosion_size_oveflow);
       }
 
-      fieldInfo.End = explosionSize;
+      fieldInfo.Storage.End = explosionSize;
     }
 
     // Perform layout and fill in the fields.

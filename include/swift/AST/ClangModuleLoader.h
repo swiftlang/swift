@@ -22,8 +22,10 @@ namespace clang {
 class ASTContext;
 class CompilerInstance;
 class Decl;
+class FunctionDecl;
 class Module;
 class Preprocessor;
+class RecordDecl;
 class Sema;
 class TargetInfo;
 class Type;
@@ -250,6 +252,13 @@ public:
   /// Returns the forwarding method in the derived class that calls the base
   /// method.
   virtual ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) = 0;
+
+  /// Returns the (retain, release) Clang functions that implement the custom
+  /// reference counting of the foreign reference type with Clang record
+  /// \p decl, or {nullptr, nullptr} if it has no custom reference counting
+  /// (i.e. it is immortal or not a valid foreign reference type).
+  virtual std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
+  getForeignReferenceTypeOperations(const clang::RecordDecl *decl) = 0;
 
   /// Returns true if we synthesize this member for every type so no need to
   /// clone it for the derived classes.

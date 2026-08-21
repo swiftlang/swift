@@ -3689,15 +3689,33 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
 
     SILBasicBlock *DebugBB = nullptr;
-    if (parseTypedValueRef(Val, B) || parseSILDebugVar(VarInfo) ||
+
+    // Parse operands: either a single typed value or a parenthesized list.
+    SmallVector<SILValue, 4> Operands;
+    if (P.Tok.is(tok::l_paren)) {
+      P.consumeToken(tok::l_paren);
+      if (!P.Tok.is(tok::r_paren)) {
+        do {
+          SILValue Operand;
+          if (parseTypedValueRef(Operand, B))
+            return true;
+          Operands.push_back(Operand);
+        } while (P.consumeIf(tok::comma));
+      }
+      if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+        return true;
+    } else {
+      if (parseTypedValueRef(Val, B))
+        return true;
+      Operands.push_back(Val);
+    }
+
+    if (parseSILDebugVar(VarInfo) ||
         parseSILDebugTransformBlock(DebugBB, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    if (Val->getType().isMoveOnly())
-      usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
-
-    ResultVal = B.createDebugValue(InstLoc, Val, VarInfo,
+    ResultVal = B.createDebugValue(InstLoc, Operands, VarInfo,
                                    usesMoveableValueDebugInfo, hasTrace);
 
     if (DebugBB)
@@ -7114,6 +7132,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   auto PartialApplyIsolation = SILFunctionTypeIsolation::forUnknown();
   ApplyOptions ApplyOpts;
   bool IsNoEscape = false;
+  bool IsCalledOnce = false;
 
   StringRef AttrName;
   SourceLoc AttrLoc;
@@ -7163,6 +7182,12 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     if (AttrName == "non_nested") {
       assert(!bool(AttrValue));
       isNested = StackAllocationIsNotNested;
+      continue;
+    }
+
+    if (AttrName == "called_once") {
+      assert(!bool(AttrValue));
+      IsCalledOnce = true;
       continue;
     }
 
@@ -7348,7 +7373,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = B.createPartialApply(
         InstLoc, FnVal, subs, Args, PartialApplyConvention,
-        PartialApplyIsolation,
+        PartialApplyIsolation, IsCalledOnce,
         IsNoEscape ? PartialApplyInst::OnStackKind::OnStack
                    : PartialApplyInst::OnStackKind::NotOnStack,
         isNested ? *isNested : StackAllocationIsNested);
@@ -8965,6 +8990,7 @@ bool SILParserState::parseSILDefaultOverrideTable(Parser &P) {
 /// decl-sil-differentiability-witness ::=
 ///   'sil_differentiability_witness'
 ///   ('[' 'serialized' ']')?
+///   ('[' 'default' ']')?
 ///   sil-linkage?
 ///   sil-differentiability-witness-config-and-function
 ///   decl-sil-differentiability-witness-body?
@@ -8999,6 +9025,18 @@ bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
       return true;
   }
 
+  // Parse '[default]' flag (optional).
+  bool isDefault = false;
+  SourceLoc defaultTokLoc;
+  if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::kw_default)) {
+    isDefault = true;
+    defaultTokLoc = P.Tok.getLoc();
+    P.consumeToken(tok::l_square);
+    P.consumeToken(tok::kw_default);
+    if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_token, "]"))
+      return true;
+  }
+
   // We need to turn on InSILBody to parse the function references.
   Lexer::SILBodyRAII tmp(*P.L);
 
@@ -9020,7 +9058,7 @@ bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
     SILDifferentiabilityWitness::createDeclaration(
         M, linkage ? *linkage : SILLinkage::DefaultForDeclaration, originalFn,
         kind, config.parameterIndices, config.resultIndices,
-        config.derivativeGenericSignature);
+        config.derivativeGenericSignature, isDefault);
     return false;
   }
 
@@ -9057,7 +9095,7 @@ bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
   SILDifferentiabilityWitness::createDefinition(
       M, linkage ? *linkage : SILLinkage::DefaultForDefinition, originalFn,
       kind, config.parameterIndices, config.resultIndices,
-      config.derivativeGenericSignature, jvp, vjp, isSerialized);
+      config.derivativeGenericSignature, jvp, vjp, isSerialized, isDefault);
   return false;
 }
 

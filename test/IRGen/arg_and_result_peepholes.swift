@@ -9,7 +9,7 @@
 // CHECK:   [[ARG_MEM:%.*]] = alloca %TSo9BigStructV
 // CHECK:   [[TMP2:%.*]] = alloca %TSo9BigStructV
 // CHECK:   [[CALL:%.*]] = alloca %TSo9BigStructV
-// CHECK:   call void @llvm.lifetime.start.p0(i64 256, ptr [[TMP]])
+// CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr [[TMP]])
 // CHECK:   [[A1:%.*]] = getelementptr inbounds{{.*}} { i64, i64, i64, i64 }, ptr [[TMP]], i32 0, i32 0
 // CHECK:   store i64 %0, ptr [[A1]]
 // CHECK:   [[A2:%.*]] = getelementptr inbounds{{.*}} { i64, i64, i64, i64 }, ptr [[TMP]], i32 0, i32 1
