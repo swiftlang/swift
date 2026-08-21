@@ -13,10 +13,10 @@
 // target, so build the test targeting 5.8 and only run it against a 5.8+
 // runtime.
 // RUN: %target-run-simple-swift(-target %target-swift-5.8-abi-triple -enable-experimental-feature Lifetimes)
+// RUN: %target-run-simple-swift(-target %target-swift-5.8-abi-triple -enable-experimental-feature Lifetimes -Xfrontend -enable-sil-opaque-values)
 // REQUIRES: executable_test
 // REQUIRES: stdlib_5_8_runtime
 // REQUIRES: swift_feature_Lifetimes
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 
