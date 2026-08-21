@@ -7792,15 +7792,17 @@ void SILVTable::verify(const SILModule &M) const {
       // Note the direction of the compatibility check: the witness
       // function must be compatible with being used as the requirement
       // type.
-      SILVerifier(*entry.getImplementation(), /*calleeCache=*/nullptr,
-                  /*dominanceInfo=*/nullptr,
-                  /*SingleFunction=*/true,
-                  /*checkLinearLifetime=*/false)
-          .requireABICompatibleFunctionTypes(
-              entry.getImplementation()->getLoweredFunctionType(),
-              baseInfo.getSILType().castTo<SILFunctionType>(),
-              "vtable entry for " + baseName + " must be ABI-compatible",
-              *entry.getImplementation());
+      SILVerifier verifier(*entry.getImplementation(), /*calleeCache=*/nullptr,
+                           /*dominanceInfo=*/nullptr,
+                           /*SingleFunction=*/true,
+                           /*checkLinearLifetime=*/false);
+      SILVerifier::VerifierErrorEmitterGuard guard(&verifier,
+                                                   entry.getImplementation());
+      verifier.requireABICompatibleFunctionTypes(
+          entry.getImplementation()->getLoweredFunctionType(),
+          baseInfo.getSILType().castTo<SILFunctionType>(),
+          "vtable entry for " + baseName + " must be ABI-compatible",
+          *entry.getImplementation());
     }
     
     // Validate the entry against its superclass vtable.
@@ -7958,16 +7960,17 @@ void SILDefaultWitnessTable::verify(const SILModule &mod) const {
         entry.getMethodWitness().Requirement.print(os);
       }
 
-      SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
-                  /*dominanceInfo=*/nullptr,
-                  /*SingleFunction=*/true,
-                  /*checkLinearLifetime=*/false)
-          .requireABICompatibleFunctionTypes(
-              witnessFunction->getLoweredFunctionType(),
-              baseInfo.getSILType().castTo<SILFunctionType>(),
-              "default witness table entry for " + baseName +
-                  " must be ABI-compatible",
-              *witnessFunction);
+      SILVerifier verifier(*witnessFunction, /*calleeCache=*/nullptr,
+                           /*dominanceInfo=*/nullptr,
+                           /*SingleFunction=*/true,
+                           /*checkLinearLifetime=*/false);
+      SILVerifier::VerifierErrorEmitterGuard guard(&verifier, witnessFunction);
+      verifier.requireABICompatibleFunctionTypes(
+          witnessFunction->getLoweredFunctionType(),
+          baseInfo.getSILType().castTo<SILFunctionType>(),
+          "default witness table entry for " + baseName +
+              " must be ABI-compatible",
+          *witnessFunction);
     }
   }
 }
