@@ -692,6 +692,28 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
                  functionKind, param->getName());
         diagnose(Context, param->getLoc(), diag::inout_param_defined_here,
                  param->getName());
+
+        auto name = param->getName();
+        if (auto *CE = PAI->getLoc().getAsASTNode<ClosureExpr>()) {
+          if (CE->getBracketRange().isValid()) {
+            SourceLoc insertLoc = CE->getBracketRange().Start.getAdvancedLoc(1);
+            bool isEmpty = (insertLoc == CE->getBracketRange().End);
+            std::string capture = name.str();
+            diagnose(Context, PAI->getLoc(),
+                     diag::copy_inout_captured_by_escaping_closure, name)
+                .fixItInsert(insertLoc, isEmpty ? capture : capture + ", ");
+          } else {
+            std::string fix = " [" + name.str() + "]";
+            if (CE->getInLoc().isInvalid())
+              fix += " in";
+            diagnose(Context, PAI->getLoc(),
+                     diag::copy_inout_captured_by_escaping_closure, name)
+                .fixItInsertAfter(CE->getLoc(), fix);
+          }
+        } else {
+          diagnose(Context, PAI->getLoc(),
+                   diag::copy_inout_captured_by_escaping_closure, name);
+        }
       }
     }
     if (functionKind != EscapingAutoClosure) {
