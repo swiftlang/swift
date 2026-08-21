@@ -747,7 +747,18 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
                                   MetatypeRepresentation::Thick,
                                   instanceType,
                                   /*allow artificial subclasses*/ true);
-    IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
+    IsExact_t exactness = IsInexact;
+    if (FnType->getRepresentation() ==
+            SILFunctionTypeRepresentation::COMMethod &&
+        FnType->hasSelfParam() &&
+        paramIndex == FnType->getParameters().size() - 1 &&
+        isa<ArchetypeType>(paramType)) {
+      // The generic Self of a native COM entry is the dynamic class recovered
+      // from the interface pointer, so the object's metadata describes it
+      // exactly even when its superclass bound is not final.
+      exactness = IsExact;
+    }
+    IGF.bindLocalTypeDataFromTypeMetadata(paramType, exactness, metadata,
                                           MetadataState::Complete);
     return;
   }
