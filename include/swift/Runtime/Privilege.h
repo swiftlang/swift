@@ -24,8 +24,8 @@ namespace swift {
 namespace runtime {
 
 /// True if the process gained credentials at exec that its invoker does not
-/// hold: `AT_SECURE` on Linux, `issetugid()` elsewhere. Windows has no
-/// equivalent and always reports false.
+/// hold: `AT_SECURE` on Linux, `issetugid()` elsewhere. Targets with no
+/// equivalent always return false.
 SWIFT_RUNTIME_STDLIB_INTERNAL
 bool _swift_isPrivilegedProcess();
 
