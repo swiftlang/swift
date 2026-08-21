@@ -320,16 +320,11 @@ std::string ASTMangler::mangleWitnessTable(const ProtocolConformance *C) {
   return finalize();
 }
 
-std::string ASTMangler::mangleWitnessThunk(
-                                     const ProtocolConformance *Conformance,
-                                           const ValueDecl *Requirement) {
-  beginMangling();
+void ASTMangler::appendWitnessThunkEntity(
+    const ProtocolConformance *Conformance, const ValueDecl *Requirement) {
   // Concrete witness thunks get a special mangling.
-  if (Conformance) {
-    if (!isa<SelfProtocolConformance>(Conformance)) {
-      appendProtocolConformance(Conformance);
-    }
-  }
+  if (Conformance && !isa<SelfProtocolConformance>(Conformance))
+    appendProtocolConformance(Conformance);
 
   if (auto ctor = dyn_cast<ConstructorDecl>(Requirement)) {
     appendConstructorEntity(ctor, /*isAllocating=*/true);
@@ -337,6 +332,12 @@ std::string ASTMangler::mangleWitnessThunk(
     assert(isa<FuncDecl>(Requirement) && "expected function");
     appendEntity(cast<FuncDecl>(Requirement));
   }
+}
+
+std::string ASTMangler::mangleWitnessThunk(
+    const ProtocolConformance *Conformance, const ValueDecl *Requirement) {
+  beginMangling();
+  appendWitnessThunkEntity(Conformance, Requirement);
 
   if (Conformance) {
     if (isa<SelfProtocolConformance>(Conformance)) {
@@ -346,6 +347,15 @@ std::string ASTMangler::mangleWitnessThunk(
     }
   }
 
+  return finalize();
+}
+
+std::string ASTMangler::mangleCOMMethodWitnessThunk(
+    const ProtocolConformance *Conformance, const ValueDecl *Requirement) {
+  assert(Conformance && !isa<SelfProtocolConformance>(Conformance));
+  beginMangling();
+  appendWitnessThunkEntity(Conformance, Requirement);
+  appendOperator("TWV");
   return finalize();
 }
 
