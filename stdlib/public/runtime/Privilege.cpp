@@ -47,7 +47,8 @@ extern "C" int csops(int, unsigned int, void *, size_t);
 bool swift::runtime::_swift_isPrivilegedProcess() {
 #if defined(__linux__)
   return getauxval(AT_SECURE);
-#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+#elif TARGET_OS_OSX || TARGET_OS_IPHONE || defined(__FreeBSD__) ||             \
+    defined(__OpenBSD__)
   return issetugid();
 #else
   return false;
