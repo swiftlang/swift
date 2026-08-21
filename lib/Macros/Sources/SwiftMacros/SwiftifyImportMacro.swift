@@ -1273,16 +1273,15 @@ struct SinglePointerThunkBuilder: ParamBoundsThunkBuilder {
     }
     // Ref has no address to hand back: for pointee types that fit in 4 words
     // Builtin.Borrow stores the value inline, so the only address available is
-    // that of a copy. _swiftifyWithOptionalPointer materializes that copy and
-    // scopes the pointer to the call, which is sound because __single implies a
-    // lifetime dependence.
+    // that of a copy.
     let ptrName = TokenSyntax("_\(name.withoutBackticks)Ptr").escapeIfNeeded
     // The closure always receives an Optional pointer, so a _Nonnull parameter
     // needs unwrapping.
-    args[index] = nullable ? "\(ptrName)" : "\(ptrName)!"
+    args[index] = "\(ptrName)"
     let innerCall = try base.buildFunctionCall(args)
+    let withPointerFunction = nullable ? "_swiftifyWithOptionalPointer(" : "withUnsafePointer(to: "
     return """
-      unsafe _swiftifyWithOptionalPointer(\(name)\(raw: questionMark).value, { \(ptrName) in \(innerCall) })
+      unsafe \(raw: withPointerFunction)\(name)\(raw: questionMark).value, { \(ptrName) in \(innerCall) })
       """
   }
   func buildBasicBoundsExtractions() throws -> [CodeBlockItemSyntax.Item] {
