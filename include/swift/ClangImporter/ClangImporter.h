@@ -337,6 +337,13 @@ public:
   /// relevant `@implementation` has been type-checked.
   bool hasObjCImplementation(const Decl *interfaceDecl) const;
 
+  /// If \p interfaceDecl is a Clang-imported declaration already matched to a
+  /// Swift `@implementation`, returns that implementation; otherwise nullptr.
+  ///
+  /// Like \c hasObjCImplementation(), this only consults the cache and never
+  /// triggers the request.
+  Decl *getCachedObjCImplementation(const Decl *interfaceDecl) const;
+
   /// Look up a type declaration by its Clang name.
   ///
   /// Note that this method does no filtering. If it finds the type in a loaded

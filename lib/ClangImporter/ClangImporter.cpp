@@ -6826,34 +6826,6 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
   return constructResult(interfaceDecls, implDecls, classDecl, categoryName);
 }
 
-static void lookupRelatedFuncs(AbstractFunctionDecl *func,
-                               SmallVectorImpl<ValueDecl *> &results) {
-  DeclName swiftName;
-  if (auto accessor = dyn_cast<AccessorDecl>(func))
-    swiftName = accessor->getStorage()->getName();
-  else
-    swiftName = func->getName();
-
-  if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
-    NLOptions options = {NLFlags::IgnoreAccessControl, NLFlags::IgnoreMissingImports};
-    ty->lookupQualified({ ty }, DeclNameRef(swiftName), func->getLoc(),
-                        (NLFlags::QualifiedDefault) | options, results);
-  }
-  else {
-    ASTContext &ctx = func->getASTContext();
-    UnqualifiedLookupOptions options =
-      UnqualifiedLookupFlags::IgnoreAccessControl;
-    UnqualifiedLookupDescriptor descriptor(
-        DeclNameRef(ctx, Identifier(), swiftName), func->getDeclContext(),
-        func->getLoc(), options);
-    auto lookup = evaluateOrDefault(func->getASTContext().evaluator,
-                                    UnqualifiedLookupRequest{descriptor}, {});
-    for (const auto &result : lookup) {
-      results.push_back(result.getValueDecl());
-    }
-  }
-}
-
 static ObjCInterfaceAndImplementation
 findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
   if (!func)
@@ -6864,54 +6836,141 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
   if (!func->hasClangNode() && !func->isObjCImplementation())
     return {};
 
-  OptionalEnum<AccessorKind> accessorKind;
-  if (auto accessor = dyn_cast<AccessorDecl>(func))
-    accessorKind = accessor->getAccessorKind();
-
   StringRef clangName = func->getCDeclName();
   if (clangName.empty())
     return {};
 
-  SmallVector<ValueDecl *, 4> results;
-  lookupRelatedFuncs(func, results);
-
-  // Classify the `results` as either the interface or an implementation.
-  // (Multiple implementations are invalid but utterable.)
-  Decl *interface = nullptr;
-  TinyPtrVector<Decl *> impls;
-
-  for (ValueDecl *result : results) {
-    AbstractFunctionDecl *resultFunc = nullptr;
-    if (accessorKind) {
-      if (auto resultStorage = dyn_cast<AbstractStorageDecl>(result))
-        resultFunc = resultStorage->getAccessor(*accessorKind);
+  // Members (methods/accessors of a nominal type) use a qualified lookup into
+  // the enclosing type. This preserves matching for `@objc @implementation`
+  // members as well as imported import-as-member declarations, and keeps the
+  // historical two-directional behavior for them. (`@c` on members is
+  // unsupported and rejected elsewhere.)
+  if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
+    OptionalEnum<AccessorKind> accessorKind;
+    DeclName swiftName;
+    if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+      accessorKind = accessor->getAccessorKind();
+      swiftName = accessor->getStorage()->getName();
+    } else {
+      swiftName = func->getName();
     }
-    else
-      resultFunc = dyn_cast<AbstractFunctionDecl>(result);
 
-    if (!resultFunc)
-      continue;
+    SmallVector<ValueDecl *, 4> results;
+    NLOptions options = {NLFlags::IgnoreAccessControl,
+                         NLFlags::IgnoreMissingImports};
+    ty->lookupQualified({ ty }, DeclNameRef(swiftName), func->getLoc(),
+                        (NLFlags::QualifiedDefault) | options, results);
 
-    if (resultFunc->getCDeclName() != clangName)
-      continue;
+    // `func` (the implementation) may not be surfaced by the qualified lookup
+    // above (e.g. when it comes from a macro expansion still being
+    // type-checked), so make sure it is classified below; otherwise
+    // `constructResult` would bail on an empty implementation list.
+    if (!is_contained(results, func))
+      results.push_back(func);
 
-    if (resultFunc->hasClangNode()) {
-      if (interface) {
-        // This clang name is overloaded. That should only happen with C++
-        // functions/methods, which aren't currently supported.
-        return {};
+    Decl *interface = nullptr;
+    TinyPtrVector<Decl *> impls;
+    for (ValueDecl *result : results) {
+      AbstractFunctionDecl *resultFunc = nullptr;
+      if (accessorKind) {
+        if (auto resultStorage = dyn_cast<AbstractStorageDecl>(result))
+          resultFunc = resultStorage->getAccessor(*accessorKind);
+      } else {
+        resultFunc = dyn_cast<AbstractFunctionDecl>(result);
       }
-      interface = result;
-    } else if (resultFunc->isObjCImplementation()) {
-      impls.push_back(result);
+
+      if (!resultFunc)
+        continue;
+      if (resultFunc->getCDeclName() != clangName)
+        continue;
+
+      if (resultFunc->hasClangNode()) {
+        if (interface) {
+          // This clang name is overloaded. That should only happen with C++
+          // functions/methods, which aren't currently supported.
+          return {};
+        }
+        interface = result;
+      } else if (resultFunc->isObjCImplementation()) {
+        impls.push_back(result);
+      }
+    }
+
+    return constructResult({ interface }, impls, interface,
+                           /*categoryName=*/Identifier());
+  }
+
+  // Global functions: resolve the Clang interface one-directionally *from* the
+  // implementation. The reverse direction (interface -> implementation) is
+  // answered lazily from the cache we populate here (see
+  // `Decl::hasObjCImplementation()` and this request's separate caching), so
+  // there is no need to search for implementations starting from an interface.
+  if (!func->isObjCImplementation())
+    return {};
+
+  ASTContext &ctx = func->getASTContext();
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  if (!importer)
+    return {};
+
+  // Ask the Clang importer directly for a declaration with this base name,
+  // searching every imported Clang module and the bridging header. This avoids
+  // any Swift-module name lookup, and does not depend on `func` being
+  // registered in the SourceLookupCache -- it may not be yet, e.g. when `func`
+  // was produced by a macro expansion that is still being type-checked.
+  SmallVector<ValueDecl *, 4> candidates;
+  VectorDeclConsumer consumer(candidates);
+  importer->lookupValue(DeclName(func->getName().getBaseName()), consumer);
+
+  // Find the single imported interface function whose C name matches.
+  Decl *interface = nullptr;
+  for (ValueDecl *candidate : candidates) {
+    auto *candidateFunc = dyn_cast<AbstractFunctionDecl>(candidate);
+    if (!candidateFunc || !candidateFunc->hasClangNode())
+      continue;
+    if (candidateFunc->getCDeclName() != clangName)
+      continue;
+
+    if (interface) {
+      // This clang name is overloaded. That should only happen with C++
+      // functions/methods, which aren't currently supported.
+      return {};
+    }
+    interface = candidate;
+  }
+
+  if (!interface)
+    return {};
+
+  // Duplicate-implementation detection. A Clang-only lookup can't see sibling
+  // Swift implementations (unlike the class path, which gathers them all in
+  // `constructResult`), so we detect duplicates at match time: if this
+  // interface was already matched to a *different* implementation, diagnose the
+  // source-later of the two.
+  if (Decl *other = importer->getCachedObjCImplementation(interface)) {
+    auto getImplAttr = [](Decl *d) {
+      return d->getAttrs().getAttribute<ObjCImplementationAttr>(
+          /*AllowInvalid=*/true);
+    };
+    auto *funcAttr = getImplAttr(func);
+    auto *otherAttr = getImplAttr(other);
+    if (other != func && funcAttr && !funcAttr->isInvalid() &&
+        otherAttr && !otherAttr->isInvalid()) {
+      Decl *first = other, *second = func;
+      if (OrderDecls()(func, other))
+        std::swap(first, second);
+      auto *secondAttr = getImplAttr(second);
+      secondAttr->setInvalid();
+      ctx.Diags
+          .diagnose(secondAttr->getLocation(),
+                    diag::objc_implementation_two_impls, interface)
+          .fixItRemove(secondAttr->getRangeWithAt());
+      ctx.Diags.diagnose(first, diag::previous_objc_implementation);
     }
   }
 
-  // If we found enough decls to construct a result, `func` should be among them
-  // somewhere.
-  assert(interface == nullptr || impls.empty() ||
-         interface == func || llvm::is_contained(impls, func));
-
+  TinyPtrVector<Decl *> impls;
+  impls.push_back(func);
   return constructResult({ interface }, impls, interface,
                          /*categoryName=*/Identifier());
 }
@@ -7037,7 +7096,16 @@ bool Decl::hasObjCImplementation() const {
 }
 
 bool ClangImporter::hasObjCImplementation(const Decl *interfaceDecl) const {
-  return Impl.ImplementationsByInterface.count(const_cast<Decl *>(interfaceDecl));
+  return getCachedObjCImplementation(interfaceDecl) != nullptr;
+}
+
+Decl *
+ClangImporter::getCachedObjCImplementation(const Decl *interfaceDecl) const {
+  auto iter =
+      Impl.ImplementationsByInterface.find(const_cast<Decl *>(interfaceDecl));
+  if (iter == Impl.ImplementationsByInterface.end())
+    return nullptr;
+  return iter->second;
 }
 
 llvm::TinyPtrVector<Decl *>
