@@ -728,7 +728,7 @@ std::optional<ResultConvention>
 swift::importer::getLibkernOwnershipOfReturnedFRT(
     const clang::NamedDecl *decl) {
   auto *func = dyn_cast<clang::FunctionDecl>(decl);
-  if (!func || func->isImplicit())
+  if (!func)
     return std::nullopt;
 
   auto *recordDecl = getReturnTypeAsRecordDeclPtr(func);
@@ -741,8 +741,24 @@ swift::importer::getLibkernOwnershipOfReturnedFRT(
   if (!func->getIdentifier())
     return std::nullopt;
 
-  // Strip leading underscores.
+  auto consumeSynthesizedPrefixes = [](StringRef &funcName) -> bool {
+    bool consumed = false;
+    while (funcName.consume_front("__synthesizedVirtualCall_") ||
+           funcName.consume_front("__synthesizedBaseCall_"))
+      consumed = true;
+    return consumed;
+  };
+
   StringRef funcName = func->getName();
+  // If this is a synthesized thunk, consume the prefix we added.
+  if (func->isImplicit()) {
+    if (!consumeSynthesizedPrefixes(funcName))
+      return std::nullopt;
+    if (funcName.starts_with("operator"))
+      return std::nullopt;
+  }
+
+  // Strip leading underscores.
   funcName = funcName.substr(funcName.find_first_not_of('_'));
 
   if (funcName == "safeMetaCast" || funcName == "requiredMetaCast" ||

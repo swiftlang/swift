@@ -150,6 +150,10 @@ public:
   static Service *_Nonnull noAnnotationWithID(int id) {
     return new Service(id);
   }
+
+  virtual Service *_Nonnull virtualNoAnnotationCopyService() const {
+    return new Service(id);
+  }
 };
 
 class NastyService : public Service {
@@ -171,6 +175,17 @@ public:
   static SWIFT_RETURNS_RETAINED LIBKERN_RETURNS_NOT_RETAINED NastyService *
   toRetainOrNotToRetain() { // expected-error {{'toRetainOrNotToRetain' cannot be annotated with both SWIFT_RETURNS_RETAINED and SWIFT_RETURNS_UNRETAINED}}
     return NastyService::withID(-1);
+  }
+};
+
+class DerivedService : public Service {
+protected:
+  explicit DerivedService(int n) : Service(n) {}
+
+public:
+  static LIBKERN_RETURNS_RETAINED DerivedService *_Nonnull derivedWithID(
+      int id) {
+    return new DerivedService(id);
   }
 };
 

@@ -140,9 +140,17 @@ Tests.test("Unannotated methods returning an OSObject subclass return +1 unless 
     let service = Service.noAnnotationWithID(37)
     expectEqual(37, service.getID())
     expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+
+    do {
+      let same = service.virtualNoAnnotationCopyService()
+      expectEqual(service.getID(), same.getID())
+      expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+    }
+
+    expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
   }
 
-  expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
+  expectEqual(manager.getTotalRetains() + 2, manager.getTotalReleases())
 }
 
 Tests.test("Missing annotation on non-OSObject subclass") {
@@ -170,6 +178,24 @@ Tests.test("OSIterator is a special case") {
 
   do {
     let iterator = OSCollectionIterator.getCollectionIterator()
+    expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+  }
+
+  expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
+}
+
+Tests.test("DerivedService") {
+  manager.reset()
+
+  do {
+    let service = DerivedService.derivedWithID(41)
+    expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+
+    do {
+      let provider = service.getProvider()
+      expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+    }
+
     expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
   }
 

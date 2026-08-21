@@ -26,6 +26,9 @@ _ = copyServiceFreeFunction(service)
 _ = Service.noAnnotationWithID(11)
 // CHECK: sil {{.*}}[clang Service.noAnnotationWithID] {{.*}} -> @owned Service
 
+_ = service.virtualNoAnnotationCopyService()
+// CHECK: sil {{.*}}[clang Service.virtualNoAnnotationCopyService] {{.*}} -> @owned Service
+
 _ = NonOSService.noAnnotationWithID(11)
 // CHECK: sil {{.*}}[clang NonOSService.noAnnotationWithID] {{.*}} -> NonOSService
 
@@ -34,3 +37,7 @@ _ = OSIterator.getIterator()
 
 _ = OSCollectionIterator.getCollectionIterator()
 // CHECK: sil {{.*}}[clang OSCollectionIterator.getCollectionIterator] {{.*}} -> @owned OSCollectionIterator
+
+let derived = DerivedService.derivedWithID(19)
+_ = derived.getProvider()
+// CHECK: sil {{.*}}[clang DerivedService.__synthesizedBaseCall___synthesizedVirtualCall_getProvider{{.*}} -> Optional<Service>
