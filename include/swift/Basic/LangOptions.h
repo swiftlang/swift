@@ -1235,6 +1235,14 @@ namespace swift {
     /// ones to apply.
     bool LoadVersionIndependentAPINotes = false;
 
+    /// Whether ClangImporter should force \c -fobjc-msgsend-selector-stubs to
+    /// be either on or off. If \c nullopt , the decision will be left to the clang driver.
+    std::optional<bool> ForceObjCMsgSendSelectorStubs = std::nullopt;
+
+    /// Whether ClangImporter should force \c -fobjc-msgsend-class-selector-stubs to
+    /// be either on or off. If \c nullopt , the decision will be left to the clang driver.
+    std::optional<bool> ForceObjCMsgSendClassSelectorStubs = std::nullopt;
+
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.
     llvm::hash_code getPCHHashComponents() const {

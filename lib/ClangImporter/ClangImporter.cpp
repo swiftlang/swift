@@ -1045,6 +1045,21 @@ void importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-fbuild-session-file=" + importerOpts.BuildSessionFilePath);
   }
 
+  if (ctx.LangOpts.EnableObjCInterop) {
+    if (importerOpts.ForceObjCMsgSendSelectorStubs) {
+      if (*importerOpts.ForceObjCMsgSendSelectorStubs)
+        invocationArgStrs.push_back("-fobjc-msgsend-selector-stubs");
+      else
+        invocationArgStrs.push_back("-fno-objc-msgsend-selector-stubs");
+    }
+    if (importerOpts.ForceObjCMsgSendClassSelectorStubs) {
+      if (*importerOpts.ForceObjCMsgSendClassSelectorStubs)
+        invocationArgStrs.push_back("-fobjc-msgsend-class-selector-stubs");
+      else
+        invocationArgStrs.push_back("-fno-objc-msgsend-class-selector-stubs");
+    }
+  }
+
   if (!importerOpts.DirectClangCC1ModuleBuild) {
     for (const auto &extraArg : importerOpts.ExtraArgs) {
       invocationArgStrs.push_back(extraArg);
