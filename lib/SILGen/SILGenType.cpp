@@ -40,6 +40,7 @@
 #include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 #include "clang/AST/Decl.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -83,6 +84,38 @@ void materializeCOMRuntimeEntries(SILGenModule &SGM, ClassDecl *CD) {
     if (auto *FD = evaluateOrDefault(C.evaluator, request, nullptr))
       materialize(FD);
   }
+}
+
+/// Materialize imported witness tables used to build this class's native COM
+/// vtables before mandatory SIL lowering disables conformance deserialization.
+void materializeInheritedCOMWitnessTables(SILGenModule &SGM, ClassDecl *CD) {
+  auto *info = CD->getCOMDeclInfo();
+  ASSERT(info && info->isImplementation());
+
+  llvm::SmallPtrSet<RootProtocolConformance *, 4> roots;
+  auto materialize = [&](ProtocolDecl *interface) {
+    auto conformance =
+        lookupConformance(CD->getDeclaredInterfaceType(), interface);
+    if (conformance.isInvalid() || !conformance.isConcrete())
+      return;
+
+    auto *root = conformance.getConcrete()->getRootConformance();
+    if (root->getDeclContext()->getParentModule() == SGM.SwiftModule ||
+        !roots.insert(root).second)
+      return;
+
+    SGM.M.linkWitnessTable(root, SILModule::LinkingMode::LinkAll);
+  };
+
+  for (auto *slot : info->getInterfaceSlots()) {
+    auto *hierarchy = slot->getCOMInterfaceHierarchy();
+    ASSERT(hierarchy && !hierarchy->isInvalid());
+    for (auto *interface : hierarchy->getABIChain())
+      materialize(interface);
+  }
+
+  if (auto *root = info->getRootInterface())
+    materialize(root);
 }
 }
 
@@ -1578,8 +1611,10 @@ public:
 
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
-      if (auto *CD = theClass->getCOMDeclInfo(); CD && CD->isImplementation())
+      if (auto *CD = theClass->getCOMDeclInfo(); CD && CD->isImplementation()) {
+        materializeInheritedCOMWitnessTables(SGM, theClass);
         materializeCOMRuntimeEntries(SGM, theClass);
+      }
 
       if (!theClass->hasClangNode()) {
         SILGenVTable genVTable(SGM, theClass);
