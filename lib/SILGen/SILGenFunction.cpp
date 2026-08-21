@@ -183,6 +183,7 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
 DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   switch (ref.kind) {
   case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::DistributedThunk:
     if (auto closure = ref.getAbstractClosureExpr())
       return getMagicFunctionName(closure);
     return getMagicFunctionName(cast<FuncDecl>(ref.getDecl()));

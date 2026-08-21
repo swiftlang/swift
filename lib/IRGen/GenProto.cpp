@@ -950,7 +950,8 @@ namespace {
       // ProtocolDescriptorBuilder::getRequirementInfo.
       assert((isa<ConstructorDecl>(func.getDecl())
                   ? (func.kind == SILDeclRef::Kind::Allocator)
-                  : (func.kind == SILDeclRef::Kind::Func)) &&
+                  : (func.kind == SILDeclRef::Kind::Func ||
+                     func.kind == SILDeclRef::Kind::DistributedThunk)) &&
              "unexpected kind for protocol witness declaration ref");
       Entries.push_back(WitnessTableEntry::forFunction(func));
     }

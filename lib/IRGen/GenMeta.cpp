@@ -1033,7 +1033,7 @@ namespace {
               entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
         if (entry.getFunction().isDistributedThunk()) {
           flags = flags.withIsAsync(true);
-          declRef = declRef.asDistributed();
+          declRef = declRef.getDistributedThunkDeclRef();
         }
         addDiscriminator(flags, schema, declRef);
       }
