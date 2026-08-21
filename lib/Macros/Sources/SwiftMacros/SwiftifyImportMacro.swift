@@ -1563,14 +1563,14 @@ func parseTypeMappingParam(_ paramAST: LabeledExprSyntax?) throws -> [String: St
   return try parseStringMappingParam(paramAST, paramName: "typeMappings")
 }
 
-func parseSpanAvailabilityParam(_ paramAST: LabeledExprSyntax?) throws -> String? {
+func parseAvailabilityParam(_ paramAST: LabeledExprSyntax?, paramName: String) throws -> String? {
   guard let unwrappedParamAST = paramAST else {
     return nil
   }
   guard let label = unwrappedParamAST.label else {
     return nil
   }
-  if label.trimmed.text != "spanAvailability" {
+  if label.trimmed.text != paramName {
     return nil
   }
   let paramExpr = unwrappedParamAST.expression
@@ -1878,6 +1878,23 @@ func isMutableSpan(_ type: TypeSyntax) -> Bool {
   return name == "MutableSpan" || name == "MutableRawSpan"
 }
 
+func isAnyRef(_ type: TypeSyntax) -> Bool {
+  if let optType = type.as(OptionalTypeSyntax.self) {
+    return isAnyRef(optType.wrappedType)
+  }
+  if let impOptType = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
+    return isAnyRef(impOptType.wrappedType)
+  }
+  if let attrType = type.as(AttributedTypeSyntax.self) {
+    return isAnyRef(attrType.baseType)
+  }
+  guard let identifierType = type.as(IdentifierTypeSyntax.self) else {
+    return false
+  }
+  let name = identifierType.name.text
+  return name == "Ref" || name == "MutableRef"
+}
+
 func isAnySpan(_ type: TypeSyntax) -> Bool {
   if let optType = type.as(OptionalTypeSyntax.self) {
     return isAnySpan(optType.wrappedType)
@@ -1895,13 +1912,26 @@ func isAnySpan(_ type: TypeSyntax) -> Bool {
   return name == "Span" || name == "RawSpan" ||  name == "MutableSpan" || name == "MutableRawSpan"
 }
 
-func getAvailability(_ newSignature: FunctionSignatureSyntax, _ spanAvailability: String?)
-  throws -> [AttributeListSyntax.Element] {
+func signatureContainsType(
+  _ newSignature: FunctionSignatureSyntax, _ predicate: (TypeSyntax) -> Bool
+) -> Bool {
+  if let returnClause = newSignature.returnClause, predicate(returnClause.type) {
+    return true
+  }
+  return newSignature.parameterClause.parameters.contains(where: { predicate($0.type) })
+}
+
+func getAvailability(
+  _ newSignature: FunctionSignatureSyntax, _ spanAvailability: String?,
+  _ refAvailability: String?
+) throws -> [AttributeListSyntax.Element] {
+  if let refAvailability, signatureContainsType(newSignature, isAnyRef) {
+    return [.attribute(AttributeSyntax("@available(\(raw: refAvailability), *)"))]
+  }
   guard let spanAvailability else {
     return []
   }
-  let returnIsSpan = newSignature.returnClause != nil && isAnySpan(newSignature.returnClause!.type)
-  if !returnIsSpan && !newSignature.parameterClause.parameters.contains(where: { isAnySpan($0.type) }) {
+  if !signatureContainsType(newSignature, isAnySpan) {
     return []
   }
   return [.attribute(AttributeSyntax("@available(\(raw: spanAvailability), *)"))]
@@ -2098,6 +2128,7 @@ func deconstructFunction(_ declaration: some DeclSyntaxProtocol) throws -> Funct
 
 func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, leadingTrivia: Trivia,
                                args arguments: [ExprSyntax], spanAvailability: String?,
+                               refAvailability: String?,
                                typeMappings: [String: String]?,
                                nullableAsEmptySpan: Bool,
                                parentNode: Syntax?) throws -> DeclSyntax {
@@ -2176,7 +2207,7 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
   let lifetimes = returnLifetimeAttribute + paramLifetimes(newSignature)
   let newLifetimeAttr = mergeLifetimeAttrs(
     funcComponents.attributes, lifetimes, funcComponents.signature.parameterClause.parameters)
-  let availabilityAttr = try getAvailability(newSignature, spanAvailability)
+  let availabilityAttr = try getAvailability(newSignature, spanAvailability, refAvailability)
   let disfavoredOverload: [AttributeListSyntax.Element] =
     [
       .attribute(
@@ -2268,7 +2299,13 @@ public struct SwiftifyImportMacro: PeerMacro {
       if typeMappings != nil {
         arguments = arguments.dropLast()
       }
-      let spanAvailability = try parseSpanAvailabilityParam(arguments.last)
+      let refAvailability = try parseAvailabilityParam(
+        arguments.last, paramName: "refAvailability")
+      if refAvailability != nil {
+        arguments = arguments.dropLast()
+      }
+      let spanAvailability = try parseAvailabilityParam(
+        arguments.last, paramName: "spanAvailability")
       if spanAvailability != nil {
         arguments = arguments.dropLast()
       }
@@ -2277,6 +2314,7 @@ public struct SwiftifyImportMacro: PeerMacro {
         try constructOverloadFunction(
           forDecl: declaration, leadingTrivia: node.leadingTrivia, args: args,
           spanAvailability: spanAvailability,
+          refAvailability: refAvailability,
           typeMappings: typeMappings,
           nullableAsEmptySpan: nullableAsEmptySpan ?? false,
           parentNode: context.lexicalContext.first)]
@@ -2351,7 +2389,13 @@ public struct SwiftifyImportProtocolMacro: ExtensionMacro {
       if typeMappings != nil {
         arguments = arguments.dropLast()
       }
-      let spanAvailability = try parseSpanAvailabilityParam(arguments.last)
+      let refAvailability = try parseAvailabilityParam(
+        arguments.last, paramName: "refAvailability")
+      if refAvailability != nil {
+        arguments = arguments.dropLast()
+      }
+      let spanAvailability = try parseAvailabilityParam(
+        arguments.last, paramName: "spanAvailability")
       if spanAvailability != nil {
         arguments = arguments.dropLast()
       }
@@ -2377,6 +2421,7 @@ public struct SwiftifyImportProtocolMacro: ExtensionMacro {
         let result = try constructOverloadFunction(
           forDecl: method, leadingTrivia: Trivia(), args: args,
           spanAvailability: spanAvailability,
+          refAvailability: refAvailability,
           typeMappings: typeMappings,
           nullableAsEmptySpan: false,
           parentNode: context.lexicalContext.first)

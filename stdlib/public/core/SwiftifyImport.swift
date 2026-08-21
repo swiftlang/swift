@@ -83,6 +83,7 @@ public enum _SwiftifyInfo {
 @attached(peer, names: overloaded)
 public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
                              spanAvailability: String? = nil,
+                             refAvailability: String? = nil,
                              typeMappings: [String: String] = [:],
                              nullableAsEmptySpan: Bool = false) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
@@ -107,6 +108,7 @@ public enum _SwiftifyProtocolMethodInfo {
   public macro _SwiftifyImportProtocol(
     _ methodInfo: _SwiftifyProtocolMethodInfo...,
     spanAvailability: String? = nil,
+    refAvailability: String? = nil,
     typeMappings: [String: String] = [:]
   ) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportProtocolMacro")

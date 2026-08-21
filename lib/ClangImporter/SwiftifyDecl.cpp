@@ -328,29 +328,34 @@ public:
   }
 
   void printAvailability() {
-    if (!hasMacroParameter("spanAvailability"))
+    printAvailabilityOfKnownDecl("spanAvailability", "Span");
+    printAvailabilityOfKnownDecl("refAvailability", "Ref");
+  }
+
+protected:
+  void printAvailabilityOfKnownDecl(StringRef ParamName, StringRef DeclName) {
+    if (!hasMacroParameter(ParamName))
       return;
 
-    ValueDecl *D = getKnownSingleDecl(SwiftContext, "Span");
+    ValueDecl *D = getKnownSingleDecl(SwiftContext, DeclName);
     const SemanticAvailableAttributes availabilityAttrs =
         D->getSemanticAvailableAttrs(/*includingInactive=*/true);
     if (availabilityAttrs.empty())
       return; // don't print availability when targeting embedded
 
     printSeparator();
-    out << "spanAvailability: ";
+    out << ParamName << ": ";
     out << "\"";
     llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
     for (auto attr : availabilityAttrs) {
       auto introducedOpt = attr.getIntroduced();
       if (!introducedOpt.has_value()) continue;
       printSeparator();
-      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
+      out << platformString(attr.getPlatform()) << " " << introducedOpt.value();
     }
     out << "\"";
   }
 
-protected:
   bool hasMacroParameter(StringRef ParamName) const {
     for (auto *Param : *SwiftifyImportDecl.parameterList)
       if (Param->getArgumentName().str() == ParamName)

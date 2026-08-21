@@ -22,7 +22,7 @@ int * __single _Null_unspecified lifetimeless(int * _Null_unspecified __single p
 
 // expected-expansion@+6:56{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullUnspecified(_ p: inout MutableRef<CInt>?) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload public func nullUnspecified(_ p: inout MutableRef<CInt>?) {|}}
 //   expected-remark@3{{macro content: |    return unsafe nullUnspecified(p?._unsafeAddress)|}}
 //   expected-remark@4{{macro content: |}|}}
 // }}
@@ -30,14 +30,14 @@ void nullUnspecified(int * _Null_unspecified __single p __noescape);
 
 // expected-expansion@+6:39{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nonnull(_ p: inout MutableRef<CInt>) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload public func nonnull(_ p: inout MutableRef<CInt>) {|}}
 //   expected-remark@3{{macro content: |    return unsafe nonnull(p._unsafeAddress)|}}
 //   expected-remark@4{{macro content: |}|}}
 // }}
 void nonnull(int * __single _Nonnull p __noescape);
 // expected-expansion@+6:46{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nonnullFlipped(_ p: inout MutableRef<CInt>) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload public func nonnullFlipped(_ p: inout MutableRef<CInt>) {|}}
 //   expected-remark@3{{macro content: |    return unsafe nonnullFlipped(p._unsafeAddress)|}}
 //   expected-remark@4{{macro content: |}|}}
 // }}
@@ -45,14 +45,14 @@ void nonnullFlipped(int * _Nonnull __single p __noescape);
 
 // expected-expansion@+6:41{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: inout MutableRef<CInt>?) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload public func nullable(_ p: inout MutableRef<CInt>?) {|}}
 //   expected-remark@3{{macro content: |    return unsafe nullable(p?._unsafeAddress)|}}
 //   expected-remark@4{{macro content: |}|}}
 // }}
 void nullable(int * __single _Nullable p __noescape);
 // expected-expansion@+6:48{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullableFlipped(_ p: inout MutableRef<CInt>?) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload public func nullableFlipped(_ p: inout MutableRef<CInt>?) {|}}
 //   expected-remark@3{{macro content: |    return unsafe nullableFlipped(p?._unsafeAddress)|}}
 //   expected-remark@4{{macro content: |}|}}
 // }}
@@ -60,7 +60,7 @@ void nullableFlipped(int * _Nullable __single p __noescape);
 
 // expected-expansion@+8:67{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullUnspecifiedConst(_ p: Ref<CInt>?) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload public func nullUnspecifiedConst(_ p: Ref<CInt>?) {|}}
 //   expected-remark@3{{macro content: |    return unsafe _swiftifyWithOptionalPointer(p?.value, { _pPtr in|}}
 //   expected-remark@4{{macro content: |            unsafe nullUnspecifiedConst(_pPtr)|}}
 //   expected-remark@5{{macro content: |        })|}}
@@ -70,7 +70,7 @@ void nullUnspecifiedConst(const int * _Null_unspecified __single p __noescape);
 
 // expected-expansion@+8:50{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nonnullConst(_ p: Ref<CInt>) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload public func nonnullConst(_ p: Ref<CInt>) {|}}
 //   expected-remark@3{{macro content: |    return unsafe _swiftifyWithOptionalPointer(p.value, { _pPtr in|}}
 //   expected-remark@4{{macro content: |            unsafe nonnullConst(_pPtr!)|}}
 //   expected-remark@5{{macro content: |        })|}}
@@ -80,7 +80,7 @@ void nonnullConst(const int * __single _Nonnull p __noescape);
 
 // expected-expansion@+8:52{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullableConst(_ p: Ref<CInt>?) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload public func nullableConst(_ p: Ref<CInt>?) {|}}
 //   expected-remark@3{{macro content: |    return unsafe _swiftifyWithOptionalPointer(p?.value, { _pPtr in|}}
 //   expected-remark@4{{macro content: |            unsafe nullableConst(_pPtr)|}}
 //   expected-remark@5{{macro content: |        })|}}
@@ -90,7 +90,7 @@ void nullableConst(const int * __single _Nullable p __noescape);
 
 // expected-expansion@+6:76{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nested(_ p: inout MutableRef<UnsafeMutablePointer<CInt>?>?) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload public func nested(_ p: inout MutableRef<UnsafeMutablePointer<CInt>?>?) {|}}
 //   expected-remark@3{{macro content: |    return unsafe nested(p?._unsafeAddress)|}}
 //   expected-remark@4{{macro content: |}|}}
 // }}
@@ -104,14 +104,14 @@ void forwardDeclared(struct S * _Null_unspecified __single p __noescape);
 struct T{};
 // expected-expansion@+14:12{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@available(swift, obsoleted: 3, renamed: "T.method(self:_:)") @_alwaysEmitIntoClient @_disfavoredOverload|}}
+//   expected-remark@2{{macro content: |@available(swift, obsoleted: 3, renamed: "T.method(self:_:)") @_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload|}}
 //   expected-remark@3{{macro content: |public func method(_ p: inout MutableRef<T>?, _ q: inout MutableRef<CInt>?) {|}}
 //   expected-remark@4{{macro content: |    return unsafe method(p?._unsafeAddress, q?._unsafeAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 // expected-expansion@+7:99{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload|}}
 //   expected-remark@3{{macro content: |public mutating func method(_ q: inout MutableRef<CInt>?) {|}}
 //   expected-remark@4{{macro content: |    return unsafe method(q?._unsafeAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
@@ -120,7 +120,7 @@ void method(struct T * _Null_unspecified __single p __noescape, int * _Null_unsp
 
 // expected-experimental-expansion@+11:89{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func lifetimebound(_ p: inout MutableRef<CInt>?) -> MutableSpan<CInt> {|}}
+//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_lifetime(copy p) @_disfavoredOverload public func lifetimebound(_ p: inout MutableRef<CInt>?) -> MutableSpan<CInt> {|}}
 //   expected-experimental-remark@3{{macro content: |    let _resultValue: UnsafeMutablePointer<CInt>? = unsafe lifetimebound(p?._unsafeAddress)|}}
 //   expected-experimental-remark@4{{macro content: |    if unsafe _resultValue == nil {|}}
 //   expected-experimental-remark@5{{macro content: |      precondition(CInt(2) == 0, "counted_by may only be null if count is 0 (unlike counted_by_or_null)")|}}
@@ -140,7 +140,7 @@ const int * __counted_by(4) _Null_unspecified lifetimeboundConstBig(const struct
 
 // expected-experimental-expansion@+24:60{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-experimental-remark@2{{macro content: |@available(swift, obsoleted: 3, renamed: "T.methodLifetimebound(self:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload|}}
+//   expected-experimental-remark@2{{macro content: |@available(swift, obsoleted: 3, renamed: "T.methodLifetimebound(self:)") @_alwaysEmitIntoClient @available(macOS 13.0, *) @_lifetime(copy p) @_disfavoredOverload|}}
 //   expected-experimental-remark@3{{macro content: |public func methodLifetimebound(_ p: inout MutableRef<T>?) -> MutableSpan<CInt> {|}}
 //   expected-experimental-remark@4{{macro content: |    let _resultValue: UnsafeMutablePointer<CInt>? = unsafe methodLifetimebound(p?._unsafeAddress)|}}
 //   expected-experimental-remark@5{{macro content: |    if unsafe _resultValue == nil {|}}
@@ -171,7 +171,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: 7be4a677ab495efa3b0f7ac1ca324a02518c3cd8ca97a133119c1d70de86fc2a
+// GENERATED-HASH: fb7b207d35990bf7c2ed5a830f47d60bad41aed4d2d375127544f5c8244c97e0
 import Test
 
 func call_lifetimeless(_ p: UnsafeMutablePointer<CInt>!) -> UnsafeMutablePointer<CInt>! {
@@ -182,6 +182,7 @@ func call_nullUnspecified(_ p: UnsafeMutablePointer<CInt>!) {
   return unsafe nullUnspecified(p)
 }
 
+@available(macOS 13.0, *)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ p: inout MutableRef<CInt>?) {
   return nullUnspecified(&p)
 }
@@ -190,6 +191,7 @@ func call_nonnull(_ p: UnsafeMutablePointer<CInt>) {
   return unsafe nonnull(p)
 }
 
+@available(macOS 13.0, *)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: inout MutableRef<CInt>) {
   return nonnull(&p)
 }
@@ -198,6 +200,7 @@ func call_nonnullFlipped(_ p: UnsafeMutablePointer<CInt>) {
   return unsafe nonnullFlipped(p)
 }
 
+@available(macOS 13.0, *)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnullFlipped(_ p: inout MutableRef<CInt>) {
   return nonnullFlipped(&p)
 }
@@ -206,6 +209,7 @@ func call_nullable(_ p: UnsafeMutablePointer<CInt>?) {
   return unsafe nullable(p)
 }
 
+@available(macOS 13.0, *)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: inout MutableRef<CInt>?) {
   return nullable(&p)
 }
@@ -214,6 +218,7 @@ func call_nullableFlipped(_ p: UnsafeMutablePointer<CInt>?) {
   return unsafe nullableFlipped(p)
 }
 
+@available(macOS 13.0, *)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nullableFlipped(_ p: inout MutableRef<CInt>?) {
   return nullableFlipped(&p)
 }
@@ -222,6 +227,7 @@ func call_nullUnspecifiedConst(_ p: UnsafePointer<CInt>!) {
   return unsafe nullUnspecifiedConst(p)
 }
 
+@available(macOS 13.0, *)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecifiedConst(_ p: Ref<CInt>?) {
   return nullUnspecifiedConst(p)
 }
@@ -230,6 +236,7 @@ func call_nonnullConst(_ p: UnsafePointer<CInt>) {
   return unsafe nonnullConst(p)
 }
 
+@available(macOS 13.0, *)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnullConst(_ p: Ref<CInt>) {
   return nonnullConst(p)
 }
@@ -238,6 +245,7 @@ func call_nullableConst(_ p: UnsafePointer<CInt>?) {
   return unsafe nullableConst(p)
 }
 
+@available(macOS 13.0, *)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nullableConst(_ p: Ref<CInt>?) {
   return nullableConst(p)
 }
@@ -246,6 +254,7 @@ func call_nested(_ p: UnsafeMutablePointer<UnsafeMutablePointer<CInt>?>!) {
   return unsafe nested(p)
 }
 
+@available(macOS 13.0, *)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nested(_ p: inout MutableRef<UnsafeMutablePointer<CInt>?>?) {
   return unsafe nested(&p)
 }
@@ -262,7 +271,8 @@ extension T {
   mutating func call_method_T(_ q: UnsafeMutablePointer<CInt>!) {
     return unsafe method(q)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload mutating func call_method_T(_ q: inout MutableRef<CInt>?) {
+  @available(macOS 13.0, *)
+    @_alwaysEmitIntoClient @_disfavoredOverload mutating func call_method_T(_ q: inout MutableRef<CInt>?) {
     return method(&q)
   }
   mutating func call_methodLifetimebound_T() -> UnsafeMutablePointer<CInt>! {
@@ -280,7 +290,7 @@ func call_lifetimebound(_ p: UnsafeMutablePointer<CInt>!) -> UnsafeMutablePointe
   return unsafe lifetimebound(p)
 }
 
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@available(macOS 13.0, *)
 @_lifetime(copy p)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_lifetimebound(_ p: inout MutableRef<CInt>?) -> MutableSpan<CInt> {
   // expected-stable-error@+2{{cannot convert value of type 'UnsafeMutablePointer<MutableRef<CInt>?>' (aka 'UnsafeMutablePointer<Optional<MutableRef<Int32>>>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
