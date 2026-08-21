@@ -41,7 +41,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/AST/Type.h"
-#include "clang/Basic/Module.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -3044,15 +3043,8 @@ namespace {
 
     void visitModuleDecl(ModuleDecl *MD, Label label) {
       printCommon(MD, "module", label);
-      printAttributes(MD);
       printFlag(MD->isNonSwiftModule(), "non_swift");
-      if (auto clangMod = MD->findUnderlyingClangModule()) {
-        printFlag(clangMod->isSubModule(), "is_submodule");
-        if (clangMod->isSubModule()) {
-          printFieldQuoted(clangMod->getFullModuleName(),
-                           Label::always("clang_full_name"));
-        }
-      }
+      printAttributes(MD);
       printFoot();
     }
 
@@ -6547,13 +6539,6 @@ namespace {
       printCommon("module_type", label);
       printDeclName(T->getModule(), Label::always("module"));
       printFlag(T->getModule()->isNonSwiftModule(), "foreign");
-      if (auto clangMod = T->getModule()->findUnderlyingClangModule()) {
-        printFlag(clangMod->isSubModule(), "is_submodule");
-        if (clangMod->isSubModule()) {
-          printFieldQuoted(clangMod->getFullModuleName(),
-                           Label::always("clang_full_name"));
-        }
-      }
       printFoot();
     }
 
