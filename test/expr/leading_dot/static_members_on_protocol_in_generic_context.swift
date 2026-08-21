@@ -166,9 +166,9 @@ test_combo(.property) // Ok
 test_combo(.method()) // Ok
 test_combo(.otherProperty) // Ok
 test_combo(.otherProperty.other) // Ok
-test_combo(.otherProperty.property) // expected-error {{static member 'property' cannot be used on instance of type 'S'}}
+test_combo(.otherProperty.property) // expected-error {{static member 'property' can only be used on the type 'S', not on the instance .otherProperty}}
 test_combo(.otherMethod()) // Ok
-test_combo(.otherMethod().method()) // expected-error {{static member 'method' cannot be used on instance of type 'S'}}
+test_combo(.otherMethod().method()) // expected-error {{static member 'method' can only be used on the type 'S', not on the instance .otherMethod()}}
 test_combo(.otherGeneric(42)) // Ok
 
 test_combo(.genericFn(42)) // expected-error {{global function 'test_combo' requires that 'G<Int>' conform to 'Q'}}
