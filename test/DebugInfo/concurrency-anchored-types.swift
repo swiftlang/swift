@@ -9,6 +9,7 @@ REQUIRES: OS=macosx
 REQUIRES: embedded_stdlib
 REQUIRES: swift_feature_Embedded
 REQUIRES: concurrency
+REQUIRES: optimized_stdlib
 
 A name and a size are not enough: a debugger reads the stored task pointer and
 the raw priority back out of a value it built itself, by member name.
