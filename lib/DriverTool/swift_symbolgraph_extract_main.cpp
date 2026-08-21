@@ -223,6 +223,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
 
   Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags,
                                                     Invocation.getFrontendOptions());
+  Invocation.computeCXXStdlibOptions();
 
   std::string InstanceSetupError;
   if (CI.setup(Invocation, InstanceSetupError)) {
@@ -272,7 +273,13 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     llvm::errs() << "Emitting symbol graph for module file: " << MainFile.getModuleDefiningPath() << '\n';
   
   int Success = symbolgraphgen::emitSymbolGraphForModule(M, Options);
-  
+
+  // Snapshot the diagnostic error state before we deliberately suppress
+  // cross-import overlay loading errors below, so the exit code reflects
+  // errors emitted up through the main module's extraction but not the
+  // intentionally-ignored overlay errors.
+  bool HadError = CI.getASTContext().hadError();
+
   // Look for cross-import overlays that the given module imports.
   
   // Clear out the diagnostic printer before looking for cross-import overlay modules,
@@ -295,6 +302,9 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
       Success |= symbolgraphgen::emitSymbolGraphForModule(CIM, Options);
     }
   }
+
+  if (HadError)
+    return EXIT_FAILURE;
 
   return Success;
 }
