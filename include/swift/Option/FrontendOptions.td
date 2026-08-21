@@ -230,6 +230,22 @@ def disable_clang_spi :
   Flag<["-"], "disable-clang-spi">,
   HelpText<"Don't import Clang SPIs as Swift SPIs">;
 
+def enable_objc_msgsend_selector_stubs :
+  Flag<["-"], "enable-objc-msgsend-selector-stubs">,
+  HelpText<"Allow use of magic 'objc_msgSend$selector:name:' stubs (default: depends on target and linker version)">;
+
+def disable_objc_msgsend_selector_stubs :
+  Flag<["-"], "disable-objc-msgsend-selector-stubs">,
+  HelpText<"Don't allow use of magic 'objc_msgSend$selector:name:' stubs (default: depends on target and linker version)">;
+
+def enable_objc_msgsend_class_selector_stubs :
+  Flag<["-"], "enable-objc-msgsend-class-selector-stubs">,
+  HelpText<"Allow use of magic 'objc_msgSendClass$selector:name:$classSymbol' stubs (default: depends on target and linker version)">;
+
+def disable_objc_msgsend_class_selector_stubs :
+  Flag<["-"], "disable-objc-msgsend-class-selector-stubs">,
+  HelpText<"Don't allow use of magic 'objc_msgSendClass$selector:name:$classSymbol' stubs (default: depends on target and linker version)">;
+
 def enable_target_os_checking :
   Flag<["-"], "enable-target-os-checking">,
   HelpText<"Enable checking the target OS of serialized modules">;
