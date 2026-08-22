@@ -18,10 +18,10 @@ add_library(swift_COM
   ISwiftObject.swift
   IUnknown.swift
   "IUnknown+Aggregation.swift"
+  ManagedObject.swift
   SwiftRuntime.swift
   TearOffInterfaces.swift
-  ThreadingModel.swift
-  UnsafeMutableRawPointer+COM.swift)
+  ThreadingModel.swift)
 set_target_properties(swift_COM PROPERTIES
   Swift_MODULE_NAME COM)
 target_link_libraries(swift_COM PRIVATE

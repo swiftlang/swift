@@ -47,7 +47,7 @@ public func AggregatedQueryInterface(_ pUnk: UnsafeMutableRawPointer, _ riid: Un
     return QueryInterface(pUnk, riid, ppvObject)
   }
 
-  let outer = UnsafeMutableRawPointer(controller)
+  let outer = ManagedObject<IUnknown>.passUnretained(controller)
   let vtable = outer.load(as: UnsafePointer<UnsafeRawPointer>.self)
   return unsafeBitCast(vtable[0], to: OperationType.self)(outer, riid, ppvObject)
 }
@@ -66,7 +66,7 @@ public func AggregatedAddRef(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
     return AddRef(pUnk)
   }
 
-  let outer = UnsafeMutableRawPointer(controller)
+  let outer = ManagedObject<IUnknown>.passUnretained(controller)
   let vtable = outer.load(as: UnsafePointer<UnsafeRawPointer>.self)
   return unsafeBitCast(vtable[1], to: OperationType.self)(outer)
 }
@@ -85,7 +85,7 @@ public func AggregatedRelease(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
     return Release(pUnk)
   }
 
-  let outer = UnsafeMutableRawPointer(controller)
+  let outer = ManagedObject<IUnknown>.passUnretained(controller)
   let vtable = outer.load(as: UnsafePointer<UnsafeRawPointer>.self)
   return unsafeBitCast(vtable[2], to: OperationType.self)(outer)
 }

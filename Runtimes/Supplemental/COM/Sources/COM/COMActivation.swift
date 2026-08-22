@@ -48,7 +48,8 @@ package func CoCreateInstance<Interface>(_ clsid: borrowing CLSID,
       let riid = UnsafeRawPointer($0).assumingMemoryBound(to: WinSDK.IID.self)
 
       let pUnknown = outer.map {
-        UnsafeMutableRawPointer($0).assumingMemoryBound(to: WinSDK.IUnknown.self)
+        let pointer = ManagedObject<IUnknown>.passUnretained($0)
+        return pointer.assumingMemoryBound(to: WinSDK.IUnknown.self)
       }
       return WinSDK.CoCreateInstance(rclsid, pUnknown, DWORD(context.rawValue),
                                      riid, &instance)
@@ -61,7 +62,7 @@ package func CoCreateInstance<Interface>(_ clsid: borrowing CLSID,
   guard let instance else {
     throw COMError(hr: E_UNEXPECTED)
   }
-  return unsafeBitCast(instance, to: Interface.self)
+  return ManagedObject<Interface>.takeRetainedValue(instance)
 }
 
 // TODO(compnerd): convert to throwing; determine if we can return the results without penalty
@@ -128,7 +129,8 @@ package func CoCreateInstanceEx<Interface>(_ clsid: CLSID,
   guard let pointer = result.pItf else {
     throw COMError(hr: E_UNEXPECTED)
   }
-  return unsafeBitCast(UnsafeMutableRawPointer(pointer), to: Interface.self)
+  let pointer = UnsafeMutableRawPointer(pointer)
+  return ManagedObject<Interface>.takeRetainedValue(pointer)
 }
 
 // MARK: - CoCreateInstance
@@ -222,10 +224,8 @@ package func CoCreateInstanceEx<PrimaryInterface, each SecondaryInterface>(_ cls
       }
 
       var iterator = results[...]
-      let primary = unsafeBitCast(iterator.removeFirst().pItf,
-                                  to: PrimaryInterface?.self)
-      return (primary, repeat unsafeBitCast(iterator.removeFirst().pItf,
-                                            to: (each SecondaryInterface)?.self))
+      let primary = ManagedObject<PrimaryInterface>.takeRetainedValue(iterator.removeFirst().pItf)
+      return (primary, repeat ManagedObject<each SecondaryInterface>.takeRetainedValue(iterator.removeFirst().pItf))
     }
   }
 

@@ -63,6 +63,33 @@ public protocol COMInterface {
   var IID: IID { get }
 }
 
+@unsafe
+public enum ManagedObject<Interface> where Interface.Type: COMInterface {
+  @_transparent
+  public static func takeRetainedValue(_ pointer: UnsafeMutableRawPointer)
+      -> Interface {
+    unsafe unsafeBitCast(pointer, to: Interface.self)
+  }
+
+  @_transparent
+  public static func takeRetainedValue(_ pointer: UnsafeMutableRawPointer?)
+      -> Interface? {
+    guard let pointer else { return nil }
+    return takeRetainedValue(pointer)
+  }
+
+  @_transparent
+  public static func takeRetainedValue<Pointee>(_ pointer: UnsafeMutablePointer<Pointee>?) -> Interface? {
+    takeRetainedValue(UnsafeMutableRawPointer(pointer))
+  }
+
+  @_transparent
+  public static func passUnretained(_ interface: borrowing Interface)
+      -> UnsafeMutableRawPointer {
+    unsafe unsafeBitCast(interface, to: UnsafeMutableRawPointer.self)
+  }
+}
+
 #if $_MicrosoftCOM
 
 public protocol COMActivatable {

@@ -28,7 +28,7 @@ public struct COMInterfaceResolution: ~Copyable {
       where Interface.Type: COMInterface {
     typealias AddRef = @convention(c) (UnsafeMutableRawPointer) -> UInt32
 
-    let pointer = UnsafeMutableRawPointer(interface)
+    let pointer = ManagedObject<Interface>.passUnretained(interface)
     let vtable = pointer.load(as: UnsafePointer<UnsafeRawPointer>.self)
     _ = unsafeBitCast(vtable[1], to: AddRef.self)(pointer)
     self.pointer = pointer
