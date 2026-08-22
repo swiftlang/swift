@@ -1422,6 +1422,22 @@ public:
   void copyOrInitValueIntoImpl(SILGenFunction &SGF, SILLocation loc,
                                ManagedValue value, bool isInit) override;
 
+  /// Emit the cast branching straight to our failure destination, without
+  /// building an intermediate Optional. Returns false if this shape isn't
+  /// supported, in which case the caller falls back to the Optional form.
+  bool tryEmitNoncopyablePatternMatch(SILGenFunction &SGF, SILLocation loc,
+                                     ManagedValue value);
+
+  bool tryInitializeFromStorageReference(SILGenFunction &SGF, Expr *initializer,
+                                         SILLocation loc) override;
+
+  /// True if this is a cast pattern whose subject is a noncopyable
+  /// existential, which is the case the direct-branch lowering handles.
+  bool isNoncopyableExistentialSubject() const {
+    Type subjectType = pattern->getType();
+    return subjectType->isNoncopyable() && subjectType->isExistentialType();
+  }
+
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization->finishInitialization(SGF);
@@ -1429,12 +1445,153 @@ public:
 };
 } // end anonymous namespace
 
+/// If \p e names storage that may be consumed out of, return the storage
+/// reference to emit as an lvalue; otherwise return null.
+///
+/// A LoadExpr means Sema resolved the reference as an rvalue load out of
+/// mutable lvalue storage -- a `var` local, a `var` stored property, an
+/// `inout`/`consuming` parameter -- which is always consumable. That is the
+/// case findStorageReferenceExprForMoveOnly(..., Consume) recognizes, and it is
+/// why that helper can't be reused here: it requires the LoadExpr
+/// unconditionally, so it rejects every immutable-storage case below.
+///
+/// Immutable storage is referenced directly, with no load, and consuming it is
+/// only *sometimes* legal -- so test the declaration rather than inferring from
+/// the shape. A local `let` may be consumed; a borrowing parameter may not.
+/// Getting that wrong is not merely a missed optimization: consuming a
+/// borrowing parameter emits SIL that mutates an @in_guaranteed argument, which
+/// the SIL verifier rejects outright rather than diagnosing. So this fails
+/// closed -- anything unrecognized returns null and the caller falls back to
+/// the ordinary rvalue path, which is always correct, just unable to preserve
+/// the subject across a failed cast.
+static Expr *findConsumableStorageReference(Expr *e) {
+  Expr *semantic = e->getSemanticsProvidingExpr();
+
+  if (auto *load = dyn_cast<LoadExpr>(semantic))
+    return load->getSubExpr();
+
+  if (auto *dre = dyn_cast<DeclRefExpr>(semantic)) {
+    auto *vd = dyn_cast<VarDecl>(dre->getDecl());
+    // A global or static `let` is only ever borrowed, never consumed.
+    if (!vd || vd->isGlobalStorage())
+      return nullptr;
+    if (auto *pd = dyn_cast<ParamDecl>(vd)) {
+      switch (pd->getSpecifier()) {
+      case ParamSpecifier::Consuming:
+      case ParamSpecifier::LegacyOwned:
+      case ParamSpecifier::ImplicitlyCopyableConsuming:
+        return dre;
+      case ParamSpecifier::Default:
+      case ParamSpecifier::InOut:
+      case ParamSpecifier::Borrowing:
+      case ParamSpecifier::LegacyShared:
+        // Note that Default means *borrowing* for a noncopyable parameter.
+        return nullptr;
+      }
+      // An ownership specifier we don't know about: fail closed.
+      return nullptr;
+    }
+    // A local `let`.
+    return dre;
+  }
+
+  // A `let` stored property is deliberately *not* handled here, even though it
+  // would be a partial consume of a consumable base. Requesting an
+  // OwnedAddressConsume lvalue for an immutable member yields the member's
+  // address under a `begin_access [read]`, so the take_on_success cast would
+  // then consume out of storage covered by a read-only access. Compare how
+  // SILGen otherwise consumes such a property (`eat(h.v)`), which uses
+  // `begin_access [modify]` plus a `copy_addr [take]` into a temporary -- but
+  // that eager take is exactly what makes preserve-on-failure impossible. So
+  // this case needs the access-kind plumbing sorted out first; until then it
+  // falls back to the ordinary rvalue path and diagnoses rather than emitting
+  // SIL whose access marker contradicts what the instruction does.
+
+  return nullptr;
+}
+
+// Try to use the original storage directly when casting a
+// noncopyable existential source.
+bool IsPatternInitialization::tryInitializeFromStorageReference(
+    SILGenFunction &SGF, Expr *initializer, SILLocation loc) {
+  if (!isNoncopyableExistentialSubject())
+    return false;
+
+  // Is the subject stored where we can use it directly?  If not, return
+  // false and caller will copy it.
+  Expr *storageExpr = findConsumableStorageReference(initializer);
+  if (!storageExpr)
+    return false;
+
+  // Use the subject directly (not a copy) as the cast's source operand
+  // so a failed cast can leave the original intact for later use.
+  FormalEvaluationScope scope(SGF);
+  LValue lv = SGF.emitLValue(storageExpr, SGFAccessKind::OwnedAddressConsume);
+  ManagedValue addr = SGF.emitConsumedLValue(loc, std::move(lv));
+
+  return tryEmitNoncopyablePatternMatch(SGF, loc, addr);
+}
+
+// If possible, emit a cast that consumes only on success.
+bool IsPatternInitialization::tryEmitNoncopyablePatternMatch(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue value) {
+  // Only the plain address-based value cast is handled here; anything else
+  // (collection downcasts, loadable representations) keeps the existing path.
+  if (pattern->getCastKind() != CheckedCastKind::ValueCast)
+    return false;
+  if (!value.getType().isAddress())
+    return false;
+
+  CanType sourceType = pattern->getType()->getCanonicalType();
+  CanType targetType = pattern->getCastType()->getCanonicalType();
+
+  auto &targetTL = SGF.getTypeLowering(targetType);
+
+  // Destination buffer for the extracted payload. Note the target may be
+  // loadable (only the existential source has to be address-only);
+  // checked_cast_addr_br writes through an address either way.
+  SILValue destAddr = SGF.emitTemporaryAllocation(loc, targetTL.getLoweredType());
+
+  SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
+  SILBasicBlock *failBB = SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
+
+  auto &initInfo = getInitInfo();
+  SGF.B.createCheckedCastAddrBranch(
+      loc, CheckedCastInstOptions(), CastConsumptionKind::TakeOnSuccess,
+      value.forward(SGF), sourceType, destAddr, targetType, contBB, failBB,
+      initInfo.numTrueTaken, initInfo.numFalseTaken);
+
+  // On the success edge the payload has been moved into destAddr and is ours
+  // to bind.
+  SGF.B.setInsertionPoint(contBB);
+  ManagedValue payload;
+  if (targetTL.isAddressOnly()) {
+    payload = SGF.emitManagedBufferWithCleanup(destAddr, targetTL);
+  } else {
+    payload = SGF.emitManagedRValueWithCleanup(
+        SGF.B.createLoad(loc, destAddr, LoadOwnershipQualifier::Take), targetTL);
+  }
+  subInitialization->copyOrInitValueInto(SGF, loc, payload, /*isInit=*/true);
+  // Note: our own finishInitialization() forwards to subInitialization, so
+  // don't finish it here -- doing so would emit the local twice.
+  return true;
+}
+
 void IsPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
                                                       SILLocation loc,
                                                       ManagedValue value,
                                                       bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
-  
+
+  // For a noncopyable existential, first try emitting the direct-branch form
+  // without producing the intermediate optional.  That encodes the success
+  // status in the CFG which makes it possible to selectively consume only on
+  // success.
+  if (isNoncopyableExistentialSubject() &&
+      tryEmitNoncopyablePatternMatch(SGF, loc, value)) {
+    return;
+  }
+
   // Try to perform the cast to the destination type, producing an optional that
   // indicates whether we succeeded.
   auto destType = OptionalType::get(pattern->getCastType());
@@ -1906,6 +2063,17 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
 
           if (initialization->isBorrow()) {
             emitExprInto(elt.getInitializer(), initialization.get(), loc);
+            continue;
+          }
+
+          // Try directly accessing the initializer's storage instead of copying
+	  // into an rvalue, so that we can leave it unconsumed if the pattern
+	  // fails.
+          if (initialization->tryInitializeFromStorageReference(
+                  *this, elt.getInitializer(), loc)) {
+            // We are now on the match-succeeded path, with the binding in
+            // place; finish it as forwardInto() would have.
+            initialization->finishInitialization(*this);
             continue;
           }
 

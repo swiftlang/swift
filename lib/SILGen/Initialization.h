@@ -196,6 +196,18 @@ public:
   /// Whether the storage owns what's stored or merely borrows it.
   virtual bool isBorrow() { return false; }
 
+  /// Attempt to initialize directly out of the storage referenced by \p
+  /// initializer, rather than having the caller evaluate \p initializer as an
+  /// rvalue (which, for a noncopyable value, would consume it via a copy).
+  ///
+  /// Returns true if this initialization handled the emission itself, in which
+  /// case the caller must not evaluate \p initializer again.
+  virtual bool tryInitializeFromStorageReference(SILGenFunction &SGF,
+                                                 Expr *initializer,
+                                                 SILLocation loc) {
+    return false;
+  }
+
   /// Whether to emit a debug value during initialization.
   void setEmitDebugValueOnInit(bool emit) { EmitDebugValueOnInit = emit; }
 

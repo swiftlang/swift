@@ -2706,6 +2706,32 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
 
+  // For TakeOnSuccess, only a successful cast consumes Src.  A failed cast
+  // leaves Src in place. Model this by recording the take at the entry of the
+  // success block rather than at the branch itself, so liveness treats Src as
+  // consumed starting there while still live from the branch to the failure
+  // edge.
+  if (auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user)) {
+    if (ccabi->getSrc() == op->get() &&
+        ccabi->getConsumptionKind() == CastConsumptionKind::TakeOnSuccess) {
+      LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br "
+                                 "take_on_success Src: " << *user);
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+        return false;
+      }
+
+      auto *successEntry = &ccabi->getSuccessBB()->front();
+      for (auto leafRange : leafRanges) {
+        useState.recordTakeUse(successEntry, leafRange);
+        useState.recordLivenessUse(user, leafRange);
+      }
+      return true;
+    }
+  }
+
   // Now that we have handled or loadTakeOrCopy, we need to now track our
   // additional pure takes.
   if (noncopyable::memInstMustConsume(op)) {
