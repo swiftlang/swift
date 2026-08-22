@@ -191,10 +191,14 @@ bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl *fn) {
                                                     cast<ConstructorDecl>(fn));
   }
 
-  // Otherwise, the type must be isolated to a global actor.
+  // Otherwise, the type or one of its stored properties must be isolated to a
+  // global actor.
   auto nominalIso = getActorIsolation(nominal);
-  if (!nominalIso.isGlobalActor())
-    return false;
+  if (!nominalIso.isGlobalActor()) {
+    return llvm::any_of(nominal->getStoredProperties(), [](VarDecl *property) {
+      return getActorIsolation(property).isGlobalActor();
+    });
+  }
 
   // if it's a deinit, then it's flow-isolated.
   if (isa<DestructorDecl>(fn))
