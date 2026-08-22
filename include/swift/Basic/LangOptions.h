@@ -1103,8 +1103,12 @@ namespace swift {
     bool SolverPruneDisjunctions = true;
 
     /// Enable an inefficient form of inference, which will sometimes prevent
-    /// exact binding promotion from taking place.
+    /// exact binding promotion from taking place. This will be off by default
+    /// eventually.
     bool SolverEnableEnumerateSupertypes = true;
+
+    /// Enable type variable joins. This will be on by default eventually.
+    bool SolverEnableTypeVariableJoins = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
