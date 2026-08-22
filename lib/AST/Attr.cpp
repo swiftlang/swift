@@ -1906,6 +1906,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::RemoteCall: {
+    Printer.printAttrName("@remoteCall");
+    switch (cast<RemoteCallAttr>(this)->getMode()) {
+    case RemoteCallMode::Async:
+      break;
+    case RemoteCallMode::SynchronousBlocking:
+      Printer << "(blocking)";
+      break;
+    }
+    break;
+  }
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
@@ -2166,6 +2178,13 @@ StringRef DeclAttribute::getAttrName() const {
     switch (cast<CalledAttr>(this)->getSemantics()) {
     case ExecutionSemantics::Once:
       return "called(once)";
+    }
+  case DeclAttrKind::RemoteCall:
+    switch (cast<RemoteCallAttr>(this)->getMode()) {
+    case RemoteCallMode::Async:
+      return "remoteCall"; // not realy used in practice
+    case RemoteCallMode::SynchronousBlocking:
+      return "remoteCall(blocking)";
     }
   }
   llvm_unreachable("bad DeclAttrKind");

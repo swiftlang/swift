@@ -34,6 +34,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -544,6 +545,7 @@ public:
   void visitUnsafeSelfDependentResultAttr(UnsafeSelfDependentResultAttr *attr);
 
   void visitCalledAttr(CalledAttr *attr);
+  void visitRemoteCallAttr(RemoteCallAttr *attr);
 };
 
 } // end anonymous namespace
@@ -9138,6 +9140,18 @@ void AttributeChecker::visitCalledAttr(CalledAttr *attr) {
   if (!Ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
     diagnoseAndRemoveAttr(attr, diag::requires_experimental_feature, "@called",
                           false, Feature::CalledAttribute.getName());
+    return;
+  }
+}
+
+void AttributeChecker::visitRemoteCallAttr(RemoteCallAttr *attr) {
+  auto *VD = dyn_cast<ValueDecl>(D);
+  // FIXME(distributed): if 'VD' is a member of a distributed actor but is not
+  // itself 'distributed', we should imply 'distributed' on it (add the
+  // DistributedActorAttr) rather than rejecting the attribute; only reject when
+  // the declaration is not a member of a distributed actor at all.
+  if (!VD || !VD->isDistributed()) {
+    diagnoseAndRemoveAttr(attr, diag::remotecall_blocking_requires_distributed);
     return;
   }
 }

@@ -220,6 +220,8 @@ extension ASTGenVisitor {
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Concurrent))
       case .Called:
         return handle(self.generateCalledAttr(attribute: node)?.asDeclAttribute)
+      case .RemoteCall:
+        return handle(self.generateRemoteCallAttr(attribute: node)?.asDeclAttribute)
       case nil where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 
@@ -2780,6 +2782,27 @@ extension ASTGenVisitor {
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
       semantics: semantics
+    )
+  }
+
+  func generateRemoteCallAttr(attribute node: AttributeSyntax) -> BridgedRemoteCallAttr? {
+    let mode: swift.RemoteCallMode? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "blocking": return .blocking
+        default: return nil
+        }
+      }
+    )
+    guard let mode else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      mode: mode
     )
   }
 
