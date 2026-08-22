@@ -233,7 +233,7 @@ static Type mapIntoLocalContext(GenericTypeParamType *param, unsigned baseDepth,
 }
 
 Type MapIntoLocalArchetypeContext::operator()(SubstitutableType *type) const {
-  unsigned baseDepth = baseGenericEnv->getGenericSignature().getNextDepth();
+  unsigned baseDepth = baseGenericEnv ? baseGenericEnv->getGenericSignature().getNextDepth() : 0;
 
   auto param = cast<GenericTypeParamType>(type);
   if (param->getDepth() >= baseDepth)
