@@ -237,6 +237,8 @@ swift_create_stdlib_targets("swift-test-libexec" "" FALSE)
 # the clang resource directory symlink stops installing correctly.
 add_subdirectory(toolchain)
 add_subdirectory(public)
+set(EMBEDDED_STDLIB_TARGET_TRIPLES
+  "${EMBEDDED_STDLIB_TARGET_TRIPLES}" PARENT_SCOPE)
 if(SWIFT_STDLIB_BUILD_PRIVATE)
   add_subdirectory(private)
 endif()
