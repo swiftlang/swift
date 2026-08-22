@@ -277,7 +277,7 @@ static unsigned intTypeBitSize(std::string name) {
   llvm::StringRef nameRef(name);
   if (nameRef.starts_with("Bi") && nameRef.ends_with("_")) {
     llvm::StringRef naturalRef = nameRef.drop_front(2).drop_back();
-    uint8_t natural;
+    unsigned natural;
     if (naturalRef.getAsInteger(10, natural)) {
       return 0;
     }
