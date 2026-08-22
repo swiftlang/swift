@@ -52,6 +52,14 @@ public func _arrayForceCast<SourceElement, TargetElement>(
   return source.map { $0 as! TargetElement }
 }
 
+@_alwaysEmitIntoClient
+public func _arrayWitnessCast<SourceElement, TargetElement>(
+  _ source: Array<SourceElement>,
+  _ witness: (SourceElement) -> TargetElement
+) -> Array<TargetElement> {
+  return source.map(witness)
+}
+
 /// Called by the casting machinery.
 @_silgen_name("_swift_arrayDownCastConditionalIndirect")
 internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
