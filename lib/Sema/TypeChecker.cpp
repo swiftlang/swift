@@ -21,6 +21,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTBridging.h"
@@ -268,10 +269,33 @@ void swift::bindExtensions(ModuleDecl &mod) {
   (void)evaluateOrDefault(eval, BindExtensionsRequest{&mod}, {});
 }
 
+static void expandAttachedExtensionMacros(Decl *decl) {
+  auto &Ctx = decl->getASTContext();
+  IterableDeclContext *DC = nullptr;
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    (void)evaluateOrDefault(Ctx.evaluator, ExpandExtensionMacros{nominal}, {});
+    DC = nominal;
+  } else if (auto *ext = dyn_cast<ExtensionDecl>(decl)) {
+    DC = ext;
+  } else {
+    return;
+  }
+
+  for (auto *member : DC->getMembers())
+    expandAttachedExtensionMacros(member);
+}
+
 void swift::performTypeChecking(SourceFile &SF) {
-  if (SF.getASTContext().TypeCheckerOpts.EnableLazyTypecheck) {
-    // Skip eager type checking. Instead, let later stages of compilation drive
-    // type checking as needed through request evaluation.
+  auto &Ctx = SF.getASTContext();
+  if (Ctx.TypeCheckerOpts.EnableLazyTypecheck) {
+    // Lazy typechecking otherwise skips eager type checking and lets later
+    // stages drive type checking through request evaluation.
+    //
+    // However, attached extension macros must still be expanded before the
+    // module is serialized so that their emitted conformances and members
+    // appear in the produced .swiftmodule. See #90068 and sourcekit-lsp#2696.
+    for (auto *decl : SF.getTopLevelDecls())
+      expandAttachedExtensionMacros(decl);
     return;
   }
 
