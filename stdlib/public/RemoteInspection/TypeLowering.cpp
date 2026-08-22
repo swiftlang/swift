@@ -884,7 +884,6 @@ public:
                        remote::RemoteAddress address,
                        int *extraInhabitantIndex) const override {
     unsigned long PayloadSize = getPayloadSize();
-    unsigned PayloadCount = getNumPayloadCases();
     unsigned TagSize = getSize() - PayloadSize;
     unsigned tag = 0;
     if (!reader.readInteger(address + PayloadSize,
@@ -892,7 +891,7 @@ public:
                             &tag)) {
       return false;
     }
-    if (tag < PayloadCount + 1) {
+    if (tag < getNumInhabitedTags()) {
       *extraInhabitantIndex = -1; // Valid payload, not an XI
     } else {
       // XIs are coded starting from the highest value that fits
@@ -901,6 +900,21 @@ public:
       *extraInhabitantIndex = maxTag - tag;
     }
     return true;
+  }
+
+  // The number of tag values that hold valid content: one per payload case,
+  // plus however many are needed to number the non-payload cases in the
+  // payload area.
+  unsigned getNumInhabitedTags() const {
+    unsigned NonPayloadCases = getNumCases() - NumEffectivePayloadCases;
+    if (NonPayloadCases == 0)
+      return NumEffectivePayloadCases;
+    unsigned PayloadSize = getPayloadSize();
+    if (PayloadSize >= 4)
+      return NumEffectivePayloadCases + 1;
+    unsigned CasesPerTag = 1U << (PayloadSize * 8U);
+    return NumEffectivePayloadCases
+      + (NonPayloadCases + CasesPerTag - 1) / CasesPerTag;
   }
 
   BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
@@ -1039,7 +1053,7 @@ public:
     tagBits += extraTagSize * 8;
 
     // Check whether this tag is used for valid content
-    auto payloadCases = getNumPayloadCases();
+    auto payloadCases = NumEffectivePayloadCases;
     auto nonPayloadCases = getNumCases() - payloadCases;
     uint32_t inhabitedTags;
     if (nonPayloadCases == 0) {
