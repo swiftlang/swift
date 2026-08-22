@@ -2459,78 +2459,6 @@ findGenericTypeInGenericDecls(ClangImporter::Implementation &impl,
                                    addDiag);
 }
 
-ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
-    DeclContext *dc, const clang::FunctionDecl *clangDecl,
-    ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
-    bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
-    ArrayRef<GenericTypeParamDecl *> genericParams) {
-
-  bool allowNSUIntegerAsInt =
-      shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
-
-  // Only eagerly import the return type if it's not too expensive (the current
-  // heuristic for that is if it's not a record type).
-  ImportDiagnosticAdder addDiag(*this, clangDecl,
-                                clangDecl->getSourceRange().getBegin());
-  clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
-  returnType = desugarIfBoundsAttributed(returnType);
-
-  ImportedType importedType = importer::findOptionSetEnum(returnType, *this);
-
-  if (auto templateType =
-          dyn_cast<clang::TemplateTypeParmType>(returnType)) {
-    importedType = {findGenericTypeInGenericDecls(
-                        *this, templateType, genericParams,
-                        getImportTypeAttrs(clangDecl), addDiag),
-                    false};
-  } else if ((isa<clang::PointerType>(returnType) ||
-          isa<clang::ReferenceType>(returnType)) &&
-         isa<clang::TemplateTypeParmType>(returnType->getPointeeType())) {
-    auto pointeeType = returnType->getPointeeType();
-    auto templateParamType = cast<clang::TemplateTypeParmType>(pointeeType);
-    PointerTypeKind pointerKind = pointeeType.getQualifiers().hasConst()
-                                      ? PTK_UnsafePointer
-                                      : PTK_UnsafeMutablePointer;
-    auto genericType =
-        findGenericTypeInGenericDecls(*this, templateParamType, genericParams,
-                                      getImportTypeAttrs(clangDecl), addDiag);
-    auto genericPointerType = genericType->wrapInPointer(pointerKind);
-    if (!genericPointerType)
-      addDiag(Diagnostic(diag::bridged_pointer_type_not_found, pointerKind));
-    importedType = {genericPointerType, false};
-  } else if (!(isa<clang::RecordType>(returnType) ||
-               isa<clang::TemplateSpecializationType>(returnType)) ||
-             // TODO: we currently don't lazily load operator return types, but
-             // this should be trivial to add.
-             clangDecl->isOverloadedOperator() ||
-             // Dependant types are trivially mapped as Any.
-             returnType->isDependentType()) {
-    // If importedType is already initialized, it means we found the enum that
-    // was supposed to be used (instead of the typedef type).
-    if (!importedType) {
-      importedType =
-          importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
-      if (!importedType) {
-        addDiag(Diagnostic(diag::return_type_not_imported));
-        return {Type(), false};
-      }
-    }
-  }
-
-  Type swiftResultTy = importedType.getType();
-  ArrayRef<Identifier> argNames = name.getArgumentNames();
-  parameterList = importFunctionParameterList(dc, clangDecl, params, isVariadic,
-                                              allowNSUIntegerAsInt, argNames,
-                                              genericParams, swiftResultTy);
-  if (!parameterList)
-    return {Type(), false};
-
-  if (clangDecl->isNoReturn())
-    swiftResultTy = SwiftContext.getNeverType();
-
-  return {swiftResultTy, importedType.isImplicitlyUnwrapped()};
-}
-
 static bool isParameterContextGlobalActorIsolated(DeclContext *dc,
                                                   const clang::Decl *parent) {
   if (getActorIsolationOfContext(dc).isGlobalActor())
@@ -2860,11 +2788,54 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   return paramInfo;
 }
 
+/// If \p param is a CFErrorRef* out-parameter, substitute NSError for CFError
+/// in \p errorTy.
+///
+/// The error parameter type has the form
+///   Optional<SomePointer<Optional<T>>>
+/// CFError shares NSError's representation, and SILGen reaches the Error
+/// existential through an entry point typed on NSError.
+static CanType substituteCFErrorWithNSError(CanType errorTy,
+                                            const clang::ParmVarDecl *param) {
+  // Decide from the Clang type, so this agrees with the check that recognized
+  // the parameter as an error out-parameter in the first place.
+  auto outerPtrType = param->getType()->getAs<clang::PointerType>();
+  if (!outerPtrType)
+    return errorTy;
+  auto innerPtrType =
+      outerPtrType->getPointeeType()->getAs<clang::PointerType>();
+  if (!innerPtrType)
+    return errorTy;
+  auto recordType = innerPtrType->getPointeeType()->getAs<clang::RecordType>();
+  if (!recordType || !importer::isRecordBridgedToNSError(recordType->getDecl()))
+    return errorTy;
+
+  auto outerOpt = errorTy.getOptionalObjectType();
+  if (!outerOpt)
+    return errorTy;
+  auto ptrBGT = dyn_cast<BoundGenericType>(outerOpt);
+  if (!ptrBGT)
+    return errorTy;
+  auto innerOpt = ptrBGT.getGenericArgs()[0]->getOptionalObjectType();
+  if (!innerOpt)
+    return errorTy;
+  auto &ctx = errorTy->getASTContext();
+  auto nsErrorTy = ctx.getNSErrorType();
+  if (!nsErrorTy)
+    return errorTy;
+  auto newInnerOpt = OptionalType::get(nsErrorTy)->getCanonicalType();
+  auto newPtr = BoundGenericType::get(ptrBGT->getDecl(), ptrBGT.getParent(),
+                                      {newInnerOpt});
+  return OptionalType::get(newPtr)->getCanonicalType();
+}
+
 ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
     bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
-    ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType) {
+    ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType,
+    std::optional<ForeignErrorConvention::Info> errorInfo,
+    CanType *errorParamType) {
   // Import the parameters.
   SmallVector<ParamDecl *, 4> parameters;
   unsigned index = 0;
@@ -2877,6 +2848,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       continue;
     }
 
+    bool paramIsError = errorInfo && index == errorInfo->ErrorParameterIndex;
     bool knownNonNull = !nonNullArgs.empty() && nonNullArgs[index];
 
     // Check nullability of the parameter.
@@ -2888,7 +2860,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     auto swiftParamTyOpt = importParameterType(
         dc, clangDecl, param, optionalityOfParam, allowNSUIntegerAsInt,
         /*isNSDictionarySubscriptGetter=*/false,
-        /*paramIsError=*/false,
+        /*paramIsError=*/paramIsError,
         /*paramIsCompletionHandler=*/false,
         /*completionHandlerErrorParamIndex=*/std::nullopt, genericParams,
         paramAddDiag);
@@ -2899,6 +2871,16 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       return nullptr;
     }
     auto swiftParamTy = swiftParamTyOpt->swiftTy;
+
+    if (paramIsError) {
+      if (errorParamType) {
+        *errorParamType = substituteCFErrorWithNSError(
+            swiftParamTy->getCanonicalType(), param);
+      }
+      ++index;
+      continue;
+    }
+
     bool isInOut = swiftParamTyOpt->isInOut;
     bool isConsuming = swiftParamTyOpt->isConsuming;
     bool isParamTypeImplicitlyUnwrapped =
@@ -3169,6 +3151,97 @@ getForeignErrorInfo(ForeignErrorConvention::Info errorInfo,
                                errorParamTy);
   }
   llvm_unreachable("bad error convention");
+}
+
+ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
+    DeclContext *dc, const clang::FunctionDecl *clangDecl,
+    ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
+    bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
+    ArrayRef<GenericTypeParamDecl *> genericParams,
+    std::optional<ForeignErrorConvention::Info> errorInfo,
+    std::optional<ForeignErrorConvention> *foreignErrorConvention) {
+
+  bool allowNSUIntegerAsInt =
+      shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
+
+  // Only eagerly import the return type if it's not too expensive (the current
+  // heuristic for that is if it's not a record type).
+  ImportDiagnosticAdder addDiag(*this, clangDecl,
+                                clangDecl->getSourceRange().getBegin());
+  clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
+  returnType = desugarIfBoundsAttributed(returnType);
+
+  ImportedType importedType = importer::findOptionSetEnum(returnType, *this);
+
+  if (auto templateType = dyn_cast<clang::TemplateTypeParmType>(returnType)) {
+    importedType = {
+        findGenericTypeInGenericDecls(*this, templateType, genericParams,
+                                      getImportTypeAttrs(clangDecl), addDiag),
+        false};
+  } else if ((isa<clang::PointerType>(returnType) ||
+              isa<clang::ReferenceType>(returnType)) &&
+             isa<clang::TemplateTypeParmType>(returnType->getPointeeType())) {
+    auto pointeeType = returnType->getPointeeType();
+    auto templateParamType = cast<clang::TemplateTypeParmType>(pointeeType);
+    PointerTypeKind pointerKind = pointeeType.getQualifiers().hasConst()
+                                      ? PTK_UnsafePointer
+                                      : PTK_UnsafeMutablePointer;
+    auto genericType =
+        findGenericTypeInGenericDecls(*this, templateParamType, genericParams,
+                                      getImportTypeAttrs(clangDecl), addDiag);
+    auto genericPointerType = genericType->wrapInPointer(pointerKind);
+    if (!genericPointerType)
+      addDiag(Diagnostic(diag::bridged_pointer_type_not_found, pointerKind));
+    importedType = {genericPointerType, false};
+  } else if (!(isa<clang::RecordType>(returnType) ||
+               isa<clang::TemplateSpecializationType>(returnType)) ||
+             // TODO: we currently don't lazily load operator return types, but
+             // this should be trivial to add (6e9bf509964).
+             clangDecl->isOverloadedOperator() ||
+             // Dependant types are trivially mapped as Any.
+             returnType->isDependentType()) {
+    // If importedType is already initialized, it means we found the enum that
+    // was supposed to be used (instead of the typedef type).
+    if (!importedType) {
+      importedType =
+          importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
+      if (!importedType) {
+        addDiag(Diagnostic(diag::return_type_not_imported));
+        return {Type(), false};
+      }
+    }
+  }
+
+  // Adjust the result type for a throwing function.
+  CanType origSwiftResultTy;
+  if (errorInfo && importedType.getType()) {
+    origSwiftResultTy = importedType.getType()->getCanonicalType();
+    importedType =
+        adjustResultTypeForThrowingFunction(*errorInfo, importedType);
+    if (!importedType.getType())
+      return {Type(), false};
+  }
+
+  Type swiftResultTy = importedType.getType();
+  CanType errorParamType;
+  ArrayRef<Identifier> argNames = name.getArgumentNames();
+  parameterList = importFunctionParameterList(
+      dc, clangDecl, params, isVariadic, allowNSUIntegerAsInt, argNames,
+      genericParams, swiftResultTy, errorInfo,
+      errorInfo ? &errorParamType : nullptr);
+  if (!parameterList)
+    return {Type(), false};
+
+  if (clangDecl->isNoReturn())
+    swiftResultTy = SwiftContext.getNeverType();
+
+  if (errorInfo && foreignErrorConvention) {
+    assert(errorParamType && "error parameter not found during import");
+    *foreignErrorConvention =
+        getForeignErrorInfo(*errorInfo, errorParamType, origSwiftResultTy);
+  }
+
+  return {swiftResultTy, importedType.isImplicitlyUnwrapped()};
 }
 
 // 'toDC' must be a subclass or a type conforming to the protocol

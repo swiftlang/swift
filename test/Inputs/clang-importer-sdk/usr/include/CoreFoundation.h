@@ -16,6 +16,8 @@ typedef struct __attribute__((objc_bridge(NSDictionary))) __CFDictionary const *
 typedef struct __attribute__((objc_bridge(NSArray))) __CFArray const *CFArrayRef;
 typedef struct __attribute__((objc_bridge(NSSet))) __CFSet const *CFSetRef;
 
+typedef struct __attribute__((objc_bridge_mutable(NSError))) __CFError *CFErrorRef;
+
 typedef CFTypeRef CFAliasForTypeRef;
 
 #if __LLP64__
@@ -39,6 +41,8 @@ extern CFIndex CFIndex_test;
 #define CF_OPTIONS(_type, _name) enum _name : _type _name; enum _name : _type
 
 #define CF_NOESCAPE __attribute__((noescape))
+#define CF_RETURNS_RETAINED __attribute__((cf_returns_retained))
+#define CF_RETURNS_NOT_RETAINED __attribute__((cf_returns_not_retained))
 
 #ifdef CGFLOAT_IN_COREFOUNDATION
 #if defined(__LP64__) && __LP64__
