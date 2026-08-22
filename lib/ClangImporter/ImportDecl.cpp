@@ -2641,9 +2641,7 @@ namespace {
         if (nd->getDeclName().isIdentifier())
           allMemberNames.insert(nd->getName());
 
-        if (Impl.SwiftContext.LangOpts.hasFeature(
-                Feature::ImportCxxMembersLazily) &&
-            !shouldEagerlyImportClangRecordMember(nd,
+        if (!shouldEagerlyImportClangRecordMember(nd,
                                                   Impl.SwiftContext.LangOpts))
           continue;
 
@@ -4577,10 +4575,6 @@ namespace {
     /// the renamed spelling is imported a second time as a deprecated migration
     /// stub, which is only '@unsafe'.
     ///
-    /// Instantiation is gated on ImportCxxMembersLazily; without that
-    /// feature ClangImporter eagerly instantiates typedef members, so the
-    /// return type is usually already instantiated by the time we get here.
-    ///
     /// This is done post-import so we don't eagerly instantiate templates for
     /// methods we may not import.
     void renameToUnsafeIfNeeded(
@@ -4593,23 +4587,19 @@ namespace {
         // Does not apply to operators, ctors, dtors, conversions
         return;
 
-      if (Impl.SwiftContext.LangOpts.hasFeature(
-              Feature::ImportCxxMembersLazily)) {
-        using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
+      using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
 
-        auto retTy = desugarIfElaborated(clangDecl->getReturnType());
-        auto *retTemplate =
-            dyn_cast_or_null<ClassTmplSpec>(retTy->getAsTagDecl());
+      auto retTy = desugarIfElaborated(clangDecl->getReturnType());
+      auto *retTemplate =
+          dyn_cast_or_null<ClassTmplSpec>(retTy->getAsTagDecl());
 
-        if (retTemplate && !retTemplate->hasDefinition()) {
-          // N.B. InstantiateClassTemplateSpecialization() returns true if it
-          // encountered an error while instantiating the returned template.
-          (void)Impl.getClangSema().InstantiateClassTemplateSpecialization(
-              clangDecl->getLocation(),
-              const_cast<ClassTmplSpec *>(retTemplate),
-              clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
-              /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
-        }
+      if (retTemplate && !retTemplate->hasDefinition()) {
+        // N.B. InstantiateClassTemplateSpecialization() returns true if it
+        // encountered an error while instantiating the returned template.
+        (void)Impl.getClangSema().InstantiateClassTemplateSpecialization(
+            clangDecl->getLocation(), const_cast<ClassTmplSpec *>(retTemplate),
+            clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
+            /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
       }
 
       auto importedName = Impl.importFullName(clangDecl, Impl.CurrentVersion);

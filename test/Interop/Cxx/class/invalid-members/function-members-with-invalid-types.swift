@@ -7,12 +7,10 @@
 //
 // Compare usability of function.h in Swift with swift-frontend
 // RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}function.h \
 // RUN:   -typo-correction-limit 0 \
 // RUN:   %t%{fs-sep}ok.swift -verify-additional-prefix ok-swift-
 // RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}function.h \
 // RUN:   -typo-correction-limit 0 \
 // RUN:   %t%{fs-sep}err.swift -verify-additional-prefix swift-
@@ -24,10 +22,7 @@
 // Check module interface of function.h
 // RUN: %target-swift-ide-test -print-module -source-filename=x \
 // RUN:   -cxx-interoperability-mode=default -I %t/Inputs \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -module-to-print=Function | %FileCheck %s
-//
-// REQUIRES: swift_feature_ImportCxxMembersLazily
 
 //--- Inputs/module.modulemap
 module Function {
