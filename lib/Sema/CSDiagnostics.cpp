@@ -8042,6 +8042,23 @@ bool ArgumentMismatchFailure::diagnosePropertyWrapperMismatch() const {
   auto argType = getFromType();
   auto paramType = getToType();
 
+  // If the types match but the parameter has an external property wrapper that
+  // has no `init(wrappedValue)` then record a diagnostic and exit early.
+  if (argType->isEqual(paramType)) {
+    if (auto *paramDecl =
+            getParameterAt(Info.getCallee(), Info.getParamPosition() - 1)) {
+      if (paramDecl->hasExternalPropertyWrapper()) {
+        auto wrapperInfo = paramDecl->getAttachedPropertyWrapperTypeInfo(0);
+        if (!wrapperInfo.wrappedValueInit) {
+          auto backingType = paramDecl->getPropertyWrapperBackingPropertyType();
+          emitDiagnostic(diag::property_wrapper_no_init_wrapped_value,
+                        backingType);
+          return true;
+        }
+      }
+    }
+  }
+
   // Verify that this is an implicit call to a property wrapper initializer
   // in a form of `init(wrappedValue:)` or deprecated `init(initialValue:)`.
   auto *call = getAsExpr<CallExpr>(getRawAnchor());
