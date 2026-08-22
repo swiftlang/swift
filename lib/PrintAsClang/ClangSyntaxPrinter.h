@@ -59,6 +59,12 @@ public:
   /// Print the base name of the given declaration.
   void printBaseName(const ValueDecl *decl) const;
 
+  /// If the name of the given declaration had to be sanitized because it is
+  /// not a valid C++ identifier, print a doc comment that states the
+  /// original Swift name, e.g. `/// Swift name: '🚀speed()'`.
+  void printSwiftNameCommentIfNeeded(const ValueDecl *decl,
+                                     StringRef indent = "") const;
+
   /// Print the C-style prefix for the given module name, that's used for
   /// C type names inside the module.
   void printModuleNameCPrefix(const ModuleDecl &mod);
