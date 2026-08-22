@@ -77,3 +77,25 @@ package struct PackageContext {
   @_alwaysEmitIntoClient
   package static var v : Int { 1 }
 }
+
+// PublicNonABI functions must always be [serialized] — verify that combining
+// @export(implementation) with other attributes doesn't break this invariant.
+
+// CHECK-LABEL: sil non_abi [serialized] [export_implementation] [always_inline] [ossa] @{{.*}}inlineAlwaysExportImpl
+@inline(always) @export(implementation) public func inlineAlwaysExportImpl() {}
+
+// CHECK-LABEL: sil non_abi [transparent] [serialized] [export_implementation] [ossa] @{{.*}}transparentExportImpl
+@_transparent @export(implementation) public func transparentExportImpl() {}
+
+// Method in a public type: effective access is public, so non_abi [serialized] is required.
+public struct ExportImplPublicContext {
+  // CHECK-LABEL: sil non_abi [serialized] [export_implementation] [always_inline] [ossa] @{{.*}}ExportImplPublicContext{{.*}}1f
+  @inline(always) @export(implementation) public func f() {}
+}
+
+// Method in an internal type: effective access is capped to internal, AEIC is
+// dropped, and the function gets hidden linkage — no [serialized] required.
+internal struct ExportImplInternalContext {
+  // CHECK-LABEL: sil hidden [export_implementation] [always_inline] [ossa] @{{.*}}ExportImplInternalContext{{.*}}1f
+  @inline(always) @export(implementation) func f() {}
+}

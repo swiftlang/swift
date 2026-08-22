@@ -334,6 +334,17 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       // linkage.
       if (isAvailableExternally(fn->getLinkage())) {
         fn->setLinkage(constant.getLinkage(ForDefinition));
+        // PublicNonABI and PackageNonABI functions must be serialized before
+        // the module is serialized. The declaration may have been created
+        // without [serialized] if it was initially emitted as HiddenExternal.
+        if (!mod.isSerialized()) {
+          auto defLinkage = fn->getLinkage();
+          if ((defLinkage == SILLinkage::PublicNonABI ||
+               defLinkage == SILLinkage::PackageNonABI) &&
+              !fn->isAnySerialized()) {
+            fn->setSerializedKind(constant.getSerializedKind());
+          }
+        }
       }
     }
     return fn;
@@ -346,6 +357,14 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   // Don't create a [serialized] function after serialization has happened.
   if (IsSer != IsNotSerialized && mod.isSerialized())
     IsSer = IsNotSerialized;
+
+  // PublicNonABI and PackageNonABI functions must be serialized before the
+  // module is serialized (SIL verifier invariant).
+  if (!mod.isSerialized() && IsSer == IsNotSerialized &&
+      (linkage == SILLinkage::PublicNonABI ||
+       linkage == SILLinkage::PackageNonABI)) {
+    IsSer = IsSerialized;
+  }
 
   Inline_t inlineStrategy = InlineDefault;
   if (constant.isNoinline())
