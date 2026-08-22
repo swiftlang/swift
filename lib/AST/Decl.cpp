@@ -2393,6 +2393,9 @@ bool Decl::hasOnlyCEntryPoint() const {
       return true;
   }
 
+  if (getAttrs().hasAttribute<CxxDeclAttr>())
+    return true;
+
   return false;
 }
 
@@ -5047,9 +5050,10 @@ void ValueDecl::setInterfaceType(Type type) {
 }
 
 StringRef ValueDecl::getCDeclName() const {
-  // Treat imported C functions as implicitly @_cdecl.
+  // Treat imported C and C++ functions as implicitly @_cdecl / @cxx.
   if (auto clangDecl = dyn_cast_or_null<clang::FunctionDecl>(getClangDecl())) {
-    if (clangDecl->getLanguageLinkage() == clang::CLanguageLinkage
+    if ((clangDecl->getLanguageLinkage() == clang::CLanguageLinkage ||
+         clangDecl->getLanguageLinkage() == clang::CXXLanguageLinkage)
           && clangDecl->getIdentifier())
       return clangDecl->getName();
   }
@@ -5058,13 +5062,15 @@ StringRef ValueDecl::getCDeclName() const {
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
     return abiRole.getCounterpart()->getCDeclName();
 
-  // Handle explicit cdecl attributes.
-  if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
-    if (!cdeclAttr->Name.empty())
-      return cdeclAttr->Name;
-    else
-      return getBaseIdentifier().str();
-  }
+  // Handle explicit @c/@_cdecl and @cxx attributes. Both store an optional
+  // explicit name and fall back to the base identifier when it is empty.
+  auto nameOrBaseIdentifier = [&](StringRef name) -> StringRef {
+    return name.empty() ? getBaseIdentifier().str() : name;
+  };
+  if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>())
+    return nameOrBaseIdentifier(cdeclAttr->Name);
+  if (auto cxxAttr = getAttrs().getAttribute<CxxDeclAttr>())
+    return nameOrBaseIdentifier(cxxAttr->Name);
 
   return "";
 }
@@ -11328,6 +11334,9 @@ bool AbstractFunctionDecl::isObjCInstanceMethod() const {
 }
 
 std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
+  if (getAttrs().hasAttribute<CxxDeclAttr>())
+    return ForeignLanguage::Cxx;
+
   auto attr = getAttrs().getAttribute<CDeclAttr>();
   if (!attr)
     return std::nullopt;

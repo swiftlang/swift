@@ -2444,6 +2444,15 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   // Okay, start processing the parameters explosion.
 
+  // A C++ method takes `this` first. The Microsoft ABI passes it even before
+  // an indirect result, so claim it now in that case.
+  bool isCXXMethod = IGF.CurSILFn->getRepresentation() ==
+                     SILFunctionTypeRepresentation::CXXMethod;
+  llvm::Value *thisValue = nullptr;
+  if (isCXXMethod && FI.getReturnInfo().isIndirect() &&
+      FI.getReturnInfo().isSRetAfterThis())
+    thisValue = params.claimNext();
+
   // First, claim all the indirect results.
   ArrayRef<SILArgument *> args = emitEntryPointIndirectReturn(
       *emission, IGF, entry, funcTy, [&](SILType directResultType) -> bool {
@@ -2453,6 +2462,34 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
       });
 
   unsigned nextArgTyIdx = 0;
+
+  // Handle the `this` argument of a C++ method. SIL passes `self` last; bind
+  // it to the `this` pointer.
+  if (isCXXMethod) {
+    SILArgument *selfArg = args.back();
+    args = args.slice(0, args.size() - 1);
+
+    if (!thisValue)
+      thisValue = params.claimNext();
+    if (selfArg->getType().isAddress()) {
+      // The `self` of a value type is passed indirectly: `this` is its
+      // address.
+      const auto &selfTI = IGF.getTypeInfo(selfArg->getType());
+      IGF.setLoweredAddress(selfArg, Address(thisValue, selfTI.getStorageType(),
+                                             selfTI.getBestKnownAlignment()));
+    } else {
+      // The `self` of a foreign reference type is a reference to the C++
+      // object: `this` is its value.
+      assert(selfArg->getType().isForeignReferenceType() &&
+             "C++ method self should be passed indirectly");
+      Explosion self;
+      self.add(thisValue);
+      IGF.setLoweredExplosion(selfArg, self);
+    }
+
+    // Skip `this` when handling the explicit arguments below.
+    nextArgTyIdx = 1;
+  }
 
   // Handle the arguments of an ObjC method.
   if (IGF.CurSILFn->getRepresentation() ==

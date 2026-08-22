@@ -6842,31 +6842,143 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
 }
 
 static void lookupRelatedFuncs(AbstractFunctionDecl *func,
-                               SmallVectorImpl<ValueDecl *> &results) {
+                               llvm::SmallSetVector<ValueDecl *, 4> &results) {
   DeclName swiftName;
   if (auto accessor = dyn_cast<AccessorDecl>(func))
     swiftName = accessor->getStorage()->getName();
   else
     swiftName = func->getName();
 
+  ASTContext &ctx = func->getASTContext();
+
+  // When the explicit C++ name differs from the Swift base name, also look
+  // candidates up under that C++ base name.
+  DeclName foreignName;
+  if (auto cxxAttr = func->getAttrs().getAttribute<CxxDeclAttr>()) {
+    if (!cxxAttr->Name.empty() &&
+        cxxAttr->Name != swiftName.getBaseName().userFacingName())
+      foreignName = DeclName(ctx.getIdentifier(cxxAttr->Name));
+  }
+
   if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
-    NLOptions options = {NLFlags::IgnoreAccessControl, NLFlags::IgnoreMissingImports};
-    ty->lookupQualified({ ty }, DeclNameRef(swiftName), func->getLoc(),
-                        (NLFlags::QualifiedDefault) | options, results);
-  }
-  else {
-    ASTContext &ctx = func->getASTContext();
-    UnqualifiedLookupOptions options =
-      UnqualifiedLookupFlags::IgnoreAccessControl;
-    UnqualifiedLookupDescriptor descriptor(
-        DeclNameRef(ctx, Identifier(), swiftName), func->getDeclContext(),
-        func->getLoc(), options);
-    auto lookup = evaluateOrDefault(func->getASTContext().evaluator,
-                                    UnqualifiedLookupRequest{descriptor}, {});
-    for (const auto &result : lookup) {
-      results.push_back(result.getValueDecl());
+    NLOptions options = {NLFlags::IgnoreAccessControl,
+                         NLFlags::IgnoreMissingImports};
+    auto doLookup = [&](DeclName name) {
+      SmallVector<ValueDecl *, 4> found;
+      ty->lookupQualified({ty}, DeclNameRef(name), func->getLoc(),
+                          (NLFlags::QualifiedDefault) | options, found);
+      for (ValueDecl *vd : found) {
+        // Qualified lookup matches members by base name only, so a compound
+        // query like `foo(_:)` also returns `foo(_:_:)`. Enforce the full
+        // compound name here to support overloads of different arity.
+        if (name.isCompoundName() && isa<AbstractFunctionDecl>(vd) &&
+            vd->getName() != name)
+          continue;
+        results.insert(vd);
+      }
+    };
+    doLookup(swiftName);
+    if (foreignName)
+      doLookup(foreignName);
+
+    // The lookups above go by Swift name, which the importer may have renamed
+    // (the non-const overload of a const/non-const pair gets a `Mutating`
+    // suffix), so look the C++ name up in the Clang scope directly too.
+    if (const auto *clangDC =
+            dyn_cast_or_null<clang::DeclContext>(ty->getClangDecl())) {
+      auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+      auto &clangIdents = clangDC->getParentASTContext().Idents;
+      clang::DeclarationName clangName(&clangIdents.get(func->getCDeclName()));
+      for (const auto *member : clangDC->lookup(clangName))
+        if (auto *imported = dyn_cast_or_null<ValueDecl>(
+                importer->importDeclDirectly(member)))
+          results.insert(imported);
     }
+
+    // Lookup in the imported type's context applies module shadowing, which
+    // can drop members that Swift extensions in the current module add. `func`
+    // is trivially related to itself, so add it to the candidate set.
+    if (importer::isClangNamespace(func->getDeclContext()) ||
+        importer::isClangCxxRecord(func->getDeclContext()))
+      results.insert(func);
+  } else {
+    UnqualifiedLookupOptions options =
+        UnqualifiedLookupFlags::IgnoreAccessControl;
+    auto doLookup = [&](DeclName name) {
+      UnqualifiedLookupDescriptor descriptor(
+          DeclNameRef(ctx, Identifier(), name), func->getDeclContext(),
+          func->getLoc(), options);
+      auto lookup = evaluateOrDefault(ctx.evaluator,
+                                      UnqualifiedLookupRequest{descriptor}, {});
+      for (const auto &result : lookup)
+        results.insert(result.getValueDecl());
+    };
+    doLookup(swiftName);
+    if (foreignName)
+      doLookup(foreignName);
   }
+}
+
+/// Whether \p a and \p b have the same parameter types, ignoring `self` and
+/// the result type. Overloads are distinguished by their parameter types, so
+/// this is what identifies which member of an imported overload set an
+/// `@implementation` function implements.
+static bool haveSameParameterTypes(const ValueDecl *a, const ValueDecl *b) {
+  auto paramsOf =
+      [](const ValueDecl *decl) -> ArrayRef<AnyFunctionType::Param> {
+    Type type = decl->getInterfaceType();
+    if (const auto *fn = dyn_cast<AbstractFunctionDecl>(decl))
+      if (fn->hasImplicitSelfDecl())
+        type = fn->getMethodInterfaceType();
+    if (const auto *fnType = type->getAs<AnyFunctionType>())
+      return fnType->getParams();
+    return {};
+  };
+
+  auto paramsA = paramsOf(a), paramsB = paramsOf(b);
+  if (paramsA.size() != paramsB.size())
+    return false;
+  for (auto i : indices(paramsA)) {
+    // Compare canonical types, on the same `getOldType()`s, exactly what
+    // `ObjCImplementationChecker` does.
+    if (paramsA[i].getOldType()->getCanonicalType() !=
+        paramsB[i].getOldType()->getCanonicalType())
+      return false;
+  }
+  return true;
+}
+
+/// Select, among the imported \p candidates sharing \p func's foreign name,
+/// the one(s) \p func implements. Parameter types pick the overload, except
+/// for a const/non-const pair, which shares them and imports as non-mutating
+/// and `mutating`; remaining ambiguity is left to the attribute checker.
+static TinyPtrVector<Decl *>
+selectImplementedOverloads(const AbstractFunctionDecl *func,
+                           const TinyPtrVector<Decl *> &candidates) {
+  if (candidates.size() <= 1)
+    return candidates;
+
+  TinyPtrVector<Decl *> selected;
+  for (Decl *candidate : candidates)
+    if (haveSameParameterTypes(func, cast<ValueDecl>(candidate)))
+      selected.push_back(candidate);
+
+  if (selected.size() > 1) {
+    auto isMutating = [](const Decl *decl) {
+      if (const auto *fd = dyn_cast<FuncDecl>(decl))
+        return fd->isMutating();
+      return false;
+    };
+    bool isFuncMutating = isMutating(func);
+    TinyPtrVector<Decl *> sameMutating;
+    for (Decl *candidate : selected)
+      if (isMutating(candidate) == isFuncMutating)
+        sameMutating.push_back(candidate);
+    if (!sameMutating.empty())
+      selected = sameMutating;
+  }
+
+  return selected;
 }
 
 static ObjCInterfaceAndImplementation
@@ -6887,47 +6999,59 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
   if (clangName.empty())
     return {};
 
-  SmallVector<ValueDecl *, 4> results;
+  llvm::SmallSetVector<ValueDecl *, 4> results;
   lookupRelatedFuncs(func, results);
 
-  // Classify the `results` as either the interface or an implementation.
-  // (Multiple implementations are invalid but utterable.)
-  Decl *interface = nullptr;
+  // Classify the `results` as either interface candidates (imported
+  // declarations) or implementations. (Multiple implementations are invalid
+  // but utterable.)
+  TinyPtrVector<Decl *> candidates;
   TinyPtrVector<Decl *> impls;
 
-  for (ValueDecl *result : results) {
-    AbstractFunctionDecl *resultFunc = nullptr;
+  auto asFunc = [&](Decl *result) -> AbstractFunctionDecl * {
     if (accessorKind) {
       if (auto resultStorage = dyn_cast<AbstractStorageDecl>(result))
-        resultFunc = resultStorage->getAccessor(*accessorKind);
+        return resultStorage->getAccessor(*accessorKind);
+      return nullptr;
     }
-    else
-      resultFunc = dyn_cast<AbstractFunctionDecl>(result);
+    return dyn_cast<AbstractFunctionDecl>(result);
+  };
 
+  for (ValueDecl *result : results) {
+    AbstractFunctionDecl *resultFunc = asFunc(result);
     if (!resultFunc)
       continue;
 
     if (resultFunc->getCDeclName() != clangName)
       continue;
 
-    if (resultFunc->hasClangNode()) {
-      if (interface) {
-        // This clang name is overloaded. That should only happen with C++
-        // functions/methods, which aren't currently supported.
-        return {};
-      }
-      interface = result;
-    } else if (resultFunc->isObjCImplementation()) {
+    if (resultFunc->hasClangNode())
+      candidates.push_back(result);
+    else if (resultFunc->isObjCImplementation())
       impls.push_back(result);
-    }
   }
+
+  // Pick the interface.
+  TinyPtrVector<Decl *> interfaces =
+      selectImplementedOverloads(func, candidates);
+  if (interfaces.empty())
+    return {};
+
+  // Implementations of other overloads are unrelated to this one; drop them so
+  // they are not reported as duplicate implementations.
+  llvm::erase_if(impls, [&](Decl *impl) {
+    return !llvm::equal(selectImplementedOverloads(asFunc(impl), candidates),
+                        interfaces);
+  });
 
   // If we found enough decls to construct a result, `func` should be among them
   // somewhere.
-  assert(interface == nullptr || impls.empty() ||
-         interface == func || llvm::is_contained(impls, func));
+  assert(interfaces.empty() || impls.empty() ||
+         llvm::is_contained(interfaces, func) ||
+         llvm::is_contained(impls, func));
 
-  return constructResult({ interface }, impls, interface,
+  return constructResult(interfaces, impls,
+                         interfaces.empty() ? nullptr : interfaces.front(),
                          /*categoryName=*/Identifier());
 }
 
@@ -9242,6 +9366,13 @@ bool importer::declIsCxxOnly(const Decl *decl) {
 bool importer::isClangNamespace(const DeclContext *dc) {
   if (const auto *ed = dc->getSelfEnumDecl())
     return isa_and_nonnull<clang::NamespaceDecl>(ed->getClangDecl());
+
+  return false;
+}
+
+bool importer::isClangCxxRecord(const DeclContext *dc) {
+  if (const auto *nominal = dc->getSelfNominalTypeDecl())
+    return isa_and_nonnull<clang::CXXRecordDecl>(nominal->getClangDecl());
 
   return false;
 }

@@ -1586,6 +1586,13 @@ ERROR(attr_com_unknown_label, none,
 ERROR(attr_com_unknown_threading_model, none,
       "unknown threading model '%0'; expected 'single', 'apartment', 'free', 'both', or 'neutral'", (StringRef))
 
+// @cxx
+ERROR(attr_expected_cxx_name,none,
+      "expected C++ function name in '%0' attribute", (StringRef))
+ERROR(attr_cxx_operator_name_backticks,none,
+      "C++ operator name in '%0' attribute must be enclosed in backticks",
+      (StringRef))
+
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 

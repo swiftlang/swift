@@ -53,9 +53,11 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"  // for COM
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -420,6 +422,7 @@ public:
   void visitAvailableAttr(AvailableAttr *attr);
 
   void visitCDeclAttr(CDeclAttr *attr);
+  void visitCxxDeclAttr(CxxDeclAttr *attr);
   void visitCOMAttr(COMAttr *attr);
   void visitExposeAttr(ExposeAttr *attr);
   void visitExternAttr(ExternAttr *attr);
@@ -1761,6 +1764,31 @@ static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
   return SourceRange();
 }
 
+/// Whether \p D is a `@cxx` instance method of an imported C++ foreign
+/// reference type whose C++ name is that of a virtual method of the type.
+static bool isCxxForeignReferenceVirtualMethod(const Decl *D) {
+  if (!D->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
+    return false;
+  const auto *FD = dyn_cast<FuncDecl>(D);
+  if (!FD || FD->isStatic())
+    return false;
+  const auto *classDecl = FD->getDeclContext()->getSelfClassDecl();
+  if (!classDecl || !classDecl->isForeignReferenceType())
+    return false;
+  const auto *record =
+      dyn_cast_or_null<clang::CXXRecordDecl>(classDecl->getClangDecl());
+  if (!record)
+    return false;
+
+  auto &clangIdents = record->getASTContext().Idents;
+  clang::DeclarationName clangName(&clangIdents.get(FD->getCDeclName()));
+  for (const auto *member : record->lookup(clangName))
+    if (const auto *method = dyn_cast<clang::CXXMethodDecl>(member))
+      if (method->isVirtual())
+        return true;
+  return false;
+}
+
 void AttributeChecker::
 visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   // If `D` is ABI-only, let ABIDeclChecker diagnose the bad attribute.
@@ -1771,6 +1799,8 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     D->getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
   if (!langAttr)
     langAttr = D->getAttrs().getAttribute<CDeclAttr>(/*AllowInvalid=*/true);
+  if (!langAttr)
+    langAttr = D->getAttrs().getAttribute<CxxDeclAttr>(/*AllowInvalid=*/true);
 
   if (!langAttr) {
     diagnose(attr->getLocation(), diag::attr_implementation_requires_language);
@@ -1895,10 +1925,41 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
 
     // FIXME: if (AFD->getCDeclName().empty())
 
-    if (!AFD->getImplementedObjCDecl()) {
-      diagnose(attr->getLocation(),
-               diag::attr_objc_implementation_func_not_found,
-               AFD->getCDeclName(), AFD);
+    auto interfaces = AFD->getAllImplementedObjCDecls();
+    if (interfaces.size() != 1) {
+      // A @cxx function whose signature is not representable in C++ cannot
+      // match anything; the representability diagnostics explain the failure
+      // better than "not found" would, so check them first and stand down if
+      // they fire.
+      if (auto *cxxAttr = AFD->getAttrs().getAttribute<CxxDeclAttr>(
+              /*AllowInvalid=*/true)) {
+        auto *FD = dyn_cast<FuncDecl>(AFD);
+        if (FD && !cxxAttr->isInvalid())
+          evaluateOrDefault(Ctx.evaluator,
+                            TypeCheckForeignFunctionRequest{FD, cxxAttr}, {});
+        if (cxxAttr->isInvalid())
+          return;
+      }
+
+      if (interfaces.empty()) {
+        // TODO: Virtual methods of foreign reference types are not supported
+        // yet. They have no candidate to match, so tell them apart from a
+        // function that is genuinely not found.
+        if (isCxxForeignReferenceVirtualMethod(AFD))
+          diagnose(AFD, diag::cxx_virtual_unsupported, AFD, AFD->getCDeclName());
+        else
+          diagnose(attr->getLocation(),
+                   diag::attr_objc_implementation_func_not_found,
+                   AFD->getCDeclName(), AFD);
+      } else {
+        // Several imported overloads have the same signature in Swift, so the
+        // function could implement any of them.
+        diagnose(attr->getLocation(),
+                 diag::attr_objc_implementation_func_ambiguous_overload, AFD,
+                 AFD->getCDeclName());
+        for (auto *interface : interfaces)
+          interface->diagnose(diag::found_candidate);
+      }
     }
   }
 }
@@ -2410,7 +2471,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
   }
 }
 
-static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
+bool swift::canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // The Swift standard library needs to be able to define reserved symbols.
   if (fromModule->isStdlibModule()
       || fromModule->getName() == fromModule->getASTContext().Id_Concurrency
@@ -2482,6 +2543,35 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   if (D->getAttrs().getAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
   }
+}
+
+void AttributeChecker::visitCxxDeclAttr(CxxDeclAttr *attr) {
+  // @cxx requires C++ interop.
+  if (!Ctx.LangOpts.EnableCXXInterop)
+    diagnose(attr->getLocation(), diag::cxx_attr_requires_cxx_interop,
+             attr->getAttrName());
+
+  // @cxx may appear on a global function or on a function declared in a Swift
+  // extension of an imported C++ namespace or C++ record.
+  auto *dc = D->getDeclContext();
+  if (dc->isTypeContext() && !importer::isClangNamespace(dc) &&
+      !importer::isClangCxxRecord(dc))
+    diagnose(attr->getLocation(), diag::cxx_invalid_context, attr);
+
+  // Reject using both @cxx and @objc on the same decl.
+  if (D->getAttrs().getAttribute<ObjCAttr>())
+    diagnose(attr->getLocation(), diag::cxx_incompatible_with_objc, D);
+
+  // Reject using both @cxx and @c/@_cdecl on the same decl.
+  if (auto *cAttr = D->getAttrs().getAttribute<CDeclAttr>())
+    diagnose(attr->getLocation(), diag::cxx_incompatible_with_cdecl, cAttr, D);
+
+  // @cxx currently requires @implementation.
+  // AllowInvalid=true so that if @implementation is present but malformed, its
+  // own diagnostics cover the problem.
+  if (!D->getAttrs().getAttribute<ObjCImplementationAttr>(
+          /*AllowInvalid=*/true))
+    diagnose(attr->getLocation(), diag::cxx_attr_requires_implementation);
 }
 
 void AttributeChecker::visitCOMAttr(COMAttr *attr) {

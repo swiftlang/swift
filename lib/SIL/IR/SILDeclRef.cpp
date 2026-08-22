@@ -1250,8 +1250,9 @@ bool SILDeclRef::hasNonUniqueDefinition() const {
 }
 
 bool SILDeclRef::declExposedToForeignLanguage(const ValueDecl *decl) {
-  // @c / @_cdecl / @objc.
+  // @c / @_cdecl / @cxx / @objc.
   if (decl->getAttrs().hasAttribute<CDeclAttr>() ||
+      decl->getAttrs().hasAttribute<CxxDeclAttr>() ||
       (decl->getAttrs().hasAttribute<ObjCAttr>() &&
        decl->getDeclContext()->isModuleScopeContext())) {
     return true;
@@ -1584,8 +1585,9 @@ std::optional<std::string> SILDeclRef::getAsmName() const {
       if (auto VD = dyn_cast<ValueDecl>(decl))
         return std::string(EA->getCName(VD));
 
-    // @c/@_cdecl
-    if (decl->getAttrs().hasAttribute<CDeclAttr>())
+    // @c/@_cdecl/@cxx.
+    if (decl->getAttrs().hasAttribute<CDeclAttr>() ||
+        decl->getAttrs().hasAttribute<CxxDeclAttr>())
       return std::string(decl->getCDeclName());
   }
 

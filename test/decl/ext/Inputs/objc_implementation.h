@@ -275,6 +275,12 @@ void CImplFuncDeprecated1(int param)
 void CImplFuncAvailable1(int param);
 void CImplFuncAvailable2(int param);
 
+void CImplOverloaded(int param) __attribute__((overloadable));
+void CImplOverloaded(float param) __attribute__((overloadable));
+
+void CImplOverloadedMixed(int param);
+void CImplOverloadedMixed(float param) __attribute__((overloadable));
+
 #if __OBJC__
 void CImplFuncMismatch3(_Nullable id param);
 void CImplFuncMismatch4(_Nullable id param);
