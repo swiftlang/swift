@@ -1,6 +1,7 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=UNSAFEMUTABLEPOINTERALLOC
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=ERRORBOX
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=COROFRAME
 
 // REQUIRES: OS=macosx
 // REQUIRES: SWIFT_STDLIB_ARCH=arm64
@@ -338,3 +339,40 @@ public func dropError() {
 // emitBoxedExistentialContainerDeallocation (swift_deallocError).
 // ERRORBOX-DAG: define {{.*}} @swift_deallocError(ptr %0, ptr %1)
 // ERRORBOX-DAG:   call void @swift_deallocObjectTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[ERRORBOX_HEADER_TYPEID]])
+
+
+// --- Yield-once coroutine frames (typed alloc for swift_coroFrameAllocTyped/DeallocTyped) ---
+
+public struct CoroFrameLarge {
+  var a: Int
+  var b: Int
+  var c: Int
+  var d: Int
+  var e: Int
+  var f: Int
+  var g: Int
+  var h: Int
+}
+
+public final class CoroFrameHolder {
+  var large: CoroFrameLarge
+
+  init(_ l: CoroFrameLarge) { large = l }
+
+  public var value: CoroFrameLarge {
+    _read {
+      yield large
+    }
+    _modify {
+      yield &large
+    }
+  }
+}
+// COROFRAME-DAG: define {{.*}} @"[[CORO_READ:\$e[0-9]+typed_allocation15CoroFrameHolderC5valueAA0.*5LargeVvr]]"(ptr {{.*}}, ptr swiftself {{.*}})
+// COROFRAME-DAG:   call ptr @swift_coroFrameAllocTyped(i64 {{.*}}, i64 [[CORO_TYPEID:[0-9]+]])
+//
+// COROFRAME-DAG: define {{.*}} @"[[CORO_READ]].resume.0"
+// COROFRAME-DAG:   call void @"__swift_coroFrameDeallocTypedStub_[[CORO_READ]]"(ptr {{.*}})
+//
+// COROFRAME-DAG: define {{.*}} @"__swift_coroFrameDeallocTypedStub_[[CORO_READ]]"(ptr %0)
+// COROFRAME-DAG:   call void @swift_coroFrameDeallocTyped(ptr %0, i64 [[CORO_TYPEID]])
