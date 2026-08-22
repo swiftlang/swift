@@ -871,6 +871,12 @@ clang::QualType ClangTypeConverter::convert(Type type) {
   if (it != Cache.end())
     return it->second;
 
+  if (type->hasCCompatibleForeignReferenceRepresentation()) {
+    auto result = ClangASTContext.VoidPtrTy;
+    Cache.insert({type, result});
+    return result;
+  }
+
   if (auto existential = type->getAs<ExistentialType>())
     type = existential->getConstraintType();
 
