@@ -435,7 +435,7 @@ EXPERIMENTAL_FEATURE(ParserASTGen, false)
 EXPERIMENTAL_FEATURE(BuiltinMacros, false)
 
 /// Generate bindings for functions that 'throw' in the C++ section of the generated Clang header.
-EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false)
+EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, true)
 
 /// Enable reference bindings.
 EXPERIMENTAL_FEATURE(ReferenceBindings, true)
