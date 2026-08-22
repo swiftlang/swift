@@ -3188,6 +3188,18 @@ bool TypeBase::hasRetainablePointerRepresentation() {
   return ::hasRetainablePointerRepresentation(getCanonicalType());
 }
 
+bool TypeBase::hasCCompatibleForeignReferenceRepresentation() {
+  Type type(this);
+  if (auto objectType = type->getOptionalObjectType())
+    type = objectType;
+
+  if (auto existential = type->getAs<ExistentialType>())
+    type = existential->getConstraintType();
+
+  return type->isExistentialType() &&
+         type->getExistentialLayout().getCOMInterface();
+}
+
 bool TypeBase::isBridgeableObjectType() {
   return ::isBridgeableObjectType(getCanonicalType());
 }
@@ -3307,6 +3319,10 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     type = valueType;
     wasOptional = true;
   }
+
+  if (language == ForeignLanguage::C &&
+      type->hasCCompatibleForeignReferenceRepresentation())
+    return { ForeignRepresentableKind::Trivial, nullptr };
 
   if (auto existential = type->getAs<ExistentialType>())
     type = existential->getConstraintType();

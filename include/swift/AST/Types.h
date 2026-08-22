@@ -1314,6 +1314,11 @@ public:
   /// retain/release runtime functions.
   bool hasRetainablePointerRepresentation();
 
+  /// Determines whether this type has the representation of a single pointer
+  /// managed by a foreign object model and can be passed directly through the
+  /// C ABI. This includes one level of optionality.
+  bool hasCCompatibleForeignReferenceRepresentation();
+
   /// Given that this type is a reference type, which kind of reference
   /// counting does it use?
   ReferenceCounting getReferenceCounting();
