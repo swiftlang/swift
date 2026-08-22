@@ -572,7 +572,10 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   }
 
   case TypeInfoKind::Borrow: {
-    swift_unreachable("not implemented");
+    // Either a bitwise copy of the referent or a pointer to it. Not
+    // SWIFT_RAW_POINTER even in the latter case: that promises the address of a
+    // heap allocation, and a borrow can point into the interior of one.
+    return SWIFT_BUILTIN;
   }
   }
 
