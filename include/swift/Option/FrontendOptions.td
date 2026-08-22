@@ -755,6 +755,10 @@ def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
   HelpText<"Disable emission of names of stored properties and enum cases in"
            "reflection metadata">;
 
+def disable_objc_ivar_metadata : Flag<["-"], "disable-objc-ivar-metadata">,
+  HelpText<"Disable emission of the Objective-C ivar list for Swift classes "
+           "with a Swift-only superclass hierarchy and a fixed layout">;
+
 def disable_llvm_merge_functions_pass : Flag<["-"], "disable-llvm-merge-functions-pass">,
   HelpText<"Disable the MergeFunctionPass LLVM IR pass">;
 
