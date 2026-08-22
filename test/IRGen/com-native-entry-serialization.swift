@@ -29,11 +29,20 @@ import Library
 public final class DerivedWidget: BaseWidget {
 }
 
-// The inherited conformance retains the native entries serialized by Library.
-// This includes the user interface and the default protocol-extension
-// witnesses used by the compiler-managed Swift identity interface.
+// Demand the class metadata, which references the private COM prefix and
+// interface vtables emitted by Client.
+public func makeDerivedWidget() -> DerivedWidget {
+  DerivedWidget()
+}
 
-// CHECK-DAG: @"$s{{.*}}13DerivedWidgetCMn.com.vtable.$s7Library7IWidgetMp" = private constant {{.*}} ptr [[VALUE:@"\$s{{.*}}10BaseWidgetC{{.*}}IWidget{{.*}}5value{{.*}}TWV"]]
-// CHECK-DAG: @"$s{{.*}}13DerivedWidgetCMn.com.vtable.$s3COM12ISwiftObjectMp" = private constant {{.*}} ptr [[OBJECT:@"\$s{{.*}}10BaseWidgetC{{.*}}ISwiftObject{{.*}}6object{{.*}}TWV"]], ptr [[METADATA:@"\$s{{.*}}10BaseWidgetC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV"]]
+// The client vtables recover their native entries from the inherited witness
+// tables serialized by Library. This covers both the user interface and the
+// default protocol-extension witnesses for the Swift identity interface.
+
+// CHECK-DAG: @"$s{{.*}}13DerivedWidgetCMn.com.vtable.$s7Library7IWidgetMp" = private constant {{.*}} ptr [[VALUE:@"\$s.*10BaseWidgetC.*IWidget.*5value.*TWV"]]
+// CHECK-DAG: @"$s{{.*}}13DerivedWidgetCMn.com.vtable.$s3COM12ISwiftObjectMp" = private constant {{.*}} ptr [[OBJECT:@"\$s.*10BaseWidgetC.*ISwiftObject.*6object.*TWV"]], ptr [[METADATA:@"\$s.*10BaseWidgetC.*ISwiftObject.*8metadata.*TWV"]]
+// CHECK-DAG: declare {{.*}}i32 [[VALUE]](ptr, ptr)
+// CHECK-DAG: declare {{.*}}ptr [[OBJECT]](ptr)
+// CHECK-DAG: declare {{.*}}ptr [[METADATA]](ptr)
 
 #endif
