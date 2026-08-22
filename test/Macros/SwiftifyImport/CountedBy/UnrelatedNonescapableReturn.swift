@@ -18,7 +18,7 @@ public func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt) -> NonescapableEnum 
   return .foo
 }
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), .lifetimeDependence(dependsOn: .param(3), pointer: .return, type: .copy))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), .lifetimeDependence(dependsOn: .param(3), pointer: .return, type: .copy), consumingLifetimebound: true)
 @_lifetime(extraNE: copy extraNE) @_lifetime(borrow ptr, copy extraNE)
 public func myFunc2(_ ptr: UnsafeMutablePointer<CInt>, _ len: CInt, _ extraNE: inout NonescapableEnum) -> NonescapableEnum {
   return .foo
@@ -43,8 +43,8 @@ public func myFunc(_ ptr: Span<CInt>) -> NonescapableEnum {
 @__swiftmacro_4test7myFunc215_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy ptr, copy extraNE) @_lifetime(ptr: copy ptr) @_lifetime(extraNE: copy extraNE) @_disfavoredOverload
-public func myFunc2(_ ptr: inout MutableSpan<CInt>, _ extraNE: inout NonescapableEnum) -> NonescapableEnum {
+@_alwaysEmitIntoClient @_lifetime(copy ptr, copy extraNE) @_lifetime(extraNE: copy extraNE) @_disfavoredOverload
+public func myFunc2(_ ptr: consuming MutableSpan<CInt>, _ extraNE: inout NonescapableEnum) -> NonescapableEnum {
     let len = CInt(exactly: ptr.count)!
     let _ptrPtr = ptr.withUnsafeMutableBufferPointer {
         unsafe $0

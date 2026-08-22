@@ -217,8 +217,7 @@ inline SpanOfInt FuncWithMutableSafeWrapper2(SpanOfInt s
 // CHECK-LEGACY-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-LEGACY-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-LEGACY-NEXT: @_lifetime(copy s)
-// CHECK-LEGACY-NEXT: @_lifetime(s: copy s)
-// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func FuncWithMutableSafeWrapper2(_ s: inout MutableSpan<CInt>) -> MutableSpan<CInt>
+// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func FuncWithMutableSafeWrapper2(_ s: consuming MutableSpan<CInt>) -> MutableSpan<CInt>
 
 inline SpanOfInt FuncWithMutableSafeWrapper3(VecOfInt &v
                                            [[clang::lifetimebound]]) {
@@ -250,8 +249,7 @@ inline SpanOfInt MixedFuncWithMutableSafeWrapper1(int * __counted_by(len) p
 // CHECK-LEGACY-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-LEGACY-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-LEGACY-NEXT: @_lifetime(copy p)
-// CHECK-LEGACY-NEXT: @_lifetime(p: copy p)
-// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func MixedFuncWithMutableSafeWrapper1(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt>
+// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func MixedFuncWithMutableSafeWrapper1(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt>
 
 inline int * __counted_by(len) MixedFuncWithMutableSafeWrapper2(VecOfInt &v
                                            [[clang::lifetimebound]], int len) {

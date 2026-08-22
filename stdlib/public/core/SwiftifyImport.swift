@@ -75,12 +75,19 @@ public enum _SwiftifyInfo {
 /// wrapper, with a runtime assertion that a returned null pointer only occurs when the count is
 /// 0. When `false`, the wrapper instead exposes `Span?`/`UnsafeBufferPointer?`, preserving source
 /// stability for projects that adopted the original `SafeInteropWrappers` experimental feature.
+/// Parameter consumingLifetimebound: when `true`, a `Mutable[Raw]Span` wrapper parameter that the
+/// return value copies its lifetime from (i.e. a `__lifetimebound` C parameter) is passed as
+/// `consuming` rather than `inout`, since `inout` cannot express that the returned span keeps
+/// borrowing the parameter after the call returns. When `false`, the wrapper keeps using `inout`,
+/// preserving source stability for projects that adopted the original `SafeInteropWrappers`
+/// experimental feature.
 #if hasFeature(Macros)
 @attached(peer, names: overloaded)
 public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
                              spanAvailability: String? = nil,
                              typeMappings: [String: String] = [:],
-                             nullableAsEmptySpan: Bool = false) =
+                             nullableAsEmptySpan: Bool = false,
+                             consumingLifetimebound: Bool = false) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
 #endif
 
