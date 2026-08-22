@@ -502,7 +502,10 @@ ArrayTypeInfo::ArrayTypeInfo(intptr_t size, const TypeRef *elementTR,
                /* size */ elementTI->getStride() * size,
                /* alignment */ elementTI->getAlignment(),
                /* stride */ elementTI->getStride() * size,
-               /* numExtraInhabitants */ elementTI->getNumExtraInhabitants(),
+               // An empty array has nowhere to store an extra inhabitant; a
+               // non-empty one takes them from its first element.
+               /* numExtraInhabitants */
+               size == 0 ? 0 : elementTI->getNumExtraInhabitants(),
                /* borrowability */ elementTI->getBorrowability(),
                /* FixedArray is always afd */ true),
       ElementTR(elementTR), ElementTI(elementTI), ElementCount(size) {}
@@ -510,12 +513,27 @@ ArrayTypeInfo::ArrayTypeInfo(intptr_t size, const TypeRef *elementTR,
 bool ArrayTypeInfo::readExtraInhabitantIndex(
     remote::MemoryReader &reader, remote::RemoteAddress address,
     int *extraInhabitantIndex) const {
+  if (ElementCount == 0) {
+    *extraInhabitantIndex = -1;
+    return true;
+  }
   return ElementTI->readExtraInhabitantIndex(reader, address,
                                              extraInhabitantIndex);
 }
 
 BitMask ArrayTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
-  return ElementTI->getSpareBits(TC, hasAddrOnly);
+  if (ElementCount == 0)
+    return BitMask::zeroMask(getSize());
+
+  // Only the first element contributes spare bits, along with any padding out
+  // to its stride. The remaining elements hold values of their own, so an
+  // enclosing enum can't put its tag there.
+  auto mask = BitMask::oneMask(getSize());
+  mask.andMask(ElementTI->getSpareBits(TC, hasAddrOnly), 0);
+  unsigned elementStride = ElementTI->getStride();
+  if (getSize() > elementStride)
+    mask.andNotMask(BitMask::oneMask(getSize() - elementStride), elementStride);
+  return mask;
 }
 
 class UnsupportedEnumTypeInfo: public EnumTypeInfo {
@@ -2823,8 +2841,14 @@ public:
       return nullptr;
     }
 
-    return TC.makeTypeInfo<ArrayTypeInfo>(sizeInt->getValue(),
-                                          BA->getElementType(), elementTI);
+    // A negative count makes the array uninhabited, and IRGen lays both it and
+    // a zero count out as empty.
+    auto count = sizeInt->getValue();
+    if (count < 0)
+      count = 0;
+
+    return TC.makeTypeInfo<ArrayTypeInfo>(count, BA->getElementType(),
+                                          elementTI);
   }
 
   const TypeInfo *visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
