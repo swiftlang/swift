@@ -19,6 +19,7 @@
 #include "PrintClangValueType.h"
 #include "SwiftToClangInteropContext.h"
 
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
@@ -54,6 +55,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
+#include <algorithm>
+#include <utility>
 
 using namespace swift;
 using namespace swift::objc_translation;
@@ -122,6 +125,37 @@ struct CxxEmissionScopeRAII {
   }
   ~CxxEmissionScopeRAII() { printer.setCxxDeclEmissionScope(prevScope); }
 };
+
+static StringRef getCxxOverloadName(const ValueDecl *valueDecl) {
+  if (isa<SubscriptDecl>(valueDecl))
+    return "operator []";
+  return cxx_translation::getNameForCxx(valueDecl);
+}
+
+static bool isCxxOverloadCandidate(const ValueDecl *valueDecl) {
+  // Destructors are emitted as the C++ destructor of the type they belong to,
+  // so they never participate in an overload set. They are also named by a
+  // special base name that has no C++ spelling.
+  if (isa<DestructorDecl>(valueDecl))
+    return false;
+  return isa<SubscriptDecl>(valueDecl) ||
+         (isa<AbstractFunctionDecl>(valueDecl) &&
+          !isa<AccessorDecl>(valueDecl));
+}
+
+/// Returns the number of Swift generic requirements used to prioritize
+/// declarations within a C++ overload set. This only determines visitation
+/// order; final signature collisions are detected after ABI validation.
+static unsigned
+getGenericRequirementCountForCxxOverload(const ValueDecl *valueDecl) {
+  auto *genericContext = valueDecl->getAsGenericContext();
+  if (!genericContext)
+    return 0;
+  auto genericSignature = genericContext->getGenericSignature();
+  if (!genericSignature)
+    return 0;
+  return genericSignature.getRequirements().size();
+}
 
 class DeclAndTypePrinter::Implementation
     : private DeclVisitor<DeclAndTypePrinter::Implementation>,
@@ -250,12 +284,42 @@ private:
     os << ";\n";
   }
 
+  /// Returns the C++ parameter type strings for a function as they would
+  /// appear in the C++ inline thunk signature.
+  llvm::SmallVector<std::string, 4>
+  getCxxParamTypes(const AbstractFunctionDecl *funcDecl) const {
+    llvm::SmallVector<std::string, 4> result;
+    auto *params = funcDecl->getParameters();
+    if (!params)
+      return result;
+    auto *emittedModule = funcDecl->getModuleContext();
+    for (auto *param : *params) {
+      auto type = param->getInterfaceType();
+      // In C++ different integer types have different bitwidths. To
+      // avoid producing redefinition errors, we are conservative with
+      // these types and consider all integral types the same.
+      if (type->isStdlibInteger()) {
+        result.push_back("int");
+      } else {
+        std::string typeStr;
+        llvm::raw_string_ostream typeOS(typeStr);
+        owningPrinter.printTypeName(typeOS, type, emittedModule);
+        result.push_back(typeStr);
+      }
+    }
+    return result;
+  }
+
   /// Prints the members of a class, extension, or protocol.
   template <bool AllowDelayed = false, typename R>
   void printMembers(R &&members) {
+    SmallVector<const Decl *, 32> orderedMembers;
+    for (const Decl *member : members)
+      orderedMembers.push_back(member);
+
     // Using statements for nested types.
     if (outputLang == OutputLanguageMode::Cxx) {
-      for (const Decl *member : members) {
+      for (const Decl *member : orderedMembers) {
         if (member->getModuleContext()->isStdlibModule())
           break;
         auto VD = dyn_cast<ValueDecl>(member);
@@ -264,9 +328,10 @@ private:
         if (const auto *TD = dyn_cast<NominalTypeDecl>(member))
           printUsingForNestedType(TD, TD->getModuleContext());
       }
+      owningPrinter.orderCxxOverloadsForEmission(orderedMembers);
     }
     bool protocolMembersOptional = false;
-    for (const Decl *member : members) {
+    for (const Decl *member : orderedMembers) {
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !shouldInclude(VD) || isa<TypeDecl>(VD))
         continue;
@@ -421,6 +486,27 @@ private:
     os << "@end\n";
   }
 
+  /// Returns true if the members of the given extension should be included
+  /// in the C++ class that represents the extended nominal type.
+  bool shouldIncludeExtensionMembersInCxx(const ExtensionDecl *ext) {
+    return cxx_translation::isExposableToCxx(ext->getGenericSignature());
+  }
+
+  SmallVector<const Decl *, 32>
+  getCxxValueTypeMembers(const NominalTypeDecl *nominal) {
+    SmallVector<const Decl *, 32> members;
+    for (const auto *member : nominal->getAllMembers())
+      members.push_back(member);
+    for (const auto *ext :
+         owningPrinter.interopContext.getExtensionsForNominalType(nominal)) {
+      if (!shouldIncludeExtensionMembersInCxx(ext))
+        continue;
+      for (const auto *member : ext->getAllMembers())
+        members.push_back(member);
+    }
+    return members;
+  }
+
   void visitStructDecl(StructDecl *SD) {
     if (outputLang != OutputLanguageMode::Cxx)
       return;
@@ -431,14 +517,8 @@ private:
         SD, /*bodyPrinter=*/
         [&]() {
           CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
-          printMembers(SD->getAllMembers());
-          for (const auto *ed :
-               owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
-            if (!cxx_translation::isExposableToCxx(ed->getGenericSignature()))
-              continue;
-
-            printMembers(ed->getAllMembers());
-          }
+          auto members = getCxxValueTypeMembers(SD);
+          printMembers(members);
         },
         owningPrinter);
     recordEmittedDeclInCurrentCxxLexicalScope(SD);
@@ -940,15 +1020,8 @@ private:
           os << "\n";
 
           CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
-          printMembers(ED->getAllMembers());
-
-          for (const auto *ext :
-               owningPrinter.interopContext.getExtensionsForNominalType(ED)) {
-            if (!cxx_translation::isExposableToCxx(ext->getGenericSignature()))
-              continue;
-
-            printMembers(ext->getAllMembers());
-          }
+          auto members = getCxxValueTypeMembers(ED);
+          printMembers(members);
         },
         owningPrinter);
     recordEmittedDeclInCurrentCxxLexicalScope(ED);
@@ -1112,32 +1185,6 @@ private:
            sel.getSelectorPieces().front().str() == "init";
   }
 
-  /// Returns the C++ parameter type strings for a function as they would
-  /// appear in the C++ inline thunk signature.
-  llvm::SmallVector<std::string, 4>
-  getCxxParamTypes(const AbstractFunctionDecl *funcDecl) const {
-    llvm::SmallVector<std::string, 4> result;
-    auto *params = funcDecl->getParameters();
-    if (!params)
-      return result;
-    auto *emittedModule = funcDecl->getModuleContext();
-    for (auto *param : *params) {
-      auto type = param->getInterfaceType();
-      // In C++ different integer types have different bitwidths. To
-      // avoid producing redefinition errors, we are conservative with
-      // these types and consider all integral types the same.
-      if (type->isStdlibInteger()) {
-        result.push_back("int");
-      } else {
-        std::string typeStr;
-        llvm::raw_string_ostream typeOS(typeStr);
-        owningPrinter.printTypeName(typeOS, type, emittedModule);
-        result.push_back(typeStr);
-      }
-    }
-    return result;
-  }
-
   /// Returns true if the given function overload is safe to emit in the current
   /// C++ lexical scope. If \p cxxNameOverride is non-empty, it is used as the
   /// C++ function name instead of the default name derived from the
@@ -1214,19 +1261,18 @@ private:
       // Check for naming conflicts between accessors and explicit methods
       // using the unified emittedFunctionOverloads map.
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        // Subscript accessors emit as operator[] and cannot conflict with
-        // named methods, so skip the overload check for them.
-        if (!SD) {
-          std::string remappedName = remapPropertyName(accessor, resultTy);
-          if (!canPrintOverloadOfFunction(AFD, remappedName)) {
+        std::string remappedName =
+            SD ? "operator []" : remapPropertyName(accessor, resultTy);
+        if (!canPrintOverloadOfFunction(AFD, remappedName)) {
+          if (!SD) {
             auto comment = ("  // skip emitting accessor method for \'" +
                             accessor->getStorage()->getBaseIdentifier().str() +
                             "\'. \'" + remappedName + "\' already declared.\n")
                                .str();
             os << comment;
             owningPrinter.outOfLineDefinitionsOS << comment;
-            return;
           }
+          return;
         }
       } else {
         if (!canPrintOverloadOfFunction(AFD))
@@ -3015,6 +3061,8 @@ static bool hasExposeAttr(const ValueDecl *VD) {
       return true;
     if (VD == VD->getASTContext().getArrayDecl())
       return true;
+    if (VD == VD->getASTContext().getDictionaryDecl())
+      return true;
     if (VD == VD->getASTContext().getOptionalDecl())
       return true;
     if (isStringNestedType(VD, "UTF8View") || isStringNestedType(VD, "Index"))
@@ -3135,6 +3183,20 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
   return true;
 }
 
+static bool hasSupportedGenericMetadataAccessor(const ValueDecl *VD,
+                                                DeclAndTypePrinter &printer) {
+  auto *nominal = dyn_cast<NominalTypeDecl>(VD);
+  if (!nominal)
+    return true;
+
+  auto requirements =
+      printer.getInteropContext()
+          .getIrABIDetails()
+          .getTypeMetadataAccessFunctionGenericRequirementParameters(
+              const_cast<NominalTypeDecl *>(nominal));
+  return requirements.size() <= NumDirectGenericTypeMetadataAccessFunctionArgs;
+}
+
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   if (VD->isInvalid())
     return false;
@@ -3154,6 +3216,8 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
     if (!cxx_translation::isExposableToCxx(
             VD,
             [this](const NominalTypeDecl *decl) { return isZeroSized(decl); }))
+      return false;
+    if (!hasSupportedGenericMetadataAccessor(VD, *this))
       return false;
     if (!isEnumExposableToCxx(VD, *this))
       return false;
@@ -3231,6 +3295,47 @@ void DeclAndTypePrinter::printTypeName(raw_ostream &os, Type ty,
 
 void DeclAndTypePrinter::printAvailability(raw_ostream &os, const Decl *D) {
   getImpl().printAvailability(os, D);
+}
+
+/// Swift generic requirements are erased from C++ function signatures. Within
+/// each C++ overload set, visit declarations with fewer requirements first so
+/// an unconstrained thunk claims a colliding signature when possible.
+///
+/// Do not predict signature collisions here: computing final C++ parameter
+/// spellings can emit supporting stubs, and detailed ABI representability is
+/// established later. The existing overload tracker remains authoritative
+/// after those checks. Reordering all same-named candidates, rather than
+/// preselecting one, also lets a later candidate claim the signature if the
+/// preferred declaration proves unprintable.
+void DeclAndTypePrinter::orderCxxOverloadsForEmission(
+    MutableArrayRef<const Decl *> declarations) {
+  struct OverloadGroup {
+    SmallVector<size_t, 2> positions;
+    SmallVector<const Decl *, 2> declarations;
+  };
+
+  llvm::StringMap<OverloadGroup> groupsByName;
+  for (size_t index = 0; index < declarations.size(); ++index) {
+    auto *valueDecl = dyn_cast<ValueDecl>(declarations[index]);
+    if (!valueDecl || !isCxxOverloadCandidate(valueDecl) ||
+        !shouldInclude(valueDecl))
+      continue;
+
+    auto &group = groupsByName[getCxxOverloadName(valueDecl)];
+    group.positions.push_back(index);
+    group.declarations.push_back(declarations[index]);
+  }
+
+  for (auto &nameAndGroup : groupsByName) {
+    auto &group = nameAndGroup.second;
+    llvm::stable_sort(group.declarations, [](const Decl *lhs, const Decl *rhs) {
+      return getGenericRequirementCountForCxxOverload(cast<ValueDecl>(lhs)) <
+             getGenericRequirementCountForCxxOverload(cast<ValueDecl>(rhs));
+    });
+    for (auto [position, declaration] :
+         llvm::zip_equal(group.positions, group.declarations))
+      declarations[position] = declaration;
+  }
 }
 
 void DeclAndTypePrinter::printAdHocCategory(
