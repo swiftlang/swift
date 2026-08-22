@@ -28,7 +28,6 @@ namespace swift {
 
 /// Available platforms for the availability attribute.
 enum class ENUM_EXTENSIBILITY_ATTR(closed) PlatformKind : uint8_t {
-  none,
 #define AVAILABILITY_PLATFORM(X, PrettyName) X,
 #include "swift/AST/PlatformKinds.def"
 };

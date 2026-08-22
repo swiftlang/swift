@@ -889,7 +889,11 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     // macOS 10.x.y).
     auto RunningVers = ExplicitAvailability->getRawMinimumVersion();
     auto RequiredVers = RequiredAvailability.getRawMinimumVersion();
-    auto Platform = targetPlatform(Context.LangOpts);
+    auto MaybePlatform = targetPlatform(Context.LangOpts);
+    if (!MaybePlatform)
+      return false;
+
+    auto Platform = *MaybePlatform;
     if (RunningVers.getMajor() != RequiredVers.getMajor())
       return false;
     if ((Platform == PlatformKind::macOS ||
@@ -966,9 +970,11 @@ static void fixAvailabilityByAddingVersionCheck(
 
     // Runtime availability checks that specify app extension platforms don't
     // work, so only suggest checks against the base platform.
-    if (auto CanonicalPlatform =
-            basePlatformForExtensionPlatform(QueryDomain.getPlatformKind())) {
-      QueryDomain = AvailabilityDomain::forPlatform(*CanonicalPlatform);
+    if (auto QueryPlatform = QueryDomain.getPlatformKind()) {
+      if (auto CanonicalPlatform =
+              basePlatformForExtensionPlatform(*QueryPlatform)) {
+        QueryDomain = AvailabilityDomain::forPlatform(*CanonicalPlatform);
+      }
     }
 
     Out << "if #available(" << QueryDomain.getNameForAttributePrinting();
