@@ -173,9 +173,8 @@ private:
   /// witness method.
   void considerWitnessSelf(CanSILFunctionType fnType);
 
-  /// Testify to generic parameters in the Self type of an @objc
-  /// generic or protocol method.
-  void considerObjCGenericSelf(CanSILFunctionType fnType);
+  /// Testify to generic parameters in the Self type of a foreign method.
+  void considerGenericClassSelf(CanSILFunctionType fnType);
 
   void considerParameter(SILParameterInfo param, unsigned paramIndex,
                          bool isSelfParameter);
@@ -237,10 +236,11 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
     // other arguments; doing so would potentially make the signature
     // incompatible with other witnesses for the same method.
     considerWitnessSelf(fnType);
-  } else if (rep == SILFunctionTypeRepresentation::ObjCMethod) {
-    // Objective-C thunks for generic methods also always derive all
-    // polymorphic parameter information from the Self argument.
-    considerObjCGenericSelf(fnType);
+  } else if (rep == SILFunctionTypeRepresentation::ObjCMethod ||
+             rep == SILFunctionTypeRepresentation::COMMethod) {
+    // Foreign thunks for generic class methods derive all polymorphic
+    // parameter information from the Self argument.
+    considerGenericClassSelf(fnType);
   } else {
     // We don't need to pass anything extra as long as all of the
     // archetypes (and their requirements) are producible from
@@ -394,7 +394,7 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
   addSelfWitnessTableFulfillment(selfTy, conformance);
 }
 
-void PolymorphicConvention::considerObjCGenericSelf(CanSILFunctionType fnType) {
+void PolymorphicConvention::considerGenericClassSelf(CanSILFunctionType fnType) {
   // If this is a static method, get the instance type.
   CanType selfTy = fnType->getSelfInstanceType(
       IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
@@ -747,7 +747,18 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
                                   MetatypeRepresentation::Thick,
                                   instanceType,
                                   /*allow artificial subclasses*/ true);
-    IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
+    IsExact_t exactness = IsInexact;
+    if (FnType->getRepresentation() ==
+            SILFunctionTypeRepresentation::COMMethod &&
+        FnType->hasSelfParam() &&
+        paramIndex == FnType->getParameters().size() - 1 &&
+        isa<ArchetypeType>(paramType)) {
+      // The generic Self of a native COM entry is the dynamic class recovered
+      // from the interface pointer, so the object's metadata describes it
+      // exactly even when its superclass bound is not final.
+      exactness = IsExact;
+    }
+    IGF.bindLocalTypeDataFromTypeMetadata(paramType, exactness, metadata,
                                           MetadataState::Complete);
     return;
   }
@@ -4006,7 +4017,17 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   if (proto->isCOMInterface()) {
     if (srcType->isExistentialType() || srcType->is<ExistentialArchetypeType>())
       return getCOMExistentialAdjustment(IGF.IGM);
-    return getCOMInterfaceAdjustment(IGF.IGM, srcType, proto);
+
+    // A protocol-extension witness on a class can express Self as an
+    // archetype, and its mapped conformance can retain that archetypal type.
+    // The root conformance identifies the class whose native COM layout
+    // supplies the interface adjustment.
+    CanType layoutType = srcType;
+    if (srcType->is<ArchetypeType>()) {
+      auto *root = concreteConformance->getRootConformance();
+      layoutType = root->getType()->getCanonicalType();
+    }
+    return getCOMInterfaceAdjustment(IGF.IGM, layoutType, proto);
   }
 
   auto cacheKind =
