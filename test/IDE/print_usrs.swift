@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -disable-objc-attr-requires-foundation-module -enable-objc-interop %s
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -disable-objc-attr-requires-foundation-module -enable-objc-interop -print-usrs -source-filename %s | %FileCheck %s -strict-whitespace
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 #if os(Windows) && (arch(arm64) || arch(x86_64))
 typealias ObjCEnumType = Int32
 #else

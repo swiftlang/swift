@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated %clang-importer-sdk -enable-objc-interop
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import ctypes
 import CoreGraphics
 import Foundation

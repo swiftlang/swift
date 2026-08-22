@@ -13,6 +13,8 @@
 // as it does not import the standard library types.
 
 //--- test.swift
+// expected-warning@<unknown> * {{libc not found for }}
+
 public func callMemCmp1(_ p1: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer) {
   // expected-error@+2{{missing argument for parameter #3 in call}}
   // expected-error@+1 2{{cannot convert value of type 'UnsafeMutableRawBufferPointer' to expected argument type 'UnsafeRawPointer'}}

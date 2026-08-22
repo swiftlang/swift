@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library -application-extension -parse-stdlib -target arm64-apple-macos11
 
+// expected-warning@<unknown> * {{using sysroot for }}
+
 // Allow referencing unavailable API in situations where the caller is marked unavailable in the same circumstances.
 
 @available(*, unavailable) // expected-note * {{'NeverAvailable' has been explicitly marked unavailable here}}
