@@ -15,9 +15,15 @@ public protocol IProvider {
 
 // CHECK-LABEL: sil {{.*}}getItem
 // CHECK:         [[ITEM:%.*]] = alloc_stack {{.*}}$Optional<any IItem>
-// CHECK-DAG:     [[POINTER:%.*]] = address_to_pointer {{.*}} [[ITEM]]
-// CHECK-DAG:     [[METHOD:%.*]] = com_method {{.*}}, #IProvider.GetItem
-// CHECK:         apply [[METHOD]]<{{.*}}>({{.*}}, {{.*}})
+// CHECK:         [[NONE:%.*]] = enum $Optional<any IItem>, #Optional.none!enumelt
+// CHECK:         store [[NONE]] to [[ITEM]]
+// CHECK:         [[ACCESS:%.*]] = begin_access [modify] [static] [[ITEM]]
+// CHECK:         [[POINTER:%.*]] = address_to_pointer {{.*}} [[ACCESS]]
+// CHECK:         [[TYPED:%.*]] = struct $UnsafeMutablePointer<Optional<any IItem>> ([[POINTER]])
+// CHECK:         [[ARGUMENT:%.*]] = enum $Optional<UnsafeMutablePointer<Optional<any IItem>>>, #Optional.some!enumelt, [[TYPED]]
+// CHECK:         [[METHOD:%.*]] = com_method {{.*}}, #IProvider.GetItem
+// CHECK:         apply [[METHOD]]<{{.*}}>({{ *}}[[ARGUMENT]],
+// CHECK:         end_access [[ACCESS]]
 func getItem(_ provider: borrowing any IProvider) -> (any IItem)? {
   var item: (any IItem)?
   _ = provider.GetItem(&item)
