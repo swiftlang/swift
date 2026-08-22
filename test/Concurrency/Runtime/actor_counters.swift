@@ -10,6 +10,11 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift() %}
+// RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift() %}
+
+import _Concurrency
+
 let printCounters = false
 
 @available(SwiftStdlib 5.1, *)
@@ -71,7 +76,11 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   for i in 0..<numWorkers {
     workers.append(
       Task.detached(priority: randomPriority) { [counters] in
+#if $Embedded
+        await Task.yield()
+#else
         try! await Task.sleep(nanoseconds: UInt64.random(in: 0..<100) * 1_000_000)
+#endif
         await worker(identity: i, counters: counters, numIterations: numIterations)
       }
     )
@@ -88,11 +97,17 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
 @available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
+#if $Embedded
+    let counters = 10
+    let workers = 100
+    let iterations = 1000
+#else
     // Useful for debugging: specify counter/worker/iteration counts
     let args = CommandLine.arguments
     let counters = args.count >= 2 ? Int(args[1])! : 10
     let workers = args.count >= 3 ? Int(args[2])! : 100
     let iterations = args.count >= 4 ? Int(args[3])! : 1000
+#endif
     print("counters: \(counters), workers: \(workers), iterations: \(iterations)")
     await runTest(numCounters: counters, numWorkers: workers, numIterations: iterations)
   }
