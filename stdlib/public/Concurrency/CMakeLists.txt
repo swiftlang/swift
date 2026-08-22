@@ -138,6 +138,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   AsyncThrowingFlatMapSequence.swift
   AsyncThrowingMapSequence.swift
   AsyncThrowingPrefixWhileSequence.swift
+  AsyncTypedFailureFilterSequence.swift
   PartialAsyncTask.swift
   GlobalActor.swift
   GlobalConcurrentExecutor.swift
