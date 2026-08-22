@@ -328,6 +328,15 @@ public:
   /// \param name The name we're searching for.
   void lookupValue(DeclName name, VisibleDeclConsumer &consumer) override;
 
+  /// Whether \p interfaceDecl is a Clang-imported declaration whose definition
+  /// is provided by a Swift `@implementation`.
+  ///
+  /// This only consults the already-populated interface-to-implementation
+  /// cache; it never triggers \c ObjCInterfaceAndImplementationRequest, so it
+  /// performs no reverse name lookup. It is therefore only meaningful once the
+  /// relevant `@implementation` has been type-checked.
+  bool hasObjCImplementation(const Decl *interfaceDecl) const;
+
   /// Look up a type declaration by its Clang name.
   ///
   /// Note that this method does no filtering. If it finds the type in a loaded
