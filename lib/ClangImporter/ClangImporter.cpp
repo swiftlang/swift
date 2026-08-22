@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -722,13 +722,12 @@ void importer::getNormalInvocationArguments(
                                               1})); // b
     }
   } else {
-    // Ideally we should turn this on for all Glibc targets that are actually
-    // using Glibc or a libc that respects that flag. This will cause some
-    // source breakage however (specifically with strerror_r()) on Linux
-    // without a workaround.
-    if (triple.isOSFuchsia() || triple.isAndroid() || triple.isMusl()) {
-      // Many of the modern libc features are hidden behind feature macros like
-      // _GNU_SOURCE or _XOPEN_SOURCE.
+    // Many of the modern libc features are hidden behind feature macros like
+    // _GNU_SOURCE or _XOPEN_SOURCE. Clang already predefines _GNU_SOURCE for
+    // these targets when the language is C++, so we define it unconditionally
+    // to minimize libc differences with and without C++ interop.
+    if (triple.isOSFuchsia() || triple.isAndroid() || triple.isMusl() ||
+        triple.isOSGlibc()) {
       llvm::append_values(invocationArgStrs, "-D_GNU_SOURCE");
     }
 

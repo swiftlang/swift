@@ -13,7 +13,6 @@ if (SWIFT_INCLUDE_TESTS AND SWIFT_BUILD_DYNAMIC_STDLIB)
   add_swift_target_library(swiftSwiftReflectionTest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
     SwiftReflectionTest.swift
     SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    SWIFT_COMPILE_FLAGS_LINUX -Xcc -D_GNU_SOURCE
     SWIFT_MODULE_DEPENDS_OSX ${swift_reflection_test_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_IOS ${swift_reflection_test_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_TVOS ${swift_reflection_test_darwin_dependencies}
