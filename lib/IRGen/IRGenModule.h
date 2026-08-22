@@ -1524,6 +1524,11 @@ public:
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
 
+  /// Native COM object-model globals.
+  llvm::DenseMap<std::pair<ClassDecl *, ProtocolDecl *>, llvm::Constant *>
+      COMVTables;
+  llvm::DenseMap<ClassDecl *, llvm::Constant *> COMInterfaceMaps;
+
   std::pair<llvm::Constant *, unsigned>
   getTypeRef(Type type, GenericSignature genericSig, MangledTypeRefRole role);
   
@@ -1704,6 +1709,9 @@ public:
 
 public:
   llvm::LLVMContext &getLLVMContext() const { return *LLVMContext; }
+
+  /// Form the target-native bytes for a COM identity.
+  llvm::Constant *getCOMIdentityConstant(llvm::StringRef identity);
 
   void emitSourceFile(SourceFile &SF);
   void emitSynthesizedFileUnit(SynthesizedFileUnit &SFU);

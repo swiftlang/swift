@@ -7263,6 +7263,9 @@ public:
       case SILFunctionType::Representation::Method:
         Printer << "method";
         break;
+      case SILFunctionType::Representation::COMMethod:
+        Printer << "com_method";
+        break;
       case SILFunctionType::Representation::CXXMethod:
         Printer << "cxx_method";
         break;
@@ -7355,6 +7358,9 @@ public:
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";
+        break;
+      case SILFunctionType::Representation::COMMethod:
+        Printer << "com_method";
         break;
       case SILFunctionType::Representation::CXXMethod:
         Printer << "cxx_method";

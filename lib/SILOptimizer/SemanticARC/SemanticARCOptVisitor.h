@@ -174,6 +174,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   FORWARDING_INST(UncheckedValueCast)
   FORWARDING_INST(ThinToThickFunction)
   FORWARDING_INST(OpenExistentialRef)
+  FORWARDING_INST(OpenCOMExistential)
   FORWARDING_INST(Upcast)
   FORWARDING_INST(UncheckedRefCast)
   FORWARDING_INST(ConvertFunction)

@@ -217,6 +217,7 @@ ClangTypeConverter::getFunctionType(ArrayRef<SILParameterInfo> params,
     return nullptr;
 
   switch (repr) {
+  case SILFunctionType::Representation::COMMethod:
   case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::CFunctionPointer:
     return ClangASTContext.getPointerType(fn).getTypePtr();
@@ -828,8 +829,8 @@ ClangTypeConverter::visitBuiltinVectorType(BuiltinVectorType *type) {
 }
 
 clang::QualType ClangTypeConverter::visitArchetypeType(ArchetypeType *type) {
-  // We see these in the case where we invoke an @objc function
-  // through a protocol.
+  // We see these when invoking an `@objc` function or COM method through a
+  // protocol.
   return getClangIdType(ClangASTContext);
 }
 
@@ -869,6 +870,12 @@ clang::QualType ClangTypeConverter::convert(Type type) {
   auto it = Cache.find(type);
   if (it != Cache.end())
     return it->second;
+
+  if (type->hasCCompatibleForeignReferenceRepresentation()) {
+    auto result = ClangASTContext.VoidPtrTy;
+    Cache.insert({type, result});
+    return result;
+  }
 
   if (auto existential = type->getAs<ExistentialType>())
     type = existential->getConstraintType();

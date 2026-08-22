@@ -126,6 +126,8 @@ public:
   virtual void addProtocolWitnessTable(RootProtocolConformance *C) {}
   virtual void addProtocolWitnessThunk(RootProtocolConformance *C,
                                        ValueDecl *requirementDecl) {}
+  virtual void addCOMMethodWitnessThunk(RootProtocolConformance *C,
+                                        ValueDecl *requirementDecl) {}
   virtual void addSwiftMetaclassStub(ClassDecl *CD) {}
   virtual void addTypeMetadataAccessFunction(CanType T) {}
   virtual void addTypeMetadataAddress(CanType T) {}

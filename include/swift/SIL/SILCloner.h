@@ -95,13 +95,18 @@ struct SubstitutionMapWithLocalArchetypes {
   ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
                                     Type origType,
                                     ProtocolDecl *proto) {
-    if (origType->is<LocalArchetypeType>())
+    if (origType->hasLocalArchetype())
       return swift::lookupConformance(origType.subst(IFS), proto);
 
     if (SubsMap) {
       if (origType->is<PrimaryArchetypeType>() ||
           origType->is<PackArchetypeType>()) {
         origType = origType->mapTypeOutOfEnvironment();
+      } else if (auto *metatype = origType->getAs<AnyMetatypeType>()) {
+        auto instanceType = metatype->getInstanceType();
+        if (instanceType->is<PrimaryArchetypeType>() ||
+            instanceType->is<PackArchetypeType>())
+          origType = origType->mapTypeOutOfEnvironment();
       }
 
       return SubsMap->lookupConformance(
@@ -2969,6 +2974,16 @@ SILCloner<ImplClass>::visitObjCMethodInst(ObjCMethodInst *Inst) {
                 Inst->getMember(), getOpType(Inst->getType())));
 }
 
+template <typename T>
+void SILCloner<T>::visitCOMMethodInst(COMMethodInst *Inst) {
+  auto &B = getBuilder();
+  B.setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto clone = B.createCOMMethod(getOpLocation(Inst->getLoc()),
+                                 getOpValue(Inst->getOperand()),
+                                 Inst->getMember(), getOpType(Inst->getType()));
+  recordClonedInstruction(Inst, clone);
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitObjCSuperMethodInst(ObjCSuperMethodInst *Inst) {
@@ -3074,6 +3089,21 @@ visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
                 getBuilder().hasOwnership()
                     ? Inst->getForwardingOwnershipKind()
                     : ValueOwnershipKind(OwnershipKind::None)));
+}
+
+template <typename T>
+void SILCloner<T>::visitOpenCOMExistentialInst(OpenCOMExistentialInst *Inst) {
+  remapRootOpenedType(Inst->getDefinedOpenedArchetype());
+
+  auto &B = getBuilder();
+  B.setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto ownership = B.hasOwnership() ? Inst->getForwardingOwnershipKind()
+                                    : ValueOwnershipKind(OwnershipKind::None);
+  auto clone = B.createOpenCOMExistential(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand()),
+                                          getOpType(Inst->getType()),
+                                          ownership);
+  recordClonedInstruction(Inst, clone);
 }
 
 template<typename ImplClass>

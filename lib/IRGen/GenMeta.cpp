@@ -884,9 +884,10 @@ namespace {
 
   public:
     ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *Proto,
-                                     SILDefaultWitnessTable *defaultWitnesses)
+                              SILDefaultWitnessTable *defaultWitnesses)
       : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses),
-        Resilient(IGM.getSwiftModule()->isResilient()) {}
+        Resilient(IGM.getSwiftModule()->isResilient() &&
+                  !Proto->isCOMInterface()) {}
 
     void layout() {
       super::layout();
@@ -915,7 +916,11 @@ namespace {
                                  ? ProtocolClassConstraint::Class
                                  : ProtocolClassConstraint::Any);
       flags.setSpecialProtocol(getSpecialProtocolID(Proto));
-      flags.setIsResilient(DefaultWitnesses != nullptr);
+      // Preserve the existing resilient-protocol discriminator for ordinary
+      // protocols. A COM interface's IID fixes its requirement layout, so its
+      // descriptor and witness tables must always agree on a fixed layout.
+      flags.setIsResilient(DefaultWitnesses != nullptr &&
+                           !Proto->isCOMInterface());
       return flags.getOpaqueValue();
     }
 
@@ -925,6 +930,7 @@ namespace {
       NumRequirementsInSignature = B.addPlaceholderWithSize(IGM.Int32Ty);
       NumRequirements = B.addPlaceholderWithSize(IGM.Int32Ty);
       asImpl().addAssociatedTypeNames();
+      asImpl().addCOMInterfaceID();
       asImpl().addRequirementSignature();
       asImpl().addRequirements();
       auto addr = IGM.getAddrOfProtocolDescriptor(Proto,
@@ -939,6 +945,18 @@ namespace {
       auto nameStr = IGM.getAddrOfGlobalIdentifierString(Proto->getName().str(),
                                            /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(nameStr);
+    }
+
+    void addCOMInterfaceID() {
+      if (!Proto->isCOMInterface())
+        return;
+
+      const COMDeclInfo *info = Proto->getCOMDeclInfo();
+      ASSERT(info && info->isInterface());
+
+      // SpecialProtocol::COM is the presence discriminator. Keep the IID inline
+      // so the descriptor owns the sole addressable representation.
+      B.add(IGM.getCOMIdentityConstant(info->getInterfaceID()));
     }
 
     void addRequirementSignature() {
@@ -2170,6 +2188,7 @@ namespace {
       addInvertedProtocols();
       maybeAddSingletonMetadataPointer();
       maybeAddDefaultOverrideTable();
+      addInstancePrefixDescriptor();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -2214,6 +2233,9 @@ namespace {
 
         if (getDefaultOverrideTable())
           flags.class_setHasDefaultOverrideTable(true);
+
+        if (getCOMObjectPrefixSize(IGM, getType()))
+          flags.class_setHasInstancePrefix(true);
       }
 
       if (ResilientSuperClassRef) {
@@ -2222,6 +2244,16 @@ namespace {
       }
       
       return flags.getOpaqueValue();
+    }
+
+    void addInstancePrefixDescriptor() {
+      auto size = getCOMObjectPrefixSize(IGM, getType());
+      if (!size)
+        return;
+
+      B.addInt16(ClassInstancePrefixDescriptorVersion);
+      B.addInt16(size / IGM.getPointerSize());
+      B.addRelativeAddress(getOrCreateCOMObjectPrefixTemplate(IGM, getType()));
     }
 
     void maybeAddResilientSuperclass() {
@@ -4659,8 +4691,12 @@ namespace {
 
     void addInstanceAddressPoint() {
       assert(!isPureObjC());
-      // Right now, we never allocate fields before the address point.
-      B.addInt32(0);
+
+      auto addressPoint = getCOMObjectPrefixSize(IGM, Target);
+      if (asImpl().hasFixedLayout())
+        addressPoint =
+            addressPoint.roundUpToAlignment(FieldLayout.getAlignment());
+      B.addInt32(addressPoint.getValue());
     }
 
     bool hasFixedLayout() { return FieldLayout.isFixedLayout(); }
@@ -4670,7 +4706,11 @@ namespace {
     void addInstanceSize() {
       assert(!isPureObjC());
       if (asImpl().hasFixedLayout()) {
-        B.addInt32(asImpl().getFieldLayout().getSize().getValue());
+        auto &layout = asImpl().getFieldLayout();
+        Size size = layout.getSize();
+        Size prefix =
+            getClassInstanceAddressPoint(IGM, Target, layout.getAlignment());
+        B.addInt32((prefix + size).getValue());
       } else {
         // Leave a zero placeholder to be filled at runtime
         B.addInt32(0);
@@ -4937,6 +4977,9 @@ namespace {
 
     void addGenericRequirement(GenericRequirement requirement,
                                ClassDecl *forClass) {
+      if (requirement.getType(IGM)->isIntegerTy())
+        return B.addInt(cast<llvm::IntegerType>(requirement.getType(IGM)), 0);
+
       switch (requirement.getKind()) {
       case GenericRequirement::Kind::Shape:
       case GenericRequirement::Kind::Value:
@@ -5101,8 +5144,8 @@ namespace {
       else
         B.addInt16(0);
 
-      // uint16_t Reserved;
-      B.addInt16(0);
+      // uint16_t InstancePrefixSizeInWords;
+      B.addInt16(getCOMObjectPrefixSize(IGM, Target) / IGM.getPointerSize());
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
@@ -5339,6 +5382,14 @@ namespace {
       }
 
       assert(requirement.isAnyWitnessTable());
+      if (requirement.isCOMInterfaceAdjustment()) {
+        auto argument =
+            requirement.getTypeParameter().subst(genericSubstitutions());
+        this->B.add(getCOMInterfaceAdjustment(IGM, argument->getCanonicalType(),
+                                              requirement.getProtocol()));
+        return;
+      }
+
       auto conformance = genericSubstitutions().lookupConformance(
           requirement.getTypeParameter()->getCanonicalType(),
           requirement.getProtocol());
@@ -7599,6 +7650,9 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
 
 /// Get the runtime identifier for a special protocol, if any.
 SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
+  if (P->isCOMInterface())
+    return SpecialProtocol::COM;
+
   auto known = P->getKnownProtocolKind();
   if (!known)
     return SpecialProtocol::None;
@@ -7702,6 +7756,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
   case KnownProtocolKind::COMInterface:
+  case KnownProtocolKind::COMActivatable:
+  case KnownProtocolKind::COMAggregatable:
     return SpecialProtocol::None;
   }
 

@@ -350,7 +350,7 @@ private struct FunctionChecker {
       switch entry {
       case .invalid, .associatedType:
         break
-      case .method(let requirement, let witness):
+      case .method(let requirement, let witness, _):
         if let witness = witness {
           callStack.push(CallSite(location: instruction.location, function: instruction.parentFunction,
                                   kind: .conformance))

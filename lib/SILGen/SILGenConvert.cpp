@@ -612,6 +612,7 @@ public:
       break;
     }
     case ExistentialRepresentation::Class:
+    case ExistentialRepresentation::COM:
     case ExistentialRepresentation::Metatype:
     case ExistentialRepresentation::None:
       llvm_unreachable("not supported");
@@ -814,6 +815,23 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     return B.createInitExistentialRef(loc, existentialTL.getLoweredType(),
                                       concreteFormalType, sub, conformances);
   }
+  case ExistentialRepresentation::COM: {
+    assert(existentialTL.isLoadable());
+    auto LoweredTy = existentialTL.getLoweredType();
+    ManagedValue sub = F(SGFContext());
+    if (sub.getType().isAddress()) {
+      // A COM-constrainted archetype keeps its ordinary opaque generic
+      // representation. Project a borrowed value from its address and retain
+      // the resulting interface pointer for the owned existential result.
+      auto projected =
+          B.createInitExistentialRef(loc, LoweredTy, concreteFormalType,
+                                     sub.getValue(), conformances,
+                                     OwnershipKind::Owned);
+      return emitManagedRValueWithCleanup(projected, existentialTL);
+    }
+    return B.createInitExistentialRef(loc, LoweredTy, concreteFormalType, sub,
+                                      conformances);
+  }
   case ExistentialRepresentation::Boxed: {
     // We defer allocation of the box to when the address is demanded.
     // Create a stack slot to hold the box once it's allocated.
@@ -1005,6 +1023,9 @@ SILGenFunction::emitOpenExistential(
 
   SILType existentialType = existentialValue.getType();
   switch (existentialType.getPreferredExistentialRepresentation()) {
+  case ExistentialRepresentation::COM:
+    assert(existentialType.isObject());
+    return B.createOpenCOMExistential(loc, existentialValue, loweredOpenedType);
   case ExistentialRepresentation::Opaque: {
     // With CoW existentials we can't consume the boxed value inside of
     // the existential. (We could only do so after a uniqueness check on

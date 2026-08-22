@@ -1413,6 +1413,13 @@ BridgedGenericEnvironment BridgedInstruction::OpenExistentialRefInst_getDefinedG
   return {getAs<swift::OpenExistentialRefInst>()->getDefinedOpenedArchetype()->getGenericEnvironment()};
 }
 
+BridgedGenericEnvironment
+BridgedInstruction::OpenCOMExistentialInst_getDefinedGenericEnvironment() const {
+  return {getAs<swift::OpenCOMExistentialInst>()
+              ->getDefinedOpenedArchetype()
+                ->getGenericEnvironment()};
+}
+
 BridgedGlobalVar BridgedInstruction::GlobalAccessInst_getGlobal() const {
   return {getAs<swift::GlobalAccessInst>()->getReferencedGlobal()};
 }
@@ -2472,6 +2479,10 @@ OptionalBridgedFunction BridgedWitnessTableEntry::getMethodWitness() const {
   return {unbridged().getMethodWitness().Witness};
 }
 
+OptionalBridgedFunction BridgedWitnessTableEntry::getMethodInterface() const {
+  return {unbridged().getMethodWitness().InterfaceEntry};
+}
+
 BridgedDeclObj BridgedWitnessTableEntry::getAssociatedTypeRequirement() const {
   return {unbridged().getAssociatedTypeWitness().Requirement};
 }
@@ -2502,9 +2513,12 @@ BridgedWitnessTableEntry BridgedWitnessTableEntry::createInvalid() {
 }
 
 BridgedWitnessTableEntry BridgedWitnessTableEntry::createMethod(BridgedDeclRef requirement,
-                                                                OptionalBridgedFunction witness) {
+                                                                OptionalBridgedFunction witness,
+                                                                OptionalBridgedFunction interface) {
   return bridge(swift::SILWitnessTable::Entry(
-    swift::SILWitnessTable::MethodWitness{requirement.unbridged(), witness.getFunction()}));
+    swift::SILWitnessTable::MethodWitness{requirement.unbridged(),
+                                          witness.getFunction(),
+                                          interface.getFunction()}));
 }
 
 BridgedWitnessTableEntry BridgedWitnessTableEntry::createAssociatedType(BridgedDeclObj requirement,

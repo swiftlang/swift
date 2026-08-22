@@ -27,6 +27,28 @@ using namespace swift;
 using namespace Lowering;
 
 namespace {
+bool isCOMInterfaceCastTarget(CanType type) {
+  if (!type->isAnyExistentialType())
+    return false;
+  return type->getExistentialLayout().getCOMInterface();
+}
+
+ManagedValue prepareCOMCastSource(SILGenFunction &SGF, SILLocation loc,
+                                  ManagedValue source) {
+  if (!source.getType().isMoveOnlyWrapped())
+    return source;
+
+  if (source.getType().isAddress()) {
+    auto address =
+        SGF.B.createMoveOnlyWrapperToCopyableAddr(loc, source.getValue());
+    return ManagedValue::forBorrowedAddressRValue(address);
+  }
+
+  if (source.getOwnershipKind() != OwnershipKind::Guaranteed)
+    source = source.borrow(SGF, loc);
+  return SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, source);
+}
+
   class CheckedCastEmitter {
     SILGenFunction &SGF;
     SILLocation Loc;
@@ -56,6 +78,20 @@ namespace {
     ManagedValue emitOperand(Expr *operand) {
       AbstractionPattern mostGeneral = SGF.SGM.Types.getMostGeneralAbstraction();
       auto &origSourceTL = SGF.getTypeLowering(mostGeneral, SourceType);
+
+      if (isCOMInterfaceCastTarget(TargetType)) {
+        auto result =
+            SGF.emitRValueAsOrig(operand, mostGeneral, origSourceTL,
+                                 SGFContext::AllowGuaranteedPlusZero);
+        result = prepareCOMCastSource(SGF, Loc, result);
+        if (result.getType().isAddress())
+          return result;
+
+        auto temporary =
+            SGF.emitTemporaryAllocation(Loc, origSourceTL.getLoweredType());
+        return SGF.B.createStoreBorrowOrTrivial(Loc, result.borrow(SGF, Loc),
+                                                temporary);
+      }
 
       SGFContext ctx;
 
@@ -94,6 +130,38 @@ namespace {
       if (Strategy == CastStrategy::Address) {
         SILValue resultBuffer =
           createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
+
+        if (isCOMInterfaceCastTarget(TargetType)) {
+          SILBasicBlock *failureBB = SGF.B.splitBlockForFallthrough();
+          SILBasicBlock *successBB = SGF.B.splitBlockForFallthrough();
+          SGF.B.createCheckedCastAddrBranch(Loc, Options,
+                                            CastConsumptionKind::CopyOnSuccess,
+                                            operand.getValue(), SourceType,
+                                            resultBuffer, TargetType,
+                                            successBB, failureBB);
+
+          // Preserve the standard forced-cast failure diagnostic without
+          // marking the successful path consume or copy the source. COM
+          // requires `QueryInterface` results to be stable, so a failed query
+          // cannot succeed when repeated here.
+          SGF.B.setInsertionPoint(failureBB);
+          auto &origSourceTL = SGF.getTypeLowering(abstraction, SourceType);
+          auto sourceCopy =
+              SGF.B.createAllocStack(Loc, origSourceTL.getLoweredType());
+          SGF.B.createCopyAddr(Loc, operand.getValue(), sourceCopy,
+                               IsNotTake, IsInitialization);
+          SGF.B.createUnconditionalCheckedCastAddr(Loc, Options,
+                                                   sourceCopy, SourceType,
+                                                   resultBuffer, TargetType);
+          SGF.B.createDeallocStack(Loc, sourceCopy);
+          SGF.B.createUnreachable(Loc);
+
+          SGF.B.setInsertionPoint(successBB);
+          return RValue(SGF, Loc, TargetType,
+                        finishFromResultBuffer(hasAbstraction, resultBuffer,
+                                               abstraction, origTargetTL, ctx));
+        }
+
         SGF.B.createUnconditionalCheckedCastAddr(Loc, Options,
                                              operand.forward(SGF), SourceType,
                                              resultBuffer, TargetType);
@@ -140,10 +208,15 @@ namespace {
         assert(operand.getType().isAddress());
         resultBuffer =
             createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
-        SGF.B.createCheckedCastAddrBranch(
-            Loc, Options, consumption, operand.forward(SGF),
-            SourceType, resultBuffer, TargetType, trueBB, falseBB,
-            TrueCount, FalseCount);
+        SILValue source =
+            consumption == CastConsumptionKind::CopyOnSuccess
+                ? operand.getValue()
+                : operand.forward(SGF);
+        SGF.B.createCheckedCastAddrBranch(Loc, Options, consumption,
+                                          source, SourceType,
+                                          resultBuffer, TargetType,
+                                          trueBB, falseBB,
+                                          TrueCount, FalseCount);
       } else {
         // Tolerate being passed an address here.  It comes up during switch
         // emission.
@@ -297,6 +370,8 @@ namespace {
 
   private:
     CastStrategy computeStrategy() const {
+      if (isCOMInterfaceCastTarget(TargetType))
+        return CastStrategy::Address;
       if (canSILUseScalarCheckedCastInstructions(
               SGF.SGM.M, SGF.F.hasLoweredAddresses(), SourceType, TargetType))
         return CastStrategy::Scalar;
@@ -347,8 +422,12 @@ void SILGenFunction::emitCheckedCastBranch(
     ProfileCounter TrueCount, ProfileCounter FalseCount) {
   CheckedCastEmitter emitter(*this, loc, source->getType(), targetType);
   ManagedValue operand = emitter.emitOperand(source);
-  emitter.emitConditional(operand, CastConsumptionKind::TakeAlways, ctx,
-                          handleTrue, handleFalse, TrueCount, FalseCount);
+  auto consumption =
+      isCOMInterfaceCastTarget(targetType->getCanonicalType())
+          ? CastConsumptionKind::CopyOnSuccess
+          : CastConsumptionKind::TakeAlways;
+  emitter.emitConditional(operand, consumption, ctx, handleTrue, handleFalse,
+                          TrueCount, FalseCount);
 }
 
 void SILGenFunction::emitCheckedCastBranch(
@@ -403,23 +482,35 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
                                        SILGenFunction &SGF) {
   // Reabstract to the most general abstraction, and put it into a
   // temporary if necessary.
-  
+
   // Figure out if we need the value to be in a temporary.
-  bool requiresAddress =
-    !canSILUseScalarCheckedCastInstructions(
-        SGF.SGM.M, SGF.F.hasLoweredAddresses(), sourceType, targetType);
-  
+  bool requiresAddress = isCOMInterfaceCastTarget(targetType) ||
+      !canSILUseScalarCheckedCastInstructions(SGF.SGM.M,
+                                              SGF.F.hasLoweredAddresses(),
+                                              sourceType, targetType);
+
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);
-  
+
+  if (isCOMInterfaceCastTarget(targetType))
+    src = prepareCOMCastSource(SGF, loc, src);
+
   bool hasAbstraction = (src.getType() != srcAbstractTL.getLoweredType());
-  
+
   // Fast path: no re-abstraction required.
   if (!hasAbstraction && (!requiresAddress || src.getType().isAddress()))
     return src;
-  
+
   TemporaryInitializationPtr init;
   if (requiresAddress) {
+  if (isCOMInterfaceCastTarget(targetType) && src.getType().isObject()) {
+    // A COM cast only needs the source value's address. Do not reabstract a
+    // one-word COM existential to the opaque existential representation.
+    auto temporary = SGF.emitTemporaryAllocation(loc, src.getType());
+    return SGF.B.createStoreBorrowOrTrivial(loc, src.borrow(SGF, loc),
+                                            temporary);
+  }
+
     init = SGF.emitTemporary(loc, srcAbstractTL);
 
     if (hasAbstraction)
@@ -511,8 +602,10 @@ RValue Lowering::emitConditionalCheckedCast(
   // Prepare a jump destination here.
   ExitableFullExpr scope(SGF, CleanupLocation(loc));
 
-  auto operandCMV = ConsumableManagedValue::forOwned(operand);
-  assert(operandCMV.getFinalConsumption() == CastConsumptionKind::TakeAlways);
+  auto operandCMV =
+      isCOMInterfaceCastTarget(resultObjectType)
+          ? ConsumableManagedValue(operand, CastConsumptionKind::CopyOnSuccess)
+          : ConsumableManagedValue::forOwned(operand);
 
   SGF.emitCheckedCastBranch(
       loc, operandCMV, operandType, resultObjectType, resultObjectCtx,
@@ -536,10 +629,8 @@ RValue Lowering::emitConditionalCheckedCast(
       },
       // The failure path.
       [&](std::optional<ManagedValue> Value) {
-        // We always are performing a take here, so Value should be std::nullopt
-        // since the object should have been destroyed immediately in the fail
-        // block.
-        assert(!Value.has_value() && "Expected a take_always consumption kind");
+        assert(!Value.has_value() &&
+               "address casts do not propagate a failure value");
         auto noneDecl = SGF.getASTContext().getOptionalNoneDecl();
 
         // If we're not emitting into a temporary, just wrap up the result
@@ -620,4 +711,3 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
   auto isa = contBB->createPhiArgument(i1Ty, OwnershipKind::None);
   return isa;
 }
-

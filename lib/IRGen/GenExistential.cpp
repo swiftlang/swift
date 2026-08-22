@@ -32,6 +32,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "BitPatternBuilder.h"
+#include "Callee.h"
 #include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
@@ -1542,7 +1543,128 @@ public:
     return ErrorProto;
   }
 };
-  
+
+/// A COM existential is the interface pointer itself. Unlike a class
+/// existential, this pointer is not a Swift heap-object address point and
+/// therefore must never be passed to Swift ARC.
+class COMExistentialTypeInfo final
+    : public SingleScalarTypeInfo<COMExistentialTypeInfo, LoadableTypeInfo> {
+  enum class Operation : unsigned {
+    AddRef = 1,
+    Release = 2,
+  };
+
+  void emit(IRGenFunction &IGF, llvm::Value *interface,
+            Operation operation) const {
+    auto *head = IGF.createBasicBlock(operation == Operation::AddRef
+                                          ? "com.addref"
+                                          : "com.release");
+    auto *tail = IGF.createBasicBlock("com.refcount.done");
+
+    IGF.Builder.CreateCondBr(IGF.Builder.CreateIsNotNull(interface), head, tail);
+    IGF.Builder.emitBlock(head);
+
+    // A COM interface pointer points at its vtable pointer. Slots 1 and 2 are
+    // AddRef and Release respectively, both with the foreign scalar ABI
+    // UInt32(void *)
+    Address instance(interface, IGF.IGM.Int8PtrTy, IGF.IGM.getPointerAlignment());
+    auto *load = IGF.Builder.CreateLoad(instance, "com.vtable");
+    Address vtable(load, IGF.IGM.Int8PtrTy, IGF.IGM.getPointerAlignment());
+    auto slot = IGF.Builder.CreateConstArrayGEP(vtable,
+                                                static_cast<unsigned>(operation),
+                                                IGF.IGM.getPointerSize(),
+                                                operation == Operation::AddRef
+                                                    ? "com.addref.slot"
+                                                    : "com.release.slot");
+    auto *method = IGF.Builder.CreateLoad(slot, "com.refcount.method");
+    auto *type = llvm::FunctionType::get(IGF.IGM.Int32Ty, {IGF.IGM.Int8PtrTy},
+                                         /*isVarArg=*/false);
+    Signature signature(type, llvm::AttributeList(), llvm::CallingConv::C);
+    auto function =
+        FunctionPointer::createUnsigned(FunctionPointer::Kind::Function,
+                                        method, signature);
+    auto *call = IGF.Builder.CreateCall(function, {interface});
+    call->setDoesNotThrow();
+    IGF.Builder.CreateBr(tail);
+
+    IGF.Builder.emitBlock(tail);
+  }
+
+public:
+  COMExistentialTypeInfo(llvm::PointerType *storage, Size size, Alignment align)
+      : SingleScalarTypeInfo(storage, size,
+                             SpareBitVector::getConstant(size.getValueInBits(),
+                                                         false),
+                             align, IsNotTriviallyDestroyable, IsCopyable,
+                             IsFixedSize, IsABIAccessible) {
+  }
+
+  static constexpr bool IsScalarTriviallyDestroyable = false;
+
+  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
+                        Atomicity atomicity) const {
+    emit(IGF, value, Operation::AddRef);
+  }
+
+  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
+                         Atomicity atomicity) const {
+    emit(IGF, value, Operation::Release);
+  }
+
+  void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
+    IGF.emitFixLifetime(value);
+  }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
+                                        bool useStructLayout) const override {
+    // No existing scalar kind has COM's vtable-dispatch ownership semantics.
+    // Keep layout-driven value operations tied to this TypeInfo.
+    return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+  }
+
+  bool mayHaveExtraInhabitants(IRGenModule &) const override {
+    return true;
+  }
+
+  unsigned getFixedExtraInhabitantCount(IRGenModule &) const override {
+    return 1;
+  }
+
+  APInt getFixedExtraInhabitantValue(IRGenModule &, unsigned bits,
+                                     unsigned index) const override {
+    assert(index == 0);
+    return APInt(bits, 0);
+  }
+
+  llvm::Value *
+  getExtraInhabitantIndex(IRGenFunction &IGF, Address source, SILType T,
+                          bool) const override {
+    source = IGF.Builder.CreateElementBitCast(source, IGF.IGM.IntPtrTy);
+    auto *value = IGF.Builder.CreateLoad(source);
+    auto *valid =
+        IGF.Builder.CreateICmpNE(value,
+                                 llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0));
+    // Null is extra inhabitant zero; valid pointers are reported as -1.
+    return IGF.Builder.CreateSExt(valid, IGF.IGM.Int32Ty);
+  }
+
+  void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                            Address destination, SILType T,
+                            bool) const override {
+    destination =
+        IGF.Builder.CreateElementBitCast(destination, IGF.IGM.IntPtrTy);
+    IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0),
+                            destination);
+  }
+
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &,
+                                           unsigned index) const override {
+    // Refcount operations branch around null, allowing Optional to use it as
+    // the payload's first extra inhabitant.
+    return index == 0;
+  }
+};
+
 } // end anonymous namespace
 
 static const TypeInfo *
@@ -1595,6 +1717,11 @@ llvm::Type *IRGenModule::getExistentialType(unsigned numTables) {
   return Types.getExistentialType(numTables);
 }
 
+const TypeInfo *irgen::createCOMInterfaceTypeInfo(IRGenModule &IGM) {
+  return new COMExistentialTypeInfo(IGM.Int8PtrTy, IGM.getPointerSize(),
+                                    IGM.getPointerAlignment());
+}
+
 static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   auto layout = T.getExistentialLayout();
 
@@ -1606,6 +1733,9 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
     // Error has a special runtime representation.
     return createErrorExistentialTypeInfo(IGM, layout);
   }
+
+  if (layout.getCOMInterface())
+    return createCOMInterfaceTypeInfo(IGM);
 
   llvm::StructType *type;
 
@@ -1822,6 +1952,19 @@ static void bindArchetype(IRGenFunction &IGF,
     setWitnessTable(IGF, archetype, i, wtable);
   }
   assert(wtableI == wtables.size());
+}
+
+void irgen::bindOpenedCOMExistentialArchetype(IRGenFunction &IGF,
+                                              CanArchetypeType archetype) {
+  for (auto *protocol : archetype->getConformsTo()) {
+    if (!protocol->isCOMInterface())
+      continue;
+    auto *adjustment = getCOMExistentialAdjustment(IGF.IGM);
+    setProtocolWitnessTableName(IGF.IGM, adjustment, archetype, protocol);
+    IGF.setUnscopedLocalTypeData(archetype,
+                                 LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol),
+                                 adjustment);
+  }
 }
 
 /// Emit protocol witness table pointers for the given protocol conformances,

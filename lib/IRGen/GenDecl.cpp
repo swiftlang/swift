@@ -6257,6 +6257,11 @@ bool IRGenModule::isResilient(NominalTypeDecl *D,
                               ClassDecl *asViewedFromRootClass) {
   assert(!asViewedFromRootClass || isa<ClassDecl>(D));
 
+  // A COM protocol's IID fixes its complete vtable and witness layout.
+  if (auto *protocol = dyn_cast<ProtocolDecl>(D);
+      protocol && protocol->isCOMInterface())
+    return false;
+
   // Ignore resilient protocols if requested.
   if (isa<ProtocolDecl>(D) && IRGen.Opts.UseFragileResilientProtocolWitnesses) {
     return false;

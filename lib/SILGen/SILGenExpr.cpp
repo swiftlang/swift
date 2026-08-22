@@ -1952,6 +1952,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::COMMethod:
     case SILFunctionType::Representation::CXXMethod:
     case SILFunctionType::Representation::KeyPathAccessorGetter:
     case SILFunctionType::Representation::KeyPathAccessorSetter:
@@ -1986,6 +1987,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::COMMethod:
     case SILFunctionType::Representation::CXXMethod:
     case SILFunctionType::Representation::KeyPathAccessorGetter:
     case SILFunctionType::Representation::KeyPathAccessorSetter:
@@ -2499,7 +2501,16 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
       }
     }
   }
-  ManagedValue operand = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto resultObjectType =
+      E->getType()->getCanonicalType().getOptionalObjectType();
+  bool isCOMInterfaceCast =
+      resultObjectType && resultObjectType->isAnyExistentialType() &&
+      resultObjectType->getExistentialLayout().getCOMInterface();
+  ManagedValue operand =
+      SGF.emitRValueAsSingleValue(E->getSubExpr(),
+                                  isCOMInterfaceCast
+                                     ? SGFContext::AllowGuaranteedPlusZero
+                                     : SGFContext());
   return emitConditionalCheckedCast(SGF, E, operand, E->getSubExpr()->getType(),
                                     E->getType(), E->getCastKind(), C,
                                     trueCount, falseCount);

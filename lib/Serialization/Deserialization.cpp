@@ -7058,6 +7058,7 @@ getActualSILFunctionTypeRepresentation(uint8_t rep) {
   CASE(Method)
   CASE(ObjCMethod)
   CASE(WitnessMethod)
+  CASE(COMMethod)
   CASE(CXXMethod)
   CASE(KeyPathAccessorGetter)
   CASE(KeyPathAccessorSetter)

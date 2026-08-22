@@ -179,6 +179,7 @@ static const PointerAuthSchema &getFunctionPointerSchema(IRGenModule &IGM,
                                                    CanSILFunctionType fnType) {
   auto &options = IGM.getOptions().PointerAuth;
   switch (fnType->getRepresentation()) {
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
     return options.FunctionPointers;
@@ -512,6 +513,7 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
     }
     
     // C function pointers are undiscriminated.
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::CFunctionPointer:
       return llvm::ConstantInt::get(IGM.Int64Ty, 0);

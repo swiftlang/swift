@@ -1584,6 +1584,8 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
   case KnownProtocolKind::COMInterface:
+  case KnownProtocolKind::COMActivatable:
+  case KnownProtocolKind::COMAggregatable:
     M = getLoadedModule(Id_COM);
     if (!M)
       M = MainModule;
@@ -6172,6 +6174,10 @@ ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::ExistentialArchetype:
   case TypeKind::ElementArchetype:
+  case TypeKind::Metatype:
+  case TypeKind::ExistentialMetatype:
+    // The metatype of n abstract type can carry an abstract conformance its
+    // instance type is a type parameter, e.g. from 'T.Type: P'.
     break;
 
   default:
@@ -6277,7 +6283,13 @@ GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
 
 #ifndef NDEBUG
   for (auto req : requirements) {
-    assert(req.getFirstType()->isTypeParameter());
+    // The subject is normally a type parameter; a metatype subject
+    // (e.g.  'T.Type: P') is also permitted, in which case its instance type
+    // must be a type parameter.
+    auto subject = req.getFirstType();
+    if (auto *metatype = subject->getAs<AnyMetatypeType>())
+      subject = metatype->getInstanceType();
+    assert(subject->isTypeParameter());
     assert(!req.getFirstType()->hasTypeVariable());
     assert(req.getKind() == RequirementKind::Layout ||
            !req.getSecondType()->hasTypeVariable());

@@ -2044,6 +2044,7 @@ ManglingError Remangler::mangleImplFunctionConvention(Node *node,
                       .Case("objc_method", 'O')
                       .Case("closure", 'K')
                       .Case("witness_method", 'W')
+                      .Case("com_method", 'V')
                       .Default(0);
   DEMANGLER_ASSERT(FuncAttr && "invalid impl function convention", node);
   if ((FuncAttr == 'B' || FuncAttr == 'C') && node->getNumChildren() > 1 &&
@@ -3006,6 +3007,12 @@ ManglingError Remangler::mangleProtocolSelfConformanceWitness(Node *node,
 ManglingError Remangler::mangleProtocolWitness(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "TW";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleCOMMethodWitness(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "TWV";
   return ManglingError::Success;
 }
 

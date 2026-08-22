@@ -3324,6 +3324,20 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::OpenCOMExistentialInst: {
+    if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty))
+      return true;
+
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
+    if (parseForwardingOwnershipKind(forwardingOwnership)
+        || parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal =
+        B.createOpenCOMExistential(InstLoc, Val, Ty, forwardingOwnership);
+    break;
+  }
+
   case SILInstructionKind::OpenExistentialValueInst: {
     if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty))
       return true;
@@ -5811,6 +5825,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     case SILInstructionKind::ClassMethodInst:
     case SILInstructionKind::SuperMethodInst:
     case SILInstructionKind::ObjCMethodInst:
+    case SILInstructionKind::COMMethodInst:
     case SILInstructionKind::ObjCSuperMethodInst: {
       SILDeclRef Member;
       SILType MethodTy;
@@ -5837,6 +5852,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         break;
       case SILInstructionKind::ObjCMethodInst:
         ResultVal = B.createObjCMethod(InstLoc, Val, Member, MethodTy);
+        break;
+      case SILInstructionKind::COMMethodInst:
+        ResultVal = B.createCOMMethod(InstLoc, Val, Member, MethodTy);
         break;
       case SILInstructionKind::ObjCSuperMethodInst:
         ResultVal = B.createObjCSuperMethod(InstLoc, Val, Member, MethodTy);
@@ -8720,8 +8738,29 @@ static bool parseSILWitnessTableEntry(
       return true;
     }
   }
+  SILFunction *COMFunc = nullptr;
+  if (P.consumeIf(tok::comma)) {
+    if (!P.Tok.is(tok::identifier) || P.Tok.getText() != "com") {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "com");
+      return true;
+    }
+    P.consumeToken();
+
+    Identifier COMFuncName;
+    SourceLoc COMFuncLoc;
+    if (P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+        witnessState.parseSILIdentifier(COMFuncName, COMFuncLoc,
+                                        diag::expected_sil_value_name))
+      return true;
+
+    COMFunc = M.lookUpFunction(COMFuncName.str());
+    if (!COMFunc) {
+      P.diagnose(COMFuncLoc, diag::sil_witness_func_not_found, COMFuncName);
+      return true;
+    }
+  }
   witnessEntries.push_back(SILWitnessTable::MethodWitness{
-    Ref, Func
+    Ref, Func, COMFunc
   });
 
   return false;
@@ -8734,7 +8773,7 @@ static bool parseSILWitnessTableEntry(
 /// decl-sil-witness-body:
 ///   '{' sil-witness-entry* '}'
 /// sil-witness-entry:
-///   method SILDeclRef ':' @SILFunctionName
+///   method SILDeclRef ':' @SILFunctionName (',' 'com' @SILFunctionName)?
 ///   associated_type AssociatedTypeDeclName: Type
 ///   associated_conformance (AssocName: ProtocolName):
 ///                              protocol-conformance|dependent

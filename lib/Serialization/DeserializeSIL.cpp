@@ -2160,6 +2160,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));      \
     break;
     ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
+    ONEOPERAND_ONETYPE_INST(OpenCOMExistential)
     ONEOPERAND_ONETYPE_INST(OpenExistentialMetatype)
     ONEOPERAND_ONETYPE_INST(OpenExistentialBox)
     ONEOPERAND_ONETYPE_INST(OpenExistentialValue)
@@ -3786,6 +3787,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::COMMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel), and an operand.
@@ -3822,6 +3824,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
           getLocalValue(Builder.maybeGetFunction(),
                         ListOfValues[NextValueIndex], operandTy),
           DRef, Ty);
+      break;
+    case SILInstructionKind::COMMethodInst:
+      ResultInst =
+          Builder.createCOMMethod(Loc, getLocalValue(Builder.maybeGetFunction(),
+                                                     ListOfValues[NextValueIndex],
+                                                     operandTy),
+                                  DRef, Ty);
       break;
     case SILInstructionKind::ObjCSuperMethodInst:
       ResultInst = Builder.createObjCSuperMethod(
@@ -4973,16 +4982,20 @@ void SILDeserializer::readWitnessTableEntries(
       });
     } else if (kind == SIL_WITNESS_METHOD_ENTRY) {
       ArrayRef<uint64_t> ListOfValues;
-      DeclID NameID;
-      WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
+      DeclID NameID, COMNameID;
+      WitnessMethodEntryLayout::readRecord(scratch, NameID, COMNameID,
+                                           ListOfValues);
       SILFunction *Func = nullptr;
       if (NameID != 0) {
         Func = getFuncForReference(MF->getIdentifierText(NameID));
       }
-      if (Func || NameID == 0) {
+      SILFunction *COMFunc = nullptr;
+      if (COMNameID != 0)
+        COMFunc = getFuncForReference(MF->getIdentifierText(COMNameID));
+      if ((Func || NameID == 0) && (COMFunc || COMNameID == 0)) {
         unsigned NextValueIndex = 0;
         witnessEntries.push_back(SILWitnessTable::MethodWitness{
-          getSILDeclRef(MF, ListOfValues, NextValueIndex), Func
+          getSILDeclRef(MF, ListOfValues, NextValueIndex), Func, COMFunc
         });
       }
     } else {

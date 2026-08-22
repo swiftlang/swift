@@ -379,6 +379,12 @@ irgen::expandCallingConv(IRGenModule &IGM,
                          SILFunctionTypeRepresentation convention, bool isAsync,
                          bool isCalleeAllocatedCoro) {
   switch (convention) {
+  case SILFunctionTypeRepresentation::COMMethod:
+    if (IGM.Context.LangOpts.COMModel == LangOptions::COMInteropModel::Microsoft &&
+        IGM.Triple.getArch() == llvm::Triple::x86)
+      return llvm::CallingConv::X86_StdCall;
+    return IGM.getOptions().PlatformCCallingConvention;
+
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
@@ -1590,6 +1596,17 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangCtx.VoidPtrTy);
     break;
 
+  case SILFunctionTypeRepresentation::COMMethod: {
+    // COM methods take their interface pointer first.
+
+    // The SIL self parameter is an archetype opened from the interface
+    // existential. It has no corresponding Clang type; its foreign ABI is the
+    // opaque interface pointer carried by that existential.
+    paramTys.push_back(clangCtx.VoidPtrTy);
+    params = params.drop_back();
+    break;
+  }
+
   case SILFunctionTypeRepresentation::CXXMethod: {
     // Cxx methods take their 'self' argument first.
     auto &self = params.back();
@@ -1891,6 +1908,9 @@ bool irgen::hasSelfContextParameter(CanSILFunctionType fnType) {
   if (!fnType->hasSelfParam())
     return false;
 
+  if (fnType->getRepresentation() == SILFunctionTypeRepresentation::COMMethod)
+    return true;
+
   SILParameterInfo param = fnType->getSelfParameter();
 
   // All the indirect conventions pass a single pointer.
@@ -1968,6 +1988,7 @@ void SignatureExpansion::expandKeyPathAccessorParameters() {
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     llvm_unreachable("non keypath accessor convention");
   }
@@ -2062,6 +2083,8 @@ void SignatureExpansion::expandParameters(
   } else {
     auto needsContext = [=]() -> bool {
       switch (FnType->getRepresentation()) {
+      case SILFunctionType::Representation::COMMethod:
+        llvm_unreachable("calling COM method in Swift CC expansion?");
       case SILFunctionType::Representation::Block:
         llvm_unreachable("adding block parameter in Swift CC expansion?");
 
@@ -2340,6 +2363,8 @@ void SignatureExpansion::expandAsyncEntryType() {
   } else {
     auto needsContext = [=]() -> bool {
       switch (FnType->getRepresentation()) {
+      case SILFunctionType::Representation::COMMethod:
+        llvm_unreachable("calling COM method in Swift CC expansion?");
       case SILFunctionType::Representation::Block:
         llvm_unreachable("adding block parameter in Swift CC expansion?");
 
@@ -2966,6 +2991,12 @@ public:
                            isOutlined);
       break;
 
+    case SILFunctionTypeRepresentation::COMMethod:
+      adjusted.add(getCallee().getCOMMethodSelf());
+      externalizeArguments(IGF, getCallee(), original, adjusted, Temporaries,
+                           isOutlined);
+      break;
+
     case SILFunctionTypeRepresentation::Block:
     case SILFunctionTypeRepresentation::CXXMethod:
       if (getCallee().getRepresentation() == SILFunctionTypeRepresentation::Block) {
@@ -3346,6 +3377,7 @@ public:
     case SILFunctionTypeRepresentation::ObjCMethod:
     case SILFunctionTypeRepresentation::Block:
     case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
     case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
@@ -4188,6 +4220,7 @@ Callee::Callee(CalleeInfo &&info, const FunctionPointer &fn,
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     assert(!FirstData && !SecondData);
     break;
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     assert(FirstData && !SecondData);
     break;
@@ -4203,6 +4236,7 @@ llvm::Value *Callee::getSwiftContext() const {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
   case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
@@ -4227,6 +4261,13 @@ llvm::Value *Callee::getBlockObject() const {
            SILFunctionTypeRepresentation::Block &&
          "not a block");
   assert(FirstData && "no block object set on callee");
+  return FirstData;
+}
+
+llvm::Value *Callee::getCOMMethodSelf() const {
+  assert(Info.OrigFnType->getRepresentation() == SILFunctionTypeRepresentation::COMMethod &&
+         "not a COM method");
+  assert(FirstData && "no interface pointer set on callee");
   return FirstData;
 }
 
@@ -4579,23 +4620,33 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
   unsigned firstParam = 0;
   unsigned paramEnd = FI.arg_size();
 
-  // Handle the ObjC prefix.
-  if (callee.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
+  switch (callee.getRepresentation()) {
+  case SILFunctionTypeRepresentation::ObjCMethod:
     // Ignore both the logical and the physical parameters associated
     // with self and (if not objc_direct) _cmd.
     firstParam += callee.isDirectObjCMethod() ? 1 :  2;
     params = params.drop_back();
+    break;
 
-  // Or the block prefix.
-  } else if (fnType->getRepresentation()
-                == SILFunctionTypeRepresentation::Block) {
+  case SILFunctionTypeRepresentation::Block:
     // Ignore the physical block-object parameter.
     firstParam += 1;
-  } else if (callee.getRepresentation() ==
-             SILFunctionTypeRepresentation::CXXMethod) {
+    break;
+
+  case SILFunctionTypeRepresentation::CXXMethod:
     // Skip the "self" param.
     firstParam += 1;
     params = params.drop_back();
+    break;
+
+  case SILFunctionTypeRepresentation::COMMethod:
+    // The interface pointer was added as the physical first parameter.
+    firstParam += 1;
+    params = params.drop_back();
+    break;
+
+  default:
+    break;
   }
 
   bool formalIndirectResult = fnType->getNumResults() > 0 &&

@@ -269,6 +269,7 @@ namespace sil_block {
   using WitnessMethodEntryLayout = BCRecordLayout<
     SIL_WITNESS_METHOD_ENTRY,
     DeclIDField,  // SILFunction name
+    DeclIDField,  // native COM entry name
     BCArray<ValueIDField> // SILDeclRef
   >;
 

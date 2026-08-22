@@ -152,7 +152,7 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
     switch origEntry {
     case .invalid:
       return WitnessTable.Entry.invalid
-    case .method(let requirement, let witness):
+    case .method(let requirement, let witness, let interface):
       guard let origMethod = witness else {
         return origEntry
       }
@@ -167,7 +167,8 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
       else {
         return origEntry
       }
-      return .method(requirement: requirement, witness: specializedMethod)
+      return .method(requirement: requirement, witness: specializedMethod,
+                     interface: interface)
     case .baseProtocol(let requirement, _):
       let selfTy = requirement.selfInterfaceType
       let baseConf = conformance.getAssociatedConformance(ofAssociatedType: selfTy, to: requirement)
@@ -215,7 +216,7 @@ private func specializeDefaultMethods(for conformance: Conformance,
     switch origEntry {
     case .invalid:
       return WitnessTable.Entry.invalid
-    case .method(let requirement, let witness):
+    case .method(let requirement, let witness, let interface):
       guard let origMethod = witness,
             // Is it a generic method where only self is generic (= a default witness method)?
             origMethod.isGeneric, origMethod.isNonGenericWitnessMethod(context)
@@ -234,7 +235,8 @@ private func specializeDefaultMethods(for conformance: Conformance,
         return origEntry
       }
       specialized = true
-      return .method(requirement: requirement, witness: specializedMethod)
+      return .method(requirement: requirement, witness: specializedMethod,
+                     interface: interface)
     case .baseProtocol(_, let witness):
       specializeDefaultMethods(for: witness, visited: &visited, context)
       return origEntry

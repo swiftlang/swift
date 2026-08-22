@@ -1076,6 +1076,10 @@ ManglingError Remangler::mangleProtocolWitness(Node *node, unsigned depth) {
   return mangleChildNodes(node, depth + 1); // protocol conformance, entity
 }
 
+ManglingError Remangler::mangleCOMMethodWitness(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleFunction(Node *node, EntityContext &ctx,
                                         unsigned depth) {
   return mangleNamedAndTypedEntity(node, 'F', "", ctx, depth + 1);
