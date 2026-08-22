@@ -25,6 +25,18 @@
 import StdlibUnittest
 import Synchronization
 
+struct Noncopyable<Wrapped: ~Copyable>: ~Copyable {
+  var wrapped: Wrapped
+
+  init(wrapping wrapped: consuming Wrapped) {
+    self.wrapped = wrapped
+  }
+}
+
+extension Noncopyable: Equatable where Wrapped: Equatable & ~Copyable { }
+
+extension Noncopyable: Hashable where Wrapped: Hashable & ~Copyable { }
+
 protocol P {}
 
 @available(SwiftStdlib 6.2, *)
@@ -41,6 +53,7 @@ enum InlineArrayTests {
     testSuite.test("Uninhabited", testUninhabited)
     testSuite.test("Throws",      testThrows)
     testSuite.test("Closures",    testClosures)
+    testSuite.test("Equatable/Hashable", testEquatableHashable)
     runAllTests()
   }
 
@@ -222,6 +235,22 @@ enum InlineArrayTests {
 
     expectEqual(x, 10)
   }
+  
+  static func testEquatableHashable() {
+    let a: [4 of Int] = [1, 2, 3, 4]
+    let b: [4 of Int] = [1, 2, 3, 4]
+    let c: [4 of Int] = [1, 2, 6, 7]
+    expectTrue(a == b)
+    expectFalse(a == c)
+    expectEqual(a._hashValue, b._hashValue)
+    
+    let na: InlineArray = [Noncopyable(wrapping: 1), Noncopyable(wrapping: 2)]
+    let nb: InlineArray = [Noncopyable(wrapping: 1), Noncopyable(wrapping: 2)]
+    let nc: InlineArray = [Noncopyable(wrapping: 6), Noncopyable(wrapping: 7)]
+    expectTrue(na == nb)
+    expectFalse(na == nc)
+    expectEqual(na._hashValue, nb._hashValue)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -243,6 +272,19 @@ extension InlineArray where Element: ~Copyable {
       swapAt(i, j)
       i = index(after: i)
       j = index(before: j)
+    }
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension InlineArray where Element: ~Copyable & Hashable {
+  var _hashValue: Int {
+    if #available(SwiftStdlib 6.5, *) {
+      return hashValue
+    } else {
+      var hasher = Hasher()
+      self.hash(into: &hasher)
+      return hasher.finalize()
     }
   }
 }
