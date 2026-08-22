@@ -515,6 +515,18 @@ TEST(MetadataTest, COMExistentialValueWitnesses) {
                                        /*superclass=*/nullptr,
                                        1, protocols);
 
+  ProtocolDescriptorRef refinedProtocols[] = {
+    ProtocolDescriptorRef::forSwift(&ProtocolCOM),
+    ProtocolDescriptorRef::forSwift(&ProtocolCOMBase)
+  };
+  auto refinedMetadata =
+      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                       /*superclass=*/nullptr,
+                                       2, refinedProtocols);
+  EXPECT_NE(metadata, refinedMetadata);
+  EXPECT_EQ(metadata->getValueWitnesses(),
+            refinedMetadata->getValueWitnesses());
+
   void *vtable[] = {
     nullptr,
     reinterpret_cast<void *>(&comTestAddRef),
