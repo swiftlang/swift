@@ -1061,15 +1061,21 @@ SILFunction *SILGenModule::emitProtocolWitness(
       auto Ty = getCOMMethodEntryType(witnessSILFnType);
       auto label = NewMangler.mangleCOMMethodWitnessThunk(
           manglingConformance, requirement.getDecl());
+      bool isExternallySubclassable =
+          CD->getEffectiveAccess() == AccessLevel::Open;
+      auto entryLinkage =
+          isExternallySubclassable ? SILLinkage::Public : linkage;
+      auto entrySerializedKind =
+          isExternallySubclassable ? IsNotSerialized : serializedKind;
       // TODO: Emit ABI-compatible COM entries as alternate machine-code entry
       // points so the adjustment can fall through into the native body.
       auto *entry =
-          builder.createFunction(SILLinkage::Private, label, Ty,
+          builder.createFunction(entryLinkage, label, Ty,
                                  getSILFunctionTypeActorIsolation(reqtSubstTy,
                                                                   requirement,
                                                                   witnessRef),
                                  genericEnv, SILLocation(witnessRef.getDecl()),
-                                 IsNotBare, IsTransparent, IsNotSerialized,
+                                 IsNotBare, IsTransparent, entrySerializedKind,
                                  IsNotDynamic, IsNotDistributed,
                                  IsNotRuntimeAccessible, ProfileCounter(),
                                  IsThunk, SubclassScope::NotApplicable,
