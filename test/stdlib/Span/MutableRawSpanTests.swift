@@ -13,6 +13,7 @@
 // RUN: %target-run-stdlib-swift
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 
@@ -69,6 +70,21 @@ suite.test("Initializer from MutableSpan")
     rawSpan.storeBytes(of: 3, as: Int64.self)
   }
   expectEqual(slice[0].storage.0, 3)
+}
+
+suite.test("Initialize with custom owner")
+.require(.stdlib_6_2).code {
+  var array = ContiguousArray<UInt8>(0..<4)
+  array.withUnsafeMutableBytes { bytes in
+    var owner = bytes
+    var span = unsafe MutableRawSpan(
+      _unsafeBytes: UnsafeMutableRawBufferPointer(rebasing: owner[1..<3]),
+      mutating: &owner
+    )
+    expectEqual(span.byteCount, 2)
+    span.storeBytes(of: 99, toByteOffset: 0, as: UInt8.self)
+  }
+  expectEqual(array, [0, 99, 2, 3])
 }
 
 suite.test("isEmpty property")
@@ -161,6 +177,54 @@ suite.test("withUnsafeMutableBytes")
     }
   }
   expectEqual(Int(a[i]), i+1)
+}
+
+suite.test("consumingWithUnsafeMutableBytes to a MutableRef")
+.skip(.custom({
+  if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+}, reason: "Requires Swift stdlib 6.4"))
+.code {
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
+
+  var array = ContiguousArray<UInt8>(0..<4)
+  array.withUnsafeMutableBytes {
+    var ref = unsafe MutableRawSpan(_unsafeBytes: $0)
+      .consumingWithUnsafeMutableBytes { bytes in
+        unsafe MutableRef(
+          unsafeAddress: bytes.baseAddress!.assumingMemoryBound(to: UInt8.self) + 1,
+          mutating: &bytes
+        )
+      }
+    expectEqual(ref.value, 1)
+    ref.value = 99
+  }
+  expectEqual(array, [0, 99, 2, 3])
+}
+
+suite.test("consumingWithUnsafeMutableBytes traps on buffer region change")
+.require(.stdlib_6_2)
+.require(.crashTesting)
+.code {
+  var array = ContiguousArray<UInt8>(0..<4)
+
+  array.withUnsafeMutableBytes {
+    unsafe MutableRawSpan(_unsafeBytes: $0)
+      .consumingWithUnsafeMutableBytes { bytes in
+        let exactRegion = unsafe UnsafeMutableRawBufferPointer(
+          start: bytes.baseAddress, count: bytes.count
+        )
+        bytes = exactRegion
+      }
+
+    expectCrashLater()
+    unsafe MutableRawSpan(_unsafeBytes: $0)
+      .consumingWithUnsafeMutableBytes { bytes in
+        let otherRegion = unsafe UnsafeMutableRawBufferPointer(
+          start: bytes.baseAddress, count: bytes.count - 1
+        )
+        bytes = otherRegion
+      }
+  }
 }
 
 suite.test("bytes property")

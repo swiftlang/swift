@@ -71,6 +71,20 @@ suite.test("Initialize with BitwiseCopyable element")
   expectEqual(m.count, 0)
 }
 
+suite.test("Initialize with custom owner")
+.require(.stdlib_6_2).code {
+  var array = ContiguousArray(0..<4)
+  array.withUnsafeMutableBufferPointer { buffer in
+    var span = unsafe MutableSpan(
+      _unsafeElements: UnsafeMutableBufferPointer(rebasing: buffer[1..<3]),
+      mutating: &buffer
+    )
+    expectEqual(span.count, 2)
+    span[0] = 99
+  }
+  expectEqual(array, [0, 99, 2, 3])
+}
+
 suite.test("isEmpty")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
@@ -258,6 +272,49 @@ suite.test("withUnsafeMutableBufferPointer")
     }
   }
   expectEqual(a[i], i+1)
+}
+
+suite.test("consumingWithUnsafeMutableBufferPointer to a MutableRef")
+.skip(.custom({
+  if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+}, reason: "Requires Swift stdlib 6.4"))
+.code {
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
+
+  var array = ContiguousArray(0..<4)
+  var ref = unsafe array.mutableSpan
+    .consumingWithUnsafeMutableBufferPointer { buffer in
+      unsafe MutableRef(
+        unsafeAddress: buffer.baseAddress! + 1, mutating: &buffer
+      )
+    }
+  expectEqual(ref.value, 1)
+  ref.value = 99
+  expectEqual(array, [0, 99, 2, 3])
+}
+
+suite.test("consumingWithUnsafeMutableBufferPointer traps on buffer region change")
+.require(.stdlib_6_2)
+.require(.crashTesting)
+.code {
+  var array = ContiguousArray(0..<4)
+  
+  unsafe array.mutableSpan.consumingWithUnsafeMutableBufferPointer {
+    buffer in
+    let exactRegion = unsafe UnsafeMutableBufferPointer(
+      start: buffer.baseAddress, count: buffer.count
+    )
+    buffer = exactRegion
+  }
+
+  expectCrashLater()
+  unsafe array.mutableSpan.consumingWithUnsafeMutableBufferPointer {
+    buffer in
+    let otherRegion = unsafe UnsafeMutableBufferPointer(
+      start: buffer.baseAddress, count: buffer.count - 1
+    )
+    buffer = otherRegion
+  }
 }
 
 suite.test("withUnsafeMutableBytes")
