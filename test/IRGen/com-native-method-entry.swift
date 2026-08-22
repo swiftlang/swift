@@ -53,19 +53,25 @@ public class DefaultWidget: IWidget {
 }
 
 // A class-bound archetype Self is recovered from the interface pointer. The
-// native entry neither receives a separate metadata argument nor materializes
-// address storage for the object before calling the extension witness.
+// native entry receives no separate metadata argument and binds the object's
+// dynamic metadata as the exact Self type. At -Onone, calling the generic
+// extension witness requires address storage for its opaque Self parameter.
 
 // CHECK-LABEL: define {{.*}}i32 {{.*}}13DefaultWidgetC{{.*}}TW.com.entry
 // CHECK-SAME:  (ptr [[DEFAULT_PTHIS:%.*]], ptr [[DEFAULT_RESULT:%.*]])
-// CHECK-NOT:     alloca ptr
 // CHECK:         [[DEFAULT_VTABLE:%.*]] = load ptr, ptr [[DEFAULT_PTHIS]]
 // CHECK:         [[DEFAULT_ADJUSTMENT_SLOT:%.*]] = getelementptr inbounds ptr, ptr [[DEFAULT_VTABLE]], i32 -1
 // CHECK:         [[DEFAULT_ADJUSTMENT:%.*]] = load i64, ptr [[DEFAULT_ADJUSTMENT_SLOT]]
 // CHECK:         [[DEFAULT_OBJECT:%.*]] = getelementptr inbounds i8, ptr [[DEFAULT_PTHIS]], i64 [[DEFAULT_ADJUSTMENT]]
-// CHECK-NOT:     store ptr [[DEFAULT_OBJECT]]
-// CHECK:         [[DEFAULT_CALL_RESULT:%.*]] = call swiftcc i32 {{.*}}IWidgetPAAE5value
+// CHECK:         [[DEFAULT_METADATA:%.*]] = load ptr, ptr [[DEFAULT_OBJECT]]
+// CHECK:         [[DEFAULT_CALL_RESULT:%.*]] = call swiftcc i32 {{.*}}IWidgetPAAE5value{{.*}}({{.*}}ptr [[DEFAULT_METADATA]]
 // CHECK:         ret i32 [[DEFAULT_CALL_RESULT]]
+
+// The optimizer eliminates the address reabstraction before code generation.
+
+// CHECK-OPT-LABEL: define {{.*}}i32 {{.*}}13DefaultWidgetC{{.*}}TWV
+// CHECK-OPT-NOT:     alloca ptr
+// CHECK-OPT:         ret i32
 
 // A class-bound interface passes the witness Self as a loadable reference. The
 // recovered object is therefore bound directly without address storage.
