@@ -966,7 +966,7 @@ extension _StringObject {
   }
 
   // Resilient way to fetch a pointer
-  @usableFromInline @inline(never)
+  @usableFromInline
   @_effects(releasenone)
   internal func getSharedUTF8Start() -> UnsafePointer<UInt8> {
     _internalInvariant(largeFastIsShared)
@@ -987,7 +987,7 @@ extension _StringObject {
 
   @usableFromInline
   internal var sharedUTF8: UnsafeBufferPointer<UInt8> {
-    @_effects(releasenone) @inline(never) get {
+    @_effects(releasenone) get {
       _internalInvariant(largeFastIsShared)
       let start = unsafe self.getSharedUTF8Start()
       return unsafe UnsafeBufferPointer(start: start, count: largeCount)
