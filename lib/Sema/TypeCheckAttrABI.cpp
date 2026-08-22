@@ -1043,8 +1043,14 @@ public:
         normalizedParams.push_back(normalizedParam);
       }
 
+      SmallVector<AnyFunctionType::Yield, 1> normalizedYields;
+      for (auto yield : func->getYields()) {
+        normalizedYields.emplace_back(normalizeType(yield.getType()),
+                                      yield.getFlags());
+      }
+
       if (isa<FunctionType>(func))
-        return FunctionType::get(normalizedParams,
+        return FunctionType::get(normalizedParams, normalizedYields,
                                  normalizeType(func->getResult()),
                                  normalizedExt);
 
@@ -1052,10 +1058,9 @@ public:
 
       // Ignore ignorable parts of the generic signature.
       auto sig = original->getAs<GenericFunctionType>()->getGenericSignature();
-      return GenericFunctionType::get(normalizeGenericSignature(sig),
-                                      normalizedParams,
-                                      normalizeType(func->getResult()),
-                                      normalizedExt);
+      return GenericFunctionType::get(
+          normalizeGenericSignature(sig), normalizedParams, normalizedYields,
+          normalizeType(func->getResult()), normalizedExt);
     }
 
     // Protocol-related types: Remove marker protocols.

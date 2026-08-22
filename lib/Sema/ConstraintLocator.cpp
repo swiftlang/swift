@@ -115,6 +115,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
     return 0;
 
   case ConstraintLocator::FunctionArgument:
+  case ConstraintLocator::FunctionYield:
   case ConstraintLocator::FunctionResult:
     return IsFunctionConversion;
 
@@ -212,6 +213,10 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 
   case ConstraintLocator::FunctionArgument:
     out << "function argument";
+    break;
+
+  case ConstraintLocator::FunctionYield:
+    out << "function yield";
     break;
 
   case ConstraintLocator::FunctionResult:

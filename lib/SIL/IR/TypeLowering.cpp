@@ -643,6 +643,7 @@ namespace {
                          IsTypeExpansionSensitive_t) {
       llvm_unreachable("shouldn't get an inout type here");
     }
+
     RetTy visitErrorType(CanErrorType type,
                          AbstractionPattern origType,
                          IsTypeExpansionSensitive_t isSensitive) {
@@ -4055,7 +4056,7 @@ static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   ASTContext &C = varType->getASTContext();
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanFunctionType::ExtInfo info;
-  return CanFunctionType::get({}, C.TheRawPointerType, info);
+  return CanFunctionType::get({}, {}, C.TheRawPointerType, info);
 }
 
 /// Removes @noescape from the given type if it's a function type. Otherwise,
@@ -4101,7 +4102,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
 
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanAnyFunctionType::ExtInfo info;
-  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {},
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {}, {},
                                  canResultTy, info);
 }
 
@@ -4129,8 +4130,8 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
 
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanAnyFunctionType::ExtInfo info;
-  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {}, resultTy,
-                                 info);
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {}, {},
+                                 resultTy, info);
 }
 
 /// Get the type of a property wrapper backing initializer,
@@ -4159,7 +4160,7 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanAnyFunctionType::ExtInfo info;
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},
-                                 resultType, info);
+                                 /* yields */ {}, resultType, info);
 }
 
 static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
@@ -4195,7 +4196,7 @@ static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
   AnyFunctionType::CanParamArrayRef paramRef(params);
   CanAnyFunctionType::ExtInfo extInfo;
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), paramRef,
-                                 resultType, extInfo);
+                                 /* yields */ {}, resultType, extInfo);
 }
 
 /// Get the type of a destructor function.
@@ -4224,12 +4225,13 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
                       : C.TheNativeObjectType);
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanFunctionType::ExtInfo info;
-  CanType methodTy = CanFunctionType::get({}, resultTy, info);
+  CanType methodTy = CanFunctionType::get({}, {}, resultTy, info);
 
   auto sig = dd->getGenericSignatureOfContext();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 llvm::ArrayRef(args), methodTy, extInfo);
+                                 llvm::ArrayRef(args), /* yields */ {},
+                                 methodTy, extInfo);
 }
 
 /// Retrieve the type of the ivar initializer or destroyer method for
@@ -4252,11 +4254,12 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
                                 : SILFunctionTypeRepresentation::Method)
                      .build();
 
-  resultType = CanFunctionType::get({}, resultType, extInfo);
+  resultType = CanFunctionType::get({}, {}, resultType, extInfo);
   auto sig = cd->getGenericSignature();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 llvm::ArrayRef(args), resultType, extInfo);
+                                 llvm::ArrayRef(args), /* yields */ {},
+                                 resultType, extInfo);
 }
 
 static CanAnyFunctionType
@@ -4291,12 +4294,12 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
           .withIsolation(funcType->getIsolation())
           .withLifetimeDependencies(funcType->getLifetimeDependencies())
           .withSendingResult(funcType->hasSendingResult())
+          .withCoroutine(funcType->isCoroutine())
           .build();
 
-  return CanAnyFunctionType::get(
-      getCanonicalSignatureOrNull(sig.genericSig),
-      funcType.getParams(), funcType.getResult(),
-      innerExtInfo);
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig.genericSig),
+                                 funcType.getParams(), funcType.getYields(),
+                                 funcType.getResult(), innerExtInfo);
 }
 
 static CanAnyFunctionType getAsyncEntryPoint(ASTContext &C) {
@@ -4321,7 +4324,7 @@ static CanAnyFunctionType getAsyncEntryPoint(ASTContext &C) {
   CanType returnType = C.getVoidType()->getCanonicalType();
   FunctionType::ExtInfo extInfo =
       FunctionType::ExtInfoBuilder().withAsync(true).build();
-  return CanAnyFunctionType::get(/*genericSig*/ nullptr, {}, returnType,
+  return CanAnyFunctionType::get(/*genericSig*/ nullptr, {}, {}, returnType,
                                  extInfo);
 }
 
@@ -4361,7 +4364,7 @@ static CanAnyFunctionType getEntryPointInterfaceType(ASTContext &C) {
                      .build();
 
   return CanAnyFunctionType::get(/*genericSig*/ nullptr, llvm::ArrayRef(params),
-                                 Int32Ty, extInfo);
+                                 /* yields */ {}, Int32Ty, extInfo);
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
@@ -4404,9 +4407,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
       vd->getInterfaceType()->getCanonicalType());
     auto sig = vd->getDeclContext()->getGenericSignatureOfContext();
     return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                   funcTy->getParams(),
-                                   funcTy.getResult(),
-                                   funcTy->getExtInfo());
+                                   funcTy->getParams(), funcTy->getYields(),
+                                   funcTy.getResult(), funcTy->getExtInfo());
   }
   
   case SILDeclRef::Kind::Allocator: {

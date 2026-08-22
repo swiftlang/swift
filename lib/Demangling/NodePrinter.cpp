@@ -629,6 +629,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
     case Node::Kind::DefaultOverride:
     case Node::Kind::BorrowAccessor:
     case Node::Kind::MutateAccessor:
+    case Node::Kind::YieldTypes:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -761,7 +762,8 @@ NodePointer NodePrinter::getChildIf(NodePointer Node, Node::Kind Kind) {
 void NodePrinter::printFunctionParameters(NodePointer LabelList,
                                           NodePointer ParameterType,
                                           unsigned depth, bool showTypes) {
-  if (ParameterType->getKind() != Node::Kind::ArgumentTuple) {
+  if (ParameterType->getKind() != Node::Kind::ArgumentTuple &&
+      ParameterType->getKind() != Node::Kind::YieldTypes) {
     setInvalid();
     return;
   }
@@ -1750,6 +1752,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << Node->getText();
     return nullptr;
   case Node::Kind::ArgumentTuple:
+  case Node::Kind::YieldTypes:
     printFunctionParameters(nullptr, Node, depth,
                             Options.ShowFunctionArgumentTypes);
     return nullptr;
