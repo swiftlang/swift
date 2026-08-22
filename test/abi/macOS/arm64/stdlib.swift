@@ -956,6 +956,7 @@ Added: _$ss13_SwiftifyExprOMa
 Added: _$ss13_SwiftifyExprOMn
 Added: _$ss13_SwiftifyExprON
 Added: _$ss13_SwiftifyInfoO11nonescapingyABs01_A4ExprO_tcABmFWC
+Added: _$ss13_SwiftifyInfoO6singleyABs01_A4ExprO_tcABmFWC
 Added: _$ss13_SwiftifyInfoO7endedByyABs01_A4ExprO_SitcABmFWC
 Added: _$ss13_SwiftifyInfoO7sizedByyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC

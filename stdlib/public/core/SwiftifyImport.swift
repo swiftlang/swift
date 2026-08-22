@@ -11,8 +11,9 @@ public enum _DependenceType {
 /// Different ways to annotate pointer parameters using the `@_SwiftifyImport` macro.
 /// All indices into parameter lists start at 1. Indices __must__ be integer literals, and strings
 /// __must__ be string literals, because their contents are parsed by the `@_SwiftifyImport` macro.
-/// Only 1 instance of `countedBy`, `sizedBy` or `endedBy` can refer to each pointer index, however
-/// `nonescaping` is orthogonal to the rest and can (and should) overlap with other annotations.
+/// Only 1 instance of `countedBy`, `sizedBy`, `endedBy` or `single` can refer to each pointer
+/// index, however `nonescaping` is orthogonal to the rest and can (and should) overlap with other
+/// annotations.
 ///
 /// This is not marked @available, because _SwiftifyImport is available for any target. Instances
 /// of _SwiftifyInfo should ONLY be passed as arguments directly to _SwiftifyImport, so they should
@@ -47,6 +48,9 @@ public enum _SwiftifyInfo {
     /// Parameter end: index of pointer in function parameter list, pointing one past the end of
     /// the same buffer as `start`.
     case endedBy(start: _SwiftifyExpr, end: Int)
+    /// Corresponds to the C `__single` attribute.
+    /// Parameter pointer: index of pointer in function parameter list.
+    case single(pointer: _SwiftifyExpr)
     /// Corresponds to the C `noescape` attribute. Allows generated wrapper to use `Span`-types
     /// instead of `UnsafeBuffer`-types, because it is known that the function doesn't capture the
     /// object past the lifetime of the function.
@@ -79,6 +83,7 @@ public enum _SwiftifyInfo {
 @attached(peer, names: overloaded)
 public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
                              spanAvailability: String? = nil,
+                             refAvailability: String? = nil,
                              typeMappings: [String: String] = [:],
                              nullableAsEmptySpan: Bool = false) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
@@ -103,6 +108,7 @@ public enum _SwiftifyProtocolMethodInfo {
   public macro _SwiftifyImportProtocol(
     _ methodInfo: _SwiftifyProtocolMethodInfo...,
     spanAvailability: String? = nil,
+    refAvailability: String? = nil,
     typeMappings: [String: String] = [:]
   ) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportProtocolMacro")
@@ -146,4 +152,19 @@ public func _swiftifyOverrideLifetime<
   // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
   // should be expressed by a builtin that is hidden within the function body.
   dependent
+}
+
+/// Let a generated wrapper turn an Optional value into an optional
+/// pointer argument without branching at the call site, so a function with
+/// several Optional pointer parameters doesn't trigger a combinatorial explosion
+/// of nested if statements.
+@export(implementation)
+@_transparent
+public func _swiftifyWithOptionalPointer<T: ~Copyable, E: ~Copyable>(
+  _ x: borrowing T?, _ f: (UnsafePointer<T>?) -> E
+) -> E {
+  switch x {
+  case .some(let value): return withUnsafePointer(to: value, f)
+  case .none: return f(nil)
+  }
 }

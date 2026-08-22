@@ -71,4 +71,18 @@ extension MutableRef where Value: ~Copyable {
       unsafe &pointer.pointee
     }
   }
+
+  /// The address of the referenced value.
+  ///
+  /// Unlike `withUnsafeMutablePointer(to:)`, this is not scoped to a closure,
+  /// so the returned pointer's validity is not enforced by the compiler. It is
+  /// only valid for as long as this `MutableRef` is alive. Accessing the value
+  /// through `value` instead lets the compiler check that for you.
+  @available(StdlibDeploymentTarget 6.4, *)
+  @unsafe
+  @export(implementation)
+  @_transparent
+  public var _unsafeAddress: UnsafeMutablePointer<Value> {
+    unsafe pointer
+  }
 }
