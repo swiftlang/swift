@@ -446,7 +446,7 @@ suite.test("_consumingExtracting() bounds checking")
 .crashOutputMatches("Byte offset range out of bounds", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
-  var span = MutableRawSpan(elements: b.mutableSpan)
+  let span = MutableRawSpan(elements: b.mutableSpan)
   expectCrashLater()
   _ = span._consumingExtracting(2 ..< .max)
 }
@@ -596,7 +596,7 @@ suite.test("_consumingExtracting(first:) bound checking")
 .crashOutputMatches("Can't have a prefix of negative length", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
-  var span = MutableRawSpan(elements: b.mutableSpan)
+  let span = MutableRawSpan(elements: b.mutableSpan)
   expectCrashLater()
   _ = span._consumingExtracting(first: -1)
 }
@@ -607,7 +607,7 @@ suite.test("_consumingExtracting(droppingLast:) bound checking")
 .crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
-  var span = MutableRawSpan(elements: b.mutableSpan)
+  let span = MutableRawSpan(elements: b.mutableSpan)
   expectCrashLater()
   _ = span._consumingExtracting(droppingLast: -1)
 }
@@ -723,7 +723,7 @@ suite.test("_consumingExtracting(last:) bound checking")
 .crashOutputMatches("Can't have a suffix of negative length", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
-  var span = MutableRawSpan(elements: b.mutableSpan)
+  let span = MutableRawSpan(elements: b.mutableSpan)
   expectCrashLater()
   _ = span._consumingExtracting(last: -1)
 }
@@ -734,7 +734,7 @@ suite.test("_consumingExtracting(droppingFirst:) bound checking")
 .crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
-  var span = MutableRawSpan(elements: b.mutableSpan)
+  let span = MutableRawSpan(elements: b.mutableSpan)
   expectCrashLater()
   _ = span._consumingExtracting(droppingFirst: -1)
 }
