@@ -2135,6 +2135,9 @@ function Build-CMakeProject {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-gnone")
           }
 
+          Add-KeyValueIfNew $Defines CMAKE_PROJECT_INCLUDE `
+            "$SourceCache\swift\utils\swift-batch-mode.cmake"
+
           # CMake 3.30+ passes all linker flags to Swift as the linker driver,
           # including those from the internal CMake modules files, without
           # a `-Xlinker` prefix. This causes build failures as Swift cannot
@@ -2259,7 +2262,8 @@ function Build-CMakeProject {
             Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS ($AndroidLinkerFlags + @("-Xlinker", "--gc-sections"))
             Add-FlagsDefine $Defines CMAKE_MODULE_LINKER_FLAGS $AndroidLinkerFlags
             Add-KeyValueIfNew $Defines SWIFT_ANDROID_LD_PATH $ld
-            Add-KeyValueIfNew $Defines CMAKE_PROJECT_INCLUDE "$SourceCache\swift\utils\android-overrides.cmake"
+            Add-KeyValueIfNew $Defines CMAKE_PROJECT_INCLUDE `
+              "$SourceCache\swift\utils\android-overrides.cmake;$SourceCache\swift\utils\swift-batch-mode.cmake"
           } else {
             # Clang Runtime explicitly sets linker flags for every target,
             # making the `add_link_options()` approach via
