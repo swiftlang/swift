@@ -589,6 +589,8 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
   // Mark the constructor transparent so that we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
 
+  constructor->setSynthesized();
+
   constructor->setBodySynthesizer(synthesizeStructDefaultConstructorBody,
                                   structDecl);
 
@@ -714,6 +716,8 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
 
   // Make the constructor transparent so we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
+
+  constructor->setSynthesized();
 
   if (wantBody) {
     auto memberMemory =
