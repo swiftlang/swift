@@ -134,6 +134,7 @@
 
 #define DEBUG_TYPE "address-lowering"
 
+#include "swift/SILOptimizer/Transforms/AddressLowering.h"
 #include "PhiStorageOptimizer.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Assertions.h"
@@ -277,8 +278,8 @@ static bool isPseudoReturnValue(SILValue value) {
   if (value->getFunction()->getConventions().getNumDirectSILResults() < 2)
     return false;
 
-  if (auto *tuple = dyn_cast<TupleInst>(value)) {
-    Operand *singleUse = tuple->getSingleUse();
+  if (value->getType().getAs<TupleType>()) {
+    Operand *singleUse = value->getSingleUse();
     return singleUse && isa<ReturnInst>(singleUse->getUser());
   }
   return false;
@@ -3228,8 +3229,8 @@ static UnconditionalCheckedCastAddrInst *rewriteUnconditionalCheckedCastInst(
   assert(destAddr);
   auto *uccai = builder.createUnconditionalCheckedCastAddr(
       uncondCheckedCast->getLoc(), uncondCheckedCast->getCheckedCastOptions(),
-      srcAddr, srcAddr->getType().getASTType(),
-      destAddr, destAddr->getType().getASTType());
+      srcAddr, uncondCheckedCast->getSourceFormalType(), destAddr,
+      uncondCheckedCast->getTargetFormalType());
   auto afterBuilder =
       pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
   if (srcAddrOnly) {
@@ -4786,22 +4787,17 @@ static void deleteRewrittenInstructions(AddressLoweringState &pass) {
   pass.deleter.cleanupDeadInstructions();
 }
 
-//===----------------------------------------------------------------------===//
-//                     AddressLowering: Function Pass
-//===----------------------------------------------------------------------===//
-
-namespace {
-class AddressLowering : public SILFunctionTransform {
-  /// The entry point to this function transformation.
-  void run() override;
-
-  void runOnFunction(SILFunction *F);
-};
-} // end anonymous namespace
-
-void AddressLowering::runOnFunction(SILFunction *function) {
-  if (!function->isDefinition())
+void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
+  // Skip functions already in lowered-address form: default (non-opaque-values)
+  // mode, a function this pass already lowered (pipeline restarts can re-run a
+  // function pass), or one deserialized as canonical.
+  if (function->hasLoweredAddresses())
     return;
+
+  if (!function->isDefinition()) {
+    function->setHasLoweredAddresses(true);
+    return;
+  }
 
   assert(function->hasOwnership() && "SIL opaque values requires OSSA");
 
@@ -4813,8 +4809,8 @@ void AddressLowering::runOnFunction(SILFunction *function) {
   // Ensure that blocks can be processed in RPO order.
   removeUnreachableBlocks(*function);
 
-  auto *dominance = PM->getAnalysis<DominanceAnalysis>();
-  auto *SLA = PM->getAnalysis<SILLoopAnalysis>();
+  auto *dominance = pm->getAnalysis<DominanceAnalysis>();
+  auto *SLA = pm->getAnalysis<SILLoopAnalysis>();
 
   AddressLoweringState pass(function, dominance->get(function), SLA);
 
@@ -4854,23 +4850,27 @@ void AddressLowering::runOnFunction(SILFunction *function) {
 
   // The CFG may change because of criticalEdge splitting during
   // createStackAllocation or StackNesting.
-  invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
-}
-
-/// The entry point to this function transformation.
-void AddressLowering::run() {
-  // Skip functions already in lowered-address form: default (non-opaque-values)
-  // mode, a function this pass already lowered (pipeline restarts can re-run a
-  // function pass), or one deserialized as canonical.
-  if (getFunction()->hasLoweredAddresses())
-    return;
-
-  runOnFunction(getFunction());
+  pm->invalidateAnalysis(
+      function, SILAnalysis::InvalidationKind::BranchesAndInstructions);
 
   // Mark the function lowered now, so its conventions and verification see
   // address form immediately (the module stage only reaches Canonical after all
   // diagnostic passes; see runSILDiagnosticPasses in Passes.cpp).
-  getFunction()->setHasLoweredAddresses(true);
+  function->setHasLoweredAddresses(true);
 }
+
+//===----------------------------------------------------------------------===//
+//                     AddressLowering: Function Pass
+//===----------------------------------------------------------------------===//
+
+namespace {
+class AddressLowering : public SILFunctionTransform {
+  /// The entry point to this function transformation.
+  void run() override;
+};
+} // end anonymous namespace
+
+/// The entry point to this function transformation.
+void AddressLowering::run() { lowerAddress(PM, getFunction()); }
 
 SILTransform *swift::createAddressLowering() { return new AddressLowering(); }
