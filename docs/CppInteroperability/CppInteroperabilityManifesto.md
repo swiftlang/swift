@@ -464,7 +464,7 @@ func printInt(_ value: Int)
 
 func caller() {
   let x = 42
-  printInt(y) // OK
+  printInt(x) // OK
 }
 ```
 
