@@ -48,27 +48,57 @@ public class DefaultWidget: IWidget {
 // class-bound archetype. Its native entry receives the recovered object
 // directly; the COM ABI does not carry a separate Self metadata argument.
 
-// CHECK-LABEL: sil private [transparent] [thunk] {{.*}}DefaultWidgetC{{.*}}TWV
+// CHECK-LABEL: sil shared [transparent] [thunk] {{.*}}DefaultWidgetC{{.*}}TWV
 // CHECK-SAME: $@convention(com_method) <[[DEFAULT_SELF:[^ ]+]] where [[DEFAULT_SELF]] : DefaultWidget>
 // CHECK-SAME: (Optional<UnsafeMutablePointer<Int32>>, @guaranteed [[DEFAULT_SELF]]) -> UInt32
+
+@com
+public final class PublicWidget: IWidget {
+}
+
+// A public final implementation emits its native entry with shared linkage.
+
+// CHECK-LABEL: sil shared [transparent] [thunk] {{.*}}PublicWidgetC{{.*}}TWV
+// CHECK-SAME: $@convention(com_method) (Optional<UnsafeMutablePointer<Int32>>, @guaranteed PublicWidget) -> UInt32
+
+@com
+open class OpenWidget: IWidget {
+  public init() {
+  }
+
+  open func value(_ result: UnsafeMutablePointer<Int32>?) -> UInt32 {
+    result?.pointee = 17
+    return 0
+  }
+}
+
+// An external subclass can reference this public entry through the serialized
+// witness-table association.
+
+// CHECK-LABEL: sil [transparent] [thunk] {{.*}}OpenWidgetC{{.*}}TWV
+// CHECK-SAME: $@convention(com_method) (Optional<UnsafeMutablePointer<Int32>>, @guaranteed OpenWidget) -> UInt32
 
 // The witness tables record the native entries separately from the ordinary
 // Swift witnesses. IRGen follows these references when it builds COM vtables.
 
 // CHECK-LABEL: sil_witness_table hidden Widget: IWidget
 // CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
-// CHECK-LABEL: sil_witness_table hidden DefaultWidget: IWidget
+// CHECK-LABEL: sil_witness_table DefaultWidget: IWidget
+// CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
+// CHECK-LABEL: sil_witness_table PublicWidget: IWidget
+// CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
+// CHECK-LABEL: sil_witness_table OpenWidget: IWidget
 // CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
 
 // The synthesized ISwiftObject conformance uses the default property
 // implementations supplied by the COM module.
 
-// DEFAULT-DAG: sil private [transparent] [thunk] {{.*}}WidgetC{{.*}}ISwiftObject{{.*}}6object{{.*}}TWV
-// DEFAULT-SAME: $@convention(com_method)
-// DEFAULT-DAG: sil private [transparent] [thunk] {{.*}}WidgetC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV
-// DEFAULT-SAME: $@convention(com_method)
-// DEFAULT-DAG: sil private [transparent] [thunk] [used] {{.*}}DefaultWidgetC{{.*}}ISwiftObject{{.*}}6object{{.*}}TW.com.entry : $@convention(com_method) <[[DEFAULT_OBJECT_SELF:[^ ]+]] where [[DEFAULT_OBJECT_SELF]] : DefaultWidget> (@guaranteed [[DEFAULT_OBJECT_SELF]]) -> UnsafeMutableRawPointer
-// DEFAULT-DAG: sil private [transparent] [thunk] [used] {{.*}}DefaultWidgetC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TW.com.entry : $@convention(com_method) <[[DEFAULT_METADATA_SELF:[^ ]+]] where [[DEFAULT_METADATA_SELF]] : DefaultWidget> (@guaranteed [[DEFAULT_METADATA_SELF]]) -> UnsafeRawPointer
+// DEFAULT-DAG: sil private [transparent] [thunk] {{.*}}WidgetC{{.*}}ISwiftObject{{.*}}6object{{.*}}TWV : $@convention(com_method)
+// DEFAULT-DAG: sil private [transparent] [thunk] {{.*}}WidgetC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV : $@convention(com_method)
+// DEFAULT-DAG: sil shared [transparent] [thunk] {{.*}}DefaultWidgetC{{.*}}ISwiftObject{{.*}}6object{{.*}}TWV : $@convention(com_method) <[[DEFAULT_OBJECT_SELF:[^ ]+]] where [[DEFAULT_OBJECT_SELF]] : DefaultWidget> (@guaranteed [[DEFAULT_OBJECT_SELF]]) -> UnsafeMutableRawPointer
+// DEFAULT-DAG: sil shared [transparent] [thunk] {{.*}}DefaultWidgetC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV : $@convention(com_method) <[[DEFAULT_METADATA_SELF:[^ ]+]] where [[DEFAULT_METADATA_SELF]] : DefaultWidget> (@guaranteed [[DEFAULT_METADATA_SELF]]) -> UnsafeRawPointer
+// DEFAULT-DAG: sil [transparent] [thunk] {{.*}}OpenWidgetC{{.*}}ISwiftObject{{.*}}6object{{.*}}TWV : $@convention(com_method) <[[OPEN_OBJECT_SELF:[^ ]+]] where [[OPEN_OBJECT_SELF]] : OpenWidget> (@guaranteed [[OPEN_OBJECT_SELF]]) -> UnsafeMutableRawPointer
+// DEFAULT-DAG: sil [transparent] [thunk] {{.*}}OpenWidgetC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV : $@convention(com_method) <[[OPEN_METADATA_SELF:[^ ]+]] where [[OPEN_METADATA_SELF]] : OpenWidget> (@guaranteed [[OPEN_METADATA_SELF]]) -> UnsafeRawPointer
 // DEFAULT-LABEL: sil_witness_table {{.*}} Widget: ISwiftObject
 // DEFAULT-DAG: method #ISwiftObject.object!getter: {{.*}}, com {{.*}}TWV
 // DEFAULT-DAG: method #ISwiftObject.metadata!getter: {{.*}}, com {{.*}}TWV

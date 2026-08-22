@@ -28,8 +28,8 @@ public final class COMObject: IDerived, IIndependent {
 // CHECK-DAG: @"$s{{.*}}9COMObjectCMn.com.vtable.$s{{.*}}8IDerivedMp"      = private constant {{.*}} { ptr @"$s{{.*}}9COMObjectCMn.com.interface_map", i64 16, ptr @QueryInterface, ptr @AddRef, ptr @Release
 // CHECK-DAG: @"$s{{.*}}9COMObjectCMn.com.vtable.$s{{.*}}12IIndependentMp" = private constant {{.*}} { ptr @"$s{{.*}}9COMObjectCMn.com.interface_map", i64 24, ptr @QueryInterface, ptr @AddRef, ptr @Release
 
-// CHECK-DAG: define internal ptr @"$s{{.*}}9COMObjectC{{.*}}ISwiftObject{{.*}}6object{{.*}}TWV"(ptr
-// CHECK-DAG: define internal ptr @"$s{{.*}}9COMObjectC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV"(ptr
+// CHECK-DAG: define linkonce_odr hidden ptr @"$s{{.*}}9COMObjectC{{.*}}ISwiftObject{{.*}}6object{{.*}}TWV"(ptr
+// CHECK-DAG: define linkonce_odr hidden ptr @"$s{{.*}}9COMObjectC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV"(ptr
 
 // The prefix template stores the vtable address points in memory order:
 // IIndependent, IDerived (which also represents IBase), then ISwiftObject
