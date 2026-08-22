@@ -25,6 +25,7 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SetVector.h"
 #include <array>
 #include <queue>
 #include <tuple>
@@ -215,6 +216,10 @@ class Serializer : public SerializerBase {
                        index_block::DECL_OFFSETS>
   DeclsToSerialize;
 
+  /// Declarations whose layout must be serialized because they contribute to
+  /// the ABI of a client-visible type but may not be available to clients.
+  llvm::SmallSetVector<const Decl *, 16> HiddenTypeLayoutsToSerialize;
+
   ASTBlockRecordKeeper<Type, TypeID,
                        index_block::TYPE_OFFSETS>
   TypesToSerialize;
@@ -355,6 +360,12 @@ private:
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
 
+  /// Schedule a declaration to receive a hidden layout representation.
+  void scheduleHiddenTypeLayoutSerialization(const Decl *D);
+
+  /// Find hidden types that contribute to this module's client-visible ABI.
+  void scheduleHiddenTypeLayouts(ArrayRef<const FileUnit *> files);
+
   /// Writes the given decl.
   void writeASTBlockEntity(const Decl *D);
 
@@ -421,6 +432,9 @@ private:
   /// This will continue until the queue is empty, even if the items currently
   /// in the queue trigger the serialization of additional decls and/or types.
   void writeAllDeclsAndTypes();
+
+  /// Writes placeholder records for scheduled hidden type layouts.
+  bool writeHiddenTypeLayoutInformationIfNeeded();
 
   /// Writes all identifiers in the IdentifiersToWrite queue.
   ///

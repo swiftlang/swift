@@ -65,6 +65,7 @@ class PointerAuthQualifier;
 } // end namespace clang
 
 namespace swift {
+  struct AbstractTypeLayout;
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;
   class ApplyExpr;
@@ -10319,6 +10320,30 @@ public:
   }
   static bool classof(const FreestandingMacroExpansion *expansion) {
     return expansion->getFreestandingMacroKind() == FreestandingMacroKind::Decl;
+  }
+};
+
+/// Represents a type whose definition could not be resolved, but for which
+/// serialized layout information is available.
+class HiddenTypeLayoutInfoDecl final : public TypeDecl {
+  explicit HiddenTypeLayoutInfoDecl(DeclContext *DC)
+      : TypeDecl(DeclKind::HiddenTypeLayoutInfo, DC, Identifier(), SourceLoc(),
+                 {}) {
+    setImplicit();
+  }
+
+public:
+  AbstractTypeLayout *Layout = nullptr;
+  TypeDecl *ParentDecl = nullptr;
+
+  SourceLoc getLocFromSource() const { return SourceLoc(); }
+
+  static HiddenTypeLayoutInfoDecl *create(ASTContext &ctx, DeclContext *DC);
+
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::HiddenTypeLayoutInfo;
   }
 };
 

@@ -833,6 +833,7 @@ public:
     case DeclKind::Macro:
     case DeclKind::MacroExpansion:
     case DeclKind::Using:
+    case DeclKind::HiddenTypeLayoutInfo:
       return false;
     case DeclKind::Missing:
       llvm_unreachable("missing decl should not show up here");

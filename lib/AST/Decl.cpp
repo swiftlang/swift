@@ -194,6 +194,9 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(MacroExpansion);
   TRIVIAL_KIND(Using);
 
+  case DeclKind::HiddenTypeLayoutInfo:
+    llvm_unreachable("hidden layout declarations are not diagnostic entities");
+
   case DeclKind::TypeAlias:
     return cast<TypeAliasDecl>(this)->getGenericParams()
              ? DescriptiveDeclKind::GenericTypeAlias
@@ -1835,6 +1838,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
   case DeclKind::Using:
+  case DeclKind::HiddenTypeLayoutInfo:
     llvm_unreachable("not a ValueDecl");
 
   case DeclKind::AssociatedType:
@@ -4167,6 +4171,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
   case DeclKind::Using:
+  case DeclKind::HiddenTypeLayoutInfo:
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:
@@ -5259,6 +5264,7 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   case DeclKind::MacroExpansion:
   case DeclKind::BuiltinTuple:
   case DeclKind::Using:
+  case DeclKind::HiddenTypeLayoutInfo:
     // These don't take attributes.
     return SourceLoc();
 
@@ -14054,4 +14060,9 @@ void ExplicitCaughtTypeRequest::cacheResult(Type type) const {
   }
 
   llvm_unreachable("Unhandled catch node");
+}
+
+HiddenTypeLayoutInfoDecl *HiddenTypeLayoutInfoDecl::create(ASTContext &ctx,
+                                                           DeclContext *DC) {
+  return new (ctx) HiddenTypeLayoutInfoDecl(DC);
 }

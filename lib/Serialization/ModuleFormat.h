@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1017; // Multi-operand debug_value serialization
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1018; // hidden type layout placeholder
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2722,6 +2722,11 @@ namespace decls_block {
   using CalledDeclAttrLayout = BCRecordLayout<
     Called_DECL_ATTR,
     BCFixed<2> // execution semantics
+  >;
+
+  using HiddenTypeLayoutInfoLayout = BCRecordLayout<
+    HIDDEN_TYPE_LAYOUT_INFO,
+    DeclIDField // declaration whose hidden layout will be represented
   >;
 
   // clang-format on

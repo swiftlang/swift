@@ -448,6 +448,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *D) {
+    return false;
+  }
+
   bool visitMacroDecl(MacroDecl *MD) {
     bool WalkGenerics = visitGenericParamListIfNeeded(MD);
 

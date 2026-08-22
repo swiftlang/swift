@@ -3949,9 +3949,11 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
 }
 
 HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,
-                            ModuleDecl *definingModule) {
+                            ModuleDecl *definingModule,
+                            HiddenTypeLayoutInfoDecl *layoutInfoDecl,
+                            CanType parent) {
   llvm::FoldingSetNodeID id;
-  HiddenType::Profile(id, mangledName, definingModule);
+  HiddenType::Profile(id, mangledName, definingModule, layoutInfoDecl, parent);
 
   void *insertPos;
   if (auto *hidden =
@@ -3962,7 +3964,7 @@ HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,
   auto nameCopy = ctx.AllocateCopy(mangledName);
 
   auto *hidden = new (ctx, AllocationArena::Permanent)
-      HiddenType(nameCopy, definingModule, ctx);
+      HiddenType(nameCopy, definingModule, layoutInfoDecl, parent, ctx);
 
   ctx.getImpl().HiddenTypes.InsertNode(hidden, insertPos);
   return hidden;
