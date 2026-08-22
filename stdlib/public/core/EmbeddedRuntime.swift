@@ -199,9 +199,25 @@ func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
 
 @c
 public func swift_coroFrameAlloc(_ size: Int, _ type: UInt64) -> UnsafeMutableRawPointer? {
-  return unsafe alignedAlloc(
-    size: size,
-    alignment: _swift_MinAllocationAlignment)
+  return unsafe alignedAlloc(size: size, alignment: _swift_MinAllocationAlignment)
+}
+
+@c
+public func swift_coroFrameAllocTyped(_ size: Int, _ type: UInt64) -> UnsafeMutableRawPointer? {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  return unsafe _swift_typedAllocate(size, _swift_MinAllocationAlignment - 1, 0, type)
+#else
+  return unsafe alignedAlloc(size: size, alignment: _swift_MinAllocationAlignment)
+#endif
+}
+
+@c
+public func swift_coroFrameDeallocTyped(_ ptr: UnsafeMutableRawPointer, _ type: UInt64) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  unsafe _swift_typedDeallocate(ptr, -1, _swift_MinAllocationAlignment - 1, 0, type)
+#else
+  unsafe free(ptr)
+#endif
 }
 
 @c
