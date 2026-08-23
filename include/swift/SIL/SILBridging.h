@@ -530,7 +530,10 @@ struct BridgedFunction {
     IsNotThunk,
     IsThunk,
     IsReabstractionThunk,
-    IsSignatureOptimizedThunk
+    IsSignatureOptimizedThunk,
+    IsBackDeployedThunk,
+    IsDistributedThunk,
+    IsDistributedProxyAdapterThunk
   };
 
   enum class SerializedKind {
