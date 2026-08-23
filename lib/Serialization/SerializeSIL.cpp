@@ -3478,6 +3478,9 @@ void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
       !impl->hasValidLinkageForFragileRef(IsSerialized))
     return;
 
+  if (deinit.isSpecialized())
+    return;
+
   // Use the mangled name of the class as a key to distinguish between classes
   // which have the same name (but are in different contexts).
   Mangle::ASTMangler mangler(deinit.getNominalDecl()->getASTContext());

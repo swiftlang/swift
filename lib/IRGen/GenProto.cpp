@@ -2804,6 +2804,17 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
           wt->getDeclContext()->getParentModule() != getSwiftModule())
         return;
     }
+
+    // A conformance can have both an unspecialized witness table and a
+    // specialized one, e.g. when a default implementation in a protocol
+    // extension had to be specialized for the conforming type. Both mangle to
+    // the same symbol, and lookups use the specialized one (see
+    // SILModule::lookUpWitnessTable), so only that one may be emitted. This
+    // matters when witness tables are emitted eagerly rather than on demand.
+    if (!wt->isSpecialized() &&
+        getSILModule().lookUpWitnessTable(wt->getConformance(),
+                                          /*isSpecialized=*/true))
+      return;
   }
 
   // Ensure that relatively-referenced symbols for witness thunks are collocated

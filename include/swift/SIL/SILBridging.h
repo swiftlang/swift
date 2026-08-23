@@ -1619,6 +1619,8 @@ struct BridgedContext {
                                                                           bool loadCalleesRecursively) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction lookupStdlibFunction(BridgedStringRef name) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedDeclObj nominal) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpSpecializedDeinitFunction(BridgedType nominalType) const;
+  void addSpecializedDeinit(BridgedType nominalType, BridgedFunction deinitFunc) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinIntegerType(SwiftInt bitWidth) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinWordType() const;

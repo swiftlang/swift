@@ -195,6 +195,14 @@ bool BridgedPassContext::fitsInOpaqueExistentialPayload(BridgedType type) const 
   return false;
 }
 
+void BridgedPassContext::visitTypesWithEmittedMetadata(
+    void *context,
+    void (*callback)(void *context, BridgedType type)) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  for (SILType type : mod->getNonCopyableTypesWithEmittedMetadata())
+    callback(context, {type});
+}
+
 OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
                                                                BridgedSubstitutionMap substitutions,
                                                                bool convertIndirectToDirect,
