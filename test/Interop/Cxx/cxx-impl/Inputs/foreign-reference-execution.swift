@@ -8,6 +8,14 @@ public func takesNode(_ n: Node) -> Int32 { return n.value }
 @cxx @implementation
 public func takesNullableNode(_ n: Node?) -> Int32 { return n?.value ?? -1 }
 
+// void reseatNode(Node *_Nonnull &p, Node *_Nonnull to);
+@cxx @implementation
+public func reseatNode(_ p: UnsafeMutablePointer<Node>, _ to: Node) { p.pointee = to }
+
+// int readNodePtr(Node *_Nonnull const &p);
+@cxx @implementation
+public func readNodePtr(_ p: UnsafePointer<Node>) -> Int32 { return p.pointee.value }
+
 // Node *_Nonnull returnsRetainedNode(Node *_Nonnull n)
 //     __attribute__((swift_attr("returns_retained")));
 @cxx @implementation

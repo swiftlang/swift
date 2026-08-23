@@ -51,6 +51,16 @@ int main() {
          takesNullableNodeRes2, liveNodes);
   // CHECK: takesNullableNode=-1 42 live=0
 
+  // A reference to a pointer: the body reseats the caller's pointer,
+  // retaining the new referent and releasing the old one.
+  Node other{7};
+  Node *slot = &node;
+  reseatNode(slot, &other);
+  int readNodePtrRes = readNodePtr(slot);
+  printf("reseatNode=%d readNodePtr=%d live=%d\n", slot == &other,
+         readNodePtrRes, liveNodes);
+  // CHECK: reseatNode=1 readNodePtr=7 live=0
+
   // A retained result is returned at +1.
   Node *returned = returnsRetainedNode(&node);
   printf("returnsRetainedNode=%d live=%d\n", returned->value, liveNodes);
