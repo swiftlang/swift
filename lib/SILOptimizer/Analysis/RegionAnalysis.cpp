@@ -687,12 +687,14 @@ RegionAnalysisValueMap::getIsolationRegion(SILValue value) const {
   return iter->getSecond().getIsolationRegionInfo();
 }
 
-/// ~Escapable values (Span, etc.) can be Sendable, but they are still a
-/// borrow of their source. Region isolation has to track them so a later
-/// use counts as a use of that source.
-static bool isEscapableForRegionIsolation(SILValue value) {
-  SILFunction *fn = value->getFunction();
-  return !fn || value->getType().isEscapable(*fn);
+/// A nonescaping mark_dependence result may have a Sendable type, but sending
+/// it must still transfer the region of the value it depends on. Treat that
+/// specific value as non-Sendable inside region isolation without changing the
+/// type's Sendable conformance for the rest of the compiler.
+static bool isSendableForRegionIsolation(SILValue value) {
+  auto *mdi = dyn_cast<MarkDependenceInst>(value);
+  return SILIsolationInfo::isSendable(value) &&
+         !(mdi && mdi->isNonEscaping());
 }
 
 std::pair<TrackableValue, bool>
@@ -713,10 +715,9 @@ RegionAnalysisValueMap::initializeTrackableValue(
   // If we did not insert, just return the already stored value.
   self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
 
-  // Before we do anything, see if we have a Sendable value. ~Escapable
-  // Sendable values are still tracked (see isEscapableForRegionIsolation).
-  if (!SILIsolationInfo::isNonSendable(value) &&
-      isEscapableForRegionIsolation(value)) {
+  // Before we do anything, see if we have a value that region isolation can
+  // ignore.
+  if (isSendableForRegionIsolation(value)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
     return {{iter.first->first, iter.first->second}, true};
   }
@@ -757,11 +758,8 @@ TrackableValue RegionAnalysisValueMap::getTrackableValueHelper(
     return {iter.first->first, iter.first->second};
   }
 
-  // Then check our oracle to see if the value is actually sendable. If we have
-  // a Sendable value that can escape, just return early. ~Escapable Sendable
-  // values fall through so later uses keep their source in use.
-  if (SILIsolationInfo::isSendable(value) &&
-      isEscapableForRegionIsolation(value)) {
+  // Then check our oracle to see if region isolation can ignore the value.
+  if (isSendableForRegionIsolation(value)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
     return {iter.first->first, iter.first->second};
   }
@@ -1040,6 +1038,15 @@ private:
   /// Visit \p sourceValue returning a load base if we find one. The actual
   /// underlying object is value.
   SILValue visit(SILValue sourceValue) {
+    // Copies of a nonescaping mark_dependence result must resolve to the
+    // mark_dependence itself. It is the point where the dependent value is
+    // joined to its base region, even when the result's type is Sendable.
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(sourceValue);
+        mdi && mdi->isNonEscaping()) {
+      value = mdi;
+      return {};
+    }
+
     // If our result is ever Sendable, we record that as our value if we do
     // not have a value yet. We always want to take the first one.
     if (SILIsolationInfo::isSendable(sourceValue)) {
@@ -4455,18 +4462,19 @@ PartitionOpTranslator::visitRefToRawPointerInst(RefToRawPointerInst *r) {
 TranslationSemantics
 PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   assert(isStaticallyLookThroughInst(mdi) && "Out of sync");
-  translateSILLookThrough(mdi->getResults(), mdi->getValue());
 
   // Nonescaping dependence isn't just a use of the base at this
-  // instruction. The dependent value (e.x.: a Span) keeps using the
-  // borrowed storage until it dies, so put them in the same region.
+  // instruction. The dependent value (e.g. a Span) keeps using the borrowed
+  // storage until it dies, so put the result, value, and base in one region.
   if (mdi->isNonEscaping()) {
-    translateSILMerge(SILValue(mdi),
-                      &mdi->getAllOperands()[MarkDependenceInst::Base],
-                      /*requireOperands=*/true, RegionMergeReason::Assign);
-  } else {
-    translateSILRequire(mdi->getBase());
+    translateSILMultiAssign(mdi->getResults(), ArrayRef<Operand *>(),
+                            makeOperandRefRange(mdi->getAllOperands()),
+                            RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
   }
+
+  translateSILLookThrough(mdi->getResults(), mdi->getValue());
+  translateSILRequire(mdi->getBase());
   return TranslationSemantics::Special;
 }
 

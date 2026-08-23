@@ -9,6 +9,15 @@
 func spanUseAfterSend() async {
   var a = [1.0, 2.0, 3.0]
   let s = a.span
+  Task { // expected-error {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'a' which is accessed later by code in the current isolation context}}
+    a = []
+  }
+  _ = s[0] // expected-note {{access can happen concurrently}}
+}
+
+func spanUseAfterAwaitedSend() async {
+  var a = [1.0, 2.0, 3.0]
+  let s = a.span
   await Task { // expected-error {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'a' which is accessed later by code in the current isolation context}}
     a = []
   }.value
@@ -23,6 +32,16 @@ func spanUseAfterSendSameIsolation() async {
     a.append(4.0)
   }.value
   _ = s[0] // expected-note {{access can happen concurrently}}
+}
+
+func derivedSpanUseAfterSend() async {
+  var a = [1.0, 2.0, 3.0]
+  let s = a.span
+  let tail = s.extracting(droppingFirst: 1)
+  await Task { // expected-error {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'a' which is accessed later by code in the current isolation context}}
+    a = []
+  }.value
+  _ = tail[0] // expected-note {{access can happen concurrently}}
 }
 
 func spanDeadBeforeSend() async {
