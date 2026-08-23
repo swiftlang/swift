@@ -4193,7 +4193,12 @@ static void printSILMoveOnlyDeinits(
       [](const SILMoveOnlyDeinit *v1, const SILMoveOnlyDeinit *v2) -> bool {
         StringRef name1 = v1->getNominalDecl()->getName().str();
         StringRef name2 = v2->getNominalDecl()->getName().str();
-        return name1.compare(name2) == -1;
+        if (int cmp = name1.compare(name2))
+          return cmp == -1;
+        // A nominal decl can have several specialized deinits, so fall back to
+        // the implementation name to get a deterministic order.
+        return v1->getImplementation()->getName() <
+               v2->getImplementation()->getName();
       });
   for (const auto *tbl : sortedTables)
     tbl->print(printCtx.OS(), printCtx.printVerbose());
@@ -4617,7 +4622,12 @@ void SILVTable::dump() const { print(llvm::errs()); }
 void SILMoveOnlyDeinit::print(llvm::raw_ostream &OS, bool verbose) const {
   OS << "sil_moveonlydeinit ";
   printSerializedKind(OS, getSerializedKind());
-  OS << getNominalDecl()->getName() << " {\n";
+  if (SILType nominalTy = getNominalType()) {
+    OS << nominalTy;
+  } else {
+    OS << getNominalDecl()->getName();
+  }
+  OS << " {\n";
   OS << "  @" << getImplementation()->getName();
   OS << "\t// " << demangleSymbol(getImplementation()->getName());
   OS << "\n";
