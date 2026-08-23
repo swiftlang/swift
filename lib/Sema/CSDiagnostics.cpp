@@ -924,6 +924,9 @@ void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
 }
 
 bool GenericArgumentsMismatchFailure::diagnoseAsError() {
+  if (getContextualTypePurpose() == CTP_ThrowStmt)
+    return diagnoseThrowsTypeMismatch();
+
   auto anchor = getAnchor();
 
   auto fromType = getFromType();
