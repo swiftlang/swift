@@ -7069,7 +7069,9 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
 /// Whether \p a and \p b have the same parameter types, ignoring `self` and
 /// the result type. Overloads are distinguished by their parameter types, so
 /// this is what identifies which member of an imported overload set an
-/// `@implementation` function implements.
+/// `@implementation` function implements. An imported declaration's C++ lvalue
+/// reference parameters are compared in their implementation spelling, as
+/// pointers.
 static bool haveSameParameterTypes(const ValueDecl *a, const ValueDecl *b) {
   auto paramsOf =
       [](const ValueDecl *decl) -> ArrayRef<AnyFunctionType::Param> {
@@ -7082,14 +7084,26 @@ static bool haveSameParameterTypes(const ValueDecl *a, const ValueDecl *b) {
     return {};
   };
 
+  // Compare canonical types, on the same `getOldType()`s, exactly what
+  // `ObjCImplementationChecker` does.
+  auto paramTypeAt = [](const ValueDecl *decl,
+                        ArrayRef<AnyFunctionType::Param> params,
+                        size_t i) -> CanType {
+    Type ty = params[i].getOldType();
+    const auto *clangFD =
+        dyn_cast_or_null<clang::FunctionDecl>(decl->getClangDecl());
+    if (!clangFD || clangFD->getNumParams() != params.size())
+      return ty->getCanonicalType();
+    return importer::getCxxReferenceImplType(
+               ty, clangFD->getParamDecl(i)->getType().getTypePtr())
+        ->getCanonicalType();
+  };
+
   auto paramsA = paramsOf(a), paramsB = paramsOf(b);
   if (paramsA.size() != paramsB.size())
     return false;
   for (auto i : indices(paramsA)) {
-    // Compare canonical types, on the same `getOldType()`s, exactly what
-    // `ObjCImplementationChecker` does.
-    if (paramsA[i].getOldType()->getCanonicalType() !=
-        paramsB[i].getOldType()->getCanonicalType())
+    if (paramTypeAt(a, paramsA, i) != paramTypeAt(b, paramsB, i))
       return false;
   }
   return true;
@@ -9629,6 +9643,27 @@ bool importer::isClangCxxRecord(const DeclContext *dc) {
     return isa_and_nonnull<clang::CXXRecordDecl>(nominal->getClangDecl());
 
   return false;
+}
+
+Type importer::getCxxReferenceImplType(Type importedTy,
+                                       const clang::Type *clangTy) {
+  if (!clangTy->isLValueReferenceType())
+    return importedTy;
+
+  // A reference to a foreign reference type imports as the reference type
+  // itself, which already is the C++ pointer. A reference to a pointer to one
+  // is a pointer to that pointer.
+  Type object = importedTy->getInOutObjectType();
+  if (object->isForeignReferenceType() &&
+      clangTy->getPointeeType()->isRecordType())
+    return object;
+
+  auto kind = clangTy->getPointeeType().isConstQualified()
+                  ? PTK_UnsafePointer
+                  : PTK_UnsafeMutablePointer;
+  if (Type wrapped = object->wrapInPointer(kind))
+    return wrapped;
+  return importedTy;
 }
 
 bool importer::isSymbolicCircularBase(const clang::CXXRecordDecl *symbolicClass,

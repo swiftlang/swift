@@ -926,6 +926,12 @@ bool isClangNamespace(const DeclContext *dc);
 /// Is this DeclContext a nominal type imported from a C++ `struct`/`class`?
 bool isClangCxxRecord(const DeclContext *dc);
 
+/// The spelling a `@cxx @implementation` parameter uses for the C++ parameter
+/// type \p clangTy, imported as \p importedTy: an lvalue reference becomes a
+/// pointer to the referent, `UnsafePointer` for `const T &` and
+/// `UnsafeMutablePointer` for `T &`; anything else stays \p importedTy.
+Type getCxxReferenceImplType(Type importedTy, const clang::Type *clangTy);
+
 /// Enumerate and import all members of the C++ namespace represented by
 /// \p namespaceEnum, invoking \p emit once for each newly imported member.
 ///
