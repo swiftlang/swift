@@ -275,6 +275,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public enum ThunkKind {
     case noThunk, thunk, reabstractionThunk, signatureOptimizedThunk
+    case backDeployedThunk, distributedThunk, distributedProxyAdapterThunk
   }
 
   public var thunkKind: ThunkKind {
@@ -283,6 +284,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case .IsThunk:                   return .thunk
     case .IsReabstractionThunk:      return .reabstractionThunk
     case .IsSignatureOptimizedThunk: return .signatureOptimizedThunk
+    case .IsBackDeployedThunk:       return .backDeployedThunk
+    case .IsDistributedThunk:        return .distributedThunk
+    case .IsDistributedProxyAdapterThunk:
+      return .distributedProxyAdapterThunk
     default:
       fatalError()
     }
@@ -294,6 +299,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case .thunk:                   bridged.setThunk(.IsThunk)
     case .reabstractionThunk:      bridged.setThunk(.IsReabstractionThunk)
     case .signatureOptimizedThunk: bridged.setThunk(.IsSignatureOptimizedThunk)
+    case .backDeployedThunk:       bridged.setThunk(.IsBackDeployedThunk)
+    case .distributedThunk:        bridged.setThunk(.IsDistributedThunk)
+    case .distributedProxyAdapterThunk:
+      bridged.setThunk(.IsDistributedProxyAdapterThunk)
     }
   }
 
