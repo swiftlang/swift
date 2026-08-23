@@ -34,7 +34,7 @@ public struct UniqueBox<Value: ~Copyable>: ~Copyable {
   @_transparent
   deinit {
     unsafe pointer.deinitialize(count: 1)
-    unsafe pointer.deallocate()
+    unsafe pointer._deallocate(capacity: 1)
   }
 }
 
@@ -68,7 +68,7 @@ extension UniqueBox where Value: ~Copyable {
   @_transparent
   public consuming func consume() -> Value {
     let result = unsafe pointer.move()
-    unsafe pointer.deallocate()
+    unsafe pointer._deallocate(capacity: 1)
     discard self
     return result
   }
