@@ -35,6 +35,13 @@ __attribute__((swift_attr("release:releaseNode"))) Node {
 
 int takesNode(Node *_Nonnull n);
 int takesNullableNode(Node *_Nullable n);
+int takesNodeByRef(Node &n);
+
+// A reference to a pointer to a foreign reference type is a pointer to that
+// pointer, implemented by a pointer to the reference type.
+void reseatNode(Node *_Nonnull &p, Node *_Nonnull to);
+int readNodePtr(Node *_Nonnull const &p);
+void mismatchedNodePtrSpelling(Node *_Nonnull &p);
 
 // Results. Only a result returned retained (+1) can be implemented in Swift.
 
@@ -45,6 +52,10 @@ Node *_Nullable returnsNullableRetainedNode(Node *_Nonnull n, int null)
 Node *_Nonnull returnsUnretainedNode(Node *_Nonnull n)
     __attribute__((swift_attr("returns_unretained")));
 Node *_Nonnull returnsUnannotatedNode(Node *_Nonnull n);
+
+// A reference to a foreign reference type never transfers ownership, so a
+// function returning one is rejected like an unannotated pointer return.
+Node &returnsNodeByRef();
 
 // A foreign reference type returned unretained by default
 
