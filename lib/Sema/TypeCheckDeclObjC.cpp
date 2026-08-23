@@ -386,8 +386,9 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
       return false;
     }
 
-    // Swift inout parameters are not representable in Objective-C.
-    if (param->isInOut()) {
+    // Swift inout parameters are not representable in Objective-C or C. In
+    // C++, an inout parameter is representable as a mutable reference.
+    if (param->isInOut() && language != ForeignLanguage::Cxx) {
       softenIfAccessNote(AFD, Reason.getAttr(),
         diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
                        AFD, getObjCDiagnosticAttrKind(Reason),
@@ -4437,14 +4438,59 @@ private:
       }
     }
 
-    // TODO: Not supported yet, ban C++ references for now.
-    bool usesReferences = clangFD->getReturnType()->isReferenceType();
-    for (const auto *param : clangFD->parameters())
-      usesReferences |= param->getType()->isReferenceType();
-    if (usesReferences) {
-      diagnose(cand, diag::cxx_references_unsupported, cand,
+    // RValue references are not supported: a `T &&` parameter imports as
+    // `consuming`, but the C++ caller destroys the referent after the call
+    // anyway, so a Swift body consuming the value would double-destroy it.
+    bool usesRValueReferences =
+        clangFD->getReturnType()->isRValueReferenceType() ||
+        llvm::any_of(clangFD->parameters(), [](const auto *param) {
+          return param->getType()->isRValueReferenceType();
+        });
+    if (usesRValueReferences) {
+      diagnose(cand, diag::cxx_rvalue_references_unsupported, cand,
                clangFD->getName());
       return true;
+    }
+
+    // An lvalue reference parameter is implemented by an `inout` or a by-value
+    // parameter. C++ callers may pass aliasing references, which `inout` and
+    // by-value parameters let the optimizer assume away, so the implementation
+    // must be marked `@unsafe`. A reference to a foreign reference type is
+    // exempt: the parameter carries the object, not the reference.
+    if (cand->getExplicitSafety() != ExplicitSafety::Unsafe) {
+      auto *loader = cand->getASTContext().getClangModuleLoader();
+      auto *params = cast<AbstractFunctionDecl>(cand)->getParameters();
+      bool diagnosed = false;
+      for (unsigned i = 0, n = clangFD->getNumParams(); i != n; ++i) {
+        const auto *clangParam = clangFD->getParamDecl(i);
+        const auto *refType =
+            clangParam->getType()->getAs<clang::LValueReferenceType>();
+        if (!refType)
+          continue;
+        auto *param = params->get(i);
+        if (refType->getPointeeType()->isRecordType() &&
+            param->getInterfaceType()->isForeignReferenceType())
+          continue;
+
+        if (!diagnosed) {
+          diagnose(cand, diag::cxx_references_require_unsafe, cand,
+                   clangFD->getName())
+              .fixItInsert(
+                  cand->getAttributeInsertionLoc(/*forModifier=*/false),
+                  "@unsafe ");
+          diagnosed = true;
+        }
+        diagnose(param, diag::cxx_reference_param_aliasing, param,
+                 param->isInOut());
+        diagnose(loader->importSourceLocation(clangParam->getLocation()),
+                 diag::cxx_reference_param_declared_here,
+                 clangParam->getIdentifier() != nullptr, clangParam)
+            .highlight(SourceRange(
+                loader->importSourceLocation(clangParam->getBeginLoc()),
+                loader->importSourceLocation(clangParam->getEndLoc())));
+      }
+      if (diagnosed)
+        return true;
     }
 
     // The symbol this implementation will be emitted under must not be one the
