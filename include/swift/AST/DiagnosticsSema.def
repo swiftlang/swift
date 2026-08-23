@@ -2305,10 +2305,20 @@ ERROR(cxx_param_ownership_unsupported,none,
       "%kindonly0 cannot be marked '@cxx' because parameter %1 of non-trivial "
       "C++ class type is '%select{borrowing|consuming}2'",
       (const AbstractFunctionDecl *, const ParamDecl *, unsigned))
-ERROR(cxx_references_unsupported,none,
-      "%kind0 cannot implement C++ function '%1' because reference "
+ERROR(cxx_rvalue_references_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because rvalue reference "
       "parameters and return types are not yet supported",
       (ValueDecl *, StringRef))
+ERROR(cxx_references_require_unsafe,none,
+      "%kind0 must be marked '@unsafe' to implement C++ function '%1'",
+      (ValueDecl *, StringRef))
+NOTE(cxx_reference_param_aliasing,none,
+     "C++ callers may %select{modify %kind0 through another reference during "
+     "the call|violate exclusive access to 'inout' %kind0}1",
+     (ValueDecl *, bool))
+NOTE(cxx_reference_param_declared_here,none,
+     "%select{parameter|%1}0 declared as a C++ reference here",
+     (bool, const clang::NamedDecl *))
 
 // @used and @section
 ERROR(section_empty_name,none,
