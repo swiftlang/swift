@@ -2285,8 +2285,8 @@ ERROR(cxx_mutating_mismatch,none,
       "%kind0 should%select{|| not}1 be 'mutating' to match "
       "%select{non-'const' ||'const' }1%kindonly2 declared by the header",
       (ValueDecl *, unsigned, const ValueDecl *))
-ERROR(cxx_references_unsupported,none,
-      "%kind0 cannot implement C++ function '%1' because reference "
+ERROR(cxx_rvalue_references_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because rvalue reference "
       "parameters and return types are not yet supported",
       (ValueDecl *, StringRef))
 ERROR(cxx_unretained_result_unsupported,none,

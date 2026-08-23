@@ -1745,7 +1745,8 @@ bool isFormallyThrownIndirectly(TypeConverter &TC,
 
 static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
                                                  const clang::Type *clangTy,
-                                                 CanType substTy) {
+                                                 CanType substTy,
+                                                 bool isCxxImplementation) {
   // A const pointer argument might have been imported as
   // UnsafePointer, COpaquePointer, or a CF foreign class.
   // (An ObjC class type wouldn't be const-qualified.)
@@ -1761,7 +1762,8 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
 
     if (auto eltTy = substTy->getAnyPointerElementType())
       return isClangTypeMoreIndirectThanSubstType(TC,
-                    clangTy->getPointeeType().getTypePtr(), CanType(eltTy));
+                    clangTy->getPointeeType().getTypePtr(), CanType(eltTy),
+                    isCxxImplementation);
 
     if (substTy->isOpaquePointer())
       // TODO: We could conceivably have an indirect opaque ** imported
@@ -1796,6 +1798,10 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
           clang::QualType(clangTy, 0))) {
     if (ref->kind == importer::CxxReferenceParameterKind::Mutating)
       return false;
+    // A `@cxx @implementation` parameter spells a const reference as an
+    // UnsafePointer, which already carries the indirection.
+    if (isCxxImplementation && substTy->getAnyPointerElementType())
+      return false;
     return !(clangTy->getPointeeType()->getAs<clang::RecordType>() &&
              substTy->isForeignReferenceType());
   }
@@ -1806,7 +1812,8 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
 static bool isFormallyPassedIndirectly(TypeConverter &TC,
                                        AbstractionPattern origType,
                                        CanType substType,
-                                       const TypeLowering &substTL) {
+                                       const TypeLowering &substTL,
+                                       bool isCxxImplementation) {
   // If this is a native Swift class that's passed directly to C/C++, treat it
   // as indirect.
   if (origType.isClangType()) {
@@ -1825,7 +1832,7 @@ static bool isFormallyPassedIndirectly(TypeConverter &TC,
   // isn't, treat it as indirect.
   if (origType.isClangType()
       && isClangTypeMoreIndirectThanSubstType(TC, origType.getClangType(),
-                                              substType)) {
+                                              substType, isCxxImplementation)) {
     return true;
   }
 
@@ -1919,7 +1926,11 @@ private:
   bool isFormallyPassedIndirectly(AbstractionPattern origType,
                                   CanType substType,
                                   const TypeLowering &substTL) {
-    return ::isFormallyPassedIndirectly(TC, origType, substType, substTL);
+    bool isCxxImplementation =
+        Constant && Constant->hasDecl() &&
+        Constant->getDecl()->getAttrs().hasAttribute<CxxDeclAttr>();
+    return ::isFormallyPassedIndirectly(TC, origType, substType, substTL,
+                                        isCxxImplementation);
   }
 
   /// Destructure the top-level parameters.  There are two things
@@ -2669,7 +2680,8 @@ static void destructureYieldsForReadAccessor(TypeConverter &TC,
   auto &tl =
       TC.getTypeLowering(origType, valueType, expansion);
   auto convention = [&] {
-    if (isFormallyPassedIndirectly(TC, origType, valueType, tlConv))
+    if (isFormallyPassedIndirectly(TC, origType, valueType, tlConv,
+                                   /*isCxxImplementation*/ false))
       return ParameterConvention::Indirect_In_Guaranteed;
     if (tlConv.isTrivial())
       return ParameterConvention::Direct_Unowned;

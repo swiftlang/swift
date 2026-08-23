@@ -23,13 +23,12 @@ double renamedOverload(double x);
 int noMatchingOverload(int x);
 double noMatchingOverload(double x);
 
-// Overloads that import with the same Swift signature (`const int &` imports
-// by value)
+// These two overloads import with the same Swift signature (`const int &`
+// imports by value), but their implementation spellings differ: a const
+// reference is implemented as a pointer.
 
-// expected-note@+1{{found this candidate}}
-int ambiguousOverload(int x);
-// expected-note@+1{{found this candidate}}
-int ambiguousOverload(const int &x);
+int constRefOverload(int x);
+int constRefOverload(const int &x);
 
 // Duplicate implementations of one overload
 

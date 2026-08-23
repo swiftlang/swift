@@ -28,6 +28,27 @@ public func takesNode(_ n: Node) -> Int32 { return n.value }
 @cxx @implementation
 public func takesNullableNode(_ n: Node?) -> Int32 { return n?.value ?? -1 }
 
+// int takesNodeByRef(Node &n);
+// CHECK-SYSV-LABEL: define{{.*}} i32 @_Z14takesNodeByRefR4Node(ptr %0)
+// CHECK-WIN-LABEL: define{{.*}} i32 @"?takesNodeByRef@@YAHAEAUNode@@@Z"(ptr %0)
+@cxx @implementation
+public func takesNodeByRef(_ n: Node) -> Int32 { return n.value }
+
+// void reseatNode(Node *_Nonnull &p, Node *_Nonnull to);
+// CHECK-SYSV-LABEL: define{{.*}} void @_Z10reseatNodeRP4NodeS0_(ptr %0, ptr %1)
+// CHECK-WIN-LABEL: define{{.*}} void @"?reseatNode@@YAXAEAPEAUNode@@PEAU1@@Z"(ptr %0, ptr %1)
+@cxx @implementation
+public func reseatNode(_ p: UnsafeMutablePointer<Node>, _ to: Node) { p.pointee = to }
+
+// int readNodePtr(Node *_Nonnull const &p);
+// The referent is a pointer: the body loads it from the incoming address.
+// CHECK-SYSV-LABEL: define{{.*}} i32 @_Z11readNodePtrRKP4Node(ptr %0)
+// CHECK-WIN-LABEL: define{{.*}} i32 @"?readNodePtr@@YAHAEBQEAUNode@@@Z"(ptr %0)
+// CHECK: [[NODE:%[0-9]+]] = load ptr, ptr %0
+// CHECK: getelementptr inbounds{{.*}} %TSo4NodeV, ptr [[NODE]]
+@cxx @implementation
+public func readNodePtr(_ p: UnsafePointer<Node>) -> Int32 { return p.pointee.value }
+
 // Node *_Nonnull returnsRetainedNode(Node *_Nonnull n)
 //     __attribute__((swift_attr("returns_retained")));
 // CHECK-SYSV-LABEL: define{{.*}} ptr @_Z19returnsRetainedNodeP4Node(ptr %0)
@@ -107,6 +128,8 @@ extension Node {
 // CHECK-SYSV:   invoke void @_ZN4Node3addEi(ptr %0, i32 2)
 // CHECK-SYSV:   invoke i32 @_ZNK4Node16overloadedByTypeEi(ptr %0, i32 3)
 // CHECK-SYSV:   invoke double @_ZNK4Node16overloadedByTypeEd(ptr %0, double 1.500000e+00)
+// CHECK-SYSV:   invoke void @_Z10reseatNodeRP4NodeS0_(ptr {{%.*}}, ptr %0)
+// CHECK-SYSV:   invoke i32 @_Z11readNodePtrRKP4Node(ptr {{%.*}})
 public func callCxxFuncs(_ n: Node) {
   _ = takesNode(n)
   _ = takesNullableNode(nil)
@@ -118,4 +141,8 @@ public func callCxxFuncs(_ n: Node) {
   let x: Int32 = 3
   _ = n.overloadedByType(x)
   _ = n.overloadedByType(1.5)
+
+  var slot = n
+  reseatNode(&slot, n)
+  _ = readNodePtr(n)
 }

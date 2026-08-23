@@ -4141,11 +4141,40 @@ private:
   }
 
   static Type getMemberType(ValueDecl *decl) {
+    Type type;
     if (auto fn = dyn_cast<AbstractFunctionDecl>(decl))
       if (fn->hasImplicitSelfDecl())
         // Strip off the uncurried `self` parameter.
-        return fn->getMethodInterfaceType();
-    return decl->getInterfaceType();
+        type = fn->getMethodInterfaceType();
+    if (!type)
+      type = decl->getInterfaceType();
+
+    // A C++ function's lvalue reference parameters are implemented as
+    // pointers; match (and diagnose) against that spelling.
+    const auto *clangFD =
+        dyn_cast_or_null<clang::FunctionDecl>(decl->getClangDecl());
+    if (!clangFD)
+      return type;
+    auto *fnTy = type->getAs<AnyFunctionType>();
+    if (!fnTy || fnTy->getParams().size() != clangFD->getNumParams())
+      return type;
+
+    SmallVector<AnyFunctionType::Param, 4> params;
+    bool anyMapped = false;
+    for (auto i : indices(fnTy->getParams())) {
+      const auto &param = fnTy->getParams()[i];
+      Type mapped = importer::getCxxReferenceImplType(
+          param.getOldType(), clangFD->getParamDecl(i)->getType().getTypePtr());
+      if (mapped->isEqual(param.getOldType())) {
+        params.push_back(param);
+      } else {
+        params.push_back(AnyFunctionType::Param(mapped, param.getLabel()));
+        anyMapped = true;
+      }
+    }
+    if (!anyMapped)
+      return type;
+    return FunctionType::get(params, fnTy->getResult(), fnTy->getExtInfo());
   }
 
   /// Describes an availability mismatch between a requirement and a candidate
@@ -4255,8 +4284,22 @@ private:
       if (reqAFD->getForeignErrorConvention() !=
           candAFD->getForeignErrorConvention())
         return MatchOutcome::WrongForeignErrorConvention;
+      const auto *clangFD =
+          dyn_cast_or_null<clang::FunctionDecl>(reqAFD->getClangDecl());
+      // Parameters are paired by index; as in `getMemberType`, only when the
+      // Swift and C++ parameter lists align.
+      if (clangFD &&
+          clangFD->getNumParams() != reqAFD->getParameters()->size())
+        clangFD = nullptr;
+      unsigned paramIdx = 0;
       for (auto [reqParam, candParam] :
            llvm::zip(*reqAFD->getParameters(), *candAFD->getParameters())) {
+        unsigned i = paramIdx++;
+        // A C++ lvalue reference parameter is implemented as a pointer; the
+        // `inout` it imports as does not constrain the implementation.
+        if (clangFD &&
+            clangFD->getParamDecl(i)->getType()->isLValueReferenceType())
+          continue;
         // In case the ObjC owership is unowned and the swift is owned, the ObjC
         // thunk will make the necessary adjustment.
         if (reqParam->getValueOwnership() != candParam->getValueOwnership() &&
@@ -4379,12 +4422,17 @@ private:
       }
     }
 
-    // TODO: Not supported yet, ban C++ references for now.
-    bool usesReferences = clangFD->getReturnType()->isReferenceType();
+    // Rvalue references are not supported: a `T &&` parameter imports as
+    // `consuming`, but the C++ caller destroys the referent after the call
+    // anyway, so a Swift body consuming the value would double-destroy it.
+    // A `T &&` return imports like `T &`, whose pointer projection would
+    // silently drop the xvalue contract.
+    bool usesRValueReferences =
+        clangFD->getReturnType()->isRValueReferenceType();
     for (const auto *param : clangFD->parameters())
-      usesReferences |= param->getType()->isReferenceType();
-    if (usesReferences) {
-      diagnose(cand, diag::cxx_references_unsupported, cand,
+      usesRValueReferences |= param->getType()->isRValueReferenceType();
+    if (usesRValueReferences) {
+      diagnose(cand, diag::cxx_rvalue_references_unsupported, cand,
                clangFD->getName());
       return true;
     }

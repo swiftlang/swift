@@ -924,6 +924,14 @@ bool isClangNamespace(const DeclContext *dc);
 /// Is this DeclContext a nominal type imported from a C++ `struct`/`class`?
 bool isClangCxxRecord(const DeclContext *dc);
 
+/// If \p clangTy is a C++ lvalue reference type, return the type a
+/// `@cxx @implementation` parameter must have to implement it: the imported
+/// referent wrapped in `UnsafePointer` (const) or `UnsafeMutablePointer`
+/// (non-const). A reference to a foreign reference type imports as the
+/// reference type itself, which already is the C++ pointer. Any other
+/// \p clangTy returns \p importedTy unchanged.
+Type getCxxReferenceImplType(Type importedTy, const clang::Type *clangTy);
+
 /// Enumerate and import all members of the C++ namespace represented by
 /// \p namespaceEnum, invoking \p emit once for each newly imported member.
 ///

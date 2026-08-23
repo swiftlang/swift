@@ -56,12 +56,14 @@ func swiftRenamedOverloadDouble(_ x: Double) -> Double { return x }
 func noMatchingOverload(_ x: Float) -> Float { return x }
 
 
-// Several overloads import with the same Swift signature, so the
-// implementation could be any of them.
+// `int` and `const int &` overloads import with the same Swift signature,
+// but their implementation spellings differ, so both are implementable.
 
-// expected-error@+1{{global function 'ambiguousOverload' could implement any of several imported overloads of 'ambiguousOverload' that have the same signature in Swift}}
 @cxx @implementation
-func ambiguousOverload(_ x: Int32) -> Int32 { return x }
+func constRefOverload(_ x: Int32) -> Int32 { return x }
+
+@cxx @implementation
+func constRefOverload(_ x: UnsafePointer<Int32>) -> Int32 { return x.pointee }
 
 
 // Duplicate implementations of one overload are diagnosed; an implementation
