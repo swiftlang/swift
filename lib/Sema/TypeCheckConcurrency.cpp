@@ -7822,12 +7822,13 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
     bool anyPlatformSpecificAttrs = false;
     for (auto available : enclosing->getSemanticAvailableAttrs()) {
       // FIXME: [availability] Generalize to AvailabilityDomain.
-      if (available.getPlatform() == PlatformKind::none)
+      auto platform = available.getPlatform();
+      if (!platform)
         continue;
 
       auto attr = new (ctx) AvailableAttr(
           SourceLoc(), SourceRange(),
-          AvailabilityDomain::forPlatform(available.getPlatform()), SourceLoc(),
+          AvailabilityDomain::forPlatform(*platform), SourceLoc(),
           AvailableAttr::Kind::Unavailable, available.getMessage(),
           /*Rename=*/"", available.getIntroduced().value_or(noVersion),
           SourceRange(), available.getDeprecated().value_or(noVersion),

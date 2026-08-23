@@ -172,7 +172,7 @@ bool AvailabilityDomain::isVersionValid(
   case Kind::Platform:
     // If the platform kind corresponds to a specific OS, LLVM is the source of
     // truth for version validity.
-    if (auto osType = tripleOSTypeForPlatform(getPlatformKind()))
+    if (auto osType = tripleOSTypeForPlatform(*getPlatformKind()))
       return llvm::Triple::isValidVersionForOS(*osType, version);
 
     // Unified versioning for Apple's operating systems starts at 26.0.
@@ -228,7 +228,7 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx,
     // standalone Swift runtime.
     return ctx.LangOpts.hasFeature(Feature::SwiftRuntimeAvailability);
   case Kind::Platform:
-    return isPlatformActive(getPlatformKind(), ctx.LangOpts, forTargetVariant);
+    return isPlatformActive(*getPlatformKind(), ctx.LangOpts, forTargetVariant);
   case Kind::Custom:
     // For now, custom domains are always active but it's conceivable that in
     // the future someone might want to define a domain but leave it inactive.
@@ -320,7 +320,7 @@ llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
   case Kind::Embedded:
     return "Embedded Swift";
   case Kind::Platform:
-    return swift::prettyPlatformString(getPlatformKind());
+    return swift::prettyPlatformString(*getPlatformKind());
   case Kind::Custom:
     return getCustomDomain()->getName().str();
   }
@@ -339,7 +339,7 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
   case Kind::Embedded:
     return "Embedded";
   case Kind::Platform:
-    return swift::platformString(getPlatformKind());
+    return swift::platformString(*getPlatformKind());
   case Kind::Custom:
     return getCustomDomain()->getName().str();
   }
@@ -370,9 +370,15 @@ static bool domainIsStrictSubsetOf(const AvailabilityDomain &child,
   case AvailabilityDomain::Kind::Embedded:
     // These domains do not have any children in the lattice.
     return false;
-  case AvailabilityDomain::Kind::Platform:
-    return inheritsAvailabilityFromPlatform(child.getPlatformKind(),
-                                            parent.getPlatformKind());
+  case AvailabilityDomain::Kind::Platform: {
+    // A non-platform domain is never a subset of a platform domain.
+    auto childPlatform = child.getPlatformKind();
+    if (!childPlatform)
+      return false;
+
+    return inheritsAvailabilityFromPlatform(*childPlatform,
+                                            *parent.getPlatformKind());
+  }
   case AvailabilityDomain::Kind::Custom:
     // Custom domains do not yet support inheritance relationships.
     return false;
@@ -425,7 +431,7 @@ AvailabilityDomain AvailabilityDomain::getRootDomain() const {
     return iOSDomain;
 
   // App Extension domains are contained by their base platform domain.
-  if (auto basePlatform = basePlatformForExtensionPlatform(getPlatformKind()))
+  if (auto basePlatform = basePlatformForExtensionPlatform(*getPlatformKind()))
     return AvailabilityDomain::forPlatform(*basePlatform);
 
   return *this;
@@ -614,7 +620,7 @@ bool StableAvailabilityDomainComparator::operator()(
   case AvailabilityDomain::Kind::Embedded:
     return false;
   case AvailabilityDomain::Kind::Platform:
-    return lhs.getPlatformKind() < rhs.getPlatformKind();
+    return *lhs.getPlatformKind() < *rhs.getPlatformKind();
   case AvailabilityDomain::Kind::Custom: {
     auto lhsMod = lhs.getModule();
     auto rhsMod = rhs.getModule();

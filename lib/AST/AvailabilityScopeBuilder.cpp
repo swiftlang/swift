@@ -1162,7 +1162,7 @@ private:
         // diagnostic and just use the current scope.
         Context.Diags.diagnose(
             query->getLoc(), diag::availability_query_required_for_platform,
-            platformString(targetPlatform(Context.LangOpts)));
+            Context.getTargetAvailabilityDomain().getNameForAttributePrinting());
         falseFlowBuilder.setUndefined();
         continue;
       }
@@ -1294,13 +1294,13 @@ private:
       // properly. For example, on the OSXApplicationExtension platform
       // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
-      auto platform = domain.getPlatformKind();
+      auto platform = *domain.getPlatformKind();
       if (isPlatformActive(platform, Context.LangOpts, forTargetVariant,
                            /* ForRuntimeQuery */ true)) {
 
         if (!bestSpec ||
             inheritsAvailabilityFromPlatform(
-                platform, bestSpec->getDomain().getPlatformKind())) {
+                platform, *bestSpec->getDomain().getPlatformKind())) {
           bestSpec = spec;
         }
       }

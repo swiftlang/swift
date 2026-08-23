@@ -1261,7 +1261,7 @@ void writeBuilderMember(
           JSON.object([&] {
             JSON.attribute(
                 "platform",
-                platformString(elem.getDomain().getPlatformKind()).str());
+                platformString(*elem.getDomain().getPlatformKind()).str());
             JSON.attribute("minVersion", elem.getVersion().getAsString());
           });
         }
