@@ -1584,9 +1584,16 @@ public:
         diagnosed = true;
       // if the type is public and not frozen, then the method must not be
       // inlinable.
+      //
+      // `discard self` has to know the type's stored properties in order
+      // to destroy them individually, so a body emitted
+      // into a client must not bake in a layout the defining library could
+      // change.
       } else if (auto fragileKind = fn->getFragileFunctionKind();
                  !nominalDecl->getAttrs().hasAttribute<FrozenAttr>()
-                 && fragileKind != FragileFunctionKind{FragileFunctionKind::None}) {
+                 && fragileKind != FragileFunctionKind{FragileFunctionKind::None}
+                 && fn->getResilienceExpansion() ==
+                        ResilienceExpansion::Minimal) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            // Code in ABI stable SDKs has already used the `@inlinable`
                            // attribute on functions using `discard self`.
