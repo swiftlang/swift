@@ -38,5 +38,5 @@ secondCallback = {
 // CHECK-DAG: @"$e20testIRGenFunctioning14secondCallbacks5UInt8VADXCSgvp"
 // CHECK-DAG: 20testIRGenFunctioning1jSivp
 // CHECK: define protected i32 @main(i32 %0, ptr %1) addrspace(1)
-// CHECK: store i16 ptrtoint (ptr addrspace(1) @"$e20testIRGenFunctioningySicfU_" to i16), ptr @"$e20testIRGenFunctioning13firstCallbackySicSgvp"
+// CHECK: store ptr addrspace(1) {{.*}}@"$e20testIRGenFunctioningySicfU_"{{.*}}, ptr @"$e20testIRGenFunctioning13firstCallbackySicSgvp"
 // CHECK: define protected void @"$e20testIRGenFunctioningySicfU_"(i16 %0) addrspace(1)

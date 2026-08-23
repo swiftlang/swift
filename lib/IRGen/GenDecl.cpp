@@ -534,7 +534,7 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
       llvm::Constant *elt = cast<llvm::Constant>(&*handle);
       std::string eltName = name.str() + "_" + elt->getName().str();
       if (elt->getType() != eltTy)
-        elt = llvm::ConstantExpr::getBitCast(elt, eltTy);
+        elt = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(elt, eltTy);
       auto var = new llvm::GlobalVariable(IGM.Module, eltTy, isConstant,
                                           linkage, elt, eltName);
       var->setSection(section);
@@ -562,7 +562,7 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
   for (auto &handle : handles) {
     auto elt = cast<llvm::Constant>(&*handle);
     if (elt->getType() != eltTy)
-      elt = llvm::ConstantExpr::getBitCast(elt, eltTy);
+      elt = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(elt, eltTy);
     elts.push_back(elt);
   }
 
