@@ -587,6 +587,8 @@ private:
   /// NOTE: This can differ from the AST in certain cases since we treat certain
   /// builtin values such as Builtin.RawPointer and Builtin.NativeObject as
   /// non-Sendable even though they are considered Sendable by the AST today.
+  /// ~Escapable types are also treated as non-Sendable so that a live Span is
+  /// an ongoing use of its source.
   static bool isNonSendableType(SILType type, SILFunction *fn);
 
   static bool isSendableType(SILType type, SILFunction *fn) {

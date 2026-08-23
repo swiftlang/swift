@@ -1729,6 +1729,12 @@ bool SILIsolationInfo::isNonSendableType(SILType type, SILFunction *fn) {
     return false;
   }
 
+  // ~Escapable types like Span are often Sendable, but they represent an
+  // ongoing borrow of their source. Region isolation has to track them so a
+  // later use is treated as a use of that source.
+  if (fn && !type.isEscapable(*fn))
+    return true;
+
   // First before we do anything, see if we have a Sendable type. In such a
   // case, just return true early.
   //

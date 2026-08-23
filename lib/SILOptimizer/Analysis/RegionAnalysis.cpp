@@ -4444,7 +4444,17 @@ TranslationSemantics
 PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   assert(isStaticallyLookThroughInst(mdi) && "Out of sync");
   translateSILLookThrough(mdi->getResults(), mdi->getValue());
-  translateSILRequire(mdi->getBase());
+
+  // Nonescaping dependence isn't just a use of the base at this
+  // instruction. The dependent value (e.x.: a Span) keeps using the
+  // borrowed storage until it dies, so put them in the same region.
+  if (mdi->isNonEscaping()) {
+    translateSILMerge(SILValue(mdi),
+                      &mdi->getAllOperands()[MarkDependenceInst::Base],
+                      /*requireOperands=*/true, RegionMergeReason::Assign);
+  } else {
+    translateSILRequire(mdi->getBase());
+  }
   return TranslationSemantics::Special;
 }
 
