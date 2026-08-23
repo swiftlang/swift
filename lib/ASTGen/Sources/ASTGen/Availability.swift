@@ -379,6 +379,13 @@ extension ASTGenVisitor {
       let platformName =  platformVersionNode.platform.rawText
       let version = self.generate(versionTuple: platformVersionNode.version)?.bridged ?? BridgedVersionTuple()
 
+      // A wildcard is not a platform, and it carries no version to record. The
+      // legacy parser diagnoses it and skips the entry.
+      // TODO: Diagnostics.
+      if platformName == "*" {
+        continue
+      }
+
       // If the name is a platform name, use it.
       let platform = BridgedOptionalPlatformKind(from: platformName.bridged)
       guard !platform.hasValue else {

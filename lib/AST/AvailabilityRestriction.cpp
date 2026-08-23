@@ -57,10 +57,11 @@ AvailabilityRestriction::getFixItDomainAndRange(const ASTContext &ctx) const {
 
 bool AvailabilityRestriction::isActiveForRuntimeQueries(
     const ASTContext &ctx) const {
-  if (getAttr().getPlatform() == PlatformKind::none)
+  auto platform = getAttr().getPlatform();
+  if (!platform)
     return true;
 
-  return swift::isPlatformActive(getAttr().getPlatform(), ctx.LangOpts,
+  return swift::isPlatformActive(*platform, ctx.LangOpts,
                                  /*forTargetVariant=*/false,
                                  /*forRuntimeQuery=*/true);
 }

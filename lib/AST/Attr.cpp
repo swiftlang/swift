@@ -515,12 +515,18 @@ isShortFormAvailabilityImpliedByOther(SemanticAvailableAttr Attr,
   assert(isShortAvailable(Attr));
 
   auto platform = Attr.getDomain().getPlatformKind();
+  if (!platform)
+    return false;
+
   for (auto other : Others) {
     auto otherPlatform = other.getDomain().getPlatformKind();
     if (platform == otherPlatform)
       continue;
 
-    if (!inheritsAvailabilityFromPlatform(platform, otherPlatform))
+    if (!otherPlatform)
+      continue;
+
+    if (!inheritsAvailabilityFromPlatform(*platform, *otherPlatform))
       continue;
 
     if (Attr.getIntroduced() == other.getIntroduced())

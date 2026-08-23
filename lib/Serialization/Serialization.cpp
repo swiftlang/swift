@@ -3310,6 +3310,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         }
       }
 
+      // Only a platform domain has a platform. The domain kind tells the
+      // reader whether this field is meaningful.
+      unsigned rawPlatform = 0;
+      if (auto platform = domain.getPlatformKind())
+        rawPlatform = static_cast<unsigned>(*platform);
+
       llvm::SmallString<32> blob;
       blob.append(theAttr->getMessage());
       blob.append(theAttr->getRename());
@@ -3322,7 +3328,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isNoAsync(),
           theAttr->isSPI(),
           static_cast<uint8_t>(domainKind),
-          static_cast<unsigned>(domain.getPlatformKind()),
+          rawPlatform,
           customDomainID,
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),

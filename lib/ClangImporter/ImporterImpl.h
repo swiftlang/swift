@@ -334,7 +334,9 @@ enum class FactoryAsInitKind {
 namespace importer {
 struct PlatformAvailability {
 private:
-  PlatformKind platformKind;
+  /// The platform that compilation is targeting, or `nullopt` if the target
+  /// triple does not correspond to a platform.
+  std::optional<PlatformKind> platformKind;
 
 public:
   /// Returns a non-optional `PlatformKind` corresponding to the platform name
