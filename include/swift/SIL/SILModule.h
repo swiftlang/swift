@@ -299,8 +299,19 @@ private:
   llvm::DenseMap<const NominalTypeDecl *, SILMoveOnlyDeinit *>
       MoveOnlyDeinitMap;
 
+  /// Lookup table for specialized move only deinits from types.
+  /// Currently only used in embedded mode.
+  llvm::DenseMap<SILType, SILMoveOnlyDeinit *> SpecializedMoveOnlyDeinitMap;
+
   /// The list of move only deinits in the module.
   std::vector<SILMoveOnlyDeinit *> moveOnlyDeinits;
+
+  /// Non-copyable types declared in this module for which IRGen may emit type
+  /// metadata, recorded by SILGen as it visits them. Only used in embedded
+  /// mode: emitting a type's metadata also emits its value witnesses, whose
+  /// destroy witness calls the deinits of the type and its members, so those
+  /// deinits must be specialized before IRGen runs.
+  std::vector<SILType> noncopyableTypesWithEmittedMetadata;
 
   /// Declarations which are externally visible.
   ///
@@ -683,6 +694,17 @@ public:
   ArrayRef<SILMoveOnlyDeinit *> getMoveOnlyDeinits() const {
     return ArrayRef<SILMoveOnlyDeinit *>(moveOnlyDeinits);
   }
+
+  /// Non-copyable types declared in this module for which IRGen may emit type
+  /// metadata. Recorded by SILGen; only populated in embedded mode.
+  ArrayRef<SILType> getNonCopyableTypesWithEmittedMetadata() const {
+    return noncopyableTypesWithEmittedMetadata;
+  }
+
+  void addNonCopyableTypeWithEmittedMetadata(SILType type) {
+    noncopyableTypesWithEmittedMetadata.push_back(type);
+  }
+
   using moveonlydeinit_iterator = SILMoveOnlyDeinitListType::iterator;
   using moveonlydeinit_const_iterator =
       SILMoveOnlyDeinitListType::const_iterator;
@@ -931,6 +953,16 @@ public:
   /// Returns null on failure.
   SILMoveOnlyDeinit *lookUpMoveOnlyDeinit(const NominalTypeDecl *nomDecl,
                                           bool deserializeLazily = true);
+
+  /// Look up a specialized move only deinit for the given type.
+  /// Returns null on failure.
+  SILMoveOnlyDeinit *lookUpSpecializedMoveOnlyDeinit(SILType nominalType);
+
+  /// Look up the deinit to use when destroying a value of the given type,
+  /// preferring a specialized deinit if one is available.
+  /// Returns null on failure.
+  SILMoveOnlyDeinit *lookUpMoveOnlyDeinitForType(SILType nominalType,
+                                                 bool deserializeLazily = true);
 
   /// Look up the function mapped to the given move only nominal type decl.
   /// Returns null on failure.
