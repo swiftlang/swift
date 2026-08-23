@@ -478,6 +478,33 @@ sil [ossa] @mark_dependence_test_base_is_a_require : $@convention(thin) @async (
   return %9999 : $()
 }
 
+// Sending the base of a nonescaping mark_dependence must conflict with a
+// later use of the dependent value.
+sil [ossa] @mark_dependence_nonescaping_use_result_after_sending_base : $@convention(thin) @async () -> () {
+bb0:
+  %0 = alloc_ref $NonSendableKlass
+  %1 = alloc_ref $NonSendableKlass
+
+  %1a = begin_borrow %1 : $NonSendableKlass
+  %2 = mark_dependence [nonescaping] %1a : $NonSendableKlass on %0 : $NonSendableKlass
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%0) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{}}
+  // expected-note @-2 {{}}
+
+  %useNonSendableKlass = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  apply %useNonSendableKlass(%2) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  // expected-note @-1 {{access can happen concurrently}}
+
+  end_borrow %1a : $NonSendableKlass
+  destroy_value %0 : $NonSendableKlass
+  destroy_value %1 : $NonSendableKlass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
 // NOTE: Since Error is Sendable, this just validates that we handle the
 // instruction and don't crash.
 sil [ossa] @alloc_existential_box_test : $@convention(thin) @async <T : Error> (@in T) -> @owned any Error {

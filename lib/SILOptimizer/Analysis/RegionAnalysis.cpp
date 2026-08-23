@@ -687,6 +687,14 @@ RegionAnalysisValueMap::getIsolationRegion(SILValue value) const {
   return iter->getSecond().getIsolationRegionInfo();
 }
 
+/// ~Escapable values (Span, etc.) can be Sendable, but they are still a
+/// borrow of their source. Region isolation has to track them so a later
+/// use counts as a use of that source.
+static bool isEscapableForRegionIsolation(SILValue value) {
+  SILFunction *fn = value->getFunction();
+  return !fn || value->getType().isEscapable(*fn);
+}
+
 std::pair<TrackableValue, bool>
 RegionAnalysisValueMap::initializeTrackableValue(
     SILValue value, SILIsolationInfo newInfo) const {
@@ -705,8 +713,10 @@ RegionAnalysisValueMap::initializeTrackableValue(
   // If we did not insert, just return the already stored value.
   self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
 
-  // Before we do anything, see if we have a Sendable value.
-  if (!SILIsolationInfo::isNonSendable(value)) {
+  // Before we do anything, see if we have a Sendable value. ~Escapable
+  // Sendable values are still tracked (see isEscapableForRegionIsolation).
+  if (!SILIsolationInfo::isNonSendable(value) &&
+      isEscapableForRegionIsolation(value)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
     return {{iter.first->first, iter.first->second}, true};
   }
@@ -748,8 +758,10 @@ TrackableValue RegionAnalysisValueMap::getTrackableValueHelper(
   }
 
   // Then check our oracle to see if the value is actually sendable. If we have
-  // a Sendable value, just return early.
-  if (SILIsolationInfo::isSendable(value)) {
+  // a Sendable value that can escape, just return early. ~Escapable Sendable
+  // values fall through so later uses keep their source in use.
+  if (SILIsolationInfo::isSendable(value) &&
+      isEscapableForRegionIsolation(value)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
     return {iter.first->first, iter.first->second};
   }
@@ -4444,7 +4456,17 @@ TranslationSemantics
 PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   assert(isStaticallyLookThroughInst(mdi) && "Out of sync");
   translateSILLookThrough(mdi->getResults(), mdi->getValue());
-  translateSILRequire(mdi->getBase());
+
+  // Nonescaping dependence isn't just a use of the base at this
+  // instruction. The dependent value (e.x.: a Span) keeps using the
+  // borrowed storage until it dies, so put them in the same region.
+  if (mdi->isNonEscaping()) {
+    translateSILMerge(SILValue(mdi),
+                      &mdi->getAllOperands()[MarkDependenceInst::Base],
+                      /*requireOperands=*/true, RegionMergeReason::Assign);
+  } else {
+    translateSILRequire(mdi->getBase());
+  }
   return TranslationSemantics::Special;
 }
 
