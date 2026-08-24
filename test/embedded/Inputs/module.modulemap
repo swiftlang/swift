@@ -6,3 +6,8 @@ module CxxStdVector {
   header "cxx-std-vector.h"
   requires cplusplus
 }
+
+module CxxMoveOnly {
+  header "cxx-move-only.h"
+  requires cplusplus
+}
