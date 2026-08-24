@@ -184,8 +184,13 @@ void AvailabilityInference::applyInferredAvailableAttrs(
         // declaration.
         if (llvm::any_of(MergedAttrs,
                          [&AvAttr](SemanticAvailableAttr MergedAttr) {
+                           auto platform = AvAttr.getPlatform();
+                           auto mergedPlatform = MergedAttr.getPlatform();
+                           if (!platform || !mergedPlatform)
+                             return false;
+
                            return inheritsAvailabilityFromPlatform(
-                               AvAttr.getPlatform(), MergedAttr.getPlatform());
+                               *platform, *mergedPlatform);
                          }))
           continue;
 
@@ -241,19 +246,24 @@ const Decl *Decl::parentDeclForAvailability() const {
 /// Returns true if the introduced version in \p newAttr should be used instead
 /// of the introduced version in \p prevAttr when both are attached to the same
 /// declaration and refer to the active platform.
+///
+/// Both attributes must be platform specific.
 static bool isBetterThan(const SemanticAvailableAttr &newAttr,
                          const std::optional<SemanticAvailableAttr> &prevAttr) {
   // If there is no prevAttr, newAttr of course wins.
   if (!prevAttr)
     return true;
 
+  DEBUG_ASSERT(newAttr.isPlatformSpecific());
+  DEBUG_ASSERT(prevAttr->isPlatformSpecific());
+
   // If they belong to the same platform, the one that introduces later wins.
   if (prevAttr->getPlatform() == newAttr.getPlatform())
     return prevAttr->getIntroduced().value() < newAttr.getIntroduced().value();
 
   // If the new attribute's platform inherits from the old one, it wins.
-  return inheritsAvailabilityFromPlatform(newAttr.getPlatform(),
-                                          prevAttr->getPlatform());
+  return inheritsAvailabilityFromPlatform(*newAttr.getPlatform(),
+                                          *prevAttr->getPlatform());
 }
 
 static std::optional<SemanticAvailableAttr>
@@ -420,7 +430,7 @@ Decl::getActiveAvailableAttrForCurrentPlatform() const {
     // We have an attribute that is active for the platform, but is it more
     // specific than our current best?
     if (!bestAttr || inheritsAvailabilityFromPlatform(
-                         attr.getPlatform(), bestAttr->getPlatform())) {
+                         *attr.getPlatform(), *bestAttr->getPlatform())) {
       bestAttr.emplace(attr);
     }
   }
@@ -462,8 +472,8 @@ std::optional<SemanticAvailableAttr> Decl::getNoAsyncAttr() const {
       bestAttr.emplace(attr);
     } else if (bestAttr && attr.isPlatformSpecific() &&
                bestAttr->isPlatformSpecific() &&
-               inheritsAvailabilityFromPlatform(attr.getPlatform(),
-                                                bestAttr->getPlatform())) {
+               inheritsAvailabilityFromPlatform(*attr.getPlatform(),
+                                                *bestAttr->getPlatform())) {
       // if they both have a viable platform, use the better one
       bestAttr.emplace(attr);
     } else if (attr.isPlatformSpecific() && !bestAttr->isPlatformSpecific()) {
@@ -512,15 +522,13 @@ getRootTargetDomains(const ASTContext &ctx) {
   if (ctx.LangOpts.hasFeature(Feature::Embedded))
     return domains;
 
-  auto targetPlatform = swift::targetPlatform(ctx.LangOpts);
-  if (targetPlatform != PlatformKind::none)
+  if (auto targetPlatform = swift::targetPlatform(ctx.LangOpts))
     domains.insert(
-        AvailabilityDomain::forPlatform(targetPlatform).getRootDomain());
+        AvailabilityDomain::forPlatform(*targetPlatform).getRootDomain());
 
-  auto targetVariantPlatform = swift::targetVariantPlatform(ctx.LangOpts);
-  if (targetVariantPlatform != PlatformKind::none)
+  if (auto targetVariantPlatform = swift::targetVariantPlatform(ctx.LangOpts))
     domains.insert(
-        AvailabilityDomain::forPlatform(targetVariantPlatform).getRootDomain());
+        AvailabilityDomain::forPlatform(*targetVariantPlatform).getRootDomain());
 
   return domains;
 }

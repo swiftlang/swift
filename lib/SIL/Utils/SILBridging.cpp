@@ -28,6 +28,7 @@
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/Test.h"
 #include <string>
@@ -896,6 +897,22 @@ BridgedOwnedString BridgedContext::getModuleDescription() const {
 
 OptionalBridgedFunction BridgedContext::lookUpNominalDeinitFunction(BridgedDeclObj nominal)  const {
   return {context->getModule()->lookUpMoveOnlyDeinitFunction(nominal.getAs<swift::NominalTypeDecl>())};
+}
+
+OptionalBridgedFunction BridgedContext::
+lookUpSpecializedDeinitFunction(BridgedType nominalType) const {
+  auto *deinit =
+      context->getModule()->lookUpSpecializedMoveOnlyDeinit(nominalType.unbridged());
+  return {deinit ? deinit->getImplementation() : nullptr};
+}
+
+void BridgedContext::addSpecializedDeinit(BridgedType nominalType,
+                                          BridgedFunction deinitFunc) const {
+  swift::SILType nominalTy = nominalType.unbridged();
+  swift::SILMoveOnlyDeinit::create(*context->getModule(),
+                                   nominalTy.getNominalOrBoundGenericNominal(),
+                                   nominalTy, swift::IsNotSerialized,
+                                   deinitFunc.getFunction());
 }
 
 BridgedFunction BridgedContext::

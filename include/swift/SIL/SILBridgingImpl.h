@@ -986,11 +986,52 @@ BridgedFunction::ABILanguage BridgedFunction::getSILFunctionLanguage() const {
 }
 
 BridgedFunction::ThunkKind BridgedFunction::isThunk() const {
-  return (ThunkKind)getFunction()->isThunk();
+  // Translate explicitly rather than casting, so that adding a case to
+  // swift::IsThunk_t cannot silently produce an invalid ThunkKind.
+  switch (getFunction()->isThunk()) {
+  case swift::IsNotThunk:
+    return ThunkKind::IsNotThunk;
+  case swift::IsThunk:
+    return ThunkKind::IsThunk;
+  case swift::IsReabstractionThunk:
+    return ThunkKind::IsReabstractionThunk;
+  case swift::IsSignatureOptimizedThunk:
+    return ThunkKind::IsSignatureOptimizedThunk;
+  case swift::IsBackDeployedThunk:
+    return ThunkKind::IsBackDeployedThunk;
+  case swift::IsDistributedThunk:
+    return ThunkKind::IsDistributedThunk;
+  case swift::IsDistributedProxyAdapterThunk:
+    return ThunkKind::IsDistributedProxyAdapterThunk;
+  }
+  llvm_unreachable("covered switch");
 }
 
 void BridgedFunction::setThunk(ThunkKind kind) const {
-  getFunction()->setThunk((swift::IsThunk_t)kind);
+  switch (kind) {
+  case ThunkKind::IsNotThunk:
+    getFunction()->setThunk(swift::IsNotThunk);
+    return;
+  case ThunkKind::IsThunk:
+    getFunction()->setThunk(swift::IsThunk);
+    return;
+  case ThunkKind::IsReabstractionThunk:
+    getFunction()->setThunk(swift::IsReabstractionThunk);
+    return;
+  case ThunkKind::IsSignatureOptimizedThunk:
+    getFunction()->setThunk(swift::IsSignatureOptimizedThunk);
+    return;
+  case ThunkKind::IsBackDeployedThunk:
+    getFunction()->setThunk(swift::IsBackDeployedThunk);
+    return;
+  case ThunkKind::IsDistributedThunk:
+    getFunction()->setThunk(swift::IsDistributedThunk);
+    return;
+  case ThunkKind::IsDistributedProxyAdapterThunk:
+    getFunction()->setThunk(swift::IsDistributedProxyAdapterThunk);
+    return;
+  }
+  llvm_unreachable("covered switch");
 }
 
 bool BridgedFunction::isWithoutActuallyEscapingThunk() const {

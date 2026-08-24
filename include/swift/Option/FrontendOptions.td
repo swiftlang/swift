@@ -1030,6 +1030,12 @@ def solver_disable_prune_disjunctions : Flag<["-"], "solver-disable-prune-disjun
 def solver_enable_prune_disjunctions : Flag<["-"], "solver-enable-prune-disjunctions">,
   HelpText<"Enable experimental disjunction pruning algorithm for lookahead in the solver">;
 
+def solver_disable_type_var_joins : Flag<["-"], "solver-disable-type-var-joins">,
+  HelpText<"Disable experimental support for joins of types containing type variables">;
+
+def solver_enable_type_var_joins : Flag<["-"], "solver-enable-type-var-joins">,
+  HelpText<"Enable experimental support for joins of types containing type variables">;
+
 def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-hacks">,
   HelpText<"Disable various constraint solver performance optimizations that have been "
            "subsumed by subsequent improvements">;

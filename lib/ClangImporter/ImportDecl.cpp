@@ -633,8 +633,13 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityRange &info,
   if (info.isAlwaysAvailable())
     return;
 
+  // A platform-versioned attribute needs a platform to attach the version to.
+  auto platform = targetPlatform(C.LangOpts);
+  if (!platform)
+    return;
+
   auto AvAttr = AvailableAttr::createPlatformVersioned(
-      C, targetPlatform(C.LangOpts), /*Message=*/"", /*Rename=*/"",
+      C, *platform, /*Message=*/"", /*Rename=*/"",
       info.getRawMinimumVersion(), /*Deprecated=*/{}, /*Obsoleted=*/{});
 
   decl->addAttribute(AvAttr);
@@ -2990,10 +2995,11 @@ namespace {
         importer::checkRetainReleaseFunctions(classDecl, Impl);
 
         auto availability = Impl.SwiftContext.getSwift58Availability();
-        if (!availability.isAlwaysAvailable()) {
+        auto platform = targetPlatform(Impl.SwiftContext.LangOpts);
+        if (!availability.isAlwaysAvailable() && platform) {
           assert(availability.hasMinimumVersion());
           auto AvAttr = AvailableAttr::createPlatformVersioned(
-              Impl.SwiftContext, targetPlatform(Impl.SwiftContext.LangOpts),
+              Impl.SwiftContext, *platform,
               /*Message=*/"", /*Rename=*/"",
               availability.getRawMinimumVersion(), /*Deprecated=*/{},
               /*Obsoleted=*/{});

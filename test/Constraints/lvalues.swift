@@ -354,3 +354,17 @@ do {
 
   array2 = [(s, s)]
 }
+
+// In this expression we produce an lvalue supertype binding.
+//
+// FIXME: We need more examples of this so that we can properly exercise type join
+// support for lvalues.
+do {
+  class Chain {
+    var next: Chain?
+  }
+
+  func f(chain: Chain) {
+    _ = (chain.next?.next)?.next?.next
+  }
+}

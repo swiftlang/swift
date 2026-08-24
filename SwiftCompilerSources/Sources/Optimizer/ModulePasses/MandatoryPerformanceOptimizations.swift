@@ -31,15 +31,29 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   (moduleContext: ModulePassContext) in
 
   var worklist = FunctionWorklist()
+  // Types whose deinits have already been specialized, shared across the whole
+  // pass so that no aggregate is walked twice.
+  var handledDeinitTypes = Set<Type>()
   // For embedded Swift, optimize all the functions (there cannot be any
   // generics, type metadata, etc.)
   if moduleContext.options.enableEmbeddedSwift {
     worklist.addAllNonGenericFunctionsAndEmbeddedThunks(of: moduleContext)
+
+    // IRGen emits the value witnesses of a type's metadata, and the destroy
+    // witness calls the deinits of the type and its members. Those deinits must
+    // be fully specialized, because unspecialized generic functions take type
+    // metadata, which doesn't exist in embedded Swift. Seed the worklist with
+    // the specializations so that they get optimized like any other function.
+    //
+    // This covers the types SILGen saw. Concrete instantiations of generic
+    // types are not among them, so `optimize` additionally specializes the
+    // deinits of the non-copyable types it encounters in each function.
+    specializeDeinitsOfEmittedMetadata(moduleContext, &handledDeinitTypes, &worklist)
   } else {
     worklist.addAllMandatoryRequiredFunctions(of: moduleContext)
   }
 
-  optimizeFunctionsTopDown(using: &worklist, moduleContext)
+  optimizeFunctionsTopDown(using: &worklist, &handledDeinitTypes, moduleContext)
 
   // It's not required to set the perf_constraint flag on all functions in embedded mode.
   // Embedded mode already implies that flag.
@@ -49,6 +63,7 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
 }
 
 private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
+                                      _ handledDeinitTypes: inout Set<Type>,
                                       _ moduleContext: ModulePassContext) {
   while let f = worklist.pop() {
     moduleContext.transform(function: f) { context in
@@ -57,12 +72,79 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
       }
     }
 
+    if moduleContext.options.enableEmbeddedSwift {
+      specializeDeinitsOfTypes(in: f, &handledDeinitTypes, moduleContext, &worklist)
+    }
+
     // Generic specialization takes care of removing metatype arguments of generic functions.
     // But sometimes non-generic functions have metatype arguments which must be removed.
     // We need handle this case with a function signature optimization.
     removeMetatypeArgumentsInCallees(of: f, moduleContext)
 
     worklist.addCallees(of: f, moduleContext)
+  }
+}
+
+/// Creates specialized deinits for the non-copyable types whose metadata IRGen
+/// may emit, so that the destroy value witness can call a concrete deinit.
+private func specializeDeinitsOfEmittedMetadata(_ moduleContext: ModulePassContext,
+                                                _ handled: inout Set<Type>,
+                                                _ worklist: inout FunctionWorklist) {
+  // Any function works to answer type-lowering queries about these types; the
+  // types are fully concrete, so the answers don't depend on the context.
+  // Prefer a definition, but a declaration is enough to lower a concrete type.
+  guard let anyFunction = moduleContext.functions.first(where: { $0.isDefinition })
+                          ?? moduleContext.functions.first(where: { _ in true }) else {
+    return
+  }
+  for type in moduleContext.typesWithEmittedMetadata {
+    Optimizer.specializeDeinits(forType: type, in: anyFunction, handled: &handled,
+                                moduleContext) {
+      worklist.pushIfNotVisited($0)
+    }
+  }
+}
+
+/// Specializes the deinits of the non-copyable types appearing in `function`.
+///
+/// The types SILGen recorded are only the ones it declared; a concrete
+/// instantiation of a generic type (`Storage<Int>`) is never among them, yet
+/// IRGen emits metadata — and therefore value witnesses that destroy it — for
+/// such types too. Those instantiations only become apparent once generic
+/// specialization has run, so scan for them as each function is optimized.
+private func specializeDeinitsOfTypes(in function: Function,
+                                      _ handled: inout Set<Type>,
+                                      _ moduleContext: ModulePassContext,
+                                      _ worklist: inout FunctionWorklist) {
+  guard function.isDefinition else {
+    return
+  }
+  for instruction in function.instructions {
+    for result in instruction.results {
+      specializeDeinits(ofType: result.type, in: function, &handled, moduleContext, &worklist)
+    }
+    for operand in instruction.operands {
+      specializeDeinits(ofType: operand.value.type, in: function, &handled, moduleContext,
+                        &worklist)
+    }
+  }
+  for argument in function.arguments {
+    specializeDeinits(ofType: argument.type, in: function, &handled, moduleContext, &worklist)
+  }
+}
+
+private func specializeDeinits(ofType type: Type,
+                               in function: Function,
+                               _ handled: inout Set<Type>,
+                               _ moduleContext: ModulePassContext,
+                               _ worklist: inout FunctionWorklist) {
+  let objectType = type.objectType
+  guard objectType.isMoveOnly, !handled.contains(objectType) else {
+    return
+  }
+  Optimizer.specializeDeinits(forType: objectType, in: function, handled: &handled,
+                              moduleContext) {
+    worklist.pushIfNotVisited($0)
   }
 }
 

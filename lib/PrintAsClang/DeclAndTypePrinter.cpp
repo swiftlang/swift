@@ -1870,7 +1870,7 @@ public:
         continue;
       }
 
-      auto platKind = AvAttr.getPlatform();
+      auto platKind = *AvAttr.getPlatform();
       const char *plat;
       switch (platKind) {
       case PlatformKind::macOS:
@@ -1931,8 +1931,6 @@ public:
       case PlatformKind::Android:
         plat = "android";
         break;
-      case PlatformKind::none:
-        llvm_unreachable("handled above");
       }
 
       maybePrintLeadingSpace();

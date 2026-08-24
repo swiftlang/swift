@@ -48,6 +48,16 @@ extension Context {
     _bridged.lookUpNominalDeinitFunction(ofNominal.bridged).function
   }
 
+  /// Looks up the specialized deinit for a concrete type, if one was created.
+  public func lookupSpecializedDeinit(ofType type: Type) -> Function? {
+    _bridged.lookUpSpecializedDeinitFunction(type.bridged).function
+  }
+
+  /// Registers `deinitFunc` as the specialized deinit of the concrete `type`.
+  public func addSpecializedDeinit(ofType type: Type, _ deinitFunc: Function) {
+    _bridged.addSpecializedDeinit(type.bridged, deinitFunc.bridged)
+  }
+
   public func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
 
   public func getBuiltinWordType() -> Type { _bridged.getBuiltinWordType().type }

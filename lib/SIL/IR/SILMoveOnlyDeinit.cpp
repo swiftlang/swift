@@ -19,22 +19,27 @@ using namespace swift;
 
 SILMoveOnlyDeinit *SILMoveOnlyDeinit::create(SILModule &mod,
                                              NominalTypeDecl *nominalDecl,
+                                             SILType nominalType,
                                              SerializedKind_t serialized,
                                              SILFunction *funcImpl) {
   auto buf =
       mod.allocate(sizeof(SILMoveOnlyDeinit), alignof(SILMoveOnlyDeinit));
-  auto *table =
-      ::new (buf) SILMoveOnlyDeinit(nominalDecl, funcImpl, unsigned(serialized));
+  auto *table = ::new (buf) SILMoveOnlyDeinit(nominalDecl, nominalType, funcImpl,
+                                              unsigned(serialized));
   mod.moveOnlyDeinits.push_back(table);
-  mod.MoveOnlyDeinitMap[nominalDecl] = table;
+  if (table->isSpecialized())
+    mod.SpecializedMoveOnlyDeinitMap[nominalType.getObjectType()] = table;
+  else
+    mod.MoveOnlyDeinitMap[nominalDecl] = table;
   return table;
 }
 
 SILMoveOnlyDeinit::SILMoveOnlyDeinit(NominalTypeDecl *nominalDecl,
+                                     SILType nominalType,
                                      SILFunction *implementation,
                                      unsigned serialized)
-    : nominalDecl(nominalDecl), funcImpl(implementation),
-      serialized(serialized) {
+    : nominalDecl(nominalDecl), nominalType(nominalType),
+      funcImpl(implementation), serialized(serialized) {
   assert(funcImpl);
   funcImpl->incrementRefCount();
 }

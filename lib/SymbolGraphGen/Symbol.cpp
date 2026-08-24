@@ -695,7 +695,7 @@ isAvailabilityDomainActive(AvailabilityDomain Domain,
   if (!Domain.isPlatform())
     return true;
 
-  auto Platform = Domain.getPlatformKind();
+  auto Platform = *Domain.getPlatformKind();
   return Platform == *ActivePlatform ||
          inheritsAvailabilityFromPlatform(*ActivePlatform, Platform);
 }
