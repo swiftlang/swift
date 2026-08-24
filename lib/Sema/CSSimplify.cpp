@@ -12775,7 +12775,11 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
   if (!type2->isTypeVariableOrMember()) {
     Type dynamicType2;
     if (type2->isAnyExistentialType()) {
-      dynamicType2 = ExistentialMetatypeType::get(type2);
+      auto layout = type2->getExistentialLayout();
+      if (layout.getCOMInterface())
+        dynamicType2 = ExistentialMetatypeType::get(getASTContext().TheAnyType);
+      else
+        dynamicType2 = ExistentialMetatypeType::get(type2);
     } else {
       dynamicType2 = MetatypeType::get(type2);
     }

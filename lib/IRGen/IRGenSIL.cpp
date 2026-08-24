@@ -3480,8 +3480,15 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   SILType opType = op->getType();
 
   switch (opType.getPreferredExistentialRepresentation()) {
-  case ExistentialRepresentation::COM:
-    llvm_unreachable("COM existential metatype projection is not implemented");
+  case ExistentialRepresentation::COM: {
+    Explosion existential = getLoweredExplosion(op);
+    auto *interface = existential.claimNext();
+    auto *metadata = emitTypeMetadataRef(opType.getASTType());
+    auto *dynamicType = Builder.CreateCall(
+        IGM.getGetCOMDynamicTypeFunctionPointer(), {interface, metadata});
+    result.add(dynamicType);
+    break;
+  }
   case ExistentialRepresentation::Metatype: {
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfMetatype(*this, existential, opType, result);
