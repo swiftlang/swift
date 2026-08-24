@@ -48,11 +48,13 @@ public func fn() {
 // SIL-LABEL: sil [asmname "implFuncPreserveMost"]
 // SIL-SAME: @convention(c, cType:
 // SIL-SAME: preserve_most
+// CHECK-LABEL: define{{.*}} preserve_mostcc i32 @implFuncPreserveMost
 
 /// fn()
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s16c_implementation2fnyyF"
 // CHECK:   call void @implFunc
 // CHECK:   call void @"\01_implFuncAsmName"
 // CHECK:   call void @implFuncRenamed_C
+// CHECK:   call preserve_mostcc i32 @implFuncPreserveMost
 // CHECK:   ret void
 // CHECK: }
