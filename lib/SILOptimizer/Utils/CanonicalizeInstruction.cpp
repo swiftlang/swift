@@ -250,7 +250,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
   // TODO: This logic subtly anticipates SILGen behavior. In the future, change
   // SILGen to avoid emitting the full load and never delete loads in Raw SIL.
   if (projections.empty() &&
-      loadInst->getModule().getStageFloor() == SILStage::Raw)
+      loadInst->getFunction()->getFunctionStage() == SILStage::Raw)
     return nextII;
 
   // Create a new address projection instruction and load instruction for each
@@ -579,7 +579,7 @@ CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
   // TODO: fix tryEliminateUnneededForwardingInst to handle debug uses.
   auto *fn = inst->getFunction();
   if (!preserveDebugInfo && fn->hasOwnership()
-      && fn->getModule().getStageFloor() != SILStage::Raw) {
+      && fn->getFunctionStage() != SILStage::Raw) {
     if (ForwardingInstruction::isa(inst))
       if (auto newNext = tryEliminateUnneededForwardingInst(inst, *this))
         return *newNext;
