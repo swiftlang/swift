@@ -4098,6 +4098,7 @@ static OpaqueBuiltinKind classifyOpaqueBuiltin(BuiltinInst *bi) {
   case BuiltinValueKind::AddTaskLocalValue:
   case BuiltinValueKind::AddressOfRawLayout:
   case BuiltinValueKind::GetEnumTag:
+  case BuiltinValueKind::GetSplitContinuationAddr:
   case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
   case BuiltinValueKind::ResumeThrowingContinuationReturning:
   case BuiltinValueKind::TaskLocalValuePush:

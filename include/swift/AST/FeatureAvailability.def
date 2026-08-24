@@ -99,6 +99,7 @@ FEATURE(DynamicCastTest,                                (6, 5))
 FEATURE(OnceClosureDestroyedError,                      (6, 5))
 FEATURE(SynchronousOperationTask,                       (6, 5))
 
+FEATURE(SplitContinuation,                              FUTURE)
 FEATURE(CustomGlobalExecutors,                          FUTURE)
 FEATURE(Differentiation,                                FUTURE)
 FEATURE(ClearSensitive,                                 FUTURE)

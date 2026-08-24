@@ -583,3 +583,17 @@ Added: _$ss6TaskIDV9_rawValues6UInt64Vvs
 
 // The resume function of a synchronous operation task, for tools
 Added: __swift_concurrency_debug_synchronous_operation_adapter
+
+// Split continuation: the ContinuationAwaiter await half (the resume half reuses
+// the existing Continuation) and the split continuation runtime entry points
+// it is built on.  The cancellation and priority-escalation handlers installed on
+// a suspension use the ordinary per-handler entry points, so they add nothing.
+Added: _$ss19ContinuationAwaiterVMa
+Added: _$ss19ContinuationAwaiterVMn
+Added: _$ss19ContinuationAwaiterVsRi_zrlE7contextAByxq_GBc_tcfC
+Added: _$ss19ContinuationAwaiterVsRi_zrlE7contextBcvg
+Added: _$ss19ContinuationAwaiterVsRi_zrlEfD
+Added: _swift_continuation_createSplit
+Added: _swift_continuation_awaitSplit
+Added: _swift_continuation_destroySplit
+Added: _swift_continuation_setResumingExecutors

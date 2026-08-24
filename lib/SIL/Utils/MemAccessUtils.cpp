@@ -2604,6 +2604,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
 
     // These consume values out of their second operand.
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
+    case BuiltinValueKind::GetSplitContinuationAddr:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationThrowing:
       visitor(&builtin->getAllOperands()[1]);
