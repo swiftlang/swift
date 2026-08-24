@@ -1,0 +1,48 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name split
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -module-name split | %FileCheck %s --check-prefix=CHECK-NOTHROW
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -module-name split | %FileCheck %s --check-prefix=CHECK-THROW
+// REQUIRES: concurrency
+
+// Serializing and deserializing a bound split continuation must preserve
+// the token, the resume buffer and both successors of the
+// await.  The two forms are checked with separate prefixes because
+// deserialization does not preserve the order of the functions.
+
+import Builtin
+import Swift
+import _Concurrency
+
+// CHECK-NOTHROW-LABEL: sil @split_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
+sil @split_await : $@async (Builtin.RawUnsafeContinuation) -> () {
+entry(%token : $Builtin.RawUnsafeContinuation):
+  %a = alloc_stack $Builtin.Int32
+  // CHECK-NOTHROW: [[CONT:%.*]] = builtin "getSplitContinuationAddr"<Builtin.Int32>(%0 : $Builtin.RawUnsafeContinuation, {{%.*}} : $*Builtin.Int32)
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%token : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  // The line ends after the resume successor, i.e. there is no error successor.
+  // CHECK-NOTHROW: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume bb{{[0-9]+}} // id:
+  await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  return undef : $()
+}
+
+// CHECK-THROW-LABEL: sil @split_await_throws : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
+sil @split_await_throws : $@async (Builtin.RawUnsafeContinuation) -> () {
+entry(%token : $Builtin.RawUnsafeContinuation):
+  %a = alloc_stack $Builtin.Int32
+  // CHECK-THROW: [[CONT:%.*]] = builtin "getSplitContinuationAddr"<Builtin.Int32>(%0 : $Builtin.RawUnsafeContinuation, {{%.*}} : $*Builtin.Int32)
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%token : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  // CHECK-THROW: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume {{bb[0-9]+}}, error [[ERROR:bb[0-9]+]]
+  await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1, error bb2
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+  // CHECK-THROW: [[ERROR]]({{%.*}} : $any Error):
+bb2(%e : $Error):
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+bb3:
+  return undef : $()
+}
