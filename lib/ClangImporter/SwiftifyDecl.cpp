@@ -343,10 +343,12 @@ public:
     out << "\"";
     llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
     for (auto attr : availabilityAttrs) {
+      auto platform = attr.getPlatform();
+      if (!platform) continue;
       auto introducedOpt = attr.getIntroduced();
       if (!introducedOpt.has_value()) continue;
       printSeparator();
-      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
+      out << prettyPlatformString(*platform) << " " << introducedOpt.value();
     }
     out << "\"";
   }

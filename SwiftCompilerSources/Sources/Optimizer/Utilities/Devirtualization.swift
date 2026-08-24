@@ -57,6 +57,12 @@ private func devirtualize(destroy: some DevirtualizableDestroy,
     return devirtualizeFixedSizeArray(destroy: destroy, isMandatory: isMandatory, context)
   }
 
+  // A tuple has no deinit of its own, but its elements may. Tuples aren't
+  // nominal, so this has to be handled before the `nominal` check below.
+  if type.isTuple {
+    return destroy.devirtualizeTupleElements(isMandatory: isMandatory, context)
+  }
+
   guard let nominal = type.nominal else {
     // E.g. a non-copyable generic function parameter
     return true
@@ -134,6 +140,7 @@ private protocol DevirtualizableDestroy : UnaryInstruction {
   var shouldDropDeinit: Bool { get }
   func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext)
   func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool
+  func devirtualizeTupleElements(isMandatory: Bool, _ context: some MutatingContext) -> Bool
   func devirtualizeEnumPayload(enumCase: EnumCase,
                                in block: BasicBlock,
                                isMandatory: Bool,
@@ -238,6 +245,30 @@ extension DestroyValueInst : DevirtualizableDestroy {
     return true
   }
 
+  fileprivate func devirtualizeTupleElements(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+    let elements = type.tupleElements
+
+    defer {
+      context.erase(instruction: self)
+    }
+
+    let builder = Builder(before: self, context)
+    if elements.allSatisfy({ $0.isTrivial(in: parentFunction) }) {
+      builder.createEndLifetime(of: operand.value)
+      return true
+    }
+    let destructure = builder.createDestructureTuple(tuple: destroyedValue)
+    var result = true
+
+    for elementValue in destructure.results where !elementValue.type.isTrivial(in: parentFunction) {
+      let destroyElement = builder.createDestroyValue(operand: elementValue)
+      if !devirtualizeDeinits(of: destroyElement, isMandatory: isMandatory, context) {
+        result = false
+      }
+    }
+    return result
+  }
+
   fileprivate func createSwitchEnum(
     atEndOf block: BasicBlock,
     cases: [(Int, BasicBlock)],
@@ -317,6 +348,31 @@ extension DestroyAddrInst : DevirtualizableDestroy {
       return devirtualizeDeinits(of: destroyPayload, isMandatory: isMandatory, context)
     }
     return true
+  }
+
+  fileprivate func devirtualizeTupleElements(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+    let builder = Builder(before: self, context)
+    let elements = type.tupleElements
+
+    defer {
+      context.erase(instruction: self)
+    }
+    if elements.allSatisfy({ $0.isTrivial(in: parentFunction) }) {
+      builder.createEndLifetime(of: operand.value)
+      return true
+    }
+    var result = true
+    for (elementIdx, elementTy) in elements.enumerated()
+      where !elementTy.isTrivial(in: parentFunction)
+    {
+      let elementAddr = builder.createTupleElementAddr(tupleAddress: destroyedAddress,
+                                                       elementIndex: elementIdx)
+      let destroyElement = builder.createDestroyAddr(address: elementAddr)
+      if !devirtualizeDeinits(of: destroyElement, isMandatory: isMandatory, context) {
+        result = false
+      }
+    }
+    return result
   }
 
   fileprivate func createSwitchEnum(

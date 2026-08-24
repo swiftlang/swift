@@ -4280,13 +4280,14 @@ public:
   /// Returns the `rename:` field of the attribute, or an empty string.
   StringRef getRename() const { return attr->Rename; }
 
-  /// Returns the platform kind that the attribute applies to, or
-  /// `PlatformKind::none` if the attribute is not platform specific.
+  /// Returns true if the attribute applies to a specific platform.
   bool isPlatformSpecific() const { return getDomain().isPlatform(); }
 
-  /// Returns the platform kind that the attribute applies to, or
-  /// `PlatformKind::none` if the attribute is not platform specific.
-  PlatformKind getPlatform() const { return getDomain().getPlatformKind(); }
+  /// Returns the platform that the attribute applies to, or `nullopt` if the
+  /// attribute is not platform specific.
+  std::optional<PlatformKind> getPlatform() const {
+    return getDomain().getPlatformKind();
+  }
 
   /// Whether this is attribute indicates unavailability in all versions.
   bool isUnconditionallyUnavailable() const {

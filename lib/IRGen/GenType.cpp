@@ -3240,8 +3240,8 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
     return false;
   }
 
-  auto deinitTable = IGF.getSILModule().lookUpMoveOnlyDeinit(
-      nominal, false /*deserialize lazily*/);
+  auto deinitTable = IGF.getSILModule().lookUpMoveOnlyDeinitForType(
+      T, false /*deserialize lazily*/);
 
   // If we do not have a deinit table already deserialized, call the value
   // witness instead.
@@ -3263,7 +3263,11 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
          && !deinitTy->hasError()
          && "deinit should have only one parameter");
 
-  auto substitutions = ty->getContextSubstitutionMap();
+  // A specialized deinit is non-generic: it already has the concrete type
+  // baked in, so it needs no substitutions (and takes no metadata arguments).
+  auto substitutions = deinitTable->isSpecialized()
+                           ? SubstitutionMap()
+                           : ty->getContextSubstitutionMap();
                                                      
   CalleeInfo info(deinitTy,
                   deinitTy->substGenericArgs(IGF.getSILModule(),
@@ -3378,8 +3382,8 @@ IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
     return IsABIAccessible;
 
   if (IGM.getSILModule().isTypeMetadataAccessible(ty) ||
-      IGM.getSILModule().lookUpMoveOnlyDeinit(nom,
-                                              false /*deserialize lazily*/))
+      IGM.getSILModule().lookUpMoveOnlyDeinitForType(
+          SILType::getPrimitiveObjectType(ty), false /*deserialize lazily*/))
     return IsABIAccessible;
 
   return IsNotABIAccessible;

@@ -3278,6 +3278,10 @@ ERROR(witness_initializer_not_required,none,
       "initializer requirement %0 can only be satisfied by a 'required' "
       "initializer in%select{| the definition of}1 non-final class %2",
       (const ValueDecl *, bool, Type))
+ERROR(witness_initializer_cxx_not_inherited,none,
+      "initializer requirement %0 cannot be satisfied by a C++ constructor of "
+      "non-final foreign reference type %1",
+      (const ValueDecl *, Type))
 ERROR(witness_initializer_failability,none,
       "non-failable initializer requirement %0"
       "%select{| in Objective-C protocol}1 cannot be satisfied by a "

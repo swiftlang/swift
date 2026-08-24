@@ -5392,7 +5392,7 @@ void suggestAnyAppleOSAvailability(const Decl *D,
     if (!semAttr || !semAttr->isPlatformSpecific())
       continue;
 
-    auto platform = semAttr->getPlatform();
+    auto platform = *semAttr->getPlatform();
 
     // Don't diagnose any declaration that already has an anyAppleOS attribute.
     if (platform == PlatformKind::anyAppleOS)
@@ -5480,7 +5480,7 @@ void suggestAnyAppleOSAvailability(const Decl *D,
       if (remainingAttrsToReplace.erase(member))
         continue;
       if (auto semAttr = D->getSemanticAvailableAttr(member)) {
-        os << ", " << platformString(semAttr->getPlatform());
+        os << ", " << semAttr->getDomain().getNameForAttributePrinting();
         if (auto v = member->getRawIntroduced())
           os << " " << *v;
       }

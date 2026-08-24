@@ -199,6 +199,14 @@ struct BridgedPassContext {
 
   bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
   bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
+
+  /// Visits the type of every non-copyable nominal type declared in this
+  /// module for which IRGen may emit type metadata (and therefore value
+  /// witnesses, which destroy the type).
+  void visitTypesWithEmittedMetadata(
+      void *_Nonnull context,
+      void (*_Nonnull callback)(void *_Nonnull context, BridgedType type)) const;
+
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
   bool tryOptimizeKeypath(BridgedInstruction apply) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;

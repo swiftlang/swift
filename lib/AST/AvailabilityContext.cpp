@@ -467,13 +467,12 @@ createImplicitAvailableAttr(AvailabilityContext::DomainInfo domainInfo,
 void AvailabilityContext::createImplicitAvailableAttrs(
     const AvailabilityContext &other, ASTContext &ctx,
     llvm::SmallVectorImpl<AvailableAttr *> &attrs) const {
-  auto platform = targetPlatform(ctx.LangOpts);
-  if (platform != PlatformKind::none) {
+  if (auto platform = targetPlatform(ctx.LangOpts)) {
     // Only describe the platform range if it is strictly narrower than the
     // range that is already implied by `other`.
     if (other.storage->platformRange.isSupersetOf(storage->platformRange)) {
       if (auto *attr = createImplicitAvailableAttr(
-              DomainInfo(AvailabilityDomain::forPlatform(platform),
+              DomainInfo(AvailabilityDomain::forPlatform(*platform),
                          storage->platformRange),
               ctx))
         attrs.push_back(attr);

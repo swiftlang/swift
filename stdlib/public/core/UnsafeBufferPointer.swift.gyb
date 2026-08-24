@@ -1150,7 +1150,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   @inlinable
   @_preInverseGenerics
   public func deallocate() {
-    unsafe _position?.deallocate()
+    unsafe _position?._deallocate(capacity: count)
   }
 }
 
