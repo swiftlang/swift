@@ -1715,7 +1715,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       original->isRuntimeAccessible());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));
-  differential->setHasLoweredAddresses(original->hasLoweredAddresses());
+  differential->inheritDerivedFrom(original);
 
   return differential;
 }

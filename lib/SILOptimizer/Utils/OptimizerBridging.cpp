@@ -510,8 +510,7 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   // function.
   specializedApplySiteCallee->setSection(original->section());
 
-  specializedApplySiteCallee->setHasLoweredAddresses(
-      original->hasLoweredAddresses());
+  specializedApplySiteCallee->inheritDerivedFrom(original);
 
   return {specializedApplySiteCallee};
 }

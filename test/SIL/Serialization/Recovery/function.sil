@@ -10,7 +10,7 @@
 sil_stage raw
 import Types
 
-// CHECK-LABEL: sil [ossa] @missingParam : $@convention(thin) (SoonToBeMissing) -> () {
+// CHECK-LABEL: sil [stage=canonical] [ossa] @missingParam : $@convention(thin) (SoonToBeMissing) -> () {
 // CHECK-RECOVERY-NEGATIVE-NOT: sil [ossa] @missingParam
 sil [ossa] @missingParam : $@convention(thin) (SoonToBeMissing) -> () {
 entry(%arg : $SoonToBeMissing):
@@ -18,7 +18,7 @@ entry(%arg : $SoonToBeMissing):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @missingResult : $@convention(thin) () -> SoonToBeMissing {
+// CHECK-LABEL: sil [stage=canonical] @missingResult : $@convention(thin) () -> SoonToBeMissing {
 // CHECK-RECOVERY-NEGATIVE-NOT: sil @missingResult
 sil @missingResult : $@convention(thin) () -> (SoonToBeMissing) {
 entry:

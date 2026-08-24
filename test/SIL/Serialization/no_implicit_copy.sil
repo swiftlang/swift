@@ -8,7 +8,7 @@ sil_stage canonical
 
 class Klass {}
 
-// CHECK-LABEL: sil [serialized] [ossa] @noImplicitCopyTest : $@convention(thin) (@owned Klass) -> () {
+// CHECK-LABEL: sil [serialized] [stage=canonical] [ossa] @noImplicitCopyTest : $@convention(thin) (@owned Klass) -> () {
 // CHECK: bb0(%0 : @noImplicitCopy @owned $Klass):
 // CHECK: } // end sil function 'noImplicitCopyTest'
 sil [serialized] [ossa] @noImplicitCopyTest : $@convention(thin) (@owned Klass) -> () {

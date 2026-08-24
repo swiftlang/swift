@@ -8,7 +8,7 @@ sil_stage canonical
 
 import Builtin
 
-// CHECK-LABEL: sil [serialized] [ossa] @test_copy_value : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK-LABEL: sil [serialized] [stage=canonical] [ossa] @test_copy_value : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[ARG1:%[0-9]+]] : @owned $Builtin.NativeObject):
 // CHECK: [[COPY_VALUE_RESULT:%[0-9]+]] = copy_value [[ARG1]] : $Builtin.NativeObject
 // CHECK: destroy_value [[ARG1]]
@@ -20,7 +20,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %1 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil [serialized] [ossa] @test_strong_copy_unowned_value : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK-LABEL: sil [serialized] [stage=canonical] [ossa] @test_strong_copy_unowned_value : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[T0:%[0-9]+]] : @owned $@sil_unowned Builtin.NativeObject):
 // CHECK-NEXT: [[COPY_RESULT:%.*]] = strong_copy_unowned_value [[T0]] : $@sil_unowned Builtin.NativeObject
 // CHECK-NEXT: destroy_value [[T0]] : $@sil_unowned Builtin.NativeObject

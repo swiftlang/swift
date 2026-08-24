@@ -802,6 +802,15 @@ public:
   /// still holds opaque values.
   void setFunctionStage(SILStage stage);
 
+  /// Take the facts a whole-function clone inherits from the function it was
+  /// derived from: the address-lowering form and the SIL stage.
+  ///
+  /// Call this where the derived function's declaration is created, which is
+  /// the only place that knows the clone is a whole-function clone rather than
+  /// a partial one such as an inline. Keeping the two facts in one call is
+  /// deliberate: they were propagated separately once, and they drifted.
+  void inheritDerivedFrom(const SILFunction *from);
+
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
     return ForceEnableLexicalLifetimes_t(ForceEnableLexicalLifetimes);
   }

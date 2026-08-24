@@ -88,7 +88,7 @@ SILFunction *GenericCloner::createDeclaration(
     NewF->setOwnershipEliminated();
   }
 
-  NewF->setHasLoweredAddresses(Orig->hasLoweredAddresses());
+  NewF->inheritDerivedFrom(Orig);
 
   // A specialization of a function goes into the same section as the original
   // function.

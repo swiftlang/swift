@@ -24,10 +24,10 @@ bb0:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [serialized] [dynamic_replacement_for "test_dynamically_replaceable"] [canonical] @test_dynamic_replacement_for
+// CHECK-LABEL: sil [serialized] [dynamic_replacement_for "test_dynamically_replaceable"] [canonical] [stage=canonical] @test_dynamic_replacement_for
 // CHECK: prev_dynamic_function_ref @test_dynamic_replacement_for
 
-// CHECK-LABEL: sil [serialized] [dynamically_replacable] [canonical] @test_dynamically_replaceable
+// CHECK-LABEL: sil [serialized] [dynamically_replacable] [canonical] [stage=canonical] @test_dynamically_replaceable
 
-// CHECK-LABEL: sil [serialized] [canonical] @test_dynamically_replaceable_impl
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] @test_dynamically_replaceable_impl
 // CHECK:  dynamic_function_ref @test_dynamically_replaceable

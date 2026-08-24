@@ -816,7 +816,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo;
+      onlyReferencedByDebugInfo, serializedStage;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
@@ -826,7 +826,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo, funcTyID, replacedFunctionID,
+      onlyReferencedByDebugInfo, serializedStage, funcTyID, replacedFunctionID,
       usedAdHocWitnessFunctionID, genericSigID, clangNodeOwnerID,
       parentModuleID, SemanticsIDs);
 
@@ -1052,6 +1052,12 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // after arbitrary optimization and lowering.
   if (!MF->isSIB())
     fn->setWasDeserializedCanonical();
+
+  // Seed the stage from what the container recorded for this function, not from
+  // the container kind. 
+  auto recordedStage = SILStage(serializedStage);
+  if (recordedStage > fn->getFunctionStage())
+    fn->setFunctionStage(recordedStage);
 
   fn->setBare(IsBare);
   if (!fn->getDebugScope()) {
@@ -4306,7 +4312,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo;
+      onlyReferencedByDebugInfo, serializedStage;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
@@ -4316,7 +4322,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo, funcTyID, replacedFunctionID,
+      onlyReferencedByDebugInfo, serializedStage, funcTyID, replacedFunctionID,
       usedAdHocWitnessFunctionID, genericSigID, clangOwnerID, parentModuleID,
       SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);

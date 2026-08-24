@@ -704,7 +704,8 @@ static bool parseDeclSILOptional(
     SmallVectorImpl<std::string> *Semantics,
     SmallVectorImpl<ParsedSpecAttr> *SpecAttrs, ValueDecl **ClangDecl,
     EffectsKind *MRK, ActorIsolation *actorIsolation, SILParser &SP,
-    SILModule &M) {
+    SILModule &M,
+    std::optional<SILStage> *functionStage = nullptr) {
   while (SP.P.consumeIf(tok::l_square)) {
     if (isLet && SP.P.Tok.is(tok::kw_let)) {
       *isLet = true;
@@ -838,6 +839,32 @@ static bool parseDeclSILOptional(
       SP.P.consumeToken(tok::string_literal);
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
+    } else if (functionStage && SP.P.Tok.getText() == "stage") {
+      SP.P.consumeToken(tok::identifier);
+      if (SP.P.parseToken(tok::equal, diag::expected_in_attribute_list))
+        return true;
+      if (SP.P.Tok.isNot(tok::identifier)) {
+        SP.P.diagnose(SP.P.Tok, diag::expected_sil_stage_name);
+        return true;
+      }
+
+      SourceLoc stageLoc = SP.P.Tok.getLoc();
+      auto stage = getSILStageByName(SP.P.Tok.getText());
+      if (!stage) {
+        SP.P.diagnose(SP.P.Tok, diag::expected_sil_stage_name);
+        return true;
+      }
+
+      if (*stage < M.getStageFloor()) {
+        SP.P.diagnose(stageLoc, diag::sil_function_stage_below_module_stage,
+                      getSILStageName(*stage),
+                      getSILStageName(M.getStageFloor()));
+        return true;
+      }
+      *functionStage = stage;
+      SP.P.consumeToken(tok::identifier);
+      SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      continue;
     } else if (asmName && SP.P.Tok.getText() == "asmname") {
       SP.P.consumeToken(tok::identifier);
       if (SP.P.Tok.getKind() != tok::string_literal) {
@@ -866,7 +893,8 @@ static bool parseDeclSILOptional(
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
-    } else if (inlineStrategy && SP.P.Tok.getText() == "heuristic_always_inline")
+    } else if (inlineStrategy &&
+               SP.P.Tok.getText() == "heuristic_always_inline")
       *inlineStrategy = HeuristicAlwaysInline;
     else if (inlineStrategy && SP.P.Tok.getText() == "always_inline")
       *inlineStrategy = AlwaysInline;
@@ -7660,6 +7688,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   SILFunction *AdHocWitnessFunction = nullptr;
   Identifier objCReplacementFor;
   ActorIsolation actorIsolation;
+  std::optional<SILStage> functionStage;
   if (parseSILLinkage(FnLinkage, P) ||
       parseDeclSILOptional(
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
@@ -7672,7 +7701,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isPerformanceConstraint, &markedAsUsed, &asmName, &section, nullptr,
           &isWeakImported, &codeGenerationModel, &needStackProtection, nullptr,
           &availability, &isWithoutActuallyEscapingThunk, &Semantics,
-          &SpecAttrs, &ClangDecl, &MRK, &actorIsolation, FunctionState, M) ||
+          &SpecAttrs, &ClangDecl, &MRK, &actorIsolation, FunctionState, M,
+          &functionStage) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_function_name) ||
@@ -7698,6 +7728,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
     FunctionState.F->setSerializedKind(SerializedKind_t(isSerialized));
     FunctionState.F->setWasDeserializedCanonical(isCanonical);
+    if (functionStage)
+      FunctionState.F->setFunctionStage(*functionStage);
     if (!hasOwnershipSSA)
       FunctionState.F->setOwnershipEliminated();
     FunctionState.F->setHasLoweredAddresses(hasLoweredAddresses);
@@ -7839,14 +7871,8 @@ bool SILParserState::parseDeclSILStage(Parser &P) {
     return true;
   }
   SILStage stage;
-  if (P.Tok.isContextualKeyword("raw")) {
-    stage = SILStage::Raw;
-    P.consumeToken();
-  } else if (P.Tok.isContextualKeyword("canonical")) {
-    stage = SILStage::Canonical;
-    P.consumeToken();
-  } else if (P.Tok.isContextualKeyword("lowered")) {
-    stage = SILStage::Lowered;
+  if (auto parsed = getSILStageByName(P.Tok.getText())) {
+    stage = *parsed;
     P.consumeToken();
   } else {
     P.diagnose(P.Tok, diag::expected_sil_stage_name);

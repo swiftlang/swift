@@ -3984,6 +3984,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (WasDeserializedCanonical && getModule().getStageFloor() == SILStage::Raw)
     OS << "[canonical] ";
 
+  // A function that is ahead of the module's stage floor carries its own stage.
+  // A function at the floor prints nothing: the module `sil_stage` line already
+  // captures this.
+  if (getFunctionStage() > getModule().getStageFloor())
+    OS << "[stage=" << getSILStageName(getFunctionStage()) << "] ";
+
   // If this function is not an external declaration /and/ is in ownership ssa
   // form, print [ossa].
   if (!isExternalDeclaration() && hasOwnership())
@@ -4447,18 +4453,7 @@ static void printExternallyVisibleDecls(SILPrintContext &Ctx,
 void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
                       bool PrintASTDecls) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
-  OS << "sil_stage ";
-  switch (StageFloor) {
-  case SILStage::Raw:
-    OS << "raw";
-    break;
-  case SILStage::Canonical:
-    OS << "canonical";
-    break;
-  case SILStage::Lowered:
-    OS << "lowered";
-    break;
-  }
+  OS << "sil_stage " << getSILStageName(StageFloor);
 
   OS << "\n\nimport " << BUILTIN_NAME
      << "\nimport " << STDLIB_NAME
