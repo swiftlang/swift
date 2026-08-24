@@ -2602,6 +2602,36 @@ FUNCTION(ContinuationThrowingResumeWithError,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
+// void *swift_continuation_createSplit(const Metadata *resultType);
+FUNCTION(ContinuationCreateSplit,
+         _Concurrency, swift_continuation_createSplit, SwiftCC,
+         SplitContinuationAvailability,
+         RETURNS(Int8PtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_continuation_awaitSplit(void *splitHeader);
+FUNCTION(ContinuationAwaitSplit,
+         _Concurrency, swift_continuation_awaitSplit, SwiftAsyncCC,
+         SplitContinuationAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_continuation_destroySplit(void *splitHeader);
+FUNCTION(ContinuationDestroySplit,
+         _Concurrency, swift_continuation_destroySplit, SwiftCC,
+         SplitContinuationAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
 // SerialExecutorRef swift_task_getCurrentExecutor();
 FUNCTION(TaskGetCurrentExecutor,
          _Concurrency, swift_task_getCurrentExecutor, SwiftCC,

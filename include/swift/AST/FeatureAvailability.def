@@ -91,6 +91,7 @@ FEATURE(TaskDeadline,                                   (6, 5))
 FEATURE(CancellationHandlerWithReason,                  (6, 5))
 FEATURE(DistributedActorResignRemoteID,                 (6, 5))
 
+FEATURE(SplitContinuation,                              FUTURE)
 FEATURE(CustomGlobalExecutors,                          FUTURE)
 FEATURE(Differentiation,                                FUTURE)
 FEATURE(ClearSensitive,                                 FUTURE)
