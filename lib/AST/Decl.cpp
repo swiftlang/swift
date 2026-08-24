@@ -3064,11 +3064,30 @@ VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
   return getPatternList()[i].getAnchoringVarDecl();
 }
 
+/// Whether the downstream compile-time-values evaluator owns validation and
+/// static initialization of every '@const'/'@section' initializer.
+static bool constValuesSILEvaluatorFoldsInitializers(const ASTContext &ctx) {
+  return ctx.LangOpts.hasFeature(Feature::CompileTimeValues) ||
+         ctx.LangOpts.hasFeature(Feature::CompileTimeValuesPreview);
+}
+
 bool PatternBindingDecl::hasSingleVarConstantFoldedInit() const {
+  auto &ctx = getASTContext();
   auto *singleVar = getSingleVar();
   if (!singleVar || !singleVar->isConstValue() ||
-      !getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions))
+      !ctx.LangOpts.hasFeature(Feature::LiteralExpressions))
     return false;
+  // When the downstream compile-time evaluator is in play, the
+  // literal-expression folder must be disabled. The two accept overlapping but
+  // different grammars: the evaluator takes 'Int(17.0 / 3.5)', which the folder
+  // rejects, and the folder takes a Clang-imported constant, which the
+  // evaluator rejects. So folding here can reject a valid compile-time value,
+  // and that error sets 'ASTContext::hadError()', which makes
+  // 'DiagnoseUnknownConstValues' bail before emitting its own diagnostic,
+  // hiding the real error behind a spurious one.
+  if (constValuesSILEvaluatorFoldsInitializers(ctx))
+    return false;
+
   // Only stdlib integer constants participate in literal-expression folding.
   // Other constant initializers (tuples, arrays, strings, etc) are left as
   // written.
