@@ -5910,6 +5910,23 @@ CanSILFunctionType SILFunctionType::get(
   patternSubs = patternSubs.getCanonical();
   invocationSubs = invocationSubs.getCanonical();
 
+  // A serialized module may have been built without Clang function types.
+  // Reconstruct a missing derivable type from the SIL signature before
+  // enforcing the invariant requested by this compilation.
+  if (ctx.LangOpts.UseClangFunctionTypes &&
+      ext.getClangTypeInfo().empty() &&
+      shouldStoreClangType(ext.getRepresentation())) {
+    std::optional<SILResultInfo> result;
+    if (normalResults.size() == 1)
+      result = normalResults.front();
+    auto &C = const_cast<ASTContext &>(ctx);
+    auto *clangType =
+        C.getCanonicalClangFunctionType(params, result,
+                                        ext.getRepresentation());
+    if (clangType)
+      ext = ext.intoBuilder().withClangFunctionType(clangType).build();
+  }
+
   // [FIXME: Clang-type-plumbing]
   if (ctx.LangOpts.UseClangFunctionTypes) {
     if (auto error = ext.checkClangType()) {
