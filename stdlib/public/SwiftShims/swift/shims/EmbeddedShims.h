@@ -359,7 +359,11 @@ _swift_embedded_error_box_destroy(SWIFT_CONTEXT void * _Nonnull object) {
 
 // Returns the address of the calling convention bridge for metadata storage init.
 static inline void * _Nonnull _swift_embedded_error_destroy_ptr(void) {
+#if defined(__AVR__)
+  return (void *)(__UINTPTR_TYPE__)_swift_embedded_error_box_destroy;
+#else
   return (void *)_swift_embedded_error_box_destroy;
+#endif
 }
 
 #ifdef __cplusplus
