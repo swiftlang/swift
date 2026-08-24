@@ -37,6 +37,7 @@
 extern void implFunc(int param);
 extern void implFuncCName(int param) __asm__("_implFuncAsmName");
 extern void implFuncRenamed_C(int param) __attribute__((swift_name("implFuncRenamed_Swift(param:)")));
+extern int implFuncPreserveMost(int param) __attribute__((preserve_most));
 
 #if __OBJC__
 @interface NoImplClass
