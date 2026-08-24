@@ -75,7 +75,7 @@ private func devirtualize(destroy: some DevirtualizableDestroy,
   }
 
   if nominal.valueTypeDestructor != nil && !destroy.shouldDropDeinit {
-    guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
+    guard var deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
       return false
     }
     // In mandatory mode, de-virtualization might create function references to functions with wrong linkage.
@@ -85,6 +85,15 @@ private func devirtualize(destroy: some DevirtualizableDestroy,
       let serialized = destroy.parentFunction.serializedKind
       guard serialized == .notSerialized || deinitFunc.hasValidLinkageForFragileRef(serialized) else {
         return false
+      }
+
+      // In Embedded Swift, go looking for an already-specialized deinit for a generic type.
+      // If there isn't one, we have to bail out.
+      if deinitFunc.isGeneric && context.options.enableEmbeddedSwift {
+        guard let specialized = context.lookupSpecializedDeinit(ofType: type) else {
+          return false
+        }
+        deinitFunc = specialized
       }
     }
 
@@ -297,7 +306,9 @@ extension DestroyAddrInst : DevirtualizableDestroy {
 
   fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
     let builder = Builder(before: self, context)
-    let subs = context.getContextSubstitutionMap(for: destroyedAddress.type)
+    let subs = deinitializer.isGeneric
+        ? context.getContextSubstitutionMap(for: destroyedAddress.type)
+        : SubstitutionMap()
     let deinitRef = builder.createFunctionRef(deinitializer)
     if !deinitializer.argumentConventions[deinitializer.selfArgumentIndex!].isIndirect {
       let value = builder.createLoad(fromAddress: destroyedAddress, ownership: .take)

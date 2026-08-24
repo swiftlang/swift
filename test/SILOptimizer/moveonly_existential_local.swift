@@ -1,9 +1,3 @@
-// Binding a non-copyable existential to a local used to crash the move-only
-// address checker. The marked value is the existential, which has a single leaf
-// subelement, but the range for a use of the payload address was computed from
-// the payload's own subelement count -- larger when the payload has a deinit,
-// which adds a bit for `self` -- overrunning the liveness bit vector.
-
 // RUN: %target-swift-frontend %s -module-name main -parse-as-library -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend %s -module-name main -parse-as-library -O -emit-sil -o /dev/null
 
