@@ -544,6 +544,15 @@ BUILTIN_SIL_OPERATION(WithUnsafeContinuation, "withUnsafeContinuation", Special)
 /// the continuation is resumed.
 BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinuation", Special)
 
+/// awaitSplitThrowingContinuation<T> :
+///   (Builtin.RawUnsafeContinuation) async throws -> sending T
+///
+/// Await a *split* continuation (created by createSplitContinuation and
+/// possibly resumed from another function/thread), binding the resume-point to
+/// the current function. Returns a value of type T, or throws an error, when the
+/// continuation is resumed.
+BUILTIN_SIL_OPERATION(AwaitSplitThrowingContinuation, "awaitSplitThrowingContinuation", Special)
+
 /// Force the current task to be rescheduled on the specified actor.
 BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 
@@ -860,6 +869,27 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
 /// Resume a throwing continuation abnormally with the given error.
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
                        "resumeThrowingContinuationThrowing", "", Special)
+
+/// Create a split continuation for a result of type T, returning its opaque
+/// token. The token is shared by both halves of a split continuation and must
+/// be awaited (awaitSplitThrowingContinuation) and resumed exactly once, then
+/// it is torn down when the creating scope returns.
+BUILTIN_MISC_OPERATION(CreateSplitContinuation,
+                       "createSplitContinuation", "", Special)
+
+
+/// Bind a split continuation token, created elsewhere by
+/// createSplitContinuation, to the *current* function: the second operand is
+/// the address of the buffer in this frame that receives the resumed value.
+BUILTIN_MISC_OPERATION(GetSplitContinuationAddr,
+                       "getSplitContinuationAddr", "", Special)
+
+/// Destroy a split continuation token created by createSplitContinuation,
+/// after its result has been consumed by the await.
+///
+/// destroySplitContinuation : (Builtin.RawUnsafeContinuation) -> ()
+BUILTIN_MISC_OPERATION(DestroySplitContinuation,
+                       "destroySplitContinuation", "", Special)
 
 /// Unchecked pointer alignment assertion. Allows the compiler to assume
 /// alignment of the pointer to emit more efficient code.
