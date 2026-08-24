@@ -24,6 +24,7 @@
 #endif
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "../runtime/Private.h"
 #include "Debug.h"
 #include "ExecutorBridge.h"
 #include "TaskPrivate.h"
@@ -2370,23 +2371,46 @@ void swift::swift_defaultActor_deallocate(DefaultActor *_actor) {
 }
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
+enum class ActorClassKind {
+  /// A default actor, i.e. it uses the default actor executor
+  DefaultActor,
+  /// An actor which uses a custom executor
+  NonDefaultActor,
+};
+
+/// Returns what kind of actor (if any) the passed metadata represents.
+static std::optional<ActorClassKind>
+classifyActorClass(const Metadata *metadata) {
+  auto *classMetadata = dyn_cast_or_null<ClassMetadata>(metadata);
+
+  if (!classMetadata || !classMetadata->isTypeMetadata())
+    return std::nullopt;
+
+  bool isActor = false;
+  while (true) {
+    if (!classMetadata->isArtificialSubclass()) {
+      const auto *description = classMetadata->getDescription();
+
+      // Trust the class descriptor if it says it's a default actor
+      if (description->isDefaultActor())
+        return ActorClassKind::DefaultActor;
+
+      isActor |= description->isActor();
+    }
+
+    // Go to the superclass
+    classMetadata = classMetadata->Superclass;
+
+    // If we run out of Swift classes, it's not a default actor
+    if (!classMetadata || !classMetadata->isTypeMetadata())
+      return isActor ? std::optional(ActorClassKind::NonDefaultActor)
+                     : std::nullopt;
+  }
+}
+
 static bool isDefaultActorClass(const ClassMetadata *metadata) {
   assert(metadata->isTypeMetadata());
-  while (true) {
-    // Trust the class descriptor if it says it's a default actor.
-    if (!metadata->isArtificialSubclass() &&
-        metadata->getDescription()->isDefaultActor()) {
-      return true;
-    }
-
-    // Go to the superclass.
-    metadata = metadata->Superclass;
-
-    // If we run out of Swift classes, it's not a default actor.
-    if (!metadata || !metadata->isTypeMetadata()) {
-      return false;
-    }
-  }
+  return classifyActorClass(metadata) == ActorClassKind::DefaultActor;
 }
 #endif
 
@@ -2979,10 +3003,17 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
 
 bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
 #if !SWIFT_CONCURRENCY_EMBEDDED
-  const ClassMetadata *metadata = cast<ClassMetadata>(_actor->metadata);
-  if (isDefaultActorClass(metadata)) {
+  if (!_actor || isObjCTaggedPointer(_actor))
+    return false;
+
+  auto actorKind = classifyActorClass(swift_getObjectType(_actor));
+  if (!actorKind)
+    return false;
+
+  switch (*actorKind) {
+  case ActorClassKind::DefaultActor:
     return asImpl(reinterpret_cast<DefaultActor *>(_actor))->isDistributedRemote();
-  } else {
+  case ActorClassKind::NonDefaultActor:
     return asImpl(reinterpret_cast<NonDefaultDistributedActor *>(_actor))->isDistributedRemote();
   }
 #else
