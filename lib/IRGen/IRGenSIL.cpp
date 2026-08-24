@@ -8584,6 +8584,12 @@ void IRGenSILFunction::visitOpenExistentialAddrInst(OpenExistentialAddrInst *i) 
 
   auto openedArchetype = i->getType().castTo<ArchetypeType>();
 
+  if (baseTy.canUseExistentialRepresentation(ExistentialRepresentation::COM)) {
+    bindOpenedCOMExistentialArchetype(*this, openedArchetype);
+    setLoweredAddress(i, base);
+    return;
+  }
+
   // Insert a copy of the boxed value for COW semantics if necessary.
   auto accessKind = i->getAccessKind();
   Address object = emitOpaqueBoxedExistentialProjection(

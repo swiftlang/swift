@@ -8314,8 +8314,8 @@ public:
 };
 
 /// Access allowed to the opened value by the open_existential_addr instruction.
-/// Allowing mutable access to the opened existential requires a boxed
-/// existential value's box to be unique.
+/// Allowing mutable access to a boxed existential requires its box to be
+/// unique.
 enum class OpenedExistentialAccess { Immutable, Mutable };
 
 OpenedExistentialAccess getOpenedExistentialAccessFor(AccessKind access);

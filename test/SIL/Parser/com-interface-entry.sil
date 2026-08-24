@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../../Inputs/COM.swift
-// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name main -parse-sil -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name main -parse-sil -emit-sil -sil-verify-all %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -21,6 +21,18 @@ final class Implementation : IInterface {
 
 sil hidden_external @witness : $@convention(witness_method: IInterface) <τ_0_0 where τ_0_0 : IInterface> (@in_guaranteed τ_0_0) -> ()
 sil hidden_external @interface : $@convention(com_method) (@guaranteed Implementation) -> ()
+
+// A COM existential can be opened directly from its one-word address.
+
+// CHECK-LABEL: sil @open_interface
+// CHECK: [[OPENED:%.*]] = open_existential_addr mutable_access %0 to $*@opened({{.*}}, any IInterface) Self
+// CHECK: return
+sil @open_interface : $@convention(thin) (@inout any IInterface) -> () {
+bb0(%0 : $*any IInterface):
+  %1 = open_existential_addr mutable_access %0 to $*@opened(1, any IInterface) Self
+  %2 = tuple ()
+  return %2 : $()
+}
 
 // CHECK-LABEL: sil_witness_table hidden Implementation: IInterface module main {
 // CHECK: method #IInterface.method:
