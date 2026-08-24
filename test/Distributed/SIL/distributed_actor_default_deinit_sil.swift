@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -target %target-swift-5.7-abi-triple -I %t | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -target %target-swift-5.7-abi-triple -enable-experimental-feature DistributedActorResignRemoteID -I %t | %FileCheck %s --enable-var-scope
 // REQUIRES: concurrency
 // REQUIRES: distributed
+// REQUIRES: swift_feature_DistributedActorResignRemoteID
 
 // FIXME(distributed): test fails on optimized build: OSS - Swift (Tools Opt+No Assert,  Stdlib Opt+DebInfo, Test Simulator) - macOS
 // REQUIRES: radar97074020

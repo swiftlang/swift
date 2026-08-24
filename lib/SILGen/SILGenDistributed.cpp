@@ -545,6 +545,11 @@ void SILGenFunction::emitDistributedActorSystemResignIDCall(
     break;
   }
 
+  if (kind == DistributedResignIDKind::ResignRemoteID &&
+      !ctx.LangOpts.hasFeature(Feature::DistributedActorResignRemoteID)) {
+    return;
+  }
+
   ProtocolDecl *DAS = ctx.getDistributedActorSystemDecl();
   if (DAS && !DAS->getSingleRequirement(methodName)) {
     assert(kind == DistributedResignIDKind::ResignRemoteID &&
@@ -583,11 +588,19 @@ void SILGenFunction::emitDistributedActorSystemResignIDCall(
       return;
     }
 
+    // If the target triple does not correspond to a versioned platform there
+    // is no OS availability to query, so emit the call unconditionally
+    auto platform = targetPlatform(ctx.LangOpts);
+    if (!platform) {
+      emitCall();
+      return;
+    }
+
     // --- Otherwise, emit:
     //   if #available(...) {
     //     self.actorSystem.resignRemoteID(self.id)
     //   }
-    auto query = AvailabilityQuery::dynamic(AvailabilityDomain::forPlatform(targetPlatform(ctx.LangOpts)),
+    auto query = AvailabilityQuery::dynamic(AvailabilityDomain::forPlatform(*platform),
                                             availabilityRange, std::nullopt);
     SILValue isAvailable = emitAvailabilityQuery(loc, query);
 
