@@ -14,6 +14,9 @@
 
 // REQUIRES: executable_test
 
+// This file triggers issue https://github.com/swiftlang/swift/issues/91660.
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
+
 import StdlibUnittest
 
 var suite = TestSuite("MutableRawSpan Tests")
