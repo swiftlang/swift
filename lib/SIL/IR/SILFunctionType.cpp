@@ -4416,12 +4416,18 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
-    auto clangType = func->getType().getTypePtr();
+    auto clangType = func->getType();
     AbstractionPattern origPattern =
         foreignInfo.self.isImportAsMember()
-            ? AbstractionPattern::getCFunctionAsMethod(origType, clangType,
+            ? AbstractionPattern::getCFunctionAsMethod(origType,
+                                                       clangType.getTypePtr(),
                                                        foreignInfo.self)
-            : AbstractionPattern(origType, clangType);
+            : AbstractionPattern(origType, clangType.getTypePtr());
+    if (shouldStoreClangType(extInfoBuilder.getRepresentation())) {
+      auto clangPointerType =
+          func->getASTContext().getPointerType(clangType).getTypePtr();
+      extInfoBuilder = extInfoBuilder.withClangFunctionType(clangPointerType);
+    }
     return getSILFunctionType(
         TC, TypeExpansionContext::minimal(), origPattern, substInterfaceType,
         extInfoBuilder, CFunctionConventions(func, TC.Context), foreignInfo,
