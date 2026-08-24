@@ -3,6 +3,14 @@
     "Assert.swift",
     "AssertCommon.swift"
   ],
+  "UncheckedString": [
+    "UncheckedString.swift",
+    "UncheckedString+Encoding.swift",
+    "UncheckedString+Literals.swift",
+    "UncheckedString+RangeReplaceableCollection.swift",
+    "UncheckedStringProtocol.swift",
+    "UncheckedStringStorage.swift"
+  ],
   "String": [
     "ASCII.swift",
     "CString.swift",

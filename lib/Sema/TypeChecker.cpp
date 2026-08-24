@@ -107,6 +107,11 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
         KnownProtocolKind::ExpressibleByBooleanLiteral);
 
   if (const auto *SLE = dyn_cast<StringLiteralExpr>(expr)) {
+    if (SLE->hasRawSplices())
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
+          KnownProtocolKind::ExpressibleByUncheckedStringLiteral);
+
     if (SLE->isSingleUnicodeScalar())
       return TypeChecker::getProtocol(
           Context, expr->getLoc(),

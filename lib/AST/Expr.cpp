@@ -1219,9 +1219,10 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
 }
 
 StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
-                                     bool Implicit)
+                                     bool Implicit,
+                                     ArrayRef<RawCodeUnitSplice> Splices)
     : BuiltinLiteralExpr(ExprKind::StringLiteral, Implicit), Val(Val),
-      Range(Range) {
+      Range(Range), Splices(Splices) {
   Bits.StringLiteralExpr.Encoding = static_cast<unsigned>(UTF8);
   Bits.StringLiteralExpr.IsSingleUnicodeScalar =
       unicode::isSingleUnicodeScalar(Val);

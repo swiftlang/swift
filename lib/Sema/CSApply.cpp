@@ -2984,6 +2984,82 @@ namespace {
           diag::builtin_boolean_literal_broken_proto);
     }
 
+    /// Returns the bit width of \p type if it is one of the fixed-width
+    /// integer types known to the compiler, or \c std::nullopt otherwise.
+    static std::optional<unsigned> getKnownFixedIntegerWidth(Type type) {
+      auto &ctx = type->getASTContext();
+      auto *nominal = type->getAnyNominal();
+      if (!nominal)
+        return std::nullopt;
+      if (nominal == ctx.getUInt8Decl() || nominal == ctx.getInt8Decl())
+        return 8;
+      if (nominal == ctx.getUInt16Decl() || nominal == ctx.getInt16Decl())
+        return 16;
+      if (nominal == ctx.getUInt32Decl() || nominal == ctx.getInt32Decl())
+        return 32;
+      if (nominal == ctx.getUInt64Decl() || nominal == ctx.getInt64Decl())
+        return 64;
+      return std::nullopt;
+    }
+
+    /// Handle a string literal that contains one or more `\x{hh}` raw code
+    /// unit escapes. Such a literal must be typed as some `UncheckedString`
+    /// (or another conformer of `ExpressibleByUncheckedStringLiteral`)
+    /// rather than as an ordinary `String`, since a raw code unit isn't
+    /// necessarily a valid Unicode scalar.
+    Expr *handleUncheckedStringLiteralExpr(StringLiteralExpr *expr,
+                                           Type type) {
+      ProtocolDecl *protocol = TypeChecker::getProtocol(
+          ctx, expr->getLoc(),
+          KnownProtocolKind::ExpressibleByUncheckedStringLiteral);
+      ProtocolDecl *builtinProtocol = TypeChecker::getProtocol(
+          ctx, expr->getLoc(),
+          KnownProtocolKind::ExpressibleByBuiltinUncheckedStringLiteral);
+
+      // For type-sugar reasons, prefer the spelling of the default literal
+      // type.
+      if (auto defaultType = TypeChecker::getDefaultType(protocol, dc)) {
+        if (defaultType->isEqual(type))
+          type = defaultType;
+      }
+
+      // If we can determine the element width, diagnose any `\x{hh}` raw
+      // escape that doesn't fit -- e.g. `\x{100}` in an
+      // `UncheckedString<UInt8>`.
+      if (auto boundGeneric = type->getAs<BoundGenericStructType>()) {
+        auto genericArgs = boundGeneric->getGenericArgs();
+        if (!genericArgs.empty()) {
+          Type elementType = genericArgs[0];
+          if (auto width = getKnownFixedIntegerWidth(elementType)) {
+            uint64_t maxValue = (*width >= 64)
+                ? UINT64_MAX
+                : ((uint64_t(1) << *width) - 1);
+            for (const auto &splice : expr->getRawSplices()) {
+              if (splice.Value > maxValue) {
+                ctx.Diags.diagnose(
+                    splice.Loc,
+                    diag::unchecked_string_literal_raw_escape_overflow,
+                    elementType, *width);
+              }
+            }
+          }
+        }
+      }
+
+      expr->setEncoding(StringLiteralExpr::UTF8WithRawSplices);
+
+      return convertLiteralInPlace(
+          expr, type, protocol, ctx.Id_UncheckedStringLiteralType,
+          DeclName(ctx, DeclBaseName::createConstructor(),
+                   {ctx.Id_uncheckedStringLiteral}),
+          builtinProtocol,
+          DeclName(ctx, DeclBaseName::createConstructor(),
+                   {ctx.Id_builtinUncheckedStringLiteral,
+                    ctx.getIdentifier("unitCount")}),
+          diag::unchecked_string_literal_broken_proto,
+          diag::builtin_unchecked_string_literal_broken_proto);
+    }
+
     Expr *handleStringLiteralExpr(LiteralExpr *expr) {
       auto stringLiteral = dyn_cast<StringLiteralExpr>(expr);
       auto magicLiteral = dyn_cast<MagicIdentifierLiteralExpr>(expr);
@@ -2991,6 +3067,15 @@ namespace {
              "literal must be either a string literal or a magic literal");
 
       auto type = simplifyType(cs.getType(expr));
+
+      if (stringLiteral) {
+        auto *uncheckedProto = TypeChecker::getProtocol(
+            ctx, expr->getLoc(),
+            KnownProtocolKind::ExpressibleByUncheckedStringLiteral);
+        if (stringLiteral->hasRawSplices() ||
+            (uncheckedProto && checkConformance(type, uncheckedProto)))
+          return handleUncheckedStringLiteralExpr(stringLiteral, type);
+      }
 
       bool isStringLiteral = true;
       bool isGraphemeClusterLiteral = false;

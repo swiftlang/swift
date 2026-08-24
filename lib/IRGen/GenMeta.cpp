@@ -7633,6 +7633,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ExpressibleByIntegerLiteral:
   case KnownProtocolKind::ExpressibleByStringInterpolation:
   case KnownProtocolKind::ExpressibleByStringLiteral:
+  case KnownProtocolKind::ExpressibleByUncheckedStringLiteral:
   case KnownProtocolKind::ExpressibleByNilLiteral:
   case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral:
   case KnownProtocolKind::ExpressibleByColorLiteral:
@@ -7643,6 +7644,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ExpressibleByBuiltinFloatLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinStringLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinUncheckedStringLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral:
   case KnownProtocolKind::OptionSet:
   case KnownProtocolKind::BridgedNSError:

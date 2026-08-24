@@ -245,6 +245,11 @@ IDENTIFIER(unicodeScalarLiteral)
 IDENTIFIER(stringLiteral)
 IDENTIFIER_(builtinStringLiteral)
 IDENTIFIER(StringLiteralType)
+
+IDENTIFIER(uncheckedStringLiteral)
+IDENTIFIER_(builtinUncheckedStringLiteral)
+IDENTIFIER(UncheckedStringLiteralType)
+
 IDENTIFIER(stringInterpolation)
 IDENTIFIER(StringInterpolation)
 IDENTIFIER(literalCapacity)

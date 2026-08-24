@@ -767,6 +767,50 @@ namespace {
       return visitLiteralExpr(expr);
     }
 
+    Type visitStringLiteralExpr(StringLiteralExpr *expr) {
+      // If the expression has already been assigned a type; just use that
+      // type.
+      if (expr->getType())
+        return expr->getType();
+
+      // A literal already known to contain a `\x{hh}` raw code unit escape
+      // is always typed via `ExpressibleByUncheckedStringLiteral`
+      // (`TypeChecker::getLiteralProtocol` handles this below); only
+      // literals that could go either way need a contextual-type check
+      // here. Only consider a contextual type that's already concrete --
+      // e.g. one of several branches of a switch expression being jointly
+      // inferred is represented by an unresolved type variable at this
+      // point, and running a conformance lookup against it here would
+      // corrupt that joint inference.
+      if (!expr->hasRawSplices()) {
+        auto contextualType = CS.getContextualType(expr,
+                                                    /*forConstraint=*/false);
+        if (contextualType && !contextualType->hasTypeVariable() &&
+            !contextualType->hasUnboundGenericType()) {
+          auto &ctx = CS.getASTContext();
+          auto *uncheckedProto = TypeChecker::getProtocol(
+              ctx, expr->getLoc(),
+              KnownProtocolKind::ExpressibleByUncheckedStringLiteral);
+          auto lookupType = contextualType->lookThroughAllOptionalTypes();
+          if (uncheckedProto && lookupConformance(lookupType, uncheckedProto)) {
+            // Prefer routing through `ExpressibleByUncheckedStringLiteral`
+            // so SILGen can materialize a native-width constant directly,
+            // rather than through `ExpressibleByStringLiteral`, which would
+            // force a UTF-8 constant to be transcoded at runtime.
+            contextualType = CS.getContextualType(expr,
+                                                  /*forConstraint=*/true);
+            CS.addConstraint(ConstraintKind::LiteralConformsTo,
+                             contextualType,
+                             uncheckedProto->getDeclaredInterfaceType(),
+                             CS.getConstraintLocator(expr));
+            return contextualType;
+          }
+        }
+      }
+
+      return visitLiteralExpr(expr);
+    }
+
     Type visitLiteralExpr(LiteralExpr *expr) {
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType())

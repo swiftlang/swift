@@ -2991,6 +2991,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       encoding = StringLiteralInst::Encoding::ObjCSelector;
     } else if (P.Tok.getText() == "bytes") {
       encoding = StringLiteralInst::Encoding::Bytes;
+    } else if (P.Tok.getText() == "bytes16") {
+      encoding = StringLiteralInst::Encoding::Bytes16;
+    } else if (P.Tok.getText() == "bytes32") {
+      encoding = StringLiteralInst::Encoding::Bytes32;
     } else if (P.Tok.getText() == "oslog") {
       encoding = StringLiteralInst::Encoding::UTF8_OSLOG;
     } else {
@@ -3015,7 +3019,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     SmallVector<char, 128> stringBuffer;
 
-    if (encoding == StringLiteralInst::Encoding::Bytes) {
+    if (encoding == StringLiteralInst::Encoding::Bytes ||
+        encoding == StringLiteralInst::Encoding::Bytes16 ||
+        encoding == StringLiteralInst::Encoding::Bytes32) {
       // Decode hex bytes.
       CharSourceRange rawStringRange(segments.front().Loc,
                                      segments.front().Length);

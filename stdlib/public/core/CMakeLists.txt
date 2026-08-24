@@ -229,6 +229,12 @@ split_embedded_sources(
   EMBEDDED TemporaryAllocation.swift
   EMBEDDED UInt128.swift
   EMBEDDED UIntBuffer.swift
+  NORMAL UncheckedString.swift
+  NORMAL UncheckedString+Encoding.swift
+  NORMAL UncheckedString+Literals.swift
+  NORMAL UncheckedString+RangeReplaceableCollection.swift
+  NORMAL UncheckedStringProtocol.swift
+  NORMAL UncheckedStringStorage.swift
 
   # UniqueArray sources
   EMBEDDED UniqueArray/UniqueArray.swift

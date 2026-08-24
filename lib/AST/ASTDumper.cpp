@@ -471,6 +471,7 @@ static StringRef getDumpString(StringLiteralExpr::Encoding value) {
   switch (value) {
     case StringLiteralExpr::UTF8: return "utf8";
     case StringLiteralExpr::OneUnicodeScalar: return "unicodeScalar";
+    case StringLiteralExpr::UTF8WithRawSplices: return "utf8WithRawSplices";
   }
 
   llvm_unreachable("Unhandled StringLiteral in switch.");
@@ -3621,9 +3622,20 @@ public:
 
   void visitStringLiteralExpr(StringLiteralExpr *E, Label label) {
     printCommon(E, "string_literal_expr", label);
-    
+
     printField(E->getEncoding(), Label::always("encoding"), ExprModifierColor);
     printFieldQuoted(E->getValue(), Label::always("value"), LiteralValueColor);
+    if (E->hasRawSplices()) {
+      printFieldQuotedRaw([&](raw_ostream &OS) {
+        OS << "[";
+        llvm::interleaveComma(E->getRawSplices(), OS,
+                              [&](const StringLiteralExpr::RawCodeUnitSplice &splice) {
+          OS << "offset=" << splice.Offset
+             << " value=0x" << llvm::utohexstr(splice.Value);
+        });
+        OS << "]";
+      }, Label::always("raw_splices"), LiteralValueColor);
+    }
     printInitializerField(E->getBuiltinInitializer(),
                           Label::always("builtin_initializer"));
     printInitializerField(E->getInitializer(), Label::always("initializer"));

@@ -1972,6 +1972,8 @@ public:
     case StringLiteralInst::Encoding::UTF8: return "utf8 ";
     case StringLiteralInst::Encoding::UTF8_OSLOG: return "oslog ";
     case StringLiteralInst::Encoding::ObjCSelector: return "objc_selector ";
+    case StringLiteralInst::Encoding::Bytes16: return "bytes16 ";
+    case StringLiteralInst::Encoding::Bytes32: return "bytes32 ";
     }
     llvm_unreachable("bad string literal encoding");
   }
@@ -1979,15 +1981,22 @@ public:
   void visitStringLiteralInst(StringLiteralInst *SLI) {
     *this << getStringEncodingName(SLI->getEncoding());
 
-    if (SLI->getEncoding() != StringLiteralInst::Encoding::Bytes) {
+    switch (SLI->getEncoding()) {
+    case StringLiteralInst::Encoding::Bytes:
+    case StringLiteralInst::Encoding::Bytes16:
+    case StringLiteralInst::Encoding::Bytes32:
+      // "Bytes" (of any unit width) are always output in a hexadecimal form.
+      *this << '"' << llvm::toHex(SLI->getValue()) << '"';
+      return;
+
+    case StringLiteralInst::Encoding::UTF8:
+    case StringLiteralInst::Encoding::ObjCSelector:
+    case StringLiteralInst::Encoding::UTF8_OSLOG:
       // FIXME: this isn't correct: this doesn't properly handle translating
       // UTF16 into UTF8, and the SIL parser always parses as UTF8.
       *this << QuotedString(SLI->getValue());
       return;
     }
-
-    // "Bytes" are always output in a hexadecimal form.
-    *this << '"' << llvm::toHex(SLI->getValue()) << '"';
   }
 
   void visitMakeBorrowInst(MakeBorrowInst *I) {

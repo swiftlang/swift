@@ -188,6 +188,7 @@ EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByFloatLiteral, "FloatLiteralType", t
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByIntegerLiteral, "IntegerLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByStringInterpolation, "StringLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByStringLiteral, "StringLiteralType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByUncheckedStringLiteral, "UncheckedStringLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByNilLiteral, nullptr, false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "UnicodeScalarType", true)
 
@@ -200,6 +201,7 @@ BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinExtendedGraphemeClu
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinFloatLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinIntegerLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinStringLiteral)
+BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinUncheckedStringLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinUnicodeScalarLiteral)
 
 #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL

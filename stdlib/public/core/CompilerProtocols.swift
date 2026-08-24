@@ -532,6 +532,40 @@ extension ExpressibleByStringLiteral
   }
 }
 
+public protocol _ExpressibleByBuiltinUncheckedStringLiteral {
+  init(
+    _builtinUncheckedStringLiteral start: Builtin.RawPointer,
+    unitCount: Builtin.Word)
+}
+
+/// A type that can be initialized with a string literal containing a
+/// `\x{hh}` raw code unit escape.
+///
+/// `\x{hh}` denotes a raw code unit value rather than a Unicode scalar, so
+/// a literal containing one cannot conform to `ExpressibleByStringLiteral`.
+/// `UncheckedString` conforms to `ExpressibleByUncheckedStringLiteral`
+/// instead; there is no supertype relationship to
+/// `ExpressibleByExtendedGraphemeClusterLiteral`/
+/// `ExpressibleByUnicodeScalarLiteral`, since a literal that may contain
+/// raw, possibly-invalid code units has no meaningful notion of "a single
+/// extended grapheme cluster" or "a single Unicode scalar".
+///
+/// Conforming to ExpressibleByUncheckedStringLiteral
+/// ==================================================
+///
+/// To add `ExpressibleByUncheckedStringLiteral` conformance to your custom
+/// type, implement the required initializer.
+public protocol ExpressibleByUncheckedStringLiteral {
+
+  /// A type that represents an unchecked string literal.
+  associatedtype UncheckedStringLiteralType: _ExpressibleByBuiltinUncheckedStringLiteral
+
+  /// Creates an instance initialized to the given unchecked string value.
+  ///
+  /// - Parameter value: The value of the new instance.
+  init(uncheckedStringLiteral value: UncheckedStringLiteralType)
+}
+
 /// A type that can be initialized using an array literal.
 ///
 /// An array literal is a simple way of expressing a list of values. Simply

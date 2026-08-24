@@ -164,6 +164,10 @@ public typealias ExtendedGraphemeClusterType = String
 /// The default type for an otherwise-unconstrained string literal.
 @_unavailableInEmbedded
 public typealias StringLiteralType = String
+/// The default type for an otherwise-unconstrained string literal
+/// containing a `\x{hh}` raw code unit escape.
+@available(SwiftStdlib 9999, *)
+public typealias UncheckedStringLiteralType = UncheckedString<UInt8>
 
 //===----------------------------------------------------------------------===//
 // Default types for unconstrained number literals
