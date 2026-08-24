@@ -83,7 +83,7 @@ if "%INCLUDE_PACKAGING%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKLin
 if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKArchitectures %WINDOWS_SDKS%"
 
 :: Build the arguments related to Android SDK cross-compilation, disabled by default
-set "AndroidSDKArgs="
+set "AndroidSDKArgs=-Android"
 if not "%ANDROID_SDKS%"=="" goto Android
 if not "%ANDROID_SDK_VERSIONS%"=="" goto Android
 if not "%ANDROID_LINK_MODES%"=="" goto Android
