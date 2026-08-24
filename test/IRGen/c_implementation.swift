@@ -48,11 +48,13 @@ public func fn() {
 // SIL-LABEL: sil [asmname "implFuncSwiftCall"]
 // SIL-SAME: @convention(c, cType:
 // SIL-SAME: swiftcall
+// CHECK-LABEL: define{{.*}} swiftcc i32 @implFuncSwiftCall
 
 /// fn()
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s16c_implementation2fnyyF"
 // CHECK:   call void @implFunc
 // CHECK:   call void @"\01_implFuncAsmName"
 // CHECK:   call void @implFuncRenamed_C
+// CHECK:   call swiftcc i32 @implFuncSwiftCall
 // CHECK:   ret void
 // CHECK: }

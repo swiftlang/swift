@@ -4704,6 +4704,8 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
     const clang::Type *clangType = nullptr;
     if (bridgedTypes.Pattern.isClangType()) {
       clangType = bridgedTypes.Pattern.getClangType();
+    } else if (bridgedTypes.Pattern.isCXXMethod()) {
+      clangType = bridgedTypes.Pattern.getCXXMethod()->getType().getTypePtr();
     }
     if (clangType) {
       // According to [NOTE: ClangTypeInfo-contents], we need to wrap a function
