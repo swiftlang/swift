@@ -44,6 +44,7 @@ do {
   }
 
   let source: any ISource = native
+  print("native COM dynamic type: \(type(of: source) == CSource.self)")
 
   do {
     let recovered = source as? CSource
@@ -113,6 +114,7 @@ pvObject.storeBytes(of: UnsafeRawPointer(lpVtbl), as: UnsafeRawPointer.self)
 
 do {
   let foreign = unsafeBitCast(pvObject, to: (any ISource).self)
+  print("foreign COM dynamic type: \(type(of: foreign) == (any ISource).self)")
   let queries = counts.query
   print("foreign COM -> native failure: \(foreign as? C == nil)")
   print("foreign queried ISwiftObject: \(counts.query == queries + 1)")
@@ -125,6 +127,7 @@ pvObject.deallocate()
 
 // CHECK:      Any(native) -> COM: true
 // CHECK-NEXT: dynamic native -> COM: true
+// CHECK-NEXT: native COM dynamic type: true
 // CHECK-NEXT: COM -> native class: true
 // CHECK-NEXT: COM -> native class [forced]: true
 // CHECK-NEXT: COM is native type: true
@@ -132,6 +135,7 @@ pvObject.deallocate()
 // CHECK-NEXT: COM -> Swift protocol: true
 // CHECK-NEXT: non-COM conversion: true
 // CHECK-NEXT: native ownership balanced: true
+// CHECK-NEXT: foreign COM dynamic type: true
 // CHECK-NEXT: foreign COM -> native failure: true
 // CHECK-NEXT: foreign queried ISwiftObject: true
 // CHECK-NEXT: foreign ownership balanced: true
