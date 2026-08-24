@@ -568,6 +568,9 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getAccessorName() const;
   BRIDGED_INLINE bool hasOwnership() const;
   BRIDGED_INLINE bool hasLoweredAddresses() const;
+  // The function's SIL stage: 0=Raw, 1=Canonical, 2=Lowered. This returns
+  // SwiftInt because BridgedContext::SILStage is declared later.
+  BRIDGED_INLINE SwiftInt getStage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getLoweredFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getLoweredFunctionTypeInContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getGenericSignature() const;

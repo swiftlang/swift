@@ -3017,7 +3017,7 @@ public:
               "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
-      require(LI->getModule().getStageFloor() == SILStage::Raw ||
+      require(LI->getFunction()->getFunctionStage() == SILStage::Raw ||
                   !LI->getOperand()->getType().isMoveOnly(),
               "'MoveOnly' types can only be copied in Raw SIL?!");
       [[fallthrough]];
@@ -3051,7 +3051,7 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
-    require(F.getModule().getStageFloor() == SILStage::Raw || !LBI->isUnchecked(),
+    require(F.getFunctionStage() == SILStage::Raw || !LBI->isUnchecked(),
             "load_borrow's unchecked bit is on");
   }
 
@@ -3109,7 +3109,7 @@ public:
             "extend_lifetime is only valid in functions with qualified "
             "ownership");
     // In Raw SIL, extend_lifetime marks the end of variable scopes.
-    if (F.getModule().getStageFloor() == SILStage::Raw)
+    if (F.getFunctionStage() == SILStage::Raw)
       return;
 
     require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
@@ -3197,7 +3197,7 @@ public:
 
   template <class AI>
   void checkAccessEnforcement(AI *AccessInst) {
-    if (AccessInst->getModule().getStageFloor() != SILStage::Raw) {
+    if (AccessInst->getFunction()->getFunctionStage() != SILStage::Raw) {
       require(AccessInst->getEnforcement() != SILAccessEnforcement::Unknown,
               "access must have known enforcement outside raw stage");
     }
@@ -3455,7 +3455,7 @@ public:
 
   void checkAssignInst(AssignInst *AI) {
     SILValue Src = AI->getSrc(), Dest = AI->getDest();
-    require(AI->getModule().getStageFloor() == SILStage::Raw,
+    require(AI->getFunction()->getFunctionStage() == SILStage::Raw,
             "assign instruction can only exist in raw SIL");
     require(Src->getType().isObject(), "Can't assign from an address source");
     require(Dest->getType().isAddress(), "Must store to an address dest");
@@ -3502,7 +3502,7 @@ public:
       return;
 
     SILValue Src = AI->getSrc();
-    require(AI->getModule().getStageFloor() == SILStage::Raw,
+    require(AI->getFunction()->getFunctionStage() == SILStage::Raw,
             "assign_or_init can only exist in raw SIL");
 
     SILValue initFn = AI->getInitializer();
@@ -3658,7 +3658,7 @@ public:
 
   void checkMarkUninitializedInst(MarkUninitializedInst *MU) {
     SILValue Src = MU->getOperand();
-    require(MU->getModule().getStageFloor() == SILStage::Raw,
+    require(MU->getFunction()->getFunctionStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
     require(Src->getType().isAddress() ||
             Src->getType().getClassOrBoundGenericClass() ||
@@ -3689,7 +3689,7 @@ public:
   }
 
   void checkMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
-    require(MFE->getModule().getStageFloor() == SILStage::Raw,
+    require(MFE->getFunction()->getFunctionStage() == SILStage::Raw,
             "mark_function_escape instruction can only exist in raw SIL");
     for (auto Elt : MFE->getElements())
       require(Elt->getType().isAddress(), "MFE must refer to variable addrs");
@@ -3703,7 +3703,7 @@ public:
                     "Store operand type and dest type mismatch");
     require(checkTypeABIAccessible(F, cai->getDest()->getType()),
             "cannot directly copy type with inaccessible ABI");
-    require(cai->getModule().getStageFloor() == SILStage::Raw ||
+    require(cai->getFunction()->getFunctionStage() == SILStage::Raw ||
                 (cai->isTakeOfSrc() || !cai->getSrc()->getType().isMoveOnly()),
             "'MoveOnly' types can only be copied in Raw SIL?!");
   }
@@ -3722,7 +3722,7 @@ public:
 
   void checkMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *SI) {
     require(F.hasOwnership(), "Only valid in OSSA.");
-    require(F.getModule().getStageFloor() == SILStage::Raw, "Only valid in Raw SIL");
+    require(F.getFunctionStage() == SILStage::Raw, "Only valid in Raw SIL");
     require(SI->getSrc()->getType().isAddress(), "Src value should be lvalue");
     require(SI->getDest()->getType().isAddress(),
             "Dest address should be lvalue");
@@ -3756,7 +3756,7 @@ public:
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "copy_value is only valid in functions with qualified "
             "ownership");
-    require(I->getModule().getStageFloor() == SILStage::Raw ||
+    require(I->getFunction()->getFunctionStage() == SILStage::Raw ||
                 !I->getOperand()->getType().isMoveOnly(),
             "'MoveOnly' types can only be copied in Raw SIL?!");
   }
@@ -5656,7 +5656,7 @@ public:
     // After mandatory passes convert_escape_to_noescape should not have the
     // '[not_guaranteed]' or '[escaped]' attributes.
     if (!SkipConvertEscapeToNoescapeAttributes &&
-        F.getModule().getStageFloor() != SILStage::Raw) {
+        F.getFunctionStage() != SILStage::Raw) {
       require(ICI->isLifetimeGuaranteed(),
               "convert_escape_to_noescape [not_guaranteed] not "
               "allowed after mandatory passes");
@@ -5694,7 +5694,7 @@ public:
 
     // If the result type is an address, ensure its base address is from a
     // function argument or Builtin.Borrow.
-    if (F.getModule().getStageFloor() >= SILStage::Canonical &&
+    if (F.getFunctionStage() >= SILStage::Canonical &&
         functionResultType.isAddress()) {
       auto base = AccessBase::compute(RI->getOperand());
       auto root = base ? base.isReference() ? base.getOwnershipReferenceRoot()
@@ -5789,7 +5789,7 @@ public:
 
       // In canonical SIL, select instructions must not cover any enum elements
       // that are unavailable.
-      if (F.getModule().getStageFloor() >= SILStage::Canonical) {
+      if (F.getFunctionStage() >= SILStage::Canonical) {
         require(elt->isAvailableDuringLowering(),
                 "select_enum dispatches on enum element that is unavailable "
                 "during lowering.");
@@ -5887,7 +5887,7 @@ public:
 
       // In canonical SIL, switch instructions must not cover any enum elements
       // that are unavailable.
-      if (F.getModule().getStageFloor() >= SILStage::Canonical) {
+      if (F.getFunctionStage() >= SILStage::Canonical) {
         require(elt->isAvailableDuringLowering(),
                 "switch_enum dispatches on enum element that is unavailable "
                 "during lowering.");
@@ -5999,7 +5999,7 @@ public:
 
       // In canonical SIL, switch instructions must not cover any enum elements
       // that are unavailable.
-      if (F.getModule().getStageFloor() >= SILStage::Canonical) {
+      if (F.getFunctionStage() >= SILStage::Canonical) {
         require(elt->isAvailableDuringLowering(),
                 "switch_enum_addr dispatches on enum element that is "
                 "unavailable during lowering.");
@@ -7024,7 +7024,7 @@ public:
 
   void checkMarkUnresolvedNonCopyableValueInst(
       MarkUnresolvedNonCopyableValueInst *i) {
-    require(i->getModule().getStageFloor() == SILStage::Raw,
+    require(i->getFunction()->getFunctionStage() == SILStage::Raw,
             "Only valid in Raw SIL! Should have been eliminated by /some/ "
             "diagnostic pass");
     if (i->getType().isAddress())
@@ -7033,7 +7033,7 @@ public:
 
   void checkMarkUnresolvedReferenceBindingInst(
       MarkUnresolvedReferenceBindingInst *i) {
-    require(i->getModule().getStageFloor() == SILStage::Raw,
+    require(i->getFunction()->getFunctionStage() == SILStage::Raw,
             "Only valid in Raw SIL! Should have been eliminated by /some/ "
             "diagnostic pass");
   }
@@ -7078,7 +7078,7 @@ public:
   }
 
   void checkUncheckedOwnershipInst(UncheckedOwnershipInst *uoi) {
-    require(F.getModule().getStageFloor() == SILStage::Raw,
+    require(F.getFunctionStage() == SILStage::Raw,
             "unchecked_ownership is valid only in raw SIL");
   }
 
