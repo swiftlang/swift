@@ -9012,6 +9012,32 @@ void IRGenSILFunction::visitGetAsyncContinuationAddrInst(
 
 void IRGenSILFunction::visitAwaitAsyncContinuationInst(
     AwaitAsyncContinuationInst *i) {
+  // getSplitContinuationAddr binds a continuation created in another frame
+  // to this one, so the suspension is set up from its operands rather than from
+  // a get_async_continuation in this frame.
+  if (auto *splitGet = dyn_cast<BuiltinInst>(i->getOperand())) {
+    assert(splitGet->getBuiltinInfo().ID ==
+               BuiltinValueKind::GetSplitContinuationAddr &&
+           "unexpected builtin awaited as a continuation");
+    llvm::Value *continuation =
+        getLoweredSingletonExplosion(splitGet->getArguments()[0]);
+    Address resumeBuffer = getLoweredAddress(splitGet->getArguments()[1]);
+    SILType resumeTy = splitGet->getArguments()[1]->getType().getObjectType();
+
+    auto *normalDestBB = getLoweredBB(i->getResumeBB()).bb;
+    bool hasError = i->getErrorBB() != nullptr;
+    auto *errorDestBB = hasError ? getLoweredBB(i->getErrorBB()).bb : nullptr;
+    auto *errorPhi = hasError ? getLoweredBB(i->getErrorBB()).phis[0] : nullptr;
+    assert(!hasError || getLoweredBB(i->getErrorBB()).phis.size() == 1 &&
+                            "error basic block should only expect one value");
+
+    // The value is delivered into the resume buffer, so the resume successor
+    // takes no arguments and there is nothing to add to its PHI nodes.
+    emitAwaitSplitContinuation(continuation, resumeBuffer, resumeTy,
+                                  normalDestBB, errorPhi, errorDestBB);
+    return;
+  }
+
   Explosion resumeResult;
 
   bool isIndirect = i->getResumeBB()->args_empty();

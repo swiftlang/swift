@@ -2308,6 +2308,59 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
   return builder.build(id);
 }
 
+// createSplitContinuation<T> : (T.Type) -> Builtin.RawUnsafeContinuation
+static ValueDecl *getCreateSplitContinuation(ASTContext &ctx,
+                                                Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted,
+                                      _conformsTo(
+                                        _typeparam(0), _escapable)
+                                        // we allow ~Copyable results
+                                      ),
+                            _parameters(_metatype(_typeparam(0))),
+                            _rawUnsafeContinuation);
+}
+
+// awaitSplitThrowingContinuation<T> :
+//   (Builtin.RawUnsafeContinuation) async throws -> sending T
+static ValueDecl *getAwaitSplitThrowingContinuation(ASTContext &ctx,
+                                                       Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+
+  builder.addParameter(makeConcrete(ctx.TheRawUnsafeContinuationType));
+
+  auto resultTy = makeGenericParam();
+  builder.addConformanceRequirement(resultTy, KnownProtocolKind::Escapable);
+  builder.setResult(resultTy);
+
+  builder.setAsync();
+  builder.setThrows();
+  builder.setSendingResult();
+
+  return builder.build(id);
+}
+
+// getSplitContinuationAddr<T> :
+//   (Builtin.RawUnsafeContinuation, T*) -> Builtin.RawUnsafeContinuation
+static ValueDecl *getGetSplitContinuationAddr(ASTContext &ctx,
+                                                 Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  builder.addParameter(makeConcrete(ctx.TheRawUnsafeContinuationType));
+  auto resumeTy = makeGenericParam();
+  builder.addConformanceRequirement(resumeTy, KnownProtocolKind::Escapable);
+  builder.addParameter(resumeTy, ParamSpecifier::InOut);
+  builder.setResult(makeConcrete(ctx.TheRawUnsafeContinuationType));
+  return builder.build(id);
+}
+
+// destroySplitContinuation : (Builtin.RawUnsafeContinuation) -> ()
+static ValueDecl *getDestroySplitContinuation(ASTContext &ctx,
+                                                 Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawUnsafeContinuation),
+                            _void);
+}
+
 static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto *actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
@@ -3645,6 +3698,26 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::WithUnsafeThrowingContinuation:
     return getWithUnsafeContinuation(Context, Id, /*throws=*/true);
+
+  case BuiltinValueKind::CreateSplitContinuation:
+    if (!Context.LangOpts.hasFeature(Feature::SplitContinuations))
+      return nullptr;
+    return getCreateSplitContinuation(Context, Id);
+
+  case BuiltinValueKind::AwaitSplitThrowingContinuation:
+    if (!Context.LangOpts.hasFeature(Feature::SplitContinuations))
+      return nullptr;
+    return getAwaitSplitThrowingContinuation(Context, Id);
+
+  case BuiltinValueKind::GetSplitContinuationAddr:
+    if (!Context.LangOpts.hasFeature(Feature::SplitContinuations))
+      return nullptr;
+    return getGetSplitContinuationAddr(Context, Id);
+
+  case BuiltinValueKind::DestroySplitContinuation:
+    if (!Context.LangOpts.hasFeature(Feature::SplitContinuations))
+      return nullptr;
+    return getDestroySplitContinuation(Context, Id);
 
   case BuiltinValueKind::HopToActor:
     return getHopToActor(Context, Id);

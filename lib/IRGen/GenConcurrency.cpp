@@ -545,6 +545,39 @@ llvm::Function *IRGenModule::getAwaitAsyncContinuationFn() {
   return suspendFn;
 }
 
+llvm::Function *IRGenModule::getAwaitSplitContinuationFn() {
+  StringRef name = "__swift_continuation_await_split_point";
+  if (llvm::GlobalValue *F = Module.getNamedValue(name))
+    return cast<llvm::Function>(F);
+
+  // The parameter here matches the extra argument passed to
+  // @llvm.coro.suspend.async by emitAwaitSplitContinuation: the split
+  // continuation's header.
+  llvm::Type *argTys[] = { Int8PtrTy };
+  auto *suspendFnTy =
+    llvm::FunctionType::get(VoidTy, argTys, false /*vaargs*/);
+
+  llvm::Function *suspendFn =
+      llvm::Function::Create(suspendFnTy, llvm::Function::InternalLinkage,
+                             name, &Module);
+  suspendFn->setCallingConv(SwiftAsyncCC);
+  suspendFn->setDoesNotThrow();
+  IRGenFunction suspendIGF(*this, suspendFn);
+  if (DebugInfo)
+    DebugInfo->emitArtificialFunction(suspendIGF, suspendFn);
+  auto &Builder = suspendIGF.Builder;
+
+  llvm::Value *header = suspendFn->getArg(0);
+  auto *call = Builder.CreateCall(
+      getContinuationAwaitSplitFunctionPointer(), {header});
+  call->setCallingConv(SwiftAsyncCC);
+  call->setDoesNotThrow();
+  call->setTailCallKind(AsyncTailCallKind);
+
+  Builder.CreateRetVoid();
+  return suspendFn;
+}
+
 void irgen::emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
                               llvm::Value *result, llvm::Value *closure,
                               llvm::Value *closureContext) {

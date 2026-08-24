@@ -3700,9 +3700,10 @@ protected:
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
+    case BuiltinValueKind::GetSplitContinuationAddr:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
-    case BuiltinValueKind::AddTaskLocalValue:
     case BuiltinValueKind::TaskLocalValuePush:
+    case BuiltinValueKind::AddTaskLocalValue:
     case BuiltinValueKind::GetEnumTag: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
       bi->setOperand(use->getOperandNumber(), opAddr);

@@ -237,6 +237,15 @@ public:
   void emitResumeAsyncContinuationThrowing(llvm::Value *continuation,
                                            llvm::Value *error);
 
+  void emitAwaitSplitContinuation(llvm::Value *continuation,
+                                     Address resumeBuffer,
+                                     SILType resumeTy,
+                                     llvm::BasicBlock *normalBB,
+                                     llvm::PHINode *optionalErrorPhi,
+                                     llvm::BasicBlock *optionalErrorBB);
+
+  void emitDestroySplitContinuation(llvm::Value *continuation);
+
   void emitClearSensitive(Address address, llvm::Value *size);
 
   FunctionPointer
