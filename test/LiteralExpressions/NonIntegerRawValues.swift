@@ -28,3 +28,13 @@ func nonConst() -> String { "x" }
 enum CallEnum: String {
   case a = nonConst() // expected-error {{raw value for enum case must be a literal}}
 }
+
+// A digit-only literal that adopted a non-integer type reaches the folder as a
+// subexpression. It must be refused, not asserted on.
+@section("mysection") let sectionFromFloatLiteralOperand: Int = Int(2.5 * 2)
+// expected-error@-1 {{not supported in a literal expression}}
+enum FloatOperandEnum: Int {
+  case a = Int(2.5 * 2)
+  // expected-error@-1 {{not supported in a literal expression}}
+  // expected-error@-2 {{raw value for enum case must be an integer literal expression}}
+}

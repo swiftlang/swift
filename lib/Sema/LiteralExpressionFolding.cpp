@@ -280,6 +280,12 @@ private:
     FoldingErrorOr<ConstantValuePtr>
     foldIntegerLiteralExpr(const IntegerLiteralExpr *expr) {
       auto exprType = expr->getType();
+      // The walker reaches every subexpression, so a digit-only literal that
+      // adopted a non-integer type (e.g. the '2' in 'Int(2.5 * 2)') arrives here
+      // too. 'getIntegerBitWidth' asserts on those.
+      if (!exprType || !exprType->isStdlibInteger())
+        return FoldingError(IllegalConstError::TypeNotSupported,
+                            expr->getLoc());
       auto resultBitWidth = getIntegerBitWidth(exprType, Ctx);
       bool isSigned = isSignedIntegerType(exprType);
       // A literal whose value doesn't fit the target type is left unfolded so
@@ -288,9 +294,9 @@ private:
       if (!isSigned && expr->isNegative())
         return FoldingError(IllegalConstError::UpstreamError, expr->getLoc());
       auto value = expr->getValue();
-      unsigned needed =
+      unsigned neededBits =
           isSigned ? value.getSignificantBits() : value.getActiveBits();
-      if (needed > resultBitWidth)
+      if (neededBits > resultBitWidth)
         return FoldingError(IllegalConstError::UpstreamError, expr->getLoc());
       if (isSigned)
         return ConstantValuePtr(std::make_unique<IntegerValue>(
