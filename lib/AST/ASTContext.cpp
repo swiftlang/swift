@@ -4059,6 +4059,24 @@ BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
   return vecTy;
 }
 
+BuiltinVectorType *BuiltinVectorType::getExtended(const ASTContext &C) const {
+  auto intTy = elementType->getAs<BuiltinIntegerType>();
+  assert(intTy && "ExtendVector element must have integer type.");
+  unsigned eltWidth = intTy->getFixedWidth();
+  auto doubleWidth = BuiltinIntegerWidth::fixed(eltWidth*2);
+  auto extendedTy = BuiltinIntegerType::get(doubleWidth, C);
+  return BuiltinVectorType::get(C, extendedTy, numElements);
+}
+
+BuiltinVectorType *BuiltinVectorType::getTruncated(const ASTContext &C) const {
+  auto intTy = elementType->getAs<BuiltinIntegerType>();
+  assert(intTy && "TruncVector element must have integer type.");
+  unsigned eltWidth = intTy->getFixedWidth();
+  auto halfWidth = BuiltinIntegerWidth::fixed(eltWidth/2);
+  auto truncatedTy = BuiltinIntegerType::get(halfWidth, C);
+  return BuiltinVectorType::get(C, truncatedTy, numElements);
+}
+
 CanTupleType TupleType::getEmpty(const ASTContext &C) {
   return cast<TupleType>(CanType(C.TheEmptyTupleType));
 }

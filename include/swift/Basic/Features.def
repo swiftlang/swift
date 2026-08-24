@@ -663,6 +663,8 @@ EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
 /// as '@unsafe(always)', instead of renaming them to '__<name>Unsafe'.
 EXPERIMENTAL_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe, true)
 
+LANGUAGE_FEATURE(BuiltinExtendVectorLanes, 0, "Support for accessing LLVM Builtins that widen or narrow vector lanes")
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
