@@ -116,9 +116,10 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -Summary || (exit /b 1)
 
 if not "%SMOKE_TEST%"=="" (
-  powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0windows-smoke-tests\RunSmokeTest.ps1 ^
+  powershell.exe -NonInteractive -ExecutionPolicy RemoteSigned -File %~dp0windows-smoke-tests\RunSmokeTest.ps1 ^
     -Installer "%PackageRoot%\installer.exe" ^
-    -SourceCache "%SourceRoot%" || (exit /b 1)
+    -SourceCache "%SourceRoot%" ^
+    -EntryPoint "%~dp0windows-smoke-tests\SmokeTest.ps1" || (exit /b 1)
 )
 
 :: Publish PDBs into a Microsoft-compatible symbol store and zip it so that

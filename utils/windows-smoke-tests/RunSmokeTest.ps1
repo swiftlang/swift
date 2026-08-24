@@ -15,41 +15,30 @@ Path to the installer to test.
 
 .PARAMETER SourceCache
 Path to the directory containing the swift-docker checkout.
-Defaults to the directory containing this checkout of swift.
 
 .PARAMETER EntryPoint
 PowerShell script containing the tests to run inside the container.
-Defaults to `SmokeTest.ps1` in this script's directory.
 #>
 [CmdletBinding()]
 param
 (
+  [Parameter(Mandatory)]
   [string] $Installer,
+  [Parameter(Mandatory)]
   [string] $SourceCache,
-  [string] $EntryPoint = "SmokeTest.ps1"
+  [Parameter(Mandatory)]
+  [string] $EntryPoint
 )
 
 $ErrorActionPreference = "Stop"
 
-if (-not $SourceCache) {
-  $SourceCache = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
-}
-
-if (-not [IO.Path]::IsPathRooted($EntryPoint)) {
-  $EntryPoint = Join-Path $PSScriptRoot $EntryPoint
-}
 if (-not (Test-Path $EntryPoint)) {
   throw "Entry point not found at '$EntryPoint'."
 }
-$EntryPoint = (Resolve-Path $EntryPoint).Path
 
-if (-not $Installer) {
-  throw "-Installer is required."
-}
 if (-not (Test-Path $Installer)) {
   throw "Installer not found at '$Installer'."
 }
-$Installer = (Resolve-Path $Installer).Path
 
 $WindowsBuild = [int](Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion").CurrentBuildNumber
 if ($WindowsBuild -ge 20348) {
