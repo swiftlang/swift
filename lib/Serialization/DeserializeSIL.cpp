@@ -1219,6 +1219,13 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
 
   ++NumDeserializedFunc;
 
+  // A .swiftmodule body is serialized only after the mandatory pipeline, so it
+  // is `Canonical` or later.
+  //
+  // A .sib body can be at any stage, so it is not seeded.
+  if (!MF->isSIB())
+    fn->setFunctionStage(SILStage::Canonical);
+
   assert(!(fn->getGenericEnvironment() && !fn->empty())
          && "function already has context generic params?!");
   if (genericEnv)
