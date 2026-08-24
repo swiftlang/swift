@@ -277,15 +277,24 @@ private:
       return FoldingError(IllegalConstError::Default, expr->getLoc());
     }
 
-    ConstantValuePtr foldIntegerLiteralExpr(const IntegerLiteralExpr *expr) {
+    FoldingErrorOr<ConstantValuePtr>
+    foldIntegerLiteralExpr(const IntegerLiteralExpr *expr) {
       auto exprType = expr->getType();
       auto value = expr->getValue();
       auto resultBitWidth = getIntegerBitWidth(exprType, Ctx);
-      if (isSignedIntegerType(exprType))
-        return std::make_unique<IntegerValue>(value.sextOrTrunc(resultBitWidth),
-                                              true);
-      return std::make_unique<IntegerValue>(value.zextOrTrunc(resultBitWidth),
-                                            false);
+      bool isSigned = isSignedIntegerType(exprType);
+      // Don't silently truncate a literal whose magnitude doesn't fit the
+      // target type, leave it unfolded so the existing overflow diagnostic
+      // still fires.
+      unsigned needed =
+          isSigned ? value.getSignificantBits() : value.getActiveBits();
+      if (needed > resultBitWidth)
+        return FoldingError(IllegalConstError::UpstreamError, expr->getLoc());
+      if (isSigned)
+        return ConstantValuePtr(std::make_unique<IntegerValue>(
+            value.sextOrTrunc(resultBitWidth), true));
+      return ConstantValuePtr(std::make_unique<IntegerValue>(
+          value.zextOrTrunc(resultBitWidth), false));
     }
 
     FoldingErrorOr<ConstantValuePtr> tryFoldBinaryExpr(const BinaryExpr *expr) {
