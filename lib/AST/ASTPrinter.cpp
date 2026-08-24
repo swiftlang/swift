@@ -6652,6 +6652,16 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     if (isMemberOfGenericParameter(T))
       return false;
 
+    // A compiler-synthesized member typealias--most importantly, the implicit
+    // typealias that witnesses an associated type--is never printed into a
+    // module interface, so a module selector naming the module that synthesized
+    // it cannot resolve to it. Reading such a name back instead resolves to the
+    // associated type, which belongs to the protocol's module and cannot be
+    // named with a module selector at all, so omit the selector entirely.
+    if (auto *TAD = dyn_cast<TypeAliasDecl>(GTD))
+      if (TAD->isSynthesized() && TAD->getDeclContext()->isTypeContext())
+        return false;
+
     // Module selectors skip over local types, so don't add one.
     return GTD->getLocalContext() == nullptr;
   }
