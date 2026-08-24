@@ -632,7 +632,12 @@ private:
     // because it is represented as a 'negative value' on the resulting
     // `IntegerLiteralExpr`.
     if (isSigned)
-      intResult.abs().toString(resultStr, 10, true);
+      // 'abs()' of a signed type's minimum overflows and stays negative, which
+      // would put a second minus sign in the digits. Widen first, then print
+      // the magnitude unsigned. 'setNegative' below carries the sign.
+      intResult.sext(intResult.getBitWidth() + 1)
+          .abs()
+          .toString(resultStr, 10, /*Signed=*/false);
     else
       intResult.toString(resultStr, 10, false);
 

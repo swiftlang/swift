@@ -23,6 +23,19 @@
 // reported as "raw value for enum case is not unique" instead.
 enum NegativeRawValue: UInt8 {
   case a = -1
-  // expected-error@-1 2 {{negative integer '-1' overflows when stored into unsigned type 'UInt8'}}
+  // Diagnosed twice: the raw literal reaches SIL in both synthesized
+  // RawRepresentable members, 'init(rawValue:)' and the 'rawValue' getter.
+  // expected-error@-3 2 {{negative integer '-1' overflows when stored into unsigned type 'UInt8'}}
+  case b
+}
+
+// A signed type's minimum folds. 'APInt::abs()' overflows on it, so the
+// magnitude is printed from a widened value and 'setNegative' carries the sign.
+@section("mysection") let signedMinimum: Int8 = -128
+@section("mysection") let signedBelowMinimum: Int8 = -129
+// expected-error@-1 {{integer literal '-129' overflows when stored into 'Int8'}}
+
+enum SignedMinimumRawValue: Int8 {
+  case a = -128
   case b
 }
