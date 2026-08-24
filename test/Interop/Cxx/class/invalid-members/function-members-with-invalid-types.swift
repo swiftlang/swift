@@ -91,8 +91,10 @@ struct GoodStruct {
   // FIXME: operators are imported eagerly, so having this member would make GoodStruct unusable
   // int operator+(Bro<Ken>) const;
 
-  Bro<Ken> begin() const;
-  Bro<Ken> end() const;
+  // FIXME: begin()/end() are imported eagerly to derive the CxxSequence
+  // conformance, so having these members would make GoodStruct unusable
+  // Bro<Ken> begin() const;
+  // Bro<Ken> end() const;
 
   // Return type templates are instantiated only if the function member is
   // actually imported, e.g., not if the function member is deleted.
@@ -118,9 +120,6 @@ struct GoodStruct {
 //
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
 // NOTE-MISSING: func overloadsDiffNumArgs(_: Never)
-//
-// CHECK-NEXT:   func __beginUnsafe() -> Never
-// CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
 
 
@@ -132,8 +131,6 @@ struct DerivedGoodStruct : GoodStruct {};
 // NOTE-MISSING: func badVirtual(_: Never) -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
-// CHECK-NEXT:   func __beginUnsafe() -> Never
-// CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
 
 struct UsingGoodStruct : GoodStruct {
@@ -149,8 +146,6 @@ struct UsingGoodStruct : GoodStruct {
 // CHECK-NEXT:   func getBad() -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
-// CHECK-NEXT:   func __beginUnsafe() -> Never
-// CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
 
 
