@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -parse-stdlib -use-clang-function-types -target i686-unknown-windows-msvc -module-name M -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -enable-experimental-com-interop -com-interop-model=microsoft -target i686-unknown-windows-msvc -module-name M -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=X86
 
