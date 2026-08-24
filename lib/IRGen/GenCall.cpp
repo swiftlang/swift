@@ -1543,6 +1543,37 @@ static bool doesClangExpansionMatchSchema(IRGenModule &IGM,
   return true;
 }
 
+static std::optional<clang::CallingConv>
+getNonDefaultClangCallingConvention(IRGenModule &IGM,
+                                    CanSILFunctionType fnType) {
+  if (fnType->getRepresentation() !=
+      SILFunctionTypeRepresentation::CFunctionPointer)
+    return std::nullopt;
+
+  auto *clangType = fnType->getClangTypeInfo().getType();
+  if (!clangType)
+    return std::nullopt;
+
+  const clang::FunctionType *functionType = nullptr;
+  if (auto *pointer = clangType->getAs<clang::PointerType>())
+    functionType = pointer->getPointeeType()->getAs<clang::FunctionType>();
+  else if (auto *reference = clangType->getAs<clang::ReferenceType>())
+    functionType =
+        reference->getPointeeType()->getAs<clang::FunctionType>();
+  else
+    functionType = clangType->getAs<clang::FunctionType>();
+
+  ASSERT(functionType && "unexpected Clang C function type");
+  auto callingConv = functionType->getCallConv();
+  auto defaultCallingConv =
+      IGM.getClangASTContext().getDefaultCallingConvention(
+          /*IsVariadic=*/false, /*IsCXXMethod=*/false);
+  if (callingConv == defaultCallingConv)
+    return std::nullopt;
+
+  return callingConv;
+}
+
 /// Expand the result and parameter types to the appropriate LLVM IR
 /// types for C, C++ and Objective-C signatures.
 void SignatureExpansion::expandExternalSignatureTypes() {
@@ -1630,8 +1661,12 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangTy);
   }
 
-  // Generate function info for this signature.
+  // Generate function info for this signature. Preserve the calling
+  // convention carried by an imported C function type rather than rebuilding
+  // every C function as the platform-default convention.
   auto extInfo = clang::FunctionType::ExtInfo();
+  if (auto callingConv = getNonDefaultClangCallingConvention(IGM, FnType))
+    extInfo = extInfo.withCallingConv(*callingConv);
 
   bool isCXXMethod =
       FnType->getRepresentation() == SILFunctionTypeRepresentation::CXXMethod;
@@ -2458,6 +2493,9 @@ Signature SignatureExpansion::getSignature() {
   auto callingConv =
       expandCallingConv(IGM, FnType->getRepresentation(), FnType->isAsync(),
                         FnType->isCalleeAllocatedCoroutine());
+  if (getNonDefaultClangCallingConvention(IGM, FnType))
+    callingConv = static_cast<llvm::CallingConv::ID>(
+        ForeignInfo.ClangInfo->getEffectiveCallingConvention());
 
   Signature result;
   result.Type = llvmType;
