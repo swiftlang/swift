@@ -1,0 +1,88 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all=true -enable-experimental-feature SplitContinuations %s | %target-sil-opt -sil-print-types -enable-sil-verify-all=true -enable-experimental-feature SplitContinuations | %FileCheck %s
+// REQUIRES: concurrency
+// REQUIRES: swift_feature_SplitContinuations
+
+// Round-trip (parse -> print -> parse -> print) and verify the
+// split-continuation builtins.  Awaiting one reuses await_async_continuation:
+// the only new piece is getSplitContinuationAddr, which binds a token created
+// elsewhere to this function.
+
+import Builtin
+import Swift
+import _Concurrency
+
+// CHECK-LABEL: sil @split_create : $@convention(thin) () -> Builtin.RawUnsafeContinuation {
+sil @split_create : $@convention(thin) () -> Builtin.RawUnsafeContinuation {
+bb0:
+  // CHECK: [[MT:%.*]] = metatype $@thin Builtin.Int32.Type
+  %mt = metatype $@thin Builtin.Int32.Type
+  // CHECK: [[TOK:%.*]] = builtin "createSplitContinuation"<Builtin.Int32>([[MT]] : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
+  %tok = builtin "createSplitContinuation"<Builtin.Int32>(%mt : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
+  // CHECK: return [[TOK]]
+  return %tok : $Builtin.RawUnsafeContinuation
+}
+
+// getSplitContinuationAddr binds a split token to this function's resume
+// buffer; the suspension itself is the ordinary await_async_continuation.  The
+// non-throwing form has only a resume successor, which takes no arguments
+// because the value is delivered into the resume buffer.
+//
+// CHECK-LABEL: sil @split_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
+sil @split_await : $@async (Builtin.RawUnsafeContinuation) -> () {
+// CHECK: bb0([[TOK:%.*]] : $Builtin.RawUnsafeContinuation):
+entry(%token : $Builtin.RawUnsafeContinuation):
+  // CHECK: [[SLOT:%.*]] = alloc_stack $Builtin.Int32
+  %a = alloc_stack $Builtin.Int32
+  // CHECK: [[CONT:%.*]] = builtin "getSplitContinuationAddr"<Builtin.Int32>([[TOK]] : $Builtin.RawUnsafeContinuation, [[SLOT]] : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%token : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  // The line ends after the resume successor, i.e. there is no error successor.
+  // CHECK: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]] // id:
+  await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1
+  // CHECK: [[RESUME]]:
+bb1:
+  // CHECK: dealloc_stack [[SLOT]]
+  dealloc_stack %a : $*Builtin.Int32
+  return undef : $()
+}
+
+// The throwing form has both successors, and the error successor takes the
+// error as its single argument.
+//
+// CHECK-LABEL: sil @split_await_throws : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
+sil @split_await_throws : $@async (Builtin.RawUnsafeContinuation) -> () {
+// CHECK: bb0([[TOK:%.*]] : $Builtin.RawUnsafeContinuation):
+entry(%token : $Builtin.RawUnsafeContinuation):
+  // CHECK: [[SLOT:%.*]] = alloc_stack $Builtin.Int32
+  %a = alloc_stack $Builtin.Int32
+  // CHECK: [[CONT:%.*]] = builtin "getSplitContinuationAddr"<Builtin.Int32>([[TOK]] : $Builtin.RawUnsafeContinuation, [[SLOT]] : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%token : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  // CHECK: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1, error bb2
+  // CHECK: [[RESUME]]:
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+  // CHECK: [[ERROR]]({{%.*}} : $any Error):
+bb2(%e : $Error):
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+
+bb3:
+  return undef : $()
+}
+
+// A split continuation is resumed with the ordinary resume builtins: its
+// token is the task-shaped header of the continuation, from which the context is
+// loaded exactly as it is from a task.
+//
+// CHECK-LABEL: sil @split_resume : $@convention(thin) (Builtin.RawUnsafeContinuation, @in Builtin.Int32) -> () {
+sil @split_resume : $@convention(thin) (Builtin.RawUnsafeContinuation, @in Builtin.Int32) -> () {
+bb0(%token : $Builtin.RawUnsafeContinuation, %val : $*Builtin.Int32):
+  %v = load %val : $*Builtin.Int32
+  // CHECK: builtin "resumeThrowingContinuationReturning"<Builtin.Int32>({{%.*}} : $Builtin.RawUnsafeContinuation, {{%.*}} : $Builtin.Int32) : $()
+  %r = builtin "resumeThrowingContinuationReturning"<Builtin.Int32>(%token : $Builtin.RawUnsafeContinuation, %v : $Builtin.Int32) : $()
+  // CHECK: builtin "destroySplitContinuation"({{%.*}} : $Builtin.RawUnsafeContinuation) : $()
+  %d = builtin "destroySplitContinuation"(%token : $Builtin.RawUnsafeContinuation) : $()
+  %t = tuple ()
+  return %t : $()
+}
