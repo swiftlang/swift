@@ -1850,16 +1850,8 @@ void Release(void *pUnk) {
 ///
 /// A successful ISwiftObject query returns a +1 interface pointer. The caller
 /// must keep that pointer alive while using `object` and release it afterwards.
-bool getISwiftObject(OpaqueValue *srcValue, const Metadata *srcType, void *&self,
-                     const Metadata *&metadata, void *&pISwiftObject) {
-  if (srcType->getKind() != MetadataKind::Existential)
-    return false;
-
-  auto existentialType = cast<ExistentialTypeMetadata>(srcType);
-  if (existentialType->getRepresentation() != ExistentialTypeRepresentation::COM)
-    return false;
-
-  auto pUnk = *reinterpret_cast<void **>(srcValue);
+bool getISwiftObject(void *pUnk, void *&self, const Metadata *&metadata,
+                     void *&pISwiftObject) {
   pISwiftObject =
       QueryInterface(pUnk,
                      reinterpret_cast<const uint8_t *>(&IID_ISwiftObject));
@@ -1885,6 +1877,33 @@ bool getISwiftObject(OpaqueValue *srcValue, const Metadata *srcType, void *&self
 
   return true;
 }
+
+bool getISwiftObject(OpaqueValue *srcValue, const Metadata *srcType, void *&self,
+                     const Metadata *&metadata, void *&pISwiftObject) {
+  if (srcType->getKind() != MetadataKind::Existential)
+    return false;
+
+  auto existentialType = cast<ExistentialTypeMetadata>(srcType);
+  if (existentialType->getRepresentation() !=
+      ExistentialTypeRepresentation::COM)
+    return false;
+
+  return getISwiftObject(*reinterpret_cast<void **>(srcValue), self, metadata,
+                         pISwiftObject);
+}
+}
+
+extern "C" SWIFT_RUNTIME_EXPORT
+const Metadata *swift::swift_getCOMDynamicType(void *interface,
+                                               const Metadata *staticType) {
+  void *object = nullptr;
+  void *pISwiftObject = nullptr;
+  const Metadata *metadata = nullptr;
+  if (!getISwiftObject(interface, object, metadata, pISwiftObject))
+    return staticType;
+
+  Release(pISwiftObject);
+  return metadata;
 }
 
 static DynamicCastResult
