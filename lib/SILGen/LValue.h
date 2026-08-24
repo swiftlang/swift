@@ -101,7 +101,7 @@ public:
     TupleElementKind,           // tuple_element_addr
     StructElementKind,          // struct_element_addr
     OptionalObjectKind,         // optional projection
-    OpenOpaqueExistentialKind,  // opened opaque existential
+    OpenAddressExistentialKind, // opened address existential
     AddressorKind,              // var/subscript addressor
     CoroutineAccessorKind,      // coroutine accessor
     ValueKind,                  // random base pointer as an lvalue
@@ -176,7 +176,7 @@ public:
 
   /// Is this some form of open-existential component?
   bool isOpenExistential() const {
-    return getKind() == OpenOpaqueExistentialKind ||
+    return getKind() == OpenAddressExistentialKind ||
            getKind() == OpenNonOpaqueExistentialKind;
   }
 

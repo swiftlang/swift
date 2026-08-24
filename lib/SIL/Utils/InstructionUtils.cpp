@@ -762,11 +762,14 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = SILType();
     return RuntimeEffect::MetaData;
 
-  case SILInstructionKind::OpenExistentialAddrInst:
-    if (cast<OpenExistentialAddrInst>(inst)->getAccessKind() ==
-        OpenedExistentialAccess::Mutable)
+  case SILInstructionKind::OpenExistentialAddrInst: {
+    auto *open = cast<OpenExistentialAddrInst>(inst);
+    if (open->getAccessKind() == OpenedExistentialAccess::Mutable &&
+        !open->getOperand()->getType().canUseExistentialRepresentation(
+            ExistentialRepresentation::COM))
       return RuntimeEffect::Allocating | RuntimeEffect::Existential;
     return RuntimeEffect::Existential;
+  }
 
   case SILInstructionKind::OpenExistentialRefInst: {
     impactType = inst->getOperand(0)->getType();

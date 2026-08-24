@@ -4871,9 +4871,12 @@ public:
     SILType operandType = OEI->getOperand()->getType();
     require(operandType.isAddress(),
             "open_existential_addr must be applied to address");
-    require(operandType.canUseExistentialRepresentation(
-                                        ExistentialRepresentation::Opaque),
-           "open_existential_addr must be applied to opaque existential");
+    auto representation = operandType.getPreferredExistentialRepresentation();
+    bool supported = representation == ExistentialRepresentation::Opaque ||
+                     representation == ExistentialRepresentation::COM;
+    require(supported,
+            "open_existential_addr must be applied to opaque or COM "
+            "existential");
 
     require(OEI->getType().isAddress(),
             "open_existential_addr result must be an address");
