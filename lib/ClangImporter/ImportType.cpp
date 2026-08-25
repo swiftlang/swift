@@ -2604,6 +2604,23 @@ ClangImporter::Implementation::importParameterType(
                                   ? ImportTypeKind::CompletionHandlerParameter
                                   : ImportTypeKind::Parameter;
 
+  // Instantiate the parameter type (via clang::Sema::isCompleteType()) before
+  // importing, using the parameter's location to improve diagnostics.
+  //
+  // Exempt operators for now, since these are imported too eagerly and can
+  // lead to spurious template instantiation failures.
+  if (auto *tagDecl = paramTy->getAsTagDecl();
+      tagDecl && !tagDecl->isCompleteDefinition()) {
+    if (auto *parentFn = dyn_cast<clang::FunctionDecl>(parent);
+        !parentFn || !parentFn->isOverloadedOperator()) {
+      auto loc = param->getSourceRange().getBegin();
+      loc = loc.isValid() ? loc : param->getLocation();
+      loc = loc.isValid() ? loc : parent->getLocation();
+      if (loc.isValid())
+        (void)getClangSema().isCompleteType(loc, paramTy);
+    }
+  }
+
   // Import the parameter type into Swift.
   auto attrs = getImportTypeAttrs(param, /*isParam=*/true);
   Type swiftParamTy;
