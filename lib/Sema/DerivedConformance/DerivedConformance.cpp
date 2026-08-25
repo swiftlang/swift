@@ -1254,7 +1254,7 @@ std::string swift::getNominalTypeInfoString(DerivedConformance &derived) {
   // thing `diagnoseMissingOwnership` checks, so it never had to say so; the
   // source a macro writes does.
   bool isNoncopyable =
-      derived.Nominal->canBeCopyable() == TypeDecl::CanBeInvertible::Never;
+      !derived.getConformanceContext()->getSelfTypeInContext()->isCopyable();
 
   std::string res;
   llvm::raw_string_ostream out(res);
