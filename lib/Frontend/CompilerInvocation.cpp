@@ -413,8 +413,8 @@ void CompilerInvocation::computeCXXStdlibOptions() {
         ClangImporter::createClangDriver(LangOpts, ClangImporterOpts);
     auto clangDriverArgs = ClangImporter::createClangArgs(
         ClangImporterOpts, SearchPathOpts, clangDriver);
-    auto &clangToolchain =
-        clangDriver.getToolChain(clangDriverArgs, LangOpts.Target);
+    auto &clangToolchain = clangDriver.getToolChain(
+        clangDriverArgs, llvm::Triple(LangOpts.Target.normalize()));
     auto cxxStdlibKind = clangToolchain.GetCXXStdlibType(clangDriverArgs);
     auto cxxDefaultStdlibKind = clangToolchain.GetDefaultCXXStdlibType();
 

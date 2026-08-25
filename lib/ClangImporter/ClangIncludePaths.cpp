@@ -225,8 +225,8 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
       ctx.ClangImporterOpts, ctx.SearchPathOpts, clangDriver);
 
   llvm::opt::ArgStringList includeArgStrings;
-  const auto &clangToolchain =
-      clangDriver.getToolChain(clangDriverArgs, triple);
+  const auto &clangToolchain = clangDriver.getToolChain(
+      clangDriverArgs, llvm::Triple(triple.normalize()));
   clangToolchain.AddClangSystemIncludeArgs(clangDriverArgs, includeArgStrings);
   auto parsedIncludeArgs = parseClangDriverArgs(clangDriver, includeArgStrings);
 
@@ -305,8 +305,8 @@ static void getLibStdCxxFileMapping(
       ctx.ClangImporterOpts, ctx.SearchPathOpts, clangDriver);
 
   llvm::opt::ArgStringList stdlibArgStrings;
-  const auto &clangToolchain =
-      clangDriver.getToolChain(clangDriverArgs, triple);
+  const auto &clangToolchain = clangDriver.getToolChain(
+      clangDriverArgs, llvm::Triple(triple.normalize()));
   clangToolchain.AddClangCXXStdlibIncludeArgs(clangDriverArgs,
                                               stdlibArgStrings);
   auto parsedStdlibArgs = parseClangDriverArgs(clangDriver, stdlibArgStrings);
@@ -521,7 +521,8 @@ void GetWindowsFileMappings(
                                        Context.ClangImporterOpts, driverVFS);
   const llvm::opt::InputArgList Args = ClangImporter::createClangArgs(
       Context.ClangImporterOpts, Context.SearchPathOpts, Driver);
-  const clang::driver::ToolChain &ToolChain = Driver.getToolChain(Args, Triple);
+  const clang::driver::ToolChain &ToolChain =
+      Driver.getToolChain(Args, llvm::Triple(Triple.normalize()));
   llvm::vfs::FileSystem &VFS = ToolChain.getVFS();
 
   struct {
