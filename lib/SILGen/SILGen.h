@@ -471,6 +471,11 @@ public:
   /// Emit a deinit table for a noncopyable type.
   void emitNonCopyableTypeDeinitTable(NominalTypeDecl *decl);
 
+  /// In Embedded Swift, record a noncopyable type for which IRGen may emit
+  /// type metadata, so that the deinits reachable from its value witnesses can
+  /// be specialized before IRGen runs.
+  void recordNonCopyableTypeWithEmittedMetadata(NominalTypeDecl *decl);
+
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
   SILDeclRef getNSStringToStringFn();

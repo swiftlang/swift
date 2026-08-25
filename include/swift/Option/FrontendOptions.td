@@ -230,6 +230,22 @@ def disable_clang_spi :
   Flag<["-"], "disable-clang-spi">,
   HelpText<"Don't import Clang SPIs as Swift SPIs">;
 
+def enable_objc_msgsend_selector_stubs :
+  Flag<["-"], "enable-objc-msgsend-selector-stubs">,
+  HelpText<"Allow use of magic 'objc_msgSend$selector:name:' stubs (default: depends on target and linker version)">;
+
+def disable_objc_msgsend_selector_stubs :
+  Flag<["-"], "disable-objc-msgsend-selector-stubs">,
+  HelpText<"Don't allow use of magic 'objc_msgSend$selector:name:' stubs (default: depends on target and linker version)">;
+
+def enable_objc_msgsend_class_selector_stubs :
+  Flag<["-"], "enable-objc-msgsend-class-selector-stubs">,
+  HelpText<"Allow use of magic 'objc_msgSendClass$selector:name:$classSymbol' stubs (default: depends on target and linker version)">;
+
+def disable_objc_msgsend_class_selector_stubs :
+  Flag<["-"], "disable-objc-msgsend-class-selector-stubs">,
+  HelpText<"Don't allow use of magic 'objc_msgSendClass$selector:name:$classSymbol' stubs (default: depends on target and linker version)">;
+
 def enable_target_os_checking :
   Flag<["-"], "enable-target-os-checking">,
   HelpText<"Enable checking the target OS of serialized modules">;
@@ -1014,6 +1030,12 @@ def solver_disable_prune_disjunctions : Flag<["-"], "solver-disable-prune-disjun
 def solver_enable_prune_disjunctions : Flag<["-"], "solver-enable-prune-disjunctions">,
   HelpText<"Enable experimental disjunction pruning algorithm for lookahead in the solver">;
 
+def solver_disable_type_var_joins : Flag<["-"], "solver-disable-type-var-joins">,
+  HelpText<"Disable experimental support for joins of types containing type variables">;
+
+def solver_enable_type_var_joins : Flag<["-"], "solver-enable-type-var-joins">,
+  HelpText<"Enable experimental support for joins of types containing type variables">;
+
 def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-hacks">,
   HelpText<"Disable various constraint solver performance optimizations that have been "
            "subsumed by subsequent improvements">;
@@ -1319,6 +1341,10 @@ def prespecialize_generic_metadata : Flag<["-"], "prespecialize-generic-metadata
 def emit_singleton_metadata_pointer : Flag<["-"], "emit-singleton-metadata-pointer">,
    HelpText<"Emit a pointer to the corresponding type metadata into non-public "
             "non-generic type descriptors.">;
+
+def disable_emit_singleton_metadata_pointer : Flag<["-"], "disable-emit-singleton-metadata-pointer">,
+   HelpText<"Do not emit a pointer to the corresponding type metadata into "
+            "non-public non-generic type descriptors.">;
 
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;

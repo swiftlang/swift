@@ -18,6 +18,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Paths.h"
+#include "swift/Runtime/Privilege.h"
 #include "swift/Runtime/Win32.h"
 #include "swift/Threading/Once.h"
 
@@ -311,8 +312,12 @@ _swift_joinPaths(const char *path, ...)
 void
 _swift_initRootPath(void *)
 {
-  // SWIFT_ROOT overrides the path returned by this function
-  const char *swiftRoot = swift::runtime::environment::SWIFT_ROOT();
+  // SWIFT_ROOT overrides the path returned by this function. The root is used to
+  // locate executables to spawn and libraries to load, so gate it on the
+  // strongest check.
+  const char *swiftRoot = swift::runtime::_swift_isRestrictedProcessForExec()
+    ? nullptr
+    : swift::runtime::environment::SWIFT_ROOT();
 
   if (!swiftRoot || !*swiftRoot) {
     rootPath = _swift_getDefaultRootPath();

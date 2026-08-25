@@ -334,7 +334,9 @@ enum class FactoryAsInitKind {
 namespace importer {
 struct PlatformAvailability {
 private:
-  PlatformKind platformKind;
+  /// The platform that compilation is targeting, or `nullopt` if the target
+  /// triple does not correspond to a platform.
+  std::optional<PlatformKind> platformKind;
 
 public:
   /// Returns a non-optional `PlatformKind` corresponding to the platform name
@@ -857,6 +859,14 @@ public:
       return {nullptr, nullptr};
     return it->second;
   }
+
+  /// Cache for getLibkernSubclass(), which classifies a CXXRecordDecl against
+  /// libkern's OSObject hierarchy.
+  llvm::DenseMap<const clang::CXXRecordDecl *, LibkernSubclass>
+      libkernSubclasses;
+
+  /// Classify \p decl against libkern's OSObject hierarchy.
+  LibkernSubclass getLibkernSubclass(const clang::CXXRecordDecl *decl);
 
   /// Calling AbstractFunctionDecl::getLifetimeDependencies before we added
   /// the conformances we want to all the imported types is problematic because

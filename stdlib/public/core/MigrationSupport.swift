@@ -361,8 +361,8 @@ extension UnsafeMutablePointer {
   }
   
   @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
-  public func deallocate(capacity _: Int) { 
-    unsafe self.deallocate()
+  public func deallocate(capacity: Int) {
+    unsafe self._deallocate(capacity: capacity)
   }
 
   /// Initializes memory starting at this pointer's address with the elements

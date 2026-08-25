@@ -11,6 +11,9 @@
 #
 #     @available(SwiftStdlib 5.2, *)
 #
+# These macros are also made available for use in tests. They are converted into
+# %target-swift-X.Y-abi-triple substitutions and stdlib_X_Y_runtime features.
+#
 # Comments in this file start with `#`. Comments and empty lines are ignored.
 # Each of the remaining lines must define an availability macro in the same
 # format used by the `-define-availability` frontend command line option.

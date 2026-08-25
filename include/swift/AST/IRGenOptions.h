@@ -674,7 +674,7 @@ public:
         IndirectAsyncFunctionPointer(false), IndirectCoroFunctionPointer(false),
         CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false),
-        EmitSingletonMetadataPointers(false), UseIncrementalLLVMCodeGen(true),
+        EmitSingletonMetadataPointers(true), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         EnableLargeLoadableTypesReg2Mem(true),
         EnableLayoutStringValueWitnesses(false),

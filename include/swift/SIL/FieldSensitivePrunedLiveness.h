@@ -203,16 +203,27 @@ struct SubElementOffset {
   /// elements of \p projectionFromRoot's type and adding this to the result of
   /// this function.
   ///
+  /// That last step only holds when \p projectionFromRoot's leaves really are a
+  /// sub-tree of the root's. Some projections look through a node of the type
+  /// tree that is opaque -- the payload of an existential, or the source of an
+  /// unchecked address cast -- and reach a type that is unrelated to the tree.
+  /// Such a projection affects the whole opaque node instead. If \p
+  /// opaqueBoundaryType is non-null and the walk looked through such a node, it
+  /// is set to that node's type, whose leaf count callers must use in place of
+  /// \p projectionFromRoot's. Otherwise it is left alone; callers should pass a
+  /// null SILType.
+  ///
   /// \returns None if we didn't know how to compute sub-element for this
   /// projection.
-  static std::optional<SubElementOffset> compute(SILValue projectionFromRoot,
-                                                 SILValue root) {
+  static std::optional<SubElementOffset>
+  compute(SILValue projectionFromRoot, SILValue root,
+          SILType *opaqueBoundaryType = nullptr) {
     assert(projectionFromRoot->getType().getCategory() ==
                root->getType().getCategory() &&
            "projectionFromRoot and root must both be objects or address.");
     if (root->getType().isObject())
       return computeForValue(projectionFromRoot, root);
-    return computeForAddress(projectionFromRoot, root);
+    return computeForAddress(projectionFromRoot, root, opaqueBoundaryType);
   }
 
   operator unsigned() const { return number; }
@@ -224,7 +235,8 @@ struct SubElementOffset {
 
 private:
   static std::optional<SubElementOffset>
-  computeForAddress(SILValue projectionFromRoot, SILValue rootAddress);
+  computeForAddress(SILValue projectionFromRoot, SILValue rootAddress,
+                    SILType *opaqueBoundaryType = nullptr);
   static std::optional<SubElementOffset>
   computeForValue(SILValue projectionFromRoot, SILValue rootValue);
 };
@@ -312,11 +324,19 @@ struct TypeTreeLeafTypeRange {
   /// the type tree.
   static void get(SILValue projectedValue, SILValue rootValue,
                   SmallVectorImpl<TypeTreeLeafTypeRange> &ranges) {
-    auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
+    SILType opaqueBoundaryType;
+    auto startEltOffset =
+        SubElementOffset::compute(projectedValue, rootValue,
+                                  &opaqueBoundaryType);
     if (!startEltOffset)
       return;
-    ranges.push_back({*startEltOffset,
-                      *startEltOffset + TypeSubElementCount(projectedValue)});
+    // A projection out of an opaque node covers that whole node; its own type's
+    // leaves are not part of the root's type tree at all.
+    auto count = opaqueBoundaryType
+                     ? TypeSubElementCount(opaqueBoundaryType,
+                                           rootValue->getFunction())
+                     : TypeSubElementCount(projectedValue);
+    ranges.push_back({*startEltOffset, *startEltOffset + count});
   }
 
   /// Which bits of \p rootValue are involved in \p op.

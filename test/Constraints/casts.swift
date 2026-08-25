@@ -341,15 +341,9 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
 
   // rdar://88334481 – Don't apply the compatibility logic for collection literals.
   typealias Magic<T> = T
-  _ = [i] as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
-  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
-
-  _ = [i] as Magic as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
-  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
-
-  _ = ([i]) as Magic as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
-  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
-
+  _ = [i] as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _ = [i] as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _ = ([i]) as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
   _  = [i: i] as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
   _  = ([i: i]) as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
   _  = [i: stringAnyDict] as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}

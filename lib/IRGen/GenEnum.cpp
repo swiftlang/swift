@@ -2066,7 +2066,7 @@ namespace {
           uint64_t word = offset / ptrBytes; // pointer-aligned, fills one word
           for (; nextWord < word; ++nextWord)
             types.push_back(IGM.SizeTy);
-          types.push_back(IGM.PtrTy);
+          types.push_back(ty);
           ++nextWord;
           hasPointer = true;
         }

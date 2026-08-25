@@ -35,6 +35,7 @@
 #include "clang/Index/IndexingAction.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTReader.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/BLAKE3.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/HashBuilder.h"
@@ -444,6 +445,14 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                                   SourceFile *initialFile = nullptr) {
   auto &fileMgr = clangCI.getFileManager();
 
+  // `IndexUnitWriter::addASTFileDependency` now takes a
+  // `clang::serialization::ModuleFile`, which we cannot produce for Swift
+  // module units (and for Clang module units without additional lookups).
+  // Since the AST file dependency is ultimately keyed on the module file
+  // path, replicate the behavior of `addASTFileDependency` here using the
+  // public `addUnitDependency` API and dedupe on the file entry.
+  llvm::DenseSet<const clang::FileEntry *> seenASTFiles;
+
   for (auto &import : imports) {
     ModuleDecl *mod = import.importedModule;
     if (mod->isOnoneSupportModule())
@@ -536,8 +545,13 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
         }
         clang::index::writer::OpaqueModule opaqMod =
             moduleNameScratch.createString(moduleName);
-        unitWriter.addASTFileDependency(*F, mod->isNonUserModule(), opaqMod,
-                                        withoutUnitName);
+        if (seenASTFiles.insert(&F->getFileEntry()).second) {
+          SmallString<64> unitName;
+          if (!withoutUnitName)
+            unitWriter.getUnitNameForOutputFile(F->getName(), unitName);
+          unitWriter.addUnitDependency(unitName.str(), *F,
+                                       mod->isNonUserModule(), opaqMod);
+        }
 
         break;
       }

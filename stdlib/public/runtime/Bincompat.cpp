@@ -18,6 +18,7 @@
 #include "swift/Runtime/Bincompat.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"
+#include "swift/Runtime/Privilege.h"
 #include "swift/Threading/Once.h"
 #include "swift/shims/RuntimeShims.h"
 #include "swift/shims/Target.h"
@@ -94,6 +95,11 @@ static bool isKnownBinCompatVersion(_SwiftStdlibVersion version) {
 }
 
 static void checkBinCompatEnvironmentVariable(void *context) {
+  // Overriding the bincompat version can remove safety checks, so it is
+  // unavailable in processes that don't allow that.
+  if (_swift_isRestrictedProcess())
+    return;
+
   _SwiftStdlibVersion version =
     { runtime::environment::SWIFT_BINARY_COMPATIBILITY_VERSION() };
 

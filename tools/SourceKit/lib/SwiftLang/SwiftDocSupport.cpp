@@ -704,10 +704,11 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
 
   for (auto Attr : getAvailableAttrs(D, Scratch)) {
     UIdent PlatformUID;
-    switch (Attr.getPlatform()) {
-    case PlatformKind::none:
+    auto Platform = Attr.getPlatform();
+    // FIXME: [availability] Handle non-platform availability domains?
+    if (!Platform) {
       PlatformUID = UIdent();
-      break;
+    } else switch (*Platform) {
     case PlatformKind::iOS:
       PlatformUID = PlatformIOS;
       break;
@@ -768,7 +769,6 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
       PlatformUID = PlatformAndroid;
       break;
     }
-    // FIXME: [availability] Handle non-platform availability domains?
 
     AvailableAttrInfo Info;
     Info.AttrKind = AvailableAttrKind;

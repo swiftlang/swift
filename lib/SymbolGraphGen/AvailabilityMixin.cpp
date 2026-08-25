@@ -27,8 +27,14 @@ StringRef Availability::getDomainDescription(AvailabilityDomain Domain) {
   if (Domain.isSwiftLanguageMode())
     return { "Swift" };
 
+  auto Platform = Domain.getPlatformKind();
+
+  // FIXME: [availability] Handle non-universal availabilty domains here.
+  if (!Platform)
+    return "*";
+
   // Platform-specific availability.
-  switch (Domain.getPlatformKind()) {
+  switch (*Platform) {
     case swift::PlatformKind::iOS:
       return { "iOS" };
     case swift::PlatformKind::macCatalyst:
@@ -67,8 +73,6 @@ StringRef Availability::getDomainDescription(AvailabilityDomain Domain) {
       return { "Windows" };
     case swift::PlatformKind::Android:
       return { "Android" };
-    case swift::PlatformKind::none:
-      return { "*" };
   }
   llvm_unreachable("invalid platform kind");
 }

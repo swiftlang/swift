@@ -279,7 +279,18 @@ extension UnsafePointer where Pointee: ~Copyable {
     // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
     // always uses the "aligned allocation" path, this ensures that the
     // runtime's allocation and deallocation paths are compatible.
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
+    Builtin.deallocRawTyped(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue, Pointee.self)
+  }
+
+  @export(implementation)
+  @_preInverseGenerics
+  internal func _deallocate(capacity: Int) {
+    let size = MemoryLayout<Pointee>.stride * capacity
+    // Passing zero alignment to the runtime forces "aligned
+    // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
+    // always uses the "aligned allocation" path, this ensures that the
+    // runtime's allocation and deallocation paths are compatible.
+    Builtin.deallocRawTyped(_rawValue, size._builtinWordValue, (0)._builtinWordValue, Pointee.self)
   }
 }
 
@@ -846,6 +857,17 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     // always uses the "aligned allocation" path, this ensures that the
     // runtime's allocation and deallocation paths are compatible.
     Builtin.deallocRawTyped(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue, Pointee.self)
+  }
+
+  @export(implementation)
+  @_preInverseGenerics
+  internal func _deallocate(capacity: Int) {
+    let size = MemoryLayout<Pointee>.stride * capacity
+    // Passing zero alignment to the runtime forces "aligned
+    // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
+    // always uses the "aligned allocation" path, this ensures that the
+    // runtime's allocation and deallocation paths are compatible.
+    Builtin.deallocRawTyped(_rawValue, size._builtinWordValue, (0)._builtinWordValue, Pointee.self)
   }
 }
 

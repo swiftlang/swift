@@ -24,6 +24,7 @@
 #endif
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "../runtime/Private.h"
 #include "Debug.h"
 #include "ExecutorBridge.h"
 #include "TaskPrivate.h"
@@ -40,6 +41,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Exception.h"
 #include "swift/Runtime/Heap.h"
+#include "swift/Runtime/Privilege.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Once.h"
 #include "swift/Threading/Thread.h"
@@ -478,6 +480,11 @@ __swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
   // Potentially, override the platform detected mode, primarily used in tests.
 #if SWIFT_STDLIB_HAS_ENVIRON && !SWIFT_CONCURRENCY_EMBEDDED
+  // The override downgrades the isolation check from fatal to a warning, so it
+  // is unavailable in processes don't allow disabling safety checks.
+  if (swift::runtime::_swift_isRestrictedProcess())
+    return nullptr;
+
   return swift::runtime::environment::
       concurrencyIsCurrentExecutorLegacyModeOverride();
 #else
@@ -810,6 +817,12 @@ static unsigned unexpectedExecutorLogLevel =
 
 static void checkUnexpectedExecutorLogLevel(void *context) {
 #if SWIFT_STDLIB_HAS_ENVIRON
+  // SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL can downgrade the executor check from a
+  // fatal error to a warning, so it is unavailable in processes don't allow
+  // disabling safety checks.
+  if (swift::runtime::_swift_isRestrictedProcess())
+    return;
+
   const char *levelStr = getenv("SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL");
   if (!levelStr)
     return;
@@ -2358,23 +2371,46 @@ void swift::swift_defaultActor_deallocate(DefaultActor *_actor) {
 }
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
+enum class ActorClassKind {
+  /// A default actor, i.e. it uses the default actor executor
+  DefaultActor,
+  /// An actor which uses a custom executor
+  NonDefaultActor,
+};
+
+/// Returns what kind of actor (if any) the passed metadata represents.
+static std::optional<ActorClassKind>
+classifyActorClass(const Metadata *metadata) {
+  auto *classMetadata = dyn_cast_or_null<ClassMetadata>(metadata);
+
+  if (!classMetadata || !classMetadata->isTypeMetadata())
+    return std::nullopt;
+
+  bool isActor = false;
+  while (true) {
+    if (!classMetadata->isArtificialSubclass()) {
+      const auto *description = classMetadata->getDescription();
+
+      // Trust the class descriptor if it says it's a default actor
+      if (description->isDefaultActor())
+        return ActorClassKind::DefaultActor;
+
+      isActor |= description->isActor();
+    }
+
+    // Go to the superclass
+    classMetadata = classMetadata->Superclass;
+
+    // If we run out of Swift classes, it's not a default actor
+    if (!classMetadata || !classMetadata->isTypeMetadata())
+      return isActor ? std::optional(ActorClassKind::NonDefaultActor)
+                     : std::nullopt;
+  }
+}
+
 static bool isDefaultActorClass(const ClassMetadata *metadata) {
   assert(metadata->isTypeMetadata());
-  while (true) {
-    // Trust the class descriptor if it says it's a default actor.
-    if (!metadata->isArtificialSubclass() &&
-        metadata->getDescription()->isDefaultActor()) {
-      return true;
-    }
-
-    // Go to the superclass.
-    metadata = metadata->Superclass;
-
-    // If we run out of Swift classes, it's not a default actor.
-    if (!metadata || !metadata->isTypeMetadata()) {
-      return false;
-    }
-  }
+  return classifyActorClass(metadata) == ActorClassKind::DefaultActor;
 }
 #endif
 
@@ -2967,10 +3003,17 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
 
 bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
 #if !SWIFT_CONCURRENCY_EMBEDDED
-  const ClassMetadata *metadata = cast<ClassMetadata>(_actor->metadata);
-  if (isDefaultActorClass(metadata)) {
+  if (!_actor || isObjCTaggedPointer(_actor))
+    return false;
+
+  auto actorKind = classifyActorClass(swift_getObjectType(_actor));
+  if (!actorKind)
+    return false;
+
+  switch (*actorKind) {
+  case ActorClassKind::DefaultActor:
     return asImpl(reinterpret_cast<DefaultActor *>(_actor))->isDistributedRemote();
-  } else {
+  case ActorClassKind::NonDefaultActor:
     return asImpl(reinterpret_cast<NonDefaultDistributedActor *>(_actor))->isDistributedRemote();
   }
 #else
