@@ -23,6 +23,11 @@ module Namespaces {
   requires cplusplus
 }
 
+module NonTrivial {
+  header "non-trivial.h"
+  requires cplusplus
+}
+
 module Operators {
   header "operators.h"
   requires cplusplus
