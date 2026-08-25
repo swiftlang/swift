@@ -4628,9 +4628,6 @@ namespace {
     /// name (it is marked '@unsafe(always)' by importAttributes instead), and
     /// the renamed spelling is imported a second time as a deprecated migration
     /// stub, which is only '@unsafe'.
-    ///
-    /// This is done post-import so we don't eagerly instantiate templates for
-    /// methods we may not import.
     void renameToUnsafeIfNeeded(
         const clang::CXXMethodDecl *clangDecl, ValueDecl *swiftDecl,
         const clang::FunctionTemplateDecl *funcTemplate = nullptr) {
@@ -4640,21 +4637,6 @@ namespace {
               clang::OverloadedOperatorKind::OO_None)
         // Does not apply to operators, ctors, dtors, conversions
         return;
-
-      using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
-
-      auto retTy = desugarIfElaborated(clangDecl->getReturnType());
-      auto *retTemplate =
-          dyn_cast_or_null<ClassTmplSpec>(retTy->getAsTagDecl());
-
-      if (retTemplate && !retTemplate->hasDefinition()) {
-        // N.B. InstantiateClassTemplateSpecialization() returns true if it
-        // encountered an error while instantiating the returned template.
-        (void)Impl.getClangSema().InstantiateClassTemplateSpecialization(
-            clangDecl->getLocation(), const_cast<ClassTmplSpec *>(retTemplate),
-            clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
-            /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
-      }
 
       auto importedName = Impl.importFullName(clangDecl, Impl.CurrentVersion);
       if (!importedName || importedName.hasCustomName())
