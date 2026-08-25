@@ -113,3 +113,8 @@ Added: _$s11Distributed0A5ActorPAAE9whenLocalyqd__Sgqd__xYiYaYbqd_0_YKXEYaqd_0_Y
 
 // Distributed.DistributedRemoteActorReferenceExecutor.checkIsolated() -> ()
 Added: _$s11Distributed0A28RemoteActorReferenceExecutorC13checkIsolatedyyF
+
+// Distributed.ExecuteDistributedTargetError.ErrorCode.incompatibleInvocationDecoder
+Added: _$s11Distributed07ExecuteA11TargetErrorV0D4CodeO29incompatibleInvocationDecoderyA2EmFWC
+// Distributed.ExecuteDistributedTargetError.ErrorCode.incompatibleResultHandler
+Added: _$s11Distributed07ExecuteA11TargetErrorV0D4CodeO25incompatibleResultHandleryA2EmFWC

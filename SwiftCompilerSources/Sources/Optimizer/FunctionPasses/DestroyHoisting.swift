@@ -107,7 +107,7 @@ private func optimize(value: Value, _ context: FunctionPassContext) {
   }
   defer { minimalLiverange.deinitialize() }
 
-  hoistDestroys(of: value, toEndOf: minimalLiverange, restrictingTo: &hoistableDestroys, context)
+  placeDestroys(of: value, atBoundaryOf: minimalLiverange, reusing: &hoistableDestroys, context)
 }
 
 private func selectHoistableDestroys(of value: Value, _ context: FunctionPassContext) -> (Bool, InstructionSet) {
@@ -130,66 +130,87 @@ private func selectHoistableDestroys(of value: Value, _ context: FunctionPassCon
   return (foundDestroys, hoistableDestroys)
 }
 
-private func hoistDestroys(of value: Value,
-                           toEndOf minimalLiverange: InstructionRange,
-                           restrictingTo hoistableDestroys: inout InstructionSet,
-                           _ context: FunctionPassContext)
+/// Places the scope-ending instructions of `value` at the boundary of `liverange`.
+///
+/// Ends move in either direction: when `liverange` reaches beyond the existing ends they sink.
+/// `isEnd` recognizes an existing end among `value`'s uses and `createEnd` emits a new one at the
+/// builder's insertion point; parameterizing both is what lets this place `end_access` as well as
+/// `destroy_value`. Ends in `reusableEnds` are kept where the boundary already falls on them and
+/// erased otherwise.
+internal func placeScopeEnds(of value: Value,
+                             atBoundaryOf liverange: InstructionRange,
+                             reusing reusableEnds: inout InstructionSet,
+                             isEnd: (Operand) -> Bool,
+                             createEnd: (Builder) -> (),
+                             _ context: FunctionPassContext)
 {
-  // The liverange, excluding regions which end up in `destroy_value [dead_end]`.
-  var nonDeadEndRange = BasicBlockRange(begin: value.parentBlock, context)
-  defer { nonDeadEndRange.deinitialize() }
-  nonDeadEndRange.insert(contentsOf: value.uses.users(ofType: DestroyValueInst.self)
-                                          .filter{ !$0.isDeadEnd }.map { $0.parentBlock })
+  createEnds(for: value, atEndPointsOf: liverange, reusing: &reusableEnds,
+             isEnd: isEnd, createEnd: createEnd, context)
 
-  createNewDestroys(for: value, atEndPointsOf: minimalLiverange, reusing: &hoistableDestroys,
-                    nonDeadEndRange: nonDeadEndRange, context)
+  createEnds(for: value, atExitPointsOf: liverange, reusing: &reusableEnds,
+             createEnd: createEnd, context)
 
-  createNewDestroys(for: value, atExitPointsOf: minimalLiverange, reusing: &hoistableDestroys,
-                    nonDeadEndRange: nonDeadEndRange, context)
-
-  removeDestroys(of: value, restrictingTo: hoistableDestroys, context)
+  removeEnds(of: value, restrictingTo: reusableEnds, isEnd: isEnd, context)
 }
 
-private func createNewDestroys(
+/// Places `destroy_value`s of the owned `value` at the boundary of `liverange`.
+internal func placeDestroys(of value: Value,
+                            atBoundaryOf liverange: InstructionRange,
+                            reusing reusableDestroys: inout InstructionSet,
+                            _ context: FunctionPassContext)
+{
+  let deadEndBlocks = context.deadEndBlocks
+  placeScopeEnds(of: value, atBoundaryOf: liverange, reusing: &reusableDestroys,
+                 isEnd: { $0.endsLifetime },
+                 createEnd: {
+                   $0.createDestroyValue(operand: value,
+                                         isDeadEnd: deadEndBlocks.isDeadEnd($0.insertionBlock!))
+                 },
+                 context)
+}
+
+private func createEnds(
   for value: Value,
   atEndPointsOf liverange: InstructionRange,
-  reusing hoistableDestroys: inout InstructionSet,
-  nonDeadEndRange: BasicBlockRange,
+  reusing reusableEnds: inout InstructionSet,
+  isEnd: (Operand) -> Bool,
+  createEnd: (Builder) -> (),
   _ context: FunctionPassContext
 ) {
   for endInst in liverange.ends {
-    if !endInst.endsLifetime(of: value) {
-      Builder.insert(after: endInst, context) { builder in
-        builder.createDestroy(of: value, reusing: &hoistableDestroys, nonDeadEndRange: nonDeadEndRange)
-      }
+    if endInst.operands.contains(where: { $0.value == value && isEnd($0) }) {
+      // The boundary already falls on an end of `value`. Keep that one instead of adding a
+      // duplicate next to it, and don't let `removeEnds` erase it.
+      reusableEnds.erase(endInst)
+      continue
+    }
+    Builder.insert(after: endInst, context) { builder in
+      builder.createEnd(reusing: &reusableEnds, createEnd)
     }
   }
 }
 
-private func createNewDestroys(
+private func createEnds(
   for value: Value,
   atExitPointsOf liverange: InstructionRange,
-  reusing hoistableDestroys: inout InstructionSet,
-  nonDeadEndRange: BasicBlockRange,
+  reusing reusableEnds: inout InstructionSet,
+  createEnd: (Builder) -> (),
   _ context: FunctionPassContext
 ) {
   for exitBlock in liverange.exitBlocks {
     let builder = Builder(atBeginOf: exitBlock, context)
-    builder.createDestroy(of: value, reusing: &hoistableDestroys, nonDeadEndRange: nonDeadEndRange)
+    builder.createEnd(reusing: &reusableEnds, createEnd)
   }
 }
 
-private func removeDestroys(
+private func removeEnds(
   of value: Value,
-  restrictingTo hoistableDestroys: InstructionSet,
+  restrictingTo reusableEnds: InstructionSet,
+  isEnd: (Operand) -> Bool,
   _ context: FunctionPassContext
 ) {
-  for use in value.uses {
-    if let destroy = use.instruction as? DestroyValueInst,
-       hoistableDestroys.contains(destroy)
-    {
-      context.erase(instruction: destroy)
-    }
+  for use in value.uses where isEnd(use) && reusableEnds.contains(use.instruction) {
+    context.erase(instruction: use.instruction)
   }
 }
 
@@ -302,17 +323,14 @@ private func isTakeOrDestroy(
 }
 
 private extension Builder {
-  func createDestroy(of value: Value,
-                     reusing hoistableDestroys: inout InstructionSet,
-                     nonDeadEndRange: BasicBlockRange) {
+  func createEnd(reusing reusableEnds: inout InstructionSet, _ createEnd: (Builder) -> ()) {
     guard case .before(let insertionPoint) = insertionPoint else {
       fatalError("unexpected kind of insertion point")
     }
-    if hoistableDestroys.contains(insertionPoint) {
-      hoistableDestroys.erase(insertionPoint)
+    if reusableEnds.contains(insertionPoint) {
+      reusableEnds.erase(insertionPoint)
     } else {
-      createDestroyValue(operand: value,
-                         isDeadEnd: !nonDeadEndRange.inclusiveRangeContains(insertionPoint.parentBlock))
+      createEnd(self)
     }
   }
 }

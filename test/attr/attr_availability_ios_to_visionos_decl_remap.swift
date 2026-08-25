@@ -8,7 +8,7 @@ public func doSomethingFarFuture() { }
 
 @available(iOS, introduced: 16.0, obsoleted: 17.0, message: "you don't want to do that anyway")
 public func doSomethingElse() { }
-// expected-note@-1 3 {{'doSomethingElse()' was obsoleted in visionOS 1.0}}
+// expected-note@-2 3 {{'doSomethingElse()' was obsoleted in visionOS 1.0}}
 
 @available(iOS, introduced: 16.0, deprecated: 17.0, message: "please don't")
 public func doSomethingInadvisable() { }
@@ -42,7 +42,7 @@ public struct ConformsToProtoObsoletedIniOS17 { }
 
 @available(iOS, introduced: 16.0, obsoleted: 17.0, message: "you don't want to do that anyway")
 extension ConformsToProtoObsoletedIniOS17: SomeProto { }
-// expected-note@-1 {{conformance of 'ConformsToProtoObsoletedIniOS17' to 'SomeProto' was obsoleted in visionOS 1.0}}
+// expected-note@-2 {{conformance of 'ConformsToProtoObsoletedIniOS17' to 'SomeProto' was obsoleted in visionOS 1.0}}
 
 
 func testDeploymentTarget() {
@@ -52,7 +52,7 @@ func testDeploymentTarget() {
   doSomethingFarFuture() // expected-error {{'doSomethingFarFuture()' is only available in visionOS 99.0 or newer}}
   // expected-note@-1 {{add 'if #available' version check}}{{3-25=if #available(visionOS 99.0, *) {\n      doSomethingFarFuture()\n  \} else {\n      // Fallback on earlier versions\n  \}}}
   doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable in visionOS: you don't want to do that anyway}}
-  doSomethingInadvisable() // expected-warning {{'doSomethingInadvisable()' was deprecated in iOS 1.0: please don't}}
+  doSomethingInadvisable() // expected-warning {{'doSomethingInadvisable()' was deprecated in visionOS 1.0: please don't}}
   doSomethingGood()
   doSomethingOld()
 
@@ -60,7 +60,7 @@ func testDeploymentTarget() {
   // expected-note@-1 {{add 'if #available' version check}}{{3-45=if #available(visionOS 1.1, *) {\n      takesSomeProto(ConformsToProtoIniOS17_4())\n  \} else {\n      // Fallback on earlier versions\n  \}}}
   takesSomeProto(ConformsToProtoIniOS99()) // expected-warning {{conformance of 'ConformsToProtoIniOS99' to 'SomeProto' is only available in visionOS 99 or newer; this is an error in the Swift 6 language mode}}
   // expected-note@-1 {{add 'if #available' version check}}{{3-43=if #available(visionOS 99, *) {\n      takesSomeProto(ConformsToProtoIniOS99())\n  \} else {\n      // Fallback on earlier versions\n  \}}}
-  takesSomeProto(ConformsToProtoDeprecatedIniOS17()) // expected-warning {{conformance of 'ConformsToProtoDeprecatedIniOS17' to 'SomeProto' was deprecated in iOS 1.0: please don't}}
+  takesSomeProto(ConformsToProtoDeprecatedIniOS17()) // expected-warning {{conformance of 'ConformsToProtoDeprecatedIniOS17' to 'SomeProto' was deprecated in visionOS 1.0: please don't}}
   takesSomeProto(ConformsToProtoObsoletedIniOS17()) // expected-error {{conformance of 'ConformsToProtoObsoletedIniOS17' to 'SomeProto' is unavailable in visionOS: you don't want to do that anyway}}
 
   if #available(iOS 17.4, *) {
@@ -85,7 +85,7 @@ func testAfterDeployment_iOS() {
   doSomethingElse() // expected-error {{'doSomethingElse()' is unavailable in visionOS: you don't want to do that anyway}}
   doSomethingFarFuture() // expected-error {{'doSomethingFarFuture()' is only available in visionOS 99.0 or newer}}
   // expected-note@-1 {{add 'if #available' version check}}
-  doSomethingInadvisable() // expected-warning {{'doSomethingInadvisable()' was deprecated in iOS 1.0: please don't}}
+  doSomethingInadvisable() // expected-warning {{'doSomethingInadvisable()' was deprecated in visionOS 1.0: please don't}}
   doSomethingGood()
   doSomethingOld()
 
@@ -96,7 +96,7 @@ func testAfterDeployment_iOS() {
 func testAfterDeployment_visionOS() {
   doSomething()
   doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable in visionOS: you don't want to do that anyway}}
-  doSomethingInadvisable() // expected-warning {{'doSomethingInadvisable()' was deprecated in iOS 1.0: please don't}}
+  doSomethingInadvisable() // expected-warning {{'doSomethingInadvisable()' was deprecated in visionOS 1.0: please don't}}
   doSomethingGood()
   doSomethingOld()
 

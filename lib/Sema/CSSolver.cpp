@@ -674,7 +674,7 @@ ConstraintSystem::SolverState::~SolverState() {
   // it in one shot at the end.
   if (ctx.Stats) {
     auto &counters = ctx.Stats->getFrontendCounters();
-    int64_t bytes = CS.getAllocator().getBytesAllocated();
+    int64_t bytes = CS.getAllocator().getTotalMemory();
     counters.NumSolverBytesAllocated += bytes;
     counters.MaxSolverBytesAllocated =
         std::max(counters.MaxSolverBytesAllocated, bytes);

@@ -2965,8 +2965,8 @@ void LoadableByAddress::recreateSingleApply(
     }
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
-        partialApplyConvention, resultIsolation, castedApply->isOnStack(),
-        castedApply->isStackAllocationNested());
+        partialApplyConvention, resultIsolation, castedApply->isCalledOnce(),
+        castedApply->isOnStack(), castedApply->isStackAllocationNested());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }
@@ -4244,8 +4244,9 @@ void AddressAssignment::finish(DominanceInfo *dominance,
     SmallVector<SILBasicBlock *, 8> boundary;
     computeDominatedBoundaryBlocks(stackLoc->getParent(), dominance, boundary);
     for (auto *block : boundary) {
-      if (deadEnds->isDeadEnd(block))
+      if (DeadEndBlocks::triviallyEndsInUnreachable(block)) {
         continue;
+      }
       auto builder = getBuilder(block->back().getIterator());
       builder.createDeallocStack(getAutoLoc(), stackLoc);
     }
@@ -4280,6 +4281,47 @@ static bool isSoleUserOf(LoadInst *load, SILInstruction *next) {
     return false;
   return true;
 }
+
+/// Returns true if the address which is assigned to \p inst's result is a
+/// projection of (or an alias for) the address which is assigned to \p inst's
+/// operand - as opposed to a new stack location the value is copied into.
+/// Must be kept in sync with the AssignAddressToDef visitors below.
+static bool resultAliasesOperandAddress(AddressAssignment &assignment,
+                                        SILInstruction *inst) {
+  switch (inst->getKind()) {
+  case SILInstructionKind::TupleExtractInst:
+  case SILInstructionKind::StructExtractInst:
+  case SILInstructionKind::UncheckedTrivialBitCastInst:
+  case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::EndCOWMutationInst:
+    return assignment.isLargeLoadableType(
+        cast<SingleValueInstruction>(inst)->getType());
+  default:
+    return false;
+  }
+}
+
+/// Returns true if \p inst forwards the address of its operand - possibly via a
+/// chain of such instructions - to a result which is used somewhere else than
+/// in the immediately following instruction.
+///
+/// In this case the operand's address needs to stay valid until those uses,
+/// which is not guaranteed. For example, the address can be a stack location
+/// which is deallocated right after \p inst.
+static bool forwardsAddressBeyondNextInstruction(AddressAssignment &assignment,
+                                                 SILInstruction *inst) {
+  while (resultAliasesOperandAddress(assignment, inst)) {
+    auto *result = cast<SingleValueInstruction>(inst);
+    // Terminators are never address forwarding, so there is a next instruction.
+    auto *next = &*std::next(inst->getIterator());
+    if (!result->hasOneUse() || result->getSingleUse()->getUser() != next)
+      return true;
+    inst = next;
+  }
+  return false;
+}
+
 namespace {
 class AssignAddressToDef : SILInstructionVisitor<AssignAddressToDef> {
   friend SILVisitorBase<AssignAddressToDef>;
@@ -4390,9 +4432,15 @@ protected:
 
   void visitLoadInst(LoadInst *load) {
     auto *defInst = load->getOperand()->getDefiningInstruction();
+    auto *nextInst = &*std::next(load->getIterator());
     // Forward the address of the load if its sole user immediately follows the
     // load instructions and if it was not the result of a coroutine.
-    if (isSoleUserOf(load, &*++load->getIterator()) &&
+    // Don't do this if the user forwards the address to a result which is used
+    // beyond the following instruction, because then the address would be
+    // needed at those uses. For example after the load's source location is
+    // deallocated.
+    if (isSoleUserOf(load, nextInst) &&
+        !forwardsAddressBeyondNextInstruction(assignment, nextInst) &&
         (!defInst || !isa<BeginApplyInst>(defInst))) {
       assignment.markForDeletion(load);
       assignment.mapValueToAddress(origValue, load->getOperand());
@@ -4740,6 +4788,14 @@ protected:
     auto newValue = builder.createMarkDependence(m->getLoc(), m->getValue(),
                                                  opdAddr, m->dependenceKind());
     m->replaceAllUsesWith(newValue);
+    assignment.markForDeletion(m);
+  }
+
+  void visitMarkDependenceAddrInst(MarkDependenceAddrInst *m) {
+    auto builder = assignment.getBuilder(m->getIterator());
+    auto opdAddr = assignment.getAddressForValue(m->getBase());
+    builder.createMarkDependenceAddr(m->getLoc(), m->getAddress(), opdAddr,
+                                     m->dependenceKind());
     assignment.markForDeletion(m);
   }
 

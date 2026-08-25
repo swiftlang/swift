@@ -227,8 +227,8 @@ struct S7 : P7 {
 protocol P8 {
   associatedtype B
 
-  @available(*, unavailable, renamed: "B")
-  typealias A = B // expected-note{{'A' has been explicitly marked unavailable here}}
+  @available(*, unavailable, renamed: "B") // expected-note{{'A' has been explicitly marked unavailable here}}
+  typealias A = B
 }
 
 func testP8<T: P8>(_: T) where T.A == Int { } // expected-error{{'A' has been renamed to 'B'}}{{34-35=B}}

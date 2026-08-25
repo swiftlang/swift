@@ -1955,18 +1955,33 @@ public:
     return createNominalType(typeAliasDecl, parent);
   }
 
-  /// Determine whether the generic parameter at the given index is a value
-  /// parameter. Returns std::nullopt if the type isn't generic or the index is
-  /// out of range.
-  std::optional<bool> isValueGenericParameter(BuiltTypeDecl anyTypeDecl,
-                                              unsigned index) const {
+  /// Which of the \p numArgs generic arguments a mangled name binds to
+  /// \p anyTypeDecl are bound to value generic parameters. Returns an empty
+  /// vector if \p anyTypeDecl isn't a generic type, or if the argument count
+  /// matches neither of the two shapes createBoundGenericType accepts: just
+  /// this type's own parameters, or, for a type with no parent, the complete
+  /// set across every level of nesting.
+  llvm::SmallVector<bool, 8>
+  getValueGenericParameterFlags(BuiltTypeDecl anyTypeDecl,
+                                unsigned numArgs) const {
     auto typeDecl = dyn_cast<TypeContextDescriptor>(anyTypeDecl);
-    if (!typeDecl)
-      return std::nullopt;
+    if (!typeDecl || !typeDecl->isGeneric())
+      return {};
     auto localParams = getLocalGenericParams(typeDecl);
-    if (index >= localParams.size())
-      return std::nullopt;
-    return localParams[index].getKind() == GenericParamKind::Value;
+    auto allParams = typeDecl->getGenericContext()->getGenericParams();
+    llvm::ArrayRef<GenericParamDescriptor> params;
+    if (numArgs == localParams.size())
+      params = localParams;
+    else if (numArgs == allParams.size())
+      params = allParams;
+    else
+      return {};
+
+    llvm::SmallVector<bool, 8> flags;
+    flags.reserve(params.size());
+    for (auto param : params)
+      flags.push_back(param.getKind() == GenericParamKind::Value);
+    return flags;
   }
 
   TypeLookupErrorOr<BuiltType>
@@ -2492,6 +2507,11 @@ public:
 
   TypeLookupErrorOr<BuiltType> createBuiltinFixedArrayType(BuiltType size,
                                                            BuiltType element) {
+    if (!element.isMetadata())
+      return TYPE_LOOKUP_ERROR_FMT("Tried to build a Builtin.FixedArray "
+                                   "without metadata for the element type");
+    // A count is indistinguishable from a metadata pointer or a pack here, so
+    // the decoder is where a count spelled as a type gets rejected.
     return BuiltType(swift_getFixedArrayTypeMetadata(MetadataState::Abstract,
                                                      size.getValue(),
                                                      element.getMetadata()));
@@ -2946,6 +2966,25 @@ static NodePointer getParameterList(NodePointer funcType) {
     return parameters;
 
   return parameterContainer;
+}
+
+/// Return the minimum length required for the decoded generic
+/// substitutions buffer, given the target's `GenericEnvironmentDescriptor`.
+/// 
+/// This acts as a guard before calling
+/// \c swift_func_getReturnTypeInfo, \c swift_func_getParameterTypeInfo
+/// and \c swift_distributed_getWitnessTables which assume the passed
+/// substitutions are sufficiently well formed.
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+size_t swift_distributed_getGenericEnvironmentKeyArgumentCount(
+    GenericEnvironmentDescriptor *genericEnv) {
+  if (!genericEnv)
+    return 0;
+  return llvm::count_if(genericEnv->getGenericParameters(),
+                        [](const GenericParamDescriptor &param) {
+                          return param.hasKeyArgument();
+                        });
 }
 
 SWIFT_CC(swift)

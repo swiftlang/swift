@@ -19,6 +19,7 @@
 #define SWIFT_TYPES_H
 
 #include "swift/AST/ASTAllocated.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -370,6 +371,12 @@ enum class TypeMatchFlags {
   IgnoreFunctionGlobalActorIsolation = 1 << 8,
   /// Require parameter labels to match.
   RequireMatchingParameterLabels = 1 << 9,
+  /// When comparing function types, treat a missing Clang function type on
+  /// either side as compatible with a present one. Used by deserialization's
+  /// cross-reference near-match to tolerate module build skew where an older
+  /// module didn't record the Clang function type; two present-but-different
+  /// Clang types still mismatch.
+  AllowMissingClangType = 1 << 10,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
@@ -769,6 +776,19 @@ public:
   bool isUnsafe() const {
     return getRecursiveProperties().isUnsafe();
   }
+
+  /// Find a type involved in this type whose declaration the given predicate
+  /// accepts, if there is one.
+  ///
+  /// This does not consider the "parent" types of a nominal type: the unsafety
+  /// of an enclosing type does not rub off on a type nested inside it. It does
+  /// consider generic arguments.
+  Type findUnsafeType(
+      llvm::function_ref<bool(NominalTypeDecl *)> isUnsafeDecl) const;
+
+  /// Find a type involved in this type that was marked '@unsafe(always)', if
+  /// there is one.
+  Type findAlwaysUnsafeType() const;
 
   /// Determine whether the type involves a primary, pack or local archetype.
   bool hasArchetype() const {
@@ -6145,7 +6165,8 @@ public:
   /// Thick swift noescape function types are trivial.
   bool isTrivialNoEscape() const {
     return isNoEscape() &&
-           getRepresentation() == SILFunctionTypeRepresentation::Thick;
+           getRepresentation() == SILFunctionTypeRepresentation::Thick &&
+           !isCalledOnce();
   }
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }

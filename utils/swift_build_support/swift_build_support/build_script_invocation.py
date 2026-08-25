@@ -388,7 +388,8 @@ class BuildScriptInvocation(object):
             # For additional isolation, disable pkg-config. Homebrew's pkg-config
             # prioritizes CommandLineTools paths, resulting in compile errors.
             args.extra_cmake_options += [
-                '-DCMAKE_IGNORE_PATH=/usr/lib;/usr/local/lib;/lib',
+                '-DCMAKE_IGNORE_PATH=/usr/lib;/usr/local/lib;/lib;'
+                '/opt/homebrew/lib',
                 '-DPKG_CONFIG_EXECUTABLE=/usr/bin/false',
             ]
 

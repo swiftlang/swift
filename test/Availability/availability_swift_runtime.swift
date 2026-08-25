@@ -31,7 +31,7 @@ func availableSwift6() {
 
 @available(Swift, introduced: 5.0, obsoleted: 5.1)
 func obsoletedBeforeSwiftRuntime() {}
-// expected-note@-1 3{{'obsoletedBeforeSwiftRuntime()' was obsoleted in Swift 5.1}}
+// expected-note@-2 3{{'obsoletedBeforeSwiftRuntime()' was obsoleted in Swift 5.1}}
 
 func reachableUseStillDiagnosed() {
   obsoletedBeforeSwiftRuntime()

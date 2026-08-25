@@ -1,0 +1,171 @@
+// RUN: %target-sil-opt -send-non-sendable -sil-region-isolation-emit-isolation-history -strict-concurrency=complete %s -o /dev/null -verify
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// SIL coverage for isolation-history notes on the IncompatibleRegionMerge
+// diagnostic. See the companion
+// transfernonsendable_isolationhistory_incompatible_merge.swift for the full
+// discussion; in brief, this is the only diagnostic in the series whose existing
+// output changes. Its shallow per-side "X is exposed to <iso> code" note is a
+// one-level-deep version of what a chain says, so a chain replaces it where one
+// is available and it survives where one is not.
+//
+// The severity is a warning until the *future* language mode rather than v6, so
+// these are warnings.
+//
+// The three shapes are pinned separately here because they are three distinct
+// outcomes of one per-side decision:
+//   both_chained  -> two chains, no shallow notes  (the behavior change)
+//   mixed         -> one chain, one shallow note   (the decision is per side)
+//   neither       -> two shallow notes             (unchanged from today)
+//
+// Primary diagnostics use empty-body matchers; chain and shallow notes have their
+// full text matched, since which of the two appears is exactly what is under test.
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+class NonSendableKlass {}
+
+actor CustomActorInstance {}
+
+@globalActor
+struct CustomActor {
+  static let shared: CustomActorInstance
+}
+
+class NonisolatedClassWithMixedFields {
+  @MainActor var mainField: NonSendableKlass
+  @CustomActor var customField: NonSendableKlass
+}
+
+sil @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
+sil @mergeTwo : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> ()
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
+// MARK: Both sides chained — each side is explained by its own walk, and neither
+// shallow note is emitted. Their absence is asserted by omission: -verify fails
+// on any unexpected note, so if a shallow note came back this test would fail.
+//
+// The two sides are still in separate regions in the snapshot, because the error
+// is raised before the merge that would join them. That is what lets each side be
+// walked independently.
+sil [ossa] @merge_both_chained : $@convention(thin) (@guaranteed NonisolatedClassWithMixedFields) -> () {
+bb0(%self : @guaranteed $NonisolatedClassWithMixedFields):
+  debug_value %self : $NonisolatedClassWithMixedFields, var, name "self"
+
+  %mainAddr = ref_element_addr %self : $NonisolatedClassWithMixedFields, #NonisolatedClassWithMixedFields.mainField
+  %mainVal = load [copy] %mainAddr : $*NonSendableKlass
+  // expected-note@+1 {{'a' is connected to 'self.mainField' which is accessible to main actor-isolated code}}
+  %a = move_value [lexical] [var_decl] %mainVal : $NonSendableKlass
+  debug_value %a : $NonSendableKlass, let, name "a"
+
+  %customAddr = ref_element_addr %self : $NonisolatedClassWithMixedFields, #NonisolatedClassWithMixedFields.customField
+  %customVal = load [copy] %customAddr : $*NonSendableKlass
+  // expected-note@+1 {{'b' is connected to 'self.customField' which is accessible to global actor 'CustomActor'-isolated code}}
+  %b = move_value [lexical] [var_decl] %customVal : $NonSendableKlass
+  debug_value %b : $NonSendableKlass, let, name "b"
+
+  // Passing both locals to a nonisolated function is what asks for the two
+  // regions to be merged, so both sides of the failed merge are locals with
+  // histories of their own -- unlike a store, where one side is the field.
+  %f = function_ref @mergeTwo : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> ()
+  %ab = begin_borrow %a : $NonSendableKlass
+  %bb = begin_borrow %b : $NonSendableKlass
+  apply %f(%ab, %bb) : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> () // expected-warning {{}}
+  end_borrow %bb : $NonSendableKlass
+  end_borrow %ab : $NonSendableKlass
+
+  destroy_value %b : $NonSendableKlass
+  destroy_value %a : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: Mixed — the source side is a local with a chain, the destination side is
+// the directly-isolated field and keeps its shallow note. Recording is on for the
+// whole function, so this is what proves the choice is made per side, on whether
+// the walk actually emitted anything, rather than on whether recording is on.
+sil [ossa] @merge_mixed : $@convention(thin) (@guaranteed NonisolatedClassWithMixedFields) -> () {
+bb0(%self : @guaranteed $NonisolatedClassWithMixedFields):
+  debug_value %self : $NonisolatedClassWithMixedFields, var, name "self"
+
+  %mainAddr = ref_element_addr %self : $NonisolatedClassWithMixedFields, #NonisolatedClassWithMixedFields.mainField
+  %mainVal = load [copy] %mainAddr : $*NonSendableKlass
+  // expected-note@+1 {{'a' is connected to 'self.mainField' which is accessible to main actor-isolated code}}
+  %a = move_value [lexical] [var_decl] %mainVal : $NonSendableKlass
+  debug_value %a : $NonSendableKlass, let, name "a"
+
+  // expected-note@+1 {{'self.customField' is exposed to global actor 'CustomActor'-isolated code}}
+  %customAddr = ref_element_addr %self : $NonisolatedClassWithMixedFields, #NonisolatedClassWithMixedFields.customField
+  %acc = begin_access [modify] [unknown] %customAddr : $*NonSendableKlass
+  %ac = copy_value %a : $NonSendableKlass
+  store %ac to [assign] %acc : $*NonSendableKlass // expected-warning {{}}
+  end_access %acc : $*NonSendableKlass
+
+  destroy_value %a : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: Neither side chained — both values are directly isolated fields, so this
+// is byte-for-byte the output that shipped before isolation-history notes reached
+// this diagnostic: two shallow notes and no chains. This is the same shape as
+// @regionMergeAssignMismerge in transfernonsendable.sil, which must keep passing
+// unedited.
+sil [ossa] @merge_neither : $@convention(thin) (@guaranteed NonisolatedClassWithMixedFields) -> () {
+bb0(%self : @guaranteed $NonisolatedClassWithMixedFields):
+  debug_value %self : $NonisolatedClassWithMixedFields, var, name "self"
+  // expected-note@+1 {{'self.mainField' is exposed to main actor-isolated code}}
+  %mainAddr = ref_element_addr %self : $NonisolatedClassWithMixedFields, #NonisolatedClassWithMixedFields.mainField
+  %mainVal = load [copy] %mainAddr : $*NonSendableKlass
+  // expected-note@+1 {{'self.customField' is exposed to global actor 'CustomActor'-isolated code}}
+  %customAddr = ref_element_addr %self : $NonisolatedClassWithMixedFields, #NonisolatedClassWithMixedFields.customField
+  store %mainVal to [assign] %customAddr : $*NonSendableKlass // expected-warning {{}}
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: CFG diamond — the merge that isolates the source side happens in bb1
+// only; bb2 assigns a fresh disconnected value. The chain must come from bb1, and
+// bb2 must contribute nothing.
+sil [ossa] @merge_diamond : $@convention(thin) (@guaranteed NonisolatedClassWithMixedFields, Builtin.Int1) -> () {
+bb0(%self : @guaranteed $NonisolatedClassWithMixedFields, %cond : $Builtin.Int1):
+  debug_value %self : $NonisolatedClassWithMixedFields, var, name "self"
+  %box = alloc_stack [lexical] [var_decl] $NonSendableKlass, let, name "a"
+  cond_br %cond, bb1, bb2
+
+// The isolating arm.
+bb1:
+  %mainAddr = ref_element_addr %self : $NonisolatedClassWithMixedFields, #NonisolatedClassWithMixedFields.mainField
+  %mainVal = load [copy] %mainAddr : $*NonSendableKlass
+  // expected-note@+1 {{'a' is connected to 'self.mainField' which is accessible to main actor-isolated code}}
+  store %mainVal to [init] %box : $*NonSendableKlass
+  br bb3
+
+// The unrelated arm: a fresh disconnected value, which must contribute no note.
+bb2:
+  %mk = function_ref @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
+  %fresh = apply %mk() : $@convention(thin) () -> @owned NonSendableKlass
+  store %fresh to [init] %box : $*NonSendableKlass
+  br bb3
+
+bb3:
+  // expected-note@+1 {{'self.customField' is exposed to global actor 'CustomActor'-isolated code}}
+  %customAddr = ref_element_addr %self : $NonisolatedClassWithMixedFields, #NonisolatedClassWithMixedFields.customField
+  %av = load [copy] %box : $*NonSendableKlass
+  %acc = begin_access [modify] [unknown] %customAddr : $*NonSendableKlass
+  store %av to [assign] %acc : $*NonSendableKlass // expected-warning {{}}
+  end_access %acc : $*NonSendableKlass
+  destroy_addr %box : $*NonSendableKlass
+  dealloc_stack %box : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}

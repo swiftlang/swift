@@ -11,9 +11,6 @@ set(swiftDemanglingSources
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/DemanglingErrorHandling.cpp")
-set(swiftDemanglingCRSources
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/CrashReporter.cpp")
-
 set(swift_demangling_cflags)
 
 if(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT)
@@ -44,11 +41,4 @@ add_swift_target_library(swiftDemangling OBJECT_LIBRARY
     -DswiftCore_EXPORTS
     ${swift_demangling_cflags}
   C_COMPILE_FLAGS_LINUX -fno-lto
-  INSTALL_IN_COMPONENT never_install)
-
-add_swift_target_library(swiftDemanglingCR OBJECT_LIBRARY
-  ${swiftDemanglingCRSources}
-  C_COMPILE_FLAGS
-    -DswiftCore_EXPORTS
-    ${swift_demangling_cflags}
   INSTALL_IN_COMPONENT never_install)

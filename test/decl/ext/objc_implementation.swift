@@ -487,6 +487,49 @@ protocol EmptySwiftProto {}
   }
 }
 
+@objc @implementation extension UniversallyDeprecatedClass1 { }
+// expected-warning@-1 {{'UniversallyDeprecatedClass1' is deprecated: use SomethingElse instead}}
+
+@available(*, deprecated, message: "use SomethingElse instead")
+@objc @implementation extension UniversallyDeprecatedClass2 { }
+
+@objc @implementation extension UniversallyDeprecatedMembersClass {
+  func deprecatedMethod1() { }
+
+  @available(*, deprecated, message: "use something else")
+  func deprecatedMethod2() { }
+
+  var deprecatedProperty1: CInt
+
+  @available(*, deprecated, message: "use something else")
+  func notDeprecatedMethod1() { }
+}
+
+// A restriction in the Swift language mode domain only prevents references from
+// Swift source, so an implementation that is restricted this way is still
+// reachable through the declaration in the header.
+@objc @implementation extension SwiftAvailabilityMembersClass {
+  @available(swift, obsoleted: 1.0, renamed: "renamedMethod()")
+  func swiftObsoletedMethod1() { }
+  // expected-warning@-1 {{instance method 'swiftObsoletedMethod1()' does not match the declaration in the header because it is unavailable}} {{none}}
+  // expected-note@-3 {{'swiftObsoletedMethod1()' was obsoleted in Swift 1.0}} {{none}}
+
+  @available(swift, obsoleted: 99.0)
+  func swiftObsoletedMethod2() { }
+
+  @available(swift 99.0)
+  func swift99Method1() { }
+  // expected-warning@-1 {{instance method 'swift99Method1()' does not match the declaration in the header because it is unavailable in Swift}} {{none}}
+  // expected-note@-3 {{'swift99Method1()' was introduced in Swift 99.0}} {{none}}
+}
+
+@available(swift, obsoleted: 1.0)
+@objc(Category) @implementation extension SwiftObsoletedExtensionClass {
+  // expected-warning@-1 {{'@objc @implementation' extension cannot implement class 'SwiftObsoletedExtensionClass' because it is unavailable}} {{none}}
+  // expected-note@-3 {{extension of 'SwiftObsoletedExtensionClass' was obsoleted in Swift 1.0}} {{none}}
+  func swiftObsoletedCategoryMethod1() { }
+}
+
 // Intentionally using `@_objcImplementation` for this test; do not upgrade!
 @_objcImplementation(EmptyCategory) extension ObjCClass {
   // expected-warning@-1 {{'@_objcImplementation' is deprecated; use '@implementation' instead}} {{1-36=@implementation}} {{1-1=@objc(EmptyCategory) }}
@@ -632,6 +675,33 @@ func CImplFuncNameMismatch2(_: Int32) {
   // expected-error@-2 {{could not find imported function 'mismatchedName2' matching global function 'CImplFuncNameMismatch2'; make sure you import the module or header that declares it}}
   // FIXME: Improve diagnostic for a partial match.
 }
+
+@implementation @_cdecl("CImplFuncUnavailable1")
+func CImplFuncUnavailable1(_: Int32) { }
+// expected-error@-1 {{global function 'CImplFuncUnavailable1' does not match the declaration in the header because it must be unavailable}}
+
+@available(*, unavailable)
+@implementation @_cdecl("CImplFuncUnavailable2")
+func CImplFuncUnavailable2(_: Int32) { }
+
+// FIXME: There is no way to satisfy this diagnostic, since 'unavailable' cannot
+// be used in an '@available' attribute for the 'swift' domain.
+@implementation @_cdecl("CImplFuncUnavailableInSwift1")
+func CImplFuncUnavailableInSwift1(_: Int32) { }
+// expected-error@-1 {{global function 'CImplFuncUnavailableInSwift1' does not match the declaration in the header because it must be unavailable in Swift}} {{none}}
+
+@implementation @_cdecl("CImplFuncDeprecated1")
+func CImplFuncDeprecated1(_: Int32) { }
+
+@available(*, unavailable)
+@implementation @_cdecl("CImplFuncAvailable1")
+func CImplFuncAvailable1(_: Int32) { }
+// expected-error@-1 {{global function 'CImplFuncAvailable1' does not match the declaration in the header because it is unavailable}}
+// expected-note@-4 {{'CImplFuncAvailable1' has been explicitly marked unavailable here}}
+
+@available(*, deprecated, message: "use something else")
+@implementation @_cdecl("CImplFuncAvailable2")
+func CImplFuncAvailable2(_: Int32) { }
 
 //
 // TODO: @_cdecl for global functions imported as computed vars

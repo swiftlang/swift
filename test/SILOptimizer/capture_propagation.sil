@@ -1043,3 +1043,58 @@ bb0(%1 : $S):
   %3 = struct_extract %2, #Int32._value
   return %3
 }
+
+// The generic reabstraction thunk that converts a direct throw to an
+// indirect throw, matching the shape of the thunk synthesized for
+// `withUnsafeBytes`'s generic result.
+sil shared [reabstraction_thunk] [ossa] @generic_param_thunk : $@convention(thin) <T> (UnsafeRawBufferPointer, @guaranteed @noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out T, @error any Error)) -> (@out T, @error_indirect any Error) {
+bb0(%0 : $*T, %1 : $*any Error, %2 : $UnsafeRawBufferPointer, %3 : @guaranteed $@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out T, @error any Error)):
+  try_apply %3(%0, %2) : $@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out T, @error any Error), normal bb2, error bb1
+
+bb1(%5 : @owned $any Error):
+  store %5 to [init] %1
+  throw_addr
+
+bb2(%8 : $()):
+  %9 = tuple ()
+  return %9
+}
+
+// A concrete closure body.
+sil private [ossa] @generic_param_body : $@convention(thin) (UnsafeRawBufferPointer) -> (@out UInt8, @error any Error) {
+bb0(%0 : $*UInt8, %1 : $UnsafeRawBufferPointer):
+  %2 = integer_literal $Builtin.Int8, 42
+  %3 = struct $UInt8 (%2 : $Builtin.Int8)
+  store %3 to [trivial] %0
+  %4 = tuple ()
+  return %4
+}
+
+// Specializing the thunk (@generic_param_thunk) body with the constant closure
+// (@generic_param_body) would cause a type mismatch because the parameter still has
+// generic type T while the closure does not.
+//
+// CHECK-LABEL: sil [ossa] @generic_param_caller
+// CHECK:         function_ref @generic_param_thunk
+// CHECK:         partial_apply [callee_guaranteed] [on_stack] {{%[0-9]+}}<UInt8>({{%[0-9]+}})
+// CHECK:       } // end sil function 'generic_param_caller'
+sil [ossa] @generic_param_caller : $@convention(thin) (UnsafeRawBufferPointer) -> (@out UInt8, @error_indirect any Error) {
+bb0(%0 : $*UInt8, %1 : $*any Error, %2 : $UnsafeRawBufferPointer):
+  %3 = function_ref @generic_param_body : $@convention(thin) (UnsafeRawBufferPointer) -> (@out UInt8, @error any Error)
+  %4 = thin_to_thick_function %3 to $@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out UInt8, @error any Error)
+  %5 = function_ref @generic_param_thunk : $@convention(thin) <T> (UnsafeRawBufferPointer, @guaranteed @noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out T, @error any Error)) -> (@out T, @error_indirect any Error)
+  %6 = partial_apply [callee_guaranteed] [on_stack] %5<UInt8>(%4) : $@convention(thin) <T> (UnsafeRawBufferPointer, @guaranteed @noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out T, @error any Error)) -> (@out T, @error_indirect any Error)
+  %7 = begin_borrow %6
+  try_apply %7(%0, %1, %2) : $@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out UInt8, @error_indirect any Error), normal bb1, error bb2
+
+bb1(%9 : $()):
+  end_borrow %7
+  destroy_value %6
+  %11 = tuple ()
+  return %11
+
+bb2:
+  end_borrow %7
+  destroy_value %6
+  unreachable
+}

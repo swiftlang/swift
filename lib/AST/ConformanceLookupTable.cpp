@@ -717,11 +717,23 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
   if (lhsHasReqs != rhsHasReqs)
     return lhsHasReqs ? Ordering::After : Ordering::Before;
 
-  // If the two conformances come from the same file, pick the first context
-  // in the file.
+  auto isSPIImplier = [](ConformanceEntry *entry) {
+    if (auto *D = entry->getDeclContext()->getAsDecl())
+      return D->isSPI();
+
+    return false;
+  };
+
+  // Handle conformances that come from the same file.
   auto lhsSF = lhs->getDeclContext()->getParentSourceFile();
   auto rhsSF = rhs->getDeclContext()->getParentSourceFile();
   if (lhsSF && lhsSF == rhsSF) {
+    // Prefer the context that isn't SPI.
+    bool lhsIsSPI = isSPIImplier(lhs);
+    if (lhsIsSPI != isSPIImplier(rhs))
+      return lhsIsSPI ? Ordering::After : Ordering::Before;
+
+    // Otherwise, pick the context that was written first in the file.
     ASTContext &ctx = lhsSF->getASTContext();
     return ctx.SourceMgr.isBeforeInBuffer(lhs->getDeclaredLoc(),
                                           rhs->getDeclaredLoc())
@@ -740,6 +752,11 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     if (typeSF == rhsSF)
       return Ordering::After;
   }
+
+  // Prefer the context that isn't SPI.
+  bool lhsIsSPI = isSPIImplier(lhs);
+  if (lhsIsSPI != isSPIImplier(rhs))
+    return lhsIsSPI ? Ordering::After : Ordering::Before;
 
   // Otherwise, pick the earlier file unit.
   auto lhsFileUnit

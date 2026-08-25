@@ -3136,6 +3136,32 @@ static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
   return SGF.B.createValueMetatype(loc, metaTy, selfValue.getValue());
 }
 
+/// Emit the operand of a `value_metatype` or `existential_metatype`
+/// instruction.
+///
+/// Neither instruction consumes its operand; they only inspect the type of the
+/// value it designates. So when the operand names existing storage, borrow that
+/// storage in place instead of loading a copy out of it. That avoids a needless
+/// retain/release, and it's what lets `type(of:)` apply to a noncopyable value,
+/// where the copy would otherwise be diagnosed as a consume.
+///
+/// The caller must have established a `FormalEvaluationScope` covering the use
+/// of the returned value.
+static ManagedValue emitMetatypeOperand(SILGenFunction &SGF, Expr *baseExpr) {
+  if (auto *load = dyn_cast<LoadExpr>(baseExpr)) {
+    auto accessKind = SGF.getTypeLowering(load->getType()).isAddressOnly()
+                          ? SGFAccessKind::BorrowedAddressRead
+                          : SGFAccessKind::BorrowedObjectRead;
+    LValue lv = SGF.emitLValue(load->getSubExpr(), accessKind);
+    return SGF.emitBorrowedLValue(load, std::move(lv));
+  }
+
+  // Otherwise the operand produces a temporary of its own, which we can just
+  // read from.
+  return SGF.emitRValueAsSingleValue(baseExpr,
+                                     SGFContext::AllowImmediatePlusZero);
+}
+
 SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
   Type formalBaseType = baseExpr->getType()->getWithoutSpecifierType();
   CanType baseTy = formalBaseType->getCanonicalType();
@@ -3144,8 +3170,8 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
   if (baseTy.isAnyExistentialType()) {
     SILType metaTy = getLoweredLoadableType(
                                       CanExistentialMetatypeType::get(baseTy));
-    auto base = emitRValueAsSingleValue(baseExpr,
-                                  SGFContext::AllowImmediatePlusZero).getValue();
+    FormalEvaluationScope scope(*this);
+    auto base = emitMetatypeOperand(*this, baseExpr).getValue();
     return B.createExistentialMetatype(loc, metaTy, base);
   }
   SILType metaTy = getLoweredLoadableType(CanMetatypeType::get(baseTy));
@@ -3165,9 +3191,11 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
     }
 
     Scope S(*this, loc);
-    auto base = emitRValueAsSingleValue(baseExpr, SGFContext::AllowImmediatePlusZero);
-    return S.popPreservingValue(B.createValueMetatype(loc, metaTy, base))
-        .getValue();
+    FormalEvaluationScope scope(*this);
+    auto base = emitMetatypeOperand(*this, baseExpr);
+    auto result = B.createValueMetatype(loc, metaTy, base);
+    scope.pop();
+    return S.popPreservingValue(result).getValue();
   }
   // Otherwise, ignore the base and return the static thin metatype.
   emitIgnoredExpr(baseExpr);
@@ -3688,8 +3716,14 @@ static AccessorDecl *
 getRepresentativeAccessorForKeyPath(AbstractStorageDecl *storage) {
   if (storage->requiresOpaqueGetter())
     return storage->getOpaqueAccessor(AccessorKind::Get);
-  assert(storage->requiresOpaqueReadCoroutine());
-  return storage->getOpaqueAccessor(AccessorKind::Read);
+  // Prefer the old read coroutine when it exists (so key paths for storage that
+  // predates the CoroutineAccessors feature keep referring to it); otherwise use
+  // the new yielding-borrow coroutine, which is the only read accessor a
+  // new-only property has.
+  if (storage->requiresOpaqueReadCoroutine())
+    return storage->getOpaqueAccessor(AccessorKind::Read);
+  assert(storage->requiresOpaqueYieldingBorrowCoroutine());
+  return storage->getOpaqueAccessor(AccessorKind::YieldingBorrow);
 }
 
 static CanType buildKeyPathIndicesTuple(ASTContext &C,
@@ -4838,6 +4872,12 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
     /// Returns true if a key path component for the given property or
     /// subscript should be externally referenced.
     auto shouldUseExternalKeyPathComponent = [&]() -> bool {
+      // Embedded Swift does not emit property descriptors, and it can't need
+      // them because there is no resilience.
+      if (getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+        return false;
+      }
+
       // The property descriptor has the canonical key path component
       // information so doesn't have to refer to another external descriptor.
       if (forPropertyDescriptor) {

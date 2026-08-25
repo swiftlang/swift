@@ -105,7 +105,7 @@ internal func inspect(options: UniversalOptions,
           } catch {
             print(" - \(error)", terminator: "", to: &Std.err)
           }
-          remoteProcess.release() // break retain cycle
+          remoteProcess.releaseContextRef() // break retain cycle
         } else {
           print(progress, " - failed to create inspector for process id \(processIdentifier)",
             terminator: "\n", to: &Std.err)

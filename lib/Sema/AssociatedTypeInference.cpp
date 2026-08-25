@@ -2278,16 +2278,24 @@ Type swift::adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
   }
 
   auto needsAdjustment = [=](FunctionType *funcType) -> bool {
-    if (adjustment == TypeAdjustment::NoescapeToEscaping)
+    switch (adjustment) {
+    case TypeAdjustment::NoescapeToEscaping:
       return funcType->isNoEscape();
-    else
+    case TypeAdjustment::NonsendableToSendable:
       return !funcType->isSendable();
+    case TypeAdjustment::CalledOnceToPlain:
+      return funcType->isCalledOnce();
+    }
   };
   auto adjust = [=](const ASTExtInfo &info) -> ASTExtInfo {
-    if (adjustment == TypeAdjustment::NoescapeToEscaping)
+    switch (adjustment) {
+    case TypeAdjustment::NoescapeToEscaping:
       return info.withNoEscape(false);
-    else
+    case TypeAdjustment::NonsendableToSendable:
       return info.withSendable(true);
+    case TypeAdjustment::CalledOnceToPlain:
+      return info.withCalledOnce(false);
+    }
   };
 
   // If we have a noescape function type, make it escaping.
@@ -2450,6 +2458,10 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
       Type inferredType =
         adjustInferredAssociatedType(TypeAdjustment::NoescapeToEscaping,
                                      secondType, noescapeToEscaping);
+      bool calledOnceToPlain = false;
+      inferredType =
+        adjustInferredAssociatedType(TypeAdjustment::CalledOnceToPlain,
+                                     inferredType, calledOnceToPlain);
       if (!inferredType->isMaterializable())
         return false;
 

@@ -21,8 +21,8 @@ extension Int32 {
   @available(swift, obsoleted: 4)
   public static func <=< (_ x: Int32, _ y: Int32) {}
 
-  @available(swift, obsoleted: 4)
-  public static func >=> (_ x: Int32, _ y: Int32) {} // expected-note{{'>=>' was obsoleted in Swift 4}}
+  @available(swift, obsoleted: 4) // expected-note{{'>=>' was obsoleted in Swift 4}}
+  public static func >=> (_ x: Int32, _ y: Int32) {}
 }
 
 func testAvailability() {

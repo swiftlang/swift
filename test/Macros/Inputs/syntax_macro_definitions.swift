@@ -821,6 +821,26 @@ public struct PeerMethodThatCallsCodeMacro: PeerMacro {
   }
 }
 
+public struct PeerFuncThatCallsCodeMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard case let .argumentList(arguments) = node.arguments else {
+      throw CustomError.message("Macro requires a string literal")
+    }
+    let codeString = try extractCodeStringArgument(arguments)
+    return [
+      """
+      func synthesizedPeerFunc() {
+        \(raw: codeString)
+      }
+      """,
+    ]
+  }
+}
+
 public struct GetterThatCallsCodeMacro: AccessorMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -3324,6 +3344,15 @@ public struct ExpressionThatEmitsCodeMacro: ExpressionMacro {
     in context: some MacroExpansionContext
   ) throws -> ExprSyntax {
     "\(raw: try verbatimCode(node.arguments))"
+  }
+}
+
+public struct CodeItemThatEmitsCodeMacro: CodeItemMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    ["\(raw: try verbatimCode(node.arguments))"]
   }
 }
 

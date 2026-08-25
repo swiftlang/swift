@@ -6,6 +6,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: no_asan
 
 // Check that initializing a Double with an integer literal doesn't result in unresolved symbols
 @inline(never)

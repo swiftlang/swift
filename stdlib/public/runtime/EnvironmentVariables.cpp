@@ -16,6 +16,7 @@
 
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Paths.h"
+#include "swift/Runtime/Privilege.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 
 #include <string.h>
@@ -222,6 +223,11 @@ static void platformInitialize(void *context) {
 
 #if defined(ENVIRON)
 void swift::runtime::environment::initialize(void *context) {
+  // Dno't allow the user executing this process to modify the environment if
+  // it's privileged (setuid/setgid).
+  if (_swift_isPrivilegedProcess())
+    return;
+
   // On platforms where we have an environment variable array available, scan it
   // directly. This optimizes for the common case where no variables are set,
   // since we only need to perform one scan to set all variables. It also allows
@@ -278,6 +284,11 @@ void swift::runtime::environment::initialize(void *context) {
 }
 #else
 void swift::runtime::environment::initialize(void *context) {
+  // Dno't allow the user executing this process to modify the environment if
+  // it's privileged (setuid/setgid).
+  if (_swift_isPrivilegedProcess())
+    return;
+
   // Emit a getenv call for each variable. This is less efficient but works
   // everywhere.
 #define VARIABLE(name, type, defaultValue, help)                               \
@@ -312,6 +323,12 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableCooperativeQueues() {
   return runtime::environment::
       SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES();
 }
+
+SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableTaskRegistry() {
+  return runtime::environment::
+      SWIFT_DEBUG_ENABLE_TASK_REGISTRY();
+}
+
 
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations() {
   return runtime::environment::SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS();

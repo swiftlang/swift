@@ -121,6 +121,11 @@ typedef unsigned int TEST_DWORD;
 #define CAST_UNSIGNED_MINUS_TEN ((unsigned)-10)
 #define CAST_TYPEDEF_UNSIGNED_MINUS_ONE ((TEST_DWORD)-1)
 
+#define CAST_SIZE_T_MINUS_ONE ((size_t)-1)
+
+typedef unsigned long NSUInteger;
+#define CAST_NSUINTEGER_MINUS_ONE ((NSUInteger)-1)
+
 // Integer Comparisons.
 
 #define EQUAL_FALSE            (99 == 66)

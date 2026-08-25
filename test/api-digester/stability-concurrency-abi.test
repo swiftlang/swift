@@ -67,6 +67,7 @@ Protocol AsyncSequence has generic signature change from <Self.AsyncIterator : _
 Protocol AsyncSequence has added inherited protocol Copyable
 Protocol AsyncSequence has added inherited protocol Escapable
 Struct CheckedContinuation has removed conformance to UnsafeSendable
+Var CancellationError._reasonRawStorage is a new API without '@available'
 Protocol AsyncIteratorProtocol is now without @rethrows
 Protocol Executor has added inherited protocol Copyable
 Protocol Executor has added inherited protocol Escapable
@@ -137,6 +138,12 @@ Func TaskLocal.get() has mangled name changing from '_Concurrency.TaskLocal.get(
 
 Func _taskIsCancelled(_:) has mangled name changing from '_Concurrency._taskIsCancelled(Builtin.NativeObject) -> Swift.Bool' to '_Concurrency._taskIsCancelled(_Concurrency._AsyncTask) -> Swift.Bool'
 Func _taskIsCancelled(_:) has parameter 0 type change from Builtin.NativeObject to _Concurrency._AsyncTask
+
+// These were @_silgen_name declarations of the default-actor runtime entry
+// points. The compiler emits calls directly to the C symbols. They shouldn't be
+// called manually, so they've been removed.
+Func _defaultActorDestroy(_:) has been removed
+Func _defaultActorInitialize(_:) has been removed
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 

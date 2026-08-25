@@ -84,18 +84,18 @@ public protocol MyResilientProtocol {
 // CHECK-NEXT: [[RESULT:%.*]] = call swiftcc i1 [[WITNESS]](ptr noalias swiftself %0, ptr %1, ptr %2)
 // CHECK-NEXT: ret i1 [[RESULT]]
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s26protocol_resilience_thunks19MyResilientProtocolP8propertySbvsTj"(i1 %0, ptr swiftself %1, ptr %2, ptr %3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s26protocol_resilience_thunks19MyResilientProtocolP8propertySbvsTj"(i1 %0, ptr noalias swiftself %1, ptr %2, ptr %3)
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds ptr, ptr %3, i32 7
 // CHECK-NEXT: [[WITNESS:%.*]] = load ptr, ptr [[WITNESS_ADDR]]
 // CHECK-arm64e-NEXT: ptrtoint ptr [[WITNESS_ADDR]] to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
-// CHECK-NEXT: call swiftcc void [[WITNESS]](i1 %0, ptr swiftself %1, ptr %2, ptr %3)
+// CHECK-NEXT: call swiftcc void [[WITNESS]](i1 %0, ptr noalias swiftself %1, ptr %2, ptr %3)
 // CHECK-NEXT: ret void
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @"$s26protocol_resilience_thunks19MyResilientProtocolP8propertySbvMTj"(ptr noalias dereferenceable({{16|32}}) %0, ptr swiftself %1, ptr %2, ptr %3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @"$s26protocol_resilience_thunks19MyResilientProtocolP8propertySbvMTj"(ptr noalias dereferenceable({{16|32}}) %0, ptr noalias swiftself %1, ptr %2, ptr %3)
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds ptr, ptr %3, i32 8
 // CHECK-NEXT: [[WITNESS:%.*]] = load ptr, ptr [[WITNESS_ADDR]]
 // CHECK-arm64e-NEXT: ptrtoint ptr [[WITNESS_ADDR]] to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
-// CHECK-NEXT: [[RESULT:%.*]] = call swiftcc { ptr, ptr } [[WITNESS]](ptr noalias dereferenceable({{16|32}}) %0, ptr swiftself %1, ptr %2, ptr %3)
+// CHECK-NEXT: [[RESULT:%.*]] = call swiftcc { ptr, ptr } [[WITNESS]](ptr noalias dereferenceable({{16|32}}) %0, ptr noalias swiftself %1, ptr %2, ptr %3)
 // CHECK-NEXT: ret { ptr, ptr } [[RESULT]]

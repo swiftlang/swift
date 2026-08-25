@@ -113,8 +113,11 @@ var gObserved: Int = 9 {
 // IR:  @"$s7section2g1Si_Sitvp" = hidden global <{ %TSi, %TSi }> <{ %TSi <{ {{(i64|i32)}} 42 }>, %TSi <{ {{(i64|i32)}} 43 }> }>, section "__DATA,__mysection"
 // IR:  @"$s7section2g2Sbvp" = hidden global %TSb <{ i1 true }>, section "__DATA,__mysection"
 // IR:  @"$s7section2g3Sbvp" = {{.*}}global %TSb <{ i1 true }>, section "__DATA,__mysection"
-// IR:  @"$s7section2g4SpySiGSgvp" = hidden global {{i64|i32}} 0, section "__DATA,__mysection"
-// IR:  @"$s7section2g5SpySiGSgvp" = hidden global {{i64|i32}} 1111638594, section "__DATA,__mysection"
+// IR:  @"$s7section2g4SpySiGSgvp" = hidden global ptr null, section "__DATA,__mysection"
+// The bit pattern may still be wrapped in a ptrtoint/inttoptr constant
+// expression pair; that pair is only eliminated by DataLayout-aware constant
+// folding, which the initializer does not go through.
+// IR:  @"$s7section2g5SpySiGSgvp" = hidden global ptr inttoptr ({{i64|i32}} {{.*}}1111638594{{.*}} to ptr), section "__DATA,__mysection"
 // IR:  @"$s7section8MyStructV7static0SivpZ" = hidden global %TSi <{ {{(i64|i32)}} 1 }>, section "__DATA,__mysection"
 // IR:  @"$s7section8gDefaultSivp" = hidden global %TSi <{ {{(i64|i32)}} 7 }>, align {{[0-9]+$}}
 // IR:  define {{.*}}@"$s7section3fooyyF"(){{.*}} section "__TEXT,__mysection"

@@ -1,0 +1,156 @@
+// RUN: %target-sil-opt -send-non-sendable -sil-region-isolation-emit-isolation-history -strict-concurrency=complete %s -o /dev/null -verify
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// SIL coverage for isolation-history notes on the InOutSendingReturned
+// diagnostic, which fires when the returned value shares a region with an
+// 'inout sending' parameter. See the companion
+// transfernonsendable_isolationhistory_inout_sending_returned.swift for the
+// source-level shapes and for the full discussion of the two request kinds.
+//
+// Both request kinds are covered here:
+//
+//   - Returning the parameter itself asks howDidBecomeIsolatedTo, whose chain
+//     terminates at the isolated value ("... which is accessible to <iso>").
+//   - Returning a different value in the same region asks
+//     howDidBecomeConnectedTo, whose chain has no isolated terminus and so ends
+//     on a plain "'a' is connected to 'b'".
+//
+// The task-isolated first parameter is the isolated source; 'debug_value' and
+// 'alloc_stack [var_decl] ... name' supply the names the notes need, since an
+// unnamed link is silently dropped.
+//
+// Primary diagnostics use empty-body matchers; chain notes have their full text
+// matched.
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+class NonSendableKlass {}
+
+sil @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
+// MARK: howDidBecomeIsolatedTo, one hop — the 'inout sending' parameter is
+// merged with the task-isolated parameter and then returned. One terminal note.
+sil [ossa] @returned_reach_one_hop : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_sending @inout NonSendableKlass) -> @sil_sending @owned NonSendableKlass {
+bb0(%x : @guaranteed $NonSendableKlass, %out : $*NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+  debug_value %out : $*NonSendableKlass, var, name "out", argno 2, expr op_deref
+
+  %c = copy_value %x : $NonSendableKlass
+  %acc = begin_access [modify] [unknown] %out : $*NonSendableKlass
+  // expected-note@+1 2 {{'out' is connected to 'x' which is accessible to code in the current isolation context}}
+  store %c to [assign] %acc : $*NonSendableKlass
+  end_access %acc : $*NonSendableKlass
+
+  %r = load [copy] %out : $*NonSendableKlass
+  return %r : $NonSendableKlass // expected-warning 2 {{}} expected-note 2 {{}}
+}
+
+// MARK: howDidBecomeIsolatedTo, two hops — through a named intermediate 'y'.
+sil [ossa] @returned_reach_two_hop : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_sending @inout NonSendableKlass) -> @sil_sending @owned NonSendableKlass {
+bb0(%x : @guaranteed $NonSendableKlass, %out : $*NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+  debug_value %out : $*NonSendableKlass, var, name "out", argno 2, expr op_deref
+
+  %f1 = function_ref @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  // expected-note@+1 2 {{result of 'mergeOne()' is connected to 'x' which is accessible to code in the current isolation context}}
+  %r1 = apply %f1(%x) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass // expected-note 2 {{'y' is connected to result of 'mergeOne()'}}
+  debug_value %y : $NonSendableKlass, let, name "y"
+
+  %c = copy_value %y : $NonSendableKlass
+  %acc = begin_access [modify] [unknown] %out : $*NonSendableKlass
+  store %c to [assign] %acc : $*NonSendableKlass // expected-note 2 {{'out' is connected to 'y'}}
+  end_access %acc : $*NonSendableKlass
+
+  destroy_value %y : $NonSendableKlass
+  %r = load [copy] %out : $*NonSendableKlass
+  return %r : $NonSendableKlass // expected-warning 2 {{}} expected-note 2 {{}}
+}
+
+// MARK: howDidBecomeConnectedTo, one hop — a value distinct from the
+// 'inout sending' parameter is merged into its region and then returned. This is
+// the first coverage anywhere of the connect request from a real emitter. The
+// chain ends on a plain "is connected to": there is no isolated terminus.
+sil [ossa] @returned_connect_one_hop : $@convention(thin) (@owned NonSendableKlass, @sil_sending @inout NonSendableKlass) -> @sil_sending @owned NonSendableKlass {
+bb0(%y : @owned $NonSendableKlass, %out : $*NonSendableKlass):
+  %yv = move_value [lexical] [var_decl] %y : $NonSendableKlass
+  debug_value %yv : $NonSendableKlass, let, name "y"
+  debug_value %out : $*NonSendableKlass, var, name "out", argno 2, expr op_deref
+
+  %c = copy_value %yv : $NonSendableKlass
+  %acc = begin_access [modify] [unknown] %out : $*NonSendableKlass
+  store %c to [assign] %acc : $*NonSendableKlass // expected-note {{'y' is connected to 'out'}}
+  end_access %acc : $*NonSendableKlass
+
+  %r = copy_value %yv : $NonSendableKlass
+  destroy_value %yv : $NonSendableKlass
+  return %r : $NonSendableKlass // expected-warning 2 {{}} expected-note 2 {{}}
+}
+
+// MARK: howDidBecomeConnectedTo, two hops — the returned value reaches the
+// parameter through a named intermediate 'z'.
+sil [ossa] @returned_connect_two_hop : $@convention(thin) (@owned NonSendableKlass, @sil_sending @inout NonSendableKlass) -> @sil_sending @owned NonSendableKlass {
+bb0(%y : @owned $NonSendableKlass, %out : $*NonSendableKlass):
+  %yv = move_value [lexical] [var_decl] %y : $NonSendableKlass
+  debug_value %yv : $NonSendableKlass, let, name "y"
+  debug_value %out : $*NonSendableKlass, var, name "out", argno 2, expr op_deref
+
+  %f1 = function_ref @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %yb = begin_borrow %yv : $NonSendableKlass
+  %r1 = apply %f1(%yb) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'y' is connected to result of 'mergeOne()'}}
+  end_borrow %yb : $NonSendableKlass
+  %z = move_value [lexical] [var_decl] %r1 : $NonSendableKlass // expected-note {{'z' is connected to result of 'mergeOne()'}}
+  debug_value %z : $NonSendableKlass, let, name "z"
+
+  %c = copy_value %z : $NonSendableKlass
+  %acc = begin_access [modify] [unknown] %out : $*NonSendableKlass
+  store %c to [assign] %acc : $*NonSendableKlass // expected-note {{'z' is connected to 'out'}}
+  end_access %acc : $*NonSendableKlass
+
+  destroy_value %z : $NonSendableKlass
+  %r = copy_value %yv : $NonSendableKlass
+  destroy_value %yv : $NonSendableKlass
+  return %r : $NonSendableKlass // expected-warning 2 {{}} expected-note 2 {{}}
+}
+
+// MARK: CFG diamond — only bb1 connects the returned value to the parameter.
+// The note lands there, and bb2's fresh value produces none.
+sil [ossa] @returned_connect_diamond : $@convention(thin) (@owned NonSendableKlass, @sil_sending @inout NonSendableKlass, Builtin.Int1) -> @sil_sending @owned NonSendableKlass {
+bb0(%y : @owned $NonSendableKlass, %out : $*NonSendableKlass, %cond : $Builtin.Int1):
+  %yv = move_value [lexical] [var_decl] %y : $NonSendableKlass
+  debug_value %yv : $NonSendableKlass, let, name "y"
+  debug_value %out : $*NonSendableKlass, var, name "out", argno 2, expr op_deref
+  cond_br %cond, bb1, bb2
+
+// The connecting arm.
+bb1:
+  %c1 = copy_value %yv : $NonSendableKlass
+  %acc1 = begin_access [modify] [unknown] %out : $*NonSendableKlass
+  store %c1 to [assign] %acc1 : $*NonSendableKlass // expected-note {{'y' is connected to 'out'}}
+  end_access %acc1 : $*NonSendableKlass
+  br bb3
+
+// The unrelated arm: a fresh value, which must not be reported.
+bb2:
+  %mk = function_ref @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %yb = begin_borrow %yv : $NonSendableKlass
+  %fresh = apply %mk(%yb) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  end_borrow %yb : $NonSendableKlass
+  destroy_value %fresh : $NonSendableKlass
+  br bb3
+
+bb3:
+  %r = copy_value %yv : $NonSendableKlass
+  destroy_value %yv : $NonSendableKlass
+  return %r : $NonSendableKlass // expected-warning 2 {{}} expected-note 2 {{}}
+}

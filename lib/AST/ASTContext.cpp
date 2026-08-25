@@ -488,6 +488,12 @@ struct ASTContext::Implementation {
   llvm::DenseMap<NormalProtocolConformance *, ::DelayedConformanceDiags>
     DelayedConformanceDiags;
 
+  /// Modules that were never loaded while deserializing a conformance's
+  /// witnesses, keyed by the conforming nominal type. Used to add an
+  /// "add 'import <module>'" note to the later requirement-failure diagnostic.
+  llvm::DenseMap<const NominalTypeDecl *, llvm::SmallSetVector<Identifier, 2>>
+    UnloadedModulesForConformingType;
+
   /// Stores information about lazy deserialization of various declarations.
   llvm::DenseMap<const Decl *, LazyContextData *> LazyContexts;
 
@@ -707,10 +713,10 @@ struct ASTContext::Implementation {
   /// Temporary arena used for a constraint solver.
   struct ConstraintSolverArena : public Arena {
     /// The allocator used for all allocations within this arena.
-    llvm::BumpPtrAllocator &Allocator;
+    ConstraintSolverAllocator &Allocator;
 
-    ConstraintSolverArena(llvm::BumpPtrAllocator &allocator)
-      : Allocator(allocator) { }
+    ConstraintSolverArena(ConstraintSolverAllocator &allocator)
+        : Allocator(allocator) {}
 
     ConstraintSolverArena(const ConstraintSolverArena &) = delete;
     ConstraintSolverArena(ConstraintSolverArena &&) = delete;
@@ -772,10 +778,9 @@ ASTContext::Implementation::~Implementation() {
     cleanup();
 }
 
-ConstraintCheckerArenaRAII::
-ConstraintCheckerArenaRAII(ASTContext &self, llvm::BumpPtrAllocator &allocator)
-  : Self(self), Data(self.getImpl().CurrentConstraintSolverArena.release())
-{
+ConstraintCheckerArenaRAII::ConstraintCheckerArenaRAII(
+    ASTContext &self, ConstraintSolverAllocator &allocator)
+    : Self(self), Data(self.getImpl().CurrentConstraintSolverArena.release()) {
   Self.getImpl().CurrentConstraintSolverArena.reset(
     new ASTContext::Implementation::ConstraintSolverArena(allocator));
 }
@@ -911,7 +916,7 @@ ASTContext::ASTContext(
 
 void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   os << "-------------------------------------------------\n";
-  os << "Arena\t0\t" << Allocator.getBytesAllocated() << "\n";
+  os << "Arena\t0\t" << Allocator.getTotalMemory() << "\n";
   Permanent.dump(os);
 
 #define SIZE(Name) os << #Name << "\t" << Name.size() << "\t0\n"
@@ -929,6 +934,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE_AND_BYTES(ForeignAsyncConventions);
   SIZE_AND_BYTES(AssociativityCache);
   SIZE_AND_BYTES(DelayedConformanceDiags);
+  SIZE_AND_BYTES(UnloadedModulesForConformingType);
   SIZE_AND_BYTES(LazyContexts);
   SIZE_AND_BYTES(ElementSignatures);
   SIZE_AND_BYTES(Overrides);
@@ -1015,7 +1021,7 @@ void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
   Stats = stats;
 
   stats->getFrontendCounters().NumASTBytesAllocated =
-      getAllocator().getBytesAllocated();
+      getAllocator().getTotalMemory();
 
   if (stats->fineGrainedTimers())
     evaluator.setStatsReporter(stats);
@@ -1532,6 +1538,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::TaskExecutor:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::ExecutorFactory:
+  case KnownProtocolKind::Clock:
     M = getLoadedModule(Id_Concurrency);
     break;
   case KnownProtocolKind::DistributedActor:
@@ -3496,6 +3503,19 @@ ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance const* cnfrm){
   return result;
 }
 
+void ASTContext::recordUnloadedModuleForConformingType(
+    const NominalTypeDecl *nominal, Identifier moduleName) {
+  getImpl().UnloadedModulesForConformingType[nominal].insert(moduleName);
+}
+
+ArrayRef<Identifier> ASTContext::getUnloadedModulesForConformingType(
+    const NominalTypeDecl *nominal) const {
+  auto known = getImpl().UnloadedModulesForConformingType.find(nominal);
+  if (known == getImpl().UnloadedModulesForConformingType.end())
+    return {};
+  return known->second.getArrayRef();
+}
+
 size_t ASTContext::getTotalMemory() const {
   size_t Size = sizeof(*this) +
     // LoadedModules ?
@@ -3531,7 +3551,7 @@ size_t ASTContext::getSolverMemory() const {
 
   if (getImpl().CurrentConstraintSolverArena) {
     Size += getImpl().CurrentConstraintSolverArena->getTotalMemory();
-    Size += getImpl().CurrentConstraintSolverArena->Allocator.getBytesAllocated();
+    Size += getImpl().CurrentConstraintSolverArena->Allocator.getTotalMemory();
   }
 
   return Size;
@@ -7650,9 +7670,9 @@ ValueOwnership swift::asValueOwnership(ParameterOwnership o) {
 }
 
 static AvailabilityDomain
-targetAvailabilityDomainForPlatform(PlatformKind platform) {
-  if (platform != PlatformKind::none)
-    return AvailabilityDomain::forPlatform(platform);
+targetAvailabilityDomainForPlatform(std::optional<PlatformKind> platform) {
+  if (platform)
+    return AvailabilityDomain::forPlatform(*platform);
 
   // Fall back to the universal domain for triples without a platform.
   return AvailabilityDomain::forUniversal();

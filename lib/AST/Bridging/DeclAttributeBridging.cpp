@@ -856,6 +856,12 @@ BridgedUnavailableFromAsyncAttr_createParsed(BridgedASTContext cContext,
       cMessage.unbridged(), atLoc, range, /*implicit=*/false);
 }
 
+BridgedUnsafeAttr
+BridgedUnsafeAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                               SourceRange range, bool isAlways) {
+  return new (cContext.unbridged()) UnsafeAttr(atLoc, range, isAlways);
+}
+
 BridgedCalledAttr
 BridgedCalledAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
                                SourceRange range,

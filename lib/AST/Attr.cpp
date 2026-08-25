@@ -22,6 +22,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IndexSubset.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -514,12 +515,18 @@ isShortFormAvailabilityImpliedByOther(SemanticAvailableAttr Attr,
   assert(isShortAvailable(Attr));
 
   auto platform = Attr.getDomain().getPlatformKind();
+  if (!platform)
+    return false;
+
   for (auto other : Others) {
     auto otherPlatform = other.getDomain().getPlatformKind();
     if (platform == otherPlatform)
       continue;
 
-    if (!inheritsAvailabilityFromPlatform(platform, otherPlatform))
+    if (!otherPlatform)
+      continue;
+
+    if (!inheritsAvailabilityFromPlatform(*platform, *otherPlatform))
       continue;
 
     if (Attr.getIntroduced() == other.getIntroduced())
@@ -1086,14 +1093,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Override: {
     if (!Options.IsForSwiftInterface)
       break;
-    // When we are printing Swift interface, we have to skip the override keyword
-    // if the overridden decl is invisible from the interface. Otherwise, an error
-    // will occur while building the Swift module because the overriding decl
-    // doesn't override anything.
-    // We couldn't skip every `override` keywords because they change the
-    // ABI if the overridden decl is also publicly visible.
-    // For public-override-internal case, having `override` doesn't have ABI
-    // implication. Thus we can skip them.
+    // Skip printing 'override' if it would result in a broken swiftinterface.
+    // For example, 'override' should be suppressed if the base decl is internal
+    // or if the base decl is SPI and the public swiftinterface is being
+    // printed.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (auto *BD = VD->getOverriddenDecl()) {
         // If the overridden decl won't be printed, printing override will fail
@@ -1102,7 +1105,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
           return false;
         if (!BD->hasClangNode() &&
             !BD->getFormalAccessScope(VD->getDeclContext(),
-                                      /*treatUsableFromInlineAsPublic*/ true)
+                                      /*treatUsableFromInlineAsPublic=*/true,
+                                      /*ignoreImportAccessLevel=*/true)
                  .isPublicOrPackage()) {
           return false;
         }
@@ -1164,6 +1168,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Export:
   case DeclAttrKind::Optimize:
   case DeclAttrKind::Exclusivity:
+  case DeclAttrKind::Unsafe:
   case DeclAttrKind::NonSendable:
   case DeclAttrKind::ObjCImplementation:
     if (getKind() == DeclAttrKind::Effects &&
@@ -1190,6 +1195,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         Printer << ' ';
         // Add @inlinable
         Printer.printSimpleAttr("inlinable", /*needAt=*/true);
+      } else if (getKind() == DeclAttrKind::Unsafe &&
+                 cast<UnsafeAttr>(this)->isAlways() &&
+                 Options.SuppressUnsafeAlways) {
+        // Older compilers don't understand the argument, and plain '@unsafe'
+        // is the closest approximation they can check.
+        Printer.printSimpleAttr("unsafe", /*needAt=*/true);
       } else {
         Printer.printSimpleAttr(attrName, /*needAt=*/true);
       }
@@ -2040,6 +2051,8 @@ StringRef DeclAttribute::getAttrName() const {
     }
     llvm_unreachable("Invalid optimization kind");
   }
+  case DeclAttrKind::Unsafe:
+    return cast<UnsafeAttr>(this)->isAlways() ? "unsafe(always)" : "unsafe";
   case DeclAttrKind::Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
       case EffectsKind::ReadNone:
@@ -3305,6 +3318,8 @@ CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
     : DeclAttribute(DeclAttrKind::Custom, atLoc, range, implicit),
       typeExpr(type), argList(argList), owner(owner), initContext(initContext) {
   assert(type);
+  if (initContext)
+    initContext->setAttribute(this);
   isArgUnsafeBit = false;
 }
 

@@ -39,7 +39,6 @@ set(swift_runtime_sources
     Borrow.cpp
     BytecodeLayouts.cpp
     Casting.cpp
-    CrashReporter.cpp
     Demangle.cpp
     DynamicCast.cpp
     Enum.cpp
@@ -73,6 +72,7 @@ set(swift_runtime_sources
     Once.cpp
     Paths.cpp
     Portability.cpp
+    Privilege.cpp
     ProtocolConformance.cpp
     RefCount.cpp
     ReflectionMirror.cpp

@@ -496,12 +496,16 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 2,
 
     /// Whether this declaration captures the 'self' param under the same name.
     IsSelfParamCapture : 1,
+
+    /// Whether this declaration represents a `sending` capture i.e.
+    /// `[sending x]` where `x` is this declaration.
+    IsSendingCapture : 1,
 
     /// Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
@@ -1328,6 +1332,11 @@ public:
   /// Query whether this declaration was explicitly declared to be safe or
   /// unsafe.
   ExplicitSafety getExplicitSafety() const;
+
+  /// Whether uses of this declaration must be acknowledged with the 'unsafe'
+  /// keyword even when strict memory safety checking is disabled, i.e. whether
+  /// it was marked '@unsafe(always)'.
+  bool isAlwaysUnsafe() const;
 
 private:
   bool isUnsafeComputed() const {
@@ -3402,6 +3411,15 @@ public:
 
   /// Is this declaration 'final'?
   bool isFinal() const;
+
+  /// True if this declaration should have a non-unique definition based on
+  /// the Embedded Swift linkage model (i.e. its type metadata / code may be
+  /// emitted redundantly in every module that references it, rather than
+  /// having a single unique definition). Returns false outside Embedded Swift.
+  ///
+  /// This is the AST-level source of truth consulted by
+  /// `SILDeclRef::declHasNonUniqueDefinition`.
+  bool hasNonUniqueDefinition() const;
 
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
@@ -6601,7 +6619,7 @@ public:
 
   /// Given that CoroutineAccessors is enabled, is _read/_modify required for
   /// ABI stability?
-  bool requiresCorrespondingUnderscoredCoroutineAccessor(
+  bool requiresCorrespondingLegacyCoroutineAccessor(
       AccessorKind kind, AccessorDecl const *decl = nullptr) const;
 
   /// Does this storage require a 'mutate' accessor in its opaque-accessors set?
@@ -7035,6 +7053,11 @@ public:
   bool isSelfParamCapture() const { return Bits.VarDecl.IsSelfParamCapture; }
   void setIsSelfParamCapture(bool IsSelfParamCapture = true) {
       Bits.VarDecl.IsSelfParamCapture = IsSelfParamCapture;
+  }
+
+  bool isSendingCapture() const { return Bits.VarDecl.IsSendingCapture; }
+  void setIsSendingCapture(bool isSending = true) {
+    Bits.VarDecl.IsSendingCapture = isSending;
   }
 
   /// Check whether this capture of the self param is actor-isolated.
@@ -8585,6 +8608,20 @@ public:
   /// vtable.
   bool needsNewVTableEntry() const;
 
+  /// Whether this is a generic method of a class that Embedded Swift must
+  /// dispatch statically, because it cannot be given a vtable entry.
+  ///
+  /// Embedded Swift has no unspecialized generic code, so a generic method
+  /// cannot appear in a vtable: there is no single implementation to put there.
+  /// Rather than reject such methods outright, they are dispatched statically
+  /// and kept out of the vtable entirely. The type checker makes that sound by
+  /// rejecting the two ways a static dispatch could be wrong -- an `open`
+  /// generic method, which a subclass in another module could override, and an
+  /// `override` of a generic method within this module.
+  ///
+  /// Returns false outside of Embedded Swift.
+  bool mustBeStaticallyDispatchedInEmbedded() const;
+
   /// True if the decl is a method which introduces a new witness table entry.
   bool requiresNewWitnessTableEntry() const {
     return getOverriddenDecls().empty();
@@ -9026,6 +9063,11 @@ class AccessorDecl final : public FuncDecl {
 
   AbstractStorageDecl *Storage;
 
+  /// Whether a yield_once_2 coroutine accessor (yielding borrow/mutate) was
+  /// written by the user with the legacy spelling (_read/_modify).  This
+  /// only affects diagnostics; it has no ABI or type-system effect.
+  bool SpelledWithLegacyCoroutineSyntax = false;
+
   AccessorDecl(SourceLoc declLoc, SourceLoc accessorKeywordLoc,
                AccessorKind accessorKind, AbstractStorageDecl *storage,
                bool async, SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
@@ -9101,6 +9143,23 @@ public:
 
   AccessorKind getAccessorKind() const {
     return AccessorKind(Bits.AccessorDecl.AccessorKind);
+  }
+
+  /// When the CoroutineAccessors feature is enabled, a `_read`/`_modify`
+  /// accessor is represented as a `yielding borrow`/`yielding mutate`
+  /// (yield_once_2) accessor so that it uses the same ABI, remembering here that
+  /// the user wrote the legacy spelling.  This only affects diagnostics.
+  ///
+  /// Rewrites this accessor's kind from the legacy coroutine accessor
+  /// (Read/Modify) to its official counterpart (YieldingBorrow/YieldingMutate),
+  /// recording that it was spelled with the legacy keyword.
+  void changeLegacyCoroutineAccessorToYielding();
+
+  /// Whether this yield_once_2 coroutine accessor was written by the user with
+  /// the `_read`/`_modify` spelling rather than the
+  /// `yielding borrow`/`yielding mutate` spelling.
+  bool isSpelledWithLegacyCoroutineSyntax() const {
+    return SpelledWithLegacyCoroutineSyntax;
   }
 
   bool isGetter() const { return getAccessorKind() == AccessorKind::Get; }
@@ -9524,6 +9583,10 @@ public:
   bool isRequired() const {
     return getAttrs().hasAttribute<RequiredAttr>();
   }
+
+  /// Retrieve the initializer kind if it has been computed, \c nullopt
+  /// otherwise. Should only be used by the ASTDumper.
+  std::optional<CtorInitializerKind> getCachedInitKind() const;
 
   /// Determine the kind of initializer this is.
   CtorInitializerKind getInitKind() const;
@@ -10597,11 +10660,10 @@ public:
 template<typename SpecificDecl>
 ABIRoleInfo(const SpecificDecl *decl) -> ABIRoleInfo<SpecificDecl>;
 
-StringRef
-getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article,
-                             std::optional<bool> underscored = std::nullopt);
+StringRef getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article,
+                             std::optional<bool> legacy = std::nullopt);
 StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind, bool article,
-                                       bool underscored);
+                                       bool legacy);
 
 inline void simple_display(llvm::raw_ostream &out,
                            MemberwiseInitKind initKind) {

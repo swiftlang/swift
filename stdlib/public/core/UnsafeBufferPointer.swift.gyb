@@ -487,11 +487,12 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 }
 
 extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
-  /// Constructs a standalone buffer pointer over the items within the supplied
-  /// range of positions in the memory region addressed by this buffer pointer.
+  /// Constructs a standalone buffer pointer over the elements within the
+  /// supplied range of indices in the memory region addressed by this buffer
+  /// pointer.
   ///
-  /// The returned buffer's first item is always at index 0; unlike buffer
-  /// slices, extracted buffers do not generally share their indices with the
+  /// The returned buffer's first element is always at index 0. Unlike buffer
+  /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
   ///     withUnsafeTemporaryAllocation(of: Int.self, capacity: 5) { buffer in
@@ -507,29 +508,33 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// slicing the buffer then rebasing the resulting buffer slice:
   ///
   ///     let a = buffer.extracting(i ..< j)
-  ///     let b = UnsafeBufferPointer(rebasing: buffer[i ..< j])
+  ///     let b = ${Self}(rebasing: buffer[i ..< j])
   ///     // `a` and `b` are now holding the same buffer
   ///
   /// However, unlike slicing, the `extracting` operation remains available even
   /// if `Element` happens to be noncopyable.
   ///
-  /// - Parameter bounds: A valid range of indices within this buffer.
-  /// - Returns: A new buffer pointer over the items at `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this buffer.
+  /// - Returns: A buffer pointer over the elements within `bounds`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(_ bounds: Range<Int>) -> Self {
-    _precondition(_checkBounds(bounds), "Index out of range")
+    _debugPrecondition(_checkBounds(bounds), "Index out of range")
     guard let start = self.baseAddress else {
       return unsafe Self(start: nil, count: 0)
     }
     return unsafe Self(start: start + bounds.lowerBound, count: bounds.count)
   }
 
-  /// Constructs a standalone buffer pointer over the items within the supplied
-  /// range of positions in the memory region addressed by this buffer pointer.
+  /// Constructs a standalone buffer pointer over the elements within the
+  /// supplied range of indices in the memory region addressed by this buffer
+  /// pointer.
   ///
-  /// The returned buffer's first item is always at index 0; unlike buffer
-  /// slices, extracted buffers do not generally share their indices with the
+  /// The returned buffer's first element is always at index 0. Unlike buffer
+  /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
   ///     withUnsafeTemporaryAllocation(of: Int.self, capacity: 5) { buffer in
@@ -544,69 +549,87 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// When `Element` is copyable, the `extracting` operation is equivalent to
   /// slicing the buffer then rebasing the resulting buffer slice:
   ///
-  ///     let a = buffer.extracting(i ..< j)
-  ///     let b = UnsafeBufferPointer(rebasing: buffer[i ..< j])
+  ///     let a = buffer.extracting(i...)
+  ///     let b = ${Self}(rebasing: buffer[i...])
   ///     // `a` and `b` are now holding the same buffer
   ///
   /// However, unlike slicing, the `extracting` operation remains available even
   /// if `Element` happens to be noncopyable.
   ///
-  /// - Parameter bounds: A valid range of indices within this buffer.
-  /// - Returns: A new buffer pointer over the items at `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this buffer.
+  /// - Returns: A buffer pointer over the elements within `bounds`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(_ bounds: some RangeExpression<Int>) -> Self {
     extracting(bounds.relative(to: unsafe Range(uncheckedBounds: (0, count))))
   }
 
-  /// Extracts and returns a copy of the entire buffer.
+  /// Returns a buffer over all the elements of this buffer.
+  ///
+  /// The returned buffer's first element is always at index 0. Unlike buffer
+  /// slices, extracted buffers do not share their indices with the
+  /// original buffer pointer.
   ///
   /// When `Element` is copyable, the `extracting` operation is equivalent to
   /// slicing the buffer then rebasing the resulting buffer slice:
   ///
   ///     let a = buffer
   ///     let b = buffer.extracting(...)
-  ///     let c = UnsafeBufferPointer(rebasing: buffer[...])
+  ///     let c = ${Self}(rebasing: buffer[...])
   ///     // `a`, `b` and `c` are now all referring to the same buffer
   ///
   /// Note that unlike slicing, the `extracting` operation remains available
   /// even if `Element` happens to be noncopyable.
   ///
   /// - Returns: The same buffer as `self`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(_ bounds: UnboundedRange) -> Self {
     unsafe self
   }
 
-  /// Constructs a standalone buffer pointer over the items within the supplied
-  /// range of positions in the memory region addressed by this buffer pointer.
+  /// Constructs a standalone buffer pointer over the elements within the
+  /// supplied range of indices in the memory region addressed by this buffer
+  /// pointer.
   ///
-  /// The returned buffer's first item is always at index 0; unlike buffer
-  /// slices, extracted buffers do not generally share their indices with the
+  /// The returned buffer's first element is always at index 0. Unlike buffer
+  /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices within this buffer.
-  /// - Returns: A new buffer pointer over the items at `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this buffer.
+  /// - Returns: A buffer pointer over the elements within `bounds`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   public func extracting(unchecked bounds: Range<Int>) -> Self {
+    _internalInvariant(_checkBounds(bounds), "Index out of range")
     let newStart = unsafe _position?.advanced(by: bounds.lowerBound)
     return unsafe Self(start: newStart, count: bounds.count)
   }
 
-  /// Constructs a standalone buffer pointer over the items within the supplied
-  /// range of positions in the memory region addressed by this buffer pointer.
+  /// Constructs a standalone buffer pointer over the elements within the
+  /// supplied range of indices in the memory region addressed by this buffer
+  /// pointer.
   ///
-  /// The returned buffer's first item is always at index 0; unlike buffer
-  /// slices, extracted buffers do not generally share their indices with the
+  /// The returned buffer's first element is always at index 0. Unlike buffer
+  /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices within this buffer.
-  /// - Returns: A new buffer pointer over the items at `bounds`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this buffer.
+  /// - Returns: A buffer pointer over the elements within `bounds`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   public func extracting(unchecked bounds: ClosedRange<Int>) -> Self {
     let range = unsafe Range(
@@ -615,8 +638,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     return unsafe extracting(unchecked: range)
   }
 
-  /// Constructs a standalone buffer pointer over the initial elements of
-  /// this buffer, up to the specified maximum length.
+  /// Returns a buffer pointer containing the initial elements of this buffer,
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this buffer,
   /// the result contains all the elements.
@@ -624,6 +647,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A buffer pointer with at most `maxLength` elements.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(first maxLength: Int) -> Self {
@@ -632,7 +657,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     return unsafe Self(_uncheckedStart: _position, count: newCount)
   }
 
-  /// Returns a buffer pointer over all but the given number of trailing
+  /// Returns a buffer pointer over all but the specified number of trailing
   /// elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
@@ -642,6 +667,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///   `k` must be greater than or equal to zero.
   /// - Returns: A buffer pointer leaving off the specified number of trailing
   ///   elements.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(droppingLast k: Int) -> Self {
@@ -651,14 +678,20 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   }
 
   /// Returns a buffer pointer containing the trailing elements of this buffer,
-  /// up to the given maximum length.
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this buffer,
   /// the result contains all the elements.
   ///
+  /// The returned buffer's first element is always at index 0. Unlike buffer
+  /// slices, extracted buffers do not share their indices with the
+  /// original buffer pointer.
+  ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A buffer pointer with at most `maxLength` elements.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(last maxLength: Int) -> Self {
@@ -668,16 +701,22 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     return unsafe Self(_uncheckedStart: newStart, count: newCount)
   }
 
-  /// Returns a buffer pointer over all but the given number of initial
+  /// Returns a buffer pointer over all but the specified number of initial
   /// elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the buffer, the result is an empty buffer.
   ///
+  /// The returned buffer's first element is always at index 0. Unlike buffer
+  /// slices, extracted buffers do not share their indices with the
+  /// original buffer pointer.
+  ///
   /// - Parameter k: The number of elements to drop from the beginning of the
   ///   buffer. `k` must be greater than or equal to zero.
   /// - Returns: A buffer pointer starting after the specified number of
   ///   elements.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(droppingFirst k: Int) -> Self {
@@ -697,7 +736,8 @@ extension UnsafeMutableBufferPointer where Element: Copyable {
   ///
   /// The `source` buffer must fit entirely in `self`.
   ///
-  /// - Returns: The index after the last item that was initialized in this buffer.
+  /// - Returns: The index after the last element that was initialized in
+  ///   this buffer.
   @export(implementation)
   internal func _initializePrefix(
     copying source: UnsafeBufferPointer<Element>
@@ -1110,7 +1150,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   @inlinable
   @_preInverseGenerics
   public func deallocate() {
-    unsafe _position?.deallocate()
+    unsafe _position?._deallocate(capacity: count)
   }
 }
 

@@ -64,7 +64,7 @@ func deprecatedInRedefinedDomain() { }
 @available(DynamicDomain)
 func availableInDynamicDomain() { }
 
-@available(UnknownDomain) // expected-error {{unrecognized platform name 'UnknownDomain'}}
+@available(UnknownDomain) // expected-error {{cannot find availability domain 'UnknownDomain'}}
 func availableInUnknownDomain() { }
 
 @available(EnabledDomain)

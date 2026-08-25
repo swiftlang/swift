@@ -104,6 +104,7 @@ PROTOCOL(RangeReplaceableCollection)
 PROTOCOL(Executor)
 PROTOCOL(SerialExecutor)
 PROTOCOL(TaskExecutor)
+PROTOCOL(Clock)
 PROTOCOL(GlobalActor)
 PROTOCOL(ExecutorFactory)
 

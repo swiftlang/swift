@@ -49,12 +49,12 @@ let _ = fooCaller(1, 2)
 
 let _ = constantFolded()
 // CHECK-LABEL: sil {{.*}} @$s8MyModule14constantFoldedSiyF
-// CHECK: debug_value undef : $Builtin.Int{{[0-9]+}}, let, name "a"
+// CHECK: debug_value (), let, name "a", type $Int
 // CHECK-SAME: transform {
 // CHECK:   [[LIT1:%[0-9]+]] = integer_literal $Builtin.Int{{[0-9]+}}, 2
 // CHECK:   return [[LIT1]]
 // CHECK: }
-// CHECK: debug_value undef : $Builtin.Int{{[0-9]+}}, let, name "b"
+// CHECK: debug_value (), let, name "b", type $Int
 // CHECK-SAME: transform {
 // CHECK:   [[LIT2:%[0-9]+]] = integer_literal $Builtin.Int{{[0-9]+}}, 3
 // CHECK:   return [[LIT2]]

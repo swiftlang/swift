@@ -16,6 +16,9 @@ open typealias OpenIsNotAllowedOnTypeAliases = Int // expected-error {{only clas
 open struct OpenIsNotAllowedOnStructs {} // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}}
 open enum OpenIsNotAllowedOnEnums_AtLeastNotYet {} // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}}
 
+@available(SwiftStdlib 5.1, *)
+open actor OpenIsNotAllowedOnActor {} // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}}
+
 /**** Open entities are at least public. ****/
 
 func foo(object: ExternalOpenClass) {

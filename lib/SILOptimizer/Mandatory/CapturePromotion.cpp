@@ -1581,8 +1581,8 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   // in debug builds if the sizes ever diverge from this 1:1 invariant.
   auto *newPAI = builder.createPartialApply(
       pai->getLoc(), fnVal, pai->getSubstitutionMap(), args,
-      pai->getCalleeConvention(), pai->getResultIsolation(), pai->isOnStack(),
-      pai->isStackAllocationNested(),
+      pai->getCalleeConvention(), pai->getResultIsolation(),
+      pai->isCalledOnce(), pai->isOnStack(), pai->isStackAllocationNested(),
       /*SpecializationInfo=*/nullptr, ApplySite(pai).getArgumentLocs());
   pai->replaceAllUsesWith(newPAI);
   pai->eraseFromParent();

@@ -1374,23 +1374,40 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   case CaptureKind::Consuming: {
     assert(!isPack);
 
+    auto argIndex = SGF.F.begin()->getNumArguments();
+    auto fnConv = SGF.F.getConventions();
+    bool isIndirect =
+        fnConv.isSILIndirect(fnConv.getParamInfoForSILArg(argIndex));
+    if (isIndirect)
+      ty = ty.getAddressType();
+
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
     fArg->setClosureCapture(true);
     ManagedValue val = SGF.emitManagedRValueWithCleanup(fArg);
 
-    // Sema treats the captured decl as an lvalue since it's `Var`-introduced;
-    // materialize an address for it, moving (not copying) the incoming
-    // owned value in, since it can't be copied.
-    auto addr = SGF.emitTemporary(Loc, lowering);
-    SGF.B.emitStoreValueOperation(Loc, val.forward(SGF), addr->getAddress(),
-                                  StoreOwnershipQualifier::Init);
-    addr->finishInitialization(SGF);
-    val = addr->getManagedAddress();
+    if (isIndirect) {
+      // The incoming address is already an owned, use it directly instead of
+      // materializing and storing into a separate temporary.
+      val = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          Loc, val,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
+    } else {
+      // Sema treats the captured decl as an lvalue since it's `Var`-introduced;
+      // materialize an address for it, moving (not copying) the incoming
+      // owned value in, since it can't be copied.
+      auto addr = SGF.emitTemporary(Loc, lowering);
+      SGF.B.emitStoreValueOperation(Loc, val.forward(SGF), addr->getAddress(),
+                                    StoreOwnershipQualifier::Init);
+      addr->finishInitialization(SGF);
+      val = addr->getManagedAddress();
 
-    val = val.ensurePlusOne(SGF, Loc);
-    val = SGF.B.createMarkUnresolvedNonCopyableValueInst(
-        Loc, val,
-        MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
+      val = val.ensurePlusOne(SGF, Loc);
+      val = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          Loc, val,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
+    }
 
     arg = val.getValue();
     enforcement = SILAccessEnforcement::Unknown;

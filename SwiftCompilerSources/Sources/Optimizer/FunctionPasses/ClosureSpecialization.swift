@@ -247,13 +247,83 @@ private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> 
   //
   specialization.uniqueCaptureArguments(context)
 
-  let specializedFunction = specialization.getOrCreateSpecializedFunction(specializedParameters, context)
+  let (specializedFunction, isNewFunction) = specialization.getOrCreateSpecializedFunction(specializedParameters, context)
 
   specialization.unUniqueCaptureArguments(context)
 
   specialization.rewriteApply(for: specializedFunction, context)
 
   specialization.deleteDeadClosures(context)
+
+  if isNewFunction {
+    /// Further specialization rounds can leave the cloned callee holding a specializable closure and an `apply` which
+    /// takes this closure as an argument. Consider the case when this specializable closure captures an argument from
+    /// the cloned callee, and this argument by itself is a specializable closure constructed in caller and passed to
+    /// the cloned callee as a parameter. Since the applied-check stops at `partial_apply` operands, a closure still
+    /// sitting in the caller (`partial_apply` of `closure0` in example) only becomes specializable once the callee it
+    /// is passed to has itself been specialized deeply enough for that closure to appear transitively full-applied.
+    ///
+    /// We specialze now rather than defer to separate closure specialization run: the caller's specialization loop does
+    /// revisit its apply each round, but unless we mutate the cloned callee now the applied-check still fails and the
+    /// loop makes no progress. So, by the time the closure specialization pass reaches the specialized callee (it's
+    /// added to pass manager worklist via `notifyNewFunction`) and does specialization for it, the caller's specialization
+    /// has already finished and its apply of callee is never revisited at all - stranding the `partial_apply` of `closure0`.
+    ///
+    /// Running `runClosureSpecialization` synchronously on the cloned callee we've just produced fully specializes it
+    /// before the caller's next specialization round, so the caller re-inspects the same apply, now sees `closure0` as
+    /// transitively applied, and specializes it - leaving no `partial_apply` of a specializable closure in the caller.
+    /// This recursion terminates: `runClosureSpecialization` performs at most 5 rounds per function, and
+    /// `findSpecializableClosure` only specializes closures whose callee has `specializationLevel <= 2`.
+    ///
+    /// Round 2 for caller: specialize apply of specialized_callee_r1.
+    ///
+    ///   caller(%0 : Float, %1 : Float) -> Float:
+    ///     %9  = partial_apply @closure0(%0)  : (Float) -> Float
+    ///     return apply @specialized_callee_r2(%1, %9)
+    ///
+    ///   specialized_callee_r2(%0 : Float, %1 : (Float) -> Float) -> Float:
+    ///     %15 = partial_apply @closure1(%1) : (Float) -> Float
+    ///     return apply @closure2(%0, %15)
+    ///
+    /// Recursive round 1 for specialized_callee_r2: specialize apply of closure2.
+    ///
+    ///   specialized_callee_r2(%0 : Float, %1 : (Float) -> Float) -> Float:
+    ///     return apply @specialized_closure2_r1(%0, %1)
+    ///
+    ///   specialized_closure2_r1(%0 : Float, %1 : (Float) -> Float) -> Float:
+    ///     %9 = apply @closure1(%0, %1) // <-- folded from _/ %3 = partial_apply @closure1(%1)
+    ///                                  //                  \ %9 = apply %3(%0)
+    ///     return %9
+    ///
+    /// Now `%9 = partial_apply @closure0(%0)` in caller is recognized as transitively applied in
+    /// `specialized_callee_r2`->`closure1`, making it subject for specialization during the 3rd round.
+    ///
+    /// Round 3 for caller: specialize apply of specialized_callee_r2.
+    ///
+    ///   caller(%0 : Float, %1 : Float) -> Float:
+    ///     return apply @specialized_callee_r3(%1, %0)
+    ///
+    ///   specialized_callee_r3(%0 : Float, %1 : Float) -> Float:
+    ///     %9  = partial_apply @closure0(%1)  : (Float) -> Float
+    ///     return apply @specialized_closure2_r1(%0, %9)
+    ///
+    /// Further specialization rounds of `specialized_callee_r3` and other functions are omitted.
+    /// Final specialization result contains no `partial_apply` left:
+    ///
+    ///   caller(%0 : Float, %1 : Float) -> Float:
+    ///     return apply @specialized_callee_final(%1, %0)
+    ///   specialized_callee_final(%0 : Float, %1 : Float) -> Float:
+    ///     return apply @specialized_closure2_final(%0, %1)
+    ///   specialized_closure2_final(%0 : Float, %1 : Float) -> Float:
+    ///     return apply @specialized_closure1_final(%0, %1)
+    ///   specialized_closure1_final(%0 : Float, %1 : Float) -> Float:
+    ///     return apply @closure0(%0, %1)
+
+    context.buildSpecializedFunction(specializedFunction: specializedFunction) {
+      (specializedFunction, specializedContext) in
+      runClosureSpecialization(function: specializedFunction, context: specializedContext)
+    }
+  }
 
   return true
 }
@@ -293,19 +363,22 @@ private func isCalleeSpecializable(of apply: ApplySite) -> Bool {
 private func analyzeArguments(of apply: ApplySite, _ context: FunctionPassContext) -> SpecializationInfo? {
   var argumentsToSpecialize = [(Operand, Closure)]()
   var rootClosures = [PartialApplyInst]()
+  var capturedDependencies = [CapturedDependency]()
   var rootClosuresAdded = InstructionSet(context)
   defer { rootClosuresAdded.deinitialize() }
 
   for argOp in apply.argumentOperands {
     var visited = ValueSet(context)
     defer { visited.deinitialize() }
-    if let closure = findSpecializableClosure(of: argOp.value, &visited),
+    var argumentDependencies = [CapturedDependency]()
+    if let closure = findSpecializableClosure(of: argOp.value, &visited, &argumentDependencies),
        // Ok, we know that we can perform the optimization but not whether or not the optimization
        // is profitable. Check if the closure is actually called in the callee (or in a function
        // called by the callee). This opens optimization opportunities, like inlining.
        isClosureApplied(apply.calleeArgument(of: argOp, in: apply.referencedFunction!)!)
     {
       argumentsToSpecialize.append((argOp, closure))
+      capturedDependencies.append(contentsOf: argumentDependencies)
       if let partialApply = closure as? PartialApplyInst,
          rootClosuresAdded.insert(partialApply)
       {
@@ -316,11 +389,13 @@ private func analyzeArguments(of apply: ApplySite, _ context: FunctionPassContex
   if argumentsToSpecialize.isEmpty {
     return nil
   }
-  return SpecializationInfo(apply: apply, closureArguments: argumentsToSpecialize, rootClosures: rootClosures)
+  return SpecializationInfo(apply: apply, closureArguments: argumentsToSpecialize, rootClosures: rootClosures,
+                            capturedDependencies: capturedDependencies)
 }
 
 // Walks down the use-def chain of a function argument, recursively, to find a rootClosure.
-private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet) -> Closure? {
+private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet,
+                                      _ capturedDependencies: inout [CapturedDependency]) -> Closure? {
   visited.insert(value)
 
   let specializationLevelLimit = 2
@@ -330,18 +405,23 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
        is ConvertEscapeToNoEscapeInst,
        is MoveValueInst,
        is CopyValueInst:
-    return findSpecializableClosure(of: (value as! UnaryInstruction).operand.value, &visited)
+    return findSpecializableClosure(of: (value as! UnaryInstruction).operand.value, &visited, &capturedDependencies)
 
   case let mdi as MarkDependenceInst:
     guard mdi.value.type.isNoEscapeFunction, mdi.value.type.isThickFunction else {
       return nil
     }
-    guard let operandClosure = findSpecializableClosure(of: mdi.value, &visited) else {
+    guard let operandClosure = findSpecializableClosure(of: mdi.value, &visited, &capturedDependencies) else {
       return nil
     }
-    // Make sure that the mark_dependence's base is part of the use-def chain and will therefore be cloned as well.
+    // A base not in the closure's use-def chain must be a root-closure capture; record it for `uniqueCaptureArguments`.
     if !visited.contains(mdi.base) {
-      return nil
+      guard let rootClosure = operandClosure as? PartialApplyInst,
+            rootClosure.arguments.contains(where: { $0 == mdi.base })
+      else {
+        return nil
+      }
+      capturedDependencies.append((closure: rootClosure, markDependence: mdi))
     }
     return operandClosure
 
@@ -354,10 +434,15 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
     //   %3 = partial_apply %2(%1)      // re-abstraction
     //   apply %f(%3)
     // ```
-    if partialApply.isPartialApplyOfThunk,
-       let argumentClosure = findSpecializableClosure(of: partialApply.arguments[0], &visited)
-    {
-      return argumentClosure
+    if partialApply.isPartialApplyOfThunk {
+      // Keep the recorded dependencies only if the thunk's argument provides the root closure;
+      // otherwise the thunk's partial_apply itself is tried as the root, below.
+      var argumentDependencies = [CapturedDependency]()
+      if let argumentClosure = findSpecializableClosure(of: partialApply.arguments[0], &visited,
+                                                        &argumentDependencies) {
+        capturedDependencies.append(contentsOf: argumentDependencies)
+        return argumentClosure
+      }
     }
     guard let callee = partialApply.referencedFunction,
           !partialApply.hasSubstitutions,
@@ -405,6 +490,9 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
 /// Either a `partial_apply` or a `thin_to_thick_function`
 private typealias Closure = SingleValueInstruction
 
+/// A `mark_dependence` whose base is a root-closure capture, paired with that capturing closure.
+private typealias CapturedDependency = (closure: PartialApplyInst, markDependence: MarkDependenceInst)
+
 /// Information about the function to be specialized and for which closure arguments.
 private struct SpecializationInfo {
 
@@ -427,6 +515,10 @@ private struct SpecializationInfo {
   // appears multiple times in `closureArguments`, it's only added a single time here.
   let rootClosures: [PartialApplyInst]
 
+  // `mark_dependence`s whose base is a root-closure capture. The base is redirected onto the
+  // capture's cast in `uniqueCaptureArguments`.
+  let capturedDependencies: [CapturedDependency]
+
   // The function to specialize
   var callee: Function { apply.referencedFunction! }
 
@@ -434,11 +526,11 @@ private struct SpecializationInfo {
 
   func getOrCreateSpecializedFunction(_ specializedParameters: [ParameterInfo],
                                       _ context: FunctionPassContext
-  ) -> Function {
+  ) -> (Function, isNewFunction: Bool) {
     let specializedFunctionName = getSpecializedFunctionName(context)
 
     if let existingSpecializedFunction = context.lookupFunction(name: specializedFunctionName) {
-      return existingSpecializedFunction
+      return (existingSpecializedFunction, false)
     }
 
     let specializedFunction =
@@ -463,7 +555,7 @@ private struct SpecializationInfo {
 
     context.notifyNewFunction(function: specializedFunction, derivedFrom: callee)
 
-    return specializedFunction
+    return (specializedFunction, true)
   }
 
   private func getSpecializedFunctionName(_ context: FunctionPassContext) -> String {
@@ -590,71 +682,6 @@ private struct SpecializationInfo {
       let clonedRootClosure = cloner.getClonedValue(of: rootClosure) as! PartialApplyInst
       let _ = cloner.context.tryOptimizeApplyOfPartialApply(closure: clonedRootClosure)
     }
-
-    /// Further specialization rounds can leave the cloned callee holding a specializable closure and an `apply` which
-    /// takes this closure as an argument. Consider the case when this specializable closure captures an argument from
-    /// the cloned callee, and this argument by itself is a specializable closure constructed in caller and passed to
-    /// the cloned callee as a parameter. Since the applied-check stops at `partial_apply` operands, a closure still
-    /// sitting in the caller (`partial_apply` of `closure0` in example) only becomes specializable once the callee it
-    /// is passed to has itself been specialized deeply enough for that closure to appear transitively full-applied.
-    ///
-    /// We specialze now rather than defer to separate closure specialization run: the caller's specialization loop does
-    /// revisit its apply each round, but unless we mutate the cloned callee now the applied-check still fails and the
-    /// loop makes no progress. So, by the time the closure specialization pass reaches the specialized callee (it's
-    /// added to pass manager worklist via `notifyNewFunction`) and does specialization for it, the caller's specialization
-    /// has already finished and its apply of callee is never revisited at all - stranding the `partial_apply` of `closure0`.
-    ///
-    /// Running `runClosureSpecialization` synchronously on the cloned callee we've just produced fully specializes it
-    /// before the caller's next specialization round, so the caller re-inspects the same apply, now sees `closure0` as
-    /// transitively applied, and specializes it - leaving no `partial_apply` of a specializable closure in the caller.
-    /// This recursion terminates: `runClosureSpecialization` performs at most 5 rounds per function, and
-    /// `findSpecializableClosure` only specializes closures whose callee has `specializationLevel <= 2`.
-    ///
-    /// Round 2 for caller: specialize apply of specialized_callee_r1.
-    ///
-    ///   caller(%0 : Float, %1 : Float) -> Float:
-    ///     %9  = partial_apply @closure0(%0)  : (Float) -> Float
-    ///     return apply @specialized_callee_r2(%1, %9)
-    ///
-    ///   specialized_callee_r2(%0 : Float, %1 : (Float) -> Float) -> Float:
-    ///     %15 = partial_apply @closure1(%1) : (Float) -> Float
-    ///     return apply @closure2(%0, %15)
-    ///
-    /// Recursive round 1 for specialized_callee_r2: specialize apply of closure2.
-    ///
-    ///   specialized_callee_r2(%0 : Float, %1 : (Float) -> Float) -> Float:
-    ///     return apply @specialized_closure2_r1(%0, %1)
-    ///
-    ///   specialized_closure2_r1(%0 : Float, %1 : (Float) -> Float) -> Float:
-    ///     %9 = apply @closure1(%0, %1) // <-- folded from _/ %3 = partial_apply @closure1(%1)
-    ///                                  //                  \ %9 = apply %3(%0)
-    ///     return %9
-    ///
-    /// Now `%9 = partial_apply @closure0(%0)` in caller is recognized as transitively applied in
-    /// `specialized_callee_r2`->`closure1`, making it subject for specialization during the 3rd round.
-    ///
-    /// Round 3 for caller: specialize apply of specialized_callee_r2.
-    ///
-    ///   caller(%0 : Float, %1 : Float) -> Float:
-    ///     return apply @specialized_callee_r3(%1, %0)
-    ///
-    ///   specialized_callee_r3(%0 : Float, %1 : Float) -> Float:
-    ///     %9  = partial_apply @closure0(%1)  : (Float) -> Float
-    ///     return apply @specialized_closure2_r1(%0, %9)
-    ///
-    /// Further specialization rounds of `specialized_callee_r3` and other functions are omitted.
-    /// Final specialization result contains no `partial_apply` left:
-    ///
-    ///   caller(%0 : Float, %1 : Float) -> Float:
-    ///     return apply @specialized_callee_final(%1, %0)
-    ///   specialized_callee_final(%0 : Float, %1 : Float) -> Float:
-    ///     return apply @specialized_closure2_final(%0, %1)
-    ///   specialized_closure2_final(%0 : Float, %1 : Float) -> Float:
-    ///     return apply @specialized_closure1_final(%0, %1)
-    ///   specialized_closure1_final(%0 : Float, %1 : Float) -> Float:
-    ///     return apply @closure0(%0, %1)
-
-    runClosureSpecialization(function: cloner.targetFunction, context: cloner.context)
   }
 
   private func addFunctionArgumentsWithoutClosures(using cloner: inout Cloner) {
@@ -747,8 +774,16 @@ private struct SpecializationInfo {
     //
     for closure in rootClosures {
       for argOp in closure.argumentOperands {
-        let cast = builder.createUncheckedValueCast(from: argOp.value, to: argOp.value.type)
+        let capturedValue = argOp.value
+        let cast = builder.createUncheckedValueCast(from: capturedValue, to: capturedValue.type)
         argOp.set(to: cast, context)
+
+        // Redirect the mark_dependence base onto the same cast: the cloner only maps the cast to
+        // the capture argument, and a shared base must follow its own closure's capture.
+        for dependency in capturedDependencies
+        where dependency.closure == closure && dependency.markDependence.base == capturedValue {
+          dependency.markDependence.baseOperand.set(to: cast, context)
+        }
       }
     }
   }

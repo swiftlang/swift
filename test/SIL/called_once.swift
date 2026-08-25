@@ -67,37 +67,37 @@ func testCalledInLoop(_ f: @called(once) () -> Void) { // expected-error {{'f' c
   }
 }
 
-func testWrappedInLocalClosure(_ f: @called(once) () -> Void) {
+func testWrappedInLocalClosure(_ f: @escaping @called(once) () -> Void) {
   let g = { @called(once) [f] in f() }
   g() // Ok
 }
 
-func testWrappedInLocalClosureImplicitly(_ f: @called(once) () -> Void) {
+func testWrappedInLocalClosureImplicitly(_ f: @escaping @called(once) () -> Void) {
   let g = { @called(once) in f() }
   g()
 }
 
-func testWrappedInLocalClosureAndReassigned1(_ f: @called(once) () -> Void) {
+func testWrappedInLocalClosureAndReassigned1(_ f: @escaping @called(once) () -> Void) {
   var g = { @called(once) in f() }
   g()
   g = { }
   g()
 }
 
-func testWrappedInLocalClosureAndReassigned2(_ f: @called(once) () -> Void) {
+func testWrappedInLocalClosureAndReassigned2(_ f: @escaping @called(once) () -> Void) {
   let g = { @called(once) in f() }
   f = { }
   g()
 }
 
-func testWrappedInLocalClosureAndReassigned3(_ f: @called(once) () -> Void) {
+func testWrappedInLocalClosureAndReassigned3(_ f: @escaping @called(once) () -> Void) {
   let g = { @called(once) in f() }
   f = { }
   g()
   f()
 }
 
-func testWrappedInLocalClosureAndReassignedMultiConsume(_ f: @called(once) () -> Void) { // expected-error {{'f' consumed more than once}}
+func testWrappedInLocalClosureAndReassignedMultiConsume(_ f: @escaping @called(once) () -> Void) { // expected-error {{'f' consumed more than once}}
   let g = { @called(once) in f() } // expected-note {{consumed here}}
   f() // expected-note {{consumed again here}}
   f = { }
@@ -106,6 +106,10 @@ func testWrappedInLocalClosureAndReassignedMultiConsume(_ f: @called(once) () ->
 }
 
 func passThroughParam(fn: @called(once) () -> Void) {
+  testCallOnce(fn) // Ok
+}
+
+func passThroughEscapingParam(fn: @escaping @called(once) () -> Void) {
   testCallOnce(fn) // Ok
 }
 
@@ -125,7 +129,7 @@ func passThroughClosureOptionalAndUnwrap(fn: consuming (@called(once) () -> Void
   _ = fn
 }
 
-func testEarlyReturnBeforeCall(cond: Bool, _ f: @called(once) () -> Void) {
+func testEarlyReturnBeforeCall(cond: Bool, _ f: @escaping @called(once) () -> Void) {
   if cond { return }
   f()
 }
@@ -148,8 +152,8 @@ func localCaptureThenCall() {
 }
 
 func captureInRegularClosure(
-  f: @called(once) () -> Void,
-  g: @called(once) () -> Void,
+  f: @escaping @called(once) () -> Void,
+  g: @escaping @called(once) () -> Void,
   optF: consuming (@called(once) () -> Void)? = nil
 ) {
   _ = { [f] in f() } // expected-error {{noncopyable 'f' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type}}
@@ -182,7 +186,7 @@ func testSwitchEachCaseCallsOnce(_ x: Int, _ f: @called(once) () -> Void) {
 // Capturing `f` into `a` consumes it right there; calling `f()` again directly
 // afterward must be caught locally, without any interprocedural reasoning
 // about what `a`'s body does with its capture.
-func testParamCaptureThenCallDirectly(f: @called(once) () -> Void) { // expected-error {{'f' consumed more than once}}
+func testParamCaptureThenCallDirectly(f: @escaping @called(once) () -> Void) { // expected-error {{'f' consumed more than once}}
   let a = { @called(once) in f() } // expected-note {{consumed here}}
   f() // expected-note {{consumed again here}}
   a()
@@ -190,7 +194,7 @@ func testParamCaptureThenCallDirectly(f: @called(once) () -> Void) { // expected
 
 // Same value captured by two different `@called(once)` closures without an
 // intervening reassignment - only the first capture may consume it.
-func testCapturedByTwoClosures(_ f: @called(once) () -> Void) { // expected-error {{'f' consumed more than once}}
+func testCapturedByTwoClosures(_ f: @escaping @called(once) () -> Void) { // expected-error {{'f' consumed more than once}}
   let a = { @called(once) in f() } // expected-note {{consumed here}}
   let b = { @called(once) in f() } // expected-note {{consumed again here}}
   a()
@@ -198,7 +202,7 @@ func testCapturedByTwoClosures(_ f: @called(once) () -> Void) { // expected-erro
 }
 
 // ... but capturing into two closures along mutually exclusive paths is fine.
-func testCapturedByTwoClosuresMutuallyExclusive(_ f: @called(once) () -> Void, cond: Bool) {
+func testCapturedByTwoClosuresMutuallyExclusive(_ f: @escaping @called(once) () -> Void, cond: Bool) {
   if cond {
     let a = { @called(once) in f() }
     a()
@@ -210,7 +214,7 @@ func testCapturedByTwoClosuresMutuallyExclusive(_ f: @called(once) () -> Void, c
 
 // A closure capturing multiple independent `@called(once)` values may call
 // each of them once.
-func testClosureCapturesTwoIndependentValues(f: @called(once) () -> Void, g: @called(once) () -> Void) {
+func testClosureCapturesTwoIndependentValues(f: @escaping @called(once) () -> Void, g: @escaping @called(once) () -> Void) {
   let a = { @called(once) in
     f()
     g()
@@ -220,7 +224,7 @@ func testClosureCapturesTwoIndependentValues(f: @called(once) () -> Void, g: @ca
 
 // The "at most once" checking still applies *inside* the closure body to its
 // own captures.
-func testClosureCapturesAndDoubleCallsOneOfThem(f: @called(once) () -> Void, g: @called(once) () -> Void) { // expected-error 2 {{'f' consumed more than once}}
+func testClosureCapturesAndDoubleCallsOneOfThem(f: @escaping @called(once) () -> Void, g: @called(once) () -> Void) { // expected-error 2 {{'f' consumed more than once}}
   let a = { @called(once) in
     f() // expected-note 2 {{consumed here}}
     f() // expected-note 2 {{consumed again here}}
@@ -230,7 +234,7 @@ func testClosureCapturesAndDoubleCallsOneOfThem(f: @called(once) () -> Void, g: 
 
 // A `@called(once)` value can also be captured alongside ordinary (copyable)
 // values without disturbing their capture kind.
-func testMixedCaptureKinds(_ f: @called(once) () -> Void, x: Int) {
+func testMixedCaptureKinds(_ f: @escaping @called(once) () -> Void, x: Int) {
   let g = { @called(once) in
     print(x)
     f()
@@ -240,13 +244,13 @@ func testMixedCaptureKinds(_ f: @called(once) () -> Void, x: Int) {
 
 // Nesting: an outer `@called(once)` closure capturing an inner one that
 // itself captures the original value.
-func testNestedCalledOnceClosures(_ f: @called(once) () -> Void) {
+func testNestedCalledOnceClosures(_ f: @escaping @called(once) () -> Void) {
   let inner = { @called(once) in f() }
   let outer = { @called(once) in inner() }
   outer()
 }
 
-func testNestedCalledOnceClosuresDouble(_ f: @called(once) () -> Void) {
+func testNestedCalledOnceClosuresDouble(_ f: @escaping @called(once) () -> Void) {
   let inner = { @called(once) in f() }
   let outer = { @called(once) in inner() }
   // expected-error@-1 {{'outer' consumed more than once}}
@@ -256,11 +260,11 @@ func testNestedCalledOnceClosuresDouble(_ f: @called(once) () -> Void) {
 
 // Returning a closure that captures a `@called(once)` value: the capture is
 // consumed where the closure literal is formed, not where it's later called.
-func makeWrapper(_ f: @called(once) () -> Void) -> @called(once) () -> Void {
+func makeWrapper(_ f: @escaping @called(once) () -> Void) -> @called(once) () -> Void {
   return { @called(once) in f() }
 }
 
-func testUseWrapper(_ f: @called(once) () -> Void) {
+func testUseWrapper(_ f: @escaping @called(once) () -> Void) {
   let w = makeWrapper(f)
   w()
 }
@@ -268,7 +272,7 @@ func testUseWrapper(_ f: @called(once) () -> Void) {
 // A captured `var` follows the same "consumed at formation" rule as a `let`;
 // reassigning it afterward is ordinary reinitialization, and using the new
 // value again later is fine.
-func testVarCaptureReassignedAfterFormation(_ f: @called(once) () -> Void) {
+func testVarCaptureReassignedAfterFormation(_ f: @escaping @called(once) () -> Void) {
   var f = f
   let g = { @called(once) in f() }
   f = makeClosure()
@@ -278,7 +282,7 @@ func testVarCaptureReassignedAfterFormation(_ f: @called(once) () -> Void) {
 
 // Without the reassignment, using `f` again after it was captured is a
 // double consumption, exactly as it would be for a `let`.
-func testVarCaptureUsedAgainWithoutReassignment(_ f: @called(once) () -> Void) {
+func testVarCaptureUsedAgainWithoutReassignment(_ f: @escaping @called(once) () -> Void) {
   var f = f // expected-warning {{variable 'f' was never mutated; consider changing to 'let' constant}}
   // expected-error@-1 {{'f' consumed more than once}}
   let g = { @called(once) in f() } // expected-note {{consumed here}}
@@ -288,7 +292,7 @@ func testVarCaptureUsedAgainWithoutReassignment(_ f: @called(once) () -> Void) {
 
 // Explicit capture-list renaming (`[g2 = f]`) goes through the same
 // consuming-capture path as a plain `[f]` capture.
-func testCaptureListRename(_ f: @called(once) () -> Void) {
+func testCaptureListRename(_ f: @escaping @called(once) () -> Void) {
   let g = { @called(once) [g2 = f] in g2() }
   g()
 }
@@ -298,7 +302,7 @@ do {
   struct S1: ~Copyable {
     let operation: @called(once) () -> Void
     
-    init(operation: @called(once) () -> Void) {
+    init(operation: @escaping @called(once) () -> Void) {
       // okay; the parameter is implicitly 'consuming'
       self.operation = operation
     }
@@ -311,7 +315,7 @@ do {
   struct S2: ~Copyable {
     let operation: @called(once) () -> Void
     
-    init(operation: @called(once) () -> Void) {
+    init(operation: @escaping @called(once) () -> Void) {
       self.operation = operation
     }
 

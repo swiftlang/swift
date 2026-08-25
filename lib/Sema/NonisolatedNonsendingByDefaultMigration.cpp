@@ -66,15 +66,13 @@ static bool isSwiftTestingTestFunction(ValueDecl *decl) {
   if (!isa<FuncDecl>(decl))
     return false;
 
-  return llvm::any_of(decl->getAttrs(), [](DeclAttribute *attr) {
-    auto customAttr = dyn_cast<CustomAttr>(attr);
-    if (!customAttr)
-      return false;
-
-    auto *macro = customAttr->getResolvedMacro();
-    return macro && macro->getBaseIdentifier().is("Test") &&
-           macro->getParentModule()->getName().is("Testing");
-  });
+  return llvm::any_of(
+      decl->getAttrs().getAttributes<CustomAttr>(),
+      [](const CustomAttr *customAttr) {
+        auto *macro = customAttr->getResolvedMacro();
+        return macro && macro->getBaseIdentifier().is("Test") &&
+               macro->getParentModule()->getName().is("Testing");
+      });
 }
 
 } // end anonymous namespace

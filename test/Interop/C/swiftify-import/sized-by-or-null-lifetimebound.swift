@@ -103,7 +103,7 @@ const void * __sized_by_or_null(len - offset) complexExpr(int len, int offset, i
 // }}
 const void * __sized_by_or_null(len) _Null_unspecified nullUnspecified(int len, int len2, const void * _Null_unspecified p __sized_by_or_null(len2) __lifetimebound);
 
-// expected-experimental-warning@+14{{combining '__sized_by_or_null' and '_Nonnull'; did you mean '__sized_by' instead?}}
+// expected-experimental-warning@+14 2 {{combining '__sized_by_or_null' and '_Nonnull'; did you mean '__sized_by' instead?}}
 // expected-experimental-expansion@+13:97{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func nonnull(_ len: CInt, _ p: RawSpan) -> RawSpan {|}}

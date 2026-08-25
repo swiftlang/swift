@@ -21,12 +21,14 @@
 #define SWIFT_INITIALIZER_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/Basic/Assertions.h"
 
 namespace llvm {
 class raw_ostream;
 }
 
 namespace swift {
+class CustomAttr;
 class ParamDecl;
 class PatternBindingDecl;
 
@@ -192,6 +194,15 @@ public:
 /// An expression within a custom attribute. The parent context is the
 /// context in which the attributed declaration occurs.
 class CustomAttributeInitializer : public Initializer {
+  CustomAttr *Attribute = nullptr;
+
+  friend class CustomAttr;
+  void setAttribute(CustomAttr *attribute) {
+    ASSERT(attribute);
+    ASSERT(!Attribute && "Cannot change the attribute after the fact");
+    Attribute = attribute;
+  }
+
 public:
   explicit CustomAttributeInitializer(DeclContext *parent)
       : Initializer(InitializerKind::CustomAttribute, parent) {}
@@ -202,6 +213,11 @@ public:
 
   void setEnclosingInitializer(Initializer *newParent) {
     setParent(newParent);
+  }
+
+  CustomAttr *getAttribute() const {
+    ASSERT(Attribute && "Initializer is not attached to an attribute");
+    return Attribute;
   }
 
   static bool classof(const DeclContext *DC) {

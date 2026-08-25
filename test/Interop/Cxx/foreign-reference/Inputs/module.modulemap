@@ -144,3 +144,13 @@ module VirtualMethodAttrs {
   header "virtual-methods-attrs.h"
   requires cplusplus
 }
+
+module InheritedGenericArgument {
+  header "inherited-generic-argument.h"
+  requires cplusplus
+}
+
+module LibkernOwnership {
+  header "libkern-ownership.hpp"
+  requires cplusplus
+}

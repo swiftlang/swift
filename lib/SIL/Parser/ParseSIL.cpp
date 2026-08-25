@@ -3689,15 +3689,33 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
 
     SILBasicBlock *DebugBB = nullptr;
-    if (parseTypedValueRef(Val, B) || parseSILDebugVar(VarInfo) ||
+
+    // Parse operands: either a single typed value or a parenthesized list.
+    SmallVector<SILValue, 4> Operands;
+    if (P.Tok.is(tok::l_paren)) {
+      P.consumeToken(tok::l_paren);
+      if (!P.Tok.is(tok::r_paren)) {
+        do {
+          SILValue Operand;
+          if (parseTypedValueRef(Operand, B))
+            return true;
+          Operands.push_back(Operand);
+        } while (P.consumeIf(tok::comma));
+      }
+      if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+        return true;
+    } else {
+      if (parseTypedValueRef(Val, B))
+        return true;
+      Operands.push_back(Val);
+    }
+
+    if (parseSILDebugVar(VarInfo) ||
         parseSILDebugTransformBlock(DebugBB, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    if (Val->getType().isMoveOnly())
-      usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
-
-    ResultVal = B.createDebugValue(InstLoc, Val, VarInfo,
+    ResultVal = B.createDebugValue(InstLoc, Operands, VarInfo,
                                    usesMoveableValueDebugInfo, hasTrace);
 
     if (DebugBB)
@@ -7114,6 +7132,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   auto PartialApplyIsolation = SILFunctionTypeIsolation::forUnknown();
   ApplyOptions ApplyOpts;
   bool IsNoEscape = false;
+  bool IsCalledOnce = false;
 
   StringRef AttrName;
   SourceLoc AttrLoc;
@@ -7163,6 +7182,12 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     if (AttrName == "non_nested") {
       assert(!bool(AttrValue));
       isNested = StackAllocationIsNotNested;
+      continue;
+    }
+
+    if (AttrName == "called_once") {
+      assert(!bool(AttrValue));
+      IsCalledOnce = true;
       continue;
     }
 
@@ -7348,7 +7373,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = B.createPartialApply(
         InstLoc, FnVal, subs, Args, PartialApplyConvention,
-        PartialApplyIsolation,
+        PartialApplyIsolation, IsCalledOnce,
         IsNoEscape ? PartialApplyInst::OnStackKind::OnStack
                    : PartialApplyInst::OnStackKind::NotOnStack,
         isNested ? *isNested : StackAllocationIsNested);
@@ -8208,27 +8233,37 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
                            nullptr, moveOnlyDeinitTableState, M))
     return true;
 
-  // Parse the class name.
-  Identifier name;
-  SourceLoc loc;
-  if (moveOnlyDeinitTableState.parseSILIdentifier(
-          name, loc, diag::expected_sil_value_name))
-    return true;
+  // Parse the nominal type name, or the type of a specialized deinit.
+  NominalTypeDecl *theNominalDecl = nullptr;
+  SILType specializedNominalTy;
+  if (parser.Tok.is(tok::sil_dollar)) {
+    if (SILParser(parser).parseSILType(specializedNominalTy))
+      return true;
+    theNominalDecl = specializedNominalTy.getNominalOrBoundGenericNominal();
+    if (!theNominalDecl)
+      return true;
+  } else {
+    Identifier name;
+    SourceLoc loc;
+    if (moveOnlyDeinitTableState.parseSILIdentifier(
+            name, loc, diag::expected_sil_value_name))
+      return true;
 
-  // Find the nominal decl.
-  llvm::PointerUnion<ValueDecl *, ModuleDecl *> res =
-      lookupTopDecl(parser, name, /*typeLookup=*/true);
-  assert(isa<ValueDecl *>(res) && "Class Nominal-up should return a Decl");
-  ValueDecl *varDecl = cast<ValueDecl *>(res);
-  if (!varDecl) {
-    parser.diagnose(loc, diag::sil_moveonlydeinit_nominal_not_found, name);
-    return true;
-  }
+    // Find the nominal decl.
+    llvm::PointerUnion<ValueDecl *, ModuleDecl *> res =
+        lookupTopDecl(parser, name, /*typeLookup=*/true);
+    assert(isa<ValueDecl *>(res) && "Class Nominal-up should return a Decl");
+    ValueDecl *varDecl = cast<ValueDecl *>(res);
+    if (!varDecl) {
+      parser.diagnose(loc, diag::sil_moveonlydeinit_nominal_not_found, name);
+      return true;
+    }
 
-  auto *theNominalDecl = dyn_cast<NominalTypeDecl>(varDecl);
-  if (!theNominalDecl) {
-    parser.diagnose(loc, diag::sil_moveonlydeinit_nominal_not_found, name);
-    return true;
+    theNominalDecl = dyn_cast<NominalTypeDecl>(varDecl);
+    if (!theNominalDecl) {
+      parser.diagnose(loc, diag::sil_moveonlydeinit_nominal_not_found, name);
+      return true;
+    }
   }
 
   SourceLoc lBraceLoc = parser.Tok.getLoc();
@@ -8261,7 +8296,8 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
   parser.parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                             lBraceLoc);
 
-  SILMoveOnlyDeinit::create(M, theNominalDecl, Serialized, func);
+  SILMoveOnlyDeinit::create(M, theNominalDecl, specializedNominalTy, Serialized,
+                            func);
   return false;
 }
 

@@ -83,6 +83,10 @@ list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature"
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "Extern")
 
+if(SWIFT_STDLIB_ENABLE_LAZY_LINK)
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-DSWIFT_STDLIB_ENABLE_LAZY_LINK")
+endif()
+
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
 
@@ -102,6 +106,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   TaskStatus.cpp
   TaskGroup.cpp
   TaskLocal.cpp
+  TaskRegistry.cpp
   ThreadingError.cpp
   TracingSignpost.cpp
   AsyncStream.cpp
@@ -142,7 +147,9 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Task.swift
   Task+PriorityEscalation.swift
   Task+TaskExecutor.swift
+  Task+Deadline.swift
   TaskCancellation.swift
+  TaskCancellationScope.swift
   TaskGroup.swift
   DiscardingTaskGroup.swift
   TaskLocal.swift

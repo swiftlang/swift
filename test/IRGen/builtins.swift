@@ -696,11 +696,11 @@ func zeroInitializerEmpty() {
 // isUnique variants
 // ----------------------------------------------------------------------------
 
-// CHECK: define hidden {{.*}}void @"$s8builtins26acceptsBuiltinNativeObjectyyBoSgzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define hidden {{.*}}void @"$s8builtins26acceptsBuiltinNativeObjectyyBoSgzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 func acceptsBuiltinNativeObject(_ ref: inout Builtin.NativeObject?) {}
 
 // native
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BoSgzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BoSgzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD_RC:.+]] = load ptr, ptr %0
 // CHECK-NEXT: %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_native(ptr %[[LD_RC]])
@@ -710,7 +710,7 @@ func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
 }
 
 // native nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BozF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BozF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD_RC:.+]] = load ptr, ptr %0
 // CHECK:      %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr %[[LD_RC]])
@@ -719,11 +719,11 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
-// CHECK: define hidden {{.*}}void @"$s8builtins16acceptsAnyObjectyyyXlSgzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define hidden {{.*}}void @"$s8builtins16acceptsAnyObjectyyyXlSgzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 func acceptsAnyObject(_ ref: inout Builtin.AnyObject?) {}
 
 // ObjC
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      [[ADDR:%.+]] = getelementptr inbounds{{.*}} [[OPTIONAL_ANYOBJECT_TY:%.*]], ptr %0, i32 0, i32 0
 // CHECK-NEXT: [[REF:%.+]] = load ptr, ptr [[ADDR]]
@@ -736,7 +736,7 @@ func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
 
 // ObjC nonNull
 // CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlzF"
-// CHECK-SAME:    (ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-SAME:    (ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      [[ADDR:%.+]] = getelementptr inbounds{{.*}} %AnyObject, ptr %0, i32 0, i32 0
 // CHECK:      [[REF:%.+]] = load ptr, ptr [[ADDR]]
@@ -748,7 +748,7 @@ func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
 }
 
 // BridgeObject nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BbzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BbzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD:.+]] = load ptr, ptr %0
 // CHECK:      %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull_bridgeObject(ptr %[[LD]])
@@ -764,7 +764,7 @@ func assumeTrue(_ x: Builtin.Int1) {
   Builtin.assume_Int1(x)
 }
 // BridgeObject nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins15isUnique_nativeyBi1_BbzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins15isUnique_nativeyBi1_BbzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD:.+]] = load ptr, ptr %0
 // CHECK-NEXT: %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr %[[LD]])
@@ -774,7 +774,7 @@ func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
 }
 
 // ImplicitlyUnwrappedOptional argument to isUnique.
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins11isUniqueIUOyBi1_BoSgzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins11isUniqueIUOyBi1_BoSgzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK: call zeroext i1 @swift_isUniquelyReferenced_native(ptr
 // CHECK: ret i1
@@ -912,7 +912,7 @@ func getEnumTag<T>(_ x: T) -> UInt32 {
   UInt32(Builtin.getEnumTag(x))
 }
 
-// CHECK-LABEL: define {{.*}} swiftcc void @"$s8builtins13injectEnumTag_3tagyxz_s6UInt32VtlF"(ptr %0, i32 %1, ptr %T)
+// CHECK-LABEL: define {{.*}} swiftcc void @"$s8builtins13injectEnumTag_3tagyxz_s6UInt32VtlF"(ptr noalias %0, i32 %1, ptr %T)
 // CHECK: %DestructiveInjectEnumTag = load ptr, ptr {{%.*}}
 // CHECK: call void %DestructiveInjectEnumTag(ptr {{.*}} %0, i32 %1, ptr %T)
 func injectEnumTag<T>(_ x: inout T, tag: UInt32) {

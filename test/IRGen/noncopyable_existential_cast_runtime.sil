@@ -1,0 +1,142 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -g -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+
+// TODO: Remove this as soon as we can get all of this working
+// under -O
+// REQUIRES: swift_test_mode_optimize_none
+
+// Regression test for taking a noncopyable payload out of an opaque
+// existential during a checked cast. Written as hand-authored canonical SIL
+// (bypassing Sema/SILGen) so it can validate the runtime/IRGen behavior
+// independently of the (currently separate, WIP) SILGen support for
+// `as?`/`as!`/`is` on noncopyable existentials.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import PrintShims
+
+sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
+
+protocol P: ~Copyable {}
+
+// Small enough to be stored inline in the opaque existential container.
+struct Small: ~Copyable, P {
+  var tag: Int64
+}
+sil_witness_table Small: P module main {}
+
+// Large enough to force the opaque existential to box the payload
+// out-of-line.
+struct Big: ~Copyable, P {
+  var tag: Int64
+  var pad0, pad1, pad2, pad4, pad5, pad6, pad7: Int64
+}
+sil_witness_table Big: P module main {}
+
+// An unrelated conformer, used to exercise the cast-failure path.
+struct Unrelated: ~Copyable, P {}
+sil_witness_table Unrelated: P module main {}
+
+sil hidden [ossa] @castSmall : $@convention(thin) (@in any P & ~Copyable) -> () {
+bb0(%0 : $*any P & ~Copyable):
+  %dest = alloc_stack $Small
+  checked_cast_addr_br take_always any P & ~Copyable in %0 to Small in %dest, bb1, bb2
+
+bb1:
+  %tagAddr = struct_element_addr %dest : $*Small, #Small.tag
+  %tag = load [trivial] %tagAddr : $*Int64
+  destroy_addr %dest : $*Small
+  br bb3(%tag : $Int64)
+
+bb2:
+  %neg1 = integer_literal $Builtin.Int64, -1
+  %neg1v = struct $Int64 (%neg1 : $Builtin.Int64)
+  br bb3(%neg1v : $Int64)
+
+bb3(%result : $Int64):
+  dealloc_stack %dest : $*Small
+  %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
+  apply %printInt64(%result) : $@convention(thin) (Int64) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+sil hidden [ossa] @castBig : $@convention(thin) (@in any P & ~Copyable) -> () {
+bb0(%0 : $*any P & ~Copyable):
+  %dest = alloc_stack $Big
+  checked_cast_addr_br take_always any P & ~Copyable in %0 to Big in %dest, bb1, bb2
+
+bb1:
+  %tagAddr = struct_element_addr %dest : $*Big, #Big.tag
+  %tag = load [trivial] %tagAddr : $*Int64
+  destroy_addr %dest : $*Big
+  br bb3(%tag : $Int64)
+
+bb2:
+  %neg1 = integer_literal $Builtin.Int64, -1
+  %neg1v = struct $Int64 (%neg1 : $Builtin.Int64)
+  br bb3(%neg1v : $Int64)
+
+bb3(%result : $Int64):
+  dealloc_stack %dest : $*Big
+  %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
+  apply %printInt64(%result) : $@convention(thin) (Int64) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+sil [ossa] @main : $@convention(c) () -> Int32 {
+bb0:
+  %castSmall = function_ref @castSmall : $@convention(thin) (@in any P & ~Copyable) -> ()
+  %castBig = function_ref @castBig : $@convention(thin) (@in any P & ~Copyable) -> ()
+
+  // Small, matching type: CHECK: 42
+  %small42Box = alloc_stack $any P & ~Copyable
+  %small42Payload = init_existential_addr %small42Box : $*any P & ~Copyable, $Small
+  %small42TagLit = integer_literal $Builtin.Int64, 42
+  %small42Tag = struct $Int64 (%small42TagLit : $Builtin.Int64)
+  %small42 = struct $Small (%small42Tag : $Int64)
+  store %small42 to [init] %small42Payload : $*Small
+  apply %castSmall(%small42Box) : $@convention(thin) (@in any P & ~Copyable) -> ()
+  dealloc_stack %small42Box : $*any P & ~Copyable
+
+  // Small, mismatched type: CHECK: -1
+  %smallFailBox = alloc_stack $any P & ~Copyable
+  %smallFailPayload = init_existential_addr %smallFailBox : $*any P & ~Copyable, $Unrelated
+  %smallFail = struct $Unrelated ()
+  store %smallFail to [init] %smallFailPayload : $*Unrelated
+  apply %castSmall(%smallFailBox) : $@convention(thin) (@in any P & ~Copyable) -> ()
+  dealloc_stack %smallFailBox : $*any P & ~Copyable
+
+  // Boxed (out-of-line), matching type: CHECK: 99
+  %bigBox = alloc_stack $any P & ~Copyable
+  %bigPayload = init_existential_addr %bigBox : $*any P & ~Copyable, $Big
+  %bigTagLit = integer_literal $Builtin.Int64, 99
+  %bigTag = struct $Int64 (%bigTagLit : $Builtin.Int64)
+  %zeroLit = integer_literal $Builtin.Int64, 0
+  %zero = struct $Int64 (%zeroLit : $Builtin.Int64)
+  %big = struct $Big (%bigTag : $Int64, %zero : $Int64, %zero : $Int64, %zero : $Int64, %zero : $Int64, %zero : $Int64, %zero : $Int64, %zero : $Int64)
+  store %big to [init] %bigPayload : $*Big
+  apply %castBig(%bigBox) : $@convention(thin) (@in any P & ~Copyable) -> ()
+  dealloc_stack %bigBox : $*any P & ~Copyable
+
+  // Boxed (out-of-line), mismatched type: CHECK: -1
+  %bigFailBox = alloc_stack $any P & ~Copyable
+  %bigFailPayload = init_existential_addr %bigFailBox : $*any P & ~Copyable, $Unrelated
+  %bigFail = struct $Unrelated ()
+  store %bigFail to [init] %bigFailPayload : $*Unrelated
+  apply %castBig(%bigFailBox) : $@convention(thin) (@in any P & ~Copyable) -> ()
+  dealloc_stack %bigFailBox : $*any P & ~Copyable
+
+  %zero32 = integer_literal $Builtin.Int32, 0
+  %ret = struct $Int32 (%zero32 : $Builtin.Int32)
+  return %ret : $Int32
+}

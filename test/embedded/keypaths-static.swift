@@ -10,13 +10,12 @@
 //   * computed properties on structs (get-only and settable mutating)
 //   * class ivar (emitted as computed settable_property in SIL)
 
-// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -enable-experimental-feature KeyPathWithMethodMembers -wmo -o - | %FileCheck -check-prefix=CHECK-IR %s
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -enable-experimental-feature KeyPathWithMethodMembers -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck -check-prefix=CHECK-OUT %s
+// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -enable-experimental-feature KeyPathWithMethodMembers -wmo -o - | %FileCheck -check-prefix=CHECK-IR %s
+// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -enable-experimental-feature KeyPathWithMethodMembers -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck -check-prefix=CHECK-OUT %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
@@ -156,57 +155,60 @@ public func kpMethod() -> KeyPath<HasMethod, () -> Int> {
 // Buffer header 0xA0000004 = -1610612732 (trivial + singleComponent + size=4)
 // Comp   header 0x01800004 =    25165828 (structTag + mutable + offset=4)
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, i32, [4 x i8], i32 } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCy4main1SVs5Int32VGMf"{{.*}}, i64 -1 }, i32 -1610612732, [4 x i8] zeroinitializer, i32 25165828 }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32 } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCy4main1SVs5Int32VGMf"{{.*}}, i64 -1 }, ptr inttoptr (i64 -5 to ptr), i32 -1610612732, [4 x i8] zeroinitializer, i32 25165828 }
 
 //
 // `\SLet.b` — let struct field at offset 4 → KeyPath (read-only).
 // Buffer header 0xA0000004 = -1610612732
 // Comp   header 0x01000004 =    16777220 (structTag + offset=4, no mutable bit)
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, i32, [4 x i8], i32 } { %swift.refcounted { ptr {{.*}}"$es7KeyPathCy4main4SLetVs5Int32VGMf"{{.*}}, i64 -1 }, i32 -1610612732, [4 x i8] zeroinitializer, i32 16777220 }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32 } { %swift.refcounted { ptr {{.*}}"$es7KeyPathCy4main4SLetVs5Int32VGMf"{{.*}}, i64 -1 }, ptr inttoptr (i64 -5 to ptr), i32 -1610612732, [4 x i8] zeroinitializer, i32 16777220 }
 
 //
 // `\Box<Int>.value` — specialization of generic `\Box<T>.value`
 // (T = Int → offset 0 in the specialized layout).
 // Comp header 0x01800000 = 25165824 (structTag + mutable + offset=0)
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, i32, [4 x i8], i32 } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCy4main3BoxVySiGSiGMf"{{.*}}, i64 -1 }, i32 -1610612732, [4 x i8] zeroinitializer, i32 25165824 }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32 } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCy4main3BoxVySiGSiGMf"{{.*}}, i64 -1 }, ptr inttoptr (i64 -1 to ptr), i32 -1610612732, [4 x i8] zeroinitializer, i32 25165824 }
 
 //
 // `\Int.self` — identity: no component, so no IsSingleComponent flag and
 // size=0 in the buffer header.
 // Buffer header 0x80000000 = -2147483648 (trivial only)
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, i32, [4 x i8] } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCyS2iGMf"{{.*}}, i64 -1 }, i32 -2147483648, [4 x i8] zeroinitializer }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8] } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCyS2iGMf"{{.*}}, i64 -1 }, ptr inttoptr (i64 -1 to ptr), i32 -2147483648, [4 x i8] zeroinitializer }
 
 //
 // `\Pair.0` — tuple element at offset 0 → WritableKeyPath, structTag +
 // mutable + offset=0 → 0x01800000.
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, i32, [4 x i8], i32 } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCys5Int32V_s5Int64VtADGMf"{{.*}}, i64 -1 }, i32 -1610612732, [4 x i8] zeroinitializer, i32 25165824 }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32 } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCys5Int32V_s5Int64VtADGMf"{{.*}}, i64 -1 }, ptr inttoptr (i64 -1 to ptr), i32 -1610612732, [4 x i8] zeroinitializer, i32 25165824 }
 
 //
 // `\Pair.1` — tuple element at offset 8 (Int32 then Int64 aligned) →
 // WritableKeyPath, structTag + mutable + offset=8 → 0x01800008 = 25165832.
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, i32, [4 x i8], i32 } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCys5Int32V_s5Int64VtAFGMf"{{.*}}, i64 -1 }, i32 -1610612732, [4 x i8] zeroinitializer, i32 25165832 }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32 } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCys5Int32V_s5Int64VtAFGMf"{{.*}}, i64 -1 }, ptr inttoptr (i64 -9 to ptr), i32 -1610612732, [4 x i8] zeroinitializer, i32 25165832 }
 
 //
 // `\Cell.value` — class settable computed → ReferenceWritableKeyPath.
 // Buffer size = 4 (comp header) + 4 (skew) + 8 (id) + 8 (getter) + 8 (setter) = 32.
 // Buffer header 0xA0000020 = -1610612704 (trivial + singleComponent + size=32).
 // Comp   header 0x02400000 = 37748736 (computedTag + settable, non-mutating).
-// The id field is the raw getter pointer; the getter and setter fields are
+// The id field is the component's identity: the getter *method* for a struct
+// member, or the key path accessor thunk when the identity would otherwise
+// require a method descriptor (which Embedded Swift does not emit) -- see
+// `\Cell.value` above. The getter and setter fields are
 // (address-discriminated) ptr-auth-signed on arm64e — the layout still
 // contains three ptr slots regardless.
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, i32, [4 x i8], i32, [4 x i8], ptr, ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es24ReferenceWritableKeyPathCy4main4CellCs5Int32VGMf"{{.*}}, i64 -1 }, i32 -1610612704, [4 x i8] zeroinitializer, i32 37748736, [4 x i8] zeroinitializer, ptr @"$e4main4CellC5values5Int32VvpACTK", ptr @"$e4main4CellC5values5Int32VvpACTK", ptr @"$e4main4CellC5values5Int32VvpACTk" }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32, [4 x i8], ptr, ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es24ReferenceWritableKeyPathCy4main4CellCs5Int32VGMf"{{.*}}, i64 -1 }, ptr null, i32 -1610612704, [4 x i8] zeroinitializer, i32 37748736, [4 x i8] zeroinitializer, ptr @"$e4main4CellC5values5Int32VvpACTK", ptr @"$e4main4CellC5values5Int32VvpACTK", ptr @"$e4main4CellC5values5Int32VvpACTk" }
 
 //
 // `\Wrap.doubled` — struct settable mutating computed → WritableKeyPath.
 // Comp header 0x02C00000 = 46137344 (computedTag + settable + mutating).
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, i32, [4 x i8], i32, [4 x i8], ptr, ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCy4main4WrapVs5Int32VGMf"{{.*}}, i64 -1 }, i32 -1610612704, [4 x i8] zeroinitializer, i32 46137344, [4 x i8] zeroinitializer, ptr @"$e4main4WrapV7doubleds5Int32VvpACTK", ptr @"$e4main4WrapV7doubleds5Int32VvpACTK", ptr @"$e4main4WrapV7doubleds5Int32VvpACTk" }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32, [4 x i8], ptr, ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCy4main4WrapVs5Int32VGMf"{{.*}}, i64 -1 }, ptr null, i32 -1610612704, [4 x i8] zeroinitializer, i32 46137344, [4 x i8] zeroinitializer, ptr @"$e4main4WrapV7doubleds5Int32Vvg", ptr @"$e4main4WrapV7doubleds5Int32VvpACTK", ptr @"$e4main4WrapV7doubleds5Int32VvpACTk" }
 
 //
 // `\Ro.v` — get-only struct computed → KeyPath.
@@ -215,13 +217,13 @@ public func kpMethod() -> KeyPath<HasMethod, () -> Int> {
 // Comp   header 0x02000000 = 33554432 (computedTag + getOnly).  Only two ptr
 // slots (id, getter) — no setter.
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, i32, [4 x i8], i32, [4 x i8], ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es7KeyPathCy4main2RoVs5Int32VGMf"{{.*}}, i64 -1 }, i32 -1610612712, [4 x i8] zeroinitializer, i32 33554432, [4 x i8] zeroinitializer, ptr @"$e4main2RoV1vs5Int32VvpACTK", ptr @"$e4main2RoV1vs5Int32VvpACTK" }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32, [4 x i8], ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es7KeyPathCy4main2RoVs5Int32VGMf"{{.*}}, i64 -1 }, ptr null, i32 -1610612712, [4 x i8] zeroinitializer, i32 33554432, [4 x i8] zeroinitializer, ptr @"$e4main2RoV1vs5Int32Vvg", ptr @"$e4main2RoV1vs5Int32VvpACTK" }
 
 //
 // `\HasMethod.doThing` — instance method → same shape as a get-only
 // computed component (no setter), value type is `() -> Int`.
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, i32, [4 x i8], i32, [4 x i8], ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es7KeyPathCy4main9HasMethodVSiycGMf"{{.*}}, i64 -1 }, i32 -1610612712, [4 x i8] zeroinitializer, i32 33554432, [4 x i8] zeroinitializer, ptr @"$e4main9HasMethodV7doThingSiyFACTkmu", ptr @"$e4main9HasMethodV7doThingSiyFACTkmu" }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32, [4 x i8], ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es7KeyPathCy4main9HasMethodVSiycGMf"{{.*}}, i64 -1 }, ptr null, i32 -1610612712, [4 x i8] zeroinitializer, i32 33554432, [4 x i8] zeroinitializer, ptr @"$e4main9HasMethodV7doThingSiyF", ptr @"$e4main9HasMethodV7doThingSiyFACTkmu" }
 
 
 // Runtime behavior: applying the keypath yields the right offset / value.

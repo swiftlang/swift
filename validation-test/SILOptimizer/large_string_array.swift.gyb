@@ -1,30 +1,25 @@
 // RUN: %empty-directory(%t)
-// RUN: %gyb %s > %t/main.swift
+// RUN: %timer-scale-test --begin 5000 --end 10000 --superlinear-threshold 1.5 --save-temps --ignore-no-data --trace --select SIL-processing.instr -O %s
 
-// The compiler should finish in less than 1 minute. To give some slack,
-// specify a timeout of 5 minutes.
-// If the compiler needs more than 5 minutes, there is probably a real problem.
-// So please don't just increase the timeout in case this fails.
-
-// RUN: %{python} %S/../../test/Inputs/timeout.py 300 %target-swift-frontend -O -parse-as-library -emit-sil %t/main.swift | %FileCheck %s
-
-// There is a separate test for an assert-enabled stdlib
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
-
-// REQUIRES: long_test
 // REQUIRES: CPU=arm64 || CPU=x86_64 || CPU=aarch64
 
 // Check if the optimizer can optimize the whole array into a statically
 // initialized global
 
-// CHECK: sil_global private [let] @{{.*9str_array.*}}WZTv_ : $_ContiguousArrayStorage<String> = {
+// RUN: %gyb -D N=5000 %s > %t/main.swift
+// RUN: %target-swift-frontend -O -emit-sil %t/main.swift | %FileCheck %s
+
+// CHECK: sil_global private [let] @$s4main10TestStructV9str_arraySaySSGvpfiTv_ : $_ContiguousArrayStorage<String> = {
 // CHECK:   %initval = object $_ContiguousArrayStorage<String>
 
-public let str_array: [String] = [
+public struct TestStruct {
+  public let str_array: [String] = [
 
-% for i in range(63500):
-  "string in array with index ${i}",
+% for i in range(int(N)):
+    "string in array with index ${i}",
 % end
 
-]
+  ]
+}
 

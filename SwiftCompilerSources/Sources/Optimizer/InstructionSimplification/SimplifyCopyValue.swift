@@ -55,6 +55,7 @@ extension CopyValueInst : OnoneSimplifiable, SILCombineSimplifiable {
 /// Preconditions:
 ///   * The `destroy_value` must be in the same basic block as the `copy_value`
 ///   * There are no uses of the copy or its forwarding instructions inside the owned value's liverange
+///   * The destructure creates at most `maxNumDestroysToCreate` element-wise destroys
 ///
 private func tryRemoveProjectedCopy(copy: CopyValueInst, _ context: SimplifyContext) {
   let block = copy.parentBlock
@@ -81,6 +82,19 @@ private func tryRemoveProjectedCopy(copy: CopyValueInst, _ context: SimplifyCont
     return
   }
 
+  // A destructure is just another way of expanding an aggregate operation into element-wise
+  // operations, so it is bounded by the same limit: up to `maxNumFieldsToExpand` fields the
+  // aggregate's `destroy_value` is expanded into element-wise destroys anyway, which makes the
+  // destructure free and removing the `copy_value` a win. Beyond it the `destroy_value` is kept
+  // whole and emitted as a single call to an outlined destroy helper, and destructuring would
+  // trade that one call for a destroy of every single field.
+  guard canDestructure(ownedValue.type, path: projectionPath,
+                       creatingFewerDestroysThan: Type.maxNumFieldsToExpand,
+                       in: copy.parentFunction)
+  else {
+    return
+  }
+
   // ---- All checks passed. Perform the transformation. ----
 
   let builder = Builder(before: destroy, context)
@@ -96,7 +110,7 @@ private func tryRemoveProjectedCopy(copy: CopyValueInst, _ context: SimplifyCont
 /// Returns true if every non-forwarding, non-debug use of `copy` and its forwarding
 /// chain is outside the owned value's liverange which ends at `destroy`.
 private func checkForwardingChain(from value: Value, to destroy: DestroyValueInst) -> Bool {
-  for use in value.uses {
+  for use in value.uses.ignoreDebugUses {
     let user = use.instruction
     if user.parentBlock != destroy.parentBlock || destroy.strictlyDominatesInBlock(user) {
       continue
@@ -122,9 +136,15 @@ private func moveForwardingChain(from value: Value,
     if user.parentBlock != destroy.parentBlock || destroy.strictlyDominatesInBlock(user) {
       continue
     }
-    let fwdInst = user as! (SingleValueInstruction & ForwardingInstruction)
-    fwdInst.move(before: destroy, context)
-    moveForwardingChain(from: fwdInst, before: destroy, context)
+    switch user {
+    case let debugValue as DebugValueInst:
+      debugValue.move(before: destroy, context)
+    case let fwdInst as (SingleValueInstruction & ForwardingInstruction):
+      fwdInst.move(before: destroy, context)
+      moveForwardingChain(from: fwdInst, before: destroy, context)
+    default:
+      fatalError("unhandled user")
+    }
   }
 }
 
@@ -145,6 +165,56 @@ private func getProjectionPath(of value: Value,
   default:
     return (initialPath, root: value)
   }
+}
+
+/// Returns true if `createDestructureChain` creates fewer than `limit` `destroy_value`
+/// instructions for `path`, and that number can be determined at all.
+private func canDestructure(_ type: Type, path: SmallProjectionPath,
+                            creatingFewerDestroysThan limit: Int, in function: Function) -> Bool {
+  return areDestroysToCreateIsMoreThanLimit(for: type, path: path, limit: limit, in: function) != nil
+}
+
+/// Returns the number of `destroy_value` instructions which `createDestructureChain` creates for
+/// `path`, or nil if that number cannot be determined or reaches `limit`.
+private func areDestroysToCreateIsMoreThanLimit(for type: Type, path: SmallProjectionPath, limit: Int,
+                                   in function: Function) -> Int? {
+  let (kind, index, subPath) = path.pop()
+
+  switch kind {
+  case .root:
+    return 0
+  case .structField:
+    guard let fields = type.getNominalFields(in: function) else {
+      return nil
+    }
+    return areDestroysToCreateIsMoreThanLimit(for: fields, at: index, subPath: subPath,
+                                              limit: limit, in: function)
+  case .tupleField:
+    return areDestroysToCreateIsMoreThanLimit(for: type.tupleElements, at: index, subPath: subPath,
+                                              limit: limit, in: function)
+  default:
+    return nil
+  }
+}
+
+private func areDestroysToCreateIsMoreThanLimit<Elements: RandomAccessCollection>(
+  for elements: Elements, at index: Int, subPath: SmallProjectionPath, limit: Int,
+  in function: Function
+) -> Int? where Elements.Element == Type, Elements.Index == Int {
+  guard index < elements.count,
+        var num = areDestroysToCreateIsMoreThanLimit(for: elements[index], path: subPath,
+                                                     limit: limit, in: function)
+  else {
+    return nil
+  }
+  for elementIdx in elements.indices
+      where elementIdx != index && !elements[elementIdx].isTrivial(in: function) {
+    num += 1
+    if num >= limit {
+      return nil
+    }
+  }
+  return num
 }
 
 private func createDestructureChain(of value: Value, path: SmallProjectionPath, _ builder: Builder) -> Value {

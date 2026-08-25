@@ -28,6 +28,7 @@
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/Test.h"
 #include <string>
@@ -595,18 +596,6 @@ BridgedOwnedString BridgedInstruction::getDebugDescription() const {
   return BridgedOwnedString(str);
 }
 
-bool BridgedInstruction::mayAccessPointer() const {
-  return ::mayAccessPointer(unbridged());
-}
-
-bool BridgedInstruction::mayLoadWeakOrUnowned() const {
-  return ::mayLoadWeakOrUnowned(unbridged());
-}
-
-bool BridgedInstruction::maySynchronize() const {
-  return ::maySynchronize(unbridged());
-}
-
 BridgedType
 BridgedInstruction::KeyPathInst_getStaticInstanceClassType() const {
   return getAs<swift::KeyPathInst>()->getStaticInstanceClassType();
@@ -685,10 +674,10 @@ public:
       hasFixedLocation(true),
       fixedLocation(ArtificialUnreachableLocation(), nullptr) {}
 
-  BridgedClonerImpl(SILInstruction *insertionPoint)
+  BridgedClonerImpl(SILInstruction *insertionPoint, SILDebugLocation loc)
     : SILCloner<BridgedClonerImpl>(*insertionPoint->getFunction()),
       hasFixedLocation(true),
-      fixedLocation(insertionPoint->getDebugLocation()) {
+      fixedLocation(loc) {
     Builder.setInsertionPoint(insertionPoint);
   }
 
@@ -786,9 +775,9 @@ BridgedCloner::BridgedCloner(BridgedGlobalVar var, BridgedContext context)
   context.context->notifyNewCloner();
 }
 
-BridgedCloner::BridgedCloner(BridgedInstruction inst,
+BridgedCloner::BridgedCloner(BridgedInstruction inst, BridgedLocation loc,
                              BridgedContext context)
-    : cloner(new BridgedClonerImpl(inst.unbridged())) {
+    : cloner(new BridgedClonerImpl(inst.unbridged(), loc.getLoc())) {
   context.context->notifyNewCloner();
 }
 
@@ -908,6 +897,22 @@ BridgedOwnedString BridgedContext::getModuleDescription() const {
 
 OptionalBridgedFunction BridgedContext::lookUpNominalDeinitFunction(BridgedDeclObj nominal)  const {
   return {context->getModule()->lookUpMoveOnlyDeinitFunction(nominal.getAs<swift::NominalTypeDecl>())};
+}
+
+OptionalBridgedFunction BridgedContext::
+lookUpSpecializedDeinitFunction(BridgedType nominalType) const {
+  auto *deinit =
+      context->getModule()->lookUpSpecializedMoveOnlyDeinit(nominalType.unbridged());
+  return {deinit ? deinit->getImplementation() : nullptr};
+}
+
+void BridgedContext::addSpecializedDeinit(BridgedType nominalType,
+                                          BridgedFunction deinitFunc) const {
+  swift::SILType nominalTy = nominalType.unbridged();
+  swift::SILMoveOnlyDeinit::create(*context->getModule(),
+                                   nominalTy.getNominalOrBoundGenericNominal(),
+                                   nominalTy, swift::IsNotSerialized,
+                                   deinitFunc.getFunction());
 }
 
 BridgedFunction BridgedContext::

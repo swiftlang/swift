@@ -64,10 +64,13 @@ public struct MyStruct {
 
 protocol P { }
 
+// A generic method of a class is dispatched statically and kept out of the
+// vtable, so it is fine as long as nothing can override it. Only `open` and
+// `override` are rejected; see classes-generic-methods.swift.
 class MyGenericClass<T> {
-  func f<U>(value: U) { } // expected-warning{{generic instance method 'f(value:)' in a class must be 'final' in Embedded Swift}}
+  func f<U>(value: U) { } // okay, statically dispatched
   func g() { }
-  class func h() where T: P { } // expected-warning{{generic class method 'h()' in a class must be 'final' in Embedded Swift}}
+  class func h() where T: P { } // okay, statically dispatched
 
   init<U>(value: U) { } // okay, can be directly called
 

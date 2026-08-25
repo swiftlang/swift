@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library -module-name MyModule
 
-@available(*, unavailable)
-func unavailable_foo() {} // expected-note {{'unavailable_foo()' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note {{'unavailable_foo()' has been explicitly marked unavailable here}}
+func unavailable_foo() {}
 
 @_unavailableInEmbedded // no-op without -enable-experimental-feature Embedded
 public func unavailable_in_embedded() { }
@@ -11,12 +11,12 @@ func test() {
   unavailable_in_embedded() // ok
 }
 
-@available(*,unavailable,message: "use 'Int' instead")
-struct NSUInteger {} // expected-note 3 {{explicitly marked unavailable here}}
+@available(*,unavailable,message: "use 'Int' instead") // expected-note 3 {{explicitly marked unavailable here}}
+struct NSUInteger {}
 
 struct Outer {
-  @available(*,unavailable,message: "use 'UInt' instead")
-  struct NSUInteger {} // expected-note 2 {{explicitly marked unavailable here}}
+  @available(*,unavailable,message: "use 'UInt' instead") // expected-note 2 {{explicitly marked unavailable here}}
+  struct NSUInteger {}
 }
 
 func foo(x : NSUInteger) { // expected-error {{'NSUInteger' is unavailable: use 'Int' instead}}
@@ -34,14 +34,14 @@ func foo(x : NSUInteger) { // expected-error {{'NSUInteger' is unavailable: use 
 }
 
 struct VarToFunc {
-  @available(*, unavailable, renamed: "function()")
-  var variable: Int { // expected-note 2 {{explicitly marked unavailable here}}
+  @available(*, unavailable, renamed: "function()") // expected-note 2 {{explicitly marked unavailable here}}
+  var variable: Int {
     get { 0 }
     set {}
   }
 
-  @available(*, unavailable, renamed: "function()")
-  func oldFunction() -> Int { return 42 } // expected-note 2 {{explicitly marked unavailable here}}
+  @available(*, unavailable, renamed: "function()") // expected-note 2 {{explicitly marked unavailable here}}
+  func oldFunction() -> Int { return 42 }
 
   func function() -> Int {
     _ = variable // expected-error{{'variable' has been renamed to 'function()'}}{{9-17=function()}}
@@ -75,8 +75,8 @@ struct DeferBody {
   }
 
   func bar() {
-    @available(*, unavailable)
-    enum No: Error { // expected-note 2 {{'No' has been explicitly marked unavailable here}}
+    @available(*, unavailable) // expected-note 2 {{'No' has been explicitly marked unavailable here}}
+    enum No: Error {
       case no
     }
     do {
@@ -122,8 +122,8 @@ func test_contextual_member_with_availability() {
   _ = Test(.foo) // Ok
 }
 
-@available(*, unavailable)
-func unavailableFunction(_ x: Int) -> Bool { true } // expected-note {{'unavailableFunction' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note {{'unavailableFunction' has been explicitly marked unavailable here}}
+func unavailableFunction(_ x: Int) -> Bool { true }
 
 /// https://github.com/apple/swift/issues/55700
 /// Availability checking not working in the `where` clause of a `for` loop

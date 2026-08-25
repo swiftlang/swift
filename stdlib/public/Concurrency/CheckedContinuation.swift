@@ -74,7 +74,6 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
   }
 
   deinit {
-    unsafe _functionPtr.deinitialize(count: 1)
     // Log if the continuation was never consumed before the instance was
     // destructed.
     if unsafe _continuationPtr.pointee != nil {
@@ -84,6 +83,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
       fatalError("SWIFT TASK CONTINUATION MISUSE")
       #endif
     }
+    unsafe _functionPtr.deinitialize(count: 1)
   }
 }
 

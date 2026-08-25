@@ -1,0 +1,260 @@
+// RUN: %target-sil-opt %s -test-runner -sil-verify-none \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   | %FileCheck %s
+
+// REQUIRES: swift_feature_Lifetimes
+
+// `mark_dependence` coverage for `lifetime_resolution_resolve`.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class Kl {}
+
+struct NE : ~Escapable {
+  var p: UnsafeRawPointer
+
+  @_lifetime(immortal)
+  init()
+}
+
+sil @getK : $@convention(thin) () -> @owned Kl
+sil @consumeK : $@convention(thin) (@owned Kl) -> ()
+sil @useRawPtr : $@convention(thin) (Builtin.RawPointer) -> ()
+sil @makeNE : $@convention(thin) (@guaranteed Kl) -> @lifetime(borrow 0) @owned NE
+sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
+
+
+// A bare `mark_dependence` is [escaping]: the dependent value's uses cannot be enumerated, so
+// the destroy stays put instead of hoisting to the mark_dependence.
+
+// CHECK-LABEL: sil [ossa] @test_markdep_escaping :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK:      [[DEP:%.*]] = mark_dependence {{%.*}} on [[V]]
+// CHECK-NEXT: apply {{%.*}}([[DEP]]) : $@convention(thin) (Builtin.RawPointer) -> ()
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_markdep_escaping : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %usePtrFn = function_ref @useRawPtr : $@convention(thin) (Builtin.RawPointer) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  %ptr = ref_to_raw_pointer %0 to $Builtin.RawPointer
+  %dep = mark_dependence %ptr on %0
+  apply %usePtrFn(%dep) : $@convention(thin) (Builtin.RawPointer) -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+// [unresolved] with an Escapable dependent.
+
+// CHECK-LABEL: sil [ossa] @test_markdep_unresolved_trivial :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK:      [[DEP:%.*]] = mark_dependence [unresolved] {{%.*}} on [[V]]
+// CHECK-NEXT: apply {{%.*}}([[DEP]]) : $@convention(thin) (Builtin.RawPointer) -> ()
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_markdep_unresolved_trivial : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %usePtrFn = function_ref @useRawPtr : $@convention(thin) (Builtin.RawPointer) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  %ptr = ref_to_raw_pointer %0 to $Builtin.RawPointer
+  %dep = mark_dependence [unresolved] %ptr on %0
+  apply %usePtrFn(%dep) : $@convention(thin) (Builtin.RawPointer) -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+// [unresolved] with a ~Escapable dependent: the uses are enumerable.
+
+// CHECK-LABEL: sil [ossa] @test_markdep_unresolved_ne :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK:      [[DEP:%.*]] = mark_dependence [unresolved] {{%.*}} on [[V]]
+// CHECK-NEXT: apply {{%.*}}([[DEP]]) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK-NEXT: destroy_value [[DEP]]
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_markdep_unresolved_ne : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %makeFn = function_ref @makeNE : $@convention(thin) (@guaranteed Kl) -> @lifetime(borrow 0) @owned NE
+  %useFn = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  %ne = apply %makeFn(%0) : $@convention(thin) (@guaranteed Kl) -> @lifetime(borrow 0) @owned NE
+  %dep = mark_dependence [unresolved] %ne on %0
+  apply %useFn(%dep) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %dep
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+// Same as above, but the base's destroy starts out above the dependent's uses,
+// so the destroy is sunk.
+
+// CHECK-LABEL: sil [ossa] @test_markdep_unresolved_ne_sink :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK:      [[DEP:%.*]] = mark_dependence [unresolved] {{%.*}} on [[V]]
+// CHECK-NEXT: apply {{%.*}}([[DEP]]) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK-NEXT: destroy_value [[DEP]]
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_markdep_unresolved_ne_sink : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %makeFn = function_ref @makeNE : $@convention(thin) (@guaranteed Kl) -> @lifetime(borrow 0) @owned NE
+  %useFn = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  %ne = apply %makeFn(%0) : $@convention(thin) (@guaranteed Kl) -> @lifetime(borrow 0) @owned NE
+  %dep = mark_dependence [unresolved] %ne on %0
+  destroy_value %0
+  apply %useFn(%dep) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %dep
+  %t = tuple ()
+  return %t
+}
+
+
+// Sinking into a successor block.
+
+// CHECK-LABEL: sil [ossa] @test_markdep_unresolved_ne_sink_across_branch :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK:      [[DEP:%.*]] = mark_dependence [unresolved] {{%.*}} on [[V]]
+// CHECK-NEXT: br bb1
+// CHECK:      bb1:
+// CHECK-NEXT: apply {{%.*}}([[DEP]]) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK-NEXT: destroy_value [[DEP]]
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_markdep_unresolved_ne_sink_across_branch : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %makeFn = function_ref @makeNE : $@convention(thin) (@guaranteed Kl) -> @lifetime(borrow 0) @owned NE
+  %useFn = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  %ne = apply %makeFn(%0) : $@convention(thin) (@guaranteed Kl) -> @lifetime(borrow 0) @owned NE
+  %dep = mark_dependence [unresolved] %ne on %0
+  destroy_value %0
+  br bb1
+
+bb1:
+  apply %useFn(%dep) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %dep
+  %t = tuple ()
+  return %t
+}
+
+
+// [nonescaping] whose result is an owned Escapable object has a scoped lifetime, so its
+// scope-ending uses bound liveness directly.
+
+// CHECK-LABEL: sil [ossa] @test_markdep_nonescaping_scoped :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[K2:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[DEP:%.*]] = mark_dependence [nonescaping] [[K2]] on [[V]]
+// CHECK-NEXT: destroy_value [[DEP]]
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_markdep_nonescaping_scoped : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %1 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  %dep = mark_dependence [nonescaping] %1 on %0
+  destroy_value %dep
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+// [nonescaping] with a trivial result has no scoped lifetime, so there are no scope-ending uses
+// to key off.
+
+// CHECK-LABEL: sil [ossa] @test_markdep_nonescaping_unscoped :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK:      [[DEP:%.*]] = mark_dependence [nonescaping] {{%.*}} on [[V]]
+// CHECK-NEXT: apply {{%.*}}([[DEP]]) : $@convention(thin) (Builtin.RawPointer) -> ()
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_markdep_nonescaping_unscoped : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %usePtrFn = function_ref @useRawPtr : $@convention(thin) (Builtin.RawPointer) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  %ptr = ref_to_raw_pointer %0 to $Builtin.RawPointer
+  %dep = mark_dependence [nonescaping] %ptr on %0
+  apply %usePtrFn(%dep) : $@convention(thin) (Builtin.RawPointer) -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+// A consume between the mark_dependence and the dependent's use is interior with respect to the
+// pinned liverange, so it takes a copy instead of ending the base's lifetime early.
+
+// CHECK-LABEL: sil [ossa] @test_markdep_escaping_interior_consume :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK:      [[DEP:%.*]] = mark_dependence {{%.*}} on [[V]]
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[V]]
+// CHECK-NEXT: apply {{%.*}}([[COPY]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: apply {{%.*}}([[DEP]]) : $@convention(thin) (Builtin.RawPointer) -> ()
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_markdep_escaping_interior_consume : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %usePtrFn = function_ref @useRawPtr : $@convention(thin) (Builtin.RawPointer) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  %ptr = ref_to_raw_pointer %0 to $Builtin.RawPointer
+  %dep = mark_dependence %ptr on %0
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  apply %usePtrFn(%dep) : $@convention(thin) (Builtin.RawPointer) -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+// mark_dependence_addr onto Escapable memory: reachable uses of that memory are not tracked.
+
+// CHECK-LABEL: sil [ossa] @test_markdep_addr :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK:      [[STK:%.*]] = alloc_stack $Kl
+// CHECK:      mark_dependence_addr [unresolved] [[STK]] on [[V]]
+// CHECK-NEXT: destroy_addr [[STK]]
+// CHECK-NEXT: dealloc_stack [[STK]]
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_markdep_addr : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %1 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %stk = alloc_stack $Kl
+  store %1 to [init] %stk
+  specify_test "lifetime_resolution_resolve %0"
+  mark_dependence_addr [unresolved] %stk on %0
+  destroy_addr %stk
+  dealloc_stack %stk
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}

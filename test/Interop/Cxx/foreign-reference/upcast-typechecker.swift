@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -disable-availability-checking -I %S/Inputs
+// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeInheritance -disable-availability-checking -I %S/Inputs -verify-ignore-unrelated
+
+// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 
 import Upcast
 
@@ -182,3 +184,20 @@ func crtpDowncast(_ b: CRTPBaseOfDerived) -> CRTPDerived {
   return b as! CRTPDerived // expected-error {{downcast from 'CRTPBaseOfDerived' (aka 'CRTPBase<CRTPDerived>') to 'CRTPDerived' is not supported for foreign reference types}}
   // expected-warning@-1 {{cast from 'CRTPBaseOfDerived' (aka 'CRTPBase<CRTPDerived>') to unrelated type 'CRTPDerived' always fails}}
 }
+
+// MARK: - Initializer requirements:
+
+protocol Describable {
+  func getBaseValue() -> Int32
+}
+
+extension RefCountedBase: Describable {}
+
+// Initializers are not inherited in C++, so they can't satisfy protocol requirements.
+protocol Creatable {
+  init()
+}
+
+extension Base: Creatable {} // expected-error {{initializer requirement 'init()' cannot be satisfied by a C++ constructor of non-final foreign reference type 'Base'}}
+extension Unrelated: Creatable {} // expected-error {{initializer requirement 'init()' cannot be satisfied by a C++ constructor of non-final foreign reference type 'Unrelated'}}
+

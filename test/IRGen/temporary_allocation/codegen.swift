@@ -21,58 +21,50 @@ do {
 // CHECK: [[VOID_PTR_RAW:%temp_alloc[0-9]*]] = alloca [2 x i8], align 1
 // CHECK: [[ONE_KB_RAND_PTR_RAW:%temp_alloc[0-9]*]] = alloca [1024 x i8], align 16
 
-// CHECK: ptrtoint ptr {{.*}} to [[WORD:i[0-9]+]]
+// CHECK: call swiftcc void @blackHole(ptr {{%.*}})
 
 
 withUnsafeTemporaryAllocation(byteCount: 0, alignment: 1) { buffer in
   blackHole(buffer.baseAddress)
 }
 // CHECK: [[ZERO_BYTE_PTR_RAW:%temp_alloc[0-9]*]] = alloca i8, align 1
-// CHECK: [[ZERO_BYTE_PTR:%[0-9]+]] = ptrtoint ptr [[ZERO_BYTE_PTR_RAW]] to [[WORD]]
-// CHECK: call swiftcc void @blackHole([[WORD]] [[ZERO_BYTE_PTR]])
+// CHECK: call swiftcc void @blackHole(ptr nonnull [[ZERO_BYTE_PTR_RAW]])
 
 withUnsafeTemporaryAllocation(byteCount: 1, alignment: 1) { buffer in
   blackHole(buffer.baseAddress)
 }
-// CHECK: [[ONE_BYTE_PTR:%[0-9]+]] = ptrtoint ptr [[ONE_BYTE_PTR_RAW]] to [[WORD]]
-// CHECK: call swiftcc void @blackHole([[WORD]] [[ONE_BYTE_PTR]])
+// CHECK: call swiftcc void @blackHole(ptr nonnull [[ONE_BYTE_PTR_RAW]])
 
 withUnsafeTemporaryAllocation(byteCount: 5, alignment: 1) { buffer in
   blackHole(buffer.baseAddress)
 }
-// CHECK: [[FIVE_BYTE_PTR:%[0-9]+]] = ptrtoint ptr [[FIVE_BYTE_PTR_RAW]] to [[WORD]]
-// CHECK: call swiftcc void @blackHole([[WORD]] [[FIVE_BYTE_PTR]])
+// CHECK: call swiftcc void @blackHole(ptr nonnull [[FIVE_BYTE_PTR_RAW]])
 
 withUnsafeTemporaryAllocation(byteCount: 1024, alignment: 8) { buffer in
   blackHole(buffer.baseAddress)
 }
-// CHECK: [[ONE_KB_PTR:%[0-9]+]] = ptrtoint ptr [[ONE_KB_PTR_RAW]] to [[WORD]]
-// CHECK: call swiftcc void @blackHole([[WORD]] [[ONE_KB_PTR]])
+// CHECK: call swiftcc void @blackHole(ptr nonnull [[ONE_KB_PTR_RAW]])
 
 // MARK: Typed buffers
 
 withUnsafeTemporaryAllocation(of: Int32.self, capacity: 4) { buffer in
   blackHole(buffer.baseAddress)
 }
-// CHECK: [[INT_PTR:%[0-9]+]] = ptrtoint ptr [[INT_PTR_RAW]] to [[WORD]]
-// CHECK: call swiftcc void @blackHole([[WORD]] [[INT_PTR]])
+// CHECK: call swiftcc void @blackHole(ptr nonnull [[INT_PTR_RAW]])
 
 _withUnprotectedUnsafeTemporaryAllocation(of: Int32.self, capacity: 4) { buffer in
   blackHole(buffer.baseAddress)
 }
-// CHECK: [[INT_PTR:%[0-9]+]] = ptrtoint ptr [[INT_PTR_RAW2]] to [[WORD]]
-// CHECK: call swiftcc void @blackHole([[WORD]] [[INT_PTR]])
+// CHECK: call swiftcc void @blackHole(ptr nonnull [[INT_PTR_RAW2]])
 
 withUnsafeTemporaryAllocation(of: Void.self, capacity: 2) { buffer in
   blackHole(buffer.baseAddress)
 }
-// CHECK: [[VOID_PTR:%[0-9]+]] = ptrtoint ptr [[VOID_PTR_RAW]] to [[WORD]]
-// CHECK: call swiftcc void @blackHole([[WORD]] [[VOID_PTR]])
+// CHECK: call swiftcc void @blackHole(ptr nonnull [[VOID_PTR_RAW]])
 
 // MARK: Alignment unknown at compile-time
 
 withUnsafeTemporaryAllocation(byteCount: 1024, alignment: Int.random(in: 0 ..< 16)) { buffer in
   blackHole(buffer.baseAddress)
 }
-// CHECK: [[ONE_KB_RAND_PTR:%[0-9]+]] = ptrtoint ptr [[ONE_KB_RAND_PTR_RAW]] to [[WORD]]
-// CHECK: call swiftcc void @blackHole([[WORD]] [[ONE_KB_RAND_PTR]])
+// CHECK: call swiftcc void @blackHole(ptr nonnull [[ONE_KB_RAND_PTR_RAW]])

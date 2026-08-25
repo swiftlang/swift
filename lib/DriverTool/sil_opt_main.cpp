@@ -837,6 +837,11 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
   }
 
+  // The implicit search paths depend on the language options - e.g. Embedded
+  // Swift picks up its runtime libraries from a different directory. Recompute
+  // them now that all language options are set.
+  Invocation.updateImplicitSearchPaths();
+
   Invocation.getDiagnosticOptions().VerifyMode =
       options.VerifyMode ? DiagnosticOptions::Verify
                          : DiagnosticOptions::NoVerify;

@@ -19,15 +19,16 @@
 #include "ClangDerivedConformances.h"
 #include "ImporterImpl.h"
 #include "SwiftDeclSynthesizer.h"
-#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -180,22 +181,21 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
   }
 }
 
-bool importer::hasAnyImmortalAttr(const clang::RecordDecl *decl) {
-  return hasSwiftAttribute(decl, {"retain:immortal", "release:immortal"});
-}
-
 importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
     const clang::NamedDecl *decl) {
   if (!decl->hasAttrs())
     return;
 
   for (const auto *attr : decl->getAttrs()) {
-    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      if (swiftAttr->getAttribute() == "returns_unretained") {
+    if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      if (swiftAttr->getAttribute() == "returns_unretained")
         hasReturnsUnretained = true;
-      } else if (swiftAttr->getAttribute() == "returns_retained") {
+      else if (swiftAttr->getAttribute() == "returns_retained")
         hasReturnsRetained = true;
-      }
+    } else if (isa<clang::OSReturnsNotRetainedAttr>(attr)) {
+      hasReturnsUnretained = true;
+    } else if (isa<clang::OSReturnsRetainedAttr>(attr)) {
+      hasReturnsRetained = true;
     }
   }
 }
@@ -634,8 +634,13 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityRange &info,
   if (info.isAlwaysAvailable())
     return;
 
+  // A platform-versioned attribute needs a platform to attach the version to.
+  auto platform = targetPlatform(C.LangOpts);
+  if (!platform)
+    return;
+
   auto AvAttr = AvailableAttr::createPlatformVersioned(
-      C, targetPlatform(C.LangOpts), /*Message=*/"", /*Rename=*/"",
+      C, *platform, /*Message=*/"", /*Rename=*/"",
       info.getRawMinimumVersion(), /*Deprecated=*/{}, /*Obsoleted=*/{});
 
   decl->addAttribute(AvAttr);
@@ -2304,42 +2309,6 @@ namespace {
       }
     }
 
-    std::pair<CustomRefCountingOperationResult,
-              CustomRefCountingOperationResult>
-    addRefCountOperationsIfRequired(ClassDecl *nominal,
-                                    clang::RecordDecl *clangType) {
-      auto &context = Impl.SwiftContext;
-      auto nonInheritedRefCountingOperations = [&] {
-        auto retainResult = evaluateOrDefault(
-            context.evaluator,
-            CustomRefCountingOperation(
-                {nominal, CustomRefCountingOperationKind::retain}),
-            {});
-        auto releaseResult = evaluateOrDefault(
-            context.evaluator,
-            CustomRefCountingOperation(
-                {nominal, CustomRefCountingOperationKind::release}),
-            {});
-        return std::make_pair(retainResult, releaseResult);
-      };
-      auto clangDecl = dyn_cast<clang::CXXRecordDecl>(clangType);
-      if (!clangDecl)
-        return nonInheritedRefCountingOperations();
-
-      auto frtInfo = evaluateOrDefault(
-          context.evaluator, ForeignReferenceTypeInfoRequest({clangDecl}), {});
-      auto *baseClangDecl =
-          dyn_cast_or_null<clang::CXXRecordDecl>(frtInfo.getDecl());
-      if (!baseClangDecl || baseClangDecl == clangDecl)
-        return nonInheritedRefCountingOperations();
-
-      auto baseSwiftDecl = cast<ClassDecl>(
-          Impl.importDecl(baseClangDecl, getActiveSwiftVersion()));
-
-      return synthesizer.addRefCountOperations(nominal, clangDecl,
-                                               baseSwiftDecl, baseClangDecl);
-    }
-
     void addSuppressedProtocol(TypeDecl *D, KnownProtocolKind kind) const {
       auto inheritedTypes = D->getInherited();
       SmallVector<InheritedEntry> entries(inheritedTypes.getEntries());
@@ -2375,23 +2344,29 @@ namespace {
       if (decl->isInterface())
         return nullptr;
 
-      bool incompleteTypeAsReference = false;
-      if (auto def = decl->getDefinition()) {
-        // Continue with the definition of the type.
+      if (auto def = decl->getDefinition())
         decl = def;
-      } else if (recordHasReferenceSemantics(decl)) {
-        // Incomplete types are okay if the resulting type has reference
-        // semantics.
-        incompleteTypeAsReference = true;
-      } else {
-        Impl.addImportDiagnostic(
-            decl,
-            Diagnostic(diag::incomplete_record, Impl.SwiftContext.AllocateCopy(
-                                                    decl->getNameAsString())),
-            decl->getLocation());
 
-        forwardDeclaration = true;
-        return nullptr;
+      auto frtInfo =
+          evaluateOrDefault(Impl.SwiftContext.evaluator,
+                            ForeignReferenceTypeInfoRequest({decl}), {});
+
+      bool incompleteTypeAsReference = false;
+
+      if (!decl->getDefinition()) {
+        if (frtInfo.isReference()) {
+          // Incomplete types are okay if the resulting type has reference
+          // semantics.
+          incompleteTypeAsReference = true;
+        } else {
+          Impl.addImportDiagnostic(decl,
+                                   Diagnostic(diag::incomplete_record,
+                                              Impl.SwiftContext.AllocateCopy(
+                                                  decl->getNameAsString())),
+                                   decl->getLocation());
+          forwardDeclaration = true;
+          return nullptr;
+        }
       }
 
       // TODO(https://github.com/apple/swift/issues/56206): Fix this once we support dependent types.
@@ -2508,14 +2483,35 @@ namespace {
         return nullptr;
       }
 
-      if (recordHasReferenceSemantics(decl))
+      if (frtInfo.isReference()) {
+        // Swift classes are always Escapable.
+        if (evaluateOrDefault(
+                Impl.SwiftContext.evaluator,
+                ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
+                CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
+          Impl.diagnose(HeaderLoc(decl->getLocation()),
+                        diag::nonescapable_foreign_reference_type, decl);
+          return nullptr;
+        }
+
+        // Escapability annotations have no effect on a foreign reference type.
+        for (auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+          if (swiftAttr->getAttribute() == "Escapable" ||
+              swiftAttr->getAttribute().starts_with("escapable_if:"))
+            Impl.diagnose(HeaderLoc(decl->getLocation()),
+                          diag::escapable_foreign_reference_type,
+                          importer::getPrettySwiftAttributeName(swiftAttr),
+                          decl);
+        }
+
         result = Impl.createDeclWithClangNode<ClassDecl>(
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
             loc, ArrayRef<InheritedEntry>{}, nullptr, dc, false);
-      else
+      } else {
         result = Impl.createDeclWithClangNode<StructDecl>(
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
             loc, ArrayRef<InheritedEntry>(), nullptr, dc);
+      }
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
       // We've written a partial entry into ImportedDecls so that nested
       // member imports (especially those that recurse into us via
@@ -2575,18 +2571,18 @@ namespace {
 
           // If this is an inherited foreign reference type, check if it has a
           // suitable superclass.
-          auto frtInfo = evaluateOrDefault(
-              Impl.SwiftContext.evaluator,
-              ForeignReferenceTypeInfoRequest({cxxRecordDecl}), {});
-          if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
-            if (auto baseDecl = cast_or_null<ClassDecl>(
-                    Impl.importDecl(primaryBase, getVersion()))) {
-              auto classResult = cast<ClassDecl>(result);
-              Type superclassType = baseDecl->getDeclaredInterfaceType();
-              classResult->setSuperclass(superclassType);
-              classResult->setInherited(
-                  Impl.SwiftContext.AllocateCopy(ArrayRef<InheritedEntry>{
-                      TypeLoc::withoutLoc(superclassType)}));
+          if (Impl.SwiftContext.LangOpts.hasFeature(
+                  Feature::ForeignReferenceTypeInheritance)) {
+            if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
+              if (auto baseDecl = cast_or_null<ClassDecl>(
+                      Impl.importDecl(primaryBase, getVersion()))) {
+                auto classResult = cast<ClassDecl>(result);
+                Type superclassType = baseDecl->getDeclaredInterfaceType();
+                classResult->setSuperclass(superclassType);
+                classResult->setInherited(
+                    Impl.SwiftContext.AllocateCopy(ArrayRef<InheritedEntry>{
+                        TypeLoc::withoutLoc(superclassType)}));
+              }
             }
           }
         }
@@ -2928,9 +2924,12 @@ namespace {
           // If this class is abstract, any of its methods might use a pure
           // virtual method.
           if (cxxRecordDecl->isAbstract()) {
-            Impl.markUnavailable(
-                result,
-                "abstract C++ classes cannot be used as values in Swift");
+            // In the future, this should be a hard error instead of a
+            // deprecation warning.
+            auto attr = AvailableAttr::createUniversallyDeprecated(
+                Impl.SwiftContext,
+                "abstract C++ classes cannot be used as values in Swift", "");
+            result->addAttribute(attr);
           }
 
           // Address-only type is a type that can't be passed in registers.
@@ -2991,17 +2990,14 @@ namespace {
       }
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
-        auto operations = addRefCountOperationsIfRequired(
-            classDecl, const_cast<clang::RecordDecl *>(decl));
-
-        validateForeignReferenceType(decl, classDecl, operations.first,
-                                     operations.second);
+        importer::checkRetainReleaseFunctions(classDecl, Impl);
 
         auto availability = Impl.SwiftContext.getSwift58Availability();
-        if (!availability.isAlwaysAvailable()) {
+        auto platform = targetPlatform(Impl.SwiftContext.LangOpts);
+        if (!availability.isAlwaysAvailable() && platform) {
           assert(availability.hasMinimumVersion());
           auto AvAttr = AvailableAttr::createPlatformVersioned(
-              Impl.SwiftContext, targetPlatform(Impl.SwiftContext.LangOpts),
+              Impl.SwiftContext, *platform,
               /*Message=*/"", /*Rename=*/"",
               availability.getRawMinimumVersion(), /*Deprecated=*/{},
               /*Obsoleted=*/{});
@@ -3061,148 +3057,6 @@ namespace {
                             suggestion);
           }
         }
-      }
-    }
-
-    void validateForeignReferenceType(
-        const clang::RecordDecl *decl, ClassDecl *classDecl,
-        CustomRefCountingOperationResult retainOperation,
-        CustomRefCountingOperationResult releaseOperation) {
-
-      if (retainOperation.kind ==
-              CustomRefCountingOperationResult::unreachable ||
-          releaseOperation.kind ==
-              CustomRefCountingOperationResult::unreachable) {
-        Impl.diagnose(HeaderLoc(decl->getLocation()),
-                      diag::foreign_reference_type_unreachable,
-                      classDecl->getNameStr());
-        return;
-      }
-
-      HeaderLoc loc(decl->getLocation());
-
-      if (retainOperation.kind ==
-          CustomRefCountingOperationResult::noAttribute) {
-        Impl.diagnose(loc, diag::reference_type_must_have_retain_release_attr,
-                      false, decl->getNameAsString());
-      } else if (retainOperation.kind ==
-                 CustomRefCountingOperationResult::tooManyAttributes) {
-        Impl.diagnose(loc, diag::too_many_reference_type_retain_release_attr,
-                      false, decl->getNameAsString());
-      } else if (retainOperation.kind ==
-                 CustomRefCountingOperationResult::notFound) {
-        Impl.diagnose(loc,
-                      diag::foreign_reference_types_cannot_find_retain_release,
-                      false, retainOperation.name, decl->getNameAsString());
-        if (!Impl.SwiftContext.LangOpts
-                 .DisableExperimentalClangImporterDiagnostics) {
-          Impl.diagnoseTopLevelValue(
-              DeclName(Impl.SwiftContext.getIdentifier(retainOperation.name)));
-        }
-      } else if (retainOperation.kind ==
-                 CustomRefCountingOperationResult::tooManyFound) {
-        Impl.diagnose(loc,
-                      diag::too_many_reference_type_retain_release_operations,
-                      false, retainOperation.name, decl->getNameAsString());
-      } else if (retainOperation.kind ==
-                 CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperationKind operationKind =
-            importer::checkRetainReleaseOperationValidity(
-                classDecl, retainOperation.operation,
-                CustomRefCountingOperationKind::retain);
-        switch (operationKind) {
-        case RetainReleaseOperationKind::notAfunction:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_release_not_a_function_decl,
-              false, retainOperation.name);
-          break;
-        case RetainReleaseOperationKind::notAnInstanceFunction:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_release_not_an_instance_function,
-              false, retainOperation.name);
-          break;
-        case RetainReleaseOperationKind::invalidReturnType:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_non_void_or_self_return_type,
-              retainOperation.name);
-          break;
-        case RetainReleaseOperationKind::invalidParameters:
-          Impl.diagnose(loc,
-                        diag::foreign_reference_types_invalid_retain_release,
-                        false, retainOperation.name, classDecl->getNameStr());
-          break;
-        case RetainReleaseOperationKind::valid:
-          break;
-        }
-      } else {
-        // Nothing to do.
-        assert(retainOperation.kind ==
-               CustomRefCountingOperationResult::immortal);
-      }
-
-      if (releaseOperation.kind ==
-          CustomRefCountingOperationResult::noAttribute) {
-        Impl.diagnose(loc, diag::reference_type_must_have_retain_release_attr,
-                      true, decl->getNameAsString());
-      } else if (releaseOperation.kind ==
-                 CustomRefCountingOperationResult::tooManyAttributes) {
-        Impl.diagnose(loc, diag::too_many_reference_type_retain_release_attr,
-                      true, decl->getNameAsString());
-      } else if (releaseOperation.kind ==
-                 CustomRefCountingOperationResult::notFound) {
-        Impl.diagnose(loc,
-                      diag::foreign_reference_types_cannot_find_retain_release,
-                      true, releaseOperation.name, decl->getNameAsString());
-        if (!Impl.SwiftContext.LangOpts
-                 .DisableExperimentalClangImporterDiagnostics) {
-          Impl.diagnoseTopLevelValue(
-              DeclName(Impl.SwiftContext.getIdentifier(releaseOperation.name)));
-        }
-      } else if (releaseOperation.kind ==
-                 CustomRefCountingOperationResult::tooManyFound) {
-        Impl.diagnose(loc,
-                      diag::too_many_reference_type_retain_release_operations,
-                      true, releaseOperation.name, decl->getNameAsString());
-      } else if (releaseOperation.kind ==
-                 CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperationKind operationKind =
-            importer::checkRetainReleaseOperationValidity(
-                classDecl, releaseOperation.operation,
-                CustomRefCountingOperationKind::release);
-        switch (operationKind) {
-        case RetainReleaseOperationKind::notAfunction:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_release_not_a_function_decl,
-              true, releaseOperation.name);
-          break;
-        case RetainReleaseOperationKind::notAnInstanceFunction:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_release_not_an_instance_function,
-              true, releaseOperation.name);
-          break;
-        case RetainReleaseOperationKind::invalidReturnType:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_release_non_void_return_type,
-              releaseOperation.name);
-          break;
-        case RetainReleaseOperationKind::invalidParameters:
-          Impl.diagnose(loc,
-                        diag::foreign_reference_types_invalid_retain_release,
-                        true, releaseOperation.name, classDecl->getNameStr());
-          break;
-        case RetainReleaseOperationKind::valid:
-          break;
-        }
-      } else {
-        // Nothing to do.
-        assert(releaseOperation.kind ==
-               CustomRefCountingOperationResult::immortal);
       }
     }
 
@@ -3731,37 +3585,28 @@ namespace {
                                  const clang::FunctionDecl *accessor);
 
     bool foreignReferenceTypePassedByRef(const clang::FunctionDecl *decl) {
-      bool anyParamPassesByVal =
-          llvm::any_of(decl->parameters(), [this, decl](auto *param) {
-            if (auto recordType = dyn_cast<clang::RecordType>(
-                    param->getType().getCanonicalType())) {
-              if (recordHasReferenceSemantics(recordType->getDecl())) {
-                Impl.addImportDiagnostic(
-                    decl,
-                    Diagnostic(diag::reference_passed_by_value,
-                               Impl.SwiftContext.AllocateCopy(
-                                   recordType->getDecl()->getNameAsString()),
-                               "a parameter"),
-                    decl->getLocation());
-                return true;
-              }
-            }
-            return false;
-          });
-
-      if (anyParamPassesByVal)
-        return true;
+      for (auto *param : decl->parameters()) {
+        if (auto recordType = dyn_cast<clang::RecordType>(
+                param->getType().getCanonicalType())) {
+          if (recordHasReferenceSemantics(recordType->getDecl())) {
+            Impl.addImportDiagnostic(
+                decl,
+                Diagnostic(diag::foreign_reference_type_by_value,
+                           /*isReturn=*/false, recordType->getDecl()),
+                param->getLocation());
+            return true;
+          }
+        }
+      }
 
       if (auto recordType = dyn_cast<clang::RecordType>(
               decl->getReturnType().getCanonicalType())) {
         if (recordHasReferenceSemantics(recordType->getDecl())) {
           Impl.addImportDiagnostic(
               decl,
-              Diagnostic(diag::reference_passed_by_value,
-                         Impl.SwiftContext.AllocateCopy(
-                             recordType->getDecl()->getNameAsString()),
-                         "the return"),
-              decl->getLocation());
+              Diagnostic(diag::foreign_reference_type_by_value,
+                         /*isReturn=*/true, recordType->getDecl()),
+              decl->getReturnTypeSourceRange().getBegin());
           return true;
         }
       }
@@ -3835,8 +3680,14 @@ namespace {
       auto attrInfo = importer::ReturnOwnershipInfo(decl);
       HeaderLoc loc(decl->getLocation());
 
-      if (recordDecl && recordHasReferenceSemantics(recordDecl) &&
-          !hasAnyImmortalAttr(recordDecl)) {
+      // These diagnostics apply only to shared (non-immortal) reference types.
+      auto frtInfo =
+          recordDecl
+              ? evaluateOrDefault(Impl.SwiftContext.evaluator,
+                                  ForeignReferenceTypeInfoRequest({recordDecl}),
+                                  {})
+              : ForeignReferenceTypeInfo();
+      if (frtInfo.isReference() && !frtInfo.isImmortal()) {
         if (attrInfo.hasConflictingAttr()) {
           Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
                         decl);
@@ -4707,7 +4558,30 @@ namespace {
       Impl.swiftify(result);
     }
 
+    /// Whether the C++ standard library overlay in stdlib/public/Cxx still
+    /// spells \a stubName in a protocol requirement. Uses of these stubs are
+    /// not deprecated yet, because Swift itself asks for them by name.
+    ///
+    /// Matching is on the stub name rather than the C++ base name because
+    /// '__beginMutatingUnsafe' derives from the imported name 'beginMutating',
+    /// not from 'begin'.
+    static bool overlayStillSpellsUnsafeStub(DeclBaseName stubName) {
+      if (stubName.isSpecial())
+        return false;
+      return llvm::StringSwitch<bool>(stubName.getIdentifier().str())
+          .Cases({"__beginUnsafe", "__endUnsafe", "__beginMutatingUnsafe",
+                  "__endMutatingUnsafe", "__findUnsafe", "__findMutatingUnsafe",
+                  "__eraseUnsafe", "__dataUnsafe"},
+                 true)
+          .Default(false);
+    }
+
     /// Apply the __Unsafe-method rename to \a imported, imported from \a decl.
+    ///
+    /// With ImportUnsafeCxxMethodsAsAlwaysUnsafe, the method keeps its original
+    /// name (it is marked '@unsafe(always)' by importAttributes instead), and
+    /// the renamed spelling is imported a second time as a deprecated migration
+    /// stub, which is only '@unsafe'.
     ///
     /// Instantiation is gated on ImportCxxMembersLazily; without that
     /// feature ClangImporter eagerly instantiates typedef members, so the
@@ -4715,8 +4589,9 @@ namespace {
     ///
     /// This is done post-import so we don't eagerly instantiate templates for
     /// methods we may not import.
-    void renameToUnsafeIfNeeded(const clang::CXXMethodDecl *clangDecl,
-                                ValueDecl *swiftDecl) {
+    void renameToUnsafeIfNeeded(
+        const clang::CXXMethodDecl *clangDecl, ValueDecl *swiftDecl,
+        const clang::FunctionTemplateDecl *funcTemplate = nullptr) {
       if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
               clang::CXXConversionDecl>(clangDecl) ||
           clangDecl->getOverloadedOperator() !=
@@ -4756,8 +4631,67 @@ namespace {
                                 ? DeclName(Impl.SwiftContext, unsafeId,
                                            currentName.getArgumentNames())
                                 : DeclName(unsafeId);
-      if (currentName != unsafeName)
+      if (currentName == unsafeName)
+        return;
+
+      if (!keepsNameWhenImportedAsUnsafe(clangDecl, Impl.SwiftContext)) {
         swiftDecl->setName(unsafeName);
+        return;
+      }
+
+      // Keep the original name, and import the method a second time under the
+      // renamed spelling as a migration stub.
+      //
+      // Every diagnostic this import could produce was already produced by the
+      // primary import of the same Clang declaration, so don't repeat them.
+      ImportedName legacyName = importedName;
+      legacyName.setDeclName(unsafeName);
+      ValueDecl *stub = nullptr;
+      {
+        DiagnosticSuppression suppression(Impl.SwiftContext.Diags);
+        stub = dyn_cast_or_null<ValueDecl>(
+            importFunctionDecl(clangDecl, legacyName,
+                               /*correctSwiftName=*/std::nullopt,
+                               /*accessorInfo=*/std::nullopt, funcTemplate));
+      }
+      if (!stub || stub == swiftDecl)
+        return;
+
+      // The stub's own name says 'Unsafe', so its uses don't have to be
+      // acknowledged with 'unsafe' unless strict memory safety is on; that
+      // also keeps existing code that already calls the renamed spelling
+      // compiling. Only the original name is '@unsafe(always)'.
+      //
+      // An implicit '@unsafe(always)' here is necessarily the one the rename
+      // heuristic asked importSwiftAttrAttributes() for; an 'unsafe(always)'
+      // spelled in C++ is explicit, and still wins.
+      if (auto *unsafeAttr = stub->getAttrs().getAttribute<UnsafeAttr>();
+          unsafeAttr && unsafeAttr->isAlways() && unsafeAttr->isImplicit()) {
+        stub->getAttrs().removeAttribute(unsafeAttr);
+        stub->addAttribute(new (Impl.SwiftContext)
+                               UnsafeAttr(/*implicit=*/true));
+      }
+
+      // A method that C++ already deprecates keeps that deprecation; Clang's
+      // message wins at the use site either way.
+      if (!overlayStillSpellsUnsafeStub(unsafeName.getBaseName()) &&
+          !clangDecl->isDeprecated()) {
+        ImportedName primaryName = importedName;
+        primaryName.setDeclName(currentName);
+        llvm::SmallString<32> renamed;
+        {
+          llvm::raw_svector_ostream os(renamed);
+          Impl.printSwiftName(primaryName, Impl.CurrentVersion,
+                              /*fullyQualified=*/false, os);
+        }
+        stub->addAttribute(AvailableAttr::createUniversallyDeprecated(
+            Impl.SwiftContext, /*Message=*/"",
+            Impl.SwiftContext.AllocateCopy(renamed.str())));
+      }
+
+      // importDeclImpl() finalizes every alternate declaration, and
+      // loadAllMembers() adds the stub to the record's members.
+      Impl.addAlternateDecl(swiftDecl, stub);
     }
 
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
@@ -4837,7 +4771,7 @@ namespace {
             // SILGen can substitute it for super calls.
             if (result) {
               SmallString<64> staticCallName("__staticCall_");
-              staticCallName += swiftName;
+              staticCallName += funcDecl->getNameStr();
 
               // Rename the original method to make sure it gets a distinct
               // mangled name from the thunk.
@@ -4846,6 +4780,9 @@ namespace {
                            Impl.SwiftContext.getIdentifier(staticCallName),
                            funcDecl->getName().getArgumentNames()));
               Impl.virtualThunkToOriginal[result] = funcDecl;
+              // swiftify is called on import, but the virtualThunkToOriginal
+              // mapping is not yet ready at that time, so call it again.
+              Impl.swiftify(result);
               return result;
             }
             Impl.markUnavailable(funcDecl,
@@ -5133,10 +5070,7 @@ namespace {
 
       // If the decl represents an availability domain, eagerly synthesize its
       // `if #available` predicate function.
-      if (decl->hasAttrs() &&
-          llvm::any_of(decl->getAttrs(), [](clang::Attr *attr) {
-            return isa<clang::AvailabilityDomainAttr>(attr);
-          }))
+      if (decl->hasAttr<clang::AvailabilityDomainAttr>())
         (void)synthesizer.makeAvailabilityDomainPredicate(decl);
 
       return result;
@@ -5186,7 +5120,7 @@ namespace {
         // Member function templates bypass VisitCXXMethodDecl, so the unsafe
         // method rename that that performs must be applied here too.
         if (auto *MD = dyn_cast<clang::CXXMethodDecl>(decl->getAsFunction()))
-          renameToUnsafeIfNeeded(MD, cast<ValueDecl>(imported));
+          renameToUnsafeIfNeeded(MD, cast<ValueDecl>(imported), decl);
       }
 
       return imported;
@@ -5861,6 +5795,7 @@ namespace {
         }
       }
 
+      Impl.swiftify(result);
       return result;
     }
 
@@ -7077,12 +7012,10 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
 /// Determine whether the given nominal type was imported with an OptionSet
 /// conformance.
 static bool isImportedOptionSet(NominalTypeDecl *nominal) {
-  for (auto attr : nominal->getAttrs()) {
-    if (auto synthesizedAttr = dyn_cast<SynthesizedProtocolAttr>(attr)) {
-      if (synthesizedAttr->getProtocol()->isSpecificProtocol(
-              KnownProtocolKind::OptionSet))
-        return true;
-    }
+  for (auto attr :
+       nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    if (attr->getProtocol()->isSpecificProtocol(KnownProtocolKind::OptionSet))
+      return true;
   }
 
   return false;
@@ -7506,6 +7439,11 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
 
   auto importedType =
       Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
+  if (!importedType) {
+    Impl.addImportDiagnostic(decl, Diagnostic(diag::return_type_not_imported),
+                             decl->getSourceRange().getBegin());
+    return nullptr;
+  }
 
   // Update the failability appropriately based on the imported method type.
   bool failable = false, isIUO = false;
@@ -8727,8 +8665,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
           return;
 
         bool inNearbyCategory =
-            std::any_of(interfaceDecl->known_categories_begin(),
-                        interfaceDecl->known_categories_end(),
+            llvm::any_of(interfaceDecl->known_categories(),
                         [=](const clang::ObjCCategoryDecl *category) -> bool {
                           if (!Impl.getClangSema().isVisible(category)) {
                             return false;
@@ -9356,6 +9293,10 @@ void ClangImporter::Implementation::importNontrivialAttribute(
   }
 }
 
+/// The `swift_attr` prefix introducing an explicit protocol conformance,
+/// e.g. `SWIFT_CONFORMS_TO_PROTOCOL(Module.Protocol)`.
+constexpr static llvm::StringLiteral conformsToPrefix = "conforms_to:";
+
 void
 ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
   auto ClangDecl =
@@ -9380,7 +9321,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
     //
     // __attribute__((swift_attr("attribute")))
     //
-    bool seenUnsafe = false;
+    std::optional<bool> seenUnsafe;
     for (auto swiftAttr : ClangDecl->specific_attrs<clang::SwiftAttrAttr>()) {
       // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
       // point at which to do name lookup for imported entities.
@@ -9485,12 +9426,21 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
+      // A declaration can carry both spellings, and these attributes are also
+      // gathered from more than one Clang declaration. The strongest one wins,
+      // regardless of the order they appear in.
       if (swiftAttr->getAttribute() == "unsafe") {
+        if (!seenUnsafe)
+          seenUnsafe = false;
+        continue;
+      }
+
+      if (swiftAttr->getAttribute() == "unsafe(always)") {
         seenUnsafe = true;
         continue;
       }
 
-      if (swiftAttr->getAttribute().starts_with("conforms_to:")) {
+      if (swiftAttr->getAttribute().starts_with(conformsToPrefix)) {
         if (auto nominal = dyn_cast<NominalTypeDecl>(MappedDecl))
           addExplicitProtocolConformance(nominal, swiftAttr, conformancesSeen);
       }
@@ -9499,12 +9449,22 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
     }
 
     bool importUnsafeHeuristic = false;
+    bool heuristicIsAlways = false;
     if (const auto *CXXMethod = dyn_cast<clang::CXXMethodDecl>(ClangDecl);
-        CXXMethod && shouldRenameCXXMethodAsUnsafe(CXXMethod, SwiftContext))
+        CXXMethod && shouldRenameCXXMethodAsUnsafe(CXXMethod, SwiftContext)) {
       importUnsafeHeuristic = true;
+      // Only require every use to be acknowledged for methods that actually
+      // kept their original name; a method that is still renamed has no
+      // un-renamed spelling to migrate to.
+      heuristicIsAlways =
+          keepsNameWhenImportedAsUnsafe(CXXMethod, SwiftContext);
+    }
 
     if (seenUnsafe || importUnsafeHeuristic) {
-      auto attr = new (SwiftContext) UnsafeAttr(/*implicit=*/!seenUnsafe);
+      auto attr = new (SwiftContext)
+          UnsafeAttr(SourceLoc(), SourceRange(),
+                     seenUnsafe.value_or(false) || heuristicIsAlways,
+                     /*implicit=*/!seenUnsafe.has_value());
       MappedDecl->addAttribute(attr);
     }
   };
@@ -9601,7 +9561,7 @@ void ClangImporter::Implementation::addExplicitProtocolConformance(
     clang::SwiftAttrAttr *conformsToAttr,
     llvm::SmallSet<ProtocolDecl *, 4> &alreadyAdded) {
   auto conformsToValue = conformsToAttr->getAttribute()
-                             .drop_front(StringRef("conforms_to:").size())
+                             .drop_front(conformsToPrefix.size())
                              .str();
   auto names = StringRef(conformsToValue).split('.');
   auto moduleName = names.first;
@@ -9671,14 +9631,13 @@ void ClangImporter::Implementation::addExplicitProtocolConformancesFromBases(
     }
   }
 
-  if (isBase && cxxRecordDecl->hasAttrs()) {
+  if (isBase) {
     llvm::SmallSet<ProtocolDecl *, 4> alreadyAdded;
-    llvm::for_each(cxxRecordDecl->getAttrs(), [&](auto *attr) {
-      if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-        if (swiftAttr->getAttribute().starts_with("conforms_to:"))
-          addExplicitProtocolConformance(nominal, swiftAttr, alreadyAdded);
-      }
-    });
+    for (auto *swiftAttr :
+         cxxRecordDecl->specific_attrs<clang::SwiftAttrAttr>()) {
+      if (swiftAttr->getAttribute().starts_with(conformsToPrefix))
+        addExplicitProtocolConformance(nominal, swiftAttr, alreadyAdded);
+    }
   }
 }
 
@@ -9711,9 +9670,9 @@ static void filterUsableVersionedAttrs(
   // Scan through Swift-Versioned clang attributes and select which one to apply
   // if multiple candidates exist.
   SmallVector<clang::SwiftVersionedAdditionAttr *, 4> swiftVersionedAttributes;
-  for (auto attr : clangDecl->attrs())
-    if (auto versionedAttr = dyn_cast<clang::SwiftVersionedAdditionAttr>(attr))
-      swiftVersionedAttributes.push_back(versionedAttr);
+  for (auto *versionedAttr :
+       clangDecl->specific_attrs<clang::SwiftVersionedAdditionAttr>())
+    swiftVersionedAttributes.push_back(versionedAttr);
 
   // An attribute version is valid to apply if it is greater than the current
   // version or is unversioned
@@ -10556,6 +10515,11 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   // TranslationUnit DeclContext here.
   assert(!dc->isTranslationUnit());
 
+  // A declaration declared inside a function body (e.g. a local C++ class) has
+  // no Swift decl context to be imported into.
+  if (dc->isFunctionOrMethod())
+    return nullptr;
+
   auto decl = dyn_cast<clang::NamedDecl>(dc);
   if (!decl || !decl->getDeclName().isIdentifier())
     return nullptr;
@@ -11021,10 +10985,13 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
   if ((cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) &&
       cxxRecord->isCompleteDefinition()) {
     const clang::RecordDecl *superclassClangDecl = nullptr;
-    auto derivedInfo =
-        evaluateOrDefault(Impl.SwiftContext.evaluator,
-                          ForeignReferenceTypeInfoRequest({cxxRecord}), {});
-    superclassClangDecl = derivedInfo.getPrimarySuperclass();
+    if (Impl.SwiftContext.LangOpts.hasFeature(
+            Feature::ForeignReferenceTypeInheritance)) {
+      auto derivedInfo =
+          evaluateOrDefault(Impl.SwiftContext.evaluator,
+                            ForeignReferenceTypeInfoRequest({cxxRecord}), {});
+      superclassClangDecl = derivedInfo.getPrimarySuperclass();
+    }
 
     for (auto base : cxxRecord->bases()) {
       if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)
@@ -11052,7 +11019,12 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     }
   }
 
-  if ((isa<clang::CXXRecordDecl>(swiftDecl->getClangDecl())) && !storage &&
+  // These all look up members by name in the Clang record, which requires a
+  // complete definition. A foreign reference type is imported even when it is
+  // only declared, and such a type has no members to find.
+  if (auto *cxxSwiftDecl =
+          dyn_cast<clang::CXXRecordDecl>(swiftDecl->getClangDecl());
+      cxxSwiftDecl && cxxSwiftDecl->isCompleteDefinition() && !storage &&
       !inheritance) {
     (void)Impl.lookupAndImportPointee(swiftDecl);
     (void)Impl.lookupAndImportSuccessor(swiftDecl);
@@ -11290,13 +11262,18 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
 
     // If there are auxiliary declarations (e.g., produced by macros), load
     // those.
-    member->visitAuxiliaryDecls([&](Decl *aux) {
-      if (auto auxValue = dyn_cast<ValueDecl>(aux)) {
-        if (auxValue->getDeclContext() == expectedDC &&
-            knownAlternateMembers.insert(auxValue).second)
-          members.push_back(auxValue);
-      }
-    });
+    auto addAuxiliaryDecls = [&](Decl *forDecl) {
+      forDecl->visitAuxiliaryDecls([&](Decl *aux) {
+        if (auto auxValue = dyn_cast<ValueDecl>(aux)) {
+          if (auxValue->getDeclContext() == expectedDC &&
+              knownAlternateMembers.insert(auxValue).second)
+            members.push_back(auxValue);
+        }
+      });
+    };
+    addAuxiliaryDecls(member);
+    for (auto alternate : getAlternateDecls(member))
+      addAuxiliaryDecls(alternate);
 
     // If this declaration shouldn't be visible, don't add it to
     // the list.

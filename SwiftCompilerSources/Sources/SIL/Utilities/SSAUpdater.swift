@@ -42,6 +42,9 @@ public struct SSAUpdater<Context: MutatingContext> {
   /// The phi arguments which were inserted so far by `getValue`, in the order they were created.
   public var insertedPhis = [Phi]()
 
+  /// The blocks in which this updater inserted a phi argument.
+  private var blocksWithInsertedPhis: BasicBlockSet
+
   /// Creates a new SSA-updater for values of `type` with the given `ownership`.
   ///
   /// All values that are constructed or merged by this updater (available values passed to
@@ -51,10 +54,12 @@ public struct SSAUpdater<Context: MutatingContext> {
     self.type = type
     self.ownership = ownership
     self.liverange = BasicBlockWorklist(context)
+    self.blocksWithInsertedPhis = BasicBlockSet(context)
   }
 
   public mutating func deinitialize() {
     liverange.deinitialize()
+    blocksWithInsertedPhis.deinitialize()
   }
 
   /// Registers `value` as the available value at the *end* of `block`.
@@ -136,7 +141,7 @@ public struct SSAUpdater<Context: MutatingContext> {
     // forward order. Therefore we have to reverse the list.
     for block in blocks.reversed() {
       if let existingValue = computedValuesAtBeginOfBlocks[block] {
-        if existingValue.isPhi(in: block) {
+        if isInsertedPhi(existingValue, in: block) {
           // Avoid creating another phi if we already have one created in this block.
           continue
         }
@@ -183,6 +188,7 @@ public struct SSAUpdater<Context: MutatingContext> {
           if previous != v {
             let phiArg = block.addArgument(type: type, ownership: ownership, context)
             insertedPhis.append(Phi(phiArg)!)
+            blocksWithInsertedPhis.insert(block)
             return phiArg
           }
         } else {
@@ -217,13 +223,24 @@ public struct SSAUpdater<Context: MutatingContext> {
         // merely forward `value`, it is its definition. This can happen if `value` is a loop-header
         // phi and the successor walk reaches the header again via a back-edge. Clearing it would
         // drop the genuine phi and cause a duplicate phi to be inserted on the next iteration.
-        if value.isPhi(in: block) {
+        if isInsertedPhi(value, in: block) {
           continue
         }
         computedValuesAtBeginOfBlocks.removeValue(forKey: block)
         worklist.pushIfNotVisited(contentsOf: block.successors)
       }
     }
+  }
+
+  /// Returns true if `value` is a phi argument which _this updater_ inserted into `block`.
+  private func isInsertedPhi(_ value: Value, in block: BasicBlock) -> Bool {
+    if blocksWithInsertedPhis.contains(block),
+       let lastArg = block.arguments.last,
+       value == lastArg
+    {
+      return true
+    }
+    return false
   }
 
   /// Rewrites each `br` predecessor of `phi`'s block to also pass the value that is live at the
@@ -356,15 +373,6 @@ public struct InstructionBasedSSAUpdater<Context: MutatingContext> {
   public var insertedPhis: [Phi] { ssaUpdater.insertedPhis }
 }
 
-private extension Value {
-  func isPhi(in block: BasicBlock) -> Bool {
-    if let arg = self as? Argument, arg.parentBlock == block {
-      return true
-    }
-    return false
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                               Unit Tests
 //===----------------------------------------------------------------------===//
@@ -381,19 +389,19 @@ let ssaUpdaterTest = Test("ssa_updater") {
     return
   }
 
-  var ssaUpdater = SSAUpdater(type: firstValue.type, ownership: firstValue.ownership, context)
+  var ssaUpdater = SSAUpdater(type: firstValue.0.type, ownership: firstValue.0.ownership, context)
   defer { ssaUpdater.deinitialize() }
 
-  var availableValuesInBlocks = Dictionary<BasicBlock, IntegerLiteralInst>()
+  var availableValuesInBlocks = Dictionary<BasicBlock, Instruction>()
 
-  for v in availableValues {
-    ssaUpdater.addAvailableValue(v, in: v.parentBlock)
-    availableValuesInBlocks[v.parentBlock] = v
+  for (v, insertionPoint) in availableValues {
+    ssaUpdater.addAvailableValue(v, in: insertionPoint.parentBlock)
+    availableValuesInBlocks[insertionPoint.parentBlock] = insertionPoint
   }
 
   for block in function.blocks {
     for inst in block.instructions {
-      for op in inst.operands where op.value is Undef && op.value.type == firstValue.type {
+      for op in inst.operands where op.value is Undef && op.value.type == firstValue.0.type {
         let v: Value
         if let available = availableValuesInBlocks[block], available.strictlyDominatesInBlock(inst) {
           v = ssaUpdater.getValue(atEndOf: block)
@@ -418,33 +426,60 @@ let instructionBasedSSAUpdaterTest = Test("instruction_based_ssa_updater") {
     return
   }
 
-  var ssaUpdater = InstructionBasedSSAUpdater(type: firstValue.type, ownership: firstValue.ownership, context)
+  var ssaUpdater = InstructionBasedSSAUpdater(type: firstValue.0.type, ownership: firstValue.0.ownership, context)
   defer { ssaUpdater.deinitialize() }
 
-  for v in availableValues {
-    for user in v.users {
-      ssaUpdater.addAvailableValue(v, after: user)
-    }
+  for (v, insertionPoint) in availableValues {
+    ssaUpdater.addAvailableValue(v, after: insertionPoint)
   }
 
   for inst in function.instructions {
-    for op in inst.operands where op.value is Undef && op.value.type == firstValue.type {
+    for op in inst.operands where op.value is Undef && op.value.type == firstValue.0.type {
       let v = ssaUpdater.getValue(before: inst)
       op.set(to: v, context)
     }
   }
 }
 
-private func getTestAvailableValues(in function: Function) -> [IntegerLiteralInst] {
-  var availableValues = [IntegerLiteralInst]()
+/// Returns the available values of a test function, together with the instruction after which
+/// each value becomes available. Available values are:
+/// - `integer_literal` instructions: available after each of their users, or after the literal
+///   itself if it has no users
+/// - block arguments which have `fix_lifetime` users: available after each such `fix_lifetime`.
+///   This allows tests to use a pre-existing block argument as an available value.
+///
+private func getTestAvailableValues(in function: Function) -> [(Value, insertionPoint: Instruction)] {
+  var availableValues = [(Value, insertionPoint: Instruction)]()
 
-  for inst in function.instructions {
-    if let il = inst as? IntegerLiteralInst {
-      availableValues.append(il)
+  for block in function.blocks {
+    for arg in block.arguments {
+      for fixLifetime in arg.uses.users(ofType: FixLifetimeInst.self) {
+        availableValues.append((arg, insertionPoint: fixLifetime))
+      }
+    }
+    for inst in block.instructions {
+      if let il = inst as? IntegerLiteralInst {
+        if il.uses.isEmpty {
+          availableValues.append((il, insertionPoint: il))
+        } else {
+          for user in il.users {
+            availableValues.append((il, insertionPoint: user))
+          }
+        }
+      }
     }
   }
 
-  availableValues.sort(by: { $0.value! < $1.value! })
+  // Order integer literals by their value (block arguments keep their relative order at the end)
+  // so that available values are added in a deterministic order.
+  availableValues.sort(by: {
+    if let il1 = $0.0 as? IntegerLiteralInst,
+       let il2 = $1.0 as? IntegerLiteralInst
+    {
+      return il1.value! < il2.value!
+    }
+    return $0.0 is IntegerLiteralInst
+  })
 
   return availableValues
 }

@@ -401,8 +401,15 @@ GROUPED_ERROR(embedded_swift_metatype_type,EmbeddedRestrictions,none,
       "cannot use metatype of type %0 in embedded Swift", (Type))
 GROUPED_ERROR(embedded_swift_keypath,EmbeddedRestrictions,none,
       "cannot use key path in embedded Swift", ())
+GROUPED_WARNING(perf_hint_keypath_captures_values,HeapAllocation,none,
+      "a key path that captures %0 value%s0 requires a heap allocation",
+      (unsigned))
 GROUPED_ERROR(embedded_swift_dynamic_cast,EmbeddedRestrictions,none,
       "cannot do dynamic casting in embedded Swift", ())
+GROUPED_WARNING(embedded_swift_cast_to_nonunique_type,EmbeddedRestrictions,none,
+      "casting to %0 across a module boundary in embedded Swift may fail at "
+      "runtime because its type metadata is not unique; mark %0 with "
+      "'@export(interface)' in its defining module", (Type))
 GROUPED_ERROR(embedded_capture_of_generic_value_with_deinit,EmbeddedRestrictions,none,
       "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
 GROUPED_ERROR(embedded_call_generic_function,EmbeddedRestrictions,none,
@@ -417,14 +424,25 @@ NOTE(embedded_constructor_called,none,
       "instance of type created here", ())
 
 // no-allocations diagnostics
-ERROR(embedded_swift_allocating_type,none,
-      "cannot use allocating type %0 in -no-allocations mode", (Type))
-ERROR(embedded_swift_allocating_coroutine,none,
-      "cannot use co-routines (like accessors) in -no-allocations mode", ())
-ERROR(embedded_swift_allocating_closure,none,
-      "cannot use escaping closures in -no-allocations mode", ())
-ERROR(embedded_swift_allocating,none,
-      "cannot use allocating operation in -no-allocations mode", ())
+GROUPED_WARNING(embedded_swift_allocating_type,HeapAllocation,none,
+      "creating an instance of type %0 involves heap allocation", (Type))
+GROUPED_WARNING(embedded_swift_allocating_coroutine,HeapAllocation,none,
+      "coroutine accessor involves heap allocation",
+      ())
+GROUPED_WARNING(embedded_swift_allocating_async,HeapAllocation,none,
+      "async call involves heap allocation", ())
+GROUPED_WARNING(embedded_swift_allocating_closure,HeapAllocation,none,
+      "escaping closure involves heap allocation", ())
+GROUPED_WARNING(embedded_swift_allocating,HeapAllocation,none,
+      "function conversion involves heap allocation", ())
+GROUPED_WARNING(embedded_swift_allocation_raw,HeapAllocation,none,
+      "explicit heap allocation", ())
+GROUPED_WARNING(embedded_swift_allocating_existential_box,HeapAllocation,none,
+      "boxing a value of type %1 into an %0 involves heap allocation",
+      (Type, Type))
+GROUPED_WARNING(embedded_swift_allocating_existential_metatype_box,HeapAllocation,none,
+      "boxing type %1 into an %0 can result in later heap allocation",
+      (Type, Type))
 
 ERROR(wrong_linkage_for_serialized_function,none,
       "function has wrong linkage to be called from %0", (StringRef))
@@ -1307,14 +1325,14 @@ GROUPED_NOTE(regionbasedisolation_value_became_part_of_isolated_region,
 
 GROUPED_NOTE(regionbasedisolation_chain_value_exposed,
      RegionIsolationIsolationHistory, none,
-     "%0 is connected to %1",
-     (Identifier, Identifier))
+     "%select{|result of }1%0 is connected to %select{|result of }3%2",
+     (Identifier, bool, Identifier, bool))
 
 GROUPED_NOTE(regionbasedisolation_chain_value_exposed_to_isolated_named,
      RegionIsolationIsolationHistory, none,
-     "%0 is connected to %1 which is accessible to "
-     "%select{%2 code|code in the current isolation context}3",
-     (Identifier, Identifier, StringRef, bool))
+     "%select{|result of }1%0 is connected to %select{|result of }3%2 which is "
+     "accessible to %select{%4 code|code in the current isolation context}5",
+     (Identifier, bool, Identifier, bool, StringRef, bool))
 
 // Concurrency related diagnostics
 ERROR(executor_factory_must_conform, none,

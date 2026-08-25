@@ -40,6 +40,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <utility>
@@ -704,10 +705,10 @@ public:
           // Don't emit nested types that are just implicitly @objc.
           // You should have to opt into this, since they are even less
           // namespaced than usual.
-          if (std::any_of(VD->getAttrs().begin(), VD->getAttrs().end(),
-                          [](const DeclAttribute *attr) {
-                            return isa<ObjCAttr>(attr) && !attr->isImplicit();
-                          })) {
+          if (llvm::any_of(VD->getAttrs().getAttributes<ObjCAttr>(),
+                           [](const ObjCAttr *attr) {
+                             return !attr->isImplicit();
+                           })) {
             nestedTypes.push_back(VD);
           }
         }
@@ -948,11 +949,10 @@ public:
     auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::Error);
     if (outputLangMode == OutputLanguageMode::ObjC
         && ED->lookupConformance(errorTypeProto, conformances)) {
-      bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
-                                       ED->getAllElements().end(),
-                                       [](const EnumElementDecl *elem) {
-        return elem->getBaseIdentifier().str() == "Domain";
-      });
+      bool hasDomainCase =
+          llvm::any_of(ED->getAllElements(), [](const EnumElementDecl *elem) {
+            return elem->getBaseIdentifier().str() == "Domain";
+          });
       if (!hasDomainCase) {
         os << "static NSString * _Nonnull const " << getNameForObjC(ED)
            << "Domain = @\"" << getErrorDomainStringForObjC(ED) << "\";\n";
@@ -967,30 +967,26 @@ public:
     M.getTopLevelDeclsWithAuxiliaryDecls(decls);
     llvm::SmallSetVector<const ValueDecl *, 4> removedValueDecls;
 
-    auto newEnd =
-        std::remove_if(decls.begin(), decls.end(),
-                       [this, &removedValueDecls](const Decl *D) -> bool {
-                         if (auto VD = dyn_cast<ValueDecl>(D)) {
-                           auto shouldRemove = !printer.shouldInclude(VD);
-                           if (shouldRemove)
-                             removedValueDecls.insert(VD);
-                           return shouldRemove;
-                         }
+    llvm::erase_if(decls, [this, &removedValueDecls](const Decl *D) -> bool {
+      if (auto VD = dyn_cast<ValueDecl>(D)) {
+        auto shouldRemove = !printer.shouldInclude(VD);
+        if (shouldRemove)
+          removedValueDecls.insert(VD);
+        return shouldRemove;
+      }
 
-                         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-                           // Immediately filter out invalid extensions.
-                           if (ED->isInvalid())
-                             return true;
-                           if (outputLangMode == OutputLanguageMode::Cxx)
-                             return false;
-                           auto baseClass = ED->getSelfClassDecl();
-                           return !baseClass ||
-                                  !printer.shouldInclude(baseClass) ||
-                                  baseClass->isForeign();
-                         }
-                         return true;
-                       });
-    decls.erase(newEnd, decls.end());
+      if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+        // Immediately filter out invalid extensions.
+        if (ED->isInvalid())
+          return true;
+        if (outputLangMode == OutputLanguageMode::Cxx)
+          return false;
+        auto baseClass = ED->getSelfClassDecl();
+        return !baseClass || !printer.shouldInclude(baseClass) ||
+               baseClass->isForeign();
+      }
+      return true;
+    });
 
     if (M.isStdlibModule()) {
       llvm::SmallVector<Decl *, 2> nestedAdds;

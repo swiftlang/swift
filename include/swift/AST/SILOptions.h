@@ -149,6 +149,9 @@ public:
   /// Enables SIL-level diagnostics for NonescapableTypes.
   bool EnableLifetimeDependenceDiagnostics = true;
 
+  /// Enables the LifetimeResolution passes and infrastructure.
+  bool EnableLifetimeResolution = false;
+
   /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
   /// annotations, Embedded Swift, and class specialization). SourceKit is the
   /// only consumer that has this disabled today (as it disables WMO

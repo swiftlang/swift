@@ -148,6 +148,11 @@ protected:
   InvocationInfo constructInvocation(const AutolinkExtractJobAction &job,
                                      const JobContext &context) const override;
 
+  void addCommonFrontendArgs(
+      const OutputInfo &OI, const CommandOutput &output,
+      const llvm::opt::ArgList &inputArgs,
+      llvm::opt::ArgStringList &arguments) const override;
+
   /// If provided, and if the user has not already explicitly specified a
   /// linker to use via the "-fuse-ld=" option, this linker will be passed to
   /// the compiler invocation via "-fuse-ld=". Return an empty string to not

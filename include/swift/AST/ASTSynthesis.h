@@ -55,6 +55,8 @@ enum SingletonTypeSynthesizer {
   _swiftInt,               // Swift.Int
   _serialExecutor,         // the '_Concurrency.SerialExecutor' protocol
   _taskExecutor,           // the '_Concurrency.TaskExecutor' protocol
+  _clock,                  // the '_Concurrency.Clock' protocol
+  _identifiable,           // the 'Swift.Identifiable' protocol
   _actor,                  // the '_Concurrency.Actor' protocol
   _distributedActor,       // the 'Distributed.DistributedActor' protocol
   _unsafeRawBufferPointer, // UnsafeRawBufferPointer
@@ -86,6 +88,15 @@ inline Type synthesizeType(SynthesisContext &SC,
     } else {
       return nullptr;
     }
+  case _clock:
+    if (auto ty = SC.Context.getProtocol(KnownProtocolKind::Clock)) {
+      return ty->getDeclaredInterfaceType();
+    } else {
+      return nullptr;
+    }
+  case _identifiable:
+    return SC.Context.getProtocol(KnownProtocolKind::Identifiable)
+      ->getDeclaredInterfaceType();
   case _actor:
     return SC.Context.getProtocol(KnownProtocolKind::Actor)
       ->getDeclaredInterfaceType();
@@ -368,6 +379,10 @@ constexpr SpecifiedParamSynthesizer<G> _owned(G sub) {
 template <class G>
 constexpr SpecifiedParamSynthesizer<G> _consuming(G sub) {
   return {ParamSpecifier::Consuming, sub};
+}
+template <class G>
+constexpr SpecifiedParamSynthesizer<G> _borrowing(G sub) {
+  return {ParamSpecifier::Borrowing, sub};
 }
 template <class G>
 constexpr SpecifiedParamSynthesizer<G> _inout(G sub) {

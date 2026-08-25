@@ -99,6 +99,13 @@ template <class T> class SILVTableVisitor {
             /*allowUsableFromInline=*/true))
         break;
 
+      // In Embedded Swift a generic method has no vtable entry to override.
+      if (auto *baseFn =
+              dyn_cast<AbstractFunctionDecl>(baseRef.getDecl())) {
+        if (baseFn->mustBeStaticallyDispatchedInEmbedded())
+          break;
+      }
+
       asDerived().addMethodOverride(baseRef, declRef);
       nextRef = baseRef;
     }

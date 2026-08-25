@@ -11,7 +11,7 @@ enum Optional<T> {
 @available(OSX, introduced: 10.5, deprecated: 10.8, obsoleted: 10.9,
               message: "you don't want to do that anyway")
 func doSomething() { }
-// expected-note @-1{{'doSomething()' was obsoleted in macOS 10.9}}
+// expected-note @-3{{'doSomething()' was obsoleted in macOS 10.9}}
 
 doSomething() // expected-error{{'doSomething()' is unavailable in macOS: you don't want to do that anyway}}
 
@@ -19,14 +19,14 @@ doSomething() // expected-error{{'doSomething()' is unavailable in macOS: you do
 // Preservation of major.minor.micro
 @available(OSX, introduced: 10.5, deprecated: 10.8, obsoleted: 10.9.1)
 func doSomethingElse() { }
-// expected-note @-1{{'doSomethingElse()' was obsoleted in macOS 10.9.1}}
+// expected-note @-2{{'doSomethingElse()' was obsoleted in macOS 10.9.1}}
 
 doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable in macOS}}
 
 // Preservation of minor-only version
 @available(OSX, introduced: 8.0, deprecated: 8.5, obsoleted: 10)
 func doSomethingReallyOld() { }
-// expected-note @-1{{'doSomethingReallyOld()' was obsoleted in macOS 10}}
+// expected-note @-2{{'doSomethingReallyOld()' was obsoleted in macOS 10}}
 
 doSomethingReallyOld() // expected-error{{'doSomethingReallyOld()' is unavailable in macOS}}
 
@@ -60,7 +60,7 @@ func functionWithDeprecatedLaterParameter(p: DeprecatedClassIn10_11) { }
 // Unconditional platform unavailability
 @available(OSX, unavailable)
 func doSomethingNotOnOSX() { }
-// expected-note @-1{{'doSomethingNotOnOSX()' has been explicitly marked unavailable here}}
+// expected-note @-2{{'doSomethingNotOnOSX()' has been explicitly marked unavailable here}}
 
 doSomethingNotOnOSX() // expected-error{{'doSomethingNotOnOSX()' is unavailable in macOS}}
 
@@ -84,21 +84,29 @@ doSomethingDeprecatedOniOS() // okay
 struct TestStruct {} // expected-note 2 {{enclosing scope requires availability of macOS 10.10 or newer}}
 
 @available(macOS 10.10, *)
-extension TestStruct { // expected-note {{enclosing scope requires availability of macOS 10.10 or newer}}
-  @available(swift 400)
-  func doTheThing() {} // expected-note {{'doTheThing()' was introduced in Swift 400}}
+extension TestStruct { // expected-note 2 {{enclosing scope requires availability of macOS 10.10 or newer}}
+  @available(swift 400) // expected-note {{'doTheThing()' was introduced in Swift 400}}
+  func doTheThing() {}
 
   @available(macOS 10.9, *) // expected-error {{instance method cannot be more available than enclosing scope}}
-  @available(swift 400)
-  func doAnotherThing() {} // expected-note {{'doAnotherThing()' was introduced in Swift 400}}
+  @available(swift 400) // expected-note {{'doAnotherThing()' was introduced in Swift 400}}
+  func doAnotherThing() {}
 
   @available(macOS 10.12, *)
-  @available(swift 400)
-  func doThirdThing() {} // expected-note {{'doThirdThing()' was introduced in Swift 400}}
+  @available(swift 400) // expected-note {{'doThirdThing()' was introduced in Swift 400}}
+  func doThirdThing() {}
 
   @available(macOS 10.12, *)
   @available(swift 1)
   func doFourthThing() {}
+
+  func doLocalThing() {
+    @available(macOS 10.9, *) // expected-warning {{local function cannot be more available than enclosing scope}}
+    func moreAvailableFunction() { }
+
+    @available(macOS 10.12, *)
+    func lessAvailableFunction() { }
+  }
 
   @available(*, deprecated)
   func doDeprecatedThing() {}
@@ -129,15 +137,15 @@ extension TestStruct {
   }
 
   var unavailableGetter: Data {
-    @available(macOS, unavailable, message: "bad getter")
-    get { return Data() } // expected-note 2 {{here}}
+    @available(macOS, unavailable, message: "bad getter") // expected-note 2 {{here}}
+    get { return Data() }
     set {}
   }
 
   var unavailableSetter: Data {
     get { return Data() }
-    @available(macOS, obsoleted: 10.5, message: "bad setter")
-    set {} // expected-note 2 {{setter for 'unavailableSetter' was obsoleted in macOS 10.5}}
+    @available(macOS, obsoleted: 10.5, message: "bad setter") // expected-note 2 {{setter for 'unavailableSetter' was obsoleted in macOS 10.5}}
+    set {}
   }
 }
 
@@ -154,14 +162,14 @@ func testAccessors() {
 
 // Check available on extensions
 
-@available(macOS, unavailable)
+@available(macOS, unavailable) // expected-note 2 {{'unavailInExtension()' has been explicitly marked unavailable here}}
 extension TestStruct {
-  func unavailInExtension() {} // expected-note 2 {{'unavailInExtension()' has been explicitly marked unavailable here}}
+  func unavailInExtension() {}
 }
 
-@available(macOS, obsoleted: 10.0)
+@available(macOS, obsoleted: 10.0) // expected-note 2 {{'obsoletedInExtension()' was obsoleted in macOS 10.0}}
 extension TestStruct {
-  func obsoletedInExtension() {} // expected-note 2 {{'obsoletedInExtension()' was obsoleted in macOS 10.0}}
+  func obsoletedInExtension() {}
 }
 
 @available(macOS, deprecated: 10.0)
@@ -169,9 +177,9 @@ extension TestStruct {
   func deprecatedInExtension() {}
 }
 
-@available(swift, introduced: 50.0)
+@available(swift, introduced: 50.0) // expected-note 2 {{'introducedInExtensionSwift()' was introduced in Swift 50.0}}
 extension TestStruct {
-  func introducedInExtensionSwift() {} // expected-note 2 {{'introducedInExtensionSwift()' was introduced in Swift 50.0}}
+  func introducedInExtensionSwift() {}
 }
 
 @available(macOS, introduced: 50)

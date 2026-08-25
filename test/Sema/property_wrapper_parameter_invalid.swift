@@ -137,9 +137,9 @@ public func f1(@Wrapper value: Int) {}
 // expected-error@+1 {{the parameter API wrapper of a '@usableFromInline' function must be '@usableFromInline' or public}}
 @usableFromInline func f3(@Wrapper value: Int) {}
 
-@available(*, unavailable)
+@available(*, unavailable) // expected-note {{'UnavailableWrapper' has been explicitly marked unavailable here}}
 @propertyWrapper
-struct UnavailableWrapper<T> { // expected-note {{'UnavailableWrapper' has been explicitly marked unavailable here}}
+struct UnavailableWrapper<T> {
   var wrappedValue: T
 }
 

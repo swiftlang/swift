@@ -121,6 +121,11 @@ module InvalidNestedStruct {
   requires cplusplus
 }
 
+module LocalClass {
+  header "local-class.h"
+  requires cplusplus
+}
+
 module ClassProtocolNameClash {
   header "class-protocol-name-clash.h"
   requires cplusplus

@@ -372,3 +372,55 @@ bb0(%0 : @owned $Foo):
   %r = tuple ()
   return %r : $()
 }
+
+//===----------------------------------------------------------------------===//
+// Regression test: the concrete type proved for `%o2` below is itself an
+// opened archetype (`@opened(11, any Derived3) Self`), because the existential
+// `%ie` was built by re-wrapping an already-opened existential into a less
+// specific protocol. `%o2` is owned and the apply's argument is
+// `@guaranteed`, so casting `%o2` directly consumed it while its own
+// `destroy_value` still consumed it too -- "Found over consume?!". The extra
+// use of `%ie` keeps the `open_existential_ref`/`init_existential_ref` pair
+// from collapsing, so no later peephole repaired the double consume.
+//
+// Casting a borrow instead is no help here: SILCombine re-simplifies a cast
+// whose target is an opened archetype away, so the borrow+cast would be
+// rebuilt forever (see `test/embedded/existential-default-method.swift`).
+// Bail out of the propagation entirely and leave the apply abstract.
+//===----------------------------------------------------------------------===//
+
+protocol Base3 : AnyObject {}
+protocol Derived3 : Base3 {}
+
+sil @makeDerived3 : $@convention(thin) () -> @owned any Derived3
+sil @takeBase3 : $@convention(method) <T where T : Base3> (@guaranteed T) -> ()
+sil @useBase3 : $@convention(thin) (@guaranteed any Base3) -> ()
+
+// CHECK-LABEL: sil [ossa] @reopenedExistentialWithConcreteOpenedArchetype :
+// CHECK-NOT:   unchecked_ref_cast
+// CHECK:       [[O2:%.*]] = open_existential_ref {{%.*}} : $any Base3 to $@opened([[#OPENED:]], any Base3) Self
+// CHECK-NOT:   unchecked_ref_cast
+// CHECK:       apply {{%.*}}<@opened([[#OPENED]], any Base3) Self>([[O2]])
+// CHECK:       destroy_value [[O2]]
+// CHECK-LABEL: } // end sil function 'reopenedExistentialWithConcreteOpenedArchetype'
+sil [ossa] @reopenedExistentialWithConcreteOpenedArchetype : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @makeDerived3 : $@convention(thin) () -> @owned any Derived3
+  %e = apply %f() : $@convention(thin) () -> @owned any Derived3
+  %o1 = open_existential_ref %e : $any Derived3 to $@opened(11, any Derived3) Self
+  %ie = init_existential_ref %o1 : $@opened(11, any Derived3) Self : $@opened(11, any Derived3) Self, $any Base3
+
+  // An extra use of %ie, so that open_existential_ref(init_existential_ref)
+  // below cannot be folded away.
+  %c = copy_value %ie : $any Base3
+  %u = function_ref @useBase3 : $@convention(thin) (@guaranteed any Base3) -> ()
+  %au = apply %u(%c) : $@convention(thin) (@guaranteed any Base3) -> ()
+  destroy_value %c : $any Base3
+
+  %o2 = open_existential_ref %ie : $any Base3 to $@opened(12, any Base3) Self
+  %g = function_ref @takeBase3 : $@convention(method) <T where T : Base3> (@guaranteed T) -> ()
+  %a = apply %g<@opened(12, any Base3) Self>(%o2) : $@convention(method) <T where T : Base3> (@guaranteed T) -> ()
+  destroy_value %o2 : $@opened(12, any Base3) Self
+  %t = tuple ()
+  return %t : $()
+}

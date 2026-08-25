@@ -1586,3 +1586,12 @@ Added: _$ss6SIMD64Vss6UInt64VRszrlE7lowHalfs6SIMD32VyADGvpMV
 Added: _$ss6SIMD64Vss6UInt64VRszrlE7oddHalfs6SIMD32VyADGvpMV
 Added: _$ss6SIMD64Vss6UInt64VRszrlE8evenHalfs6SIMD32VyADGvpMV
 Added: _$ss6SIMD64Vss6UInt64VRszrlE8highHalfs6SIMD32VyADGvpMV
+
+// Distributed runtime: query key-argument count for the target's generic env
+Added: _swift_distributed_getGenericEnvironmentKeyArgumentCount
+
+// Task Registry
+Added: _concurrencyEnableTaskRegistry
+
+// Privilege gating for environment variables
+Added: __swift_isRestrictedProcess

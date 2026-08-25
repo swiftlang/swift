@@ -46,8 +46,7 @@ static std::optional<Path> getActualModuleMapPath(
   Path result;
 
   if (!Opts.RuntimeResourcePath.empty()) {
-    result.append(Opts.RuntimeResourcePath.begin(),
-                  Opts.RuntimeResourcePath.end());
+    result.assign(Opts.RuntimeResourcePath);
     llvm::sys::path::append(result, platform);
     if (isArchSpecific) {
       llvm::sys::path::append(result, arch);
@@ -63,8 +62,7 @@ static std::optional<Path> getActualModuleMapPath(
 
   StringRef SDKPath = Opts.getSDKPath();
   if (!SDKPath.empty()) {
-    result.clear();
-    result.append(SDKPath.begin(), SDKPath.end());
+    result.assign(SDKPath);
     llvm::sys::path::append(result, "usr", "lib", "swift");
     llvm::sys::path::append(result, platform);
     if (isArchSpecific) {

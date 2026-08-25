@@ -138,6 +138,7 @@ UNINTERESTING_FEATURE(OldOwnershipOperatorSpellings)
 UNINTERESTING_FEATURE(MoveOnlyEnumDeinits)
 UNINTERESTING_FEATURE(MoveOnlyTuples)
 UNINTERESTING_FEATURE(MoveOnlyPartialReinitialization)
+UNINTERESTING_FEATURE(NoncopyableCasting)
 UNINTERESTING_FEATURE(AccessLevelOnImport)
 UNINTERESTING_FEATURE(AllowNonResilientAccessInPackage)
 UNINTERESTING_FEATURE(ClientBypassResilientAccessInPackage)
@@ -178,7 +179,6 @@ UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
 UNINTERESTING_FEATURE(EmbeddedDynamicExclusivity)
-UNINTERESTING_FEATURE(EmbeddedKeyPaths)
 UNINTERESTING_FEATURE(TypedAllocation)
 UNINTERESTING_FEATURE(MutateAndConsumeInDeinit)
 
@@ -472,6 +472,9 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
 UNINTERESTING_FEATURE(ClosureBodyMacro)
 UNINTERESTING_FEATURE(BuiltinConcurrencyStackNesting)
 UNINTERESTING_FEATURE(BuiltinTaskCancellationShield)
+UNINTERESTING_FEATURE(BuiltinTaskCancellationScope)
+UNINTERESTING_FEATURE(BuiltinTaskDeadline)
+UNINTERESTING_FEATURE(BuiltinCancellationHandlerWithReason)
 UNINTERESTING_FEATURE(BuiltinAddTaskLocalValue)
 UNINTERESTING_FEATURE(BuiltinContinuationNonCopyableSuccess)
 UNINTERESTING_FEATURE(CompileTimeValuesPreview)
@@ -483,6 +486,8 @@ UNINTERESTING_FEATURE(SafeInteropWrappersNullAsEmptySpan)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(ImportCxxMembersLazily)
+UNINTERESTING_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe)
+UNINTERESTING_FEATURE(LibkernOwnershipConventions)
 UNINTERESTING_FEATURE(ForeignReferenceTypeInheritance)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
@@ -495,6 +500,11 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
   case DeclKind::Var: {
     auto *var = cast<VarDecl>(decl);
     return llvm::any_of(var->getAllAccessors(),
+                        accessorDeclUsesFeatureCoroutineAccessors);
+  }
+  case DeclKind::Subscript: {
+    auto *subscript = cast<SubscriptDecl>(decl);
+    return llvm::any_of(subscript->getAllAccessors(),
                         accessorDeclUsesFeatureCoroutineAccessors);
   }
   case DeclKind::Accessor: {
@@ -616,6 +626,13 @@ static bool usesFeatureBorrowAndMutateAccessors(Decl *decl) {
 static bool usesFeatureInlineAlways(Decl *decl) {
   if (auto *inlineAttr = decl->getAttrs().getAttribute<InlineAttr>()) {
     return inlineAttr->getKind() == InlineKind::Always;
+  }
+  return false;
+}
+
+static bool usesFeatureAlwaysUnsafeAttribute(Decl *decl) {
+  if (auto *unsafeAttr = decl->getAttrs().getAttribute<UnsafeAttr>()) {
+    return unsafeAttr->isAlways();
   }
   return false;
 }

@@ -69,20 +69,20 @@ public struct AfterDeploymentTarget {
   init<T>(_ t: T) {}
 }
 
-@available(macOS, obsoleted: 10.14.5)
-public struct ObsoletedBetweenTargets { // expected-note * {{'ObsoletedBetweenTargets' was obsoleted in macOS 10.14.5}}
+@available(macOS, obsoleted: 10.14.5) // expected-note * {{'ObsoletedBetweenTargets' was obsoleted in macOS 10.14.5}}
+public struct ObsoletedBetweenTargets {
   @usableFromInline internal init() {}
   init<T>(_ t: T) {}
 }
 
-@available(macOS, obsoleted: 10.15)
-public struct ObsoletedAtDeploymentTarget { // expected-note * {{'ObsoletedAtDeploymentTarget' was obsoleted in macOS 10.15}}
+@available(macOS, obsoleted: 10.15) // expected-note * {{'ObsoletedAtDeploymentTarget' was obsoleted in macOS 10.15}}
+public struct ObsoletedAtDeploymentTarget {
   @usableFromInline internal init() {}
   init<T>(_ t: T) {}
 }
 
-@available(macOS, unavailable)
-public struct Unavailable { // expected-note * {{'Unavailable' has been explicitly marked unavailable here}}
+@available(macOS, unavailable) // expected-note * {{'Unavailable' has been explicitly marked unavailable here}}
+public struct Unavailable {
   @usableFromInline internal init() {}
   init<T>(_ t: T) {}
 }
@@ -112,8 +112,8 @@ public protocol AtDeploymentTargetProto {}
 @available(macOS 11, *)
 public protocol AfterDeploymentTargetProto {}
 
-@available(macOS, obsoleted: 10.14.5)
-public protocol ObsoletedBetweenTargetsProto {} // expected-note * {{'ObsoletedBetweenTargetsProto' was obsoleted in macOS 10.14.5}}
+@available(macOS, obsoleted: 10.14.5) // expected-note * {{'ObsoletedBetweenTargetsProto' was obsoleted in macOS 10.14.5}}
+public protocol ObsoletedBetweenTargetsProto {}
 
 @available(macOS, unavailable)
 public protocol UnavailableProto {}
@@ -137,8 +137,8 @@ public class AtDeploymentTargetClass {}
 @available(macOS 11, *)
 public class AfterDeploymentTargetClass {}
 
-@available(macOS, obsoleted: 10.14.5)
-public class ObsoletedBetweenTargetsClass {} // expected-note * {{'ObsoletedBetweenTargetsClass' was obsoleted in macOS 10.14.5}}
+@available(macOS, obsoleted: 10.14.5) // expected-note * {{'ObsoletedBetweenTargetsClass' was obsoleted in macOS 10.14.5}}
+public class ObsoletedBetweenTargetsClass {}
 
 @available(macOS, unavailable)
 public class UnavailableClass {}

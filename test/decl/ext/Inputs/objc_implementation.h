@@ -234,6 +234,41 @@
 
 @end
 
+__attribute__((deprecated("use SomethingElse instead")))
+@interface UniversallyDeprecatedClass1 : NSObject
+@end
+
+__attribute__((deprecated("use SomethingElse instead")))
+@interface UniversallyDeprecatedClass2 : NSObject
+@end
+
+@interface UniversallyDeprecatedMembersClass : NSObject
+
+- (void)deprecatedMethod1 __attribute__((deprecated("use something else")));
+- (void)deprecatedMethod2 __attribute__((deprecated("use something else")));
+
+@property int deprecatedProperty1
+    __attribute__((deprecated("use something else")));
+
+- (void)notDeprecatedMethod1;
+
+@end
+
+@interface SwiftAvailabilityMembersClass : NSObject
+
+- (void)swiftObsoletedMethod1;
+- (void)swiftObsoletedMethod2;
+- (void)swift99Method1;
+
+@end
+
+@interface SwiftObsoletedExtensionClass : NSObject
+@end
+
+@interface SwiftObsoletedExtensionClass (Category)
+- (void)swiftObsoletedCategoryMethod1;
+@end
+
 #endif
 
 void CImplFunc1(int param);
@@ -245,6 +280,15 @@ void CImplFuncMismatch1(int param);
 void CImplFuncMismatch2(int param);
 
 void CImplDuplicate(int param);
+
+void CImplFuncUnavailable1(int param) __attribute__((unavailable));
+void CImplFuncUnavailable2(int param) __attribute__((unavailable));
+void CImplFuncUnavailableInSwift1(int param)
+    __attribute__((availability(swift, unavailable)));
+void CImplFuncDeprecated1(int param)
+    __attribute__((deprecated("use something else")));
+void CImplFuncAvailable1(int param);
+void CImplFuncAvailable2(int param);
 
 #if __OBJC__
 void CImplFuncMismatch3(_Nullable id param);

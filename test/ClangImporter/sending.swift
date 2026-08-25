@@ -39,6 +39,13 @@ func funcTestSendingArg() async {
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
+func funcTestSendingArgPrecededAttr() async {
+  let x = NonSendableCStruct()
+  sendUserDefinedIntoGlobalFunctionPrecededAttr(x) // expected-warning {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
+  useValue(x) // expected-note {{access can happen concurrently}}
+}
+
 func funcTestSendingClosureArg() async {
   sendingWithCompletionHandler { (x: sending NonSendableCStruct) in
     sendUserDefinedIntoGlobalFunction(x) // expected-warning {{sending 'x' risks causing data races}}

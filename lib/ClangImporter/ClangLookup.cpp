@@ -72,14 +72,30 @@ class CollectLookupResults {
   /// laziness (i.e., see type of MemberLookupTable::isLazilyComplete).
   DeclBaseName name;
   TinyPtrVector<ValueDecl *> &result;
+  ClangImporter::Implementation &impl;
 
 public:
-  CollectLookupResults(DeclBaseName name, TinyPtrVector<ValueDecl *> &result)
-      : name(name), result(result) {}
+  CollectLookupResults(DeclBaseName name, TinyPtrVector<ValueDecl *> &result,
+                       ClangImporter::Implementation &impl)
+      : name(name), result(result), impl(impl) {}
 
   void add(ValueDecl *imported) {
     if (imported->getBaseName() == name)
       result.push_back(imported);
+
+    // A Clang declaration can be imported under more than one name; the
+    // '__<name>Unsafe' migration stub of an unsafe C++ method is one such
+    // alternate, and only the alternate carries the name being looked up here.
+    //
+    // Only consider alternates declared alongside 'imported'. Other kinds of
+    // alternate are re-parented elsewhere -- an anonymous enum constant, for
+    // instance, is imported both at module scope and as a member of the
+    // enclosing struct.
+    for (auto *alternate : impl.getAlternateDecls(imported)) {
+      if (alternate->getBaseName() == name &&
+          alternate->getDeclContext() == imported->getDeclContext())
+        result.push_back(alternate);
+    }
 
     // Expand any macros introduced by the Clang importer.
     imported->visitAuxiliaryDecls([&](Decl *decl) {
@@ -175,11 +191,12 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
 
   TinyPtrVector<ValueDecl *> result;
 
-  auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(nullptr);
+  auto &Importer = *static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  auto *lookupTable = Importer.findLookupTable(nullptr);
   auto foundDecls = lookupTable->lookup(SerializedSwiftName(name.getBaseName()),
                                         EffectiveClangContext());
 
-  CollectLookupResults collector(name.getBaseName(), result);
+  CollectLookupResults collector(name.getBaseName(), result, Importer.Impl);
   llvm::SmallPtrSet<clang::NamedDecl *, 8> seenDecls;
   for (SwiftLookupTable::SingleEntry foundEntry : foundDecls) {
     auto *foundDecl = foundEntry.dyn_cast<clang::NamedDecl *>();
@@ -347,7 +364,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
   // The set of declarations we found.
   TinyPtrVector<ValueDecl *> result;
-  CollectLookupResults collector(name.getBaseName(), result);
+  CollectLookupResults collector(name.getBaseName(), result, Importer.Impl);
 
   // Find the results that are actually a member of "recordDecl".
   ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
@@ -376,20 +393,32 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     if (isa<clang::CXXConstructorDecl>(found) && isa<ClassDecl>(recordDecl))
       continue;
 
-    auto imported = clangModuleLoader->importDeclDirectly(found);
+    auto *imported =
+        cast_or_null<ValueDecl>(clangModuleLoader->importDeclDirectly(found));
     if (!imported)
       continue;
 
     // If this member is found due to inheritance, clone it from the base class
     // by synthesizing getters and setters.
     if (inheritance) {
+      // Alternate declarations are recorded against the base class's
+      // declaration, so they have to be cloned separately.
+      for (auto *alternate : Importer.Impl.getAlternateDecls(imported)) {
+        if (alternate->getBaseName() != name.getBaseName() ||
+            alternate->getDeclContext() != imported->getDeclContext())
+          continue;
+        if (auto *clonedAlternate = clangModuleLoader->importBaseMemberDecl(
+                alternate, inheritingDecl, inheritance))
+          result.push_back(clonedAlternate);
+      }
+
       imported = clangModuleLoader->importBaseMemberDecl(
-          cast<ValueDecl>(imported), inheritingDecl, inheritance);
+          imported, inheritingDecl, inheritance);
       if (!imported)
         continue;
     }
 
-    collector.add(cast<ValueDecl>(imported));
+    collector.add(imported);
   }
 
   if (inheritance) {
@@ -452,7 +481,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     // from that base: they are reachable via the Swift superclass chain
     // instead.
     const clang::RecordDecl *superclassClangDecl = nullptr;
-    if (!inheritance) {
+    if (!inheritance &&
+        ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeInheritance)) {
       auto derivedInfo = evaluateOrDefault(
           ctx.evaluator, ForeignReferenceTypeInfoRequest({cxxRecord}), {});
       if (auto primaryBase = derivedInfo.getPrimarySuperclass())
@@ -883,9 +913,13 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
   // declaring class is that superclass (or a Clang base of it) are reachable
   // via the Swift superclass chain and should not be synthesized here again.
   const clang::CXXRecordDecl *superclassClangDecl = nullptr;
-  auto frtInfo = evaluateOrDefault(
-      SwiftContext.evaluator, ForeignReferenceTypeInfoRequest({CXXRecord}), {});
-  superclassClangDecl = frtInfo.getPrimarySuperclass();
+  if (SwiftContext.LangOpts.hasFeature(
+          Feature::ForeignReferenceTypeInheritance)) {
+    auto frtInfo =
+        evaluateOrDefault(SwiftContext.evaluator,
+                          ForeignReferenceTypeInfoRequest({CXXRecord}), {});
+    superclassClangDecl = frtInfo.getPrimarySuperclass();
+  }
 
   llvm::SmallMapVector<CXXOverloadArgTypes,
                        std::pair<CXXOverload, CXXOverload>, 1>

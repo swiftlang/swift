@@ -32,6 +32,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/DeclarationName.h"
@@ -41,6 +42,9 @@
 #include "clang/AST/Type.h"
 #include "clang/Basic/Module.h"
 #include "clang/Sema/Overload.h"
+#include "llvm-c/Types.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/Casting.h"
 #include <optional>
 
 using namespace swift;
@@ -339,10 +343,12 @@ public:
     out << "\"";
     llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
     for (auto attr : availabilityAttrs) {
+      auto platform = attr.getPlatform();
+      if (!platform) continue;
       auto introducedOpt = attr.getIntroduced();
       if (!introducedOpt.has_value()) continue;
       printSeparator();
-      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
+      out << prettyPlatformString(*platform) << " " << introducedOpt.value();
     }
     out << "\"";
   }
@@ -491,15 +497,47 @@ struct UnaliasedInstantiationVisitor
     return false;
   }
 
+  bool VisitRecordType(const clang::RecordType *RT) {
+    if (isa_and_nonnull<clang::ClassTemplateSpecializationDecl>(
+            RT->getDecl())) {
+      hasUnaliasedInstantiation = true;
+      DLOG("Signature contains raw template, skipping\n");
+      return false;
+    }
+    return true;
+  }
+
   static bool checkTemplates(clang::QualType clangType, bool hasLifetime,
                              bool isStdSpan) {
     if (hasLifetime && isStdSpan) {
       // std::span is transformed to Swift Span, so the std::span template
       // instantiation won't show up in the macro expansion's signature. The
       // element type still needs to be checked.
-      const auto *TST = clangType->getAs<clang::TemplateSpecializationType>();
-      ASSERT(TST && "std::span is not specialized?");
-      clangType = TST->template_arguments()[0].getAsType();
+      auto getTemplateArg = [](clang::QualType Ty) {
+        const auto *STTPT = Ty->getAs<clang::SubstTemplateTypeParmType>();
+        if (!STTPT)
+          return clang::QualType();
+        const auto *RT =
+            dyn_cast<clang::RecordType>(STTPT->getReplacementType());
+        if (!RT)
+          return clang::QualType();
+        const auto *CD =
+            dyn_cast<clang::ClassTemplateSpecializationDecl>(RT->getDecl());
+        if (!CD)
+          return clang::QualType();
+        auto Args = CD->getTemplateArgs().asArray();
+        return Args[0].getAsType();
+      };
+      if (const auto *TST =
+              clangType->getAs<clang::TemplateSpecializationType>())
+        clangType = TST->template_arguments()[0].getAsType();
+      else if (clang::QualType ArgTy = getTemplateArg(clangType);
+               !ArgTy.isNull()) {
+        clangType = ArgTy;
+      } else {
+        assert(0 && "unknown std::span representation");
+        return true;
+      }
     }
     UnaliasedInstantiationVisitor checker;
     checker.TraverseType(clangType);
@@ -629,10 +667,6 @@ static bool getImplicitObjectParamAnnotation(const clang::ObjCMethodDecl* D) {
     return false; // Only C++ methods have implicit params
 }
 
-static size_t getNumParams(const clang::FunctionDecl* D) {
-    return D->getNumParams();
-}
-
 static bool shouldSkipModule(ModuleDecl *M) {
   if (M->isClangBridgingHeaderImportModule()) {
     DLOG("is from bridging header (or C++ namespace)\n");
@@ -745,7 +779,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       ASSERT(MappedDecl->isImportAsInstanceMember());
       swiftNumParams += 1;
     }
-    if (getNumParams(ClangDecl) != swiftNumParams) {
+    if (ClangDecl->param_size() != swiftNumParams) {
       DLOG("mismatching parameter lists");
       assert(
           ClangDecl->isVariadic() ||
@@ -758,7 +792,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
 
     size_t selfParamIndex = MappedDecl->isImportAsInstanceMember()
                                 ? MappedDecl->getSelfIndex()
-                                : getNumParams(ClangDecl);
+                                : ClangDecl->param_size();
     for (auto [index, clangParam] : llvm::enumerate(ClangDecl->parameters())) {
       clang::QualType clangParamTy = clangParam->getType();
       DLOG_SCOPE("Checking parameter '" << *clangParam << "' with type '"
@@ -908,14 +942,68 @@ static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (SwiftContext.LangOpts.DisableSafeInteropWrappers)
     return;
-  auto ClangDecl = dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
-  if (!ClangDecl)
+  const clang::Decl *ClangDecl = MappedDecl->getClangDecl();
+
+  if (ClangDecl && ClangDecl->isImplicit()) {
+    if (auto *F = dyn_cast<FuncDecl>(MappedDecl)) {
+      if (const FuncDecl *Orig = getOriginalForVirtualThunk(F)) {
+        DLOG("Remapping virtual thunk to original clang decl\n");
+        ClangDecl = Orig->getClangDecl();
+      }
+    }
+  }
+
+  auto ClangFuncDecl = dyn_cast_or_null<clang::FunctionDecl>(ClangDecl);
+  auto ClangObjCMethodDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(ClangDecl);
+  if (!ClangFuncDecl && !ClangObjCMethodDecl)
+    return;
+  ASSERT(!ClangFuncDecl || !ClangObjCMethodDecl);
+
+  if (isa<ProtocolDecl>(MappedDecl->getParent()))
     return;
 
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
   if (!SwiftifyImportDecl) {
     DLOG("_SwiftifyImport macro not found\n");
     return;
+  }
+
+  // A method that overrides a virtual method needs no wrapper of its own if it
+  // inherits one: the base class wrapper calls the virtual method, so it already
+  // dispatches to this override, and a second wrapper here would only add an
+  // overload that cannot be resolved against the inherited one.
+  //
+  // The wrapper is only inherited when the C++ base class is imported as the
+  // Swift superclass. Reached any other way - through a value type base, or a
+  // base that is not the primary one - the base class wrapper is cloned rather
+  // than inherited and cannot be called, so this override does need its own. Ask
+  // for the primary superclass in Clang terms rather than looking at the Swift
+  // superclass, which is not necessarily set up yet while importing a member.
+  if (auto *CxxMethod = dyn_cast<clang::CXXMethodDecl>(ClangDecl)) {
+    auto primarySuperclassOf = [&](const clang::CXXRecordDecl *Record) {
+      return evaluateOrDefault(SwiftContext.evaluator,
+                               ForeignReferenceTypeInfoRequest({Record}), {})
+          .getPrimarySuperclass();
+    };
+    if (CxxMethod->size_overridden_methods() > 0) {
+      llvm::SmallPtrSet<const clang::CXXRecordDecl *, 16> SuperClasses;
+      for (auto *Super = primarySuperclassOf(CxxMethod->getParent()); Super;
+           Super = primarySuperclassOf(Super)) {
+        SuperClasses.insert(Super->getCanonicalDecl());
+      }
+      if (SuperClasses.size() > 0) {
+        for (auto *Overridden : CxxMethod->overridden_methods()) {
+          if (SuperClasses.count(Overridden->getParent()->getCanonicalDecl())) {
+            // FIXME: We should still generate a safe wrapper if the superclass
+            // is missing one, or if this one would produce a different
+            // signature.
+            DLOG("Inherits the wrapper of an overridden virtual method, which "
+                 "dispatches here\n");
+            return;
+          }
+        }
+      }
+    }
   }
 
   // For projects adopting SafeInteropWrappers we preserve the original
@@ -934,7 +1022,10 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     SwiftifyInfoFunctionPrinter printer(
         getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl,
         typeMapping, DiagnosedMissingNullableAsEmptySpanParam);
-    if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl)) {
+    bool foundInfo = ClangFuncDecl ?
+      swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl) :
+      swiftifyImpl(*this, printer, MappedDecl, ClangObjCMethodDecl);
+    if (!foundInfo) {
       DLOG("No relevant bounds or lifetime info found\n");
       return;
     }

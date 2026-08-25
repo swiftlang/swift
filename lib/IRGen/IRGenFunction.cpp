@@ -161,6 +161,15 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
                             {size, alignMask}, name);
 }
 
+/// Emit a typed 'raw' allocation, which has no heap pointer and is
+/// not guaranteed to be zero-initialized.
+llvm::Value *IRGenFunction::emitAllocRawTypedCall(
+    llvm::Value *size, llvm::Value *alignMask, llvm::Value *typeDescriptor,
+    const llvm::Twine &name) {
+  return emitAllocatingCall(*this, IGM.getAllocRawTypedFunctionPointer(),
+                            {size, alignMask, typeDescriptor}, name);
+}
+
 /// Emit a heap allocation.
 llvm::Value *IRGenFunction::emitAllocObjectCall(
     llvm::Value *metadata, llvm::Value *size, llvm::Value *alignMask,
@@ -211,10 +220,29 @@ llvm::Value *IRGenFunction::emitVerifyEndOfLifetimeCall(llvm::Value *object,
 }
 
 void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
+                                      std::optional<uint64_t> mallocTypeId,
                                       llvm::Value *&box,
                                       llvm::Value *&valueAddress) {
+  if (mallocTypeId) {
+    auto *descriptorConst =
+        llvm::ConstantInt::get(IGM.Int64Ty, *mallocTypeId);
+    return emitAllocBoxTypedCall(typeMetadata, descriptorConst, box,
+                                 valueAddress);
+  }
   llvm::CallInst *call =
       Builder.CreateCall(IGM.getAllocBoxFunctionPointer(), typeMetadata);
+  call->addFnAttr(llvm::Attribute::NoUnwind);
+
+  box = Builder.CreateExtractValue(call, 0);
+  valueAddress = Builder.CreateExtractValue(call, 1);
+}
+
+void IRGenFunction::emitAllocBoxTypedCall(llvm::Value *typeMetadata,
+                                          llvm::Value *typeDescriptor,
+                                          llvm::Value *&box,
+                                          llvm::Value *&valueAddress) {
+  llvm::CallInst *call = Builder.CreateCall(
+      IGM.getAllocBoxTypedFunctionPointer(), {typeMetadata, typeDescriptor});
   call->addFnAttr(llvm::Attribute::NoUnwind);
 
   box = Builder.CreateExtractValue(call, 0);
@@ -228,6 +256,21 @@ void IRGenFunction::emitMakeBoxUniqueCall(llvm::Value *box,
                                           llvm::Value *&outValueAddress) {
   llvm::CallInst *call = Builder.CreateCall(
       IGM.getMakeBoxUniqueFunctionPointer(), {box, typeMetadata, alignMask});
+  call->addFnAttr(llvm::Attribute::NoUnwind);
+
+  outBox = Builder.CreateExtractValue(call, 0);
+  outValueAddress = Builder.CreateExtractValue(call, 1);
+}
+
+void IRGenFunction::emitMakeBoxUniqueTypedCall(llvm::Value *box,
+                                               llvm::Value *typeMetadata,
+                                               llvm::Value *alignMask,
+                                               llvm::Value *typeDescriptor,
+                                               llvm::Value *&outBox,
+                                               llvm::Value *&outValueAddress) {
+  llvm::CallInst *call = Builder.CreateCall(
+      IGM.getMakeBoxUniqueTypedFunctionPointer(),
+      {box, typeMetadata, alignMask, typeDescriptor});
   call->addFnAttr(llvm::Attribute::NoUnwind);
 
   outBox = Builder.CreateExtractValue(call, 0);
@@ -275,6 +318,16 @@ void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
   // For now, all we have is swift_slowDealloc.
   return emitDeallocatingCall(*this, IGM.getSlowDeallocFunctionPointer(),
                               {pointer, size, alignMask});
+}
+
+/// Emit a typed 'raw' deallocation, which has no heap pointer and is not
+/// guaranteed to be zero-initialized.
+void IRGenFunction::emitDeallocRawTypedCall(llvm::Value *pointer,
+                                            llvm::Value *size,
+                                            llvm::Value *alignMask,
+                                            llvm::Value *typeDescriptor) {
+  return emitDeallocatingCall(*this, IGM.getDeallocRawTypedFunctionPointer(),
+                              {pointer, size, alignMask, typeDescriptor});
 }
 
 void IRGenFunction::emitTSanInoutAccessCall(llvm::Value *address) {

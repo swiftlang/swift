@@ -29,7 +29,7 @@ struct ImplStored : ~Copyable & P {
   var ur: U
 }
 
-struct ImplUnderscoredCoroutineAccessors : ~Copyable & P {
+struct ImplLegacyCoroutineAccessors : ~Copyable & P {
   typealias Property = U
   var _i: U
   var ubgs: U {

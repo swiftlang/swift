@@ -97,7 +97,7 @@ public:
 
       struct {
         TypeVariableType *TypeVar;
-        TypeVariableType *OtherTypeVar;
+        Type OtherType;
         Constraint *Constraint;
       } BindingRelation;
 
@@ -183,9 +183,12 @@ public:
 #define SCORE_CHANGE(Name) static Change Name(ScoreKind kind, unsigned value);
 #define GRAPH_NODE_CHANGE(Name) static Change Name(TypeVariableType *typeVar, \
                                                    Constraint *constraint);
-#define BINDING_RELATION_CHANGE(Name)                                          \
+#define BINDING_VAR_RELATION_CHANGE(Name)                                      \
   static Change Name(TypeVariableType *typeVar,                                \
                      TypeVariableType *otherTypeVar, Constraint *constraint);
+#define BINDING_TYPE_RELATION_CHANGE(Name)                                     \
+  static Change Name(TypeVariableType *typeVar,                                \
+                     Type otherType, Constraint *constraint);
 #include "swift/Sema/CSTrail.def"
 
     /// Create a change that added a type variable.

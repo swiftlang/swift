@@ -369,7 +369,6 @@ namespace sil_block {
   using SILDebugValueLayout = BCRecordLayout<
     SIL_DEBUG_VALUE,
 
-    SILTypeCategoryField, /// operand type category
     SILTypeCategoryField, /// debug var type category
     BCFixed<11>,          /// hasReconstructionBlock, movableValueDebuginfo,
                           /// trace, hasDebugVar, isLet,

@@ -1055,6 +1055,12 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   if (decl->isFinal() || decl->shouldUseObjCDispatch() || decl->hasClangNode())
     return false;
 
+  // Embedded Swift has no unspecialized generic code, so there is no single
+  // implementation to put in a vtable slot for a generic method. Such methods
+  // are dispatched statically instead.
+  if (decl->mustBeStaticallyDispatchedInEmbedded())
+    return false;
+
   auto &ctx = dc->getASTContext();
 
   // Initializers are not normally inherited, but required initializers can

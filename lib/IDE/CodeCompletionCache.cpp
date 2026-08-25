@@ -499,9 +499,11 @@ static std::string getName(StringRef cacheDirectory,
     OSS << "-" << component;
 
   // name-<hash of module filename>
-  auto hash = llvm::hash_value(K.ModuleFilename);
+  auto hasher = StableHasher::defaultHasher();
+  hasher.combine(K.ModuleFilename);
+  auto words = std::move(hasher).finalize();
   SmallString<16> hashStr;
-  llvm::APInt(64, uint64_t(hash)).toStringUnsigned(hashStr, /*Radix*/ 36);
+  llvm::APInt(64, words.first).toStringUnsigned(hashStr, /*Radix*/ 36);
   OSS << "-" << hashStr << ".completions";
 
   return std::string(name.str());

@@ -5,7 +5,7 @@
 @available(*, unavailable)
 @resultBuilder
 struct UnavailableBuilder {
-// expected-note@-1 2 {{'UnavailableBuilder' has been explicitly marked unavailable here}}
+// expected-note@-3 2 {{'UnavailableBuilder' has been explicitly marked unavailable here}}
   static func buildBlock() {}
 }
 
@@ -198,7 +198,7 @@ func testUnavailableBuildPartialBlock() -> Int {
 struct UnavailableBuildPartialBlockAndBuildBlock {
   @available(*, unavailable)
   static func buildPartialBlock(first: Int) -> Int { 0 }
-  // expected-note@-1 {{'buildPartialBlock(first:)' has been explicitly marked unavailable here}}
+  // expected-note@-2 {{'buildPartialBlock(first:)' has been explicitly marked unavailable here}}
 
   static func buildPartialBlock(accumulated: Int, next: Int) -> Int { 0 }
 
@@ -214,9 +214,9 @@ func testUnavailableBuildPartialBlockAndBuildBlock() -> Int {
   3
 }
 
-@available(*, unavailable)
+@available(*, unavailable) // expected-note {{'UnavailableBuilderWithPartialBlock' has been explicitly marked unavailable here}}
 @resultBuilder
-struct UnavailableBuilderWithPartialBlock { // expected-note {{'UnavailableBuilderWithPartialBlock' has been explicitly marked unavailable here}}
+struct UnavailableBuilderWithPartialBlock {
   @available(*, unavailable)
   static func buildPartialBlock(first: String) -> Int { 0 }
   static func buildPartialBlock(accumulated: Int, next: Int) -> Int { 0 }

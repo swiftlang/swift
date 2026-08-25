@@ -166,7 +166,7 @@ public:
       llvm::function_ref<void(llvm::MapVector<Type, std::string> &)>;
 
   /// Print generated C++ helper function
-  void printCustomCxxFunction(const SmallVector<Type> &neededTypes,
+  void printCustomCxxFunction(ArrayRef<Type> neededTypes,
                               bool NeedsReturnTypes,
                               PrinterTy retTypeAndNamePrinter,
                               PrinterTy paramPrinter, bool isConstFunc,

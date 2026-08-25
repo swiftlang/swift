@@ -695,7 +695,7 @@ isAvailabilityDomainActive(AvailabilityDomain Domain,
   if (!Domain.isPlatform())
     return true;
 
-  auto Platform = Domain.getPlatformKind();
+  auto Platform = *Domain.getPlatformKind();
   return Platform == *ActivePlatform ||
          inheritsAvailabilityFromPlatform(*ActivePlatform, Platform);
 }
@@ -790,21 +790,27 @@ void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
   // If we were asked to filter the availability platforms for the output graph,
   // perform that filtering here.
   if (Graph->Walker.Options.AvailabilityPlatforms) {
-    auto AvailabilityPlatforms =
+    const auto &AvailabilityPlatforms =
         Graph->Walker.Options.AvailabilityPlatforms.value();
-    if (Graph->Walker.Options.AvailabilityIsBlockList) {
-      for (const auto Availability : Availabilities.keys()) {
-        if (Availability != "*" && AvailabilityPlatforms.contains(Availability)) {
-          Availabilities.erase(Availability);
-        }
-      }
-    } else {
-      for (const auto Availability : Availabilities.keys()) {
-        if (Availability != "*" && !AvailabilityPlatforms.contains(Availability)) {
-          Availabilities.erase(Availability);
-        }
-      }
+    const bool IsBlockList = Graph->Walker.Options.AvailabilityIsBlockList;
+
+    // Collect the keys to drop before erasing any of them: mutating a
+    // StringMap while walking it is invalid. llvm::StringMap::remove_if() is
+    // the idiomatic spelling of this loop, but it does not exist before
+    // LLVM 23, so spell it out instead of guarding on the LLVM version.
+    SmallVector<StringRef, 8> FilteredOutPlatforms;
+    for (const auto &Entry : Availabilities) {
+      // Universal availability, such as unconditional deprecation, is not
+      // tied to a platform and is never filtered out.
+      if (Entry.getKey() == "*")
+        continue;
+
+      const bool IsListed = AvailabilityPlatforms.contains(Entry.getKey());
+      if (IsBlockList ? IsListed : !IsListed)
+        FilteredOutPlatforms.push_back(Entry.getKey());
     }
+    for (const StringRef Platform : FilteredOutPlatforms)
+      Availabilities.erase(Platform);
   }
 
   if (Availabilities.empty()) {

@@ -14,6 +14,7 @@ import itertools
 
 class TestParameters(object):
   name = ''
+  base_name = ''
   prefix = []
   suffix = []
   base = ''
@@ -21,6 +22,12 @@ class TestParameters(object):
   mutable = False
   range_replaceable = False
   base_kind = ''
+  shard_count = 1
+
+def shard_count_for(base):
+  if "Mutable" in base:
+    return 4
+  return 1
 
 def all_tests():
   for traversal, base_kind, mutable, range_replaceable in itertools.product(
@@ -46,8 +53,10 @@ def all_tests():
        '[-9994, -9993, -9992]')
     ]:
       test.name = 'Slice_Of_' + test.base + '_' + name + '.swift'
+      test.base_name = test.name[:-len('.swift')]
       test.prefix = prefix
-      test.suffix
+      test.suffix = suffix
+      test.shard_count = shard_count_for(test.base)
       yield test
 
 def test_methods(test):
@@ -70,6 +79,16 @@ def test_methods(test):
 }%
 
 % for test in all_tests():
+% if test.shard_count > 1:
+// BEGIN Inputs/${test.base_name}/main.swift
+// -*- swift -*-
+
+//===----------------------------------------------------------------------===//
+// Automatically Generated From validation-test/stdlib/Slice/Inputs/Template.swift.gyb
+// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+
+% else:
 // BEGIN ${test.name}
 // -*- swift -*-
 
@@ -84,6 +103,7 @@ def test_methods(test):
 // FIXME: the test is too slow when the standard library is not optimized.
 // REQUIRES: optimized_stdlib
 
+% end
 import StdlibUnittest
 import StdlibCollectionUnittest
 
@@ -166,4 +186,28 @@ SliceTests.add${method}Tests(
 % end
 
 runAllTests()
+% if test.shard_count > 1:
+%   for shard_index in range(test.shard_count):
+// BEGIN ${test.base_name}_shard${shard_index + 1}.swift
+// -*- swift -*-
+
+//===----------------------------------------------------------------------===//
+// Automatically Generated From validation-test/stdlib/Slice/Inputs/Template.swift.gyb
+// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+
+// This file runs one shard of the tests defined in
+// Inputs/${test.base_name}/main.swift,
+// to limit each shard's running time to a reasonable amount.
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s %S/Inputs/${test.base_name}/main.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out --stdlib-unittest-shard-count ${test.shard_count} --stdlib-unittest-shard-index ${shard_index}
+
+// REQUIRES: executable_test
+
+// FIXME: the test is too slow when the standard library is not optimized.
+// REQUIRES: optimized_stdlib
+%   end
+% end
 % end

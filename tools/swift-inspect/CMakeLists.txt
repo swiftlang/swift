@@ -80,9 +80,11 @@ add_executable(swift-inspect
   Sources/swift-inspect/Operations/DumpRawMetadata.swift
   Sources/swift-inspect/AndroidRemoteProcess.swift
   Sources/swift-inspect/Backtrace.swift
+  Sources/swift-inspect/Cleanup.swift
   Sources/swift-inspect/DarwinRemoteProcess.swift
   Sources/swift-inspect/LinuxRemoteProcess.swift
   Sources/swift-inspect/main.swift
+  Sources/swift-inspect/OpaqueRef.swift
   Sources/swift-inspect/Process.swift
   Sources/swift-inspect/RemoteMirror+Extensions.swift
   Sources/swift-inspect/RemoteProcess.swift

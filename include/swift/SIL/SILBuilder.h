@@ -378,7 +378,8 @@ public:
       SubstitutionMap subs, ParameterConvention calleeConvention,
       SILFunctionTypeIsolation resultIsolation,
       PartialApplyInst::OnStackKind onStack =
-          PartialApplyInst::OnStackKind::NotOnStack);
+          PartialApplyInst::OnStackKind::NotOnStack,
+      bool isCalledOnce = false);
 
   //===--------------------------------------------------------------------===//
   // CFG Manipulation
@@ -591,6 +592,7 @@ public:
       ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
       SILFunctionTypeIsolation ResultIsolation =
           SILFunctionTypeIsolation::forUnknown(),
+      bool IsCalledOnce = false,
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       StackAllocationIsNested_t IsNested = StackAllocationIsNested,
@@ -608,7 +610,8 @@ public:
            "Args");
     return insert(PartialApplyInst::create(
         getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention,
-        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested, ArgLocs));
+        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested,
+        IsCalledOnce, ArgLocs));
   }
 
   BeginApplyInst *createBeginApply(

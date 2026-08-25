@@ -210,6 +210,8 @@ extension ASTGenVisitor {
         return handle(self.generateTypeEraserAttr(attribute: node)?.asDeclAttribute)
       case .UnavailableFromAsync:
         return handle(self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute)
+      case .Unsafe:
+        return handle(self.generateUnsafeAttr(attribute: node)?.asDeclAttribute)
       case .Reasync:
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .AtReasync))
       case .Rethrows:
@@ -317,7 +319,6 @@ extension ASTGenVisitor {
         .Testable,
         .Transparent,
         .UIApplicationMain,
-        .Unsafe,
         .UnsafeInheritExecutor,
         .UnsafeNoObjCTaggedPointer,
         .UnsafeNonEscapableResult,
@@ -1294,14 +1295,14 @@ extension ASTGenVisitor {
     }
 
     // TODO: Diangose
-    fatalError("expected identifier, 'self', or integer in @lifetime")
+    fatalError("expected identifier, 'self', or integer in @_lifetime")
   }
 
   func generateLifetimeEntry(attribute node: AttributeSyntax) -> BridgedLifetimeEntry? {
     self.generateWithLabeledExprListArguments(attribute: node) { args in
       guard !args.isEmpty else {
         // TODO: Diagnose
-        fatalError("expected arguments in @lifetime attribute")
+        fatalError("expected arguments in @_lifetime attribute")
       }
 
       var target: BridgedLifetimeDescriptor? = nil
@@ -1316,7 +1317,7 @@ extension ASTGenVisitor {
         } else {
           if arg.label != nil {
             // TODO: Diagnose.
-            fatalError("invalid argument label in @lifetime attribute")
+            fatalError("invalid argument label in @_lifetime attribute")
           }
         }
 
@@ -1344,10 +1345,10 @@ extension ASTGenVisitor {
 
   /// E.g.
   ///   ```
-  ///   @lifetime(src1, src2)
-  ///   @lifetime(target: borrow src1, copy src2)
-  ///   @lifetime(2)
-  ///   @lifetime(self)
+  ///   @_lifetime(src1, src2)
+  ///   @_lifetime(target: borrow src1, copy src2)
+  ///   @_lifetime(2)
+  ///   @_lifetime(self)
   ///   ```
   func generateLifetimeAttr(attribute node: AttributeSyntax) -> BridgedLifetimeAttr? {
     guard let entry = self.generateLifetimeEntry(attribute: node) else {
@@ -2433,6 +2434,33 @@ extension ASTGenVisitor {
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
       message: self.ctx.allocateCopy(string: message ?? "")
+    )
+  }
+
+  /// E.g.
+  ///   ```
+  ///   @unsafe
+  ///   @unsafe(always)
+  ///   ```
+  func generateUnsafeAttr(attribute node: AttributeSyntax) -> BridgedUnsafeAttr? {
+    let isAlways: Bool? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "always": return true
+        default: return nil
+        }
+      },
+      valueIfOmitted: false
+    )
+    guard let isAlways else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      isAlways: isAlways
     )
   }
 

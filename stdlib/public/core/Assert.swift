@@ -12,9 +12,9 @@
 
 /// Performs a traditional C-style assert with an optional message.
 ///
-/// Use this function for internal consistency checks that are active during testing
-/// but do not impact performance of shipping code. To check for invalid usage
-/// in Release builds, see `precondition(_:_:file:line:)`.
+/// Use this function for internal consistency checks that are active during
+/// testing but do not impact performance of shipping code. To check for invalid
+/// usage in Release builds, see `precondition(_:_:file:line:)`.
 ///
 /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
 ///   configuration): If `condition` evaluates to `false`, stop program
@@ -171,8 +171,9 @@ public func assertionFailure(
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailure(kind: .fatal(), message(), file: file, line: line,
-      flags: _fatalErrorFlags())
+    _opaqueAssertionFailure(
+      kind: .fatal(), message(), file: file, line: line, flags: _fatalErrorFlags()
+    )
   }
   else if _isFastAssertConfiguration() {
     _conditionallyUnreachable()
@@ -186,8 +187,9 @@ public func assertionFailure(
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailure(kind: .fatal(), message(), file: file, line: line,
-      flags: _fatalErrorFlags())
+    _assertionFailure(
+      kind: .fatal(), message(), file: file, line: line, flags: _fatalErrorFlags()
+    )
   }
   else if _isFastAssertConfiguration() {
     _conditionallyUnreachable()

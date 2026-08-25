@@ -149,47 +149,53 @@ public class Instruction : CustomStringConvertible, Hashable {
     return bridged.mayHaveSideEffects()
   }
 
-  public final var mayAccessPointerOrGlobal: Bool {
-    guard mayReadOrWriteMemory else {
-      return false
-    }
+  /// True if arbitrary functions may be called by this instruction.
+  /// This can be either directly, e.g. by an `apply` instruction, or indirectly by destroying a value which
+  /// might have a deinitializer which can call functions.
+  public var mayCallFunction: Bool { false }
+
+  public final var isDeinitBarrier: Bool {
     switch self {
-    case is BuiltinInst:
-      // Consider all builtins that read/write memory to access pointers.
+    case SIL.isFullApplySite, is EndApplyInst, is AbortApplyInst:
       return true
+
+    case is LoadWeakInst, is LoadUnownedInst, is StrongCopyUnownedValueInst, is StrongCopyUnmanagedValueInst:
+      // Moving a destroy over a load-weak changes its behavior, because if the object is destroyed
+      // before the load-weak it yields nil.
+      return true
+
+    case is HopToExecutorInst:
+      // A synchronization point.
+      return true
+
+    case let endAccess as EndAccessInst where endAccess.beginAccess.enforcement == .dynamic:
+      // A deinitializer can read and write class properties, global variables or boxes - which are
+      // protected by dynamic access scopes: the deinit could modify the memory which the access
+      // scope is reading, or vice versa.
+      return true
+
+    case let builtin as BuiltinInst:
+      // A memory accessing builtin can be an implicit load weak, a synchronization point or a
+      // pointer access.
+      return builtin.mayReadOrWriteMemory
+
     case let endBorrow as EndBorrowInst:
+      // Accessing memory via an arbitrary pointer is a deinit barrier, because it may conflict
+      // with a pointer access in a de-initializer.
       switch endBorrow.borrow {
       case let loadBorrow as LoadBorrowInst:
         return FindPointerOrGlobalWalker.mayAccessPointerOrGlobal(loadBorrow.address)
       default:
         return false
       }
+
     default:
-      return operands.contains { op in
-        FindPointerOrGlobalWalker.mayAccessPointerOrGlobal(op.value)
-      }
-    }
-  }
-
-  /// True if arbitrary functions may be called by this instruction.
-  /// This can be either directly, e.g. by an `apply` instruction, or indirectly by destroying a value which
-  /// might have a deinitializer which can call functions.
-  public var mayCallFunction: Bool { false }
-
-  public final var mayLoadWeakOrUnowned: Bool {
-    return bridged.mayLoadWeakOrUnowned()
-  }
-
-  public final var maySynchronize: Bool {
-    return bridged.maySynchronize()
-  }
-
-  public final var isDeinitBarrier: Bool {
-    switch self {
-    case SIL.isFullApplySite, is EndApplyInst, is AbortApplyInst:
-      return true
-    default:
-      return mayAccessPointerOrGlobal || mayLoadWeakOrUnowned || maySynchronize
+      // Accessing memory via an arbitrary pointer or a global is a deinit barrier, because it may
+      // conflict with such an access in a de-initializer.
+      return mayReadOrWriteMemory &&
+             operands.contains { op in
+               FindPointerOrGlobalWalker.mayAccessPointerOrGlobal(op.value)
+             }
     }
   }
 
@@ -1047,6 +1053,7 @@ class TailAddrInst : SingleValueInstruction, IndexingInstruction {}
 @_semantics("fast_cast")
 public protocol InitExistentialInstruction: Instruction {
   var conformances: ConformanceArray { get }
+  var formalConcreteType: CanonicalType { get }
 }
 
 final public
@@ -1076,6 +1083,10 @@ final public
 class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
   public var conformances: ConformanceArray {
     ConformanceArray(bridged: bridged.InitExistentialValueInst_getConformances())
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitExistentialValueInst_getFormalConcreteType())
   }
 }
 
@@ -1116,6 +1127,10 @@ class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction, In
 
   public var conformances: ConformanceArray {
     ConformanceArray(bridged: bridged.InitExistentialMetatypeInst_getConformances())
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitExistentialMetatypeInst_getFormalConcreteType())
   }
 }
 
@@ -1590,6 +1605,9 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
 
+  /// True is this is a partial application of a `@called(once)` function value.
+  public var isCalledOnce: Bool { bridged.PartialApplyInst_isCalledOnce() }
+
   /// Warning: isOnStack returns false for all closures prior to ClosureLifetimeFixup, even if they capture on-stack
   /// addresses and need to be diagnosed as non-escaping closures. Use mayEscape to determine whether a closure is
   /// non-escaping prior to ClosureLifetimeFixup.
@@ -1863,6 +1881,18 @@ final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVaria
 }
 
 final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation {
+  public var existentialType: Type {
+    results[0].type
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.AllocExistentialBoxInst_getFormalConcreteType())
+  }
+
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.AllocExistentialBoxInst_getConformances())
+  }
+
 }
 
 //===----------------------------------------------------------------------===//
@@ -2410,6 +2440,10 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
   public var source: Value { operand.value }
   public var successBlock: BasicBlock { bridged.CheckedCastBranch_getSuccessBlock().block }
   public var failureBlock: BasicBlock { bridged.CheckedCastBranch_getFailureBlock().block }
+
+  public var targetFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.CheckedCastBranch_getTargetFormalType())
+  }
 
   public func updateSourceFormalTypeFromOperandLoweredType() {
     bridged.CheckedCastBranch_updateSourceFormalTypeFromOperandLoweredType()

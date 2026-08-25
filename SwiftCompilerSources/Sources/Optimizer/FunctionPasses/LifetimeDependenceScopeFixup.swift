@@ -1104,7 +1104,7 @@ private extension BeginApplyInst {
 /// Visit all dependent uses.
 ///
 /// Set 'dependsOnCaller' if a use escapes the function.
-private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
+internal struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   let function: Function
   let context: Context
   let visitor: (Instruction) -> WalkResult

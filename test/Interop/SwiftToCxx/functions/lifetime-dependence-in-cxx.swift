@@ -65,13 +65,13 @@ extension Owner {
 // CHECK: SWIFT_INLINE_THUNK View borrowSelfMutating() SWIFT_SELF_LIFETIMEBOUND SWIFT_SYMBOL({{.*}});
 // CHECK: SWIFT_INLINE_THUNK View getViewProperty() const SWIFT_SELF_LIFETIMEBOUND SWIFT_SYMBOL({{.*}});
 
-// CHECK: SWIFT_INLINE_THUNK View borrowBorrowingParam(const Owner& SWIFT_NOESCAPE o SWIFT_LIFETIMEBOUND) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK: SWIFT_INLINE_THUNK View borrowDefaultParam(const Owner& SWIFT_NOESCAPE o SWIFT_LIFETIMEBOUND) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK: SWIFT_INLINE_THUNK View borrowInoutParam(Owner& SWIFT_NOESCAPE o SWIFT_LIFETIMEBOUND) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK: SWIFT_INLINE_THUNK View borrowInoutViewParam(View& SWIFT_NOESCAPE v SWIFT_LIFETIMEBOUND) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK: SWIFT_INLINE_THUNK View borrowSecondParam(int64_t ignored, const Owner& SWIFT_NOESCAPE o SWIFT_LIFETIMEBOUND) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK: SWIFT_INLINE_THUNK View copyBorrowingParam(const View& SWIFT_NOESCAPE v) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK: SWIFT_INLINE_THUNK View copyDefaultParam(const View& SWIFT_NOESCAPE v) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK View borrowBorrowingParam(const Owner& o SWIFT_LIFETIMEBOUND) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK View borrowDefaultParam(const Owner& o SWIFT_LIFETIMEBOUND) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK View borrowInoutParam(Owner& o SWIFT_LIFETIMEBOUND) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK View borrowInoutViewParam(View& v SWIFT_LIFETIMEBOUND) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK View borrowSecondParam(int64_t ignored, const Owner& o SWIFT_LIFETIMEBOUND) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK View copyBorrowingParam(const View& v) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK View copyDefaultParam(const View& v) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 
 // The attribute is repeated on the out-of-line definitions of the members.
 // CHECK: SWIFT_INLINE_THUNK View Owner::borrowSelf() const SWIFT_SELF_LIFETIMEBOUND {

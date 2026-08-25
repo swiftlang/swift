@@ -187,6 +187,10 @@ void CaptureInfo::print(raw_ostream &OS) const {
                  OS << "<direct>";
                if (capture.isNoEscape())
                  OS << "<noescape>";
+               if (capture.isConsumed())
+                 OS << "<consumed>";
+               if (capture.isSending())
+                 OS << "<sending>";
              },
              [&] { OS << ", "; });
 

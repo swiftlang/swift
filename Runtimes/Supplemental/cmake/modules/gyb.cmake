@@ -38,7 +38,7 @@ function(gyb_expand source output)
   add_custom_command(
     OUTPUT  "${full_output_path}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${dir}"
-    COMMAND "${CMAKE_COMMAND}" -E env "$<TARGET_FILE:Python3::Interpreter>" "${gyb_tool}" ${GYB_FLAGS} -o "${full_output_path}.tmp" "${source}"
+    COMMAND "${CMAKE_COMMAND}" -E env -- "$<TARGET_FILE:Python3::Interpreter>" "${gyb_tool}" ${GYB_FLAGS} -o "${full_output_path}.tmp" "${source}"
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${full_output_path}.tmp" "${full_output_path}"
     COMMAND "${CMAKE_COMMAND}" -E remove "${full_output_path}.tmp"
     DEPENDS ${gyb_tool} ${gyb_tool}.py ${GYB_DEPENDS} ${gyb_expand_deps}

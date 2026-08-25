@@ -63,3 +63,28 @@ func testClosure() {
   // expected-forbidden-error@-2 {{'called(once)' attribute is only valid when experimental feature CalledAttribute is enabled}}
   _ = x
 }
+
+func testSendingCaptures() {
+  class NS {
+    func test() {
+      _ = { @called(once) [sending self] in
+        // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+        // expected-forbidden-error@-2 {{expected 'weak', 'unowned', or no specifier in capture list}}
+        _ = self
+      }
+    }
+  }
+
+  let ns = NS()
+  _ = { @called(once) [sending ns] in
+    // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+    // expected-forbidden-error@-2 {{expected 'weak', 'unowned', or no specifier in capture list}}
+    ns
+  }
+  _ = { @called(once) [x = 42, sending ns = NS()] in
+    // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+    // expected-forbidden-error@-2 {{expected 'weak', 'unowned', or no specifier in capture list}}
+    _ = x
+    _ = ns
+  }
+}

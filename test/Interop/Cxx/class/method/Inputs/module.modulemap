@@ -34,3 +34,10 @@ module SwiftNameDifferentType {
   header "swift-name-different-type.h"
   requires cplusplus
 }
+
+module AlwaysUnsafeProjections {
+  header "always-unsafe-projections.h"
+  requires cplusplus
+
+  export *
+}

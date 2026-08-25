@@ -81,6 +81,9 @@ VARIABLE(SWIFT_DEBUG_ENABLE_CACHE_PROTOCOL_CONFORMANCES_BY_TYPE_DESCRIPTOR,
 VARIABLE(SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES, boolean, true,
          "Enable dispatch cooperative queues in the global executor.")
 
+VARIABLE(SWIFT_DEBUG_ENABLE_TASK_REGISTRY, boolean, true,
+         "Enable the global live-task tracking registry.")
+
 #ifndef NDEBUG
 
 VARIABLE(SWIFT_DEBUG_ENABLE_PROTOCOL_CONFORMANCES_LOOKUP_LOG,

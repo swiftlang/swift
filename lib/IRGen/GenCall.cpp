@@ -354,9 +354,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM, SILType paramSILType,
   llvm::AttrBuilder b(IGM.getLLVMContext());
   // Thanks to exclusivity checking, it is not possible to alias inouts except
   // those that are inout_aliasable.
-  if (!aliasable && paramSILType.getASTType()->getAnyPointerElementType()) {
-    // To ward against issues with LLVM's alias analysis, for now, only add the
-    // attribute if it's a pointer being passed inout.
+  if (!aliasable) {
     b.addAttribute(llvm::Attribute::NoAlias);
   }
   // Bitwise takable value types are guaranteed not to capture
@@ -5757,7 +5755,7 @@ StackAddress irgen::allocateForCoercion(IRGenFunction &IGF,
   llvm::Align alignment =
       std::max(DL.getABITypeAlign(fromTy), DL.getABITypeAlign(toTy));
 
-  Size size(std::max(fromSize, toSize));
+  auto size = Size::forBits(std::max(fromSize, toSize));
   auto buffer = IGF.emitStaticAlloca(bufferTy, size,
                                      Alignment(alignment.value()),
                                      basename + ".coerced");
@@ -6419,7 +6417,7 @@ Signature irgen::emitCastOfFunctionPointer(IRGenFunction &IGF,
                             : IGF.IGM.getSignature(fnType);
 
   // Emit the cast.
-  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.PtrTy);
+  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.FunctionPtrTy);
 
   // Return the information.
   return sig;
@@ -6618,7 +6616,7 @@ FunctionPointer FunctionPointer::forExplosionValue(IRGenFunction &IGF,
                                                    llvm::Value *fnPtr,
                                                    CanSILFunctionType fnType) {
   // Bitcast out of an opaque pointer type.
-  assert(fnPtr->getType() == IGF.IGM.Int8PtrTy);
+  assert(fnPtr->getType() == IGF.IGM.Int8ProgramSpacePtrTy);
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, fnType);
   auto authInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, fnType);
 
@@ -6637,7 +6635,7 @@ FunctionPointer::getExplosionValue(IRGenFunction &IGF,
   }
 
   // Bitcast to an opaque pointer type.
-  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
+  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8ProgramSpacePtrTy);
 
   return fnPtr;
 }

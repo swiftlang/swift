@@ -1913,16 +1913,12 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   return makeParserSuccess();
 }
 
-static PlatformKind getPlatformFromDomainOrIdentifier(
+static std::optional<PlatformKind> getPlatformFromDomainOrIdentifier(
     const AvailabilityDomainOrIdentifier &domainOrIdentifier) {
   if (auto domain = domainOrIdentifier.getAsDomain())
     return domain->getPlatformKind();
 
-  if (auto platform =
-          platformFromString(domainOrIdentifier.getAsIdentifier()->str()))
-    return *platform;
-
-  return PlatformKind::none;
+  return platformFromString(domainOrIdentifier.getAsIdentifier()->str());
 }
 
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
@@ -1943,7 +1939,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
     for (auto *Spec : Specs) {
       auto Platform =
           getPlatformFromDomainOrIdentifier(Spec->getDomainOrIdentifier());
-      if (Platform == PlatformKind::none)
+      if (!Platform)
         continue;
 
       auto Version = Spec->getRawVersion();
@@ -1952,7 +1948,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
                  diag::attr_availability_platform_version_major_minor_only,
                  AttrName);
       }
-      PlatformAndVersions.emplace_back(Platform, Version);
+      PlatformAndVersions.emplace_back(*Platform, Version);
     }
 
     return makeParserSuccess();
@@ -1966,12 +1962,21 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
 
   // Parse the platform name.
   StringRef platformText = Tok.getText();
+  bool IsWildcard = platformText == "*";
   auto MaybePlatform = platformFromString(platformText);
-  WasEmpty = WasEmpty || !MaybePlatform.has_value();
+  WasEmpty = WasEmpty || (!IsWildcard && !MaybePlatform.has_value());
   SourceLoc PlatformLoc = Tok.getLoc();
   consumeToken();
 
-  if (!MaybePlatform.has_value()) {
+  if (IsWildcard) {
+    // Wildcards ('*') aren't supported in this kind of list.
+    diagnose(PlatformLoc, diag::attr_availability_wildcard_ignored,
+             AttrName);
+
+    // If this list entry is just a wildcard, skip it.
+    if (Tok.isAny(tok::comma, tok::r_paren))
+      return makeParserSuccess();
+  } else if (!MaybePlatform.has_value()) {
     if (auto correctedPlatform = closestCorrectedPlatformString(platformText)) {
       diagnose(PlatformLoc, diag::attr_availability_suggest_platform,
                platformText, AttrName, *correctedPlatform)
@@ -1980,14 +1985,6 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
       diagnose(PlatformLoc, diag::attr_availability_unknown_platform,
                platformText, AttrName);
     }
-  } else if (*MaybePlatform == PlatformKind::none) {
-    // Wildcards ('*') aren't supported in this kind of list.
-    diagnose(PlatformLoc, diag::attr_availability_wildcard_ignored,
-             AttrName);
-
-    // If this list entry is just a wildcard, skip it.
-    if (Tok.isAny(tok::comma, tok::r_paren))
-      return makeParserSuccess();
   }
 
   // Parse version number.
@@ -2006,12 +2003,8 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
              AttrName);
   }
 
-  if (MaybePlatform.has_value()) {
-    auto Platform = *MaybePlatform;
-    if (Platform != PlatformKind::none) {
-      PlatformAndVersions.emplace_back(Platform, VerTuple);
-    }
-  }
+  if (MaybePlatform.has_value())
+    PlatformAndVersions.emplace_back(*MaybePlatform, VerTuple);
 
   return makeParserSuccess();
 }
@@ -2731,6 +2724,11 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   // diagnostic this can be used for better error presentation.
   SourceRange AttrRange;
 
+  auto attrRangeWithAt = [&]() -> SourceRange {
+    SourceLoc end = AttrRange.End.isValid() ? AttrRange.End : Loc;
+    return SourceRange(AtLoc.isValid() ? AtLoc : Loc, end);
+  };
+
   ParserStatus Status;
 
   switch (DK) {
@@ -2910,6 +2908,20 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Unsafe: {
+    // Handle '@unsafe' and '@unsafe(always)'.
+    auto always = parseSingleAttrOption<bool>(
+        *this, Loc, AttrRange, AttrName, DK, {{Context.Id_always, true}},
+        /*valueIfOmitted=*/false);
+    if (!always.has_value())
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) UnsafeAttr(AtLoc, AttrRange, *always));
+
+    break;
+  }
+
   case DeclAttrKind::ReferenceOwnership: {
     // Handle weak/unowned/unowned(unsafe).
     auto Kind = AttrName == "weak" ? ReferenceOwnership::Weak
@@ -2979,10 +2991,10 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       // this declaration with a different access level.
       if (access != cast<AccessControlAttr>(DuplicateAttribute)->getAccess()) {
         diagnose(Loc, diag::multiple_access_level_modifiers)
-            .highlight(AttrRange);
+            .highlight(attrRangeWithAt());
         diagnose(DuplicateAttribute->getLocation(),
                  diag::previous_access_level_modifier)
-            .highlight(DuplicateAttribute->getRange());
+            .highlight(DuplicateAttribute->getRangeWithAt());
 
         // Remove the reference to the duplicate attribute
         // to avoid the extra diagnostic.
@@ -3055,10 +3067,10 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     // this declaration with a different access level.
     if (access != cast<SetterAccessAttr>(DuplicateAttribute)->getAccess()) {
       diagnose(Loc, diag::multiple_access_level_modifiers)
-        .highlight(AttrRange);
+          .highlight(attrRangeWithAt());
       diagnose(DuplicateAttribute->getLocation(),
                diag::previous_access_level_modifier)
-          .highlight(DuplicateAttribute->getRange());
+          .highlight(DuplicateAttribute->getRangeWithAt());
 
       // Remove the reference to the duplicate attribute
       // to avoid the extra diagnostic.
@@ -4367,11 +4379,11 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   if (DuplicateAttribute) {
     diagnose(Loc, diag::duplicate_attribute, DeclAttribute::isDeclModifier(DK))
-      .highlight(AttrRange);
+        .highlight(attrRangeWithAt());
     diagnose(DuplicateAttribute->getLocation(),
              diag::previous_attribute,
              DeclAttribute::isDeclModifier(DK))
-      .highlight(DuplicateAttribute->getRange());
+        .highlight(DuplicateAttribute->getRangeWithAt());
   }
 
   // If this is a decl modifier spelled with an @, emit an error and remove it
@@ -8467,7 +8479,7 @@ bool Parser::parseAccessorAfterIntroducer(
       !Context.LangOpts.hasFeature(Feature::CoroutineAccessors)) {
     diagnose(Tok, diag::accessor_requires_coroutine_accessors,
              getAccessorNameForDiagnostic(Kind, /*article*/ false,
-                                          /*underscored*/ false));
+                                          /*legacy*/ false));
   }
 
   if (Kind == AccessorKind::Borrow || Kind == AccessorKind::Mutate) {
@@ -8476,7 +8488,7 @@ bool Parser::parseAccessorAfterIntroducer(
         !Flags.contains(PD_InProtocol)) {
       diagnose(Tok, diag::borrow_mutate_accessor_not_supported_in_decl,
                getAccessorNameForDiagnostic(Kind, /*article*/ true,
-                                            /*underscored*/ false));
+                                            /*legacy*/ false));
     }
   }
 
@@ -8486,7 +8498,7 @@ bool Parser::parseAccessorAfterIntroducer(
     if (Tok.is(tok::l_brace))
       diagnose(Tok, diag::unexpected_getset_implementation_in_protocol,
                getAccessorNameForDiagnostic(Kind, /*article*/ false,
-                                            /*underscored*/ false));
+                                            /*legacy*/ false));
     return false;
   }
 
@@ -8917,11 +8929,40 @@ AccessorDecl *Parser::ParsedAccessors::add(AccessorDecl *accessor) {
 void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      bool invalid) {
   classify(P, storage, invalid);
+
+  // When the CoroutineAccessors feature is enabled, in *surface source* the
+  // keywords `_read`/`_modify` and `yielding borrow`/`yielding mutate` are just
+  // two spellings of the same coroutine accessor.  Now that classify() has run
+  // its spelling-aware conflict diagnostics on the distinct kinds, rewrite a
+  // written `_read`/`_modify` to its yielding counterpart, remembering the
+  // underscored spelling for later diagnostics.
+  //
+  // The point is to make the accessor's *representation* independent of the
+  // source spelling.  The ABI -- in particular whether the old yield_once
+  // (`_read`/`_modify`) accessor is also emitted for backwards compatibility --
+  // is then determined by a consistent set of rules that do not depend on how
+  // the accessor was spelled; the rewrite does not itself dictate the ABI.
+  //
+  // This applies only to surface source.  In a .swiftinterface or .sil file,
+  // `_read`/`_modify` are ABI-level declarations -- synonyms for the yield_once
+  // accessor -- not surface spellings, so they already denote the correct
+  // accessor and must be taken literally.  (Post-parse, this leaves
+  // AccessorKind::Read/Modify uniformly meaning "the yield_once ABI accessor".)
+  if (P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors) &&
+      P.SF.Kind != SourceFileKind::Interface &&
+      P.SF.Kind != SourceFileKind::SIL) {
+    for (auto *accessor : Accessors) {
+      auto kind = accessor->getAccessorKind();
+      if (kind == AccessorKind::Read || kind == AccessorKind::Modify)
+        accessor->changeLegacyCoroutineAccessorToYielding();
+    }
+  }
+
   storage->setAccessors(LBLoc, Accessors, RBLoc);
 }
 
 static std::optional<AccessorKind>
-getCorrespondingUnderscoredAccessorKind(AccessorKind kind) {
+getCorrespondingLegacyAccessorKind(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::YieldingBorrow:
     return {AccessorKind::Read};
@@ -8946,20 +8987,20 @@ getCorrespondingUnderscoredAccessorKind(AccessorKind kind) {
 static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,
                                          AccessorDecl *&second) {
   if (!second) return;
-  bool underscored =
-      (getCorrespondingUnderscoredAccessorKind(first->getAccessorKind()) ==
+  bool legacy =
+      (getCorrespondingLegacyAccessorKind(first->getAccessorKind()) ==
        second->getAccessorKind()) ||
-      (getCorrespondingUnderscoredAccessorKind(second->getAccessorKind()) ==
+      (getCorrespondingLegacyAccessorKind(second->getAccessorKind()) ==
        first->getAccessorKind()) ||
       first->getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors);
   P.diagnose(
       second->getLoc(), diag::conflicting_accessor,
       isa<SubscriptDecl>(first->getStorage()),
-      getAccessorNameForDiagnostic(second, /*article*/ true, underscored),
-      getAccessorNameForDiagnostic(first, /*article*/ true, underscored));
+      getAccessorNameForDiagnostic(second, /*article*/ true, legacy),
+      getAccessorNameForDiagnostic(first, /*article*/ true, legacy));
   P.diagnose(
       first->getLoc(), diag::previous_accessor,
-      getAccessorNameForDiagnostic(first, /*article*/ false, underscored),
+      getAccessorNameForDiagnostic(first, /*article*/ false, legacy),
       /*already*/ false);
   second->setInvalid();
 }

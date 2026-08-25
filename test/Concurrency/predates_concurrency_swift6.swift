@@ -202,7 +202,7 @@ class UnavailableSendable {}
 
 @available(*, unavailable)
 extension UnavailableSendable: @unchecked Sendable {}
-// expected-note@-1 8 {{conformance of 'UnavailableSendable' to 'Sendable' has been explicitly marked unavailable here}}
+// expected-note@-2 8 {{conformance of 'UnavailableSendable' to 'Sendable' has been explicitly marked unavailable here}}
 
 typealias T = RequireSendable<NotSendable>
 // expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}

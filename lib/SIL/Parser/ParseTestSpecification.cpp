@@ -32,7 +32,7 @@ void findAndDeleteTraceValues(SILFunction *function,
       if (auto *debugValue = dyn_cast<DebugValueInst>(&inst)) {
         if (!debugValue->hasTrace())
           continue;
-        values.push_back(debugValue->getOperand());
+        values.push_back(debugValue->getSingleOperand());
         debugValue->eraseFromParent();
       }
     }

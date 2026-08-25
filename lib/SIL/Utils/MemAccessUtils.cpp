@@ -435,53 +435,6 @@ bool swift::isLetAddress(SILValue address) {
 }
 
 //===----------------------------------------------------------------------===//
-//                      MARK: Deinitialization barriers.
-//===----------------------------------------------------------------------===//
-
-bool swift::mayAccessPointer(SILInstruction *instruction) {
-  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
-         !isa<AbortApplyInst>(instruction));
-  if (!instruction->mayReadOrWriteMemory())
-    return false;
-  if (isa<BuiltinInst>(instruction)) {
-    // Consider all builtins that read/write memory to access pointers.
-    return true;
-  }
-  bool retval = false;
-  visitAccessedAddress(instruction, [&retval](Operand *operand) {
-    auto accessStorage = AccessStorage::compute(operand->get());
-    auto kind = accessStorage.getKind();
-    if (kind == AccessRepresentation::Kind::Unidentified ||
-        kind == AccessRepresentation::Kind::Global)
-      retval = true;
-  });
-  return retval;
-}
-
-bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
-  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
-         !isa<AbortApplyInst>(instruction));
-  if (isa<BuiltinInst>(instruction)) {
-    return instruction->mayReadOrWriteMemory();
-  }
-  return isa<LoadWeakInst>(instruction) 
-      || isa<LoadUnownedInst>(instruction) 
-      || isa<StrongCopyUnownedValueInst>(instruction)
-      || isa<StrongCopyUnmanagedValueInst>(instruction);
-}
-
-/// Conservatively, whether this instruction could involve a synchronization
-/// point like a memory barrier, lock or syscall.
-bool swift::maySynchronize(SILInstruction *instruction) {
-  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
-         !isa<AbortApplyInst>(instruction));
-  if (isa<BuiltinInst>(instruction)) {
-    return instruction->mayReadOrWriteMemory();
-  }
-  return isa<HopToExecutorInst>(instruction);
-}
-
-//===----------------------------------------------------------------------===//
 //                         MARK: AccessRepresentation
 //===----------------------------------------------------------------------===//
 
@@ -2642,6 +2595,10 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::CondFailMessage:
     case BuiltinValueKind::AllocRaw:
     case BuiltinValueKind::DeallocRaw:
+    case BuiltinValueKind::AllocRawTyped:
+    case BuiltinValueKind::DeallocRawTyped:
+    case BuiltinValueKind::AllocErrorBoxTyped:
+    case BuiltinValueKind::DeallocErrorBoxTyped:
     case BuiltinValueKind::StackAlloc:
     case BuiltinValueKind::UnprotectedStackAlloc:
     case BuiltinValueKind::AllocVector:

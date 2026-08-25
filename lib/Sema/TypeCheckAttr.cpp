@@ -4957,7 +4957,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     // Diagnose and ignore arguments.
     if (attr->hasArgs()) {
       diagnose(attr->getLocation(), diag::result_builder_arguments)
-        .highlight(attr->getArgs()->getSourceRange());
+          .highlight(attr->getRangeWithAt());
     }
 
     // Complain if this isn't the primary result-builder attribute.
@@ -5392,7 +5392,7 @@ void suggestAnyAppleOSAvailability(const Decl *D,
     if (!semAttr || !semAttr->isPlatformSpecific())
       continue;
 
-    auto platform = semAttr->getPlatform();
+    auto platform = *semAttr->getPlatform();
 
     // Don't diagnose any declaration that already has an anyAppleOS attribute.
     if (platform == PlatformKind::anyAppleOS)
@@ -5480,7 +5480,7 @@ void suggestAnyAppleOSAvailability(const Decl *D,
       if (remainingAttrsToReplace.erase(member))
         continue;
       if (auto semAttr = D->getSemanticAvailableAttr(member)) {
-        os << ", " << platformString(semAttr->getPlatform());
+        os << ", " << semAttr->getDomain().getNameForAttributePrinting();
         if (auto v = member->getRawIntroduced())
           os << " " << *v;
       }
@@ -5848,10 +5848,11 @@ void AttributeChecker::checkBackDeployedAttrs(
       // Find the attribute that makes the declaration unavailable.
       const Decl *attrDecl = D;
       do {
+        // FIXME: Adopt AvailabilityRestriction::emitNoteForDecl()
         if (auto unavailableAttr = attrDecl->getUnavailableAttr()) {
           diagnose(unavailableAttr->getParsedAttr()->AtLoc,
                    diag::availability_marked_unavailable, VD)
-              .highlight(unavailableAttr->getParsedAttr()->getRange());
+              .highlight(unavailableAttr->getParsedAttr()->getRangeWithAt());
           break;
         }
 
@@ -5882,7 +5883,7 @@ void AttributeChecker::checkBackDeployedAttrs(
         diagnose(availableAttr.getParsedAttr()->AtLoc,
                  diag::availability_introduced_in_version, VD,
                  introDomainAndRange->getDomain(), introRange)
-            .highlight(availableAttr.getParsedAttr()->getRange());
+            .highlight(availableAttr.getParsedAttr()->getRangeWithAt());
         continue;
       }
     }
@@ -6606,6 +6607,14 @@ findAutoDiffOriginalFunctionDecl(
           if (candidate) {
             maybeAccessorKind = AccessorKind::YieldingMutate;
           }
+        } else if (accessorKind == AccessorKind::Read) {
+          // With the CoroutineAccessors feature, a `_read` is represented as a
+          // `yielding borrow`.  Find it, but keep `maybeAccessorKind` as `Read`
+          // so diagnostics still refer to the `_read` spelling the user wrote.
+          candidate = asd->getOpaqueAccessor(AccessorKind::YieldingBorrow);
+        } else if (accessorKind == AccessorKind::Modify) {
+          // Likewise `_modify` is represented as a `yielding mutate`.
+          candidate = asd->getOpaqueAccessor(AccessorKind::YieldingMutate);
         }
       }
       // Error if candidate is missing the requested accessor.
@@ -9107,9 +9116,9 @@ AttributeChecker::visitAddressableForDependenciesAttr(
 void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
   if (auto safeAttr = D->getAttrs().getAttribute<SafeAttr>()) {
     D->diagnose(diag::safe_and_unsafe_attr, D)
-      .highlight(attr->getRange())
-      .highlight(safeAttr->getRange())
-      .warnInSwiftInterface(D->getDeclContext());
+        .highlight(attr->getRangeWithAt())
+        .highlight(safeAttr->getRangeWithAt())
+        .warnInSwiftInterface(D->getDeclContext());
   }
 }
 

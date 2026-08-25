@@ -152,7 +152,7 @@ struct PotentialBinding {
   /// Determine whether this binding could be a viable candidate
   /// to be "joined" with some other binding. It has to be at least
   /// a non-default r-value supertype binding with no type variables.
-  bool isViableForJoinOrMeet() const;
+  bool isViableForJoinOrMeet(bool allowTypeVariableJoins) const;
 
   static PotentialBinding forHole(TypeVariableType *typeVar,
                                   ConstraintLocator *locator) {
@@ -260,7 +260,7 @@ struct PotentialBindings {
   TypeVariableType *TypeVar;
 
   /// The set of all constraints that have been added via infer().
-  llvm::SmallSetVector<Constraint *, 2> Constraints;
+  llvm::SmallSetVector<Constraint *, 4> Constraints;
 
   /// The set of potential bindings.
   llvm::SmallVector<PotentialBinding, 4> Bindings;
@@ -273,38 +273,60 @@ struct PotentialBindings {
   /// must be bound to an lvalue.
   llvm::TinyPtrVector<Constraint *> LValueOf;
 
-  /// The set of type variables adjacent to the current one.
+  /// Both $T0 and $T1 appear in each other's EquivalentTo:
   ///
-  /// Type variables contained here are either related through the
-  /// bindings (contained in the binding type e.g. `Foo<$T0>`), or
-  /// reachable through subtype/conversion  relationship e.g.
-  /// `$T0 subtype of $T1` or `$T0 arg conversion $T1`.
+  /// $T0 equiv $T1
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 1> EquivalentTo;
+
+  /// $T0's AdjacentVars contains $T1:
+  ///
+  /// G<$T1> conv $T0
   llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 2> AdjacentVars;
 
-  /// A set of all not-yet-resolved type variables this type variable
-  /// is a subtype of, supertype of or is equivalent to. This is used
-  /// to determine ordering inside of a chain of subtypes to help infer
-  /// transitive bindings  and protocol requirements.
-  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> SubtypeOf;
-  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
-  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
+  /// $T0's SubtypeOf contains $T1:
+  ///
+  /// $T0 conv $T1
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 1> SubtypeOf;
+
+  /// $T0's SubtypeDelay contains $T1:
+  ///
+  /// [$T0] conv $T1
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 1> SubtypeDelay;
+
+  /// $T1's SupertypeOf contains $T0:
+  ///
+  /// $T0 conv $T1
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 1> SupertypeOf;
+
+  /// $T1's SupertypeDelay contains $T0:
+  ///
+  /// $T0 conv [$T1]
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 1> SupertypeDelay;
+
+  /// $T0's ElementTypes contains either of these bind constraints:
+  ///
+  /// $T0.Element bind X
+  /// X bind $T0.Element
+  llvm::SmallVector<std::pair<Type, Constraint *>, 1> ElementTypes;
 
   /// The set of protocol conformance requirements imposed on this type variable.
   llvm::SmallVector<Constraint *, 4> Protocols;
 
   /// The set of unique literal protocol requirements placed on this
   /// type variable.
-  llvm::SmallVector<LiteralRequirement, 2> Literals;
+  llvm::SmallVector<LiteralRequirement, 1> Literals;
 
   /// The set of fallback constraints imposed on this type variable.
-  llvm::SmallVector<Constraint *, 2> Defaults;
+  llvm::SmallVector<Constraint *, 1> Defaults;
 
   ASTNode AssociatedCodeCompletionToken = ASTNode();
 
-#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+#define BINDING_CONSTRAINT_ADDITION(PropertyName, Storage)                      \
   void record##PropertyName(Constraint *constraint);
-#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+#define BINDING_VAR_RELATION_ADDITION(RelationName, Storage)                    \
   void record##RelationName(TypeVariableType *typeVar, Constraint *originator);
+#define BINDING_TYPE_RELATION_ADDITION(RelationName, Storage)                   \
+  void record##RelationName(Type type, Constraint *originator);
 #include "swift/Sema/CSTrail.def"
 
   PotentialBindings(ConstraintSystem &cs, TypeVariableType *typeVar)
@@ -447,7 +469,7 @@ class BindingSet {
 
   const PotentialBindings &Info;
 
-  llvm::SmallPtrSet<TypeVariableType *, 4> AdjacentVars;
+  llvm::SmallPtrSet<TypeVariableType *, 4> ReferencedVars;
 
   /// Generation number of PotentialBindings at the time this BindingSet
   /// was constructed.

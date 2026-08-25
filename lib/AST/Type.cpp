@@ -183,6 +183,80 @@ bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
 }
 
+Type TypeBase::findUnsafeType(
+    llvm::function_ref<bool(NominalTypeDecl *)> isUnsafeDecl) const {
+  // A type that isn't unsafe at all has nothing to acknowledge.
+  if (!isUnsafe())
+    return Type();
+
+  /// Looks for a nominal type that the predicate accepts.
+  class Walker : public TypeWalker {
+    llvm::function_ref<bool(NominalTypeDecl *)> isUnsafeDecl;
+
+  public:
+    Type found;
+
+    Walker(llvm::function_ref<bool(NominalTypeDecl *)> isUnsafeDecl)
+        : isUnsafeDecl(isUnsafeDecl) {}
+
+    Action walkToTypePre(Type type) override {
+      if (found)
+        return Action::Stop;
+
+      if (auto typeDecl = type->getAnyNominal()) {
+        if (isUnsafeDecl(typeDecl)) {
+          found = type;
+          return Action::Stop;
+        }
+      }
+
+      // Do not recurse into nominal types, because we do not want to visit
+      // their "parent" types.
+      if (isa<NominalOrBoundGenericNominalType>(type.getPointer()) ||
+          isa<UnboundGenericType>(type.getPointer())) {
+        // Recurse into the generic arguments. This operation is recursive,
+        // because we also need to see the generic arguments of parent types.
+        walkGenericArguments(type);
+
+        return Action::SkipNode;
+      }
+
+      return Action::Continue;
+    }
+
+  private:
+    /// Recursively walk the generic arguments of this type and its parent
+    /// types.
+    void walkGenericArguments(Type type) {
+      if (!type)
+        return;
+
+      if (auto boundGeneric = type->getAs<BoundGenericType>()) {
+        for (auto genericArg : boundGeneric->getGenericArgs())
+          genericArg.walk(*this);
+      }
+
+      if (auto nominalOrBound = type->getAs<NominalOrBoundGenericNominalType>())
+        return walkGenericArguments(nominalOrBound->getParent());
+
+      if (auto unbound = type->getAs<UnboundGenericType>())
+        return walkGenericArguments(unbound->getParent());
+    }
+  };
+
+  Walker walker(isUnsafeDecl);
+  Type(const_cast<TypeBase *>(this)).walk(walker);
+  return walker.found;
+}
+
+Type TypeBase::findAlwaysUnsafeType() const {
+  // Walk the canonical type: sugar such as a typealias can hide an
+  // always-unsafe type from a structural walk, and we only care about which
+  // declaration is to blame, not how it was spelled.
+  return getCanonicalType()->findUnsafeType(
+      [](NominalTypeDecl *typeDecl) { return typeDecl->isAlwaysUnsafe(); });
+}
+
 bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
                                   bool functionsCount) {
   switch (type->getKind()) {
@@ -3669,7 +3743,16 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
     if (!ext2.isNoEscape())
       ext1 = ext1.withNoEscape(false);
   }
-  if (!ext1.isEqualTo(ext2, useClangTypes(fn1)))
+  bool compareClangTypes = useClangTypes(fn1);
+  // Under AllowMissingClangType (set for deserialization near-matches), a
+  // function type that carries a Clang type is compatible with one that lacks
+  // it — module build skew where an older module didn't record the Clang
+  // function type. Two present-but-different Clang types still mismatch.
+  if (compareClangTypes &&
+      matchMode.contains(TypeMatchFlags::AllowMissingClangType) &&
+      (ext1.getClangTypeInfo().empty() || ext2.getClangTypeInfo().empty()))
+    compareClangTypes = false;
+  if (!ext1.isEqualTo(ext2, compareClangTypes))
     return false;
 
   return paramsAndResultMatch();

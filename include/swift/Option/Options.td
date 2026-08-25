@@ -1893,6 +1893,14 @@ def enable_autolinking_runtime_compatibility_bytecode_layouts
       HelpText<"Enable autolinking for the bytecode layouts runtime "
                "compatibility library">;
 
+def weak_link_span_compatibility_lib
+    : Flag<[ "-" ], "weak-link-span-compatibility-lib">,
+      Flags<[ FrontendOption ]>,
+      HelpText<"Weakly link the symbols that are back deployed by the Span "
+               "compatibility library instead of strongly linking them, when "
+               "the deployment target predates the OS release that introduced "
+               "them">;
+
 def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph">;

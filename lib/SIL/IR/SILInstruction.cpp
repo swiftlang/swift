@@ -195,14 +195,9 @@ void SILInstruction::dropNonOperandReferences() {
     return;
   }
 
-  // If we have a DebugValueInst with a debug reconstruction block, drop it.
-  if (auto *DVI = dyn_cast<DebugValueInst>(this)) {
-    if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
-      DebugBB->dropAllReferences();
-      DebugBB->eraseAllInstructions(getModule());
-      DVI->setDebugReconstructionBlock(nullptr);
-    }
-  }
+  // If we have a DebugValueInst with a debug reconstruction block, free it.
+  if (auto *DVI = dyn_cast<DebugValueInst>(this))
+    DVI->setDebugReconstructionBlock(nullptr);
 }
 
 namespace {
@@ -1404,6 +1399,9 @@ SILInstruction::getStackAllocation() const {
       BUILTIN_CASE(TaskAddPriorityEscalationHandler,
                    TaskAddPriorityEscalationHandler)
       BUILTIN_CASE(TaskAddCancellationHandler, TaskAddCancellationHandler)
+      BUILTIN_CASE(TaskAddCancellationHandlerWithReason, TaskAddCancellationHandler)
+      BUILTIN_CASE(TaskPushDeadline, TaskPushDeadline)
+      BUILTIN_CASE(TaskCancellationScopePush, TaskCancellationScopePush)
 #undef BUILTIN_CASE
 
       default:
@@ -1516,6 +1514,8 @@ SILInstruction::getStackDeallocation() const {
                    BuiltinTaskAddPriorityEscalationHandler)
       BUILTIN_CASE(TaskRemoveCancellationHandler,
                    BuiltinTaskAddCancellationHandler)
+      BUILTIN_CASE(TaskPopDeadline, BuiltinTaskPushDeadline)
+      BUILTIN_CASE(TaskCancellationScopePop, BuiltinTaskCancellationScopePush)
 #undef BUILTIN_CASE
 
       default:
@@ -1554,7 +1554,6 @@ bool SILInstruction::mayRequirePackMetadata(SILFunction const &F) const {
     return false;
   }
   case SILInstructionKind::ClassMethodInst:
-  case SILInstructionKind::DebugValueInst: 
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::DestroyValueInst:
   // Unary instructions.

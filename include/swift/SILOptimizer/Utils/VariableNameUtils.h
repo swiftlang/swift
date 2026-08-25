@@ -38,6 +38,20 @@ public:
     /// DISCUSSION: This may not be the correct semantics for all name inference
     /// since we may want to consider computed properties to be tied to self.
     InferSelfThroughAllAccessors = 0x1,
+
+    /// If set then when a call's result is bound directly to a variable, name
+    /// the result after the call that produced it -- spelled `foo()` -- rather
+    /// than after the variable being initialized.
+    ///
+    /// DISCUSSION: By default the inferrer prefers the variable, since that is
+    /// the name the user wrote for the value. A client explaining where a value
+    /// came from rather than what it is now wants the opposite, and wants the
+    /// name to read as the *result of calling* the function, not as a value
+    /// that merely shares the function's name. This only applies to the
+    /// `let x = foo()` shape, where the variable's name would otherwise be
+    /// taken from the initializing move_value [var_decl]; it does not change
+    /// how a value that is merely passed around is named.
+    NameCallResultAfterCallee = 0x2,
   };
 
   using Options = OptionSet<Flag>;
@@ -180,6 +194,12 @@ private:
   /// attribute that didn't carry a decl).
   ValueDecl *leafDecl = nullptr;
 
+  /// Set when the inferred name names a call rather than a variable -- i.e.
+  /// when \c Flag::NameCallResultAfterCallee applied and the name is the
+  /// spelling of the callee. A consumer needs this to phrase the name as the
+  /// *result of* that call; the name itself only says which call it was.
+  bool nameIsCallResult = false;
+
   /// The final string we computed.
   SmallString<64> &resultingString;
 
@@ -278,8 +298,17 @@ public:
   /// SourceLoc may be invalid when the inferred name has no associated
   /// providing source location (e.g., a single-component name coming
   /// directly from a debug_value with no usable loc).
+  ///
+  /// \p extraOptions additional inference options to apply on top of the
+  /// defaults this helper uses, for clients that want a different naming
+  /// policy (e.g. \c Flag::NameCallResultAfterCallee).
+  ///
+  /// \p nameIsCallResult if non-null, set to true when the returned name names
+  /// a call (see \c Flag::NameCallResultAfterCallee) rather than a variable, so
+  /// the caller can phrase it as the result of that call.
   static std::optional<std::pair<Identifier, SourceLoc>>
-  inferNameAndFirstPathComponent(SILValue value);
+  inferNameAndFirstPathComponent(SILValue value, Options extraOptions = {},
+                                 bool *nameIsCallResult = nullptr);
 
   /// Result of \c inferNameAndLeafDecl. Carries the joined+interned name,
   /// the first-name-providing source location (see \c firstNameProvidingLoc),
@@ -304,6 +333,10 @@ public:
   /// Returns the source location whose name was first pushed onto the name
   /// path during the walk. See \c firstNameProvidingLoc for details.
   SourceLoc getFirstNameProvidingLoc() const { return firstNameProvidingLoc; }
+
+  /// Whether the inferred name names a call rather than a variable. See
+  /// \c nameIsCallResult.
+  bool isNameACallResult() const { return nameIsCallResult; }
 
   /// Returns the leaf-most component's \c ValueDecl if \c drainVariableNamePath
   /// has run on a non-empty path whose leaf was a decl, otherwise null.

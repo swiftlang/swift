@@ -352,7 +352,7 @@ extension ASTGenVisitor {
       )
     default:
       // TODO: Diagnose.
-      fatalError("expected identifier, 'self', or integer in @lifetime")
+      fatalError("expected identifier, 'self', or integer in @_lifetime")
     }
   }
 

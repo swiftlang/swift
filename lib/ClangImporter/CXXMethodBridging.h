@@ -3,6 +3,7 @@
 
 #include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
 #include <string>
 
 namespace swift {
@@ -158,10 +159,10 @@ private:
   const clang::CXXMethodDecl *method = nullptr;
 
   bool nameIsBlacklist() {
-    auto loweredName = getClangName().lower();
     // Names that start with "get" or "set" but aren't getters or setters.
-    return loweredName == "getter" || loweredName == "setter" ||
-           loweredName == "get" || loweredName == "set";
+    return llvm::StringSwitch<bool>(getClangName())
+        .CasesLower({"getter", "setter", "get", "set"}, true)
+        .Default(false);
   }
 };
 

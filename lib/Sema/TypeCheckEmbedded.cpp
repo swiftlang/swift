@@ -78,42 +78,6 @@ swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
   return DiagnosticBehavior::Unspecified;
 }
 
-/// Determine whether the inner signature is more generic than the outer
-/// signature, ignoring differences that
-static bool isABIMoreGenericThan(GenericSignature innerSig, GenericSignature outerSig) {
-  auto canInnerSig = innerSig.getCanonicalSignature();
-  auto canOuterSig = outerSig.getCanonicalSignature();
-  if (canInnerSig == canOuterSig)
-    return false;
-
-  // The inner signature added generic parameters.
-  if (canOuterSig.getGenericParams().size() !=
-        canInnerSig.getGenericParams().size())
-    return true;
-
-  // Look at the requirements of the inner signature that aren't satisfied
-  // by the outer signature, to see if there are any requirements that aren't
-  // just marker protocols.
-  auto requirements = canInnerSig.requirementsNotSatisfiedBy(canOuterSig);
-  for (const auto &req : requirements) {
-    switch (req.getKind()) {
-    case RequirementKind::Conformance:
-      if (req.getProtocolDecl()->isMarkerProtocol())
-        continue;
-
-      return true;
-
-    case RequirementKind::Superclass:
-    case RequirementKind::Layout:
-    case RequirementKind::SameShape:
-    case RequirementKind::SameType:
-      return true;
-    }
-  }
-
-  return false;
-}
-
 /// Check embedded restrictions in the signature of the given function.
 void swift::checkEmbeddedRestrictionsInSignature(
     const AbstractFunctionDecl *func) {
@@ -122,18 +86,45 @@ void swift::checkEmbeddedRestrictionsInSignature(
   if (!behavior)
     return;
 
-  // If we're in a class, one cannot have a non-final generic function.
-  if (auto classDecl = dyn_cast<ClassDecl>(func->getDeclContext())) {
-    if (!classDecl->isSemanticallyFinal() &&
-        ((isa<FuncDecl>(func) && !func->isSemanticallyFinal()) ||
-         (isa<ConstructorDecl>(func) &&
-          cast<ConstructorDecl>(func)->isRequired())) &&
-        isABIMoreGenericThan(func->getGenericSignature(),
-                             classDecl->getGenericSignature())) {
+  auto classDecl = dyn_cast<ClassDecl>(func->getDeclContext());
+  if (!classDecl)
+    return;
+
+  // A `required` generic initializer is reached through the metatype of a
+  // dynamic type, so there is no way to dispatch it statically.
+  if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
+    if (ctor->isRequired() && !classDecl->isSemanticallyFinal() &&
+        func->getGenericSignature().isABIMoreGenericThan(
+            classDecl->getGenericSignature())) {
       func->diagnose(diag::generic_nonfinal_in_embedded_swift, func,
-                     isa<ConstructorDecl>(func))
+                     /*isRequiredInit=*/true)
         .limitBehavior(defaultEmbeddedLimitationForError(func, func->getLoc()));
     }
+    return;
+  }
+
+  // A generic method of a class is dispatched statically and kept out of the
+  // vtable. That is only sound if nothing can override it, so reject the two
+  // ways an override could arise.
+  if (classDecl->isSemanticallyFinal() ||
+      !func->getGenericSignature().isABIMoreGenericThan(
+          classDecl->getGenericSignature()))
+    return;
+
+  // An override needs the overridden method to have a vtable entry to dispatch
+  // through, which a generic method does not get. Diagnose this before `open`,
+  // since an `open` override should be described as the override problem.
+  if (func->getOverriddenDecl()) {
+    func->diagnose(diag::generic_override_in_embedded_swift, func)
+      .limitBehavior(defaultEmbeddedLimitationForError(func, func->getLoc()));
+    return;
+  }
+
+  // An `open` method can be overridden from another module, which we would
+  // never see -- so this has to be rejected at the declaration.
+  if (func->getFormalAccess() == AccessLevel::Open) {
+    func->diagnose(diag::generic_open_in_embedded_swift, func)
+      .limitBehavior(defaultEmbeddedLimitationForError(func, func->getLoc()));
   }
 }
 
@@ -145,9 +136,10 @@ void swift::diagnoseGenericMemberOfExistentialInEmbedded(
   if (!behavior)
     return;
 
-  if (isABIMoreGenericThan(
-          member->getInnermostDeclContext()->getGenericSignatureOfContext(),
-          member->getDeclContext()->getGenericSignatureOfContext())) {
+  if (member->getInnermostDeclContext()
+          ->getGenericSignatureOfContext()
+          .isABIMoreGenericThan(
+              member->getDeclContext()->getGenericSignatureOfContext())) {
     dc->getASTContext().Diags.diagnose(loc, diag::use_generic_member_of_existential_in_embedded_swift, member,
         baseType)
       .limitBehavior(*behavior);

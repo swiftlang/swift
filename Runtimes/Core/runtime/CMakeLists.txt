@@ -15,7 +15,6 @@ add_library(swiftRuntimeCore OBJECT
     Borrow.cpp
     BytecodeLayouts.cpp
     Casting.cpp
-    CrashReporter.cpp
     Demangle.cpp
     DynamicCast.cpp
     Enum.cpp
@@ -48,6 +47,7 @@ add_library(swiftRuntimeCore OBJECT
     Once.cpp
     Paths.cpp
     Portability.cpp
+    Privilege.cpp
     ProtocolConformance.cpp
     RefCount.cpp
     ReflectionMirror.cpp
@@ -101,6 +101,7 @@ target_compile_definitions(swiftRuntimeCore
     $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_ARCH="${SwiftCore_ARCH_SUBDIR}">
     $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_LIB_SUBDIR="${SwiftCore_PLATFORM_SUBDIR}">
     $<$<BOOL:${SwiftCore_ENABLE_FATALERROR_BACKTRACE}>:-DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING>
+    $<$<BOOL:${SwiftCore_ENABLE_STDLIB_LAZY_LINK}>:-DSWIFT_STDLIB_ENABLE_LAZY_LINK>
   PUBLIC
     $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>
     $<$<BOOL:${SwiftCore_ENABLE_OS_TRACE_LAZY_INIT}>:-DSWIFT_USE_OS_TRACE_LAZY_INIT>)

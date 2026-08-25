@@ -3,21 +3,21 @@
 @available(tvOS, introduced: 1.0, deprecated: 2.0, obsoleted: 9.0,
               message: "you don't want to do that anyway")
 func doSomething() { }
-// expected-note @-1{{'doSomething()' was obsoleted in tvOS 9.0}}
+// expected-note @-3{{'doSomething()' was obsoleted in tvOS 9.0}}
 
 doSomething() // expected-error{{'doSomething()' is unavailable in tvOS: you don't want to do that anyway}}
 
 // Preservation of major.minor.micro
 @available(tvOS, introduced: 1.0, deprecated: 2.0, obsoleted: 8.0)
 func doSomethingElse() { }
-// expected-note @-1{{'doSomethingElse()' was obsoleted in tvOS 8.0}}
+// expected-note @-2{{'doSomethingElse()' was obsoleted in tvOS 8.0}}
 
 doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable in tvOS}}
 
 // Preservation of minor-only version
 @available(tvOS, introduced: 1.0, deprecated: 1.5, obsoleted: 9)
 func doSomethingReallyOld() { }
-// expected-note @-1{{'doSomethingReallyOld()' was obsoleted in tvOS 9}}
+// expected-note @-2{{'doSomethingReallyOld()' was obsoleted in tvOS 9}}
 
 doSomethingReallyOld() // expected-error{{'doSomethingReallyOld()' is unavailable in tvOS}}
 

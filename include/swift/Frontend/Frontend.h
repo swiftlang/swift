@@ -280,6 +280,15 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
+  /// Recompute the implicit search paths for the runtime libraries and
+  /// frameworks.
+  ///
+  /// These paths depend on the target, the SDK path and on language options -
+  /// e.g. Embedded Swift uses its own set of runtime libraries. Tools which
+  /// modify LangOptions directly, instead of going through parseArgs(), need to
+  /// call this afterwards.
+  void updateImplicitSearchPaths();
+
   /// Compute the default prebuilt module cache path for a given resource path
   /// and SDK version. This function is also used by LLDB.
   static std::string
@@ -304,6 +313,24 @@ public:
 
   /// Compute whether or not we support aarch64TBI
   void computeAArch64TBIOptions();
+
+  /// What an Embedded Swift compilation is being set up for.
+  enum class EmbeddedSwiftContext {
+    /// A full compilation, producing a binary or a module.
+    FullCompilation,
+    /// An expression the debugger compiles against a binary that was already
+    /// built with Embedded Swift.
+    DebuggerExpression,
+  };
+
+  /// Turn on Embedded Swift, along with the option state the compiler derives
+  /// from it.
+  ///
+  /// \param exclusivityEnforcementSpecified Whether the user passed
+  /// -enforce-exclusivity=.
+  void
+  setCommonEmbeddedSwiftOptions(EmbeddedSwiftContext context,
+                                bool exclusivityEnforcementSpecified = false);
 
   /// Computes the runtime resource path relative to the given Swift
   /// executable.

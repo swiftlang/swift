@@ -31,6 +31,14 @@
     let memoryMap: SwiftInspectLinux.MemoryMap
     let symbolCache: SwiftInspectLinux.SymbolCache
 
+    /// The reference passed to the reflection context, which the context holds
+    /// until `releaseContextRef()` clears it.
+    private var contextRef: OpaqueRef?
+
+    func releaseContextRef() {
+      contextRef = nil
+    }
+
     /// A symbol resolved (lazily) against the target process's symbol cache.
     /// `addr` is `nil` when the symbol isn't found.
     struct RemoteSymbol {
@@ -141,10 +149,11 @@
         return nil
       }
 
+      self.contextRef = OpaqueRef(self)
       guard
         let context = swift_reflection_createReflectionContextWithDataLayout(
-          self.toOpaqueRef(), Self.QueryDataLayout, Self.Free, Self.ReadBytes, Self.GetStringLength,
-          Self.GetSymbolAddress)
+          self.contextRef?.pointer, Self.QueryDataLayout, Self.Free, Self.ReadBytes,
+          Self.GetStringLength, Self.GetSymbolAddress)
       else { return nil }
       self.context = context
     }

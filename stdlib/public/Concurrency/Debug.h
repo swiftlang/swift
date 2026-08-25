@@ -70,13 +70,14 @@ bool _swift_concurrency_debug_supportsPriorityEscalation;
 /// new value; bump _swift_concurrency_debug_internal_layout_version when
 /// adding one.
 enum class _concurrency_current_task_storage_kind : uint8_t {
-  /// The task pointer lives in TLS at offset 0 of the runtime's internal
-  /// current-task variable, which the debugger locates via debug info.
+  /// The task pointer lives in TLS at offset 0 of the runtime's exported
+  /// current-task variable, `_swift_concurrency_currentTask`.
   cxx_thread_local = 1,
 
-  /// The task pointer lives at offset 0 of the runtime's internal current-task
-  /// variable (no TLS resolution). Used by single-threaded /
-  /// SWIFT_THREADING_NONE builds where `SWIFT_THREAD_LOCAL` expands to nothing.
+  /// The task pointer lives at offset 0 of the runtime's current-task variable,
+  /// `_swift_concurrency_currentTask` (no TLS resolution). Used by
+  /// single-threaded / SWIFT_THREADING_NONE builds where `SWIFT_THREAD_LOCAL`
+  /// expands to nothing.
   global = 2,
 
   /// Pthread thread-specific data with a *reserved* (compile-time constant)

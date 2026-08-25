@@ -116,11 +116,12 @@ BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
 BridgedCaptureListEntry BridegedCaptureListEntry_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedReferenceOwnership cOwnershipKind, SourceRange ownershipRange,
-    Identifier name, SourceLoc nameLoc, SourceLoc equalLoc,
+    bool isSending, Identifier name, SourceLoc nameLoc, SourceLoc equalLoc,
     BridgedExpr cInitializer) {
   return CaptureListEntry::createParsed(
-      cContext.unbridged(), unbridged(cOwnershipKind), ownershipRange, name,
-      nameLoc, equalLoc, cInitializer.unbridged(), cDeclContext.unbridged());
+      cContext.unbridged(), unbridged(cOwnershipKind), ownershipRange,
+      isSending, name, nameLoc, equalLoc, cInitializer.unbridged(),
+      cDeclContext.unbridged());
 }
 
 BridgedCaptureListExpr

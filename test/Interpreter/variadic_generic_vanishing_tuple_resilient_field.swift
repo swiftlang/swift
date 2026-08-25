@@ -7,6 +7,9 @@
 
 // REQUIRES: executable_test
 
+// Match the swift-5.9 target triple above.
+// REQUIRES: stdlib_5_9_runtime
+
 // Storing a pack-expansion tuple property hits an unrelated pre-existing SILGen
 // assertion under SIL opaque values (TupleInitialization::copyOrInitValueInto);
 // the metadata-completion bug this test guards is in IRGen and is exercised by

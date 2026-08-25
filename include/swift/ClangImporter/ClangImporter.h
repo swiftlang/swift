@@ -86,6 +86,7 @@ class DeclContext;
 class DiagnosticEngine;
 class EffectiveClangContext;
 class EnumDecl;
+class Evaluator;
 class FuncDecl;
 class ImportDecl;
 class IRGenOptions;
@@ -117,6 +118,18 @@ enum OptionalTypeKind : unsigned {
   OTK_ImplicitlyUnwrappedOptional
 };
 enum { NumOptionalTypeKinds = 2 };
+
+/// Where a C++ record sits in libkern's OSObject hierarchy. This is used to
+/// decide whether to apply libkern's ownership convention.
+///
+/// Only meaningful when the 'LibkernOwnershipConventions' feature is enabled.
+enum class LibkernSubclass {
+  None,
+  OSObject,
+  /// OSIterator derives from OSObject, so a type that derives from OSIterator
+  /// also derives from OSObject.
+  OSIterator,
+};
 
 /// This interface is implemented by LLDB to serve as a fallback when Clang
 /// modules can't be imported from source in the debugger.
@@ -742,6 +755,12 @@ public:
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
+  std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
+  getForeignReferenceTypeOperations(const clang::RecordDecl *decl) override;
+
+  /// Classify \p decl against libkern's OSObject hierarchy.
+  LibkernSubclass getLibkernSubclass(const clang::RecordDecl *decl);
+
   void checkCalledClangFunction(const ValueDecl *funcDecl,
                                 SourceLoc callSiteLoc) override;
 
@@ -777,10 +796,6 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 bool isCompletionHandlerParamName(StringRef paramName);
 
 namespace importer {
-/// Returns true if the given C/C++ reference type uses "immortal"
-/// retain/release functions.
-bool hasAnyImmortalAttr(const clang::RecordDecl *decl);
-
 struct ReturnOwnershipInfo {
   ReturnOwnershipInfo(const clang::NamedDecl *decl);
 
@@ -819,6 +834,19 @@ bool isCxxConstReferenceType(const clang::Type *type);
 /// Determine whether the given Clang record declaration has an attribute that
 /// makes it import as a reference types. Does not check its bases, if any.
 bool hasImportReferenceAttr(const clang::RecordDecl *decl);
+
+/// Whether any declaration of \p decl carries one of the given swift_attrs.
+/// A swift_attr propagates to later redeclarations only, and Clang carries just
+/// the first one, so an attribute is not necessarily visible on the declaration
+/// at hand.
+bool hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
+                                  ArrayRef<StringRef> attrs);
+
+/// Whether the given Clang record is imported as a foreign reference type,
+/// including when it has no definition. Accounts for inherited reference-ness
+/// when a definition is available, and for an annotation on any declaration in
+/// the chain when it is not.
+bool isForeignReferenceRecord(const clang::RecordDecl *decl, Evaluator &eval);
 
 /// Determine whether the given Clang record declaration has the
 /// swift_attr("import_opaque_pointer") attribute, which causes any pointer
@@ -938,7 +966,23 @@ matchSwiftAttr(const clang::Decl *decl,
 /// \param decl The Clang function or method declaration to inspect.
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
-getOwnershipOfReturnedFRT(const clang::NamedDecl *decl);
+getOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
+
+/// Determines the ownership convention of functions that return libkern's
+/// OSObject or one of its subclasses.
+///
+/// - Methods which start with "get" or "Get" and which are not returning
+///   a subclass of OSIterator are assumed to be getters.
+///   They return at "+0" and the caller is not responsible for releasing the
+///   returned object.
+///
+/// - All other methods are assumed to return at "+1", and the caller is
+///   responsible for releasing the returned object.
+///
+/// \param decl The Clang function or method declaration to inspect.
+/// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
+std::optional<ResultConvention>
+getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
 
 enum class RefCountedPtrError {
   NotAnnotated,

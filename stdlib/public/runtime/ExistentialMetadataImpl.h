@@ -473,6 +473,45 @@ struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBoxBase
   }
 };
 
+/// A COM existential is a single interface pointer. Its ownership operations
+/// dispatch through the interface's ownership vtable prefix rather than Swift
+/// or Objective-C reference counting.
+struct SWIFT_LIBRARY_VISIBILITY COMExistentialBox
+    : RetainableBoxBase<COMExistentialBox, void *> {
+  using RefCountOperation = uint32_t (*)(void *);
+
+  static void invoke(void *interface, unsigned slot) {
+    if (!interface)
+      return;
+
+    auto **vtable = *reinterpret_cast<void ***>(interface);
+    reinterpret_cast<RefCountOperation>(vtable[slot])(interface);
+  }
+
+  static void *retain(void *interface) {
+    invoke(interface, 1);
+    return interface;
+  }
+
+  static void release(void *interface) {
+    invoke(interface, 2);
+  }
+
+  // Null is the sole extra inhabitant. Keeping this set deliberately narrow
+  // ensures that value witnesses never dispatch through an arbitrary invalid
+  // pointer pattern.
+  static constexpr unsigned numExtraInhabitants = 1;
+
+  static void storeExtraInhabitantTag(void **dest, unsigned tag) {
+    assert(tag == 1);
+    *dest = nullptr;
+  }
+
+  static unsigned getExtraInhabitantTag(void *const *src) {
+    return *src ? 0 : 1;
+  }
+};
+
 /// A box implementation class for an existential container with
 /// a class constraint and a fixed number of protocol witness tables.
 template <unsigned NumWitnessTables>

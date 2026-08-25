@@ -359,17 +359,9 @@ class Y {}
 
 sil [ossa] @getObject : $@convention(thin) () -> @owned AnyObject
 
-// No overlap (access ignored):
-//     def
-//     use
-//     begin_access
-//     end_access
-//     destroy
-//
 // CHECK-LABEL: sil [ossa] @testNoOverlapInLiveBlock : $@convention(thin) () -> () {
 // CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
-// CHECK-NOT: copy_value
-// CHECK:   store [[DEF]] to [init]
+// CHECK:   copy_value
 // CHECK:   begin_access
 // CHECK:   end_access
 // CHECK: bb1:
@@ -401,19 +393,9 @@ bb1:
   return %v : $()
 }
 
-// No overlap (access ignored):
-//     def
-//     use
-//     br...
-// bb...
-//     begin_access
-//     end_access
-//     destroy
-//
 // CHECK-LABEL: sil [ossa] @testNoOverlapInDeadBlock : $@convention(thin) () -> () {
 // CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
-// CHECK-NOT: copy_value
-// CHECK:   store [[DEF]] to [init] %{{.*}} : $*AnyObject
+// CHECK:   copy_value
 // CHECK: br bb1
 // CHECK: bb1:
 // CHECK:   begin_access

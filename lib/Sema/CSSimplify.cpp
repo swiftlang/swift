@@ -3262,8 +3262,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   if (func1->isCalledOnce() != func2->isCalledOnce()) {
-    if (func1->isCalledOnce() ||
-        (kind < ConstraintKind::Subtype && !isWitnessMatching(locator))) {
+    if (func1->isCalledOnce() || kind < ConstraintKind::Subtype) {
       if (!shouldAttemptFixes())
         return SolutionKind::Error;
 
@@ -16528,7 +16527,9 @@ void ConstraintSystem::addConstraint(Requirement req,
       }
     }
 
-    conformsToAnyObject = true;
+    // Native classes conform to AnyObject, but foreign reference types do not,
+    // so only imply the AnyObject requirement when the bound isn't an FRT.
+    conformsToAnyObject = !req.getSecondType()->isForeignReferenceType();
     kind = ConstraintKind::Subtype;
     break;
   }

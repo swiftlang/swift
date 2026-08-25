@@ -8,73 +8,73 @@ protocol OlfactoryProtocol {
   func bad() // expected-note {{here}}
   @available(*, unavailable, message: "it was smelly")
   func smelly() // expected-note {{here}}
-  @available(*, unavailable, renamed: "new")
-  func old() // expected-note {{here}}
-  @available(*, unavailable, renamed: "new", message: "it was smelly")
-  func oldAndSmelly() // expected-note {{here}}
+  @available(*, unavailable, renamed: "new") // expected-note {{here}}
+  func old()
+  @available(*, unavailable, renamed: "new", message: "it was smelly") // expected-note {{here}}
+  func oldAndSmelly()
 
   @available(*, unavailable)
   var badProp: Int { get } // expected-note {{here}}
   @available(*, unavailable, message: "it was smelly")
   var smellyProp: Int { get } // expected-note {{here}}
-  @available(*, unavailable, renamed: "new")
-  var oldProp: Int { get } // expected-note {{here}}
-  @available(*, unavailable, renamed: "new", message: "it was smelly")
-  var oldAndSmellyProp: Int { get } // expected-note {{here}}
+  @available(*, unavailable, renamed: "new") // expected-note {{here}}
+  var oldProp: Int { get }
+  @available(*, unavailable, renamed: "new", message: "it was smelly") // expected-note {{here}}
+  var oldAndSmellyProp: Int { get }
 
-  @available(*, unavailable, renamed: "init")
-  func nowAnInitializer() // expected-note {{here}}
-  @available(*, unavailable, renamed: "init()")
-  func nowAnInitializer2() // expected-note {{here}}
+  @available(*, unavailable, renamed: "init") // expected-note {{here}}
+  func nowAnInitializer()
+  @available(*, unavailable, renamed: "init()") // expected-note {{here}}
+  func nowAnInitializer2()
 
-  @available(*, unavailable, renamed: "foo")
-  init(nowAFunction: Int) // expected-note {{here}}
-  @available(*, unavailable, renamed: "foo(_:)")
-  init(nowAFunction2: Int) // expected-note {{here}}
+  @available(*, unavailable, renamed: "foo") // expected-note {{here}}
+  init(nowAFunction: Int)
+  @available(*, unavailable, renamed: "foo(_:)") // expected-note {{here}}
+  init(nowAFunction2: Int)
 
-  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
-  func unavailableArgNames(a: Int) // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
-  func unavailableArgRenamed(a: Int) // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments()")
-  func unavailableNoArgs() // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(a:)")
-  func unavailableSame(a: Int) // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
-  func unavailableUnnamed(_ a: Int) // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(_:)")
-  func unavailableUnnamedSame(_ a: Int) // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(_:)")
-  func unavailableNewlyUnnamed(a: Int) // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)")
-  func unavailableMultiSame(a: Int, b: Int) // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(example:another:)")
-  func unavailableMultiUnnamed(_ a: Int, _ b: Int) // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)")
-  func unavailableMultiUnnamedSame(_ a: Int, _ b: Int) // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)")
-  func unavailableMultiNewlyUnnamed(a: Int, b: Int) // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)") // expected-note {{here}}
+  func unavailableArgNames(a: Int)
+  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)") // expected-note {{here}}
+  func unavailableArgRenamed(a: Int)
+  @available(*, unavailable, renamed: "shinyLabeledArguments()") // expected-note {{here}}
+  func unavailableNoArgs()
+  @available(*, unavailable, renamed: "shinyLabeledArguments(a:)") // expected-note {{here}}
+  func unavailableSame(a: Int)
+  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)") // expected-note {{here}}
+  func unavailableUnnamed(_ a: Int)
+  @available(*, unavailable, renamed: "shinyLabeledArguments(_:)") // expected-note {{here}}
+  func unavailableUnnamedSame(_ a: Int)
+  @available(*, unavailable, renamed: "shinyLabeledArguments(_:)") // expected-note {{here}}
+  func unavailableNewlyUnnamed(a: Int)
+  @available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)") // expected-note {{here}}
+  func unavailableMultiSame(a: Int, b: Int)
+  @available(*, unavailable, renamed: "shinyLabeledArguments(example:another:)") // expected-note {{here}}
+  func unavailableMultiUnnamed(_ a: Int, _ b: Int)
+  @available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)") // expected-note {{here}}
+  func unavailableMultiUnnamedSame(_ a: Int, _ b: Int)
+  @available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)") // expected-note {{here}}
+  func unavailableMultiNewlyUnnamed(a: Int, b: Int)
 
-  @available(*, unavailable, renamed: "init(shinyNewName:)")
-  init(unavailableArgNames: Int) // expected-note{{here}}
-  @available(*, unavailable, renamed: "init(a:)")
-  init(_ unavailableUnnamed: Int) // expected-note{{here}}
-  @available(*, unavailable, renamed: "init(_:)")
-  init(unavailableNewlyUnnamed: Int) // expected-note{{here}}
-  @available(*, unavailable, renamed: "init(a:b:)")
-  init(_ unavailableMultiUnnamed: Int, _ b: Int) // expected-note{{here}}
-  @available(*, unavailable, renamed: "init(_:_:)")
-  init(unavailableMultiNewlyUnnamed a: Int, b: Int) // expected-note{{here}}
+  @available(*, unavailable, renamed: "init(shinyNewName:)") // expected-note{{here}}
+  init(unavailableArgNames: Int)
+  @available(*, unavailable, renamed: "init(a:)") // expected-note{{here}}
+  init(_ unavailableUnnamed: Int)
+  @available(*, unavailable, renamed: "init(_:)") // expected-note{{here}}
+  init(unavailableNewlyUnnamed: Int)
+  @available(*, unavailable, renamed: "init(a:b:)") // expected-note{{here}}
+  init(_ unavailableMultiUnnamed: Int, _ b: Int)
+  @available(*, unavailable, renamed: "init(_:_:)") // expected-note{{here}}
+  init(unavailableMultiNewlyUnnamed a: Int, b: Int)
 
-  @available(*, unavailable, renamed: "shinyLabeledArguments(x:)")
-  func unavailableTooFew(a: Int, b: Int) // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(x:b:)")
-  func unavailableTooMany(a: Int) // expected-note {{here}}
-  @available(*, unavailable, renamed: "shinyLabeledArguments(x:)")
-  func unavailableNoArgsTooMany() // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(x:)") // expected-note {{here}}
+  func unavailableTooFew(a: Int, b: Int)
+  @available(*, unavailable, renamed: "shinyLabeledArguments(x:b:)") // expected-note {{here}}
+  func unavailableTooMany(a: Int)
+  @available(*, unavailable, renamed: "shinyLabeledArguments(x:)") // expected-note {{here}}
+  func unavailableNoArgsTooMany()
 
-  @available(*, unavailable, renamed: "Base.shinyLabeledArguments()")
-  func unavailableHasType() // expected-note {{here}}
+  @available(*, unavailable, renamed: "Base.shinyLabeledArguments()") // expected-note {{here}}
+  func unavailableHasType()
 }
 
 final class SchnozType : OlfactoryProtocol {
@@ -146,8 +146,8 @@ extension Kitten {
 // Test preventing protocol witnesses for unavailable requirements
 @objc
 protocol ProtocolWithRenamedRequirement {
-  @available(*, unavailable, renamed: "new(bar:)")
-  @objc optional func old(foo: Int) // expected-note{{'old(foo:)' has been explicitly marked unavailable here}}
+  @available(*, unavailable, renamed: "new(bar:)") // expected-note{{'old(foo:)' has been explicitly marked unavailable here}}
+  @objc optional func old(foo: Int)
   func new(bar: Int)
 }
 

@@ -40,11 +40,11 @@
 
 GROUP(no_group,none,"")
 
-GROUP(ActorConformanceToGlobalActorProtocol,none,"actors-cannot-conform-to-global-actor-protocols")
 GROUP(ActorIsolatedCall,none,"actor-isolated-call")
 GROUP(ActorIsolatedMutatingAsync,none,"actor-isolated-mutating-async")
 GROUP(AddPreconcurrencyImport,none,"add-preconcurrency-import")
 GROUP(AlwaysAvailableDomain,none,"always-available-domain")
+GROUP(AlwaysUnsafe,none,"always-unsafe")
 GROUP(AvailabilityUnrecognizedName,none,"availability-unrecognized-name")
 GROUP(CanImportMissingModule,none,"canimport-missing-module")
 GROUP(ClangDeclarationImport,none,"clang-declaration-import")
@@ -62,6 +62,7 @@ GROUP(ExistentialAny,none,"existential-any")
 GROUP(ExistentialMemberAccess,none,"existential-member-access-limitations")
 GROUP(ExistentialType,ToolchainLocalDocumentation,"existential-type")
 GROUP(ExplicitSendable,DefaultIgnoreWarnings,"explicit-sendable-annotations")
+GROUP(HeapAllocation,none,"heap-allocation")
 GROUP(ImplementationOnlyDeprecated,none,"implementation-only-deprecated")
 GROUP(InconsistentImportAccess,none,"inconsistent-import-access")
 GROUP(ImplicitStrongCapture,none,"implicit-strong-capture")
@@ -125,6 +126,7 @@ GROUP(WeakMutability,none,"weak-mutability")
 GROUP(OldSuppressedAssociatedTypes,none,"old-suppressed-associatedtypes")
 
 GROUP_LINK(PerformanceHints,ExistentialType)
+GROUP_LINK(PerformanceHints,HeapAllocation)
 GROUP_LINK(PerformanceHints,ReturnTypeImplicitCopy)
 GROUP_LINK(PerformanceHints,UntypedThrows)
 

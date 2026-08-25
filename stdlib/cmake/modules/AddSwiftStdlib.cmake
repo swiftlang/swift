@@ -728,7 +728,7 @@ function(_add_swift_lipo_target)
 
     # Use lipo to create the final binary.
     add_custom_command_target(unused_var
-        COMMAND "${CMAKE_COMMAND}" "-E" "env" ${lipo_lto_env} "${SWIFT_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
+        COMMAND "${CMAKE_COMMAND}" "-E" "env" ${lipo_lto_env} -- "${SWIFT_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
         ${codesign_command}
         CUSTOM_TARGET_NAME "${LIPO_TARGET}"
         OUTPUT "${LIPO_OUTPUT}"
@@ -1166,13 +1166,13 @@ function(add_swift_target_library_single target name)
   endif()
 
   # Define availability macros.
-  deployment_version(DEPLOYMENT_VERSION
-    SDK "${SWIFTLIB_SINGLE_SDK}"
-    DEPLOYMENT_VERSION_OSX "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_OSX}"
-    DEPLOYMENT_VERSION_IOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_IOS}"
-    DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_TVOS}"
-    DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
-    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}")
+  deployment_version(STDLIB_DEPLOYMENT_VERSION SDK "${SWIFTLIB_SINGLE_SDK}")
+  set(STDLIB_DEPLOYMENT_VERSION_MACCATALYST
+    "$CACHE{SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}")
+  if(NOT STDLIB_DEPLOYMENT_VERSION_MACCATALYST)
+    set(STDLIB_DEPLOYMENT_VERSION_MACCATALYST
+      "${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}")
+  endif()
 
   # Compute the availability definitions to use for this library. Under
   # Embedded Swift, all stdlib APIs should be available always, so replace
@@ -1208,8 +1208,8 @@ function(add_swift_target_library_single target name)
             string(REGEX MATCH "anyAppleOS ([0-9]+(\.[0-9]+)+)" platform_version "${def}")
             string(REGEX MATCH "[0-9]+(\.[0-9]+)+" version "${platform_version}")
           endif()
-          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}")
-            string(REGEX REPLACE ":.*" ":iOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
+          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${STDLIB_DEPLOYMENT_VERSION_MACCATALYST}")
+            string(REGEX REPLACE ":.*" ":iOS ${STDLIB_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
           endif()
         elseif(SWIFTLIB_SINGLE_SDK STREQUAL "OSX" AND SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR STREQUAL "zippered")
           string(REGEX MATCH "iOS ([0-9]+(\.[0-9]+)+)" ios_platform_version "${def}")
@@ -1222,8 +1222,8 @@ function(add_swift_target_library_single target name)
             set(macos_version "${any_version}")
             set(ios_version "${any_version}")
           endif()
-          if((NOT macos_version STREQUAL "9999" OR NOT ios_version STREQUAL "9999") AND (macos_version VERSION_GREATER "${DEPLOYMENT_VERSION}" OR ios_version VERSION_GREATER "${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}"))
-            string(REGEX REPLACE ":.*" ": macOS ${DEPLOYMENT_VERSION}, iOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
+          if((NOT macos_version STREQUAL "9999" OR NOT ios_version STREQUAL "9999") AND (macos_version VERSION_GREATER "${STDLIB_DEPLOYMENT_VERSION}" OR ios_version VERSION_GREATER "${STDLIB_DEPLOYMENT_VERSION_MACCATALYST}"))
+            string(REGEX REPLACE ":.*" ": macOS ${STDLIB_DEPLOYMENT_VERSION}, iOS ${STDLIB_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
           endif()
         else()
           string(REGEX MATCH "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ([0-9]+(\.[0-9]+)+)" platform_version "${def}")
@@ -1232,8 +1232,8 @@ function(add_swift_target_library_single target name)
             string(REGEX MATCH "anyAppleOS ([0-9]+(\.[0-9]+)+)" platform_version "${def}")
             string(REGEX MATCH "[0-9]+(\.[0-9]+)+" version "${platform_version}")
           endif()
-          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${DEPLOYMENT_VERSION}")
-            string(REGEX REPLACE ":.*" ":${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ${DEPLOYMENT_VERSION}" current "${current}")
+          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${STDLIB_DEPLOYMENT_VERSION}")
+            string(REGEX REPLACE ":.*" ":${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ${STDLIB_DEPLOYMENT_VERSION}" current "${current}")
           endif()
         endif()
       endif()

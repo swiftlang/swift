@@ -144,6 +144,17 @@ BridgedAccessorDecl BridgedAccessorDecl_createParsed(
       cThrownType.unbridged(), cDeclContext.unbridged());
 }
 
+void BridgedAccessorDecl_remapLegacyCoroutineAccessorIfEnabled(
+    BridgedAccessorDecl cAccessor) {
+  auto *accessor = cAccessor.unbridged();
+  if (!accessor->getASTContext().LangOpts.hasFeature(
+          Feature::CoroutineAccessors))
+    return;
+  auto kind = accessor->getAccessorKind();
+  if (kind == AccessorKind::Read || kind == AccessorKind::Modify)
+    accessor->changeLegacyCoroutineAccessorToYielding();
+}
+
 static VarDecl::Introducer unbridged(BridgedVarDeclIntroducer introducer) {
   switch (introducer) {
   case BridgedVarDeclIntroducerLet:

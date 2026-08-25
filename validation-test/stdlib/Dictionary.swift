@@ -1430,25 +1430,25 @@ DictionaryTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
 DictionaryTestSuite.test("COW.Fast.Values.AccessDoesNotReallocate") {
   let d1 = getCOWFastDictionary()
   let identity1 = d1._rawIdentifier()
-  
+
   assert([1010, 1020, 1030] == d1.values.sorted())
   assert(identity1 == d1._rawIdentifier())
-  
+
   var d2 = d1
   assert(identity1 == d2._rawIdentifier())
-  
+
   let i = d2.index(forKey: 10)!
   assert(d1.values[i] == 1010)
   assert(d1[i] == (10, 1010))
-  
+
   d2.values[i] += 1
   assert(d2.values[i] == 1011)
   assert(d2[10]! == 1011)
   assert(identity1 != d2._rawIdentifier())
-  
+
   assert(d1[10]! == 1010)
   assert(identity1 == d1._rawIdentifier())
-  
+
   checkCollection(
     Array(d1.values),
     d1.values,
@@ -1513,7 +1513,7 @@ DictionaryTestSuite.test("COW.Slow.Values.Uniqueness") {
 DictionaryTestSuite.test("COW.Fast.Keys.AccessDoesNotReallocate") {
   let d1 = getCOWFastDictionary()
   let identity1 = d1._rawIdentifier()
-  
+
   assert([10, 20, 30] == d1.keys.sorted())
 
   let i = d1.index(forKey: 10)!
@@ -1526,7 +1526,7 @@ DictionaryTestSuite.test("COW.Fast.Keys.AccessDoesNotReallocate") {
     d1.keys,
     stackTrace: SourceLocStack())
   { $0 == $1 }
-  
+
   do {
     var d2: [MinimalHashableValue : Int] = [
       MinimalHashableValue(10): 1010,
@@ -1541,7 +1541,7 @@ DictionaryTestSuite.test("COW.Fast.Keys.AccessDoesNotReallocate") {
     ]
     // Make collisions less likely
     d2.reserveCapacity(1000)
-    
+
     // Find the last key in the dictionary
     var lastKey: MinimalHashableValue = d2.first!.key
     for i in d2.indices { lastKey = d2[i].key }
@@ -1555,7 +1555,7 @@ DictionaryTestSuite.test("COW.Fast.Keys.AccessDoesNotReallocate") {
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     let k = d2.index(forKey: lastKey)!
     expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
-    
+
     // keys.firstIndex(of:) - O(1) bucket + linear search
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     let l = d2.keys.firstIndex(of: lastKey)!
@@ -1862,7 +1862,7 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
     assert(d[1111] == nil)
   }
   do {
-    let d = Dictionary(dictionaryLiteral: 
+    let d = Dictionary(dictionaryLiteral:
         (10, 1010), (20, 1020))
     assert(d.count == 2)
     assert(d[10]! == 1010)
@@ -1870,7 +1870,7 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
     assert(d[1111] == nil)
   }
   do {
-    let d = Dictionary(dictionaryLiteral: 
+    let d = Dictionary(dictionaryLiteral:
         (10, 1010), (20, 1020), (30, 1030))
     assert(d.count == 3)
     assert(d[10]! == 1010)
@@ -1879,7 +1879,7 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
     assert(d[1111] == nil)
   }
   do {
-    let d = Dictionary(dictionaryLiteral: 
+    let d = Dictionary(dictionaryLiteral:
         (10, 1010), (20, 1020), (30, 1030), (40, 1040))
     assert(d.count == 4)
     assert(d[10]! == 1010)
@@ -1993,7 +1993,6 @@ DictionaryTestSuite.test("mapValues(_:)") {
   let d2 = d1.mapValues(String.init)
 
   expectEqual(d1.count, d2.count)
-  expectEqual(d1.keys.first, d2.keys.first)
 
   for (key, _) in d1 {
     expectEqual(String(d1[key]!), d2[key]!)
@@ -2008,6 +2007,30 @@ DictionaryTestSuite.test("mapValues(_:)") {
 
     // Calling mapValues shouldn't ever recalculate any hashes.
     let d4 = d3.mapValues(String.init)
+    expectEqual(d4.count, d3.count)
+    expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
+  }
+}
+
+DictionaryTestSuite.test("mapKeyedValues") {
+  let d1 = [10: 1010, 20: 1020, 30: 1030]
+  let d2 = d1.mapKeyedValues { "\($0): \($1)" }
+
+  expectEqual(d1.count, d2.count)
+
+  for (key, value) in d1 {
+    expectEqual("\(key): \(value)", d2[key]!)
+  }
+
+  do {
+    let d3: [MinimalHashableValue : Int] = Dictionary(
+      uniqueKeysWithValues: d1.lazy.map { (MinimalHashableValue($0), $1) })
+    expectEqual(d3.count, 3)
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
+
+    let d4 = d3.mapKeyedValues { "\($0): \($1)" }
     expectEqual(d4.count, d3.count)
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
     expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)

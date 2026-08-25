@@ -840,7 +840,6 @@ public:
     }
   }
 
-  
   /// Account for bugs in LLVM.
   ///
   /// - When a variable is spilled into a stack slot, LiveDebugValues fails to
@@ -852,10 +851,15 @@ public:
   ///   on 32-bit targets as it will also fire for doubles.
   ///
   /// - CodeGen Prepare may drop dbg.values pointing to PHI instruction.
+  ///
+  /// - A dbg_value of a global's address has no location at -O0; only
+  ///   variables backed by a stack slot get one.
   bool needsShadowCopy(llvm::Value *Storage) {
     // If we have a constant data vector, we always need a shadow copy due to
     // bugs in LLVM.
     if (isa<llvm::ConstantDataVector>(Storage))
+      return true;
+    if (isa<llvm::GlobalValue>(Storage))
       return true;
     return !isa<llvm::Constant>(Storage);
   }
@@ -3638,7 +3642,7 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
     assert(vector.size() == 2 && "thick function pointer with size != 2");
     llvm::Value *functionValue = vector[0];
     llvm::Value *contextValue = vector[1];
-    bool castToRefcountedContext = calleeInfo.OrigFnType->isNoEscape();
+    bool castToRefcountedContext = calleeInfo.OrigFnType->isTrivialNoEscape();
     return getSwiftFunctionPointerCallee(IGF, functionValue, contextValue,
                                          std::move(calleeInfo),
                                          castToRefcountedContext, true);
@@ -6133,16 +6137,18 @@ static void salvageDebugReconstructionInst(llvm::Instruction *I) {
 }
 
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
-  auto SILVal = i->getOperand();
-  bool IsAddrVal = SILVal->getType().isAddress();
+  auto *DebugBB = i->getDebugReconstructionBlock();
+  // If there is a debug reconstruction block, the debug_value operand isn't
+  // the value of the variable.
+  SILValue SILVal = DebugBB ? SILValue() : i->getSingleOperand();
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
 
   auto VarInfo = i->getCompleteVarInfo();
-  if (isa<SILUndef>(SILVal) && VarInfo.Name == "$error") {
+  if (SILVal && isa<SILUndef>(SILVal) && VarInfo.Name == "$error") {
     // We cannot track the location of inlined error arguments because it has no
     // representation in SIL.
-    if (!IsAddrVal && !i->getDebugScope()->InlinedCallSite) {
+    if (!SILVal->getType().isAddress() && !i->getDebugScope()->InlinedCallSite) {
       auto funcTy = CurSILFn->getLoweredFunctionType();
       emitErrorResultVar(funcTy, funcTy->getErrorResult(), i);
     }
@@ -6180,7 +6186,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   // Put the value into a shadow-copy stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
   llvm::SmallVector<llvm::Instruction *, 4> DebugBBInsts;
-  if (auto *DebugBB = i->getDebugReconstructionBlock()) {
+  if (DebugBB) {
     // Debug basic blocks should not exist at -Onone. They don't support
     // shadow copies or async lifetime extension.
     auto *BB = Builder.GetInsertBlock();
@@ -6195,10 +6201,13 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     // entries added during the emission are cleaned up.
     ConditionalDominanceScope condScope(*this);
 
-    if (!DebugBB->args_empty()) {
-      // Bind the block argument to the operand.
-      SILValue operand = i->getOperand();
-      SILArgument *blockArg = DebugBB->getArgument(0);
+    // Bind each block argument to its operand.
+    auto Operands = i->getAllOperands();
+    assert(DebugBB->getNumArguments() == Operands.size() &&
+           "debug block arguments must match the operands");
+    for (auto Idx : indices(DebugBB->getArguments())) {
+      SILValue operand = Operands[Idx].get();
+      SILArgument *blockArg = DebugBB->getArgument(Idx);
       if (operand->getType().isAddress()) {
         setLoweredAddress(blockArg, getLoweredAddress(operand));
       } else {
@@ -6246,7 +6255,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
         Storage, TI.getStorageType(),
         i->getDebugScope(), VarInfo, IsAnonymous,
         i->usesMoveableValueDebugInfo(), &VarInfo.DIExpr));
-  } else if (IsAddrVal) {
+  } else if (SILVal->getType().isAddress()) {
     auto &TI = getTypeInfo(SILVal->getType());
     auto Addr = getLoweredAddress(SILVal);
     auto *Storage = Addr.getAddress();
@@ -7460,7 +7469,11 @@ void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
 
 void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     swift::ConvertEscapeToNoEscapeInst *i) {
-  // This instruction makes the context trivial.
+  // This instruction makes the context trivial, unless the result is a
+  // `@called(once)` closure, whose context remains a real refcounted object
+  // that must still be retained/released/destroyed correctly.
+  bool contextIsTrivial =
+      i->getType().castTo<SILFunctionType>()->isTrivialNoEscape();
   Explosion in = getLoweredExplosion(i->getOperand());
   Explosion out;
   // Differentiable functions contain multiple pairs of fn and ctx pointer.
@@ -7469,7 +7482,8 @@ void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     llvm::Value *fn = in.claimNext();
     llvm::Value *ctx = in.claimNext();
     out.add(fn);
-    out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
+    out.add(contextIsTrivial ? Builder.CreateBitCast(ctx, IGM.OpaquePtrTy)
+                             : ctx);
   }
   setLoweredExplosion(i, out);
 }
@@ -7591,6 +7605,29 @@ static void emitTrapAndUndefValue(IRGenSILFunction &IGF,
     out.add(llvm::UndefValue::get(schema.getScalarType()));
 }
 
+/// Whether two loadable types explode to the same sequence of scalar/aggregate
+/// element types. Types can share a storage type but still differ here (e.g. a
+/// pointer exploded as `ptr` vs. as an integer word), which matters when
+/// deciding whether an explosion can be transferred verbatim.
+static bool haveSameExplosionSchema(IRGenModule &IGM,
+                                    const LoadableTypeInfo &lhs,
+                                    const LoadableTypeInfo &rhs) {
+  ExplosionSchema lhsSchema, rhsSchema;
+  lhs.getSchema(lhsSchema);
+  rhs.getSchema(rhsSchema);
+  if (lhsSchema.size() != rhsSchema.size())
+    return false;
+  for (unsigned i = 0, n = lhsSchema.size(); i != n; ++i) {
+    const auto &l = lhsSchema[i];
+    const auto &r = rhsSchema[i];
+    if (l.isScalar() != r.isScalar())
+      return false;
+    if (l.isScalar() && l.getScalarType() != r.getScalarType())
+      return false;
+  }
+  return true;
+}
+
 static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
                                       SourceLoc loc,
                                       Explosion &in,
@@ -7599,9 +7636,19 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
                                       const LoadableTypeInfo &outTI) {
   // If the transfer is doable bitwise, and if the elements of the explosion are
   // the same type, then just transfer the elements.
+  //
+  // Comparing the storage types is not enough: two types can share the same
+  // (opaque) storage type yet explode to different scalar types -- e.g. a
+  // single-pointer C union stored as an integer word vs. an
+  // `Optional<UnsafePointer>` exploded as `ptr`. Transferring the explosion
+  // directly in that case would hand a value of the wrong type to the
+  // destination, so also require the explosion schemas to match element-wise;
+  // otherwise fall through to the stack path, which reloads with the
+  // destination's schema.
   if (inTI.isBitwiseTakable(ResilienceExpansion::Maximal) &&
       outTI.isBitwiseTakable(ResilienceExpansion::Maximal) &&
-      isStructurallySame(inTI.getStorageType(), outTI.getStorageType())) {
+      isStructurallySame(inTI.getStorageType(), outTI.getStorageType()) &&
+      haveSameExplosionSchema(IGF.IGM, inTI, outTI)) {
     in.transferInto(out, in.size());
     return;
   }
@@ -7732,7 +7779,7 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
   Explosion from = getLoweredExplosion(i->getOperand());
   Explosion to;
   to.add(Builder.CreateBitCast(from.claimNext(), IGM.FunctionPtrTy));
-  if (i->getType().castTo<SILFunctionType>()->isNoEscape())
+  if (i->getType().castTo<SILFunctionType>()->isTrivialNoEscape())
     to.add(llvm::ConstantPointerNull::get(IGM.OpaquePtrTy));
   else
     to.add(IGM.RefCountedNull);
@@ -8076,9 +8123,88 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   // instantiated at runtime through `swift_getKeyPath` (which isn't
   // available in embedded builds anyway).
   if (IGM.canEmitStaticKeyPathInstance(I)) {
-    llvm::Constant *staticInstance = IGM.emitStaticKeyPathInstance(I);
+    if (!I->needsRuntimeInstantiation()) {
+      llvm::Constant *staticInstance = IGM.emitStaticKeyPathInstance(I);
+      Explosion e;
+      e.add(staticInstance);
+      setLoweredExplosion(I, e);
+      return;
+    }
+
+    // The key path captures values (subscript arguments), so it can't be a
+    // shared immortal constant. Everything except those values is still known
+    // at compile time, so emit a template, allocate a real refcounted instance,
+    // copy the template over it, and store the captures into the argument
+    // areas the template reserved.
+    SmallVector<uint32_t, 2> argDataOffsets;
+    llvm::Constant *templateInstance =
+        IGM.emitStaticKeyPathInstance(I, &argDataOffsets);
+    assert(!argDataOffsets.empty() &&
+           "a capturing key path must reserve argument space");
+
+    // The template's first word is the metadata pointer and the second is an
+    // immortal refcount; `swift_allocObject` writes a real header, so copy only
+    // what follows it.
+    auto ptrSize = IGM.getPointerSize();
+    auto headerSize = Size(2 * ptrSize.getValue());
+    auto *templateGlobal = cast<llvm::GlobalVariable>(
+        templateInstance->stripPointerCasts());
+    auto totalSize = Size(
+        IGM.DataLayout.getTypeAllocSize(templateGlobal->getValueType()));
+
+    auto classTy = I->getStaticInstanceClassType();
+    auto *metadata = IGM.getAddrOfTypeMetadata(classTy.getASTType());
+
+    llvm::Value *instance = emitAllocObjectCall(
+        llvm::ConstantExpr::getBitCast(metadata, IGM.TypeMetadataPtrTy),
+        llvm::ConstantInt::get(IGM.SizeTy, totalSize.getValue()),
+        llvm::ConstantInt::get(IGM.SizeTy, ptrSize.getValue() - 1),
+        /*mallocTypeId=*/std::nullopt, "keypath.instance");
+
+    llvm::Value *instanceBytes = Builder.CreateBitCast(instance, IGM.Int8PtrTy);
+    llvm::Value *dst = Builder.CreateConstInBoundsGEP1_32(
+        IGM.Int8Ty, instanceBytes, headerSize.getValue());
+    llvm::Value *src = Builder.CreateConstInBoundsGEP1_32(
+        IGM.Int8Ty, llvm::ConstantExpr::getBitCast(templateInstance,
+                                                   IGM.Int8PtrTy),
+        headerSize.getValue());
+    Builder.CreateMemCpy(dst, llvm::MaybeAlign(ptrSize.getValue()),
+                         src, llvm::MaybeAlign(ptrSize.getValue()),
+                         totalSize.getValue() - headerSize.getValue());
+
+    // Initialize each captured operand into its slot. The operands appear in
+    // component order, matching the offsets the template reported.
+    unsigned operandIdx = 0;
+    for (uint32_t argDataOffset : argDataOffsets) {
+      Size slot(argDataOffset);
+      // Walk the operands belonging to this component in declaration order.
+      // Each component's arguments are laid out back-to-back with their natural
+      // alignment, mirroring `computeStaticKeyPathComponentLayout`.
+      for (; operandIdx < I->getAllOperands().size(); ++operandIdx) {
+        auto operand = I->getAllOperands()[operandIdx].get();
+        auto operandTy = operand->getType();
+        auto &ti = getTypeInfo(operandTy);
+        auto &fixedTI = cast<FixedTypeInfo>(ti);
+        slot = slot.roundUpToAlignment(fixedTI.getFixedAlignment());
+        llvm::Value *slotPtr = Builder.CreateConstInBoundsGEP1_32(
+            IGM.Int8Ty, instanceBytes, slot.getValue());
+        auto addr = ti.getAddressForPointer(
+            Builder.CreateBitCast(slotPtr, IGM.PtrTy));
+        if (operandTy.isAddress()) {
+          ti.initializeWithTake(*this, addr, getLoweredAddress(operand),
+                                operandTy, /*isOutlined=*/false,
+                                /*zeroizeIfSensitive=*/true);
+        } else {
+          Explosion operandValue = getLoweredExplosion(operand);
+          cast<LoadableTypeInfo>(ti).initialize(*this, operandValue, addr,
+                                                /*isOutlined=*/false);
+        }
+        slot += fixedTI.getFixedSize();
+      }
+    }
+
     Explosion e;
-    e.add(staticInstance);
+    e.add(Builder.CreateBitCast(instance, IGM.RefCountedPtrTy));
     setLoweredExplosion(I, e);
     return;
   }

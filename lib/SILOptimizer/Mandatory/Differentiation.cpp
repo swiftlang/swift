@@ -1190,7 +1190,11 @@ bool DifferentiationTransformer::emitDefaultDerivative(
 
   auto sm = SubstitutionMap::get(
       defaultWitness->getDerivativeGenericSignature(),
-      QuerySubstitutionMap{wtThunkSubMap}, LookUpConformanceInModule());
+      [&](SubstitutableType *type) {
+        auto protoTy = QuerySubstitutionMap{wtThunkSubMap}(type);
+        return fn->mapTypeIntoEnvironment(protoTy->mapTypeOutOfEnvironment());
+      },
+      LookUpConformanceInModule());
 
   auto *entry = fn->createBasicBlock();
   createEntryArguments(fn);

@@ -20,12 +20,13 @@
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityRange.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
-// FIXME: [availability] Remove this when possible
-#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PlatformKindUtils.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
@@ -183,8 +184,13 @@ void AvailabilityInference::applyInferredAvailableAttrs(
         // declaration.
         if (llvm::any_of(MergedAttrs,
                          [&AvAttr](SemanticAvailableAttr MergedAttr) {
+                           auto platform = AvAttr.getPlatform();
+                           auto mergedPlatform = MergedAttr.getPlatform();
+                           if (!platform || !mergedPlatform)
+                             return false;
+
                            return inheritsAvailabilityFromPlatform(
-                               AvAttr.getPlatform(), MergedAttr.getPlatform());
+                               *platform, *mergedPlatform);
                          }))
           continue;
 
@@ -240,19 +246,24 @@ const Decl *Decl::parentDeclForAvailability() const {
 /// Returns true if the introduced version in \p newAttr should be used instead
 /// of the introduced version in \p prevAttr when both are attached to the same
 /// declaration and refer to the active platform.
+///
+/// Both attributes must be platform specific.
 static bool isBetterThan(const SemanticAvailableAttr &newAttr,
                          const std::optional<SemanticAvailableAttr> &prevAttr) {
   // If there is no prevAttr, newAttr of course wins.
   if (!prevAttr)
     return true;
 
+  DEBUG_ASSERT(newAttr.isPlatformSpecific());
+  DEBUG_ASSERT(prevAttr->isPlatformSpecific());
+
   // If they belong to the same platform, the one that introduces later wins.
   if (prevAttr->getPlatform() == newAttr.getPlatform())
     return prevAttr->getIntroduced().value() < newAttr.getIntroduced().value();
 
   // If the new attribute's platform inherits from the old one, it wins.
-  return inheritsAvailabilityFromPlatform(newAttr.getPlatform(),
-                                          prevAttr->getPlatform());
+  return inheritsAvailabilityFromPlatform(*newAttr.getPlatform(),
+                                          *prevAttr->getPlatform());
 }
 
 static std::optional<SemanticAvailableAttr>
@@ -288,6 +299,95 @@ bool Decl::isAvailableAsSPI() const {
   return false;
 }
 
+bool SynthesizeLocalAvailableAttrsRequest::appliesTo(const Decl *decl) {
+  // Only a declaration in a local context can be covered by an availability
+  // scope that isn't already accounted for by the availability of a parent
+  // declaration.
+  if (!decl->getDeclContext()->isLocalContext())
+    return false;
+
+  // The storage for a local variable is emitted as part of its enclosing
+  // function, and a use of the variable that precedes its declaration is
+  // rejected, so every reference to it is already inside the region that the
+  // attributes would describe.
+  if (isa<AbstractStorageDecl>(decl) || isa<PatternBindingDecl>(decl))
+    return false;
+
+  // The accessors for local variables, on the other hand, need implicit
+  // availability to control whether they get emitted as independent functions
+  // by SILGen.
+  if (isa<AccessorDecl>(decl))
+    return true;
+
+  // Implicit declarations should generally be synthesized with appropriate
+  // availability.
+  return !decl->isImplicit();
+}
+
+evaluator::SideEffect
+SynthesizeLocalAvailableAttrsRequest::evaluate(Evaluator &evaluator,
+                                               Decl *decl) const {
+  DEBUG_ASSERT(appliesTo(decl));
+
+  auto loc = decl->getSourceRangeIncludingAttrs().Start;
+  if (loc.isInvalid())
+    return {};
+
+  auto &ctx = decl->getASTContext();
+  auto *sf = decl->getDeclContext()
+                 ->getParentModule()
+                 ->getSourceFileContainingLocation(loc);
+  if (!sf)
+    return {};
+
+  auto *rootScope = AvailabilityScope::getOrBuildForSourceFile(*sf);
+  if (!rootScope)
+    return {};
+
+  // Find the scope that describes the availability of the position that the
+  // declaration appears in. Scopes introduced by the declaration itself are
+  // excluded since the restrictions they describe are the ones that are already
+  // written on the declaration.
+  ASTNode stopAtNode =
+      const_cast<Decl *>(decl->getConcreteSyntaxDeclForAttributes());
+  llvm::SmallVector<AvailabilityScope *, 8> scopeStack;
+  auto *scope =
+      rootScope->findMostRefinedSubContext(loc, ctx, scopeStack, stopAtNode);
+  if (!scope)
+    return {};
+
+  // Find the innermost enclosing scope that a declaration introduced. The
+  // restrictions that it and the scopes above it describe are already inherited
+  // from that declaration.
+  AvailabilityScope *declScope = scopeStack.front();
+  for (auto [parent, candidate] :
+       llvm::zip_first(llvm::drop_begin(llvm::reverse(scopeStack)),
+                       llvm::reverse(scopeStack))) {
+    // A scope that does not refine the availability of its parent, like the
+    // placeholder that lazy expansion leaves behind for a declaration, does not
+    // describe a restriction of its own.
+    if (candidate->getAvailabilityContext() == parent->getAvailabilityContext())
+      continue;
+
+    if (!candidate->isIntroducedByStmt()) {
+      declScope = candidate;
+      break;
+    }
+  }
+
+  if (declScope == scope)
+    return {};
+
+  llvm::SmallVector<AvailableAttr *, 4> attrs;
+  scope->getAvailabilityContext().createImplicitAvailableAttrs(
+      declScope->getAvailabilityContext(), ctx, attrs);
+
+  for (auto *attr : attrs)
+    decl->getAttrs().add(attr);
+
+  return {};
+}
+
 SemanticAvailableAttributes
 Decl::getSemanticAvailableAttrs(bool includeInactive) const {
   // A decl in an @abi gets its availability from the decl it's attached to.
@@ -297,6 +397,14 @@ Decl::getSemanticAvailableAttrs(bool includeInactive) const {
 
   // Apply file defaults for availability attributes.
   const_cast<Decl *>(this)->applyFileDefaults();
+
+  // Synthesize the attributes that are implied by the availability scopes
+  // containing a declaration in a local context.
+  if (SynthesizeLocalAvailableAttrsRequest::appliesTo(this)) {
+    evaluateOrDefault(
+        getASTContext().evaluator,
+        SynthesizeLocalAvailableAttrsRequest{const_cast<Decl *>(this)}, {});
+  }
 
   // We assume all requests that add attributes as a side effect have been made.
   // Requesting ExpandMemberAttributeMacros or similar would be a cycle though,
@@ -322,7 +430,7 @@ Decl::getActiveAvailableAttrForCurrentPlatform() const {
     // We have an attribute that is active for the platform, but is it more
     // specific than our current best?
     if (!bestAttr || inheritsAvailabilityFromPlatform(
-                         attr.getPlatform(), bestAttr->getPlatform())) {
+                         *attr.getPlatform(), *bestAttr->getPlatform())) {
       bestAttr.emplace(attr);
     }
   }
@@ -364,8 +472,8 @@ std::optional<SemanticAvailableAttr> Decl::getNoAsyncAttr() const {
       bestAttr.emplace(attr);
     } else if (bestAttr && attr.isPlatformSpecific() &&
                bestAttr->isPlatformSpecific() &&
-               inheritsAvailabilityFromPlatform(attr.getPlatform(),
-                                                bestAttr->getPlatform())) {
+               inheritsAvailabilityFromPlatform(*attr.getPlatform(),
+                                                *bestAttr->getPlatform())) {
       // if they both have a viable platform, use the better one
       bestAttr.emplace(attr);
     } else if (attr.isPlatformSpecific() && !bestAttr->isPlatformSpecific()) {
@@ -414,15 +522,13 @@ getRootTargetDomains(const ASTContext &ctx) {
   if (ctx.LangOpts.hasFeature(Feature::Embedded))
     return domains;
 
-  auto targetPlatform = swift::targetPlatform(ctx.LangOpts);
-  if (targetPlatform != PlatformKind::none)
+  if (auto targetPlatform = swift::targetPlatform(ctx.LangOpts))
     domains.insert(
-        AvailabilityDomain::forPlatform(targetPlatform).getRootDomain());
+        AvailabilityDomain::forPlatform(*targetPlatform).getRootDomain());
 
-  auto targetVariantPlatform = swift::targetVariantPlatform(ctx.LangOpts);
-  if (targetVariantPlatform != PlatformKind::none)
+  if (auto targetVariantPlatform = swift::targetVariantPlatform(ctx.LangOpts))
     domains.insert(
-        AvailabilityDomain::forPlatform(targetVariantPlatform).getRootDomain());
+        AvailabilityDomain::forPlatform(*targetVariantPlatform).getRootDomain());
 
   return domains;
 }
@@ -884,11 +990,12 @@ AvailabilityRange ASTContext::getSwiftFutureAvailability() const {
 }
 
 AvailabilityRange ASTContext::getSwiftAvailability(unsigned major,
-                                                   unsigned minor) const {
+                                                   unsigned minor,
+                                                   bool ignoreMinOS) const {
   auto target = LangOpts.Target;
 
   // Deal with special cases for Swift 5.3 and lower
-  if (major == 5 && minor <= 3) {
+  if (major == 5 && minor <= 3 && !ignoreMinOS) {
     if (target.getArchName() == "arm64e")
       return AvailabilityRange::alwaysAvailable();
     if (target.isMacOSX() && target.isAArch64())

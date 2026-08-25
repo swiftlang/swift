@@ -170,7 +170,7 @@ foreach(sdk ${DISPATCH_SDKS})
         # NOTE(compnerd) provide a custom install command to
         # ensure that we strip out the DESTDIR environment
         # from the sub-build
-        ${CMAKE_COMMAND} -E env --unset=DESTDIR ${CMAKE_COMMAND} --build . --target install
+        ${CMAKE_COMMAND} -E env --unset=DESTDIR -- ${CMAKE_COMMAND} --build . --target install
         COMMAND
         ${CMAKE_COMMAND} -E copy
         <INSTALL_DIR>/${LIBDISPATCH_RUNTIME_DIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}dispatch${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
@@ -267,7 +267,7 @@ foreach(sdk ${DISPATCH_SDKS})
                             # NOTE(compnerd) provide a custom install command to
                             # ensure that we strip out the DESTDIR environment
                             # from the sub-build
-                            ${CMAKE_COMMAND} -E env --unset=DESTDIR ${CMAKE_COMMAND} --build . --target install
+                            ${CMAKE_COMMAND} -E env --unset=DESTDIR -- ${CMAKE_COMMAND} --build . --target install
                           STEP_TARGETS
                             install
                           BUILD_BYPRODUCTS

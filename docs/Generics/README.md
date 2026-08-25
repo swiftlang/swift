@@ -57,17 +57,26 @@ The font size and link targets are probably too small for a smartphone display, 
 
 ## Current Status
 
-This is a work in progress.
+This is a work in progress. The following chapters are still in progress:
 
-The following chapters need some editing:
-
-- Part IV:
+- Part II:
+  - Existential Types
+- Part III:
   - Completion
 
 The following chapters are not yet written:
 
 - Part III:
-  - Existential Types
-- Part IV:
   - The Property Map
   - Minimization
+
+## Citing the book
+
+To cite this book with BibTeX, use something like the following, and please ensure the URL is visible in your output:
+
+    @misc{csg,
+      title  = "Compiling {S}wift {G}enerics",
+      author = "Slava Pestov",
+      url    = "https://download.swift.org/docs/assets/generics.pdf",
+      year   = {2026}
+    }

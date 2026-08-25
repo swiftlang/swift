@@ -462,6 +462,10 @@ extension ASTGenVisitor {
       throwsSpecifierLoc: self.generateSourceLoc(node.effectSpecifiers?.throwsClause),
       thrownType: self.generate(type: node.effectSpecifiers?.thrownError)
     )
+    // With the CoroutineAccessors feature enabled, `_read`/`_modify` are just a
+    // spelling of the yielding accessors; rewrite them to match the C++ parser
+    // (ParsedAccessors::record).  ASTGen only parses surface source.
+    accessor.remapLegacyCoroutineAccessorIfEnabled()
     accessor.asDecl.attachParsedAttrs(attrs)
     if let body = node.body {
       self.withDeclContext(accessor.asDeclContext) {

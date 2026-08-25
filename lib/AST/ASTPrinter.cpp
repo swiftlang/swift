@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilityContext.h"
@@ -1463,6 +1464,21 @@ bool canPrintSyntheticSILGenName(const Decl *D) {
   return true;
 }
 
+/// Whether the given declaration has an attached global actor attribute.
+///
+/// Unlike \c Decl::getGlobalActorAttr() this inspects the attribute list
+/// directly. Actor isolation inference attaches implicit global actor
+/// attributes, and it may do so after \c GlobalActorAttributeRequest has
+/// already been evaluated for the declaration, leaving a stale cached result.
+static bool hasGlobalActorAttr(const Decl *D) {
+  for (auto *attr : D->getAttrs().getAttributes<CustomAttr>()) {
+    auto *nominal = attr->getNominalDecl();
+    if (nominal && nominal->isGlobalActor())
+      return true;
+  }
+  return false;
+}
+
 void PrintAST::printAttributes(const Decl *D) {
   if (Options.SkipAttributes)
     return;
@@ -1572,6 +1588,25 @@ void PrintAST::printAttributes(const Decl *D) {
       if (VD->isObjC() && !isa<EnumElementDecl>(VD) &&
           !attrs.hasAttribute<ObjCAttr>() && ABIRoleInfo(D).providesAPI()) {
         Printer.printAttrName("@objc");
+        Printer << " ";
+      }
+    }
+
+    // Implicit deinits get printed in interfaces, making them effectively
+    // explicit in the context of the interface. Implicit deinits in subclasses
+    // also have isolation that is inferred from their super deinits, but don't
+    // have attributes reflecting that inferred isolation in the AST. As a
+    // result, an inferred global actor isolation for such a deinit needs to be
+    // printed explicitly to ensure that the decl round-trips successfully.
+    if (auto *dtor = dyn_cast<DestructorDecl>(D); dtor && dtor->isImplicit()) {
+      auto inferred =
+          getInferredActorIsolation(const_cast<DestructorDecl *>(dtor));
+      if (inferred.source.kind == IsolationSource::Override &&
+          inferred.isolation.isGlobalActor() && !hasGlobalActorAttr(dtor)) {
+        Printer.callPrintNamePre(PrintNameContext::Attribute);
+        Printer << "@";
+        inferred.isolation.getGlobalActor().print(Printer, Options);
+        Printer.printNamePost(PrintNameContext::Attribute);
         Printer << " ";
       }
     }
@@ -3686,6 +3721,13 @@ static void
 suppressingFeatureInlineAlways(PrintOptions &options,
                                llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressInlineAlways, true);
+  action();
+}
+
+static void
+suppressingFeatureAlwaysUnsafeAttribute(PrintOptions &options,
+                                        llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressUnsafeAlways, true);
   action();
 }
 
@@ -6456,18 +6498,14 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
-  /// If \p TyDecl belongs to an explicit submodule, return the \c ModuleDecl
-  /// for that submodule; otherwise just return the parent module.
+  /// If \p TyDecl belongs to a submodule, return the \c ModuleDecl for that
+  /// submodule; otherwise just return the parent module.
   ModuleDecl *getParentSubModuleOrModule(GenericTypeDecl *TyDecl) {
     // Only clang declarations can belong to a submodule
     if (auto clangNode = TyDecl->getClangNode()) {
       auto importer = TyDecl->getASTContext().getClangModuleLoader();
       if (auto clangMod = importer->getClangOwningModule(clangNode)) {
-        // Explicit submodules are only visible if specifically imported;
-        // everything else has the visibility of its top-level module.
-        if (clangMod->isSubModule() && clangMod->IsExplicit) {
-          return importer->getWrapperForModule(clangMod);
-        }
+        return importer->getWrapperForModule(clangMod);
       }
     }
 

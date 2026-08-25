@@ -328,7 +328,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
 
 // CHECK-LABEL: sil [ossa] @projections
 // CHECK-NEXT:  [%0: read e1.0.s0.c0.s0.v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @projections : $@convention(thin) (@guaranteed EP) -> Builtin.Int32 {
 bb0(%0 : @guaranteed $EP):
@@ -979,7 +979,7 @@ bb0(%0 : $*Int32):
 
 // CHECK-LABEL: sil [ossa] @$writeToHead
 // CHECK-NEXT:  [%0: write s0.c0.v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @$writeToHead : $@convention(thin) (@guaranteed S) -> () {
 bb0(%0 : @guaranteed $S):
@@ -1000,7 +1000,7 @@ bb0(%0 : @guaranteed $S):
 // CHECK-LABEL: sil [ossa] @storeToArgs
 // CHECK-NEXT:  [%0: noescape **, write c0.v**]
 // CHECK-NEXT:  [%1: noescape **, write c0.v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @storeToArgs : $@convention(thin) (@guaranteed List, @guaranteed List) -> () {
 [%0: noescape **]
@@ -1090,7 +1090,7 @@ bb3(%6 : $Builtin.RawPointer) :
 
 // CHECK-LABEL: sil [ossa] @calleeWriteToHead
 // CHECK-NEXT:  [%0: write s0.c0.v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @calleeWriteToHead : $@convention(thin) (@guaranteed S) -> () {
 bb0(%0 : @guaranteed $S):
@@ -1126,7 +1126,7 @@ bb0(%0 : @guaranteed $List):
 
 // CHECK-LABEL: sil [ossa] @readIdentifiedBoxArg
 // CHECK-NEXT:  [%0: read c0.v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int32 }) -> Int32 {
 bb0(%0 : @guaranteed ${ var Int32 }):
@@ -1160,7 +1160,7 @@ bb0(%0 : $X):
 }
 
 // CHECK-LABEL: sil @is_unique_test
-// CHECK-NEXT:  [%0: destroy v**]
+// CHECK-NEXT:  [%0: read v**, destroy v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
 sil @is_unique_test : $@convention(thin) (@inout X) -> () {

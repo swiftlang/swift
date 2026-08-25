@@ -2002,6 +2002,14 @@ ERROR(attr_objc_implementation_raise_minimum_deployment_target,none,
       "'@implementation' of an Objective-C class requires a minimum deployment "
       "target of at least %0 %1",
       (AvailabilityDomain, AvailabilityRange))
+ERROR(objc_implementation_extension_only_available_in,none,
+      "'@objc @implementation' extension cannot implement %kind0 because it is "
+      "only available in %1%select{| %3 or newer}2",
+      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
+ERROR(objc_implementation_extension_unavailable,none,
+      "'@objc @implementation' extension cannot implement %kind0 because it is "
+      "unavailable%select{ in %2|}1",
+      (const ValueDecl *, bool, AvailabilityDomain))
 ERROR(attr_implementation_requires_language,none,
       "'@implementation' used without specifying the language being "
       "implemented",
@@ -2115,6 +2123,17 @@ ERROR(objc_implementation_mismatched_error_convention_other,none,
       "different Objective-C error convention; please file a bug report with a "
       "sample project, as the compiler should be able to describe the mismatch",
       (const ValueDecl *))
+
+ERROR(objc_implementation_availability_mismatch_only_available_in,none,
+      "%kind0 does not match the declaration in the header because it "
+      "%select{is|must be}1 only available in %2%select{| %4 or newer}3",
+      (const ValueDecl *, /*mustBe=*/bool, AvailabilityDomain, bool,
+       AvailabilityRange))
+
+ERROR(objc_implementation_availability_mismatch_unavailable,none,
+      "%kind0 does not match the declaration in the header because it "
+      "%select{is|must be}1 unavailable%select{ in %3|}2",
+      (const ValueDecl *, /*mustBe=*/bool, bool, AvailabilityDomain))
 
 ERROR(objc_implementation_wrong_objc_name,none,
       "selector %0 for %kind1 not found in header; did you mean %2?",
@@ -2559,6 +2578,13 @@ ERROR(called_once_cannot_be_used_with_borrowing,none,
 ERROR(called_once_function_type_mismatch,none,
       "invalid conversion from '@called(once)' function of type %0 "
       "to function type %1", (Type, Type))
+ERROR(sending_capture_requires_experimental_feature,none,
+      "'sending' capture is only valid when experimental feature "
+      "'CalledAttribute' is enabled",
+      ())
+ERROR(sending_capture_decl_requires_called_once,none,
+      "'sending' capture may only be declared in a '@called(once)' closure",
+      ())
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
@@ -3129,6 +3155,9 @@ ERROR(type_does_not_conform_anyobject_in_decl_ref,none,
 ERROR(type_does_not_conform_decl_owner,none,
       "%kind0 requires that %1 conform to %2",
       (const ValueDecl *, Type, Type))
+NOTE(missing_conformance_unloaded_module,none,
+     "the conformance of %0 to %1 could not be loaded because module %2 was not "
+     "imported; add import of module %2", (Type, Type, Identifier))
 ERROR(type_does_not_conform_anyobject_decl_owner,none,
       "%kind0 requires that %1 be a class type",
       (const ValueDecl *, Type, Type))
@@ -3249,6 +3278,10 @@ ERROR(witness_initializer_not_required,none,
       "initializer requirement %0 can only be satisfied by a 'required' "
       "initializer in%select{| the definition of}1 non-final class %2",
       (const ValueDecl *, bool, Type))
+ERROR(witness_initializer_cxx_not_inherited,none,
+      "initializer requirement %0 cannot be satisfied by a C++ constructor of "
+      "non-final foreign reference type %1",
+      (const ValueDecl *, Type))
 ERROR(witness_initializer_failability,none,
       "non-failable initializer requirement %0"
       "%select{| in Objective-C protocol}1 cannot be satisfied by a "
@@ -5648,7 +5681,7 @@ GROUPED_ERROR(opaque_type_unsupported_availability,OpaqueTypeInference,none,
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
   "an '@inlinable' function|" \
-  "an '@_alwaysEmitIntoClient' function|" \
+  "an '@export(implementation)' function|" \
   "a default argument value|" \
   "a property initializer in a '@frozen' type|" \
   "a '@backDeployed' function|" \
@@ -6258,11 +6291,6 @@ NOTE(shared_state_nonisolated_unsafe,none,
 NOTE(note_actor_isolated_witness,none,
      "%0 %kind1 cannot satisfy %2 requirement",
      (ActorIsolation, const ValueDecl *, ActorIsolation))
-GROUPED_ERROR(actor_cannot_conform_to_global_actor_protocol,ActorConformanceToGlobalActorProtocol,none,
-      "actor %0 cannot conform to global-actor-isolated protocol %1",
-      (Type, Type))
-NOTE(protocol_isolated_to_global_actor_here,none,
-     "%0 is isolated to global actor %1 here", (Type, Type))
 GROUPED_ERROR(conformance_mismatched_isolation,ConformanceIsolation,none,
       "conformance of %0 to %kind1 involves isolation mismatches "
       "and can cause data races",
@@ -6805,6 +6833,9 @@ ERROR(downcast_to_foreign_reference_type,none,
 ERROR(cxx_super_pure_virtual_call,none,
       "cannot use 'super' to call C++ pure virtual method %0; it has no base "
       "class implementation", (const ValueDecl *))
+ERROR(cxx_super_safe_interop_wrapper_call,none,
+      "calling safe interop wrapper %0 in foreign reference type %1 using "
+      "'super' is not supported", (const ValueDecl *, const ValueDecl *))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_ownership_not_optional,none,
@@ -7424,12 +7455,12 @@ ERROR(availability_must_occur_alone, none,
       (AvailabilityDomain, bool))
 ERROR(availability_unexpected_version, none,
       "unexpected version number for %0", (AvailabilityDomain))
-GROUPED_ERROR(availability_unrecognized_platform_name,
+GROUPED_ERROR(availability_domain_not_found,
         AvailabilityUnrecognizedName, PointsToFirstBadToken,
-        "unrecognized platform name %0", (Identifier))
-GROUPED_ERROR(availability_suggest_platform_name,
+        "cannot find availability domain %0", (Identifier))
+GROUPED_ERROR(availability_suggest_domain,
         AvailabilityUnrecognizedName, PointsToFirstBadToken,
-        "unrecognized platform name %0; did you mean '%1'?",
+        "cannot find availability domain %0; did you mean '%1'?",
         (Identifier, StringRef))
 WARNING(availability_unsupported_version_number, none,
         "'%0' is not a supported version number", (llvm::VersionTuple))
@@ -7485,15 +7516,15 @@ ERROR(availability_decl_unavailable_rename, none,
 
 NOTE(availability_marked_unavailable, none,
      "%0 has been explicitly marked unavailable here",
-     (const ValueDecl *))
+     (const Decl *))
 
 NOTE(availability_introduced_in_version, none,
      "%0 was introduced in %1 %2",
-     (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
+     (const Decl *, AvailabilityDomain, AvailabilityRange))
 
 NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",
-     (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
+     (const Decl *, AvailabilityDomain, AvailabilityRange))
 
 GROUPED_WARNING(availability_deprecated, DeprecatedDeclaration, Deprecation,
                 "%0 %select{is|%select{is|was}3}1 "
@@ -7824,7 +7855,7 @@ NOTE(resilience_decl_declared_here,
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
-      "'%select{@_transparent|@inlinable|@_alwaysEmitIntoClient|%error}1' and must "
+      "'%select{@_transparent|@inlinable|@export(implementation)|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,
@@ -8944,7 +8975,7 @@ ERROR(lifetime_dependence_cannot_infer_kind, none,
 ERROR(lifetime_dependence_cannot_infer_scope_ownership, none,
       "cannot borrow the lifetime of '%0', which has consuming ownership on %1",
       (StringRef, StringRef))
-ERROR(lifetime_dependence_cannot_infer_scope_foreign_by_value, none,
+ERROR(lifetime_dependence_scope_foreign_by_value, none,
       "cannot borrow the lifetime of '%0', which is passed by value on %1",
       (StringRef, StringRef))
 NOTE(lifetime_dependence_cannot_infer_inout_suggest, none,
@@ -9040,7 +9071,7 @@ ERROR(safe_and_unsafe_attr,none,
       "%kindbase0 cannot be both '@safe' and '@unsafe'", (const Decl *))
 
 GROUPED_WARNING(unsafe_superclass,StrictMemorySafety,none,
-     "%kindbase0 has superclass involving unsafe type %1", 
+     "%kindbase0 has superclass involving unsafe type %1",
      (const ValueDecl *, Type))
 
 GROUPED_WARNING(conformance_involves_unsafe,StrictMemorySafety,none,
@@ -9065,6 +9096,12 @@ GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
       "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
+GROUPED_ERROR(always_unsafe_without_unsafe,AlwaysUnsafe,none,
+      "expression uses constructs that are very hard to use correctly and must "
+      "be marked with 'unsafe'", ())
+GROUPED_ERROR(for_always_unsafe_without_unsafe,AlwaysUnsafe,none,
+      "for-in loop uses constructs that are very hard to use correctly and "
+      "must be marked with 'unsafe'", ())
 GROUPED_WARNING(no_unsafe_in_unsafe,UnnecessaryUnsafe,none,
         "no unsafe operations occur within 'unsafe' expression", ())
 GROUPED_WARNING(no_unsafe_in_unsafe_for,UnnecessaryUnsafe,none,
@@ -9130,6 +9167,13 @@ GROUPED_WARNING(generic_nonfinal_in_embedded_swift, EmbeddedRestrictions,
                 none,
                 "generic %kind0 in a class %select{must be 'final'|cannot be 'required'}1 in Embedded Swift",
                 (const Decl *, bool))
+GROUPED_ERROR(generic_open_in_embedded_swift, EmbeddedRestrictions, none,
+              "generic %kind0 in a class cannot be 'open' in Embedded Swift",
+              (const Decl *))
+GROUPED_ERROR(generic_override_in_embedded_swift, EmbeddedRestrictions, none,
+              "generic %kind0 in a class cannot override another method in "
+              "Embedded Swift",
+              (const Decl *))
 GROUPED_WARNING(use_generic_member_of_existential_in_embedded_swift,
                 EmbeddedRestrictions, none,
                 "cannot use generic %kind0 on a value of type %1 in Embedded Swift",

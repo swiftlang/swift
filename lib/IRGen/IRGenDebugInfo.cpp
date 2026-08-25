@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRGenDebugInfo.h"
+#include "Field.h"
 #include "GenEnum.h"
 #include "GenOpaque.h"
 #include "GenStruct.h"
@@ -289,6 +290,17 @@ public:
                         unsigned Depth, unsigned Index, StringRef Name);
   void emitPackCountParameter(IRGenFunction &IGF, llvm::Value *Metadata,
                               SILDebugVariable VarInfo);
+
+  void emitExistentialPayloadType(swift::Type Ty) {
+    if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::ASTTypes)
+      return;
+    if (!Ty || Ty->hasTypeParameter() || Ty->hasArchetype())
+      return;
+
+    auto DbgTy = DebugTypeInfo::getFromTypeInfo(
+        Ty, IGM.getTypeInfoForUnlowered(Ty), IGM);
+    anchorType(getOrCreateType(DbgTy));
+  }
 
   /// Return flags which enable debug info emission for call sites, provided
   /// that it is supported and enabled.
@@ -1192,11 +1204,62 @@ private:
     StringRef Name;
     unsigned AlignInBits;
     TrackingDIType DIType;
-    MemberDIType(StringRef Name, unsigned AlignInBits, llvm::DIType *DIType)
-        : Name(Name), AlignInBits(AlignInBits), DIType(DIType) {}
+    llvm::DINode::DIFlags Flags;
+    MemberDIType(StringRef Name, unsigned AlignInBits, llvm::DIType *DIType,
+                 llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero)
+        : Name(Name), AlignInBits(AlignInBits), DIType(DIType), Flags(Flags) {}
   };
 
   unsigned getByteSize() { return CI.getTargetInfo().getCharWidth(); }
+
+  /// Append the DWARF member describing \p field to \p MemberTypes, and return
+  /// false if \p RequireComplete was asked for but the member's size is not
+  /// known.
+  bool collectFieldMember(Field field, swift::Type ParentTy,
+                          llvm::DINode::DIFlags Flags, bool RequireComplete,
+                          SmallVectorImpl<MemberDIType> &MemberTypes) {
+    swift::Type MemberTy;
+    const TypeInfo *TI = nullptr;
+    switch (field.getKind()) {
+    case Field::MissingMember:
+      // A placeholder for a member the importer could not translate describes
+      // no storage of its own, and has no name to describe it with.
+      return true;
+
+    case Field::Var: {
+      VarDecl *VD = field.getVarDecl();
+      MemberTy = ParentTy->getTypeOfMember(VD);
+      TI = &IGM.getTypeInfoForUnlowered(
+          IGM.getSILTypes().getAbstractionPattern(VD), MemberTy);
+      break;
+    }
+
+    case Field::DefaultActorStorage:
+    case Field::NonDefaultDistributedActorStorage:
+      // There is no VarDecl and no abstraction pattern; the field's type is a
+      // builtin whose size IRGen already knows.
+      MemberTy = field.getInterfaceType(IGM);
+      TI = &IGM.getTypeInfoForUnlowered(MemberTy);
+      Flags |= llvm::DINode::FlagArtificial;
+      break;
+    }
+
+    std::optional<DebugTypeInfo> DbgTy;
+    if (RequireComplete) {
+      if (auto Completed =
+              CompletedDebugTypeInfo::getFromTypeInfo(MemberTy, *TI, IGM))
+        DbgTy = *Completed;
+      else
+        return false;
+    } else {
+      DbgTy = DebugTypeInfo::getFromTypeInfo(MemberTy, *TI, IGM);
+    }
+
+    MemberTypes.emplace_back(field.getName(), getAlignInBits(*DbgTy),
+                             getOrCreateType(*DbgTy), Flags);
+    anchorTypeAliasesIn(MemberTy);
+    return true;
+  }
 
   /// The alignment to record in the debug info for \p DbgTy, in bits, or 0 to
   /// record none. The DWARF emitter checks for a 0 and omits DW_AT_alignment 
@@ -1219,24 +1282,21 @@ private:
     // Collect the members.
     SmallVector<MemberDIType, 16> MemberTypes;
     if (!IGM.isResilient(Decl, ResilienceExpansion::Maximal)) {
-      for (VarDecl *VD : Decl->getStoredProperties()) {
-        auto memberTy = Type->getTypeOfMember(VD);
-        if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
-                memberTy,
-                IGM.getTypeInfoForUnlowered(
-                    IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
-                IGM)) {
-          MemberTypes.emplace_back(VD->getName().str(),
-                                   getAlignInBits(*DbgTy),
-                                   getOrCreateType(*DbgTy));
-          anchorTypeAliasesIn(memberTy);
-        } else {
-          // Without complete type info we can only create a forward decl.
-          return DBuilder.createForwardDecl(
-              llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
-              llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
-        }
-      }
+      bool Incomplete = false;
+      // forEachField(), not getStoredProperties(): a root default actor has an
+      // artificial storage field ahead of its stored properties, which
+      // getStoredProperties() does not know about. See collectFieldMember.
+      forEachField(IGM, Decl, [&](Field field) {
+        if (Incomplete)
+          return;
+        Incomplete = !collectFieldMember(field, Type, Flags,
+                                         /*RequireComplete=*/true, MemberTypes);
+      });
+      if (Incomplete)
+        // Without complete type info we can only create a forward decl.
+        return DBuilder.createForwardDecl(
+            llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
+            llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
     }
 
     SmallVector<llvm::Metadata *, 16> Members;
@@ -1244,7 +1304,7 @@ private:
     for (auto &Member : MemberTypes)
       Members.push_back(createMemberType(Member.DIType, Member.Name,
                                          OffsetInBits, Member.AlignInBits,
-                                         Scope, File, Flags));
+                                         Scope, File, Member.Flags));
 
     llvm::DINodeArray BoundParams = collectGenericParams(Type);
     llvm::DICompositeType *DITy = createStruct(
@@ -1279,26 +1339,18 @@ private:
     SmallVector<MemberDIType, 16> MemberTypes;
 
     if (!IGM.isResilient(Decl, ResilienceExpansion::Maximal)) {
-      for (VarDecl *VD : Decl->getStoredProperties()) {
-        Type memberTy = UnsubstitutedType->getTypeOfMember(VD);
-        auto DbgTy = DebugTypeInfo::getFromTypeInfo(
-            memberTy,
-            IGM.getTypeInfoForUnlowered(
-                IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
-            IGM);
-        MemberTypes.emplace_back(VD->getName().str(),
-                                 getAlignInBits(DbgTy),
-                                 getOrCreateType(DbgTy));
-        anchorTypeAliasesIn(memberTy);
-      }
+      forEachField(IGM, Decl, [&](Field field) {
+        collectFieldMember(field, UnsubstitutedType, Flags,
+                           /*RequireComplete=*/false, MemberTypes);
+      });
     }
 
     SmallVector<llvm::Metadata *, 16> Members;
     for (auto &Member : MemberTypes) {
       unsigned OffsetInBits = 0;
-      auto *member = createMemberType(Member.DIType, Member.Name,
-                                         OffsetInBits, Member.AlignInBits,
-                                      Scope, File, Flags);
+      auto *member =
+          createMemberType(Member.DIType, Member.Name, OffsetInBits,
+                           Member.AlignInBits, Scope, File, Member.Flags);
       Members.push_back(member);
     }
 
@@ -2048,9 +2100,8 @@ private:
     }
 
     case TypeKind::BuiltinFloat: {
-      auto *FloatTy = BaseTy->castTo<BuiltinFloatType>();
-      // Assuming that the bitwidth and FloatTy->getFPKind() are identical.
-      SizeInBits = FloatTy->getBitWidth();
+      SizeInBits = IGM.DataLayout.getTypeAllocSizeInBits(
+          IGM.getStorageTypeForUnlowered(BaseTy));
       Encoding = llvm::dwarf::DW_ATE_float;
       break;
     }
@@ -2241,16 +2292,25 @@ private:
 
       llvm::DINodeArray Annotations = nullptr;
       if (auto *PD = dyn_cast_or_null<ProtocolDecl>(Decl)) {
-        if (PD->isMarkerProtocol()) {
+        SmallVector<llvm::Metadata *, 2> Annots;
+        auto addFlag = [&](StringRef Name) {
           llvm::Metadata *Ops[2] = {
-              llvm::MDString::get(IGM.getLLVMContext(),
-                                  StringRef("swift.MarkerProtocol")),
+              llvm::MDString::get(IGM.getLLVMContext(), Name),
               llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
                   llvm::Type::getInt1Ty(IGM.getLLVMContext()), true))};
-          SmallVector<llvm::Metadata *, 1> Annots = {
-              llvm::MDNode::get(IGM.getLLVMContext(), Ops)};
+          Annots.push_back(llvm::MDNode::get(IGM.getLLVMContext(), Ops));
+        };
+
+        if (PD->isMarkerProtocol())
+          addFlag("swift.MarkerProtocol");
+
+        if (PD->isObjC())
+          addFlag("swift.ObjCProtocol");
+        else if (PD->requiresClass())
+          addFlag("swift.ClassConstrainedProtocol");
+
+        if (!Annots.empty())
           Annotations = DBuilder.getOrCreateArray(Annots);
-        }
       }
 
       return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
@@ -2518,9 +2578,11 @@ private:
           nullptr, llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
     }
 
-    // A special stdlib builtin type, which the debugger looks up by mangled
-    // name, so it must not be renamed to "<unknown>" below.
+    // Special stdlib builtin types, which the debugger looks up by mangled
+    // name, so they must not be renamed to "<unknown>" below.
     case TypeKind::BuiltinUnsafeValueBuffer:
+    case TypeKind::BuiltinDefaultActorStorage:
+    case TypeKind::BuiltinNonDefaultDistributedActorStorage:
       break;
 
     // The following types exist primarily for internal use by the type
@@ -2528,8 +2590,6 @@ private:
     case TypeKind::Error:
     case TypeKind::SILBlockStorage:
     case TypeKind::SILToken:
-    case TypeKind::BuiltinDefaultActorStorage:
-    case TypeKind::BuiltinNonDefaultDistributedActorStorage:
     case TypeKind::SILMoveOnlyWrapped:
     case TypeKind::Integer:
       LLVM_DEBUG(llvm::dbgs() << "Unhandled type: ";
@@ -2694,6 +2754,32 @@ private:
 #define MAP_BUILTIN_TYPE(CLANG, SWIFT) anchorAlias(#SWIFT);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 #undef MAP_BUILTIN_TYPE
+  }
+
+  /// Anchor DIEs for the concurrency types a debugger presents a task through.
+  /// A debugger builds values of these itself, out of task state it reads from
+  /// the process, so nothing in the program has to name them and nothing else
+  /// pulls them into the debug info.
+  void anchorConcurrencyTypes() {
+    if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::ASTTypes)
+      return;
+
+    ASTContext &Ctx = IGM.Context;
+    for (StructDecl *Decl :
+         {Ctx.getUnsafeCurrentTaskDecl(), Ctx.getTaskPriorityDecl()}) {
+      // Null when the concurrency module was never imported; such a program has
+      // no task to present.
+      if (!Decl)
+        continue;
+      // Across a resilience boundary the layout is not this module's to
+      // describe, and a debugger there has reflection metadata to read instead.
+      if (IGM.isResilient(Decl, ResilienceExpansion::Maximal))
+        continue;
+      Type Ty = Decl->getDeclaredInterfaceType();
+      auto DbgTy = DebugTypeInfo::getFromTypeInfo(
+          Ty, IGM.getTypeInfoForUnlowered(Ty), IGM);
+      anchorType(getOrCreateType(DbgTy));
+    }
   }
 
   /// Forward-declared composite types may still refer refer to a type alias by
@@ -3213,6 +3299,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   }
   createSpecialStlibBuiltinTypes();
   anchorClangInteropTypeAliases();
+  anchorConcurrencyTypes();
 }
 
 void IRGenDebugInfoImpl::finalize() {
@@ -4489,6 +4576,10 @@ void IRGenDebugInfo::emitPackCountParameter(IRGenFunction &IGF,
                                             SILDebugVariable VarInfo) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitPackCountParameter(IGF, Metadata,
                                                                   VarInfo);
+}
+
+void IRGenDebugInfo::emitExistentialPayloadType(swift::Type Ty) {
+  static_cast<IRGenDebugInfoImpl *>(this)->emitExistentialPayloadType(Ty);
 }
 
 llvm::DIBuilder &IRGenDebugInfo::getBuilder() {

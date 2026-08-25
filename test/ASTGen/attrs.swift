@@ -241,6 +241,10 @@ struct ReferenceOwnershipModifierTest<X: AnyObject> {
     unowned(unsafe) var unmanagedValue: X
 }
 
+@unsafe func unsafeTest() {}
+@unsafe(always) func alwaysUnsafeTest() {}
+@safe func safeTest() {}
+
 @_rawLayout(like: T) struct RawStorage<T>: ~Copyable {}
 @_rawLayout(like: T, movesAsLike) struct RawStorage2<T>: ~Copyable {}
 @_rawLayout(likeArrayOf: T, count: 4) struct RawSmallArray<T>: ~Copyable {}

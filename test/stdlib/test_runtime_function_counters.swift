@@ -5,6 +5,12 @@
 // REQUIRES: runtime_function_counters
 // REQUIRES: executable_test
 
+// OS and back-deployment runtimes never build with
+// SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS. We can only test a locally built
+// runtime.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 /// Test functionality related to the runtime function counters.
 
 class C {

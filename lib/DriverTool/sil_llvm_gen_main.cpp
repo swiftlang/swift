@@ -405,6 +405,11 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
   Invocation.getLangOptions().EnableCXXInterop = options.EnableCxxInterop;
   Invocation.computeCXXStdlibOptions();
 
+  // The implicit search paths depend on the language options - e.g. Embedded
+  // Swift picks up its runtime libraries from a different directory. Recompute
+  // them now that all language options are set.
+  Invocation.updateImplicitSearchPaths();
+
   // Setup the IRGen Options.
   IRGenOptions &Opts = Invocation.getIRGenOptions();
   Opts.OutputKind = options.OutputKind;

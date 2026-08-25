@@ -272,20 +272,24 @@ class SchemeMockTestCase(unittest.TestCase):
     def _compute_remote_path(self, *, repo_name: str):
         remote_info = self.config["repos"][repo_name]["remote"]
         id = remote_info.get("id")
-        url = remote_info.get("url")
         if id is not None:
             return os.path.join(self._remotes_path, remote_info["id"])
-        elif url is not None:
+
+        for url_key in ("url", "https-url", "ssh-url"):
+            url = remote_info.get(url_key)
+            if url is None:
+                continue
             url_path = get_path_from_url(url)
             workspace_path = os.path.dirname(self._remotes_path)
             self.assertEqual(
                 os.path.commonpath((workspace_path, url_path)), workspace_path
             )
             return os.path.join(self._remotes_path, os.path.basename(url_path))
-        else:
-            raise RuntimeError(
-                f"'remote' for '{local_repo_name}' must have an 'id' or 'url' item"
-            )
+
+        raise RuntimeError(
+            f"'remote' for '{repo_name}' must have an 'id', 'url', 'https-url' "
+            "or 'ssh-url' item"
+        )
 
     def remote_path(self, *, repo_name: str):
         return self._compute_remote_path(repo_name=repo_name)

@@ -1,10 +1,9 @@
-// RUN: %target-run-simple-swift(   -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim -enable-experimental-feature EmbeddedKeyPaths -enable-experimental-feature KeyPathWithMethodMembers) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim -enable-experimental-feature EmbeddedKeyPaths -enable-experimental-feature KeyPathWithMethodMembers) | %FileCheck %s
+// RUN: %target-run-simple-swift(   -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim -enable-experimental-feature KeyPathWithMethodMembers) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim -enable-experimental-feature KeyPathWithMethodMembers) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
@@ -464,4 +463,408 @@ do {
   ht[keyPath: kp0] = 70
   ht[keyPath: kp1] = 80
   print(ht.pair.0 == 70 && ht.pair.1 == 80 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// -----------------------------------------------------------------------------
+// AnyKeyPath / PartialKeyPath type erasure.  Even though embedded doesn't
+// have full existential type introspection, key path erasure works because
+// each concrete KeyPath subclass overrides `_projectReadOnlyAsAny` — those
+// overrides are found via the vtable of the immortal static-instance
+// object, so `AnyKeyPath.subscript` / `PartialKeyPath.subscript` /
+// `swift_getAtAnyKeyPath` / `swift_getAtPartialKeyPath` route through them
+// without needing `_openExistential` on `Any.Type`.
+//
+// Covers: single-component, multi-component chain, class-boundary chain,
+// wrong-typed root (nil result), PartialKeyPath, identity, Hashable use.
+// -----------------------------------------------------------------------------
+
+struct Erasable {
+  var x: Int32
+  var y: Int32
+}
+struct OtherRoot {
+  var v: Int32
+}
+struct NestedErasable {
+  var e: Erasable
+}
+final class ClsErasable {
+  var count: Int32 = 100
+}
+struct HoldsClsErasable {
+  var c: ClsErasable
+}
+
+do {
+  // Single-component KP erased to `AnyKeyPath`.
+  let kpX: KeyPath<Erasable, Int32> = \Erasable.x
+  let anyX: AnyKeyPath = kpX
+  let e = Erasable(x: 42, y: 99)
+  print((e[keyPath: anyX] as? Int32) == 42 ? "OK!" : "FAIL") // CHECK: OK!
+
+  // Multi-component chain erased.
+  let kpNested: KeyPath<NestedErasable, Int32> = \NestedErasable.e.x
+  let anyNested: AnyKeyPath = kpNested
+  print((NestedErasable(e: e)[keyPath: anyNested] as? Int32) == 42
+        ? "OK!" : "FAIL") // CHECK: OK!
+
+  // Class-boundary chain erased.
+  let hc = HoldsClsErasable(c: ClsErasable())
+  hc.c.count = 77
+  let kpCls: ReferenceWritableKeyPath<HoldsClsErasable, Int32> =
+      \HoldsClsErasable.c.count
+  let anyCls: AnyKeyPath = kpCls
+  print((hc[keyPath: anyCls] as? Int32) == 77 ? "OK!" : "FAIL") // CHECK: OK!
+
+  // Heterogeneous `[AnyKeyPath]` array — wrong-typed root yields nil.
+  let kpV: KeyPath<OtherRoot, Int32> = \OtherRoot.v
+  let paths: [AnyKeyPath] = [kpX, kpV]
+  print((e[keyPath: paths[0]] as? Int32) == 42 ? "OK!" : "FAIL") // CHECK: OK!
+  print(e[keyPath: paths[1]] == nil ? "OK!" : "FAIL") // CHECK: OK!
+
+  // PartialKeyPath — root fixed, value erased to Any (not Any?).
+  let partial: PartialKeyPath<Erasable> = kpX
+  print((e[keyPath: partial] as? Int32) == 42 ? "OK!" : "FAIL") // CHECK: OK!
+
+  // Identity via `AnyKeyPath`.
+  var i: Int32 = 7
+  let anyIdent: AnyKeyPath = \Int32.self
+  print((i[keyPath: anyIdent] as? Int32) == 7 ? "OK!" : "FAIL") // CHECK: OK!
+  _ = i  // suppress "never mutated" note
+
+  // `AnyKeyPath == AnyKeyPath` — the static-instance emitter shares one
+  // immortal global per pattern, so identical-shape paths compare equal
+  // by object identity.  Different-typed paths compare unequal.
+  print(anyX == kpX ? "OK!" : "FAIL") // CHECK: OK!
+  print(anyX != paths[1] ? "OK!" : "FAIL") // CHECK: OK!
+
+  // `AnyKeyPath`'s `Hashable` conformance is covered separately, in
+  // `keypaths-hashable.swift`: using one as a `Dictionary` key pulls in
+  // `_HashTable` and the hash seed, which need `ceil` and `arc4random_buf`.
+  // This test's link recipe can't satisfy those on Linux, and restricting the
+  // whole file would cost the rest of its coverage there.
+}
+
+// -----------------------------------------------------------------------------
+// Multi-component chains that include a get-only computed (or method)
+// intermediate.  The embedded runtime walker allocates a scratch buffer
+// sized to the intermediate type (queried from the type-metadata pointer
+// embedded in the KP buffer), invokes the getter thunk with the sret ABI
+// via a C shim, walks the tail, and destroys the scratch.
+// -----------------------------------------------------------------------------
+
+struct MidComputedInner {
+  var d: Int32
+  var e: Int32
+}
+struct MidComputedOuter {
+  var inner: MidComputedInner
+  var innerGet: MidComputedInner { MidComputedInner(d: 100, e: 200) }
+  var innerLive: MidComputedInner { inner }  // returns the actual storage
+}
+
+// stored -> computed (fresh copy) -> stored
+do {
+  let o = MidComputedOuter(inner: MidComputedInner(d: 10, e: 20))
+  let kpD: KeyPath<MidComputedOuter, Int32> = \.innerGet.d
+  let kpE: KeyPath<MidComputedOuter, Int32> = \.innerGet.e
+  print(o[keyPath: kpD] == 100 ? "OK!" : "FAIL") // CHECK: OK!
+  print(o[keyPath: kpE] == 200 ? "OK!" : "FAIL") // CHECK: OK!
+
+  // Get-only computed that returns a copy of the underlying `inner`
+  // storage — the walker reads through that copy.
+  let kpLive: KeyPath<MidComputedOuter, Int32> = \.innerLive.d
+  print(o[keyPath: kpLive] == 10 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// stored -> computed (final)
+do {
+  struct C {
+    var v: Int32 = 21
+    var doubled: Int32 { v &* 2 }
+  }
+  struct H { var c: C = C() }
+  let h = H()
+  let kp: KeyPath<H, Int32> = \H.c.doubled
+  print(h[keyPath: kp] == 42 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// class root -> computed (final)
+final class ClsRoot {
+  var v: Int32 = 5
+  var tripled: Int32 { v &* 3 }
+}
+do {
+  let cr = ClsRoot()
+  cr.v = 7
+  let kp: KeyPath<ClsRoot, Int32> = \ClsRoot.tripled
+  print(cr[keyPath: kp] == 21 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// stored -> class -> computed (chain crossing a class boundary into a
+// computed final step).
+struct HoldsCls {
+  var c: ClsRoot
+}
+do {
+  let hc = HoldsCls(c: ClsRoot())
+  hc.c.v = 9
+  let kp: KeyPath<HoldsCls, Int32> = \HoldsCls.c.tripled
+  print(hc[keyPath: kp] == 27 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// Longer chain: stored -> stored -> computed -> stored (3 steps + computed).
+struct Deep1 { var d2: Deep2 = Deep2() }
+struct Deep2 { var mid: Deep3 { Deep3() }; var s: Int32 = 0 }
+struct Deep3 { var v: Int32 = 77 }
+do {
+  let d = Deep1()
+  let kp: KeyPath<Deep1, Int32> = \Deep1.d2.mid.v
+  print(d[keyPath: kp] == 77 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// Method component in a chain.
+struct HasMethodInChain {
+  var underlying: Int32 = 33
+  func get() -> Int32 { underlying }
+}
+struct WrapsMethod {
+  var m: HasMethodInChain = HasMethodInChain()
+}
+do {
+  let w = WrapsMethod()
+  // \.m.get produces a KeyPath<WrapsMethod, () -> Int32> — the last
+  // component is a method.  Not directly what we're testing here.
+  // Instead: stored -> computed (via a get-only property that returns a
+  // fresh value).  Covered above.
+  _ = w
+}
+
+// Non-trivial intermediate: ensure the walker destroys a class-holding
+// scratch value.  A get-only computed returns a fresh Holds<Counter>,
+// the walker reads through it to fetch the Counter's value, then must
+// destroy the scratch (releasing Counter to zero refcount).
+final class ChainCounter {
+  static var live: Int32 = 0
+  var value: Int32 = 42
+  init() { ChainCounter.live &+= 1 }
+  deinit { ChainCounter.live &-= 1 }
+}
+struct HoldsChainCounter {
+  var c: ChainCounter
+}
+struct HasFresh {
+  // Get-only computed returns a fresh Holds every time.  The walker
+  // must destroy this intermediate after extracting `c.value`.
+  var freshHolds: HoldsChainCounter { HoldsChainCounter(c: ChainCounter()) }
+}
+do {
+  ChainCounter.live = 0
+  let hf = HasFresh()
+  let kp: KeyPath<HasFresh, Int32> = \HasFresh.freshHolds.c.value
+  print(hf[keyPath: kp] == 42 ? "OK!" : "FAIL") // CHECK: OK!
+  // The intermediate `HoldsChainCounter` was allocated inside the walker;
+  // once the walker destroys it, ChainCounter's refcount drops.  The
+  // walker's returned Int32 didn't retain anything.
+  print(ChainCounter.live == 0 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// Read-only through a settable-computed intermediate.  The pattern still
+// contains the setter, but the walker only calls the getter.  Verifies
+// the layout with a getter+setter slot is walked correctly.
+struct WithSettableComputed {
+  var storage: Int32 = 5
+  var wrapped: SomeInner {
+    get { SomeInner(v: storage) }
+    set { storage = newValue.v }
+  }
+}
+struct SomeInner {
+  var v: Int32
+}
+do {
+  let w = WithSettableComputed(storage: 88)
+  let kp: KeyPath<WithSettableComputed, Int32> = \.wrapped.v
+  print(w[keyPath: kp] == 88 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// Erasing a computed-mid-chain KP to AnyKeyPath and applying via
+// subscript-on-AnyKeyPath.  Exercises `_projectReadOnlyAsAny` through
+// the vtable dispatch (KeyPath<Root,Value>._projectReadOnly(from:))
+// which now handles computed intermediates.
+do {
+  let o = MidComputedOuter(inner: MidComputedInner(d: 1, e: 2))
+  let kp: KeyPath<MidComputedOuter, Int32> = \.innerGet.d
+  let any: AnyKeyPath = kp
+  print((o[keyPath: any] as? Int32) == 100 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// -----------------------------------------------------------------------------
+// Writable computed intermediates: `WritableKeyPath` / `ReferenceWritableKeyPath`
+// chains with settable computed components in the middle.  The embedded
+// runtime installs an `_Embedded{Mutating,Nonmutating}WritebackBuffer` on
+// the `keepAlive` chain for each such intermediate: the getter fills a
+// heap scratch, the caller mutates through the leaf pointer, and each
+// writeback's `deinit` fires the setter in LIFO order to propagate the
+// mutation up.
+// -----------------------------------------------------------------------------
+
+struct WKInner {
+  var v: Int32 = 0
+}
+
+struct WKOuterMut {
+  var _b: WKInner = WKInner()
+  var b: WKInner {
+    get { _b }
+    set { _b = newValue }
+  }
+}
+
+// WK: stored -> mutating-computed -> stored
+do {
+  var o = WKOuterMut()
+  o._b.v = 5
+  let kp: WritableKeyPath<WKOuterMut, Int32> = \.b.v
+  print(o[keyPath: kp] == 5 ? "OK!" : "FAIL") // CHECK: OK!
+  o[keyPath: kp] = 42
+  print(o._b.v == 42 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// WK: nested mutating-computed intermediates (2 layers).
+struct WKMid {
+  var _o: WKOuterMut = WKOuterMut()
+  var o: WKOuterMut {
+    get { _o }
+    set { _o = newValue }
+  }
+}
+struct WKTop {
+  var _m: WKMid = WKMid()
+  var m: WKMid {
+    get { _m }
+    set { _m = newValue }
+  }
+}
+do {
+  var t = WKTop()
+  t._m._o._b.v = 10
+  let kp: WritableKeyPath<WKTop, Int32> = \.m.o.b.v
+  print(t[keyPath: kp] == 10 ? "OK!" : "FAIL") // CHECK: OK!
+  t[keyPath: kp] = 99
+  print(t._m._o._b.v == 99 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// WK: mutating computed at the leaf (writeback still fires).
+do {
+  var o = WKOuterMut()
+  o._b.v = 3
+  // The leaf `b` is settable — the KP is
+  // `\WKOuterMut.b` (Value = WKInner).
+  let kp: WritableKeyPath<WKOuterMut, WKInner> = \.b
+  print(o[keyPath: kp].v == 3 ? "OK!" : "FAIL") // CHECK: OK!
+  o[keyPath: kp] = WKInner(v: 77)
+  print(o._b.v == 77 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// RWK: single nonmutating-computed (class), read + write.
+final class RWKCls {
+  var _v: Int32 = 0
+  var v: Int32 {
+    get { _v }
+    set { _v = newValue }
+  }
+}
+do {
+  let c = RWKCls()
+  c._v = 5
+  let kp: ReferenceWritableKeyPath<RWKCls, Int32> = \.v
+  print(c[keyPath: kp] == 5 ? "OK!" : "FAIL") // CHECK: OK!
+  c[keyPath: kp] = 42
+  print(c._v == 42 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// RWK: stored -> class -> nonmutating-computed.
+struct HoldsRWK {
+  var c: RWKCls = RWKCls()
+}
+do {
+  var h = HoldsRWK()
+  h.c._v = 5
+  let kp: ReferenceWritableKeyPath<HoldsRWK, Int32> = \.c.v
+  print(h[keyPath: kp] == 5 ? "OK!" : "FAIL") // CHECK: OK!
+  h[keyPath: kp] = 42
+  print(h.c._v == 42 ? "OK!" : "FAIL") // CHECK: OK!
+  // Aliased reference sees the mutation (RWK semantics).
+  let alias = h.c
+  print(alias._v == 42 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// RWK: stored -> mutating-computed -> stored -> class -> nonmutating-computed.
+// Exercises a chain with BOTH kinds of writeback stacked LIFO.
+struct RWKInner {
+  var c: RWKCls = RWKCls()
+}
+struct RWKWrapper {
+  var storage: RWKInner = RWKInner()
+  var view: RWKInner {
+    get { storage }
+    set { storage = newValue }
+  }
+}
+struct RWKOuter {
+  var w: RWKWrapper = RWKWrapper()
+}
+do {
+  var o = RWKOuter()
+  o.w.storage.c._v = 100
+  let kp: ReferenceWritableKeyPath<RWKOuter, Int32> = \.w.view.c.v
+  print(o[keyPath: kp] == 100 ? "OK!" : "FAIL") // CHECK: OK!
+  o[keyPath: kp] = 200
+  print(o.w.storage.c._v == 200 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// Non-trivial value in mutating writeback: the intermediate carries a
+// class reference, so the writeback's `destroy` must release the class
+// after firing the setter.
+final class WBCounter {
+  static var live: Int32 = 0
+  var value: Int32 = 0
+  init(_ v: Int32) { value = v; WBCounter.live &+= 1 }
+  deinit { WBCounter.live &-= 1 }
+}
+struct HoldsWBCounter {
+  var c: WBCounter = WBCounter(0)
+  var v: Int32 { get { c.value } set { c.value = newValue } }
+}
+struct WKHoldsHolds {
+  var _hh: HoldsWBCounter = HoldsWBCounter()
+  var hh: HoldsWBCounter {
+    get { _hh }
+    set { _hh = newValue }
+  }
+}
+do {
+  WBCounter.live = 0
+  var wh = WKHoldsHolds()
+  // `WKHoldsHolds()` allocates one WBCounter inside its default
+  // `_hh`.  Refcount = 1.
+  print(WBCounter.live == 1 ? "OK!" : "FAIL") // CHECK: OK!
+
+  let kp: WritableKeyPath<WKHoldsHolds, Int32> = \.hh.v
+  print(wh[keyPath: kp] == 0 ? "OK!" : "FAIL") // CHECK: OK!
+  wh[keyPath: kp] = 99
+  print(wh._hh.c.value == 99 ? "OK!" : "FAIL") // CHECK: OK!
+  // After the write:
+  //   * walker copied `wh._hh` into scratch (retain → live=2)
+  //   * caller mutated scratch's `c.value` via nested computed setter
+  //   * mutating writeback deinit fires: setter copies scratch into
+  //     `wh._hh` (that store releases the old `_hh.c` → live=1),
+  //     then walker destroys scratch (releases scratch's `c` → live=0)
+  //   * ...wait, but the original counter was actually the same object
+  //     as scratch's, aliased through the retain.  The final store
+  //     copies scratch back into `_hh`, so `wh._hh.c` again refers to
+  //     the same underlying object.  Net: still 1 live.
+  print(WBCounter.live == 1 ? "OK!" : "FAIL") // CHECK: OK!
+  _ = wh  // keep wh alive so its _hh.c stays around
 }

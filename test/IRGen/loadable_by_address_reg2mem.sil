@@ -499,3 +499,67 @@ bb0:
   return %ret : $()
 }
 
+
+struct LargeRef {
+  var c: C1
+  var p: (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+}
+
+// CHECK-LABEL: sil @test_mark_dependence_addr_large_argument
+// CHECK:       bb0(%0 : $*LargeRef, %1 : $*Builtin.NativeObject):
+// CHECK:         [[STK:%.*]] = alloc_stack $LargeRef
+// CHECK:         copy_addr [take] %0 to [init] [[STK]]
+// CHECK:         mark_dependence_addr [nonescaping] %1 : $*Builtin.NativeObject on [[STK]] : $*LargeRef
+// CHECK:       } // end sil function 'test_mark_dependence_addr_large_argument'
+sil @test_mark_dependence_addr_large_argument : $@convention(thin) (@guaranteed LargeRef, @in_guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $LargeRef, %1 : $*Builtin.NativeObject):
+  mark_dependence_addr [nonescaping] %1 : $*Builtin.NativeObject on %0 : $LargeRef
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @test_mark_dependence_addr_large_loaded_value
+// CHECK:       bb0(%0 : $*LargeRef, %1 : $*Builtin.NativeObject):
+// CHECK-NOT:     alloc_stack
+// CHECK:         mark_dependence_addr [nonescaping] %1 : $*Builtin.NativeObject on %0 : $*LargeRef
+// CHECK:       } // end sil function 'test_mark_dependence_addr_large_loaded_value'
+sil @test_mark_dependence_addr_large_loaded_value : $@convention(thin) (@in_guaranteed LargeRef, @in_guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*LargeRef, %1 : $*Builtin.NativeObject):
+  %2 = load %0 : $*LargeRef
+  mark_dependence_addr [nonescaping] %1 : $*Builtin.NativeObject on %2 : $LargeRef
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil @useC1 : $@convention(thin) (@guaranteed C1) -> ()
+
+// CHECK-LABEL: sil @test_alloc_stack_in_loop_no_return
+// CHECK:       bb1:
+// CHECK:         [[STK:%.*]] = alloc_stack $LargeRef
+// CHECK:         copy_addr [take] %0 to [init] [[STK]]
+// CHECK:       bb2:
+// CHECK:         dealloc_stack [[STK]]
+// CHECK:         br bb1
+// CHECK:       bb3:
+// CHECK-NOT:     dealloc_stack
+// CHECK:         unreachable
+// CHECK:       } // end sil function 'test_alloc_stack_in_loop_no_return'
+sil @test_alloc_stack_in_loop_no_return : $@convention(thin) (@in_guaranteed LargeRef, Builtin.Int1) -> () {
+bb0(%0 : $*LargeRef, %1 : $Builtin.Int1):
+  br bb1
+
+bb1:
+  %2 = load %0 : $*LargeRef
+  retain_value %2 : $LargeRef
+  %3 = struct_extract %2 : $LargeRef, #LargeRef.c
+  %4 = function_ref @useC1 : $@convention(thin) (@guaranteed C1) -> ()
+  apply %4(%3) : $@convention(thin) (@guaranteed C1) -> ()
+  cond_br %1, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  unreachable
+}
+

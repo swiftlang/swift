@@ -4781,13 +4781,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         parsedClangFunctionType = nullptr;
       }
 
-      if (!repr->isInvalid() && called->isOnce()) {
+      if (!repr->isInvalid() && called->isOnce())
         isCalledOnce = true;
-        // `@called(once)` implies `consuming` which means that the
-        // type should always be escaping in parameter positions.
-        if (parentOptions.is(TypeResolverContext::FunctionInput))
-          noescape = false;
-      }
     } else {
       diagnoseInvalid(repr, called->getAttrLoc(),
                       diag::requires_experimental_feature, "@called", false,
@@ -5735,6 +5730,11 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {
+        // `@called(once)` functions always have consuming semantics
+        // regardless of whether they are @escaping or not.
+        if (fnTy->isCalledOnce())
+          break;
+
         diagnoseInvalid(ownershipRepr, ownershipRepr->getLoc(),
                         diag::ownership_specifier_nonescaping_closure,
                         ownershipRepr->getSpecifierSpelling());

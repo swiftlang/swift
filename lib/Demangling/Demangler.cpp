@@ -401,8 +401,10 @@ void Node::addChild(NodePointer Child, NodeFactory &Factory) {
       Children.Nodes = nullptr;
       Children.Number = 0;
       Children.Capacity = 0;
-      Factory.Reallocate(Children.Nodes, Children.Capacity, 3);
-      assert(Children.Capacity >= 3);
+      // Growing from zero, so this cannot exceed the capacity limit.
+      bool grew = Factory.Reallocate(Children.Nodes, Children.Capacity, 3);
+      (void)grew;
+      assert(grew && Children.Capacity >= 3);
       Children.Nodes[0] = Child0;
       Children.Nodes[1] = Child1;
       Children.Nodes[2] = Child;
@@ -412,7 +414,10 @@ void Node::addChild(NodePointer Child, NodeFactory &Factory) {
     }
     case PayloadKind::ManyChildren:
       if (Children.Number >= Children.Capacity) {
-        Factory.Reallocate(Children.Nodes, Children.Capacity, 1);
+        if (!Factory.Reallocate(Children.Nodes, Children.Capacity, 1)) {
+          Factory.setTooComplex();
+          return;
+        }
       }
       assert(Children.Number < Children.Capacity);
       Children.Nodes[Children.Number++] = Child;
@@ -508,6 +513,7 @@ void NodeFactory::freeSlabs(AllocatedSlab *slab) {
   
 void NodeFactory::clear() {
   assert(!isBorrowed);
+  TooComplex = false;
   if (CurrentSlab) {
 #ifdef NODE_FACTORY_DEBUGGING
     fprintf(stderr, "%s## clear: allocated memory = %zu\n", indent().c_str(), allocatedMemory);
@@ -637,7 +643,9 @@ int NodeFactory::nestingLevel = 0;
 // Fast integer formatting
 namespace {
 
-// Format an unsigned integer into a buffer
+// Format an integer into a buffer, returning the number of characters written
+// not counting the terminating NUL. The buffer must have room for one byte
+// beyond that.
 template <typename U,
           typename std::enable_if<std::is_unsigned<U>::value, bool>::type = true>
 size_t int2str(U n, char *buf) {
@@ -679,7 +687,10 @@ size_t int2str(S n, char *buf) {
 
   if (n < 0) {
     *buf++ = '-';
-    return int2str(static_cast<U>(-n), buf);
+    // Negate in the unsigned type to avoid UB by negating the most negative
+    // value.
+    U magnitude = (U)0 - (U)n;
+    return 1 + int2str(magnitude, buf);
   }
   return int2str(static_cast<U>(n), buf);
 }
@@ -691,27 +702,46 @@ size_t int2str(S n, char *buf) {
 //////////////////////////////////
 
 void CharVector::append(StringRef Rhs, NodeFactory &Factory) {
-  if (NumElems + Rhs.size() > Capacity)
-    Factory.Reallocate(Elems, Capacity, /*Growth*/ Rhs.size());
+  // Compute in 64-bit so we don't overflow 32-bit quantities.
+  uint64_t NewSize = (uint64_t)NumElems + Rhs.size();
+  if (NewSize > Capacity) {
+    if (!Factory.Reallocate(Elems, Capacity, /*Growth*/ Rhs.size()) ||
+        NewSize > Capacity) {
+      Factory.setTooComplex();
+      return;
+    }
+  }
   memcpy(Elems + NumElems, Rhs.data(), Rhs.size());
-  NumElems += Rhs.size();
+  NumElems = (uint32_t)NewSize;
   assert(NumElems <= Capacity);
 }
 
 void CharVector::append(int Number, NodeFactory &Factory) {
-  const int MaxIntPrintSize = 11;
-  if (NumElems + MaxIntPrintSize > Capacity)
-    Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxIntPrintSize);
-  int Length = int2str(Number, Elems + NumElems);
+  // 11 characters for -2147483648, plus the NUL that int2str writes.
+  const int MaxIntPrintSize = 12;
+  if ((uint64_t)NumElems + MaxIntPrintSize > Capacity) {
+    if (!Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxIntPrintSize) ||
+        (uint64_t)NumElems + MaxIntPrintSize > Capacity) {
+      Factory.setTooComplex();
+      return;
+    }
+  }
+  size_t Length = int2str(Number, Elems + NumElems);
   assert(Length > 0 && Length < MaxIntPrintSize);
   NumElems += Length;
 }
 
 void CharVector::append(unsigned long long Number, NodeFactory &Factory) {
+  // 20 characters for 18446744073709551615, plus the NUL that int2str writes.
   const int MaxPrintSize = 21;
-  if (NumElems + MaxPrintSize > Capacity)
-    Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxPrintSize);
-  int Length = int2str(Number, Elems + NumElems);
+  if ((uint64_t)NumElems + MaxPrintSize > Capacity) {
+    if (!Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxPrintSize) ||
+        (uint64_t)NumElems + MaxPrintSize > Capacity) {
+      Factory.setTooComplex();
+      return;
+    }
+  }
+  size_t Length = int2str(Number, Elems + NumElems);
   assert(Length > 0 && Length < MaxPrintSize);
   NumElems += Length;
 }
@@ -815,6 +845,9 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
   if (topLevel->getNumChildren() == 0)
     return nullptr;
 
+  if (isTooComplex())
+    return nullptr;
+
   return topLevel;
 }
 
@@ -831,6 +864,9 @@ NodePointer Demangler::demangleType(StringRef MangledName,
   if (popNode())
     return nullptr;
 
+  if (isTooComplex())
+    return nullptr;
+
   return Result;
 }
 
@@ -845,6 +881,8 @@ bool Demangler::parseAndPushNodes() {
 
     NodePointer Node = demangleOperator();
     if (!Node)
+      return false;
+    if (isTooComplex())
       return false;
     pushNode(Node);
   }
@@ -1326,6 +1364,8 @@ NodePointer Demangler::demangleIdentifier() {
       assert(WordIdx < MaxNumWords);
       StringRef Slice = Words[WordIdx];
       Identifier.append(Slice, *this);
+      if (Identifier.size() > MaxIdentifierLength)
+        return nullptr;
     }
     if (nextIf('0'))
       break;
@@ -1342,8 +1382,12 @@ NodePointer Demangler::demangleIdentifier() {
       if (!Punycode::decodePunycodeUTF8(Slice, PunycodedString))
         return nullptr;
       Identifier.append(StringRef(PunycodedString), *this);
+      if (Identifier.size() > MaxIdentifierLength)
+        return nullptr;
     } else {
       Identifier.append(Slice, *this);
+      if (Identifier.size() > MaxIdentifierLength)
+        return nullptr;
       int wordStartPos = -1;
       for (int Idx = 0, End = (int)Slice.size(); Idx <= End; ++Idx) {
         char c = (Idx < End ? Slice[Idx] : 0);

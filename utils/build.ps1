@@ -76,7 +76,7 @@ Build Android SDKs. Requires Android NDK to be available.
 
 .PARAMETER AndroidNDKVersion
 The version number of the Android NDK to be used.
-Format: r{number}[{letter}] (e.g., r28c)
+Format: r{number}[{letter}][-revision-suffix] (e.g., r28c or r30-beta2)
 Default: "r28c"
 
 .PARAMETER AndroidAPILevel
@@ -178,7 +178,7 @@ param
 
   # Android SDK Options
   [switch] $Android = $false,
-  [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
+  [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?(-beta[1-9])?$")]
   [string] $AndroidNDKVersion = "r28c",
   [ValidateRange(21, 36)]
   [int] $AndroidAPILevel = 23,
@@ -260,12 +260,12 @@ if ($UseHostToolchain -is [string]) {
 $DefaultPinned = @{
   AMD64 = @{
     PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10.exe";
-    PinnedSHA256 = "C9C3E64A05E5ED0857C2DF5B099113251F326CE73A05E1C88D0AB6F8EFE04BA2";
+    PinnedSHA256 = "C287DD533A65A73D657B1B9F2305BE50552F89B46199A0F6162A287DEE547149";
     PinnedVersion = "6.4.0";
   };
   ARM64 = @{
     PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10-arm64/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10-arm64.exe"
-    PinnedSHA256 = "9481876E76B42A4FFA7B5394EA47C664FA899CBD6F1986E4770E8D9F3E21F773";
+    PinnedSHA256 = "8C9F35E37DA08CC598E0CBC7821880D2282E4D02633DD78ECBB248370A5C9985";
     PinnedVersion = "6.4.0";
   };
 }
@@ -485,6 +485,11 @@ $KnownNDKs = @{
     URL = "https://dl.google.com/android/repository/android-ndk-r28c-windows.zip"
     SHA256 = "6bec98ac2354d8a919760889a1a41d020132e5e8cfa1b1fe51610a72c36a466b"
     ClangVersion = 19
+  }
+  "r30-beta2" = @{
+    URL = "https://dl.google.com/android/repository/android-ndk-r30-beta2-windows.zip"
+    SHA256 = "e2c01b70794365a95ad84b5a68b7a52df11b7672097fc3f487cdfd205483d6b5"
+    ClangVersion = 21
   }
 }
 
@@ -1583,12 +1588,25 @@ function Get-Dependencies {
         Invoke-Program (Get-DotNet) "$($WiX.Path)\wix.dll" -- burn extract -acceptEula $WiX.EulaIdentifier $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
       }
       New-Item -ItemType Directory -Path $destination -Force | Out-Null
-      subst X: "$BinaryCache\toolchains\$ToolchainName"
-      Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
-        $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
-        Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=X:\
+      $RuntimePath = "LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin"
+      $RuntimeDestination = Join-Path -Path $destination -ChildPath $RuntimePath
+      $RuntimeTarget = [IO.Path]::Combine("X:\", $RuntimePath)
+      New-Item -ItemType Directory -Path $RuntimeDestination -Force | Out-Null
+      $DriveMapped = $false
+      try {
+        Invoke-Program -OutNull subst.exe X: "$destination"
+        $DriveMapped = $true
+        Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
+          $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
+          # Administrative installs do not run rtl.msi's SetDirectory actions.
+          $TargetDirectory = if ($_.Name -eq "rtl.msi") { $RuntimeTarget } else { "X:\" }
+          Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TargetDirectory
+        }
+      } finally {
+        if ($DriveMapped) {
+          subst.exe /d X: | Out-Null
+        }
       }
-      subst /d X:
     }
 
     if ($IncludeSBoM) {
@@ -1825,7 +1843,7 @@ $Compilers = @{
     C = @{
       Executable        = "cl.exe"
       DriverStyle       = [DriverStyle]::CL
-      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:preprocessor")
+      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:preprocessor", "/source-charset:utf-8")
       DebugFlags        = { param([string] $Format)
         @()
       }
@@ -1834,7 +1852,7 @@ $Compilers = @{
     CXX = @{
       Executable        = "cl.exe"
       DriverStyle       = [DriverStyle]::CL
-      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:preprocessor", "/Zc:__cplusplus")
+      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:preprocessor", "/Zc:__cplusplus", "/source-charset:utf-8")
       DebugFlags        = { param([string] $Format)
         @()
       }
@@ -5547,6 +5565,9 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   Copy-File "$BinaryCache\$($Platform.Triple)\msi\$($Platform.Architecture.VSName)-$([System.IO.Path]::GetFileNameWithoutExtension("bundle\installer.wixproj")).binlog" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.cab" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.msi" $Stage
+  # Needed by the swift.org code-signing pipeline, which re-links the bundle
+  # from pre-built artifacts without rebuilding project references.
+  Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\baf.dll" $Stage
   foreach ($Build in $WindowsSDKBuilds) {
     Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Build.Architecture.VSName)\*.msm" $Stage
   }

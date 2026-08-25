@@ -176,6 +176,10 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return PackElementArray(type: self)
   }
 
+  public static var maxNumFieldsToExpand: Int {
+    BridgedType.getMaxNumFieldsToExpand()
+  }
+
   /// Returns nil if the nominal is a resilient type because in this case the complete list
   /// of fields is not known.
   public func getNominalFields(in function: Function) -> NominalFieldsArray? {

@@ -1367,8 +1367,8 @@ CaptureListEntry::CaptureListEntry(PatternBindingDecl *PBD) : PBD(PBD) {
 
 CaptureListEntry CaptureListEntry::createParsed(
     ASTContext &Ctx, ReferenceOwnership ownershipKind,
-    SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
-    SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
+    SourceRange ownershipRange, bool isSending, Identifier name,
+    SourceLoc nameLoc, SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
 
   bool forceVar = ownershipKind == ReferenceOwnership::Weak &&
                   !Ctx.LangOpts.hasFeature(Feature::ImmutableWeakCaptures);
@@ -1389,6 +1389,9 @@ CaptureListEntry CaptureListEntry::createParsed(
 
   if (CLE.isSimpleSelfCapture())
     VD->setIsSelfParamCapture();
+
+  if (isSending)
+    VD->setIsSendingCapture();
 
   return CLE;
 }
@@ -1626,6 +1629,10 @@ static ValueDecl *getCalledValue(Expr *E, bool skipFunctionConversions) {
   }
 
   Expr *E2 = E->getValueProvidingExpr();
+
+  if (auto *L = dyn_cast<LoadExpr>(E2))
+    E2 = L->getSubExpr()->getValueProvidingExpr();
+
   if (E != E2)
     return getCalledValue(E2, skipFunctionConversions);
 

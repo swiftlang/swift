@@ -193,6 +193,14 @@ public:
   void emitPackCountParameter(IRGenFunction &IGF, llvm::Value *Metadata,
                               SILDebugVariable VarInfo);
 
+  /// Emit and retain complete debug info for a type that is only ever used as
+  /// the payload of an existential.
+  ///
+  /// Debug info is otherwise only emitted for types that some variable or
+  /// parameter has, so a type that appears solely inside an existential gets
+  /// none.
+  void emitExistentialPayloadType(swift::Type Ty);
+
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder();
 };
