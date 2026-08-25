@@ -228,3 +228,143 @@ enum UnavailableEnum: Hashable {
   // CHECK-NEXT:   }
 
 }
+
+// CHECK-LABEL: internal enum MultipleCasesInLine : Hashable
+enum MultipleCasesInLine: Hashable {
+  // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
+  // CHECK-NEXT:     switch (lhs, rhs) {
+  // CHECK-NEXT:     case (.a(let l0), .a(let r0)):
+  // CHECK-NEXT:       guard l0 == r0 else {
+  // CHECK-NEXT:         return false
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       return true
+  // CHECK-NEXT:     case (.b(let l0), .b(let r0)):
+  // CHECK-NEXT:       guard l0 == r0 else {
+  // CHECK-NEXT:         return false
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       return true
+  // CHECK-NEXT:     default:
+  // CHECK-NEXT:       return false
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+
+  // CHECK:        case a(Int), b(String)
+  case a(Int), b(String)
+
+  // CHECK:        internal func hash(into hasher: inout Hasher) {
+  // CHECK-NEXT:     switch self {
+  // CHECK-NEXT:     case .a(let a0):
+  // CHECK-NEXT:       hasher.combine(0)
+  // CHECK-NEXT:       hasher.combine(a0)
+  // CHECK-NEXT:     case .b(let a0):
+  // CHECK-NEXT:       hasher.combine(1)
+  // CHECK-NEXT:       hasher.combine(a0)
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+
+  // CHECK:        internal var hashValue: Int {
+  // CHECK-NEXT:     get {
+  // CHECK-NEXT:       return _hashValue(for: self)
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+}
+
+// CHECK-LABEL: internal enum MultipleAssociatedValues : Hashable
+enum MultipleAssociatedValues: Hashable {
+  // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
+  // CHECK-NEXT:     switch (lhs, rhs) {
+  // CHECK-NEXT:     case (.a(let l0, let l1), .a(let r0, let r1)):
+  // CHECK-NEXT:       guard l0 == r0 else {
+  // CHECK-NEXT:         return false
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       guard l1 == r1 else {
+  // CHECK-NEXT:         return false
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       return true
+  // CHECK-NEXT:     case (.b(let l0, let l1, let l2), .b(let r0, let r1, let r2)):
+  // CHECK-NEXT:       guard l0 == r0 else {
+  // CHECK-NEXT:         return false
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       guard l1 == r1 else {
+  // CHECK-NEXT:         return false
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       guard l2 == r2 else {
+  // CHECK-NEXT:         return false
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       return true
+  // CHECK-NEXT:     default:
+  // CHECK-NEXT:       return false
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+
+  // CHECK:        case a(Int, String)
+  case a(Int, String)
+  // CHECK:        case b(Int, String, Bool)
+  case b(Int, String, Bool)
+
+  // CHECK:        internal func hash(into hasher: inout Hasher) {
+  // CHECK-NEXT:     switch self {
+  // CHECK-NEXT:     case .a(let a0, let a1):
+  // CHECK-NEXT:       hasher.combine(0)
+  // CHECK-NEXT:       hasher.combine(a0)
+  // CHECK-NEXT:       hasher.combine(a1)
+  // CHECK-NEXT:     case .b(let a0, let a1, let a2):
+  // CHECK-NEXT:       hasher.combine(1)
+  // CHECK-NEXT:       hasher.combine(a0)
+  // CHECK-NEXT:       hasher.combine(a1)
+  // CHECK-NEXT:       hasher.combine(a2)
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+
+  // CHECK:        internal var hashValue: Int {
+  // CHECK-NEXT:     get {
+  // CHECK-NEXT:       return _hashValue(for: self)
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+}
+
+// CHECK-LABEL: internal enum WithArgumentLabels : Hashable
+enum WithArgumentLabels: Hashable {
+  // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
+  // CHECK-NEXT:     switch (lhs, rhs) {
+  // CHECK-NEXT:     case (.a(x: let l0, y: let l1), .a(x: let r0, y: let r1)):
+  // CHECK-NEXT:       guard l0 == r0 else {
+  // CHECK-NEXT:         return false
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       guard l1 == r1 else {
+  // CHECK-NEXT:         return false
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       return true
+  // CHECK-NEXT:     case (.b(value: let l0), .b(value: let r0)):
+  // CHECK-NEXT:       guard l0 == r0 else {
+  // CHECK-NEXT:         return false
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       return true
+  // CHECK-NEXT:     default:
+  // CHECK-NEXT:       return false
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+
+  // CHECK:        case a(x: Int, y: String)
+  case a(x: Int, y: String)
+  // CHECK:        case b(value: Bool)
+  case b(value: Bool)
+
+  // CHECK:        internal func hash(into hasher: inout Hasher) {
+  // CHECK-NEXT:     switch self {
+  // CHECK-NEXT:     case .a(let a0, let a1):
+  // CHECK-NEXT:       hasher.combine(0)
+  // CHECK-NEXT:       hasher.combine(a0)
+  // CHECK-NEXT:       hasher.combine(a1)
+  // CHECK-NEXT:     case .b(let a0):
+  // CHECK-NEXT:       hasher.combine(1)
+  // CHECK-NEXT:       hasher.combine(a0)
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+
+  // CHECK:        internal var hashValue: Int {
+  // CHECK-NEXT:     get {
+  // CHECK-NEXT:       return _hashValue(for: self)
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+}
