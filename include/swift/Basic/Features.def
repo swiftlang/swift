@@ -663,6 +663,11 @@ EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
 /// as '@unsafe(always)', instead of renaming them to '__<name>Unsafe'.
 EXPERIMENTAL_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe, true)
 
+/// Infer the return ownership of C++ methods that return libkern's OSObject or
+/// one of its subclasses from the method's name, following libkern's
+/// conventions.
+EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
