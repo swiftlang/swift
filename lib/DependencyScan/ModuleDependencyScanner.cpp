@@ -23,6 +23,7 @@
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/ScanningLoaders.h"
@@ -254,6 +255,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       workerASTContext->SourceMgr, workerDiagnosticEngine.get(),
       workerASTContext->SearchPathOpts, workerASTContext->LangOpts,
       workerASTContext->ClangImporterOpts, workerASTContext->CASOpts,
+      workerASTContext->SILOpts,
       workerCompilerInvocation->getFrontendOptions(),
       /* buildModuleCacheDirIfAbsent */ false,
       getModuleCachePathFromClang(
@@ -456,7 +458,7 @@ ModuleDependencyScanner::getModuleImportIdentifier(StringRef moduleName) {
 
 SwiftDependencyTracker::SwiftDependencyTracker(
     std::shared_ptr<llvm::cas::ObjectStore> CAS, llvm::PrefixMapper *Mapper,
-    const CompilerInvocation &CI)
+    const CompilerInvocation &CI, ArrayRef<std::string> ExtraFiles)
     : CAS(CAS), Mapper(Mapper) {
   auto &SearchPathOpts = CI.getSearchPathOptions();
 
@@ -492,6 +494,12 @@ SwiftDependencyTracker::SwiftDependencyTracker(
 
   // Add blocklist file.
   for (auto &File: CI.getFrontendOptions().BlocklistConfigFilePaths)
+    addCommonFile(File);
+
+  // Add extra files that are needed at replay time but are not otherwise
+  // named in the Swift invocation (e.g. sanitizer ignorelists auto-injected
+  // by the Clang driver).
+  for (auto &File : ExtraFiles)
     addCommonFile(File);
 
   // Add access notes.
@@ -2152,6 +2160,21 @@ std::string ModuleDependencyScanner::remapPath(StringRef Path) const {
   if (!PrefixMapper)
     return Path.str();
   return PrefixMapper->mapToString(Path);
+}
+
+std::optional<SwiftDependencyTracker>
+ModuleDependencyScanner::createSwiftDependencyTracker(
+    const CompilerInvocation &CI) {
+  if (!CAS)
+    return std::nullopt;
+
+  // Files referenced by cc1 args that the Clang driver implicitly injects
+  // (e.g. sanitizer ignorelists for `-fsanitize=...`) live on the parsed
+  // Clang invocation and must be added to the CAS input tree.
+  const auto &clangLangOpts =
+      ScanASTContext.getClangModuleLoader()->getClangInstance().getLangOpts();
+  return SwiftDependencyTracker(CAS, PrefixMapper.get(), CI,
+                                clangLangOpts.NoSanitizeFiles);
 }
 
 LibraryLevel swift::libraryLevelFromPath(StringRef modulePath,
