@@ -1,0 +1,70 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -inline %s | %FileCheck %s
+
+// A debug reconstruction block may mention a generic parameter. Inlining
+// substitutes it, and if the substituted type contains an opened archetype, the
+// cloned instruction needs type dependent operands on the
+// open_existential_metatype instruction defining it, which lives outside the block.
+// This is not supported, so the debug_value must be dropped.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Base {}
+class Box<T> : Base {}
+class Concrete {}
+
+// The block casts to a type using the generic type T.
+// This salvage is valid.
+//
+// CHECK-LABEL: sil [always_inline] [ossa] @generic_callee :
+// CHECK:         debug_value %0 : $Base, let, name "boxed", transform {
+// CHECK:           %1 = unchecked_ref_cast %0 : $Base to $Box<T>
+// CHECK:         }
+// CHECK-LABEL: } // end sil function 'generic_callee'
+sil [ossa] [always_inline] @generic_callee : $@convention(thin) <T> (@guaranteed Base) -> () {
+bb0(%0 : @guaranteed $Base):
+  debug_value %0 : $Base, let, name "boxed", transform {
+  bb0(%0 : $Base):
+    %1 = unchecked_ref_cast %0 : $Base to $Box<T>
+    return %1 : $Box<T>
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The debug_value here, upon inlining, would be rewritten to use the
+// type-dependent value %2 within the reconstruction block, which would
+// crash the verifier.
+//
+// CHECK-LABEL: sil [ossa] @caller_opened_archetype :
+// CHECK-NOT:     debug_value
+// CHECK-NOT:     transform
+// CHECK-NOT:     @opened
+// CHECK-LABEL: } // end sil function 'caller_opened_archetype'
+sil [ossa] @caller_opened_archetype : $@convention(thin) (@guaranteed Base, @thick Any.Type) -> () {
+bb0(%0 : @guaranteed $Base, %1 : $@thick Any.Type):
+  %2 = open_existential_metatype %1 : $@thick Any.Type to $@thick (@opened(1, Any) Self).Type
+  %f = function_ref @generic_callee : $@convention(thin) <T> (@guaranteed Base) -> ()
+  %c = apply %f<@opened(1, Any) Self>(%0) : $@convention(thin) <T> (@guaranteed Base) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// If there is no existential, the debug_value gets inlined with the correct
+// replacement type.
+//
+// CHECK-LABEL: sil [ossa] @caller_concrete :
+// CHECK:         debug_value %0 : $Base, let, name "boxed", transform {
+// CHECK:           %1 = unchecked_ref_cast %0 : $Base to $Box<Concrete>
+// CHECK:           return %1 : $Box<Concrete>
+// CHECK:         }
+// CHECK-LABEL: } // end sil function 'caller_concrete'
+sil [ossa] @caller_concrete : $@convention(thin) (@guaranteed Base) -> () {
+bb0(%0 : @guaranteed $Base):
+  %f = function_ref @generic_callee : $@convention(thin) <T> (@guaranteed Base) -> ()
+  %c = apply %f<Concrete>(%0) : $@convention(thin) <T> (@guaranteed Base) -> ()
+  %r = tuple ()
+  return %r : $()
+}
