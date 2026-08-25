@@ -1302,24 +1302,18 @@ public:
     forbidObjectType(UnownedStorageType, value, valueDescription);
   }
 
-  // Require that the operand is a reference-counted type, or an Optional
+  // Require that the operand permits reference storage, or is an Optional
   // thereof.
   void requireReferenceOrOptionalReferenceValue(SILValue value,
                                                 const Twine &valueDescription) {
     require(value->getType().isObject(), valueDescription +" must be an object");
-    
-    auto objectTy = value->getType().unwrapOptionalType();
-    
-    // Immortal C++ foreign reference types are represented as trivially lowered
-    // types since they do not require retain/release calls.
-    bool isImmortalFRT = objectTy.isForeignReferenceType() &&
-                         objectTy.getASTType()->getReferenceCounting() ==
-                             ReferenceCounting::None;
 
-    require(objectTy.isReferenceCounted(F.getModule()) || isImmortalFRT,
+    auto objectTy = value->getType().unwrapOptionalType();
+    require(objectTy.getASTType()->allowsOwnership(
+                F.getGenericSignature().getPointer()),
             valueDescription + " must have reference semantics");
   }
-  
+
   // Require that the operand is a type that supports reference storage
   // modifiers.
   void requireReferenceStorageCapableValue(SILValue value,
