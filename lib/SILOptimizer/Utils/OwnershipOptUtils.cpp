@@ -25,6 +25,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/ScopedAddressUtils.h"
@@ -288,6 +289,54 @@ void GuaranteedOwnershipExtension::transform(Status status) {
 //                          Utility Helper Functions
 //===----------------------------------------------------------------------===//
 
+/// Whether a destroy_value, which is created to compensate for deleting the
+/// consuming operand \p op, should be marked [dead_end].
+///
+/// If `op`'s user forwards ownership, the new destroy_value takes over the role
+/// of the destroys which ended the forwarded lifetime. Therefore it must only be
+/// a "meaningful" destroy - one which is guaranteed to run the deinitializer -
+/// if one of those destroys was meaningful, too. Otherwise the deinitializer was
+/// never guaranteed to run and earlier optimizations may have left the value
+/// only partially initialized. Running its deinit would then be a miscompile.
+static IsDeadEnd_t isDeadEndCleanup(Operand *op) {
+  ValueWorklist worklist(op->getUser()->getFunction());
+
+  // Pushes all values which take over the forwarded ownership of \p inst,
+  // which also includes the block arguments of forwarding terminators, like
+  // `switch_enum`.
+  // Returns false if \p inst doesn't forward ownership.
+  auto pushForwardedValues = [&](SILInstruction *inst) {
+    ForwardingOperation forwarding(inst);
+    if (!forwarding)
+      return false;
+    return forwarding.visitForwardedValues([&](SILValue value) {
+      worklist.pushIfNotVisited(value);
+      return true;
+    });
+  };
+
+  if (!pushForwardedValues(op->getUser()))
+    return IsntDeadEnd;
+
+  bool foundDeadEndDestroy = false;
+  while (SILValue value = worklist.pop()) {
+    for (Operand *use : value->getUses()) {
+      if (!use->isLifetimeEnding())
+        continue;
+      if (auto *dvi = dyn_cast<DestroyValueInst>(use->getUser())) {
+        if (!dvi->isDeadEnd())
+          return IsntDeadEnd;
+        foundDeadEndDestroy = true;
+        continue;
+      }
+      // Follow forwarded lifetimes.
+      if (!pushForwardedValues(use->getUser()))
+        return IsntDeadEnd;
+    }
+  }
+  return foundDeadEndDestroy ? IsDeadEnd : IsntDeadEnd;
+}
+
 static void cleanupOperandsBeforeDeletion(SILInstruction *oldValue,
                                           InstModCallbacks &callbacks) {
   SILBuilderWithScope builder(oldValue);
@@ -300,7 +349,8 @@ static void cleanupOperandsBeforeDeletion(SILInstruction *oldValue,
     case OwnershipKind::Any:
       llvm_unreachable("Invalid ownership for value");
     case OwnershipKind::Owned: {
-      auto *dvi = builder.createDestroyValue(oldValue->getLoc(), op.get());
+      auto *dvi = builder.createDestroyValue(oldValue->getLoc(), op.get(),
+                                             isDeadEndCleanup(&op));
       callbacks.createdNewInst(dvi);
       continue;
     }
