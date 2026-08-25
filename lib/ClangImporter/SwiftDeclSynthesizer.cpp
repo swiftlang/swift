@@ -305,6 +305,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
   case clang::APValue::Struct:
   case clang::APValue::Union:
   case clang::APValue::Vector:
+  case clang::APValue::Matrix:
     llvm_unreachable("Unhandled APValue kind");
 
   case clang::APValue::Float:
@@ -1069,14 +1070,14 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   clang::ASTContext &Ctx = ImporterImpl.getClangASTContext();
 
   // Getter: static inline FieldType get(RecordType self);
-  auto recordType = Ctx.getRecordType(structDecl);
+  auto recordType = Ctx.getCanonicalTagType(structDecl);
   auto recordPointerType = Ctx.getPointerType(recordType);
   auto fieldType = fieldDecl->getType();
 
   auto cGetterName = getAccessorDeclarationName(Ctx, importedStructDecl,
                                                 importedFieldDecl, "getter");
   auto cGetterType =
-      Ctx.getFunctionType(fieldDecl->getType(), recordType,
+      Ctx.getFunctionType(fieldDecl->getType(), {recordType},
                           clang::FunctionProtoType::ExtProtoInfo());
   auto cGetterDecl = createClangFunctionDecl(Ctx, structDecl->getDeclContext(),
                                          cGetterName, cGetterType);
@@ -1820,10 +1821,13 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   bool elementIsNoncopyable = false;
   if (auto *nominal = elementTy->getAnyNominal()) {
     if (auto *clangDecl =
-            dyn_cast_or_null<clang::RecordDecl>(nominal->getClangDecl()))
+            dyn_cast_or_null<clang::RecordDecl>(nominal->getClangDecl())) {
+      auto declTy =
+          ImporterImpl.getClangASTContext().getCanonicalTagType(clangDecl);
       elementIsNoncopyable =
-          getCxxValueSemanticsKind(clangDecl->getTypeForDecl(), ImporterImpl) ==
+          getCxxValueSemanticsKind(declTy.getTypePtr(), ImporterImpl) ==
           CxxValueSemanticsKind::MoveOnly;
+    }
   }
 
   bool useAddress =
@@ -2253,8 +2257,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
       os << "_";
       std::unique_ptr<clang::ItaniumMangleContext> mangler{
           clang::ItaniumMangleContext::create(clangCtx, clangCtx.getDiagnostics())};
-      auto derivedType = clangCtx.getTypeDeclType(baseClass)
-        .getCanonicalType();
+      auto derivedType = clangCtx.getCanonicalTagType(baseClass);
       mangler->mangleCanonicalTypeName(derivedType, os);
     }
 
@@ -2350,7 +2353,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
       /*IsImplicit=*/false);
   if (castThisToNonConstThis) {
     auto baseClassPtr =
-        clangCtx.getPointerType(clangCtx.getRecordType(derivedClass));
+        clangCtx.getPointerType(clangCtx.getCanonicalTagType(derivedClass));
     clang::CastKind Kind;
     clang::CXXCastPath Path;
     clangSema.CheckPointerConversion(thisExpr, baseClassPtr, Kind, Path,
@@ -2847,7 +2850,8 @@ synthesizeFunctionConstructorBody(AbstractFunctionDecl *afd, void *context) {
 
   auto wrapperClangDecl =
       cast<clang::CXXRecordDecl>(wrapperInstDecl->getClangDecl());
-  auto wrapperClangType = clangCtx.getRecordType(wrapperClangDecl).withConst();
+  auto wrapperClangType =
+      clangCtx.getCanonicalTagType(wrapperClangDecl).withConst();
 
   // Create a fake variable with the __SwiftFunctionWrapper<...> type.
   auto fakeWrapperVarDecl = clang::VarDecl::Create(
@@ -2858,7 +2862,8 @@ synthesizeFunctionConstructorBody(AbstractFunctionDecl *afd, void *context) {
   auto fakeWrapperRefExpr = createClangDeclRefExpr(
       clangCtx, fakeWrapperVarDecl, wrapperClangType, clang::VK_LValue);
 
-  auto functionTypeClangType = clangCtx.getRecordType(functionTypeClangDecl);
+  auto functionTypeClangType =
+      clangCtx.getCanonicalTagType(functionTypeClangDecl);
   auto functionTypeClangInfo =
       clangCtx.getTrivialTypeSourceInfo(functionTypeClangType);
   SmallVector<clang::Expr *, 1> constructExprArgs = {fakeWrapperRefExpr};
@@ -3018,7 +3023,7 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
           const_cast<clang::CXXRecordDecl *>(cxxRecordDecl)))
     return {};
 
-  clang::QualType cxxRecordTy = clangCtx.getRecordType(cxxRecordDecl);
+  clang::QualType cxxRecordTy = clangCtx.getCanonicalTagType(cxxRecordDecl);
   clang::SourceLocation cxxRecordDeclLoc = cxxRecordDecl->getLocation();
 
   llvm::SmallVector<clang::CXXConstructorDecl *, 4> ctorDeclsForSynth;
@@ -3233,8 +3238,8 @@ FuncDecl *SwiftDeclSynthesizer::makeBaseClassPointerCastFunction(
   clang::Sema::SFINAETrap trap(clangSema);
 
   // Build `Derived * _Nonnull` and `Base * _Nonnull`, and the function type.
-  clang::QualType derivedTy = clangCtx.getRecordType(derivedClass),
-                  baseTy = clangCtx.getRecordType(baseClass);
+  clang::QualType derivedTy = clangCtx.getCanonicalTagType(derivedClass),
+                  baseTy = clangCtx.getCanonicalTagType(baseClass);
 
   clang::QualType derivedPtrTy = clangCtx.getPointerType(derivedTy),
                   basePtrTy = clangCtx.getPointerType(baseTy);
@@ -3400,16 +3405,16 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
     return false;
 
   auto checkType = [](clang::QualType t) {
-    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
-      if (auto cxxRecord =
-              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
-        if (hasImportReferenceAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
-            hasUnsafeAPIAttr(cxxRecord))
-          return true;
+    // N.B. Use Type::getAsCXXRecordDecl() rather than reaching for
+    // RecordType::getDecl(): the latter can be any declaration of the record,
+    // and Swift attributes are not propagated across redeclarations.
+    if (auto *cxxRecord = t->getAsCXXRecordDecl()) {
+      if (hasImportReferenceAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
+          hasUnsafeAPIAttr(cxxRecord))
+        return true;
 
-        if (!isSufficientlyTrivial(cxxRecord))
-          return false;
-      }
+      if (!isSufficientlyTrivial(cxxRecord))
+        return false;
     }
 
     return true;
@@ -3499,8 +3504,14 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
   // If this type isn't imported as noncopyable, we can't respect the request
   // for a destroy operation.
   ASTContext &ctx = ImporterImpl.SwiftContext;
-  auto valueSemanticsKind =
-      getCxxValueSemanticsKind(clangType->getTypeForDecl(), ImporterImpl);
+  CxxValueSemanticsKind valueSemanticsKind;
+  {
+    auto *clangDeclType = ImporterImpl.getClangASTContext()
+                              .getCanonicalTagType(clangType)
+                              .getTypePtr();
+
+    valueSemanticsKind = getCxxValueSemanticsKind(clangDeclType, ImporterImpl);
+  }
 
   if (valueSemanticsKind == CxxValueSemanticsKind::Unknown)
     return nullptr;

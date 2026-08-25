@@ -1063,9 +1063,12 @@ static ManagedValue emitCBridgedToNativeValue(
       return ManagedValue();
     auto record = dyn_cast_or_null<clang::CXXRecordDecl>(
         bridgedType->castTo<StructType>()->getDecl()->getClangDecl());
-    if (record && Lowering::getBridgedSmartPtr(AbstractionPattern(
-                      bridgedType, record->getTypeForDecl()))) {
-      return emitBridgeSmartPtrToReference(SGF, loc, v, bridgedType);
+    if (record) {
+      auto recordTy = record->getASTContext().getCanonicalTagType(record);
+      if (Lowering::getBridgedSmartPtr(
+              AbstractionPattern(bridgedType, recordTy.getTypePtr()))) {
+        return emitBridgeSmartPtrToReference(SGF, loc, v, bridgedType);
+      }
     }
     return ManagedValue();
   };

@@ -164,7 +164,9 @@ public:
 
   // Do not traverse type locs, as they might contain expressions that reference
   // code that should not be instantiated and/or emitted.
-  bool TraverseTypeLoc(clang::TypeLoc TL) { return true; }
+  bool TraverseTypeLoc(clang::TypeLoc TL, bool TraverseQualifier = true) {
+    return true;
+  }
 
   // IRGen only ever emits concrete declarations, never templates. We must not
   // descend into a template declaration at all.

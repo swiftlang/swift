@@ -172,6 +172,50 @@ struct ClangInvocationFileMapping {
   bool requiresBuiltinHeadersInSystemModules = false;
 };
 
+/// An owning, copyable snapshot of everything
+/// \c ClangImporter::computeClangImporterFileSystem needs from an \c ASTContext
+/// and its \c ClangInvocationFileMapping.
+///
+/// This exists so that clients which must build the ClangImporter file system
+/// more than once can do so without holding on to the \c ASTContext (and
+/// therefore the whole \c CompilerInstance) they derived it from. The Clang
+/// dependency scanner is the motivating case: it needs a *separate* file system
+/// instance per scanning worker, because it calls
+/// \c setCurrentWorkingDirectory on whatever file system it is handed, and
+/// several workers do so concurrently.
+struct ClangImporterVFSRecipe {
+  /// One in-memory file overlaid on top of the base file system.
+  struct OverridenFile {
+    std::string path;
+    /// The file's contents, which this recipe does not own.
+    ///
+    /// \c InMemoryFileSystem::addFileNoOwn does not copy contents either, so
+    /// this storage must outlive not just the recipe but every file system
+    /// built from it. It is owned by the \c allocateString callback given to
+    /// \c ClangImporter::computeClangImporterVFSRecipe, or -- if no callback was
+    /// given -- by the originating \c ClangInvocationFileMapping.
+    llvm::MemoryBufferRef contents;
+  };
+
+  /// Whether the base file system is immutable and must be used unmodified.
+  bool hasImmutableFileSystem = false;
+
+  /// Whether to dump the mapping to \c llvm::errs().
+  bool dumpClangDiagnostics = false;
+
+  /// Clang's '-working-directory', if one was specified.
+  std::optional<std::string> workingDirectory;
+
+  /// Redirected file mappings. These are applied to Clang via '-ivfsoverlay'
+  /// rather than by the computed file system; they are recorded here only
+  /// because their presence affects whether a file system is built at all, and
+  /// for diagnostic dumping.
+  SmallVector<std::pair<std::string, std::string>, 2> redirectedFiles;
+
+  /// Files to overlay on top of the base file system.
+  SmallVector<OverridenFile, 2> overridenFiles;
+};
+
 /// Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter final : public ClangModuleLoader {
@@ -240,6 +284,27 @@ public:
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS,
       bool suppressDiagnostics = false,
       llvm::function_ref<StringRef(StringRef)> allocateString = nullptr);
+
+  /// Snapshot the information needed to build the ClangImporter file system, so
+  /// that it can be built repeatedly and independently of \p ctx.
+  ///
+  /// \param allocateString If provided, the overriden files' contents are copied
+  /// into storage owned by the callback, and the returned recipe may outlive
+  /// \p ctx and \p fileMapping. Otherwise the recipe points into
+  /// \p fileMapping 's buffers and must not outlive them.
+  static ClangImporterVFSRecipe computeClangImporterVFSRecipe(
+      const ASTContext &ctx, const ClangInvocationFileMapping &fileMapping,
+      llvm::function_ref<StringRef(StringRef)> allocateString = nullptr);
+
+  /// Compute the file system used by the ClangImporter from a recipe.
+  ///
+  /// Each call layers fresh file systems on top of \p baseFS, so callers that
+  /// need independently mutable file systems (notably one per Clang dependency
+  /// scanning worker) get them by passing a freshly created \p baseFS.
+  static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+  computeClangImporterFileSystem(
+      const ClangImporterVFSRecipe &recipe,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS);
 
   /// Install a helper object that can synthesize Clang Decls from debug
   /// info. Used by LLDB.
@@ -502,8 +567,7 @@ public:
   /// replica.
   ///
   /// \sa clang::GeneratePCHAction
-  bool emitBridgingPCH(StringRef headerPath, StringRef outputPCHPath,
-                       bool cached);
+  bool emitBridgingPCH(StringRef headerPath, StringRef outputPCHPath);
 
   /// Returns true if a clang CompilerInstance can successfully read in a PCH,
   /// assuming it exists, with the current options. This can be used to find out
@@ -676,7 +740,7 @@ public:
 
   std::optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
-                 StringRef SwiftPCHHash, bool Cached);
+                 StringRef SwiftPCHHash);
   std::optional<std::string>
   /// \param isExplicit true if the PCH filename was passed directly
   /// with -import-objc-header option.

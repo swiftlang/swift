@@ -21,7 +21,8 @@ sil_vtable TestClass {}
 // CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
 // CHECK-NEXT: [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: %reference.new = call ptr @swift_initStackObject(ptr [[M]], ptr %reference.raw)
-// CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 -1, ptr %reference.new)
+//   No lifetime marker: the operand is the result of swift_initStackObject, not
+//   a static alloca, and lifetime markers are only valid on allocas.
 // CHECK-NEXT: ret void
 sil @alloc_on_stack : $@convention(thin) () -> () {
 bb0:

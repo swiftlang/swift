@@ -54,6 +54,8 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LLVMRemarkStreamer.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
@@ -780,6 +782,18 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 }
 
 IRGenModule::~IRGenModule() {
+  // If we still own the LLVM context (i.e. it was not handed off to a
+  // GeneratedModule by intoGeneratedModule), finalize its main remark streamer
+  // before the context destroys it. Finalization flushes the remark string
+  // table to the end of the remarks file and releases the serializer, which
+  // llvm::remarks::RemarkStreamer's destructor asserts has happened. This is
+  // the last chance to do so for pipelines that install a remark streamer but
+  // never reach performLLVM, such as sil-opt running a command-line-selected
+  // pass pipeline with -save-optimization-record. Note that RemarkStream, the
+  // file the serializer writes to, is a member and thus still alive here.
+  if (LLVMContext && LLVMContext->getMainRemarkStreamer())
+    llvm::finalizeLLVMOptimizationRemarks(*LLVMContext);
+
   destroyMetadataLayoutMap();
   destroyPointerAuthCaches();
   delete &Types;
@@ -796,6 +810,8 @@ namespace RuntimeConstants {
   const auto ArgMemOnly = llvm::MemoryEffects::argMemOnly();
   const auto ArgMemReadOnly = llvm::MemoryEffects::argMemOnly(llvm::ModRefInfo::Ref);
   const auto InaccessibleMemOnly = llvm::MemoryEffects::inaccessibleMemOnly();
+  const auto InaccessibleOrArgMemOnly =
+      llvm::MemoryEffects::inaccessibleOrArgMemOnly();
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;

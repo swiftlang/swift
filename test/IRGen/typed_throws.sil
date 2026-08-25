@@ -131,7 +131,7 @@ bb6:
 // CHECK:   [[INS1:%.*]] = insertvalue { ptr, ptr } [[INS0]], ptr [[ERR]], 1
 // CHECK:   [[P0:%.*]] = extractvalue { ptr, ptr } [[INS1]], 0
 // CHECK:   [[P1:%.*]] = extractvalue { ptr, ptr } [[INS1]], 1
-// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @does_throw_async.0, ptr {{%.*}}, ptr {{%.*}}, ptr [[P0]], ptr [[P1]], ptr inttoptr (i64 1 to ptr))
+// CHECK:   call void (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @does_throw_async.0, ptr {{%.*}}, ptr {{%.*}}, ptr [[P0]], ptr [[P1]], ptr inttoptr (i64 1 to ptr))
 // CHECK:   unreachable
 
 sil @does_throw_async : $@convention(thin) @async () -> @error S {
@@ -147,7 +147,7 @@ sil @does_throw_async : $@convention(thin) @async () -> @error S {
 // CHECK:   [[CMB:%.*]] = insertvalue { ptr, ptr } undef, ptr [[R]], 0
 // CHECK:   [[P0:%.*]] = extractvalue { ptr, ptr } [[CMB:%.*]], 0
 // CHECK:   [[P1:%.*]] = extractvalue { ptr, ptr } [[CMB]], 1
-// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{.*}}, i1 false, ptr @does_not_throw_async.0, ptr {{.*}}, ptr {{.*}}, ptr [[P0]], ptr [[P1]], ptr null)
+// CHECK:   call void (ptr, i1, ...) @llvm.coro.end.async(ptr {{.*}}, i1 false, ptr @does_not_throw_async.0, ptr {{.*}}, ptr {{.*}}, ptr [[P0]], ptr [[P1]], ptr null)
 // CHECK:   unreachable
 sil @does_not_throw_async : $@convention(thin) @async () -> (@owned A, @error S) {
   %0 = function_ref @create_error : $@convention(thin) () -> @owned A
@@ -335,7 +335,7 @@ bb3:
 }
 
 // CHECK: define{{.*}} swifttailcc void @throwNoErrorAsync(ptr swiftasync %0, i64 %1, ptr noalias %2, ptr %"\CF\84_0_0", ptr %3)
-// CHECK:  call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%[0-9]+}}, i1 false, ptr @throwNoErrorAsync.0, ptr {{%[0-9]+}}, ptr {{%[0-9]+}}, ptr null)
+// CHECK:  call void (ptr, i1, ...) @llvm.coro.end.async(ptr {{%[0-9]+}}, i1 false, ptr @throwNoErrorAsync.0, ptr {{%[0-9]+}}, ptr {{%[0-9]+}}, ptr null)
 sil @throwNoErrorAsync : $@convention(thin) @async <τ_0_0> (Builtin.Int64, @in τ_0_0) -> @error_indirect τ_0_0 {
 bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
   %5 = tuple ()
@@ -344,7 +344,7 @@ bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
 
 // CHECK: define{{.*}} swifttailcc void @throwErrorAsync(ptr swiftasync %0, i64 %1, ptr noalias %2, ptr %"\CF\84_0_0", ptr %3)
 // CHECK:   call ptr {{%[^,]+}}(ptr noalias %3, ptr noalias %2, ptr %"\CF\84_0_0")
-// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%[0-9]+}}, i1 false, ptr @throwErrorAsync.0, ptr {{%[0-9]+}}, ptr {{%[0-9]+}}, ptr inttoptr (i64 1 to ptr))
+// CHECK:   call void (ptr, i1, ...) @llvm.coro.end.async(ptr {{%[0-9]+}}, i1 false, ptr @throwErrorAsync.0, ptr {{%[0-9]+}}, ptr {{%[0-9]+}}, ptr inttoptr (i64 1 to ptr))
 
 sil @throwErrorAsync : $@convention(thin) @async <τ_0_0> (Builtin.Int64, @in τ_0_0) -> @error_indirect τ_0_0 {
 bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):

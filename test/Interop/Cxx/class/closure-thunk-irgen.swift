@@ -46,14 +46,14 @@ public func testClosureToFuncPtrReturnNonTrivial() {
 
 // CHECK: define linkonce_odr hidden swiftcc void @"$sSo10NonTrivialVIetCX_ABIegn_TR"(ptr noalias dereferenceable(8) %[[V0:.*]], ptr %[[V1:.*]])
 // CHECK: %[[V2:.*]] = alloca %{{.*}}, align 8
-// CHECK: call void @llvm.lifetime.start.p0(i64 8, ptr %[[V2]])
+// CHECK: call void @llvm.lifetime.start.p0(ptr %[[V2]])
 // CHECK: call {{(void|ptr)}} @_ZN10NonTrivialC{{1|2}}ERKS_(ptr %[[V2]], ptr %[[V0]])
 // CHECK: invoke void %[[V1]](ptr %[[V2]])
 // CHECK: to label %[[INVOKE_CONT:.*]] unwind label %{{.*}}
 
 // CHECK: [[INVOKE_CONT]]:
 // CHECK-NEXT: call {{(void|ptr)}} @_ZN10NonTrivialD{{1|2}}Ev(ptr %[[V2]])
-// CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 8, ptr %[[V2]])
+// CHECK-NEXT: call void @llvm.lifetime.end.p0(ptr %[[V2]])
 // CHECK-NEXT: ret void
 
 // CHECK: define internal swiftcc void @"$sSo10NonTrivialVIetCX_ABIegn_TRTA"(ptr noalias dereferenceable(8) %[[V0]], ptr swiftself %[[V1]])

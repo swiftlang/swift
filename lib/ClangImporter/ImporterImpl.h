@@ -2394,14 +2394,12 @@ bool keepsNameWhenImportedAsUnsafe(const clang::CXXMethodDecl *method,
                                    ASTContext &ctx);
 
 inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
-    return elaborated->desugar().getTypePtr();
+  // FIXME: Remove this function after 2026 rebranch is complete.
   return type;
 }
 
 inline clang::QualType desugarIfElaborated(clang::QualType type) {
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
-    return elaborated->desugar();
+  // FIXME: Remove this function after 2026 rebranch is complete.
   return type;
 }
 

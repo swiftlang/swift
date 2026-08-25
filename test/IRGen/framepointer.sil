@@ -35,7 +35,7 @@ entry(%i : $Int32):
 // CHECK-SYSV: }
 // CHECK-SYSV-macosx: attributes [[ATTR]] = { {{.*}}"frame-pointer"="all"
 // CHECK-SYSV-linux-gnu: attributes [[ATTR]] = { {{.*}}"frame-pointer"="all"
-// CHECK-SYSV-linux-android: attributes [[ATTR]] = { {{.*}}"frame-pointer"="non-leaf"
+// CHECK-SYSV-linux-android: attributes [[ATTR]] = { {{.*}}"frame-pointer"="non-leaf-no-reserve"
 // CHECK-WIN: }
 // CHECK-WIN: attributes [[ATTR]] = { {{.*}}
 
@@ -64,7 +64,7 @@ entry(%i : $Int32):
 // LEAF:   ret i32 %1
 // LEAF: }
 
-// LEAF-SYSV: attributes [[ATTR]] = {{{.*}}"frame-pointer"="non-leaf"
+// LEAF-SYSV: attributes [[ATTR]] = {{{.*}}"frame-pointer"="non-leaf-no-reserve"
 // LEAF-WIN: attributes [[ATTR]] = {{{.*}}
 
 // NOFP: define{{.*}} swiftcc i32 @leaf_function_no_frame_pointer(i32 %0) [[ATTR:#.*]] {

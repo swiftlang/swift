@@ -130,6 +130,7 @@ static std::unique_ptr<SerializableLLVMType> serializeLLVMTypeImpl(
   case llvm::Type::ScalableVectorTyID:
   case llvm::Type::TypedPointerTyID:
   case llvm::Type::TargetExtTyID:
+  case llvm::Type::ByteTyID:
     llvm::report_fatal_error("unsupported LLVM storage type");
   }
 
@@ -189,6 +190,7 @@ deserializeLLVMTypeImpl(llvm::LLVMContext &ctx,
   case llvm::Type::ScalableVectorTyID:
   case llvm::Type::TypedPointerTyID:
   case llvm::Type::TargetExtTyID:
+  case llvm::Type::ByteTyID:
     llvm::report_fatal_error("unsupported serialized LLVM storage type");
   }
 

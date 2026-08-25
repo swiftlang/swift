@@ -75,12 +75,10 @@ public func consume2S<T>(_: consuming S<T>, _: consuming S<T>) {}
 // CHECK-LLVM:         [[S_SIZE_ADDR:%[^,]+]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr 
 //  HECK-LLVM-SAME:        [[S_VWT]]
 // CHECK-LLVM:         [[S_SIZE:%[^,]+]] = load [[INT]], ptr [[S_SIZE_ADDR]]
+//                     The copies are dynamic allocas, so they get no lifetime
+//                     markers; those are only valid on static allocas.
 // CHECK-LLVM:         [[COPY_1_ADDR:%[^,]+]] = alloca i8, [[INT]] [[S_SIZE]]
-// CHECK-LLVM:         call void @llvm.lifetime.start.p0(
-// CHECK-LLVM-SAME:        ptr [[COPY_1_ADDR]])
 // CHECK-LLVM:         [[COPY_2_ADDR:%[^,]+]] = alloca i8, [[INT]] [[S_SIZE]]
-// CHECK-LLVM:         call void @llvm.lifetime.start.p0(
-// CHECK-LLVM-SAME:        ptr [[COPY_2_ADDR]])
 // CHECK-LLVM:         call void @llvm.lifetime.start.p0(
 // CHECK-LLVM-SAME:        ptr [[G_METADATA_PACK]])
 // CHECK-LLVM:         [[G_METADATA_PACK_T_SLOT:%[^,]+]] = getelementptr inbounds{{.*}} [1 x ptr], ptr [[G_METADATA_PACK]]
@@ -93,10 +91,6 @@ public func consume2S<T>(_: consuming S<T>, _: consuming S<T>) {}
 // CHECK-LLVM:         call swiftcc void @consume2S(ptr noalias [[COPY_2_ADDR]], ptr noalias [[COPY_1_ADDR]], ptr [[T_METADATA]])
 // CHECK-LLVM:         call void @llvm.lifetime.end.p0(
 // CHECK-LLVM-SAME:        ptr [[G_METADATA_PACK]])
-// CHECK-LLVM:         call void @llvm.lifetime.end.p0(
-// CHECK-LLVM-SAME:        ptr [[COPY_2_ADDR]])
-// CHECK-LLVM:         call void @llvm.lifetime.end.p0(
-// CHECK-LLVM-SAME:        ptr [[COPY_1_ADDR]])
 // CHECK-LLVM-LABEL: }
 @_silgen_name("callConsume2S")
 public func callConsume2S<T>(_ s: S<T>) {

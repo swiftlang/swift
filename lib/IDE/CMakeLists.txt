@@ -54,6 +54,7 @@ target_link_libraries(swiftIDE PRIVATE
   clangAST
   clangBasic
   clangIndex
+  clangUnifiedSymbolResolution
   clangLex)
 
 if (SWIFT_BUILD_SWIFT_SYNTAX)

@@ -11,12 +11,12 @@ sil @use_pack : $@convention(thin) <each τ_0_0> (@pack_guaranteed Pack{repeat e
 // CHECK: [[SIZE_VALUE_WITNESS:%.*]] = getelementptr {{.*}} %swift.vwtable, ptr [[VALUE_WITNESS_TABLE]], i32 0, i32 8
 // CHECK: [[SIZE:%.*]] = load {{.*}}ptr [[SIZE_VALUE_WITNESS]]
 // CHECK: [[MALLOC:%.*]] = call ptr @malloc({{.*}} [[SIZE]])
-// CHECK: call void @llvm.lifetime.start.p0({{.*}} -1, ptr [[MALLOC]])
+//   No lifetime marker: the buffer is malloc'd, and lifetime markers are only
+//   valid on static allocas; malloc/free already delimit its lifetime.
 // CHECK: [[INIT_WITH_COPY_PTR:%.*]] = getelementptr inbounds ptr, ptr [[VALUE_WITNESS_TABLE]], i32 2
 // CHECK: [[INIT_WITH_COPY:%.*]] = load ptr, ptr [[INIT_WITH_COPY_PTR]]
 // CHECK: call ptr %InitializeWithCopy(ptr {{.*}}[[MALLOC]], ptr {{.*}}[[IN]], ptr [[META]])
 // CHECK: call swiftcc void @use_value(ptr noalias [[MALLOC]], ptr [[META]])
-// CHECK: call void @llvm.lifetime.end.p0({{.*}} -1, ptr [[MALLOC]])
 // CHECK: call void @free(ptr [[MALLOC]])
 // CHECK-NEXT: ret void
 sil @test_alloc_stack : $@convention(thin) <T> (@in_guaranteed T) -> () {
@@ -36,12 +36,12 @@ bb0(%0 : $*T):
 // CHECK: [[SIZE_VALUE_WITNESS:%.*]] = getelementptr {{.*}} %swift.vwtable, ptr [[VALUE_WITNESS_TABLE]], i32 0, i32 8
 // CHECK: [[SIZE:%.*]] = load {{.*}}ptr [[SIZE_VALUE_WITNESS]]
 // CHECK: [[MALLOC:%.*]] = call ptr @malloc({{.*}} [[SIZE]])
-// CHECK: call void @llvm.lifetime.start.p0({{.*}} -1, ptr [[MALLOC]])
+//   No lifetime marker: the buffer is malloc'd, and lifetime markers are only
+//   valid on static allocas; malloc/free already delimit its lifetime.
 // CHECK: [[INIT_WITH_COPY_PTR:%.*]] = getelementptr inbounds ptr, ptr [[VALUE_WITNESS_TABLE]], i32 2
 // CHECK: [[INIT_WITH_COPY:%.*]] = load ptr, ptr [[INIT_WITH_COPY_PTR]]
 // CHECK: call ptr %InitializeWithCopy(ptr {{.*}}[[MALLOC]], ptr {{.*}}[[IN]], ptr [[META]])
 // CHECK: call swiftcc void @use_value(ptr noalias [[MALLOC]], ptr [[META]])
-// CHECK: call void @llvm.lifetime.end.p0({{.*}} -1, ptr [[MALLOC]])
 // CHECK: call void @free(ptr [[MALLOC]])
 // CHECK-NEXT: ret void
 sil @test_alloc_stack_name : $@convention(thin) <T> (@in_guaranteed T) -> () {

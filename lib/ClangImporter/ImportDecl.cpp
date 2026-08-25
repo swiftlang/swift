@@ -386,7 +386,6 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
         break;
       case clang::TargetInfo::AArch64ABIBuiltinVaList:
         break;
-      case clang::TargetInfo::PNaClABIBuiltinVaList:
       case clang::TargetInfo::SystemZBuiltinVaList:
       case clang::TargetInfo::X86_64ABIBuiltinVaList:
       case clang::TargetInfo::XtensaABIBuiltinVaList:
@@ -2369,8 +2368,11 @@ namespace {
         }
       }
 
+      auto *const declTy =
+          Impl.getClangASTContext().getCanonicalTagType(decl).getTypePtr();
+
       // TODO(https://github.com/apple/swift/issues/56206): Fix this once we support dependent types.
-      if (decl->getTypeForDecl()->isDependentType()) {
+      if (declTy->isDependentType()) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
                       diag::record_is_dependent,
@@ -2478,7 +2480,7 @@ namespace {
 
       // Do not import std::promise.
       if (decl->isInStdNamespace() && decl->getName() == "promise" &&
-          getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl) !=
+          getCxxValueSemanticsKind(declTy, Impl) !=
               CxxValueSemanticsKind::Copyable) {
         return nullptr;
       }
@@ -2487,7 +2489,7 @@ namespace {
         // Swift classes are always Escapable.
         if (evaluateOrDefault(
                 Impl.SwiftContext.evaluator,
-                ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
+                ClangTypeEscapability({declTy, &Impl}),
                 CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
           Impl.diagnose(HeaderLoc(decl->getLocation()),
                         diag::nonescapable_foreign_reference_type, decl);
@@ -2522,7 +2524,7 @@ namespace {
         Impl.ImportedDecls.erase({decl->getCanonicalDecl(), getVersion()});
       };
 
-      if (getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl) !=
+      if (getCxxValueSemanticsKind(declTy, Impl) !=
           CxxValueSemanticsKind::Copyable) {
         result->addAttribute(new (Impl.SwiftContext)
                                  MoveOnlyAttr(/*Implicit=*/true));
@@ -2532,7 +2534,7 @@ namespace {
       bool isNonEscapable = false;
       if (evaluateOrDefault(
               Impl.SwiftContext.evaluator,
-              ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
+              ClangTypeEscapability({declTy, &Impl}),
               CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
         result->addAttribute(new (Impl.SwiftContext)
                                  NonEscapableAttr(/*Implicit=*/true));
@@ -3206,8 +3208,9 @@ namespace {
 
       // It is important that we bail on an unimportable record *before* we import
       // any of its members or cache the decl.
-      auto valueSemanticsKind =
-          getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl);
+      auto *const declTy =
+          Impl.getClangASTContext().getCanonicalTagType(decl).getTypePtr();
+      auto valueSemanticsKind = getCxxValueSemanticsKind(declTy, Impl);
       if (valueSemanticsKind == CxxValueSemanticsKind::Unknown) {
 
         HeaderLoc loc(decl->getLocation());
@@ -3300,8 +3303,12 @@ namespace {
       //
       //    template <> struct MyTemplate<int>;
       //
+      // N.B. Consult the redeclaration chain rather than this particular
+      // declaration: an explicit specialization may well be declared before it
+      // is defined, and `decl` can be any declaration of the specialization —
+      // notably, canonical tag types are formed with the first one.
       if (decl->getSpecializationKind() == clang::TSK_ExplicitSpecialization &&
-          !decl->isCompleteDefinition())
+          !decl->getDefinition())
         return nullptr;
 
       // `decl->getDefinition()` can return nullptr before the call to sema and
@@ -3394,7 +3401,7 @@ namespace {
         // Enumeration type.
         auto &clangContext = Impl.getClangASTContext();
         auto type = Impl.importTypeIgnoreIUO(
-            clangContext.getTagDeclType(clangEnum), ImportTypeKind::Value,
+            clangContext.getCanonicalTagType(clangEnum), ImportTypeKind::Value,
             ImportDiagnosticAdder(Impl, clangEnum, clangEnum->getLocation()),
             isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
         if (!type)
@@ -3502,8 +3509,9 @@ namespace {
       // when it comes to getter/setter generation.
       if (auto parent = dyn_cast<clang::CXXRecordDecl>(
               decl->getAnonField()->getParent())) {
-        auto semanticsKind =
-            getCxxValueSemanticsKind(parent->getTypeForDecl(), Impl);
+        auto *parentTy =
+            Impl.getClangASTContext().getCanonicalTagType(parent).getTypePtr();
+        auto semanticsKind = getCxxValueSemanticsKind(parentTy, Impl);
         if (semanticsKind == CxxValueSemanticsKind::Unknown)
           return nullptr;
       }
@@ -4449,6 +4457,8 @@ namespace {
             idx, LifetimeFlags().withAnnotated());
       }
 
+      auto &clangCtx = Impl.getClangASTContext();
+
       if (inheritLifetimeParamIndicesForReturn.any() ||
           scopedLifetimeParamIndicesForReturn.any())
         lifetimeDependencies.emplace_back(
@@ -4463,18 +4473,22 @@ namespace {
             returnIdx, LifetimeFlags().withAnnotated());
       else if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl)) {
         // Assume default constructed view types have no dependencies.
-        if (ctordecl->isDefaultConstructor() &&
-            evaluateOrDefault(
-                Impl.SwiftContext.evaluator,
-                ClangTypeEscapability(
-                    {ctordecl->getParent()->getTypeForDecl(), &Impl}),
-                CxxEscapability::Unknown) == CxxEscapability::NonEscapable)
-          lifetimeDependencies.push_back(immortalLifetime);
+        if (ctordecl->isDefaultConstructor()) {
+          auto *parentTy =
+              clangCtx.getCanonicalTagType(ctordecl->getParent()).getTypePtr();
+
+          if (evaluateOrDefault(Impl.SwiftContext.evaluator,
+                                ClangTypeEscapability({parentTy, &Impl}),
+                                CxxEscapability::Unknown) ==
+              CxxEscapability::NonEscapable) {
+            lifetimeDependencies.push_back(immortalLifetime);
+          }
+        }
       }
       clang::QualType resultTypeForEscapability = retType;
       if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl))
         resultTypeForEscapability =
-            Impl.getClangASTContext().getRecordType(ctordecl->getParent());
+            clangCtx.getCanonicalTagType(ctordecl->getParent());
       bool resultIsNonEscapable =
           isNonEscapableAnnotatedType(resultTypeForEscapability.getTypePtr());
       bool resultDependenceIsAnnotated =
@@ -9092,8 +9106,6 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
     return nullptr;
 
   clang::QualType UnderlyingType = ClangTypedef->getUnderlyingType();
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(UnderlyingType))
-    UnderlyingType = elaborated->desugar();
 
   // A typedef to a typedef should get imported as a typealias.
   auto *TypedefT = UnderlyingType->getAs<clang::TypedefType>();
@@ -11001,8 +11013,7 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
       if (auto spectType =
               dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();
-      if (auto elaborated = dyn_cast<clang::ElaboratedType>(baseType))
-        baseType = elaborated->desugar();
+
       if (!isa<clang::RecordType>(baseType))
         continue;
 

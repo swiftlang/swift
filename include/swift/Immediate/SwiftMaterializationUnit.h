@@ -27,6 +27,7 @@
 #include "llvm/ExecutionEngine/Orc/IndirectionUtils.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/LazyReexports.h"
+#include "llvm/ExecutionEngine/Orc/MemoryAccess.h"
 #include "llvm/ExecutionEngine/Orc/SymbolStringPool.h"
 
 #include "swift/AST/TBDGenRequests.h"
@@ -109,9 +110,11 @@ private:
   static void handleLazyCompilationFailure();
 
   SwiftJIT(std::unique_ptr<llvm::orc::LLJIT> J,
+           std::unique_ptr<llvm::orc::MemoryAccess> MemAccess,
            std::unique_ptr<llvm::orc::EPCIndirectionUtils> EPCIU);
 
   std::unique_ptr<llvm::orc::LLJIT> J;
+  std::unique_ptr<llvm::orc::MemoryAccess> MemAccess;
   std::unique_ptr<llvm::orc::EPCIndirectionUtils> EPCIU;
   llvm::orc::LazyCallThroughManager &LCTM;
   std::unique_ptr<llvm::orc::IndirectStubsManager> ISM;

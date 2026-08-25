@@ -49,12 +49,11 @@ bool BuiltinInfo::isReadNone() const {
 
 const llvm::AttributeSet &
 IntrinsicInfo::getOrCreateFnAttributes(ASTContext &Ctx) const {
-  using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeSet>;
-  if (DenseMapInfo::isEqual(FnAttrs, DenseMapInfo::getEmptyKey())) {
+  if (!FnAttrs) {
     FnAttrs =
         llvm::Intrinsic::getFnAttributes(Ctx.getIntrinsicScratchContext(), ID);
   }
-  return FnAttrs;
+  return FnAttrs.value();
 }
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
@@ -2737,17 +2736,17 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::MMX:
   case IITDescriptor::AMX:
   case IITDescriptor::Metadata:
-  case IITDescriptor::ExtendArgument:
-  case IITDescriptor::TruncArgument:
+  case IITDescriptor::Extend:
+  case IITDescriptor::Trunc:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
   case IITDescriptor::VecOfAnyPtrsToElt:
   case IITDescriptor::VecOfBitcastsToInt:
-  case IITDescriptor::Subdivide2Argument:
-  case IITDescriptor::Subdivide4Argument:
+  case IITDescriptor::Subdivide2:
+  case IITDescriptor::Subdivide4:
   case IITDescriptor::PPCQuad:
   case IITDescriptor::AArch64Svcount:
-  case IITDescriptor::OneNthEltsVecArgument:
+  case IITDescriptor::OneNthEltsVec:
     // These types cannot be expressed in swift yet.
     return Type();
 
@@ -2773,8 +2772,8 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   }
   
   // The element type of a vector type.
-  case IITDescriptor::VecElementArgument: {
-    Type argType = getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::VecElement: {
+    Type argType = getTypeArgument(D.getOverloadIndex());
     if (!argType) return Type();
     auto vecType = argType->getAs<BuiltinVectorType>();
     if (!vecType) return Type();
@@ -2789,12 +2788,16 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   }
 
   // A type argument.
-  case IITDescriptor::Argument:
-    return getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::Overloaded:
+    return getTypeArgument(D.getOverloadIndex());
+
+  // A fully dependent type that mirrors a previously specified overload type.
+  case IITDescriptor::Match:
+    return getTypeArgument(D.getOverloadIndex());
 
   // A vector of the same width as a type argument.
-  case IITDescriptor::SameVecWidthArgument: {
-    Type maybeVectorType = getTypeArgument(D.getArgumentNumber());
+  case IITDescriptor::SameVecWidth: {
+    Type maybeVectorType = getTypeArgument(D.getOverloadIndex());
     if (!maybeVectorType) return Type();
     Type eltType = decodeImmediate();
     if (!eltType) return Type();

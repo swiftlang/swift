@@ -82,7 +82,7 @@ public:
   }
 
   template <class... T>
-  static size_t getExtraAllocationSize(T &&...ignored) {
+  [[maybe_unused]] static size_t getExtraAllocationSize(T &&...ignored) {
     return 0;
   }
 };

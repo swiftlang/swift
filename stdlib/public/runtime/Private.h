@@ -594,7 +594,7 @@ public:
   /// as to map the entire object readonly, or we might just want to avoid
   /// dirtying memory unnecessarily.
   template <class T>
-  static void assignUnlessEqual(T &dest, T newValue) {
+  inline void assignUnlessEqual(T &dest, T newValue) {
     if (dest != newValue)
       dest = newValue;
   }
