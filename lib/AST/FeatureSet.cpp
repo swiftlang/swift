@@ -180,6 +180,7 @@ UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
 UNINTERESTING_FEATURE(EmbeddedDynamicExclusivity)
 UNINTERESTING_FEATURE(TypedAllocation)
+UNINTERESTING_FEATURE(BuiltinAllocRawTyped)
 UNINTERESTING_FEATURE(MutateAndConsumeInDeinit)
 
 static bool usesFeatureUnderscoreOwned(Decl *D) {
