@@ -2201,6 +2201,20 @@ FUNCTION(CoroFrameAlloc, Swift, swift_coroFrameAlloc, C_CC,
          NO_ATTRS,
          EFFECT(RuntimeEffect::Allocating),
          UNKNOWN_MEMEFFECTS)
+FUNCTION(CoroFrameAllocTyped, Swift, swift_coroFrameAllocTyped, C_CC,
+         AlwaysAvailable,
+         RETURNS(Int8PtrTy),
+         ARGS(SizeTy, Int64Ty),
+         NO_ATTRS,
+         EFFECT(RuntimeEffect::Allocating),
+         UNKNOWN_MEMEFFECTS)
+FUNCTION(CoroFrameDeallocTyped, Swift, swift_coroFrameDeallocTyped, C_CC,
+         AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, Int64Ty),
+         NO_ATTRS,
+         EFFECT(RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
 
 // void *_Block_copy(void *block);
 FUNCTION(BlockCopy, BlocksRuntime, _Block_copy, C_CC, AlwaysAvailable,
