@@ -255,6 +255,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       workerASTContext->SourceMgr, workerDiagnosticEngine.get(),
       workerASTContext->SearchPathOpts, workerASTContext->LangOpts,
       workerASTContext->ClangImporterOpts, workerASTContext->CASOpts,
+      workerASTContext->SILOpts,
       workerCompilerInvocation->getFrontendOptions(),
       /* buildModuleCacheDirIfAbsent */ false,
       getModuleCachePathFromClang(
