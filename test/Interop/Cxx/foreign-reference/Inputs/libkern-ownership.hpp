@@ -32,12 +32,12 @@ class ObjectManager {
   }
 } SWIFT_IMMORTAL_REFERENCE;
 
-class BaseObject {
+class OSObject {
   mutable int retainCount;
   
 protected:
-  BaseObject() : retainCount(1) {}
-  virtual ~BaseObject() = default;
+  OSObject() : retainCount(1) {}
+  virtual ~OSObject() = default;
 
 public:
   virtual void retain() const { 
@@ -53,7 +53,7 @@ public:
   virtual int getRetainCount() const { return retainCount; }
 } SWIFT_SHARED_REFERENCE(.retain, .release);
 
-class RegistryEntry : public BaseObject {
+class RegistryEntry : public OSObject {
   RegistryEntry *parent = nullptr;
   RegistryEntry *child = nullptr;
 
@@ -129,6 +129,12 @@ public:
     return static_cast<Service *>(getParent());
   }
 
+  // Make sure that leading underscores are stripped from the method's name when
+  // we apply libkern's ownership convention
+  virtual Service *_Nullable __getProvider(void) const {
+    return static_cast<Service *>(getParent());
+  }
+
   // Without an annotation Swift would infer +0, while libkern expects +1.
   virtual LIBKERN_RETURNS_RETAINED Service *_Nonnull copyService() const {
     return new Service(id);
@@ -138,6 +144,15 @@ public:
   // name of the function starts with "get")
   static LIBKERN_RETURNS_RETAINED Service *_Nonnull getCopyOfService(Service *_Nonnull service) {
     return new Service(service->getID());
+  }
+
+  // Swift infers +0, but libkern ownership semantics infer +1
+  static Service *_Nonnull noAnnotationWithID(int id) {
+    return new Service(id);
+  }
+
+  virtual Service *_Nonnull virtualNoAnnotationCopyService() const {
+    return new Service(id);
   }
 };
 
@@ -163,6 +178,17 @@ public:
   }
 };
 
+class DerivedService : public Service {
+protected:
+  explicit DerivedService(int n) : Service(n) {}
+
+public:
+  static LIBKERN_RETURNS_RETAINED DerivedService *_Nonnull derivedWithID(
+      int id) {
+    return new DerivedService(id);
+  }
+};
+
 // Swift infers +1 (free function whose name begins with "copy"), and so does
 // libkern
 inline Service *_Nonnull copyServiceFreeFunction(Service *_Nonnull service) {
@@ -172,3 +198,46 @@ inline Service *_Nonnull copyServiceFreeFunction(Service *_Nonnull service) {
 inline bool checkEqual(Service *_Nullable serviceA, Service *_Nullable serviceB) {
   return serviceA == serviceB;
 }
+
+class NonOSService {
+  mutable int retainCount = 1;
+  int id = 0;
+
+  NonOSService(int n) : id(n) {}
+
+public:
+  // Swift infers +0, and this is not a subclass of OSObject, so libkern's
+  // ownership rules don't apply.
+  static NonOSService *_Nonnull noAnnotationWithID(int id) {
+    return new NonOSService(id);
+  }
+
+  int getID() const { return id; }
+
+  void retain() const {
+    ObjectManager::get().recordRetain();
+    ++retainCount;
+  }
+  void release() const {
+    ObjectManager::get().recordRelease();
+    if (--retainCount == 0)
+      delete this;
+  }
+
+} SWIFT_SHARED_REFERENCE(.retain, .release);
+
+class OSIterator : public OSObject {
+public:
+  // According to libkern's ownership conventions, methods that start with "get"
+  // return +0 by default. However, if such a method returns OSIterator or one of
+  // its subclasses, then it still returns +1.
+  static OSIterator *_Nonnull getIterator() { return new OSIterator(); }
+};
+
+class OSCollectionIterator : public OSIterator {
+public:
+  // The iterator exception applies to subclasses of OSIterator too.
+  static OSCollectionIterator *_Nonnull getCollectionIterator() {
+    return new OSCollectionIterator();
+  }
+};
