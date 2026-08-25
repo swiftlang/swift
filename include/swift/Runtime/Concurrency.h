@@ -1008,17 +1008,19 @@ void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
 #endif
 
 // Declare all the hooks
-#define SWIFT_CONCURRENCY_HOOK(returnType, name, ...)                   \
-  typedef SWIFT_CC(swift) returnType (*name##_original)(__VA_ARGS__);   \
-  typedef SWIFT_CC(swift) returnType                                    \
-    (*name##_hook_t)(__VA_ARGS__, name##_original original);            \
-  SWIFT_EXPORT_FROM(swift_Concurrency) name##_hook_t name##_hook
+#define SWIFT_CONCURRENCY_HOOK(returnType, name, ...)                          \
+  typedef SWIFT_CC(swift) returnType (*name##_original)(__VA_ARGS__);          \
+  typedef SWIFT_CC(swift)                                                      \
+      returnType (*name##_hook_t)(__VA_ARGS__, name##_original original);      \
+  SWIFT_EXPORT_FROM(swift_Concurrency)                                         \
+  name##_hook_t __ptrauth_swift_concurrency_hook name##_hook
 
-#define SWIFT_CONCURRENCY_HOOK0(returnType, name)                       \
-  typedef SWIFT_CC(swift) returnType (*name##_original)();              \
-  typedef SWIFT_CC(swift) returnType                                    \
-    (*name##_hook_t)(name##_original original);                         \
-  SWIFT_EXPORT_FROM(swift_Concurrency) name##_hook_t name##_hook
+#define SWIFT_CONCURRENCY_HOOK0(returnType, name)                              \
+  typedef SWIFT_CC(swift) returnType (*name##_original)();                     \
+  typedef SWIFT_CC(swift)                                                      \
+      returnType (*name##_hook_t)(name##_original original);                   \
+  SWIFT_EXPORT_FROM(swift_Concurrency)                                         \
+  name##_hook_t __ptrauth_swift_concurrency_hook name##_hook
 
 #include "ConcurrencyHooks.def"
 
@@ -1027,7 +1029,8 @@ typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_original)();
 typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_override)(
     swift_task_asyncMainDrainQueue_original original);
 SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_hook)(
+SWIFT_CC(swift)
+void (*__ptrauth_swift_concurrency_hook swift_task_asyncMainDrainQueue_hook)(
     swift_task_asyncMainDrainQueue_original original,
     swift_task_asyncMainDrainQueue_override compatOverride);
 
