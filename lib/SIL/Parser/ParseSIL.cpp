@@ -3925,6 +3925,34 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::DiagnoseInst: {
+    StringRef AttrName;
+    if (!parseSILOptional(AttrName, *this)) {
+      P.diagnose(InstLoc.getSourceLoc(), diag::sil_diagnose_requires_attribute);
+      return true;
+    }
+
+    using DiagnoseKind = DiagnoseInst::DiagnoseKind;
+    DiagnoseKind Kind = llvm::StringSwitch<DiagnoseKind>(AttrName)
+                            .Case("unpermitted_copy",
+                                  DiagnoseKind::UnpermittedCopy)
+                            .Default(DiagnoseKind::Invalid);
+
+    if (Kind == DiagnoseKind::Invalid) {
+      P.diagnose(InstLoc.getSourceLoc(), diag::sil_diagnose_invalid_attribute,
+                 AttrName);
+      return true;
+    }
+
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal = B.createDiagnose(InstLoc, Val, Kind);
+    break;
+  }
+
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst: {
     StringRef AttrName;
     if (!parseSILOptional(AttrName, *this)) {

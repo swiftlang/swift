@@ -2950,6 +2950,18 @@ public:
     *this << getIDAndType(RI->getOperand());
   }
 
+  void visitDiagnoseInst(DiagnoseInst *I) {
+    using DiagnoseKind = DiagnoseInst::DiagnoseKind;
+    switch (I->getKind()) {
+    case DiagnoseKind::Invalid:
+      llvm::report_fatal_error("Invalid?!");
+    case DiagnoseKind::UnpermittedCopy:
+      *this << "[unpermitted_copy] ";
+      break;
+    }
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitTypeValueInst(TypeValueInst *tvi) {
     *this << tvi->getType() << " for " << tvi->getParamType();
   }

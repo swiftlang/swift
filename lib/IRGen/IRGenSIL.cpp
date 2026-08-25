@@ -1444,6 +1444,10 @@ public:
   void visitExtendLifetimeInst(ExtendLifetimeInst *i) {
     llvm_unreachable("should not exist after ownership lowering!?");
   }
+  void visitDiagnoseInst(DiagnoseInst *i) {
+    llvm::report_fatal_error("Raw-SIL-only, should have been eliminated by a "
+                             "diagnostic pass!");
+  }
   void
   visitUncheckedOwnershipConversionInst(UncheckedOwnershipConversionInst *i) {
     llvm_unreachable("unimplemented");

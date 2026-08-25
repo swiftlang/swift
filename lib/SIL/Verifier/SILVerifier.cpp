@@ -7094,6 +7094,12 @@ public:
       checkAddressWalkerCanVisitAllTransitiveUses(i);
   }
 
+  void checkDiagnoseInst(DiagnoseInst *i) {
+    require(i->getModule().getStage() == SILStage::Raw,
+            "Only valid in Raw SIL! Should have been eliminated by /some/ "
+            "diagnostic pass");
+  }
+
   void checkMarkUnresolvedReferenceBindingInst(
       MarkUnresolvedReferenceBindingInst *i) {
     require(i->getModule().getStage() == SILStage::Raw,

@@ -589,6 +589,21 @@ final public class HopToExecutorInst : Instruction, UnaryInstruction {}
 
 final public class FixLifetimeInst : Instruction, UnaryInstruction {}
 
+/// Marks its operand as needing a diagnostic of the given kind to be emitted by
+/// a later diagnostic pass. Produces no result and does not consume its operand.
+/// Only valid in Raw SIL.
+final public class DiagnoseInst : Instruction, UnaryInstruction {
+  // This enum's raw values must match swift::DiagnoseInst::DiagnoseKind
+  public enum DiagnoseKind: Int {
+    case invalid = 0
+
+    /// The marked value is a copy that is not permitted by the language (use-after-consume, noncopyable, etc)
+    case unpermittedCopy
+  }
+
+  public var kind: DiagnoseKind { DiagnoseKind(rawValue: bridged.Diagnose_getKind())! }
+}
+
 // See C++ VarDeclCarryingInst
 @_semantics("fast_cast")
 public protocol VarDeclInstruction : Instruction {

@@ -924,6 +924,12 @@ public struct Builder {
     return notifyNew(fixLifetime.getAs(FixLifetimeInst.self))
   }
 
+  @discardableResult
+  public func createDiagnose(operand: Value, kind: DiagnoseInst.DiagnoseKind) -> DiagnoseInst {
+    let diagnose = bridged.createDiagnose(operand.bridged, kind.rawValue)
+    return notifyNew(diagnose.getAs(DiagnoseInst.self))
+  }
+
   public func createDropDeinit(of value: Value) -> DropDeinitInst {
     let dropDeinit = bridged.createDropDeinit(value.bridged)
     return notifyNew(dropDeinit.getAs(DropDeinitInst.self))
