@@ -353,3 +353,50 @@ class ComputedGetSetWitness: HasMutableVar {
     set { }
   }
 }
+
+// Check cases where generic parameter prohibits use of isolated conformances by conforming to Sendable/SendableMetatype
+
+// expected-note@+1 11{{requirement specified as 'T' : 'P' [with T = C]}}
+struct SendableWrapper<T: P & Sendable> { }
+
+typealias GlobalTypeAliasTest = SendableWrapper<C> // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+struct GlobalVarTest {
+  var prop: SendableWrapper<C>? = nil // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  init() { }
+}
+
+struct GlobalFuncParamTest {
+  func method(_: SendableWrapper<C>) { } // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+struct GlobalFuncResultTest {
+  func method() -> SendableWrapper<C> { fatalError() } // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+struct GlobalSubscriptTest {
+  subscript(_: SendableWrapper<C>) -> Int { 0 } // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+struct GlobalInitTest {
+  init(_: SendableWrapper<C>) { } // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+enum GlobalEnumCaseTest {
+  case payload(SendableWrapper<C>) // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+func testLocalDeclKindTests() {
+  typealias LocalTypeAliasTest = SendableWrapper<C> // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  let localVar: SendableWrapper<C>? = nil // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  _ = localVar
+
+  func local(_: SendableWrapper<C>) { } // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  struct LocalNestedTypeTest {
+    var prop: SendableWrapper<C>? = nil // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+    init() { }
+  }
+}
+

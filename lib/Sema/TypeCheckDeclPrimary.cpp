@@ -2568,6 +2568,8 @@ public:
     (void) VD->getPropertyWrapperInitializerInfo();
     (void) VD->getImplInfo();
     checkGlobalIsolation(VD);
+    TypeChecker::checkIsolatedConformancesInType(VD->getValueInterfaceType(),
+                                                 VD->getLoc());
 
     // Visit auxiliary decls first
     VD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *var) {
@@ -3002,6 +3004,18 @@ public:
 
     TypeChecker::checkParameterList(SD->getIndices(), SD);
 
+    for (auto *param : *SD->getIndices())
+      TypeChecker::checkIsolatedConformancesInType(param->getInterfaceType(),
+                                                   param->getLoc());
+
+    {
+      auto elementLoc = SD->getElementTypeRepr()
+                            ? SD->getElementTypeRepr()->getLoc()
+                            : SD->getLoc();
+      TypeChecker::checkIsolatedConformancesInType(
+          SD->getElementInterfaceType(), elementLoc);
+    }
+
     checkDefaultArguments(SD->getIndices());
     checkVariadicParameters(SD->getIndices(), SD);
 
@@ -3054,7 +3068,12 @@ public:
     (void) TAD->getUnderlyingType();
 
     // Make sure to check the underlying type.
-    
+    auto underlyingLoc = TAD->getUnderlyingTypeRepr()
+                             ? TAD->getUnderlyingTypeRepr()->getLoc()
+                             : TAD->getLoc();
+    TypeChecker::checkIsolatedConformancesInType(TAD->getUnderlyingType(),
+                                                 underlyingLoc);
+
     TypeChecker::checkDeclAttributes(TAD);
     checkAccessControl(TAD);
     checkGenericParams(TAD);
@@ -3701,6 +3720,16 @@ public:
       }
 
       TypeChecker::checkParameterList(FD->getParameters(), FD);
+
+      for (auto *param : *FD->getParameters())
+        TypeChecker::checkIsolatedConformancesInType(param->getInterfaceType(),
+                                                     param->getLoc());
+
+      auto resultLoc = FD->getResultTypeRepr()
+                           ? FD->getResultTypeRepr()->getLoc()
+                           : FD->getLoc();
+      TypeChecker::checkIsolatedConformancesInType(FD->getResultInterfaceType(),
+                                                   resultLoc);
     }
 
     checkAccessControl(FD);
@@ -3822,6 +3851,10 @@ public:
 
     if (auto *PL = EED->getParameterList()) {
       TypeChecker::checkParameterList(PL, EED);
+
+      for (auto *param : *PL)
+        TypeChecker::checkIsolatedConformancesInType(param->getInterfaceType(),
+                                                     param->getLoc());
 
       checkDefaultArguments(PL);
       checkVariadicParameters(PL, EED);
@@ -4130,6 +4163,11 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
     TypeChecker::checkParameterList(CD->getParameters(), CD);
+
+    for (auto *param : *CD->getParameters())
+      TypeChecker::checkIsolatedConformancesInType(param->getInterfaceType(),
+                                                   param->getLoc());
+
     checkEmbeddedRestrictionsInSignature(CD);
 
     if (CD->getAsyncLoc().isValid())

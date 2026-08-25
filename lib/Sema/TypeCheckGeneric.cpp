@@ -28,6 +28,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -1203,9 +1204,7 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     auto substReq = item.SubstReq;
 
     SmallVector<Requirement, 2> subReqs;
-    SmallVector<ProtocolConformanceRef, 2> isolatedConformances;
-    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true,
-                                      &isolatedConformances)) {
+    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true)) {
     case CheckRequirementResult::Success:
       break;
 
@@ -1237,22 +1236,6 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
       hadSubstFailure = true;
       break;
     }
-
-    if (!isolatedConformances.empty() && signature) {
-      // Dig out the original type parameter for the requirement.
-      // FIXME: req might not be the right pre-substituted requirement,
-      // if this came from a conditional requirement.
-      for (const auto &isolatedConformance : isolatedConformances) {
-        (void)isolatedConformance;
-        if (auto failed =
-                signature->prohibitsIsolatedConformance(req.getFirstType())) {
-            return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
-              req, substReq,
-              TinyPtrVector<ProtocolConformanceRef>(isolatedConformances),
-              failed->second);
-        }
-      }
-    }
   }
 
   if (hadSubstFailure)
@@ -1260,6 +1243,81 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
 
   return CheckGenericArgumentsResult::createSuccess();
 }
+
+void TypeChecker::checkIsolatedConformancesInType(Type type, SourceLoc loc) {
+  if (!type || type->hasError() || loc.isInvalid())
+    return;
+
+  class IsolatedConformanceInTypeWalker : public TypeWalker {
+    SourceLoc loc;
+
+  public:
+    explicit IsolatedConformanceInTypeWalker(SourceLoc loc) : loc(loc) {}
+
+    Action walkToTypePre(Type ty) override {
+      auto boundGeneric = ty->getAs<BoundGenericType>();
+      if (!boundGeneric)
+        return Action::Continue;
+
+      auto *decl = boundGeneric->getDecl();
+      auto signature = decl->getGenericSignature();
+      if (!signature)
+        return Action::Continue;
+
+      auto substitutions =
+          QuerySubstitutionMap{boundGeneric->getContextSubstitutionMap()};
+      const auto result = TypeChecker::checkIsolatedConformancesForDiagnostics(
+          signature, signature.getRequirements(), substitutions);
+      if (result.getKind() == CheckRequirementsResult::RequirementFailure) {
+        TypeChecker::diagnoseRequirementFailure(
+            result.getRequirementFailureInfo(), loc, decl->getLoc(), ty,
+            signature.getGenericParams(), substitutions);
+      }
+
+      return Action::Continue;
+    }
+  };
+
+  type.walk(IsolatedConformanceInTypeWalker(loc));
+}
+
+CheckGenericArgumentsResult
+TypeChecker::checkIsolatedConformancesForDiagnostics(
+    GenericSignature signature, ArrayRef<Requirement> requirements,
+    TypeSubstitutionFn substitutions) {
+  if (!signature)
+    return CheckGenericArgumentsResult::createSuccess();
+
+  for (const auto &req : requirements) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    // Dig out the original type parameter for the requirement.
+    // FIXME: req might not be the right pre-substituted requirement,
+    // if this came from a conditional requirement.
+    auto prohibits =
+        signature->prohibitsIsolatedConformance(req.getFirstType());
+    if (!prohibits)
+      continue;
+
+    auto substReq = req.subst(substitutions, LookUpConformanceInModule());
+
+    SmallVector<Requirement, 2> subReqs;
+    SmallVector<ProtocolConformanceRef, 2> isolatedConformances;
+    (void)substReq.checkRequirement(subReqs, /*allowMissing=*/true,
+                                    &isolatedConformances);
+    if (isolatedConformances.empty())
+      continue;
+
+    return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
+        req, substReq,
+        TinyPtrVector<ProtocolConformanceRef>(isolatedConformances),
+        prohibits->second);
+  }
+
+  return CheckGenericArgumentsResult::createSuccess();
+}
+
 
 Requirement
 RequirementRequest::evaluate(Evaluator &evaluator,
