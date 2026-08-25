@@ -932,6 +932,13 @@ bool isClangCxxRecord(const DeclContext *dc);
 /// \p clangTy returns \p importedTy unchanged.
 Type getCxxReferenceImplType(Type importedTy, const clang::Type *clangTy);
 
+/// The C++ name of an overloaded operator, e.g. "operator==".
+std::string getCxxOperatorName(clang::OverloadedOperatorKind op);
+
+/// The overloaded operator \p name is the C++ name of, e.g. "operator==", if
+/// any.
+std::optional<clang::OverloadedOperatorKind> getCxxOperatorKind(StringRef name);
+
 /// Enumerate and import all members of the C++ namespace represented by
 /// \p namespaceEnum, invoking \p emit once for each newly imported member.
 ///

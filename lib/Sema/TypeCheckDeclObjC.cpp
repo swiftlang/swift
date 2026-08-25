@@ -718,7 +718,9 @@ bool swift::isRepresentableInLanguage(
     return false;
 
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
-  if (AFD->isOperator()) {
+  // C++ has operator functions; a `@cxx` implementation of one may be a Swift
+  // operator function.
+  if (AFD->isOperator() && language != ForeignLanguage::Cxx) {
     AFD->diagnose((isa<ProtocolDecl>(AFD->getDeclContext())
                     ? diag::objc_operator_proto
                     : diag::objc_operator))
@@ -4172,9 +4174,28 @@ private:
         anyMapped = true;
       }
     }
+    // The importer drops the `T &` result of a compound assignment operator,
+    // which conventionally returns `*this`; the implementation must still
+    // produce it, in the pointer spelling of a reference result.
+    Type result = fnTy->getResult();
+    if (clangFD->isOverloadedOperator() && result->isVoid() &&
+        clangFD->getReturnType()->isLValueReferenceType()) {
+      auto *record = clangFD->getReturnType()->getPointeeCXXRecordDecl();
+      auto *referent = record ? dyn_cast_or_null<NominalTypeDecl>(
+                                    decl->getASTContext()
+                                        .getClangModuleLoader()
+                                        ->importDeclDirectly(record))
+                              : nullptr;
+      if (referent) {
+        result = importer::getCxxReferenceImplType(
+            referent->getDeclaredInterfaceType(),
+            clangFD->getReturnType().getTypePtr());
+        anyMapped = true;
+      }
+    }
     if (!anyMapped)
       return type;
-    return FunctionType::get(params, fnTy->getResult(), fnTy->getExtInfo());
+    return FunctionType::get(params, result, fnTy->getExtInfo());
   }
 
   /// Describes an availability mismatch between a requirement and a candidate
@@ -4197,6 +4218,13 @@ private:
     auto &ctx = cand->getASTContext();
     if (ctx.LangOpts.DisableAvailabilityChecking)
       return std::nullopt;
+
+    // The importer marks a member operator unavailable in favor of the Swift
+    // operator it synthesizes for it; that says nothing about the C++ operator.
+    if (const auto *clangFD =
+            dyn_cast_or_null<clang::FunctionDecl>(req->getClangDecl()))
+      if (clangFD->isOverloadedOperator() && req->isUnavailable())
+        return std::nullopt;
 
     std::optional<AvailabilityContext> baseRequirementAvailability;
 
@@ -4357,6 +4385,7 @@ private:
         dyn_cast_or_null<clang::FunctionDecl>(interface->getClangDecl());
     if (!clangFD)
       return false;
+    StringRef cxxName = cast<ValueDecl>(interface)->getCDeclName();
 
     // A @cxx implementation must be the C++ function's one and only
     // definition. Reject a match to a function that is already defined in the
@@ -4372,15 +4401,14 @@ private:
       unsigned reason = clangFD->isDefined()     ? 0
                         : clangFD->isConstexpr() ? 2
                                                  : 1;
-      diagnose(cand, diag::cxx_func_defined, cand, clangFD->getName(), reason);
+      diagnose(cand, diag::cxx_func_defined, cand, cxxName, reason);
       return true;
     }
 
     if (const auto *method = dyn_cast<clang::CXXMethodDecl>(clangFD)) {
       if (method->isVirtual()) {
         if (method->isPureVirtual()) {
-          diagnose(cand, diag::cxx_pure_virtual_unsupported, cand,
-                   clangFD->getName());
+          diagnose(cand, diag::cxx_pure_virtual_unsupported, cand, cxxName);
           return true;
         }
 
@@ -4392,7 +4420,7 @@ private:
         if (keyFunction &&
             keyFunction->getCanonicalDecl() == method->getCanonicalDecl()) {
           diagnose(cand, diag::cxx_virtual_key_function_unsupported, cand,
-                   clangFD->getName());
+                   cxxName);
           return true;
         }
 
@@ -4402,7 +4430,7 @@ private:
         // TODO: Add support for emitting the thunks.
         if (auto reason = cxxOverrideUnsupportedReason(method)) {
           diagnose(cand, diag::cxx_virtual_override_unsupported, cand,
-                   clangFD->getName(), *reason);
+                   cxxName, *reason);
           return true;
         }
       }
@@ -4432,8 +4460,7 @@ private:
     for (const auto *param : clangFD->parameters())
       usesRValueReferences |= param->getType()->isRValueReferenceType();
     if (usesRValueReferences) {
-      diagnose(cand, diag::cxx_rvalue_references_unsupported, cand,
-               clangFD->getName());
+      diagnose(cand, diag::cxx_rvalue_references_unsupported, cand, cxxName);
       return true;
     }
 
@@ -4454,7 +4481,7 @@ private:
         unsigned reason =
             importer::ReturnOwnershipInfo(clangFD).hasReturnsUnretained ? 1 : 0;
         diagnose(cand, diag::cxx_unretained_result_unsupported, cand,
-                 clangFD->getName(), reason);
+                 cxxName, reason);
         return true;
       }
     }

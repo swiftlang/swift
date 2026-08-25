@@ -6851,13 +6851,22 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
 
   ASTContext &ctx = func->getASTContext();
 
-  // When the explicit C++ name differs from the Swift base name, also look
-  // candidates up under that C++ base name.
-  DeclName foreignName;
-  if (auto cxxAttr = func->getAttrs().getAttribute<CxxDeclAttr>()) {
-    if (!cxxAttr->Name.empty() &&
-        cxxAttr->Name != swiftName.getBaseName().userFacingName())
-      foreignName = DeclName(ctx.getIdentifier(cxxAttr->Name));
+  // When the C++ name differs from the Swift base name, also look candidates
+  // up under the name(s) it imports as: the C++ name itself, or, for an
+  // operator, its Swift operator spelling (a free operator) and the importer's
+  // `__operatorX` (a member operator).
+  SmallVector<DeclName, 2> foreignNames;
+  std::optional<clang::OverloadedOperatorKind> opKind;
+  if (func->getAttrs().hasAttribute<CxxDeclAttr>()) {
+    StringRef cxxName = func->getCDeclName();
+    opKind = importer::getCxxOperatorKind(cxxName);
+    if (opKind) {
+      foreignNames.push_back(
+          DeclName(ctx.getIdentifier(clang::getOperatorSpelling(*opKind))));
+      foreignNames.push_back(DeclName(importer::getOperatorName(ctx, *opKind)));
+    } else if (cxxName != swiftName.getBaseName().userFacingName()) {
+      foreignNames.push_back(DeclName(ctx.getIdentifier(cxxName)));
+    }
   }
 
   if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
@@ -6874,11 +6883,15 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
         if (name.isCompoundName() && isa<AbstractFunctionDecl>(vd) &&
             vd->getName() != name)
           continue;
+        // An operator name also finds top-level operator functions, which
+        // are unrelated to a member.
+        if (vd->getDeclContext()->getSelfNominalTypeDecl() != ty)
+          continue;
         results.insert(vd);
       }
     };
     doLookup(swiftName);
-    if (foreignName)
+    for (DeclName foreignName : foreignNames)
       doLookup(foreignName);
 
     // The lookups above go by Swift name, which the importer may have renamed
@@ -6887,8 +6900,11 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
     if (const auto *clangDC =
             dyn_cast_or_null<clang::DeclContext>(ty->getClangDecl())) {
       auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-      auto &clangIdents = clangDC->getParentASTContext().Idents;
-      clang::DeclarationName clangName(&clangIdents.get(func->getCDeclName()));
+      auto &clangCtx = clangDC->getParentASTContext();
+      clang::DeclarationName clangName =
+          opKind ? clangCtx.DeclarationNames.getCXXOperatorName(*opKind)
+                 : clang::DeclarationName(
+                       &clangCtx.Idents.get(func->getCDeclName()));
       for (const auto *member : clangDC->lookup(clangName))
         if (auto *imported = dyn_cast_or_null<ValueDecl>(
                 importer->importDeclDirectly(member)))
@@ -6910,11 +6926,16 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
           func->getLoc(), options);
       auto lookup = evaluateOrDefault(ctx.evaluator,
                                       UnqualifiedLookupRequest{descriptor}, {});
-      for (const auto &result : lookup)
+      for (const auto &result : lookup) {
+        // An operator name also finds operator functions declared in types,
+        // which are unrelated to a global function.
+        if (result.getValueDecl()->getDeclContext()->isTypeContext())
+          continue;
         results.insert(result.getValueDecl());
+      }
     };
     doLookup(swiftName);
-    if (foreignName)
+    for (DeclName foreignName : foreignNames)
       doLookup(foreignName);
   }
 }
@@ -9405,6 +9426,25 @@ bool importer::isClangCxxRecord(const DeclContext *dc) {
     return isa_and_nonnull<clang::CXXRecordDecl>(nominal->getClangDecl());
 
   return false;
+}
+
+std::string importer::getCxxOperatorName(clang::OverloadedOperatorKind op) {
+  StringRef spelling = clang::getOperatorSpelling(op);
+  // A spelling that is a word (`operator new`) needs a separating space.
+  return (Twine("operator") + (llvm::isAlpha(spelling.front()) ? " " : "") +
+          spelling)
+      .str();
+}
+
+std::optional<clang::OverloadedOperatorKind>
+importer::getCxxOperatorKind(StringRef name) {
+  for (unsigned i = clang::OO_None + 1; i < clang::NUM_OVERLOADED_OPERATORS;
+       ++i) {
+    auto op = static_cast<clang::OverloadedOperatorKind>(i);
+    if (name == getCxxOperatorName(op))
+      return op;
+  }
+  return std::nullopt;
 }
 
 Type importer::getCxxReferenceImplType(Type importedTy,
