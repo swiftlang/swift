@@ -1441,6 +1441,12 @@ void SILGenModule::recordNonCopyableTypeWithEmittedMetadata(
   if (nom->isGenericContext())
     return;
 
+  // Only `@export(interface)` types get their metadata emitted eagerly; the
+  // metadata of any other type is emitted lazily, and only if something
+  // actually needs it.
+  if (nom->getEffectiveCodeGenerationModel() != CodeGenerationModel::Interface)
+    return;
+
   auto type = nom->getDeclaredInterfaceType()->getCanonicalType();
   M.addNonCopyableTypeWithEmittedMetadata(
       SILType::getPrimitiveObjectType(type));
