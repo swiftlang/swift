@@ -449,7 +449,7 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   
   // The substitution determines the destination type.
   auto &destLowering =
-      SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
+    SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
   if (destLowering.isAddress())
     return emitAddressOnlyFromRawPointer(
         SGF, loc, destLowering, args[0], C, IsNotTake);
@@ -464,6 +464,29 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   SILValue result = SGF.B.createRawPointerToRef(loc, args[0].getUnmanagedValue(),
                                                 destType, /*isImmortal=*/false);
   // The result has ownership semantics, so it owns a reference.
+  return SGF.emitManagedRValueWithCleanup(result, destLowering);
+}
+
+/// Specialized emitter for Builtin.takeFromRawPointer.
+static ManagedValue
+emitBuiltinTakeFromRawPointer(SILGenFunction &SGF, SILLocation loc,
+                              SubstitutionMap substitutions,
+                              ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(substitutions.getReplacementTypes().size() == 1 &&
+         "take should have a single substitution");
+  assert(args.size() == 1 && "take should have a single argument");
+
+  auto &destLowering =
+      SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
+  if (destLowering.isAddress())
+    return emitAddressOnlyFromRawPointer(
+        SGF, loc, destLowering, args[0], C, IsTake);
+
+  assert(destLowering.isLoadable());
+  SILType destType = destLowering.getLoweredType();
+
+  SILValue result = SGF.B.createRawPointerToRef(
+      loc, args[0].getUnmanagedValue(), destType, /*isImmortal=*/false);
   return SGF.emitManagedRValueWithCleanup(result, destLowering);
 }
 
