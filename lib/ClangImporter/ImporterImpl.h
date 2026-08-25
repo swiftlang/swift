@@ -495,6 +495,12 @@ public:
   llvm::DenseSet<std::pair<const clang::FunctionDecl *, DiagID>>
       DiagnosedTemplateDiagnostics;
 
+  // Tracks already-emitted diagnostics associated with template arguments
+  // (e.g., from a malformed SWIFT_ESCAPABLE_IF) to avoid duplicate diagnostics.
+  llvm::DenseSet<
+      std::pair<const clang::ClassTemplateSpecializationDecl *, unsigned>>
+      DiagnosedConditionalAttrParams;
+
   const bool ImportForwardDeclarations;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
