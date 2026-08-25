@@ -447,14 +447,13 @@ extension EnumTypeInfo: TypeInfoProtocol {
       .boolArg("isObjC"),
       .arrayArg("cases", parser: EnumCaseInfo.fromSyntax)
     )
+
+    // Enum cases can be overloaded, letting several cases can share a name. Name lookup
+    // resolves such a reference to the last one in decl order, so drop every earlier
+    // case with a name we have already seen.
     var seen: Set<String> = Set()
-    let uniqueCases = cases.reversed().compactMap { (c: EnumCaseInfo) -> EnumCaseInfo? in
-      if !seen.insert(c.name).inserted {
-        return nil
-      }
-      return c
-    }.reversed()
-    return Self(isObjC: isObjC, cases: uniqueCases.map { $0 })
+    let uniqueCases = cases.reversed().filter { seen.insert($0.name).inserted }.reversed()
+    return Self(isObjC: isObjC, cases: Array(uniqueCases))
   }
 
   public var syntax: ExprSyntax {
