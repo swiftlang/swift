@@ -109,6 +109,22 @@ public func returnsTrivialStruct() -> TrivialStruct {
 }
 
 
+// Non-trivial class
+
+// void takesNonTrivial(NonTrivialClass obj);
+// The argument is the address of the caller's temporary.
+// CHECK-SYSV-LABEL: define{{.*}} void @_Z15takesNonTrivial15NonTrivialClass(ptr %0)
+// CHECK-WIN-LABEL: define{{.*}} void @"?takesNonTrivial@@YAXVNonTrivialClass@@@Z"(ptr %0)
+@cxx @implementation
+public func takesNonTrivial(_ obj: NonTrivialClass) {}
+
+// NonTrivialClass returnsNonTrivial();
+// CHECK-SYSV-LABEL: define{{.*}} void @_Z17returnsNonTrivialv(ptr noalias sret(%TSo15NonTrivialClassV) %0)
+// CHECK-WIN-LABEL: define{{.*}} @"?returnsNonTrivial@@YA?AVNonTrivialClass@@XZ"(ptr {{[^,]*}}sret
+@cxx @implementation
+public func returnsNonTrivial() -> NonTrivialClass { return NonTrivialClass() }
+
+
 // Overloads
 
 // int overloadedByArity(int x);
@@ -172,6 +188,8 @@ public func swiftRenamedFoo(_ x: CInt) -> CInt { return x }
 // CHECK-SYSV:   invoke void @_Z8swapIntsPiS_
 // CHECK-SYSV:   invoke void @_Z18takesTrivialStruct13TrivialStruct
 // CHECK-SYSV:   invoke {{.*}} @_Z20returnsTrivialStructv
+// CHECK-SYSV:   invoke void @_Z15takesNonTrivial15NonTrivialClass
+// CHECK-SYSV:   invoke void @_Z17returnsNonTrivialv
 // CHECK-SYSV:   invoke i32 @_Z17overloadedByArityi
 // CHECK-SYSV:   invoke i32 @_Z17overloadedByArityii
 // CHECK-SYSV:   invoke i32 @_Z14withDefaultArgii
@@ -194,6 +212,9 @@ public func callCxxFuncs() {
 
   takesTrivialStruct(TrivialStruct(x: 1, y: 2))
   _ = returnsTrivialStruct()
+
+  takesNonTrivial(NonTrivialClass())
+  _ = returnsNonTrivial()
 
   _ = overloadedByArity(42)
   _ = overloadedByArity(42, 67)

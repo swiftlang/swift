@@ -361,6 +361,19 @@ static void diagnoseFunctionParamNotRepresentable(
   Reason.describe(AFD);
 }
 
+/// Whether \p type is an imported C++ class that C++ cannot pass in registers
+/// (a non-trivial copy or move constructor, or a non-trivial destructor).
+static bool isNonTrivialCxxRecord(Type type) {
+  auto *structDecl = type->getStructOrBoundGenericStruct();
+  if (!structDecl)
+    return false;
+  auto *record =
+      dyn_cast_or_null<clang::CXXRecordDecl>(structDecl->getClangDecl());
+  return record && (record->hasNonTrivialCopyConstructor() ||
+                    record->hasNonTrivialMoveConstructor() ||
+                    record->hasNonTrivialDestructor());
+}
+
 static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
                                                const ParameterList *PL,
                                                ObjCReason Reason) {
@@ -392,6 +405,26 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
         diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
                        AFD, getObjCDiagnosticAttrKind(Reason),
                        language)
+          .highlight(param->getSourceRange())
+          .limitBehavior(behavior));
+      Reason.describe(AFD);
+
+      return false;
+    }
+
+    // The C++ ABI decides whether the callee owns a non-trivial class passed
+    // by value (it does not under Itanium, it does under Microsoft), so
+    // `borrowing` and `consuming` each contradict one ABI. Only the default
+    // ownership follows the ABI; reject both modifiers on every target.
+    auto ownership = param->getValueOwnership();
+    if (language == ForeignLanguage::Cxx &&
+        (ownership == ValueOwnership::Shared ||
+         ownership == ValueOwnership::Owned) &&
+        isNonTrivialCxxRecord(param->getTypeInContext())) {
+      softenIfAccessNote(AFD, Reason.getAttr(),
+        diags.diagnose(param->getStartLoc(),
+                       diag::cxx_param_ownership_unsupported, AFD, param,
+                       ownership == ValueOwnership::Owned)
           .highlight(param->getSourceRange())
           .limitBehavior(behavior));
       Reason.describe(AFD);

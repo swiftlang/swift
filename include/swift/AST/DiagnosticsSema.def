@@ -2285,6 +2285,12 @@ ERROR(cxx_mutating_mismatch,none,
       "%kind0 should%select{|| not}1 be 'mutating' to match "
       "%select{non-'const' ||'const' }1%kindonly2 declared by the header",
       (ValueDecl *, unsigned, const ValueDecl *))
+ERROR(cxx_param_ownership_unsupported,none,
+      "%kindonly0 cannot be marked '@cxx' because parameter %1 of non-trivial "
+      "C++ class type is '%select{borrowing|consuming}2'; C++ decides which "
+      "side destroys such an argument, so the implementation must take it "
+      "with default ownership",
+      (const AbstractFunctionDecl *, const ParamDecl *, unsigned))
 ERROR(cxx_rvalue_references_unsupported,none,
       "%kind0 cannot implement C++ function '%1' because rvalue reference "
       "parameters and return types are not yet supported",
