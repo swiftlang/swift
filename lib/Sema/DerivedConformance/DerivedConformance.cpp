@@ -1055,8 +1055,6 @@ handleASTNodeForDerivation(ASTContext &C, DerivedConformance &derived,
     // value of this flag is true
     if (getterShouldBeImmutableComputed)
       varDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
-    else
-      varDecl->getImplInfo();
 
     // The derived property of an actor must be nonisolated, otherwise it
     // cannot satisfy the nonisolated requirement it witnesses.
@@ -1132,23 +1130,6 @@ swift::deriveRequirementViaMacro(DerivedConformance &derived,
   });
   ASSERT(witness && "Expected a witness but got NULL");
 
-  AccessLevel access = derived.Nominal->getFormalAccess();
-  if (access == AccessLevel::Private)
-    access = AccessLevel::FilePrivate;
-  witness->overwriteAccess(access);
-
-  // A witness of a '@usableFromInline' type must itself be usable from inline,
-  // otherwise it cannot satisfy the requirement it witnesses.
-  auto inheritUsableFromInline = [&](ValueDecl *vDecl) {
-    if (!derived.Nominal->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
-        vDecl->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
-        vDecl->hasAttributeWithInlinableSemantics() ||
-        !DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::UsableFromInline,
-                                                 vDecl))
-      return;
-    vDecl->addAttribute(new (C) UsableFromInlineAttr(/*implicit=*/true));
-  };
-
   expansion->forEachExpandedNode([&](ASTNode node) {
     auto *decl = node.dyn_cast<Decl *>();
     if (!decl)
@@ -1156,7 +1137,8 @@ swift::deriveRequirementViaMacro(DerivedConformance &derived,
     auto *vDecl = dyn_cast<ValueDecl>(decl);
     if (!vDecl)
       return;
-    inheritUsableFromInline(vDecl);
+    vDecl->copyFormalAccessFrom(derived.Nominal,
+                                /*sourceIsParentContext=*/true);
     derived.addMemberToConformanceContext(vDecl, /*insertAtHead=*/true);
   });
 
