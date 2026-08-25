@@ -1115,19 +1115,6 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
     if (!member->getDeclContext()->getParentSourceFile())
       return;
 
-    // If \p member comes from expanding a synthetic macro, we should skip
-    // checking the source order as it will most certainly be wrong.
-    auto loc = member->getLoc();
-    if (loc.isValid()) {
-      auto &SM = member->getASTContext().SourceMgr;
-      auto bufferID = SM.findBufferContainingLoc(loc);
-      auto SFS = SM.getSourceFilesForBufferID(bufferID);
-      auto * SF = SFS.empty() ? nullptr : SFS[0];
-      auto *enclosing = SF ? SF->getEnclosingSourceFile() : nullptr;
-      if (enclosing && enclosing->Kind == SourceFileKind::SyntheticMacro)
-        return;
-    }
-    
     auto shouldSkip = [](Decl *d) {
       // PatternBindingDecl source ranges overlap with VarDecls and
       // EnumCaseDecl source ranges overlap with EnumElementDecls.
@@ -1144,6 +1131,19 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
       if (d->hasClangNode())
         return true;
 
+      // If \p member comes from expanding a synthetic macro, we should skip
+      // checking the source order as it will most certainly be wrong.
+      auto loc = d->getLoc();
+      if (loc.isValid()) {
+        auto &SM = d->getASTContext().SourceMgr;
+        auto bufferID = SM.findBufferContainingLoc(loc);
+        auto SFS = SM.getSourceFilesForBufferID(bufferID);
+        auto * SF = SFS.empty() ? nullptr : SFS[0];
+        auto *enclosing = SF ? SF->getEnclosingSourceFile() : nullptr;
+        if (enclosing && enclosing->Kind == SourceFileKind::SyntheticMacro)
+          return true;
+      }
+      
       return false;
     };
 
