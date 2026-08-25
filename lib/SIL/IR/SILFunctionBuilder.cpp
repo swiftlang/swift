@@ -220,6 +220,12 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setPerfConstraints(PerformanceConstraints::ManualOwnership);
   }
 
+  uint8_t noSanitizeMask = 0;
+  for (auto *attr : Attrs.getAttributes<NoSanitizeAttr>())
+    noSanitizeMask |= 1u << unsigned(attr->getKind());
+  if (noSanitizeMask)
+    F->setNoSanitizeMask(noSanitizeMask);
+
   if (Attrs.hasAttribute<LexicalLifetimesAttr>()) {
     F->setForceEnableLexicalLifetimes(DoForceEnableLexicalLifetimes);
   }

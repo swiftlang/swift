@@ -84,6 +84,14 @@ enum class ENUM_EXTENSIBILITY_ATTR(closed) InlineKind : uint8_t {
   Last_InlineKind = Always
 };
 
+/// Kinds of sanitizers that can be suppressed with @_noSanitize.
+enum class ENUM_EXTENSIBILITY_ATTR(closed) NoSanitizeKind : uint8_t {
+  Address SWIFT_NAME("address") = 0,
+  Thread SWIFT_NAME("thread") = 1,
+  MemTag SWIFT_NAME("memtag") = 2,
+  Last_NoSanitizeKind = MemTag
+};
+
 /// This enum represents the possible values of the @_effects attribute.
 /// These values are ordered from the strongest guarantee to the weakest,
 /// so please do not reorder existing values.

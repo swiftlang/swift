@@ -640,6 +640,11 @@ EXPERIMENTAL_FEATURE(Reparenting, true)
 /// Allows a `get` returning a noncopyable type have owned semantics in opaque interfaces.
 EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
 
+/// Allows `@noSanitize(<kind>)` on functions to suppress LLVM sanitize_*
+/// function attributes on the emitted function (mirrors Clang's
+/// __attribute__((no_sanitize("<kind>")))).
+EXPERIMENTAL_FEATURE(NoSanitize, true)
+
 /// Allow access to the Iterable protocols/types outside the stdlib.
 LANGUAGE_FEATURE(BorrowingSequence, 516, "Iterable protocol")
 

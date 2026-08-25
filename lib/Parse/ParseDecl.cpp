@@ -2877,6 +2877,22 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::NoSanitize: {
+    auto kind = parseSingleAttrOption<NoSanitizeKind>(
+        *this, Loc, AttrRange, AttrName, DK, {
+          { Context.getIdentifier("address"), NoSanitizeKind::Address },
+          { Context.getIdentifier("thread"),  NoSanitizeKind::Thread },
+          { Context.getIdentifier("memtag"),  NoSanitizeKind::MemTag },
+        });
+    if (!kind)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) NoSanitizeAttr(AtLoc, AttrRange, *kind));
+
+    break;
+  }
+
   case DeclAttrKind::Optimize: {
     auto optMode = parseSingleAttrOption<OptimizationMode>(
         *this, Loc, AttrRange, AttrName, DK, {

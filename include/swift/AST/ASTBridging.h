@@ -1067,6 +1067,13 @@ BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
                                                  swift::SourceRange range,
                                                  swift::InlineKind kind);
 
+SWIFT_NAME("BridgedNoSanitizeAttr.createParsed(_:atLoc:range:kind:)")
+BridgedNoSanitizeAttr
+BridgedNoSanitizeAttr_createParsed(BridgedASTContext cContext,
+                                   swift::SourceLoc atLoc,
+                                   swift::SourceRange range,
+                                   swift::NoSanitizeKind kind);
+
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedParsedLifetimeDependenceKind {
   BridgedParsedLifetimeDependenceKindDefault,
   BridgedParsedLifetimeDependenceKindBorrow,

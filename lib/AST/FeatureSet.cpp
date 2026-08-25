@@ -576,6 +576,10 @@ static bool usesFeatureNonexhaustiveAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<NonexhaustiveAttr>();
 }
 
+static bool usesFeatureNoSanitize(Decl *decl) {
+  return decl->getAttrs().hasAttribute<NoSanitizeAttr>();
+}
+
 static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
   auto *VD = dyn_cast<ValueDecl>(decl);
   if (!VD)

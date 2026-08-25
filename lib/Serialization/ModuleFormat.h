@@ -2481,6 +2481,11 @@ namespace decls_block {
     BCFixed<2>  // inline value
   >;
 
+  using NoSanitizeDeclAttrLayout = BCRecordLayout<
+    NoSanitize_DECL_ATTR,
+    BCFixed<2>  // no-sanitize kind
+  >;
+
   using ExportDeclAttrLayout = BCRecordLayout<
     Export_DECL_ATTR,
     BCFixed<1>  // export kind value

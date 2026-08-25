@@ -603,6 +603,17 @@ static StringRef getDumpString(InlineKind kind) {
   }
   llvm_unreachable("unhandled InlineKind");
 }
+static StringRef getDumpString(NoSanitizeKind kind) {
+  switch (kind) {
+  case NoSanitizeKind::Address:
+    return "address";
+  case NoSanitizeKind::Thread:
+    return "thread";
+  case NoSanitizeKind::MemTag:
+    return "memtag";
+  }
+  llvm_unreachable("unhandled NoSanitizeKind");
+}
 static StringRef getDumpString(ExportKind kind) {
   switch (kind) {
   case ExportKind::Interface:
@@ -5384,6 +5395,11 @@ public:
   }
   void visitInlineAttr(InlineAttr *Attr, Label label) {
     printCommon(Attr, "inline_attr", label);
+    printField(Attr->getKind(), Label::always("kind"));
+    printFoot();
+  }
+  void visitNoSanitizeAttr(NoSanitizeAttr *Attr, Label label) {
+    printCommon(Attr, "no_sanitize_attr", label);
     printField(Attr->getKind(), Label::always("kind"));
     printFoot();
   }
