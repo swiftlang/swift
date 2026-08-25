@@ -13,6 +13,7 @@
 #include "TypeCheckCOM.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -405,10 +406,117 @@ COMInterfaceHierarchyRequest::evaluate(Evaluator &evaluator,
       COMInterfaceHierarchy(C.AllocateCopy(markers), C.AllocateCopy(chain)));
 }
 
+static Type getCOMRuntimeEntryType(ASTContext &C, Identifier name) {
+  auto mutableRawPointer = C.getUnsafeMutableRawPointerType();
+  StringRef entry = name.str();
+
+  SmallVector<AnyFunctionType::Param, 3> parameters;
+  Type result;
+  if (entry == "QueryInterface" || entry == "AggregatedQueryInterface") {
+    auto rawPointer = C.getUnsafeRawPointerType();
+    auto optionalMutableRawPointer = OptionalType::get(mutableRawPointer);
+    auto mutableRawPointerPointer = BoundGenericType::get(
+        C.getUnsafeMutablePointerDecl(), Type(), {optionalMutableRawPointer});
+
+    parameters.emplace_back(mutableRawPointer);
+    parameters.emplace_back(rawPointer);
+    parameters.emplace_back(mutableRawPointerPointer);
+    result = C.getInt32Type();
+  } else if (entry == "AddRef" || entry == "AggregatedAddRef" ||
+             entry == "Release" || entry == "AggregatedRelease") {
+    parameters.emplace_back(mutableRawPointer);
+    result = C.getUInt32Type();
+  } else {
+    return Type();
+  }
+
+  return FunctionType::get(parameters, result, FunctionType::ExtInfo());
+}
+
+static bool hasCOMRuntimeEntryType(FuncDecl *entry, Type expected) {
+  auto *function = expected->castTo<FunctionType>();
+  auto *parameters = entry->getParameters();
+  if (parameters->size() != function->getParams().size())
+    return false;
+
+  for (unsigned index = 0; index < parameters->size(); ++index) {
+    if (!parameters->get(index)->getInterfaceType()->isEqual(
+            function->getParams()[index].getPlainType()))
+      return false;
+  }
+
+  return entry->getResultInterfaceType()->isEqual(function->getResult());
+}
+
+FuncDecl *COMRuntimeEntryRequest::evaluate(Evaluator &evaluator,
+                                           ModuleDecl *module,
+                                           Identifier name) const {
+  auto &C = module->getASTContext();
+  SmallVector<ValueDecl *, 2> results;
+  C.lookupInModule(module, name.str(), results);
+
+  FuncDecl *entry = nullptr;
+  bool found = false;
+  for (auto *result : results) {
+    auto *candidate = dyn_cast<FuncDecl>(result);
+    if (!candidate)
+      continue;
+
+    found = true;
+    if (!candidate->hasOnlyCEntryPoint())
+      continue;
+
+    if (entry) {
+      C.Diags.diagnose(SourceLoc(), diag::com_runtime_ambiguous_entry,
+                       name.str());
+      return nullptr;
+    }
+    entry = candidate;
+  }
+
+  if (entry) {
+    Type expected = getCOMRuntimeEntryType(C, name);
+    if (!expected || hasCOMRuntimeEntryType(entry, expected))
+      return entry;
+
+    C.Diags.diagnose(SourceLoc(), diag::com_runtime_entry_type, name.str(),
+                     entry->getInterfaceType(), expected);
+    return nullptr;
+  }
+
+  if (found)
+    C.Diags.diagnose(SourceLoc(), diag::com_runtime_invalid_entry, name.str());
+  else
+    C.Diags.diagnose(SourceLoc(), diag::com_runtime_missing_entry, name.str());
+  return nullptr;
+}
+
 void com::validateImplementation(ClassDecl *CD) {
   auto *info = CD->getCOMDeclInfo();
   if (!info)
     return;
+
+  auto &C = CD->getASTContext();
+  auto *M = C.getLoadedModule(C.Id_COM);
+  if (!M && C.MainModule && C.MainModule->getName() == C.Id_COM)
+    M = C.MainModule;
+
+  if (M) {
+    bool aggregated = false;
+    if (auto *PD = C.getProtocol(KnownProtocolKind::COMAggregatable)) {
+      auto conformance = lookupConformance(CD->getDeclaredInterfaceType(), PD);
+      aggregated = !conformance.isInvalid();
+    }
+
+    for (StringRef name : {
+             aggregated ? "AggregatedQueryInterface" : "QueryInterface",
+             aggregated ? "AggregatedAddRef" : "AddRef",
+             aggregated ? "AggregatedRelease" : "Release",
+         }) {
+      auto request = COMRuntimeEntryRequest{M, C.getIdentifier(name)};
+      (void)evaluateOrDefault(C.evaluator, request, nullptr);
+    }
+  }
 
   if (CD->isActor())
     CD->diagnose(diag::com_actor_implementation, CD->getName());

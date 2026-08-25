@@ -2375,6 +2375,17 @@ ERROR(com_non_native_implementation, none,
 ERROR(com_generic_activatable_implementation, none,
       "generic class %0 cannot declare a COM implementation identifier",
       (DeclName))
+ERROR(com_runtime_missing_entry, none,
+      "function '%0' not found in the 'COM' module", (StringRef))
+ERROR(com_runtime_ambiguous_entry, none,
+      "multiple direct C entry points named '%0' found in the 'COM' module",
+      (StringRef))
+ERROR(com_runtime_invalid_entry, none,
+      "function '%0' in the 'COM' module must provide a direct C entry point",
+      (StringRef))
+ERROR(com_runtime_entry_type, none,
+      "function '%0' in the 'COM' module has type %1; expected %2",
+      (StringRef, Type, Type))
 
 ERROR(metatype_extension_com_only, none,
       "protocol metatype extensions are reserved for COM interop", ())
