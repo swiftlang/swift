@@ -1605,6 +1605,7 @@ namespace  {
     UNINTERESTING_ATTR(Called)
     UNINTERESTING_ATTR(Concurrent)
     UNINTERESTING_ATTR(Consuming)
+    UNINTERESTING_ATTR(CxxDecl)
     UNINTERESTING_ATTR(Documentation)
     UNINTERESTING_ATTR(Dynamic)
     UNINTERESTING_ATTR(DynamicCallable)
