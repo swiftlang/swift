@@ -392,10 +392,16 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
 ///   - class types, generic or not
 ///   - archetypes with class or class protocol bounds
 ///   - existentials with class or class protocol bounds
+///   - COM interface existentials
 /// But not:
 ///   - function types
 bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
-  return getCanonicalType().allowsOwnership(sig);
+  auto type = getCanonicalType();
+  if (type.allowsOwnership(sig))
+    return true;
+
+  return type->isExistentialType() &&
+         type->getExistentialLayout().getCOMInterface();
 }
 
 static void expandDefaults(SmallVectorImpl<ProtocolDecl *> &protocols,
