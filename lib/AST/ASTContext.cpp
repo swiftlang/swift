@@ -44,6 +44,7 @@
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -1520,10 +1521,7 @@ MacroDecl *ASTContext::getBuiltinDerivedConformanceMacroDecl(
   if (auto *macro = getImpl().BuiltinDerivedConformanceMacroDecls[index])
     return macro;
 
-  ModuleDecl *stdlib = getStdlibModule();
-  assert(stdlib && "Stdlib module must be available to derive conformances "
-                   "via builtin macros");
-  FileUnit &file = stdlib->getFiles()[0]->getOrCreateSynthesizedFile();
+  FileUnit &file = TheBuiltinModule->getMainFile(FileUnitKind::Builtin);
 
   auto param = [&](StringRef label, StringRef name, Type type) {
     Identifier argumentName =
