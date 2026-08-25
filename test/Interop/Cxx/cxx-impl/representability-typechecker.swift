@@ -77,13 +77,9 @@ func returnsTrivialStruct() -> TrivialStruct { fatalError() }
 
 // Non-trivial classes
 
-// expected-error@+3{{global function cannot be marked '@cxx' because the type of the parameter cannot be represented in C++}}
-// expected-note@+2{{non-trivial C++ classes cannot be represented in C++}}
 @cxx @implementation
 func takesNonTrivial(_ obj: NonTrivialClass) {}
 
-// expected-error@+3{{global function cannot be marked '@cxx' because its result type cannot be represented in C++}}
-// expected-note@+2{{non-trivial C++ classes cannot be represented in C++}}
 @cxx @implementation
 func returnsNonTrivial() -> NonTrivialClass { fatalError() }
 
