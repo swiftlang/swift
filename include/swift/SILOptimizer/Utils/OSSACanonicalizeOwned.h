@@ -483,9 +483,12 @@ private:
     auto &module = currentDef->getFunction()->getModule();
 
     // The move-only checker (which runs in raw SIL) relies on ignoring deinit
-    // barriers for non-lexical lifetimes.
-    // Optimizations, on the other hand, should always respect deinit barriers.
-    if (module.getStage() == SILStage::Raw && !currentDef->isLexical())
+    // barriers for non-lexical lifetimes. Optimizations, on the other hand,
+    // should always respect deinit barriers.
+    //
+    // This reads the module floor, not the function's stage,
+    // supportsLexicalLifetimes() below is keyed to the module stage floor.
+    if (module.getStageFloor() == SILStage::Raw && !currentDef->isLexical())
       return false;
 
     if (currentDef->getFunction()->forceEnableLexicalLifetimes())
