@@ -4,44 +4,44 @@
 
 // CHECK-LABEL: internal enum HasElementsWithAvailability : Hashable
 enum HasElementsWithAvailability: Hashable {
-  // CHECK:       @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
-  // CHECK-NEXT:    var index_a: Int
+  // CHECK:       @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
+  // CHECK-NEXT:    var index_lhs: Int
   // CHECK-EMPTY:
-  // CHECK-NEXT:    switch a {
+  // CHECK-NEXT:    switch lhs {
   // CHECK-NEXT:    case .alwaysAvailable:
-  // CHECK-NEXT:      index_a = 0
+  // CHECK-NEXT:      index_lhs = 0
   // CHECK-NEXT:    case .neverAvailable:
   // CHECK-NEXT:    fatalError("Unavailable code reached")
   // CHECK-NEXT:    case .unavailableMacOS:
-  // CHECK-NEXT:      index_a = 1
+  // CHECK-NEXT:      index_lhs = 1
   // CHECK-NEXT:    case .unavailableiOS:
-  // CHECK-NEXT:      index_a = 2
+  // CHECK-NEXT:      index_lhs = 2
   // CHECK-NEXT:    case .unavailableMacCatalyst:
-  // CHECK-NEXT:      index_a = 3
+  // CHECK-NEXT:      index_lhs = 3
   // CHECK-NEXT:    case .unavailableMacOSAndiOS:
   // CHECK-NEXT:    fatalError("Unavailable code reached")
   // CHECK-NEXT:    case .unavailableMacOSAndMacCatalyst:
-  // CHECK-NEXT:      index_a = 4
+  // CHECK-NEXT:      index_lhs = 4
   // CHECK-NEXT:    }
-  // CHECK-NEXT:    var index_b: Int
+  // CHECK-NEXT:    var index_rhs: Int
   // CHECK-EMPTY:
-  // CHECK-NEXT:    switch b {
+  // CHECK-NEXT:    switch rhs {
   // CHECK-NEXT:    case .alwaysAvailable:
-  // CHECK-NEXT:      index_b = 0
+  // CHECK-NEXT:      index_rhs = 0
   // CHECK-NEXT:    case .neverAvailable:
   // CHECK-NEXT:    fatalError("Unavailable code reached")
   // CHECK-NEXT:    case .unavailableMacOS:
-  // CHECK-NEXT:      index_b = 1
+  // CHECK-NEXT:      index_rhs = 1
   // CHECK-NEXT:    case .unavailableiOS:
-  // CHECK-NEXT:      index_b = 2
+  // CHECK-NEXT:      index_rhs = 2
   // CHECK-NEXT:    case .unavailableMacCatalyst:
-  // CHECK-NEXT:      index_b = 3
+  // CHECK-NEXT:      index_rhs = 3
   // CHECK-NEXT:    case .unavailableMacOSAndiOS:
   // CHECK-NEXT:    fatalError("Unavailable code reached")
   // CHECK-NEXT:    case .unavailableMacOSAndMacCatalyst:
-  // CHECK-NEXT:      index_b = 4
+  // CHECK-NEXT:      index_rhs = 4
   // CHECK-NEXT:    }
-  // CHECK-NEXT:    return index_a == index_b
+  // CHECK-NEXT:    return index_lhs == index_rhs
   // CHECK-NEXT:  }
 
   // CHECK:       case alwaysAvailable

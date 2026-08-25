@@ -4,24 +4,24 @@
 
 // CHECK-LABEL: internal enum Simple : Hashable
 enum Simple: Hashable {
-  // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
-  // CHECK-NEXT:     var index_a: Int
+  // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
+  // CHECK-NEXT:     var index_lhs: Int
   // CHECK-EMPTY:
-  // CHECK-NEXT:     switch a {
+  // CHECK-NEXT:     switch lhs {
   // CHECK-NEXT:     case .a:
-  // CHECK-NEXT:       index_a = 0
+  // CHECK-NEXT:       index_lhs = 0
   // CHECK-NEXT:     case .b:
-  // CHECK-NEXT:       index_a = 1
+  // CHECK-NEXT:       index_lhs = 1
   // CHECK-NEXT:     }
-  // CHECK-NEXT:     var index_b: Int
+  // CHECK-NEXT:     var index_rhs: Int
   // CHECK-EMPTY:
-  // CHECK-NEXT:     switch b {
+  // CHECK-NEXT:     switch rhs {
   // CHECK-NEXT:     case .a:
-  // CHECK-NEXT:       index_b = 0
+  // CHECK-NEXT:       index_rhs = 0
   // CHECK-NEXT:     case .b:
-  // CHECK-NEXT:       index_b = 1
+  // CHECK-NEXT:       index_rhs = 1
   // CHECK-NEXT:     }
-  // CHECK-NEXT:     return index_a == index_b
+  // CHECK-NEXT:     return index_lhs == index_rhs
   // CHECK-NEXT:   }
 
   // CHECK:        case a
@@ -49,8 +49,8 @@ enum Simple: Hashable {
 
 // CHECK-LABEL: internal enum HasAssociatedValues : Hashable
 enum HasAssociatedValues: Hashable {
-  // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
-  // CHECK-NEXT:     switch (a, b) {
+  // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
+  // CHECK-NEXT:     switch (lhs, rhs) {
   // CHECK-NEXT:     case (.a(let l0), .a(let r0)):
   // CHECK-NEXT:       guard l0 == r0 else {
   // CHECK-NEXT:         return false
@@ -97,24 +97,24 @@ enum HasAssociatedValues: Hashable {
 
 // CHECK-LABEL: internal enum HasUnavailableElement : Hashable
 enum HasUnavailableElement: Hashable {
-  // CHECK:       @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
-  // CHECK-NEXT:    var index_a: Int
+  // CHECK:       @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
+  // CHECK-NEXT:    var index_lhs: Int
   // CHECK-EMPTY:
-  // CHECK-NEXT:    switch a {
+  // CHECK-NEXT:    switch lhs {
   // CHECK-NEXT:    case .a:
-  // CHECK-NEXT:      index_a = 0
+  // CHECK-NEXT:      index_lhs = 0
   // CHECK-NEXT:    case .b:
   // CHECK-NEXT:      fatalError({{.*}})
   // CHECK-NEXT:    }
-  // CHECK-NEXT:    var index_b: Int
+  // CHECK-NEXT:    var index_rhs: Int
   // CHECK-EMPTY:
-  // CHECK-NEXT:    switch b {
+  // CHECK-NEXT:    switch rhs {
   // CHECK-NEXT:    case .a:
-  // CHECK-NEXT:      index_b = 0
+  // CHECK-NEXT:      index_rhs = 0
   // CHECK-NEXT:    case .b:
   // CHECK-NEXT:      fatalError({{.*}})  
   // CHECK-NEXT:    }
-  // CHECK-NEXT:    return index_a == index_b
+  // CHECK-NEXT:    return index_lhs == index_rhs
   // CHECK-NEXT:  }
 
   // CHECK:       case a
@@ -144,8 +144,8 @@ enum HasUnavailableElement: Hashable {
 
 // CHECK-LABEL: internal enum HasAssociatedValuesAndUnavailableElement : Hashable
 enum HasAssociatedValuesAndUnavailableElement: Hashable {
-  // CHECK:       @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
-  // CHECK-NEXT:    switch (a, b) {
+  // CHECK:       @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
+  // CHECK-NEXT:    switch (lhs, rhs) {
   // CHECK-NEXT:    case (.a(let l0), .a(let r0)):
   // CHECK-NEXT:      guard l0 == r0 else {
   // CHECK-NEXT:        return false
@@ -185,24 +185,24 @@ enum HasAssociatedValuesAndUnavailableElement: Hashable {
 // CHECK-LABEL: internal enum UnavailableEnum : Hashable
 @available(*, unavailable)
 enum UnavailableEnum: Hashable {
-  // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
-  // CHECK-NEXT:     var index_a: Int
+  // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
+  // CHECK-NEXT:     var index_lhs: Int
   // CHECK-EMPTY:
-  // CHECK-NEXT:     switch a {
+  // CHECK-NEXT:     switch lhs {
   // CHECK-NEXT:     case .a:
-  // CHECK-NEXT:       index_a = 0
+  // CHECK-NEXT:       index_lhs = 0
   // CHECK-NEXT:     case .b:
-  // CHECK-NEXT:       index_a = 1
+  // CHECK-NEXT:       index_lhs = 1
   // CHECK-NEXT:     }
-  // CHECK-NEXT:     var index_b: Int
+  // CHECK-NEXT:     var index_rhs: Int
   // CHECK-EMPTY:
-  // CHECK-NEXT:     switch b {
+  // CHECK-NEXT:     switch rhs {
   // CHECK-NEXT:     case .a:
-  // CHECK-NEXT:       index_b = 0
+  // CHECK-NEXT:       index_rhs = 0
   // CHECK-NEXT:     case .b:
-  // CHECK-NEXT:       index_b = 1
+  // CHECK-NEXT:       index_rhs = 1
   // CHECK-NEXT:     }
-  // CHECK-NEXT:     return index_a == index_b
+  // CHECK-NEXT:     return index_lhs == index_rhs
   // CHECK-NEXT:   }
 
   // CHECK:        case a

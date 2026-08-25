@@ -14,16 +14,16 @@ enum NoValues {
     case a, b
 }
 // CHECK-LABEL: enum NoValues {
-// CHECK-FRAGILE:   @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: NoValues, _ b: NoValues) -> Bool
-// CHECK-RESILIENT: static func == (a: NoValues, b: NoValues) -> Bool
+// CHECK-FRAGILE:   @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ lhs: NoValues, _ rhs: NoValues) -> Bool
+// CHECK-RESILIENT: static func == (lhs: NoValues, rhs: NoValues) -> Bool
 // CHECK:   case a, b
 // CHECK:   func hash(into hasher: inout Hasher)
 // CHECK:   var hashValue: Int { get }
 // CHECK: }
 
 // CHECK-LABEL: extension Enum : Equatable where T : Equatable {
-// CHECK-FRAGILE:   @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Enum<T>, _ b: Enum<T>) -> Bool
-// CHECK-RESILIENT: static func == (a: Enum<T>, b: Enum<T>) -> Bool
+// CHECK-FRAGILE:   @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ lhs: Enum<T>, _ rhs: Enum<T>) -> Bool
+// CHECK-RESILIENT: static func == (lhs: Enum<T>, rhs: Enum<T>) -> Bool
 // CHECK: }
 // CHECK-LABEL: extension Enum : Hashable where T : Hashable {
 // CHECK:   func hash(into hasher: inout Hasher)

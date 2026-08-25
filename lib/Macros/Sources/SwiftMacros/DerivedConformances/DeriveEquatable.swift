@@ -43,7 +43,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
     return
       """
       \(getAttributes())
-      static func \(getFunctionName())(_ a: \(raw: ownership)Self, _ b: \(raw: ownership)Self) -> Swift::Bool {
+      static func \(getFunctionName())(_ lhs: \(raw: ownership)Self, _ rhs: \(raw: ownership)Self) -> Swift::Bool {
         \(getBody())
       }
       """
@@ -103,7 +103,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
 
     let guards: [CodeBlockItemSyntax] = comparedProperties.map { property in
       """
-      guard a.\(raw: property.name) == b.\(raw: property.name) else {
+      guard lhs.\(raw: property.name) == rhs.\(raw: property.name) else {
         return false
       }
       """
@@ -132,9 +132,9 @@ public struct DeriveEquatableMacro: DeclarationMacro {
   static func getNoAssociatedValuesBody(
     _ enumInfo: EnumTypeInfo
   ) -> CodeBlockItemListSyntax {
-    var items = getDiscriminant(enumInfo, scrutinee: "a", discrName: "index_a")
-    items += getDiscriminant(enumInfo, scrutinee: "b", discrName: "index_b")
-    items += ["return index_a == index_b"]
+    var items = getDiscriminant(enumInfo, scrutinee: "lhs", discrName: "index_lhs")
+    items += getDiscriminant(enumInfo, scrutinee: "rhs", discrName: "index_rhs")
+    items += ["return index_lhs == index_rhs"]
     return items
   }
 
@@ -186,7 +186,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
 
     return
       """
-      switch (a, b) {
+      switch (lhs, rhs) {
       \(raw: cases.map { $0.trimmedDescription }.joined(separator: "\n"))
       }
       """

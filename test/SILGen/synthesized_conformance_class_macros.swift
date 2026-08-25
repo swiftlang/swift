@@ -11,7 +11,7 @@ final class Final<T> {
 // CHECK:   @_hasStorage final var x: T { get set }
 // CHECK:   init(x: T)
 // CHECK:   enum CodingKeys : CodingKey {
-// CHECK:     @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Final<T>.CodingKeys, _ b: Final<T>.CodingKeys) -> Bool
+// CHECK:     @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ lhs: Final<T>.CodingKeys, _ rhs: Final<T>.CodingKeys) -> Bool
 // CHECK:     case x
 // CHECK:     init?(stringValue: String)
 // CHECK:     init?(intValue: Int)
@@ -31,7 +31,7 @@ class Nonfinal<T> {
 // CHECK:   @_hasStorage var x: T { get set }
 // CHECK:   init(x: T)
 // CHECK:   enum CodingKeys : CodingKey {
-// CHECK:     @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Nonfinal<T>.CodingKeys, _ b: Nonfinal<T>.CodingKeys) -> Bool
+// CHECK:     @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ lhs: Nonfinal<T>.CodingKeys, _ rhs: Nonfinal<T>.CodingKeys) -> Bool
 // CHECK:     case x
 // CHECK-DAG:     init?(stringValue: String)
 // CHECK-DAG:     init?(intValue: Int)
