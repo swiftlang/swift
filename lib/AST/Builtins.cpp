@@ -2737,8 +2737,6 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::MMX:
   case IITDescriptor::AMX:
   case IITDescriptor::Metadata:
-  case IITDescriptor::ExtendArgument:
-  case IITDescriptor::TruncArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
   case IITDescriptor::VecOfAnyPtrsToElt:
@@ -2779,6 +2777,22 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
     auto vecType = argType->getAs<BuiltinVectorType>();
     if (!vecType) return Type();
     return vecType->getElementType();
+  }
+
+  case IITDescriptor::ExtendArgument: {
+    Type argType = getTypeArgument(D.getArgumentNumber());
+    if (!argType) return Type();
+    if (auto vecType = argType->getAs<BuiltinVectorType>())
+      return vecType->getExtended(Context);
+    return Type();
+  }
+
+  case IITDescriptor::TruncArgument: {
+    Type argType = getTypeArgument(D.getArgumentNumber());
+    if (!argType) return Type();
+    if (auto vecType = argType->getAs<BuiltinVectorType>())
+      return vecType->getTruncated(Context);
+    return Type();
   }
 
   // A pointer to an immediate type.

@@ -663,6 +663,9 @@ EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
 /// as '@unsafe(always)', instead of renaming them to '__<name>Unsafe'.
 EXPERIMENTAL_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe, true)
 
+/// Handle lookup for llvm intrinsics like aarch64.neon.smull and .sqxtn
+LANGUAGE_FEATURE(BuiltinExtendVectorLanes, 0, "Support for accessing LLVM Builtins that widen or narrow vector lanes")
+
 /// Infer the return ownership of C++ methods that return libkern's OSObject or
 /// one of its subclasses from the method's name, following libkern's
 /// conventions.

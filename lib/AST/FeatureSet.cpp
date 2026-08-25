@@ -765,6 +765,8 @@ static bool usesFeatureCalledAttribute(Decl *D) {
   return usesTypeMatching(D, hasCalled);
 }
 
+UNINTERESTING_FEATURE(BuiltinExtendVectorLanes)
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
