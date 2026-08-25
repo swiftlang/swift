@@ -741,7 +741,8 @@ bool swift::isRepresentableInLanguage(
     return false;
 
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
-  if (AFD->isOperator()) {
+  // A `@cxx` implementation of a C++ operator may be a Swift operator.
+  if (AFD->isOperator() && language != ForeignLanguage::Cxx) {
     AFD->diagnose((isa<ProtocolDecl>(AFD->getDeclContext())
                     ? diag::objc_operator_proto
                     : diag::objc_operator))
@@ -4150,12 +4151,48 @@ private:
     return MatchOutcome::WrongType;
   }
 
+  /// The importer drops the `T &` result of e.g. `operator+=`, but the
+  /// implementation must still return it, as a pointer. Returns \p type, the
+  /// imported type of \p decl, with that result restored.
+  static Type restoreCxxOperatorResult(const ValueDecl *decl, Type type) {
+    const auto *clangFD =
+        dyn_cast_or_null<clang::FunctionDecl>(decl->getClangDecl());
+    if (!clangFD || !clangFD->isOverloadedOperator() ||
+        !clangFD->getReturnType()->isLValueReferenceType())
+      return type;
+    const auto *fnTy = type->getAs<AnyFunctionType>();
+    if (!fnTy || !fnTy->getResult()->isVoid())
+      return type;
+    const auto *record = clangFD->getReturnType()->getPointeeCXXRecordDecl();
+    if (!record)
+      return type;
+    const auto *referent = dyn_cast_or_null<NominalTypeDecl>(
+        decl->getASTContext().getClangModuleLoader()->importDeclDirectly(
+            record));
+    if (!referent)
+      return type;
+    // A reference to a foreign reference type is the type itself.
+    Type result = referent->getDeclaredInterfaceType();
+    if (!result->isForeignReferenceType()) {
+      auto kind = clangFD->getReturnType()->getPointeeType().isConstQualified()
+                      ? PTK_UnsafePointer
+                      : PTK_UnsafeMutablePointer;
+      result = result->wrapInPointer(kind);
+      if (!result)
+        return type;
+    }
+    return FunctionType::get(fnTy->getParams(), {}, result, fnTy->getExtInfo());
+  }
+
   static Type getMemberType(ValueDecl *decl) {
+    Type type;
     if (auto fn = dyn_cast<AbstractFunctionDecl>(decl))
       if (fn->hasImplicitSelfDecl())
         // Strip off the uncurried `self` parameter.
-        return fn->getMethodInterfaceType();
-    return decl->getInterfaceType();
+        type = fn->getMethodInterfaceType();
+    if (!type)
+      type = decl->getInterfaceType();
+    return restoreCxxOperatorResult(decl, type);
   }
 
   /// Describes an availability mismatch between a requirement and a candidate
@@ -4178,6 +4215,13 @@ private:
     auto &ctx = cand->getASTContext();
     if (ctx.LangOpts.DisableAvailabilityChecking)
       return std::nullopt;
+
+    // Member operators are imported unavailable in favor of synthesized Swift
+    // operators; that doesn't apply to the C++ operator.
+    if (const auto *clangFD =
+            dyn_cast_or_null<clang::FunctionDecl>(req->getClangDecl()))
+      if (clangFD->isOverloadedOperator() && req->isUnavailable())
+        return std::nullopt;
 
     std::optional<AvailabilityContext> baseRequirementAvailability;
 
@@ -4324,6 +4368,7 @@ private:
         dyn_cast_or_null<clang::FunctionDecl>(interface->getClangDecl());
     if (!clangFD)
       return false;
+    StringRef cxxName = cast<ValueDecl>(interface)->getCDeclName();
 
     // A @cxx implementation must be the C++ function's one and only
     // definition. Reject a match to a function that is already defined in the
@@ -4339,7 +4384,7 @@ private:
       unsigned reason = clangFD->isDefined()     ? 0
                         : clangFD->isConstexpr() ? 2
                                                  : 1;
-      diagnose(cand, diag::cxx_func_defined, cand, clangFD->getName(), reason);
+      diagnose(cand, diag::cxx_func_defined, cand, cxxName, reason);
       return true;
     }
 
@@ -4378,8 +4423,7 @@ private:
           return param->getType()->isRValueReferenceType();
         });
     if (usesRValueReferences) {
-      diagnose(cand, diag::cxx_rvalue_references_unsupported, cand,
-               clangFD->getName());
+      diagnose(cand, diag::cxx_rvalue_references_unsupported, cand, cxxName);
       return true;
     }
 
@@ -4404,8 +4448,7 @@ private:
           continue;
 
         if (!diagnosed) {
-          diagnose(cand, diag::cxx_references_require_unsafe, cand,
-                   clangFD->getName())
+          diagnose(cand, diag::cxx_references_require_unsafe, cand, cxxName)
               .fixItInsert(
                   cand->getAttributeInsertionLoc(/*forModifier=*/false),
                   "@unsafe ");
@@ -4479,7 +4522,7 @@ private:
     unsigned reason =
         importer::ReturnOwnershipInfo(clangFD).hasReturnsUnretained ? 1 : 0;
     diagnose(cand, diag::cdecl_unretained_result_unsupported, cand, isCxx,
-             clangFD->getName(), reason);
+             cast<ValueDecl>(interface)->getCDeclName(), reason);
     return true;
   }
 
