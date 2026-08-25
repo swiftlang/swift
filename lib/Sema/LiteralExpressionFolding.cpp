@@ -280,12 +280,14 @@ private:
     FoldingErrorOr<ConstantValuePtr>
     foldIntegerLiteralExpr(const IntegerLiteralExpr *expr) {
       auto exprType = expr->getType();
-      auto value = expr->getValue();
       auto resultBitWidth = getIntegerBitWidth(exprType, Ctx);
       bool isSigned = isSignedIntegerType(exprType);
-      // Don't silently truncate a literal whose magnitude doesn't fit the
-      // target type, leave it unfolded so the existing overflow diagnostic
-      // still fires.
+      // A literal whose value doesn't fit the target type is left unfolded so
+      // the existing overflow diagnostic still fires, rather than folding it to
+      // a wrapped value. A negative literal never fits an unsigned type.
+      if (!isSigned && expr->isNegative())
+        return FoldingError(IllegalConstError::UpstreamError, expr->getLoc());
+      auto value = expr->getValue();
       unsigned needed =
           isSigned ? value.getSignificantBits() : value.getActiveBits();
       if (needed > resultBitWidth)

@@ -13,3 +13,16 @@
 // A value that fits still folds.
 @section("mysection") let unsignedFits: UInt8 = 255
 @section("mysection") let signedFits: Int8 = 127
+
+// A negative literal never fits an unsigned type. 'IntegerLiteralExpr::getValue'
+// wraps it before the bit-width check can see it, so negativity is tested first.
+@section("mysection") let unsignedNegative: UInt8 = -1
+// expected-error@-1 {{negative integer '-1' overflows when stored into unsigned type 'UInt8'}}
+
+// The wrapped value could otherwise collide with another raw value and be
+// reported as "raw value for enum case is not unique" instead.
+enum NegativeRawValue: UInt8 {
+  case a = -1
+  // expected-error@-1 2 {{negative integer '-1' overflows when stored into unsigned type 'UInt8'}}
+  case b
+}
