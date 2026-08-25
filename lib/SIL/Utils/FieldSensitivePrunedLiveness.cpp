@@ -617,6 +617,35 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
   llvm_unreachable("Not understand subtype");
 }
 
+/// If a use of \p projectedValue reaches its root by projecting a payload out
+/// of an existential, returns that existential's type; otherwise returns an
+/// empty type.
+///
+/// An existential is opaque: the leaf subelements of its payload are not tracked
+/// separately, so projecting a payload address out of one does not enter a
+/// larger element space. `SubElementOffset::compute` accordingly treats the
+/// existential projections as offset-preserving pass-throughs, so counting the
+/// payload's subelements would produce a range past the end of the
+/// existential's own elements -- e.g. a payload with a deinit has an extra bit
+/// for `self`.
+static SILType getExistentialTypeForSubElementCount(SILValue projectedValue) {
+  SILValue value = projectedValue;
+  SILType existentialType;
+  while (true) {
+    if (auto *iea = dyn_cast<InitExistentialAddrInst>(value)) {
+      value = iea->getOperand();
+      existentialType = value->getType();
+      continue;
+    }
+    if (auto *oea = dyn_cast<OpenExistentialAddrInst>(value)) {
+      value = oea->getOperand();
+      existentialType = value->getType();
+      continue;
+    }
+    return existentialType;
+  }
+}
+
 void TypeTreeLeafTypeRange::get(
     Operand *op, SILValue rootValue,
     SmallVectorImpl<TypeTreeLeafTypeRange> &ranges) {
@@ -685,16 +714,23 @@ void TypeTreeLeafTypeRange::get(
   // Uses that borrow a value do not involve the deinit bit.
   //
   // FIXME: This shouldn't be limited to applies.
+  auto subElementCount = TypeSubElementCount(projectedValue);
+  SILType deinitBitType = projectedValue->getType();
+  if (SILType existentialType =
+          getExistentialTypeForSubElementCount(projectedValue)) {
+    subElementCount = TypeSubElementCount(existentialType, op->getFunction());
+    deinitBitType = existentialType;
+  }
+
   unsigned deinitBitOffset = 0;
-  if (op->get()->getType().isValueTypeWithDeinit() &&
+  if (deinitBitType.isValueTypeWithDeinit() &&
       op->getOperandOwnership() == OperandOwnership::Borrow &&
       ApplySite::isa(op->getUser())) {
     deinitBitOffset = 1;
   }
 
-  ranges.push_back({*startEltOffset, *startEltOffset +
-                                         TypeSubElementCount(projectedValue) -
-                                         deinitBitOffset});
+  ranges.push_back(
+      {*startEltOffset, *startEltOffset + subElementCount - deinitBitOffset});
 }
 
 void TypeTreeLeafTypeRange::constructProjectionsForNeededElements(
