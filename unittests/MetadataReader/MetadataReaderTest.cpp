@@ -232,3 +232,57 @@ TEST(MetadataReader, WordsArraySavedAcrossNestedDemangle) {
   ASSERT_EQ(argIdent->getKind(), Node::Kind::Identifier);
   EXPECT_EQ(argIdent->getText(), "OtherType");
 }
+
+// A class descriptor in the inspected process can name itself as its own
+// resilient superclass. Walking that chain must stop rather than recurse until
+// the stack runs out.
+TEST(MetadataReader, ResilientSuperclassCycleTerminates) {
+  // The bytes below are laid out by hand, so make sure the descriptor is still
+  // the shape they assume.
+  static_assert(sizeof(TargetClassDescriptor<Runtime>) == 44,
+                "class descriptor layout changed");
+
+  struct ClassDescriptorBytes {
+    uint32_t Flags;
+    int32_t Parent;
+    int32_t Name;
+    int32_t AccessFunctionPtr;
+    int32_t Fields;
+    int32_t SuperclassType;
+    uint32_t ResilientMetadataBounds;
+    uint32_t ExtraClassFlags;
+    uint32_t NumImmediateMembers;
+    uint32_t NumFields;
+    uint32_t FieldOffsetVectorOffset;
+    int32_t ResilientSuperclass;
+  };
+  static_assert(offsetof(ClassDescriptorBytes, ResilientSuperclass) ==
+                    sizeof(TargetClassDescriptor<Runtime>),
+                "resilient superclass is not the first trailing object");
+
+  TypeContextDescriptorFlags typeFlags;
+  typeFlags.class_setHasResilientSuperclass(true);
+  typeFlags.class_setResilientSuperclassReferenceKind(
+      TypeReferenceKind::DirectTypeDescriptor);
+  ContextDescriptorFlags flags(ContextDescriptorKind::Class,
+                               /*isGeneric*/ false, /*isUnique*/ true,
+                               /*hasInvertibleProtocols*/ false,
+                               typeFlags.getOpaqueValue());
+
+  ClassDescriptorBytes descriptor = {};
+  descriptor.Flags = flags.getIntValue();
+  // Relative pointer back to the start of the descriptor itself.
+  descriptor.ResilientSuperclass =
+      -int32_t(offsetof(ClassDescriptorBytes, ResilientSuperclass));
+
+  const uint64_t descriptorAddr = 0x1000;
+  auto reader = std::make_shared<MockMemoryReader>();
+  reader->addMemory(descriptorAddr, &descriptor, sizeof(descriptor));
+
+  TestMetadataReader metadataReader(reader);
+  auto descriptorRef =
+      metadataReader.readContextDescriptor(RemoteAddress(descriptorAddr, 0));
+  ASSERT_TRUE(descriptorRef);
+
+  EXPECT_FALSE(metadataReader.getClassMetadataBounds(descriptorRef).has_value());
+}
