@@ -994,7 +994,6 @@ bool swift::memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal) {
   return false;
 }
 
-
 /// Provides the location to use when plumbing the synthesized macro expansion
 /// with its parent context for name lookup.
 static SourceLoc getValidParentLocForDerivation(DerivedConformance &derived,
@@ -1038,7 +1037,7 @@ handleASTNodeForDerivation(ASTContext &C, DerivedConformance &derived,
   auto *decl = node.dyn_cast<Decl *>();
   if (!decl)
     return nullptr;
-  
+
   if (isa<PatternBindingDecl>(decl))
     return nullptr;
 
@@ -1056,7 +1055,7 @@ handleASTNodeForDerivation(ASTContext &C, DerivedConformance &derived,
     // value of this flag is true
     if (getterShouldBeImmutableComputed)
       varDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
-    else 
+    else
       varDecl->getImplInfo();
 
     // The derived property of an actor must be nonisolated, otherwise it
@@ -1151,10 +1150,12 @@ swift::deriveRequirementViaMacro(DerivedConformance &derived,
   };
 
   expansion->forEachExpandedNode([&](ASTNode node) {
-    auto *decl = node.dyn_cast<Decl*>();
-    if (!decl) return;
+    auto *decl = node.dyn_cast<Decl *>();
+    if (!decl)
+      return;
     auto *vDecl = dyn_cast<ValueDecl>(decl);
-    if (!vDecl) return;
+    if (!vDecl)
+      return;
     inheritUsableFromInline(vDecl);
     derived.addMemberToConformanceContext(vDecl, /*insertAtHead=*/true);
   });
@@ -1169,24 +1170,23 @@ static void printEnumCaseInfo(llvm::raw_ostream &out,
   bool markReachable = !decl->isUnreachableAtRuntime() ||
                        decl->getParentEnum()->isUnreachableAtRuntime();
   // Escape names as they must appear in source so a keyword-named case or
-  // label (`init`, `class`, ...) round-trips as a valid reference in the macros.
+  // label (`init`, `class`, ...) round-trips as a valid reference in the
+  // macros.
   out << "EnumCaseInfo(name: "
-      << QuotedString(
-             identifierEscapingIfNeeded(decl->getNameStr(),
-                                        PrintNameContext::TypeMember))
+      << QuotedString(identifierEscapingIfNeeded(decl->getNameStr(),
+                                                 PrintNameContext::TypeMember))
       << ", associatedValueLabels: [";
-  llvm::interleaveComma(decl->getName().getArgumentNames(), out,
-                        [&](Identifier name) {
-                          if (name.empty()) {
-                            out << "nil";
-                          } else {
-                            printAsQuotedString(
-                                out,
-                                identifierEscapingIfNeeded(
-                                    name.str(),
-                                    PrintNameContext::FunctionParameterExternal));
-                          }
-                        });
+  llvm::interleaveComma(
+      decl->getName().getArgumentNames(), out, [&](Identifier name) {
+        if (name.empty()) {
+          out << "nil";
+        } else {
+          printAsQuotedString(
+              out,
+              identifierEscapingIfNeeded(
+                  name.str(), PrintNameContext::FunctionParameterExternal));
+        }
+      });
   out << "], isReachable: " << (markReachable ? "true" : "false") << ")";
 }
 
@@ -1208,9 +1208,8 @@ static void printStoredProperty(llvm::raw_ostream &out, const VarDecl *decl) {
   // Escape the name as above so a keyword-named property is emitted as a valid
   // member reference by the macros.
   out << "StoredProperty(name: "
-      << QuotedString(
-             identifierEscapingIfNeeded(decl->getNameStr(),
-                                        PrintNameContext::TypeMember))
+      << QuotedString(identifierEscapingIfNeeded(decl->getNameStr(),
+                                                 PrintNameContext::TypeMember))
       << ", typeName: " << QuotedString(decl->getTypeInContext().getString())
       << ", isVar: " << (isVar ? "true" : "false")
       << ", isStatic: " << (decl->isStatic() ? "true" : "false")
@@ -1254,8 +1253,8 @@ std::string swift::getNominalTypeInfoString(DerivedConformance &derived) {
   // The old synthesis built parameters without a TypeRepr, which is the only
   // thing `diagnoseMissingOwnership` checks, so it never had to say so; the
   // source a macro writes does.
-  bool isNoncopyable = derived.Nominal->canBeCopyable() ==
-                       TypeDecl::CanBeInvertible::Never;
+  bool isNoncopyable =
+      derived.Nominal->canBeCopyable() == TypeDecl::CanBeInvertible::Never;
 
   std::string res;
   llvm::raw_string_ostream out(res);
