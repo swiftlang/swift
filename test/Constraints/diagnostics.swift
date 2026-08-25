@@ -1572,6 +1572,12 @@ func testNilCoalescingOperatorRemoveFix() {
       ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-1:9-+0:12=}}
 }
 
+func testInvalidMethodWithInvalidArg(_ x: Int) {
+  x.undefinedMethod(undefined)
+  // expected-error@-1 {{value of type 'Int' has no member 'undefinedMethod'}}
+  // expected-error@-2 {{cannot find 'undefined' in scope}}
+}
+
 // FIXME: https://github.com/swiftlang/swift/issues/89918
 let _ = type(of: Int.foo) // expected-error {{failed to produce diagnostic}}
 
