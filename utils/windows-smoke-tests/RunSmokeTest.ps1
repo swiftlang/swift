@@ -40,13 +40,13 @@ if (-not (Test-Path $Installer)) {
   throw "Installer not found at '$Installer'."
 }
 
-$WindowsBuild = [int](Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion").CurrentBuildNumber
-if ($WindowsBuild -ge 20348) {
-  $Variant = "ltsc2022-full"
-} elseif ($WindowsBuild -ge 17763) {
-  $Variant = "1809-full"
+$Build = [System.Environment]::OSVersion.Version.Build
+$Variant = if ($Build -ge 20348) {
+  "ltsc2022-full"
+} elseif ($Build -ge 17763) {
+  "1809-full"
 } else {
-  throw "Smoke tests are not supported on this Windows version (build $WindowsBuild)."
+  throw "Swift is not supported on this Windows Version (Build $Build)"
 }
 
 $Dockerfile = Join-Path $SourceCache "swift-docker\swift-ci\main\windows\smoketest\$Variant\Dockerfile"
