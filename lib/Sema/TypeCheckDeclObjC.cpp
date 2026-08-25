@@ -3558,6 +3558,26 @@ private:
     diag.fixItInsert(insertionLoc, attrText);
   }
 
+  /// Returns true if an availability mismatch in \p domain between an
+  /// `@objc @implementation` declaration and the Objective-C declaration it
+  /// implements should be a warning until a future language mode.
+  ///
+  /// \p implIsLessAvailable indicates which of the two declarations the
+  /// restriction applies to.
+  static bool
+  shouldDowngradeAvailabilityMismatchDiag(AvailabilityDomain domain,
+                                          bool implIsLessAvailable) {
+    // Platform availability mismatches were not diagnosed before this check
+    // was introduced, so existing code depends on them being allowed.
+    if (domain.isPlatform())
+      return true;
+
+    // A restriction in the Swift language mode domain only prevents references
+    // from Swift source, so an implementation that is restricted this way is
+    // still reachable through the declaration in the header.
+    return implIsLessAvailable && domain.isSwiftLanguageMode();
+  }
+
   /// If \p ext is less available than the Objective-C declarations in
   /// \p interfaceDecls that it implements, diagnoses the availability
   /// restriction that makes it so.
@@ -3595,7 +3615,9 @@ private:
           domain, domain.isVersioned(), domainAndRange.getRange());
     };
 
-    emit().warnUntilLanguageModeIf(domain.isPlatform(), LanguageMode::future);
+    emit().warnUntilLanguageModeIf(shouldDowngradeAvailabilityMismatchDiag(
+                                       domain, /*implIsLessAvailable=*/true),
+                                   LanguageMode::future);
 
     restriction->emitNoteForDecl(ext);
   }
@@ -4369,7 +4391,10 @@ private:
 
     {
       auto diag = emit();
-      diag.warnUntilLanguageModeIf(domain.isPlatform(), LanguageMode::future);
+      diag.warnUntilLanguageModeIf(
+          shouldDowngradeAvailabilityMismatchDiag(
+              domain, mismatch.candidateIsLessAvailable),
+          LanguageMode::future);
 
       if (mustBe)
         addAvailabilityFixIt(diag, cand, restriction);
