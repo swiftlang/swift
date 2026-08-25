@@ -1218,6 +1218,12 @@ static Value *createCast(IRBuilder<> &Builder, Value *V, Type *DestTy) {
   if (V->getType() == DestTy)
     return V;
 
+  // FunctionComparator::cmpTypes considers a pointer and an integer of pointer
+  // size to be equivalent, and it compares aggregates and vectors element-wise.
+  // Therefore the source and destination type can be aggregates or vectors
+  // which only differ in some of their element types, e.g. `{ ptr }` and
+  // `{ i64 }` or `[2 x ptr]` and `[2 x i64]`. There is no cast between
+  // aggregates, so cast the elements individually and re-build the aggregate.
   Type *SrcTy = V->getType();
   if (SrcTy->isStructTy()) {
     assert(DestTy->isStructTy());
@@ -1233,9 +1239,28 @@ static Value *createCast(IRBuilder<> &Builder, Value *V, Type *DestTy) {
     return Result;
   }
   assert(!DestTy->isStructTy());
-  if (SrcTy->isIntegerTy() && DestTy->isPointerTy())
+
+  if (auto *SrcArrayTy = dyn_cast<ArrayType>(SrcTy)) {
+    auto *DestArrayTy = cast<ArrayType>(DestTy);
+    assert(SrcArrayTy->getNumElements() == DestArrayTy->getNumElements());
+    Type *DestElementTy = DestArrayTy->getElementType();
+    Value *Result = UndefValue::get(DestTy);
+    for (unsigned int I = 0, E = SrcArrayTy->getNumElements(); I < E; ++I) {
+      Value *Element =
+          createCast(Builder, Builder.CreateExtractValue(V, llvm::ArrayRef(I)),
+                     DestElementTy);
+
+      Result = Builder.CreateInsertValue(Result, Element, llvm::ArrayRef(I));
+    }
+    return Result;
+  }
+  assert(!DestTy->isArrayTy());
+
+  // Vectors of pointers and vectors of integers can be converted with a single
+  // inttoptr/ptrtoint, so they don't need to be handled element-wise.
+  if (SrcTy->isIntOrIntVectorTy() && DestTy->isPtrOrPtrVectorTy())
     return Builder.CreateIntToPtr(V, DestTy);
-  else if (SrcTy->isPointerTy() && DestTy->isIntegerTy())
+  else if (SrcTy->isPtrOrPtrVectorTy() && DestTy->isIntOrIntVectorTy())
     return Builder.CreatePtrToInt(V, DestTy);
   else
     return Builder.CreateBitCast(V, DestTy);
