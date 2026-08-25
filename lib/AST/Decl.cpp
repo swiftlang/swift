@@ -63,6 +63,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
@@ -5189,6 +5190,13 @@ StringRef ValueDecl::getCDeclName() const {
          clangDecl->getLanguageLinkage() == clang::CXXLanguageLinkage)
           && clangDecl->getIdentifier())
       return clangDecl->getName();
+    // An overloaded operator has no identifier; name it `operator==` etc.
+    if (clangDecl->getLanguageLinkage() == clang::CXXLanguageLinkage &&
+        clangDecl->isOverloadedOperator())
+      return getASTContext()
+          .getIdentifier(importer::getCxxOperatorName(
+              clangDecl->getOverloadedOperator()))
+          .str();
   }
 
   auto abiRole = ABIRoleInfo(this);
@@ -5202,8 +5210,15 @@ StringRef ValueDecl::getCDeclName() const {
   };
   if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>())
     return nameOrBaseIdentifier(cdeclAttr->Name);
-  if (auto cxxAttr = getAttrs().getAttribute<CxxDeclAttr>())
+  if (auto cxxAttr = getAttrs().getAttribute<CxxDeclAttr>()) {
+    // A Swift operator function implements the C++ operator of the same
+    // spelling.
+    if (cxxAttr->Name.empty() && isOperator())
+      return getASTContext()
+          .getIdentifier(("operator" + getBaseIdentifier().str()).str())
+          .str();
     return nameOrBaseIdentifier(cxxAttr->Name);
+  }
 
   return "";
 }
