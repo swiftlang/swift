@@ -119,6 +119,18 @@ enum OptionalTypeKind : unsigned {
 };
 enum { NumOptionalTypeKinds = 2 };
 
+/// Where a C++ record sits in libkern's OSObject hierarchy. This is used to
+/// decide whether to apply libkern's ownership convention.
+///
+/// Only meaningful when the 'LibkernOwnershipConventions' feature is enabled.
+enum class LibkernSubclass {
+  None,
+  OSObject,
+  /// OSIterator derives from OSObject, so a type that derives from OSIterator
+  /// also derives from OSObject.
+  OSIterator,
+};
+
 /// This interface is implemented by LLDB to serve as a fallback when Clang
 /// modules can't be imported from source in the debugger.
 ///
@@ -746,6 +758,9 @@ public:
   std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
   getForeignReferenceTypeOperations(const clang::RecordDecl *decl) override;
 
+  /// Classify \p decl against libkern's OSObject hierarchy.
+  LibkernSubclass getLibkernSubclass(const clang::RecordDecl *decl);
+
   void checkCalledClangFunction(const ValueDecl *funcDecl,
                                 SourceLoc callSiteLoc) override;
 
@@ -951,7 +966,23 @@ matchSwiftAttr(const clang::Decl *decl,
 /// \param decl The Clang function or method declaration to inspect.
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
-getOwnershipOfReturnedFRT(const clang::NamedDecl *decl);
+getOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
+
+/// Determines the ownership convention of functions that return libkern's
+/// OSObject or one of its subclasses.
+///
+/// - Methods which start with "get" or "Get" and which are not returning
+///   a subclass of OSIterator are assumed to be getters.
+///   They return at "+0" and the caller is not responsible for releasing the
+///   returned object.
+///
+/// - All other methods are assumed to return at "+1", and the caller is
+///   responsible for releasing the returned object.
+///
+/// \param decl The Clang function or method declaration to inspect.
+/// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
+std::optional<ResultConvention>
+getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
 
 enum class RefCountedPtrError {
   NotAnnotated,
