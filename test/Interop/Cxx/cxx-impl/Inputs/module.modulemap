@@ -23,6 +23,11 @@ module Namespaces {
   requires cplusplus
 }
 
+module Operators {
+  header "operators.h"
+  requires cplusplus
+}
+
 module Overloads {
   header "overloads.h"
   requires cplusplus
