@@ -2429,6 +2429,20 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     }
   }
 
+  // Instantiate the return type (via clang::Sema::isCompleteType()) before
+  // importing, using the FunctionDecl's return location to improve diagnostics.
+  //
+  // Exempt operators for now, since these are imported too eagerly and can
+  // lead to spurious template instantiation failures.
+  if (auto *tagDecl = returnType->getAsTagDecl();
+      tagDecl && !tagDecl->isCompleteDefinition() &&
+      !clangDecl->isOverloadedOperator()) {
+    auto loc = clangDecl->getReturnTypeSourceRange().getBegin();
+    loc = loc.isValid() ? loc : clangDecl->getLocation();
+    if (loc.isValid())
+      (void)getClangSema().isCompleteType(loc, returnType);
+  }
+
   // Import the result type.
   return importType(
       returnType,
