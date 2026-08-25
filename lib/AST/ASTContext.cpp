@@ -1565,7 +1565,7 @@ MacroDecl *ASTContext::getBuiltinDerivedConformanceMacroDecl(
     return macro;
   };
 
-  MacroDecl *macro;
+  MacroDecl *macro = nullptr;
   switch (kind) {
   case BuiltinDerivedConformanceMacroKind::DeriveEquatable:
     macro = makeMacro(
