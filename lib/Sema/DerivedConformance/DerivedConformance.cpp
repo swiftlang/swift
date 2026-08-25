@@ -1266,18 +1266,3 @@ std::string swift::getNominalTypeInfoString(DerivedConformance &derived) {
       << ", isNoncopyable: " << (isNoncopyable ? "true" : "false") << ")";
   return res;
 }
-
-bool swift::hasBeenMacroSynthesized(Decl *decl) {
-  auto loc = decl->getStartLoc();
-  if (loc.isInvalid())
-    return false;
-  auto &SM = decl->getASTContext().SourceMgr;
-  auto bufferID = SM.findBufferContainingLoc(loc);
-  auto SFS = SM.getSourceFilesForBufferID(bufferID);
-  if (SFS.empty())
-    return false;
-  auto *enclosing = SFS[0]->getEnclosingSourceFile();
-  if (!enclosing) 
-    return false;
-  return enclosing->Kind == SourceFileKind::SyntheticMacro;
-}

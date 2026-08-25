@@ -1133,16 +1133,8 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
 
       // If \p member comes from expanding a synthetic macro, we should skip
       // checking the source order as it will most certainly be wrong.
-      auto loc = d->getLoc();
-      if (loc.isValid()) {
-        auto &SM = d->getASTContext().SourceMgr;
-        auto bufferID = SM.findBufferContainingLoc(loc);
-        auto SFS = SM.getSourceFilesForBufferID(bufferID);
-        auto * SF = SFS.empty() ? nullptr : SFS[0];
-        auto *enclosing = SF ? SF->getEnclosingSourceFile() : nullptr;
-        if (enclosing && enclosing->Kind == SourceFileKind::SyntheticMacro)
-          return true;
-      }
+      if (d->isFromSyntheticMacroExpansion())
+        return true;
       
       return false;
     };

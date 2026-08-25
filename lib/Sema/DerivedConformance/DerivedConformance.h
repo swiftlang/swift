@@ -477,8 +477,7 @@ deriveRequirementViaMacro(DerivedConformance &derived, ValueDecl *requirement,
 /// for by producing valid swift syntax.
 std::string getNominalTypeInfoString(DerivedConformance &derived);
 
-/// Returns whether \p decl comes from expanding a synthetic macro.
-bool hasBeenMacroSynthesized(Decl *decl);
+
 } // namespace swift
 
 #endif
