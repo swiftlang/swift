@@ -165,6 +165,183 @@ namespace {
   };
 } // end anonymous namespace
 
+namespace {
+class MainTypeDeclFinder : public ASTWalker {
+  bool Found = false;
+
+public:
+  bool found() const { return Found; }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    if (isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D)) {
+      auto &attrs = D->getAttrs();
+      if (attrs.hasAttribute<MainTypeAttr>() ||
+          attrs.hasAttribute<UIApplicationMainAttr>() ||
+          attrs.hasAttribute<NSApplicationMainAttr>()) {
+        Found = true;
+        return Action::Stop();
+      }
+    }
+
+    if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+      auto &evaluator = D->getASTContext().evaluator;
+      ParseMembersRequest req(IDC);
+      // Only walk into cached parsed members to avoid invoking lazy parsing.
+      // We force eager parsing of function bodies that might contain an @main
+      // type in a main source file.
+      if (evaluator.hasCachedResult(req)) {
+        for (auto *member : evaluateOrFatal(evaluator, req).members) {
+          member->walk(*this);
+          if (Found)
+            return Action::Stop();
+        }
+      }
+      return Action::SkipNode();
+    }
+
+    return Action::Continue();
+  }
+};
+} // end anonymous namespace
+
+static bool hasMainTypeDecl(ArrayRef<ASTNode> items) {
+  MainTypeDeclFinder finder;
+  for (auto item : items) {
+    item.walk(finder);
+    if (finder.found())
+      return true;
+  }
+  return false;
+}
+
+namespace {
+class ReparentInitializerWalker : public ASTWalker {
+  DeclContext *DC;
+
+public:
+  explicit ReparentInitializerWalker(DeclContext *DC) : DC(DC) {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
+  LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
+    return LazyInitializerWalking::None;
+  }
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
+      CE->setParent(DC);
+      return Action::SkipNode(E);
+    }
+    if (auto *ME = dyn_cast<MacroExpansionExpr>(E))
+      ME->setDeclContext(DC);
+    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E))
+      SVE->setDeclContext(DC);
+    if (auto *TE = dyn_cast<TapExpr>(E)) {
+      if (auto *var = TE->getVar())
+        var->setDeclContext(DC);
+    }
+
+    return Action::Continue(E);
+  }
+
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+    if (auto *EP = dyn_cast<ExprPattern>(P))
+      EP->setDeclContext(DC);
+    if (auto *EP = dyn_cast<EnumElementPattern>(P))
+      EP->setDeclContext(DC);
+
+    return Action::Continue(P);
+  }
+
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    if (auto *CS = dyn_cast<CaseStmt>(S)) {
+      for (auto *caseVar : CS->getCaseBodyVariables())
+        caseVar->setDeclContext(DC);
+    }
+    if (auto *BS = dyn_cast<BreakStmt>(S))
+      BS->setDeclContext(DC);
+    if (auto *CS = dyn_cast<ContinueStmt>(S))
+      CS->setDeclContext(DC);
+    if (auto *FS = dyn_cast<FallthroughStmt>(S))
+      FS->setDeclContext(DC);
+    if (auto *FES = dyn_cast<ForEachStmt>(S))
+      FES->setDeclContext(DC);
+
+    return Action::Continue(S);
+  }
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    if (!D->getDeclContext()->isLocalContext())
+      return Action::SkipNode();
+
+    D->setDeclContext(DC);
+
+    return Action::SkipNodeIf(isa<DeclContext>(D));
+  }
+};
+} // end anonymous namespace
+
+/// Rewrite the AST of code parsed in script mode as if it was parsed in library mode.
+static void rewriteTopLevelCodeAsLibraryCode(Parser &P, MutableArrayRef<ASTNode> items) {
+  auto &SF = P.SF;
+  for (auto &item : items) {
+    auto *TLCD = dyn_cast_or_null<TopLevelCodeDecl>(item.dyn_cast<Decl *>());
+    if (!TLCD)
+      continue;
+
+    // Currently a TopLevelCodeDecl will only ever have 0 or 1 elements.
+    auto elements = TLCD->getBody()->getElements();
+    if (elements.empty())
+      continue;
+    assert(elements.size() == 1 && "Expected TopLevelCodeDecl body to have only a single element");
+    auto element = elements.front();
+
+    // Rewrite top level bindings as globals.
+    if (auto *PBD =
+            dyn_cast_or_null<PatternBindingDecl>(element.dyn_cast<Decl *>())) {
+      PBD->setDeclContext(&SF);
+
+      for (auto idx : range(PBD->getNumPatternEntries())) {
+        auto *initContext = PatternBindingInitializer::create(&SF);
+
+        PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
+          VD->setTopLevelGlobal(false);
+          for (auto *custom : VD->getAttrs().getAttributes<CustomAttr>()) {
+            if (auto *attrInit = custom->getInitContext())
+              attrInit->setEnclosingInitializer(initContext);
+          }
+        });
+        PBD->setInitContext(idx, initContext);
+
+        if (auto *init = PBD->getInit(idx))
+          init->walk(ReparentInitializerWalker(initContext));
+      }
+      item = PBD;
+      continue;
+    }
+
+    // Rewrite expression macro expansions as declaration macro expansions.
+    if (auto *MEE = dyn_cast_or_null<MacroExpansionExpr>(element.dyn_cast<Expr *>())) {
+      item = MEE->createSubstituteDecl();
+      continue;
+    }
+
+    // Diagnose constructs which aren't allowed in library mode.
+    if (isa<Stmt *>(element))
+      P.diagnose(element.getStartLoc(), diag::illegal_top_level_stmt);
+    else if (isa<Expr *>(element))
+      P.diagnose(element.getStartLoc(), diag::illegal_top_level_expr);
+    else
+      assert(false && "unexpected TopLevelCodeDecl element");
+  }
+}
+
 /// Main entrypoint for the parser.
 ///
 /// \verbatim
@@ -220,6 +397,11 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
                diag::unexpected_conditional_compilation_block_terminator);
       consumeToken();
     }
+  }
+
+  if (SF.isScriptMode() && hasMainTypeDecl(items)) {
+    SF.disableTopLevelCode();
+    rewriteTopLevelCodeAsLibraryCode(*this, items);
   }
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
@@ -5930,7 +6112,8 @@ static unsigned skipUntilMatchingRBrace(Parser &P, bool &HasPoundDirective,
                                         bool &HasNestedClassDeclarations,
                                         bool &HasNestedTypeDeclarations,
                                         bool &HasPotentialRegexLiteral,
-                                        bool &HasDerivativeDeclarations) {
+                                        bool &HasDerivativeDeclarations,
+                                        bool &HasMainTypeDeclarations) {
   HasPoundDirective = false;
   HasPoundSourceLocation = false;
   HasOperatorDeclarations = false;
@@ -5938,6 +6121,7 @@ static unsigned skipUntilMatchingRBrace(Parser &P, bool &HasPoundDirective,
   HasNestedTypeDeclarations = false;
   HasPotentialRegexLiteral = false;
   HasDerivativeDeclarations = false;
+  HasMainTypeDeclarations = false;
 
   unsigned OpenBraces = 1;
   unsigned OpenPoundIf = 0;
@@ -5970,9 +6154,21 @@ static unsigned skipUntilMatchingRBrace(Parser &P, bool &HasPoundDirective,
       if (P.Tok.is(tok::identifier)) {
         std::optional<DeclAttrKind> DK =
             DeclAttribute::getAttrKindFromString(P.Tok.getText());
-        if (DK && *DK == DeclAttrKind::Derivative) {
-          HasDerivativeDeclarations = true;
-          P.consumeToken();
+        if (DK) {
+          switch (*DK) {
+          case DeclAttrKind::Derivative:
+            HasDerivativeDeclarations = true;
+            P.consumeToken();
+            break;
+          case DeclAttrKind::MainType:
+          case DeclAttrKind::UIApplicationMain:
+          case DeclAttrKind::NSApplicationMain:
+            HasMainTypeDeclarations = true;
+            P.consumeToken();
+            break;
+          default:
+            break;
+          }
         }
       }
       continue;
@@ -7543,10 +7739,18 @@ bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
   bool HasPoundSourceLocation;
   bool HasNestedTypeDeclarations;
   bool HasPotentialRegexLiteral;
+  bool HasMainTypeDeclarations;
   skipUntilMatchingRBrace(*this, HasPoundDirective, HasPoundSourceLocation,
                           HasOperatorDeclarations, HasNestedClassDeclarations,
                           HasNestedTypeDeclarations, HasPotentialRegexLiteral,
-                          HasDerivativeDeclarations);
+                          HasDerivativeDeclarations, HasMainTypeDeclarations);
+
+  // If this member list may declare an '@main' type, parse it eagerly, because
+  // otherwise we can't tell whether top-level code needs to be suppressed in
+  // this file.
+  if (HasMainTypeDeclarations && SF.Kind == SourceFileKind::Main)
+    return false;
+
   if (!HasPoundDirective && !HasPotentialRegexLiteral) {
     // If we didn't see any pound directive, we must not have seen
     // #sourceLocation either.
@@ -8157,11 +8361,17 @@ bool Parser::canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations,
   bool HasNestedClassDeclarations;
   bool HasPotentialRegexLiteral;
   bool HasDerivativeDeclarations;
+  bool HasMainTypeDeclarations;
   skipUntilMatchingRBrace(*this, HasPoundDirectives, HasPoundSourceLocation,
                           HasOperatorDeclarations, HasNestedClassDeclarations,
                           HasNestedTypeDeclarations, HasPotentialRegexLiteral,
-                          HasDerivativeDeclarations);
+                          HasDerivativeDeclarations, HasMainTypeDeclarations);
   if (HasPoundSourceLocation || HasPotentialRegexLiteral)
+    return false;
+
+  // If this body may declare an '@main' type, parse it eagerly, because otherwise we
+  // can't tell whether top-level code needs to be suppressed in this file.
+  if (HasMainTypeDeclarations && SF.Kind == SourceFileKind::Main)
     return false;
 
   BackTrack.cancelBacktrack();

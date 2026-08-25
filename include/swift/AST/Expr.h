@@ -6611,6 +6611,7 @@ public:
   getResultExprs(SmallVectorImpl<Expr *> &scratch) const;
 
   DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *dc) { DC = dc; }
 
   SourceRange getSourceRange() const;
 

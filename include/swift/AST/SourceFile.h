@@ -172,6 +172,10 @@ private:
   /// The source location of the main type.
   SourceLoc MainDeclDiagLoc;
 
+  /// `true` if top level code should be disabled in this source file regardless
+  /// of its `SourceFileKind`
+  bool TopLevelCodeDisabled = false;
+
   /// A hash of all interface-contributing tokens that have been lexed for
   /// this source file.
   ///
@@ -754,7 +758,7 @@ public:
   bool isScriptMode() const {
     switch (Kind) {
     case SourceFileKind::Main:
-      return true;
+      return !TopLevelCodeDisabled;
 
     case SourceFileKind::Library:
     case SourceFileKind::Interface:
@@ -766,6 +770,8 @@ public:
     }
     llvm_unreachable("bad SourceFileKind");
   }
+
+  void disableTopLevelCode();
 
   ValueDecl *getMainDecl() const override { return MainDecl; }
   SourceLoc getMainDeclDiagLoc() const {
