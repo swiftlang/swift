@@ -924,9 +924,6 @@ void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
 }
 
 bool GenericArgumentsMismatchFailure::diagnoseAsError() {
-  if (getContextualTypePurpose() == CTP_ThrowStmt)
-    return diagnoseThrowsTypeMismatch();
-
   auto anchor = getAnchor();
 
   auto fromType = getFromType();
@@ -1004,6 +1001,9 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
       assert(purpose != CTP_Unused);
+
+      if (diagnoseThrowsTypeMismatch())
+        return true;
 
       // If this is call to a closure e.g. `let _: A = { B() }()`
       // let's point diagnostic to its result.
