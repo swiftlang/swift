@@ -69,6 +69,7 @@ add_swift_host_library(swiftAST STATIC
   GenericEnvironment.cpp
   GenericParamList.cpp
   GenericSignature.cpp
+  HiddenTypeLayout.cpp
   Identifier.cpp
   ImportCache.cpp
   IndexSubset.cpp

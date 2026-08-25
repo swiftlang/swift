@@ -25,6 +25,7 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SetVector.h"
 #include <array>
 #include <queue>
 #include <tuple>
@@ -34,6 +35,7 @@ namespace clang {
 }
 
 namespace swift {
+  struct HiddenTypeLayoutRequirement;
   class SILModule;
 
   namespace fine_grained_dependencies {
@@ -215,6 +217,10 @@ class Serializer : public SerializerBase {
                        index_block::DECL_OFFSETS>
   DeclsToSerialize;
 
+  /// Declarations whose layout must be serialized because they contribute to
+  /// the ABI of a client-visible type but may not be available to clients.
+  llvm::SmallSetVector<const Decl *, 16> HiddenTypeLayoutsToSerialize;
+
   ASTBlockRecordKeeper<Type, TypeID,
                        index_block::TYPE_OFFSETS>
   TypesToSerialize;
@@ -355,6 +361,10 @@ private:
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
 
+  /// Handle a hidden layout requirement discovered by AST analysis.
+  void handleHiddenTypeLayoutRequirement(
+      const HiddenTypeLayoutRequirement &requirement);
+
   /// Writes the given decl.
   void writeASTBlockEntity(const Decl *D);
 
@@ -421,6 +431,9 @@ private:
   /// This will continue until the queue is empty, even if the items currently
   /// in the queue trigger the serialization of additional decls and/or types.
   void writeAllDeclsAndTypes();
+
+  /// Writes placeholder records for scheduled hidden type layouts.
+  bool writeHiddenTypeLayoutInformationIfNeeded();
 
   /// Writes all identifiers in the IdentifiersToWrite queue.
   ///
