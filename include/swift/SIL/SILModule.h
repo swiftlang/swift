@@ -349,8 +349,8 @@ private:
   llvm::DenseMap<std::pair<Decl *, VarDecl *>, unsigned> fieldIndices;
   llvm::DenseMap<EnumElementDecl *, unsigned> enumCaseIndices;
 
-  /// The stage of processing this module is at.
-  SILStage Stage;
+  /// A module-wide lower bound on the stage of every function in the module.
+  SILStage StageFloor;
 
   /// The set of deserialization notification handlers.
   DeserializationNotificationHandlerSet deserializationNotificationHandlers;
@@ -1001,18 +1001,30 @@ public:
       ArrayRef<SILDefaultOverrideTable::Entry> entries);
 
   /// Return a lower bound on the stage of every function in the function list.
-  /// SILFunction::create() seeds a new function from it and setStage() sweeps
-  /// the list up to it.
+  /// SILFunction::create() seeds a new function from it and commitStage()
+  /// sweeps the list up to it.
   ///
   /// For a per-function query, read SILFunction::getFunctionStage(), which may
-  /// be ahead of this.
-  SILStage getStage() const { return Stage; }
+  /// be ahead of the floor.
+  SILStage getStageFloor() const { return StageFloor; }
+
+  /// True once the module has committed to at least Canonical, so the mandatory
+  /// pipeline will not run. It may have completed, or the input may have been
+  /// canonical already.
+  bool hasCommittedCanonical() const {
+    return StageFloor >= SILStage::Canonical;
+  }
+
+  /// True once the module has committed to Lowered. LoadableByAddress has
+  /// rewritten function types module-wide, so canonical bodies can no longer be
+  /// deserialized or linked in.
+  bool hasCommittedLowered() const { return StageFloor >= SILStage::Lowered; }
 
   /// Advance the module to s and sweep every function behind it up to it.
   /// The stage only ever moves forward.
-  void setStage(SILStage s) {
-    assert(s >= Stage && "regressing stage?!");
-    Stage = s;
+  void commitStage(SILStage s) {
+    assert(s >= StageFloor && "regressing stage floor?!");
+    StageFloor = s;
     for (SILFunction &f : *this)
       if (f.getFunctionStage() < s)
         f.setFunctionStage(s);
@@ -1219,7 +1231,7 @@ void verificationFailure(
     llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
 
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
-  switch (mod.getStage()) {
+  switch (mod.getStageFloor()) {
   case SILStage::Raw:
     // In raw SIL, lexical markers are used for diagnostics and are always
     // present.

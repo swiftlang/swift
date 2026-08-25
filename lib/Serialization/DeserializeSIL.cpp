@@ -732,7 +732,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // canonical SIL form.
   assert(!forDebugScope || declarationOnly); // debug scopes must always be read
                                              // declaration only
-  switch (SILMod.getStage()) {
+  switch (SILMod.getStageFloor()) {
   case SILStage::Raw:
   case SILStage::Canonical:
     break;
