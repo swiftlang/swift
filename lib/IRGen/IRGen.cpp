@@ -54,6 +54,7 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/InlineCost.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
@@ -392,6 +393,22 @@ void swift::performLLVMOptimizations(
     // LLVM is removing the Os pipeline and will instead rely
     // on O2 with the appropriate function attributes
     level = llvm::OptimizationLevel::O2;
+
+    // Swift always used the Os pipeline for optimized builds; a few of its
+    // tunings are keyed off the pipeline size level rather than the function
+    // optsize/minsize attribute, so reproduce them on O2 to preserve behavior.
+    // (Loop unrolling/vectorization and the per-caller inline clamps are
+    // attribute-driven and identical on Os and O2, so need no adjustment.)
+
+    // Os used the size-tuned inline threshold; O2 uses the larger speed default.
+    PTO.InlinerThreshold = llvm::InlineConstants::OptSizeThreshold;
+
+    // Os disabled IPSCCP function specialization. There is no PTO knob, so
+    // neutralize it through its cost option.
+    auto &RegisteredOpts = llvm::cl::getRegisteredOptions();
+    if (auto *MaxClones = static_cast<llvm::cl::opt<unsigned> *>(
+            RegisteredOpts.lookup("funcspec-max-clones")))
+      *MaxClones = 0;
   } else {
     level = llvm::OptimizationLevel::O0;
   }
