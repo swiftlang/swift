@@ -6023,6 +6023,19 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     }
   }
 
+  if (ctx.LangOpts.EnableCOMInterop &&
+      (ownershipKind == ReferenceOwnership::Weak ||
+       ownershipKind == ReferenceOwnership::Unowned) &&
+      underlyingType->isExistentialType() &&
+      underlyingType->getExistentialLayout().getCOMInterface()) {
+    Diags.diagnose(attr->getLocation(),
+                   diag::invalid_ownership_com_existential, underlyingType,
+                   ownershipKind);
+    Diags.diagnose(attr->getLocation(),
+                   diag::com_existential_reference_ownership_unmanaged);
+    attr->setInvalid();
+  }
+
   auto PDC = dyn_cast<ProtocolDecl>(dc);
   if (PDC && !PDC->isObjC()) {
     // Ownership does not make sense in protocols, except for "weak" on

@@ -6682,6 +6682,17 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
       swift::StrongCopy##Name##ValueInst *i) {                                 \
     Explosion in = getLoweredExplosion(i->getOperand());                       \
     auto silTy = i->getOperand()->getType();                                   \
+    Type resultTy = i->getType().getASTType();                                 \
+    if (auto objectTy = resultTy->getOptionalObjectType())                     \
+      resultTy = objectTy;                                                     \
+    if (resultTy->isExistentialType() &&                                       \
+        resultTy->getExistentialLayout().getCOMInterface()) {                  \
+      auto &ti = cast<LoadableTypeInfo>(getTypeInfo(i->getType()));            \
+      Explosion output;                                                        \
+      ti.copy(*this, in, output, irgen::Atomicity::Atomic);                    \
+      setLoweredExplosion(i, output);                                          \
+      return;                                                                  \
+    }                                                                          \
     auto &ti = getReferentTypeInfo(*this, silTy);                              \
     /* Since we are unchecked, we just use strong retain here. We do not       \
      * perform any checks */                                                   \

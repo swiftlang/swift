@@ -6917,6 +6917,13 @@ ERROR(invalid_ownership_incompatible_class,none,
 ERROR(invalid_ownership_incompatible_foreign_reference_type,none,
       "%0 is incompatible with 'weak' references, because it is a foreign reference type",
       (Type))
+ERROR(invalid_ownership_com_existential,none,
+      "%0 is incompatible with %1 references because COM interface "
+      "existentials do not support managed reference storage",
+      (Type, ReferenceOwnership))
+NOTE(com_existential_reference_ownership_unmanaged,none,
+     "use 'unowned(unsafe)' to store the interface without ownership tracking",
+     ())
 ERROR(downcast_to_foreign_reference_type,none,
       "downcast from %0 to %1 is not supported for foreign reference types",
       (Type, Type))

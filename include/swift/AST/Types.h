@@ -7864,7 +7864,8 @@ END_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 /// The storage type of a variable with non-strong reference
 /// ownership semantics.
 ///
-/// The referent type always satisfies allowsOwnership().
+/// The referent type always satisfies allowsOwnership(). Managed ownership
+/// may still be rejected for a particular reference model.
 ///
 /// These types may appear in the AST only as the type of a variable;
 /// getTypeOfReference strips this layer from the formal type of a
