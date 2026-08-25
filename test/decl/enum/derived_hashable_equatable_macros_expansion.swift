@@ -107,3 +107,30 @@ enum WithLabels: Hashable {
 // CHECK-NEXT:       return false
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
+
+enum WithRawIdentifiers: Hashable {
+  case `foo bar`
+  case `default`(Int)
+  case a(`foo bar`: String)
+}
+
+// CHECK: @_semantics("derived_enum_equals")
+// CHECK-NEXT: @_implements(Swift::Equatable, ==(_:_:))
+// CHECK-NEXT: static func __derived_enum_equals(_ lhs: Self, _ rhs: Self) -> Swift::Bool {
+// CHECK-NEXT:   switch (lhs, rhs) {
+// CHECK-NEXT:   case (.`foo bar`, .`foo bar`):
+// CHECK-NEXT:     return true
+// CHECK-NEXT:   case (.`default`(let l0), .`default`(let r0)):
+// CHECK-NEXT:     guard l0 == r0 else {
+// CHECK-NEXT:       return false
+// CHECK-NEXT:     }
+// CHECK-NEXT:     return true
+// CHECK-NEXT:   case (.a(`foo bar`: let l0), .a(`foo bar`: let r0)):
+// CHECK-NEXT:     guard l0 == r0 else {
+// CHECK-NEXT:       return false
+// CHECK-NEXT:     }
+// CHECK-NEXT:     return true
+// CHECK-NEXT:   default:
+// CHECK-NEXT:       return false
+// CHECK-NEXT:   }
+// CHECK-NEXT: }
