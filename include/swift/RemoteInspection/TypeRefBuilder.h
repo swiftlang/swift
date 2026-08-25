@@ -2083,6 +2083,8 @@ private:
         remote::RemoteAddress protocolDescriptorAddress) {
       std::optional<std::string> protocolName =
           readProtocolNameFromProtocolDescriptor(protocolDescriptorAddress);
+      if (!protocolName.has_value())
+        return std::nullopt;
 
       // Read the protocol conformance descriptor itself
       auto protocolContextDescriptorBytes = OpaqueByteReader(
@@ -2104,15 +2106,19 @@ private:
       return constructFullyQualifiedNameFromContextChain(contextNameChain);
     }
 
-    remote::RemoteAddress getParentDescriptorAddress(
+    std::optional<remote::RemoteAddress> getParentDescriptorAddress(
         remote::RemoteAddress contextDescriptorAddress,
         const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
             *contextDescriptor) {
       auto parentOffsetAddress = contextDescriptorAddress.applyRelativeOffset(
           (int32_t)contextDescriptor->getParentOffset());
-      auto parentOfsetBytes =
+      auto parentOffsetBytes =
           OpaqueByteReader(parentOffsetAddress, sizeof(uint32_t));
-      auto parentFieldOffset = (const int32_t *)parentOfsetBytes.get();
+      if (!parentOffsetBytes.get()) {
+        Error = "Failed to read parent offset in a context descriptor.";
+        return std::nullopt;
+      }
+      auto parentFieldOffset = (const int32_t *)parentOffsetBytes.get();
       auto parentTargetAddress =
           parentOffsetAddress.applyRelativeOffset(*parentFieldOffset);
       return parentTargetAddress;
@@ -2175,8 +2181,12 @@ private:
         return;
       }
 
-      const auto parentDescriptorAddress = getParentDescriptorAddress(
+      const auto optionalParentDescriptorAddress = getParentDescriptorAddress(
           contextDescriptorAddress, contextDescriptor);
+      if (!optionalParentDescriptorAddress.has_value())
+        return;
+      const auto parentDescriptorAddress =
+          optionalParentDescriptorAddress.value();
 
       auto addParentNameAndRecurse =
           [&](remote::RemoteAddress parentContextDescriptorAddress,
@@ -2315,14 +2325,16 @@ private:
     // Given that at a given offset from the opaque type descriptor base there
     // is an offset to a TypeRef string, read it.
     auto readRequirementTypeRefAddress =
-        [&](uintptr_t offsetFromOpaqueDescBase,
-            uintptr_t requirementAddress) -> remote::RemoteAddress {
+        [&](uintptr_t offsetFromOpaqueDescBase, uintptr_t requirementAddress)
+        -> std::optional<remote::RemoteAddress> {
       std::string typeRefString = "";
       auto fieldOffsetOffset = requirementAddress + offsetFromOpaqueDescBase -
                                (uintptr_t)opaqueTypeDescriptor;
       auto fieldOffsetAddress = opaqueTypeDescriptorAddress + fieldOffsetOffset;
       auto fieldOffsetBytes =
           OpaqueByteReader(fieldOffsetAddress, sizeof(uint32_t));
+      if (!fieldOffsetBytes.get())
+        return std::nullopt;
       auto fieldOffset = (const int32_t *)fieldOffsetBytes.get();
       auto fieldAddress = fieldOffsetAddress.applyRelativeOffset(*fieldOffset);
       return fieldAddress;
@@ -2353,19 +2365,25 @@ private:
         auto conformanceRequirementProtocolName =
             nameReader.readFullyQualifiedProtocolName(
                 protocolDescriptorAddress);
+        if (!conformanceRequirementProtocolName.has_value())
+          continue;
         protocolRequirements.push_back(*conformanceRequirementProtocolName);
       }
       if (req.getKind() == GenericRequirementKind::SameType) {
         // Read Param Name
         auto paramAddress = readRequirementTypeRefAddress(req.getParamOffset(),
                                                           (uintptr_t)(&req));
-        std::string demangledParamName =
-            nodeToString(demangleTypeRef(RDF.readTypeRef(paramAddress)));
+        if (!paramAddress.has_value())
+          continue;
+        std::string demangledParamName = nodeToString(
+            demangleTypeRef(RDF.readTypeRef(paramAddress.value())));
 
         // Read the substituted Type Name
         auto typeAddress = readRequirementTypeRefAddress(
             req.getSameTypeNameOffset(), (uintptr_t)(&req));
-        auto typeTypeRef = RDF.readTypeRef(typeAddress);
+        if (!typeAddress.has_value())
+          continue;
+        auto typeTypeRef = RDF.readTypeRef(typeAddress.value());
         std::string demangledTypeName =
             nodeToString(demangleTypeRef(typeTypeRef));
         std::string mangledTypeName;
