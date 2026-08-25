@@ -912,6 +912,32 @@ FunctionPointer irgen::getCoroFrameAllocStubFunctionPointer(IRGenModule &IGM) {
                                     sig);
 }
 
+llvm::Constant *irgen::getCoroFrameDeallocTypedStubFn(IRGenFunction &IGF) {
+  auto &IGM = IGF.IGM;
+  llvm::SmallString<64> name;
+  llvm::raw_svector_ostream(name) << "__swift_coroFrameDeallocTypedStub_"
+                                  << IGF.CurFn->getName();
+  auto *typeId = IGF.getMallocTypeId();
+  return IGM.getOrCreateHelperFunction(
+      name, IGM.VoidTy, {IGM.Int8PtrTy},
+      [&](IRGenFunction &stubIGF) {
+        auto parameters = stubIGF.collectParameters();
+        auto *ptr = parameters.claimNext();
+        stubIGF.Builder.CreateCall(
+            stubIGF.IGM.getCoroFrameDeallocTypedFunctionPointer(),
+            {ptr, typeId});
+        stubIGF.Builder.CreateRetVoid();
+      },
+      /*setIsNoInline=*/false,
+      /*forPrologue=*/false,
+      /*isPerformanceConstraint=*/false,
+      /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C,
+      /*transformAttrs=*/[&IGM](llvm::AttributeList &attrs) {
+        attrs = attrs.addFnAttribute(IGM.getLLVMContext(),
+                                      llvm::Attribute::AlwaysInline);
+      });
+}
+
 static Size getOffsetOfOpaqueIsolationField(IRGenModule &IGM,
                                       const LoadableTypeInfo &isolationTI) {
   auto offset = IGM.RefCountedStructSize;
@@ -1518,9 +1544,18 @@ public:
     llvm::Value *buffer = origParams.claimNext();
     llvm::Value *id;
     if (subIGF.IGM.getOptions().EmitTypeMallocForCoroFrame) {
-      // Use swift_coroFrameAllocStub to emit our allocator.
-      auto coroAllocFn = subIGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(subIGF.IGM));
       auto mallocTypeId = subIGF.getMallocTypeId();
+      llvm::Constant *coroAllocFn;
+      if (subIGF.IGM.isTypedAllocationAvailable()) {
+        coroAllocFn =
+            subIGF.IGM.getOpaquePtr(subIGF.IGM.getCoroFrameAllocTypedFn());
+        deallocFn =
+            subIGF.IGM.getOpaquePtr(getCoroFrameDeallocTypedStubFn(subIGF));
+      } else {
+        // Use swift_coroFrameAllocStub to emit our allocator.
+        coroAllocFn =
+            subIGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(subIGF.IGM));
+      }
       id = subIGF.Builder.CreateIntrinsicCall(
         llvm::Intrinsic::coro_id_retcon_once,
         {llvm::ConstantInt::get(
