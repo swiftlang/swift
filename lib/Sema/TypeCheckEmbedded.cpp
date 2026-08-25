@@ -148,8 +148,12 @@ void swift::diagnoseGenericMemberOfExistentialInEmbedded(
 
 void swift::diagnoseDynamicCastInEmbedded(
     const DeclContext *dc, const CheckedCastExpr *cast) {
-  // If we are not supposed to diagnose Embedded Swift limitations, do nothing.
-  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, cast->getLoc());
+  // A cast to a type involving a protocol needs a runtime conformance lookup,
+  // which the embedded runtime cannot do. This has always been unsupported --
+  // for the address-only forms SILGen produces, the optimizer rejects it
+  // outright -- so it is an error in Embedded Swift rather than a warning.
+  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, cast->getLoc(),
+                                                   /*wasAlwaysEmbeddedError=*/true);
   if (!behavior)
     return;
 
