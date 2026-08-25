@@ -410,8 +410,6 @@ GROUPED_WARNING(embedded_swift_cast_to_nonunique_type,EmbeddedRestrictions,none,
       "casting to %0 across a module boundary in embedded Swift may fail at "
       "runtime because its type metadata is not unique; mark %0 with "
       "'@export(interface)' in its defining module", (Type))
-GROUPED_ERROR(embedded_capture_of_generic_value_with_deinit,EmbeddedRestrictions,none,
-      "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
 GROUPED_ERROR(embedded_call_generic_function,EmbeddedRestrictions,none,
       "cannot specialize generic function or default protocol method in this context", ())
 GROUPED_ERROR(embedded_call_generic_function_with_dynamic_self,EmbeddedRestrictions,none,

@@ -1,12 +1,3 @@
-// Emitting the metadata of a non-copyable type also emits its value witnesses,
-// and the destroy witness calls the deinits of the type and its members. In
-// Embedded Swift those deinits must be fully specialized, because unspecialized
-// generic functions take type metadata, which doesn't exist there.
-//
-// `@export(interface)` is what makes a type's metadata emitted eagerly, so the
-// types below use it rather than the module-wide `CodeGenerationModel=interface`
-// (which is not a `Features.def` feature and so can't be spelled in a REQUIRES).
-
 // RUN: %target-swift-frontend %s -module-name main -parse-as-library -enable-experimental-feature Embedded -emit-sil -o - | %FileCheck -check-prefix SIL %s
 // RUN: %target-swift-frontend %s -module-name main -parse-as-library -enable-experimental-feature Embedded -emit-ir -o - | %FileCheck -check-prefix IR %s
 
@@ -54,28 +45,39 @@ public struct Unused: ~Copyable {
   var items: Storage<Int>
 }
 
+// Forming an existential is the other thing that makes IRGen emit metadata for
+// a type, so the deinit of the concrete type has to be specialized there too.
 // A concrete instantiation of a generic type is never among the types SILGen
-// records, so it has to be discovered from the SIL. `LocalOnly<Int>` is only
-// ever a local and `GenericBox<Int>`'s container is itself generic, so neither
-// is reachable from a recorded non-generic type — yet both get a specialized
-// deinit.
-// SIL-DAG: sil_moveonlydeinit $LocalOnly<Int> {
-// SIL-DAG: sil_moveonlydeinit $GenericBox<Int> {
+// recorded, so this one is found from the `init_existential` instruction.
+// SIL-DAG: sil_moveonlydeinit $Existentialized<Int> {
+public protocol HasF: ~Copyable {
+  func f()
+}
+
+public struct Existentialized<T>: ~Copyable, HasF {
+  var q: UnsafeMutablePointer<Int>
+  init() { q = .allocate(capacity: 1) }
+  public func f() {}
+  deinit { q.deallocate() }
+}
+
+@inline(never)
+func take(_ e: consuming any HasF & ~Copyable) { e.f() }
+
+public func useExistential() {
+  take(Existentialized<Int>())
+}
+
+// A type that is merely a local, with no metadata emitted for it, needs no
+// specialized deinit: nothing will ever call it through a value witness.
+// SIL-NOT: sil_moveonlydeinit $LocalOnly<Int> {
 public struct LocalOnly<T>: ~Copyable {
   var p: UnsafeMutablePointer<Int>
   init() { p = .allocate(capacity: 1) }
   deinit { p.deallocate() }
 }
 
-public struct GenericBox<T>: ~Copyable {
-  var q: UnsafeMutablePointer<Int>
-  init() { q = .allocate(capacity: 1) }
-  deinit { q.deallocate() }
-}
-
 public func useLocalOnly() {
   let s = LocalOnly<Int>()
   _ = s.p
-  let g = GenericBox<Int>()
-  _ = g.q
 }
