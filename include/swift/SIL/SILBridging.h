@@ -978,6 +978,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt MarkUninitializedInst_getKind() const;
   BRIDGED_INLINE SwiftInt MarkUnresolvedNonCopyableValue_getCheckKind() const;
   BRIDGED_INLINE bool MarkUnresolvedNonCopyableValue_isStrict() const;
+  BRIDGED_INLINE SwiftInt Diagnose_getKind() const;
   BRIDGED_INLINE void RefCountingInst_setIsAtomic(bool isAtomic) const;
   BRIDGED_INLINE bool RefCountingInst_getIsAtomic() const;
   BRIDGED_INLINE void AllocRefInstBase_setIsStackAllocatable() const;
@@ -1562,6 +1563,9 @@ struct BridgedBuilder{
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkUnresolvedNonCopyableValue(
     BridgedValue value, SwiftInt checkKind, bool isStrict) const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDiagnose(
+    BridgedValue operand, SwiftInt kind) const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndAccess(BridgedValue value) const;
 

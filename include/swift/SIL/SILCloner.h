@@ -2437,6 +2437,15 @@ void SILCloner<ImplClass>::visitMarkUnresolvedNonCopyableValueInst(
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitDiagnoseInst(DiagnoseInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto *DI = getBuilder().createDiagnose(getOpLocation(Inst->getLoc()),
+                                         getOpValue(Inst->getOperand()),
+                                         Inst->getKind());
+  recordClonedInstruction(Inst, DI);
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitMarkUnresolvedReferenceBindingInst(
     MarkUnresolvedReferenceBindingInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

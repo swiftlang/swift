@@ -1976,6 +1976,10 @@ bool BridgedInstruction::MarkUnresolvedNonCopyableValue_isStrict() const {
   return getAs<swift::MarkUnresolvedNonCopyableValueInst>()->isStrict();
 }
 
+SwiftInt BridgedInstruction::Diagnose_getKind() const {
+  return (SwiftInt)getAs<swift::DiagnoseInst>()->getKind();
+}
+
 void BridgedInstruction::RefCountingInst_setIsAtomic(bool isAtomic) const {
   getAs<swift::RefCountingInst>()->setAtomicity(
       isAtomic ? swift::RefCountingInst::Atomicity::Atomic
@@ -3419,6 +3423,13 @@ BridgedInstruction BridgedBuilder::createMarkUnresolvedNonCopyableValue(BridgedV
   return {unbridged().createMarkUnresolvedNonCopyableValueInst(
       regularLoc(), value.getSILValue(), (swift::MarkUnresolvedNonCopyableValueInst::CheckKind)checkKind,
       (swift::MarkUnresolvedNonCopyableValueInst::IsStrict_t)isStrict)};
+}
+
+BridgedInstruction BridgedBuilder::createDiagnose(BridgedValue operand,
+                                                  SwiftInt kind) const {
+  return {unbridged().createDiagnose(
+      regularLoc(), operand.getSILValue(),
+      (swift::DiagnoseInst::DiagnoseKind)kind)};
 }
 
 
