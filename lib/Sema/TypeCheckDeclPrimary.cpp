@@ -2442,6 +2442,7 @@ public:
     if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD))
       (void)IOD->getPrecedenceGroup();
     checkAccessControl(OD);
+    TypeChecker::checkIsolatedConfromancesInDecl(OD);
   }
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
@@ -2471,6 +2472,7 @@ public:
   void visitMacroDecl(MacroDecl *MD) {
     TypeChecker::checkDeclAttributes(MD);
     checkAccessControl(MD);
+    TypeChecker::checkIsolatedConfromancesInDecl(MD);
 
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
@@ -2568,8 +2570,6 @@ public:
     (void) VD->getPropertyWrapperInitializerInfo();
     (void) VD->getImplInfo();
     checkGlobalIsolation(VD);
-    TypeChecker::checkIsolatedConformancesInType(VD->getValueInterfaceType(),
-                                                 VD->getLoc());
 
     // Visit auxiliary decls first
     VD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *var) {
@@ -2872,6 +2872,8 @@ public:
 
     checkExplicitAvailability(PBD);
 
+    TypeChecker::checkIsolatedConfromancesInDecl(PBD);
+
     // If the initializers in the PBD aren't checked yet, do so now.
     for (auto i : range(PBD->getNumPatternEntries())) {
       if (!PBD->isInitialized(i))
@@ -3004,20 +3006,10 @@ public:
 
     TypeChecker::checkParameterList(SD->getIndices(), SD);
 
-    for (auto *param : *SD->getIndices())
-      TypeChecker::checkIsolatedConformancesInType(param->getInterfaceType(),
-                                                   param->getLoc());
-
-    {
-      auto elementLoc = SD->getElementTypeRepr()
-                            ? SD->getElementTypeRepr()->getLoc()
-                            : SD->getLoc();
-      TypeChecker::checkIsolatedConformancesInType(
-          SD->getElementInterfaceType(), elementLoc);
-    }
-
     checkDefaultArguments(SD->getIndices());
     checkVariadicParameters(SD->getIndices(), SD);
+
+    TypeChecker::checkIsolatedConfromancesInDecl(SD);
 
     if (DC->getSelfClassDecl()) {
       checkDynamicSelfType(SD, SD->getValueInterfaceType());
@@ -3067,16 +3059,10 @@ public:
     // Force requests that can emit diagnostics.
     (void) TAD->getUnderlyingType();
 
-    // Make sure to check the underlying type.
-    auto underlyingLoc = TAD->getUnderlyingTypeRepr()
-                             ? TAD->getUnderlyingTypeRepr()->getLoc()
-                             : TAD->getLoc();
-    TypeChecker::checkIsolatedConformancesInType(TAD->getUnderlyingType(),
-                                                 underlyingLoc);
-
     TypeChecker::checkDeclAttributes(TAD);
     checkAccessControl(TAD);
     checkGenericParams(TAD);
+    TypeChecker::checkIsolatedConfromancesInDecl(TAD);
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
@@ -3102,6 +3088,8 @@ public:
 
     // Trigger the checking for overridden declarations.
     (void) AT->getOverriddenDecls();
+
+    TypeChecker::checkIsolatedConfromancesInDecl(AT);
 
     auto defaultType = AT->getDefaultDefinitionType();
     if (defaultType && !defaultType->hasError()) {
@@ -3229,6 +3217,7 @@ public:
     checkInheritanceClause(ED);
     diagnoseMissingExplicitSendable(ED);
     checkAccessControl(ED);
+    TypeChecker::checkIsolatedConfromancesInDecl(ED);
 
     auto &DE = Ctx.Diags;
     if (auto rawTy = ED->getRawType()) {
@@ -3267,6 +3256,7 @@ public:
     TypeChecker::checkDeclCircularity(ED);
 
     TypeChecker::checkConformancesInContext(ED);
+    TypeChecker::checkIsolatedConfromancesInDecl(ED);
 
     // If our enum is marked as move only, it cannot be indirect or have any
     // indirect cases.
@@ -3315,6 +3305,7 @@ public:
     TypeChecker::checkDeclCircularity(SD);
 
     TypeChecker::checkConformancesInContext(SD);
+    TypeChecker::checkIsolatedConfromancesInDecl(SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -3614,6 +3605,7 @@ public:
     TypeChecker::checkDeclCircularity(CD);
 
     TypeChecker::checkConformancesInContext(CD);
+    TypeChecker::checkIsolatedConfromancesInDecl(CD);
 
     maybeDiagnoseClassWithoutInitializers(CD);
 
@@ -3689,6 +3681,8 @@ public:
     if (PD->getParentSourceFile())
       TypeChecker::checkConformancesInContext(PD);
 
+    TypeChecker::checkIsolatedConfromancesInDecl(PD);
+
     checkDeprecatedSuppressedAssociatedTypes(PD);
   }
 
@@ -3720,16 +3714,6 @@ public:
       }
 
       TypeChecker::checkParameterList(FD->getParameters(), FD);
-
-      for (auto *param : *FD->getParameters())
-        TypeChecker::checkIsolatedConformancesInType(param->getInterfaceType(),
-                                                     param->getLoc());
-
-      auto resultLoc = FD->getResultTypeRepr()
-                           ? FD->getResultTypeRepr()->getLoc()
-                           : FD->getLoc();
-      TypeChecker::checkIsolatedConformancesInType(FD->getResultInterfaceType(),
-                                                   resultLoc);
     }
 
     checkAccessControl(FD);
@@ -3737,6 +3721,8 @@ public:
     TypeChecker::checkDeclAttributes(FD);
     TypeChecker::checkDistributedFunc(FD);
     checkEmbeddedRestrictionsInSignature(FD);
+
+    TypeChecker::checkIsolatedConfromancesInDecl(FD);
 
     // Untyped throws might need to be diagnosed.
     SourceLoc throwsLoc = FD->getThrowsLoc();
@@ -3851,11 +3837,6 @@ public:
 
     if (auto *PL = EED->getParameterList()) {
       TypeChecker::checkParameterList(PL, EED);
-
-      for (auto *param : *PL)
-        TypeChecker::checkIsolatedConformancesInType(param->getInterfaceType(),
-                                                     param->getLoc());
-
       checkDefaultArguments(PL);
       checkVariadicParameters(PL, EED);
     }
@@ -3879,6 +3860,7 @@ public:
     }
 
     checkAccessControl(EED);
+    TypeChecker::checkIsolatedConfromancesInDecl(EED);
   }
 
   /// The extended type must be '(repeat each Element)' or a generic
@@ -4139,6 +4121,8 @@ public:
     checkTupleExtension(ED);
 
     checkExtensionAddsSoloInvertibleProtocol(ED);
+
+    TypeChecker::checkIsolatedConfromancesInDecl(ED);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
@@ -4163,10 +4147,6 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
     TypeChecker::checkParameterList(CD->getParameters(), CD);
-
-    for (auto *param : *CD->getParameters())
-      TypeChecker::checkIsolatedConformancesInType(param->getInterfaceType(),
-                                                   param->getLoc());
 
     checkEmbeddedRestrictionsInSignature(CD);
 
@@ -4301,6 +4281,7 @@ public:
     checkVariadicParameters(CD->getParameters(), CD);
 
     TypeChecker::checkObjCImplementation(CD);
+    TypeChecker::checkIsolatedConfromancesInDecl(CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {

@@ -599,15 +599,6 @@ checkGenericArgumentsForDiagnostics(GenericSignature signature,
 /// with a `Sendable`/`SendableMetatype` requirement on the corresponding
 /// generic parameter, and report on any failures in detail for diagnostic
 /// needs.
-///
-/// This must only be called once every declaration that could witness the
-/// requirements involved has already been fully checked: determining
-/// whether a conformance is isolated can require fully checking that
-/// conformance, which could reintroduce a cycle if attempted while one of
-/// its witnessing declarations was still being resolved. In particular,
-/// this must never be folded back into \c checkGenericArgumentsForDiagnostics
-/// itself, since that is also used during ordinary interface type
-/// resolution.
 CheckGenericArgumentsResult
 checkIsolatedConformancesForDiagnostics(GenericSignature signature,
                                         ArrayRef<Requirement> requirements,
@@ -617,13 +608,13 @@ checkIsolatedConformancesForDiagnostics(GenericSignature signature,
 /// substituted using an isolated conformance where the corresponding
 /// generic parameter carries a `Sendable` or `SendableMetatype` requirement
 /// that prohibits it, and diagnose each violation at \p loc.
-///
-/// This is checked separately from (and after) the rest of interface type
-/// resolution because determining whether a conformance is isolated
-/// requires it to be fully checked, which could otherwise introduce
-/// circularity while a declaration's own interface type is still being
-/// resolved.
 void checkIsolatedConformancesInType(Type type, SourceLoc loc);
+
+/// Search \p D's interface type for bound generic types whose generic arguments
+/// were substituted using an isolated conformance where the corresponding
+/// generic parameter carries a `Sendable` or `SendableMetatype` requirement
+/// that prohibits it.
+void checkIsolatedConfromancesInDecl(Decl *D);
 
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
