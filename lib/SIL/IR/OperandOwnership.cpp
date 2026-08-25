@@ -1062,6 +1062,32 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
   return OperandOwnership::InstantaneousUse;
 }
 
+// Both AddTaskLocalValue and TaskLocalValuePush have the same signature:
+// operand 0 is the key (Builtin.RawPointer), always trivial; operand 1 is
+// the generic value that is consumed.
+static OperandOwnership visitTaskLocalValueOperand(const Operand &op,
+                                                   BuiltinInst *bi) {
+  if (&op == &bi->getOperandRef(0))
+    return OperandOwnership::TrivialUse;
+
+  assert(&op == &bi->getOperandRef(1));
+  if (op.get()->getType().isAddress())
+    return OperandOwnership::TrivialUse;
+  return OperandOwnership::DestroyingConsume;
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitAddTaskLocalValue(BuiltinInst *bi,
+                                                          StringRef attr) {
+  return visitTaskLocalValueOperand(op, bi);
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitTaskLocalValuePush(BuiltinInst *bi,
+                                                           StringRef attr) {
+  return visitTaskLocalValueOperand(op, bi);
+}
+
 OperandOwnership OperandOwnershipBuiltinClassifier::
 visitResumeNonThrowingContinuationReturning(BuiltinInst *bi, StringRef attr) {
   // The value operand is consumed.
@@ -1123,13 +1149,8 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemoveCancellationHandler)
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddPriorityEscalationHandler)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemovePriorityEscalationHandler)
-// This is a trivial use since our first operand is a Builtin.RawPointer and our
-// second is an address to our generic Value.
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskLocalValuePush)
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AddTaskLocalValue)
 // Trivial use of the token result of AddTaskLocalValue.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, RemoveTaskLocalValue)
-
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPush)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)
 
