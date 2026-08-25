@@ -1608,7 +1608,7 @@ struct BridgedContext {
   // Module
 
   BridgedOwnedString getModuleDescription() const;
-  BRIDGED_INLINE SILStage getSILStage() const;
+  BRIDGED_INLINE SILStage getStageFloor() const;
   BRIDGED_INLINE bool moduleIsSerialized() const;
   BRIDGED_INLINE bool usesOpaqueValues() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getCurrentModuleContext() const;

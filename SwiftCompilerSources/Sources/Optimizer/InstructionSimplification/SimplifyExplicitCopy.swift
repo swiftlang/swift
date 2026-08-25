@@ -28,7 +28,7 @@ import SIL
 ///
 extension ExplicitCopyValueInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
-    if context.silStage == .raw {
+    if context.stageFloor == .raw {
       // Make sure we don't remove `explicit_copy_value` in the diagnostic pipeline.
       return
     }
@@ -51,7 +51,7 @@ extension ExplicitCopyValueInst : Simplifiable, SILCombineSimplifiable {
 ///
 extension ExplicitCopyAddrInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
-    if context.silStage == .raw {
+    if context.stageFloor == .raw {
       // Make sure we don't remove `explicit_copy_addr` in the diagnostic pipeline.
       return
     }

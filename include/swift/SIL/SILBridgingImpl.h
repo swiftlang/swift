@@ -3462,8 +3462,8 @@ bool BridgedContext::hasChangeNotification(NotificationKind changeKind) const {
   return (context->getChangeNotifications() & (swift::SILContext::NotificationKind)changeKind) != 0;
 }
 
-BridgedContext::SILStage BridgedContext::getSILStage() const {
-  return (SILStage)context->getModule()->getStage();
+BridgedContext::SILStage BridgedContext::getStageFloor() const {
+  return (SILStage)context->getModule()->getStageFloor();
 }
 
 bool BridgedContext::moduleIsSerialized() const {
