@@ -35,6 +35,7 @@ module Function {
 
 // NOTE: Bro<Ken> is an invalid type and will produce an error when instantiated
 
+// expected-swift-note@+2 {{requested here}}
 template <typename K>
 struct Bro {
   typename K::enough iAm; // cxx-error {{no type named 'enough'}}
@@ -60,7 +61,6 @@ struct GoodStruct {
   // expected-swift-note@+2 {{explicitly marked unavailable here}}
   // expected-swift-note@+1 {{explicitly marked unavailable here}}
   Bro<Ken> badReturn() const;
-  // expected-swift-note@-1 {{requested here}}
 
   // expected-swift-note@+2 {{unavailable (cannot import)}}
   // expected-swift-note@+1 {{unavailable (cannot import)}}
@@ -100,10 +100,12 @@ struct GoodStruct {
 // CHECK:      struct GoodStruct {
 // CHECK-NEXT:   init()
 //
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func badReturn() -> Never
 //
 // NOTE-MISSING: func badArg(_: Never)
 //
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func getBad() -> Never
 //
 // NOTE-MISSING: func badStatic(_: Never) -> Never

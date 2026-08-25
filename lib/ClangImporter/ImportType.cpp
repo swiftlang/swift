@@ -2472,8 +2472,6 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   bool allowNSUIntegerAsInt =
       shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
 
-  // Only eagerly import the return type if it's not too expensive (the current
-  // heuristic for that is if it's not a record type).
   ImportDiagnosticAdder addDiag(*this, clangDecl,
                                 clangDecl->getSourceRange().getBegin());
   clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
@@ -2502,22 +2500,34 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
     if (!genericPointerType)
       addDiag(Diagnostic(diag::bridged_pointer_type_not_found, pointerKind));
     importedType = {genericPointerType, false};
-  } else if (!(isa<clang::RecordType>(returnType) ||
-               isa<clang::TemplateSpecializationType>(returnType)) ||
-             // TODO: we currently don't lazily load operator return types, but
-             // this should be trivial to add.
-             clangDecl->isOverloadedOperator() ||
-             // Dependant types are trivially mapped as Any.
-             returnType->isDependentType()) {
+  } else if (!importedType) {
     // If importedType is already initialized, it means we found the enum that
     // was supposed to be used (instead of the typedef type).
+    importedType = importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
     if (!importedType) {
-      importedType =
-          importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
-      if (!importedType) {
+      // If we reach here, it means we can't import this function's return type.
+      // Sometimes, instead of skipping this function entirely, we import the
+      // function but we mark it as unavailable and map its return type to
+      // 'Never' so that it doesn't just get diagnosed as a missing member.
+      //
+      // TODO: unify the policy around unimportable/semi-unimportable types and
+      // decls, and replace this confusingly ad hoc logic.
+      //
+      // The condition below preserves historical compiler behavior for
+      // different kinds of decls.
+      bool importAsUnavailable =
+          isa<clang::RecordType, clang::TemplateSpecializationType>(
+              returnType) &&
+          !clangDecl->isOverloadedOperator() && !returnType->isDependentType();
+      if (!importAsUnavailable) {
+        // Emit diagnostic and return without assigning to parameterList, to
+        // signal that the function decl should not be imported.
         addDiag(Diagnostic(diag::return_type_not_imported));
         return {Type(), false};
       }
+      // Fall through with an empty result type. The path below assigns to
+      // parameterList, which causes importFunctionDecl() to import the function
+      // but mark it unavailable and map the return type to 'Never'.
     }
   }
 
