@@ -45,9 +45,10 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
     // metadata, which doesn't exist in embedded Swift. Seed the worklist with
     // the specializations so that they get optimized like any other function.
     //
-    // This covers the types SILGen saw. Concrete instantiations of generic
-    // types are not among them, so `optimize` additionally specializes the
-    // deinits of the non-copyable types it encounters in each function.
+    // This covers types which are `@export(interface)`, whose metadata is
+    // emitted eagerly. The other things IRGen emits metadata for -- boxes and
+    // existentials -- are handled in `optimize` when their instructions are
+    // visited.
     specializeDeinitsOfEmittedMetadata(moduleContext, &handledDeinitTypes, &worklist)
   } else {
     worklist.addAllMandatoryRequiredFunctions(of: moduleContext)
@@ -68,12 +69,8 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
   while let f = worklist.pop() {
     moduleContext.transform(function: f) { context in
       if context.loadFunction(function: f, loadCalleesRecursively: true) {
-        optimize(function: f, context, moduleContext, &worklist)
+        optimize(function: f, context, moduleContext, &worklist, &handledDeinitTypes)
       }
-    }
-
-    if moduleContext.options.enableEmbeddedSwift {
-      specializeDeinitsOfTypes(in: f, &handledDeinitTypes, moduleContext, &worklist)
     }
 
     // Generic specialization takes care of removing metatype arguments of generic functions.
@@ -105,34 +102,8 @@ private func specializeDeinitsOfEmittedMetadata(_ moduleContext: ModulePassConte
   }
 }
 
-/// Specializes the deinits of the non-copyable types appearing in `function`.
-///
-/// The types SILGen recorded are only the ones it declared; a concrete
-/// instantiation of a generic type (`Storage<Int>`) is never among them, yet
-/// IRGen emits metadata — and therefore value witnesses that destroy it — for
-/// such types too. Those instantiations only become apparent once generic
-/// specialization has run, so scan for them as each function is optimized.
-private func specializeDeinitsOfTypes(in function: Function,
-                                      _ handled: inout Set<Type>,
-                                      _ moduleContext: ModulePassContext,
-                                      _ worklist: inout FunctionWorklist) {
-  guard function.isDefinition else {
-    return
-  }
-  for instruction in function.instructions {
-    for result in instruction.results {
-      specializeDeinits(ofType: result.type, in: function, &handled, moduleContext, &worklist)
-    }
-    for operand in instruction.operands {
-      specializeDeinits(ofType: operand.value.type, in: function, &handled, moduleContext,
-                        &worklist)
-    }
-  }
-  for argument in function.arguments {
-    specializeDeinits(ofType: argument.type, in: function, &handled, moduleContext, &worklist)
-  }
-}
-
+/// Specializes the deinits of the non-copyable `type`, and of its stored
+/// properties and enum payloads, because IRGen is about to emit metadata for it.
 private func specializeDeinits(ofType type: Type,
                                in function: Function,
                                _ handled: inout Set<Type>,
@@ -164,7 +135,7 @@ fileprivate struct PathFunctionTuple: Hashable {
   var function: Function
 }
 
-private func optimize(function: Function, _ context: FunctionPassContext, _ moduleContext: ModulePassContext, _ worklist: inout FunctionWorklist) {
+private func optimize(function: Function, _ context: FunctionPassContext, _ moduleContext: ModulePassContext, _ worklist: inout FunctionWorklist, _ handledDeinitTypes: inout Set<Type>) {
   var alreadyInlinedFunctions: Set<PathFunctionTuple> = Set()
 
   // ObjectOutliner replaces calls to findStringSwitchCase with _findStringSwitchCaseWithCache, but this happens as a late SIL optimization,
@@ -186,6 +157,21 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         worklist.pushIfNotVisited($0)
       }
     }
+  }
+
+  // IRGen emits type metadata for a boxed or existential value, and for the
+  // destination of a checked cast. The destroy value witness of that metadata
+  // calls the type's deinit, which in embedded Swift has to be fully
+  // specialized first.
+  func specializeDeinitsOfMetadata(for type: Type) {
+    if context.options.enableEmbeddedSwift {
+      specializeDeinits(ofType: type, in: function, &handledDeinitTypes, moduleContext,
+                        &worklist)
+    }
+  }
+
+  func specializeDeinitsOfMetadata(forFormalType type: CanonicalType) {
+    specializeDeinitsOfMetadata(for: type.loweredType(in: function))
   }
 
   var changed = true
@@ -210,8 +196,18 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         }
       case let cast as UnconditionalCheckedCastInst:
         specializeVTable(for: cast.type, instruction: cast)
+        specializeDeinitsOfMetadata(forFormalType: cast.targetFormalType)
       case let cast as UncheckedRefCastInst:
         specializeVTable(for: cast.type, instruction: cast)
+
+      // The destination of a checked cast needs metadata for the runtime check.
+      case let cast as UnconditionalCheckedCastAddrInst:
+        specializeDeinitsOfMetadata(forFormalType: cast.targetFormalType)
+      case let cast as CheckedCastBranchInst:
+        specializeDeinitsOfMetadata(forFormalType: cast.targetFormalType)
+      case let cast as CheckedCastAddrBranchInst:
+        specializeDeinitsOfMetadata(forFormalType: cast.targetFormalType)
+
       case let kpi as KeyPathInst:
         // In Embedded Swift, specialize the functions that are referenced
         // by the key path.
@@ -240,6 +236,7 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
 
       case let initExRef as InitExistentialRefInst:
         if context.options.enableEmbeddedSwift {
+          specializeDeinitsOfMetadata(for: initExRef.instance.type)
           for c in initExRef.conformances where c.isConcrete {
             specializeWitnessTable(for: c, moduleContext)
             worklist.addWitnessMethods(of: c, moduleContext)
@@ -248,9 +245,19 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
 
       case let initExAddr as InitExistentialAddrInst:
         if context.options.enableEmbeddedSwift {
+          specializeDeinitsOfMetadata(for: initExAddr.formalConcreteType.loweredType(in: function))
           for c in initExAddr.conformances where c.isConcrete && !c.protocol.isMarkerProtocol {
             specializeWitnessTable(for: c, moduleContext)
             worklist.addWitnessMethods(of: c, moduleContext)
+          }
+        }
+
+      case let allocBox as AllocBoxInst:
+        // Metadata is emitted for the boxed type, and its destroy value witness
+        // calls that type's deinit.
+        if context.options.enableEmbeddedSwift {
+          for field in allocBox.type.getBoxFields(in: function) {
+            specializeDeinitsOfMetadata(for: field)
           }
         }
 
