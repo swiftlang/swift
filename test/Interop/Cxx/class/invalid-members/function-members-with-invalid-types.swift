@@ -41,6 +41,14 @@ struct Bro {
                           // expected-swift-error@-1 {{no type named 'enough'}}
 };
 
+// NOTE: like Bro, but only used as a parameter type, so that the instantiation
+// is requested while importing a parameter rather than a return type.
+template <typename K>
+struct Sis {
+  typename K::enough iAm; // cxx-error {{no type named 'enough'}}
+                          // expected-swift-error@-1 {{no type named 'enough'}}
+};
+
 struct Ken {};
 
 struct __attribute__((swift_attr("import_reference")))
@@ -65,6 +73,16 @@ struct GoodStruct {
   // expected-swift-note@+2 {{unavailable (cannot import)}}
   // expected-swift-note@+1 {{unavailable (cannot import)}}
   void badArg(Bro<Ken>) const;
+
+  // Sis<Ken> is only ever named as a parameter type, so its instantiation is
+  // requested while importing a parameter rather than a return type.
+  void badParam(
+    Sis<Ken> // expected-swift-note {{requested here}}
+  ) const;
+
+  // Define this valid overload so that badParam(Sis<Ken>) so that we have
+  // something to legitimately look up.
+  void badParam(int ok) const;
 
   // expected-swift-note@+1 * {{explicitly marked unavailable here}}
   Bro<Ken> getBad() const;
@@ -105,6 +123,9 @@ struct GoodStruct {
 //
 // NOTE-MISSING: func badArg(_: Never)
 //
+// CHECK-NEXT:   func badParam(_ ok: CInt)
+// NOTE-MISSING: func badParam(_: Never)
+//
 // CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func getBad() -> Never
 //
@@ -124,6 +145,7 @@ struct DerivedGoodStruct : GoodStruct {};
 // CHECK:      struct DerivedGoodStruct {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func badReturn() -> Never
+// CHECK-NEXT:   func badParam(_ ok: CInt)
 // CHECK-NEXT:   func getBad() -> Never
 // NOTE-MISSING: func badVirtual(_: Never) -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
@@ -140,6 +162,7 @@ struct UsingGoodStruct : GoodStruct {
 // CHECK:      struct UsingGoodStruct {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func badReturn() -> Never
+// CHECK-NEXT:   func badParam(_ ok: CInt)
 // CHECK-NEXT:   func getBad() -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
@@ -183,6 +206,10 @@ void err(void) {
   gs.overloadsSameNumArgs(42); // cxx-note {{requested here}}
   // The Bro<Ken> type is instantiated while considering overloads candidates
   // for GoodStruct::overloadsSameNumArgs(_).
+
+  gs.badParam(42); // cxx-note {{requested here}}
+  // Likewise, Sis<Ken> is instantiated while considering overload candidates
+  // for GoodStruct::badParam(_).
 
   // It is only instantiated once and thus no longer triggers diagnostics in
   // its following uses:
@@ -248,6 +275,9 @@ func err() {
                             // expected-swift-warning@-1 {{an enum with no cases}}
                             // expected-swift-note@-2 {{add an explicit type annotation}}
   gs.badArg(inc)            // expected-swift-error {{has no member}}
+
+  // Importing this overload set instantiates Sis<Ken> for the other overloads.
+  gs.badParam(42)
 
   let inc2 = gs.getBad()     // expected-swift-error {{is unavailable}}
                              // expected-swift-warning@-1 {{an enum with no cases}}
