@@ -236,27 +236,26 @@ extension LabeledExprListSyntax {
 
   /// Parses zero labelled arguments from the argument list
   func expect() throws {
-    let lst = Array(self)
-    guard lst.count == 0 else {
+    guard count == 0 else {
       throw TypeInfoParseError.argCountMismatch(expected: 0, args: self)
     }
   }
 
   /// Parses one labelled argument from the argument list.
   func expect<A>(_ a: ArgParser<A>) throws -> A {
-    let lst = Array(self)
-    guard lst.count == 1 else {
+    guard count == 1 else {
       throw TypeInfoParseError.argCountMismatch(expected: 1, args: self)
     }
+    let lst = Array(self)
     return try a.expect(arg: lst[0])
   }
 
   /// Parses two labelled arguments from the argument list.
   func expect<A, B>(_ a: ArgParser<A>, _ b: ArgParser<B>) throws -> (A, B) {
-    let lst = Array(self)
-    guard lst.count == 2 else {
+    guard count == 2 else {
       throw TypeInfoParseError.argCountMismatch(expected: 2, args: self)
     }
+    let lst = Array(self)
     return (
       try a.expect(arg: lst[0]),
       try b.expect(arg: lst[1])
@@ -267,10 +266,10 @@ extension LabeledExprListSyntax {
   func expect<A, B, C>(
     _ a: ArgParser<A>, _ b: ArgParser<B>, _ c: ArgParser<C>
   ) throws -> (A, B, C) {
-    let lst = Array(self)
-    guard lst.count == 3 else {
+    guard count == 3 else {
       throw TypeInfoParseError.argCountMismatch(expected: 3, args: self)
     }
+    let lst = Array(self)
     return (
       try a.expect(arg: lst[0]),
       try b.expect(arg: lst[1]),
@@ -282,10 +281,10 @@ extension LabeledExprListSyntax {
   func expect<A, B, C, D>(
     _ a: ArgParser<A>, _ b: ArgParser<B>, _ c: ArgParser<C>, _ d: ArgParser<D>
   ) throws -> (A, B, C, D) {
-    let lst = Array(self)
-    guard lst.count == 4 else {
+    guard count == 4 else {
       throw TypeInfoParseError.argCountMismatch(expected: 4, args: self)
     }
+    let lst = Array(self)
     return (
       try a.expect(arg: lst[0]),
       try b.expect(arg: lst[1]),
@@ -298,10 +297,10 @@ extension LabeledExprListSyntax {
   func expect<A, B, C, D, E>(
     _ a: ArgParser<A>, _ b: ArgParser<B>, _ c: ArgParser<C>, _ d: ArgParser<D>, _ e: ArgParser<E>
   ) throws -> (A, B, C, D, E) {
-    let lst = Array(self)
-    guard lst.count == 5 else {
+    guard count == 5 else {
       throw TypeInfoParseError.argCountMismatch(expected: 5, args: self)
     }
+    let lst = Array(self)
     return (
       try a.expect(arg: lst[0]),
       try b.expect(arg: lst[1]),
