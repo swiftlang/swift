@@ -349,8 +349,9 @@ private:
   llvm::DenseMap<std::pair<Decl *, VarDecl *>, unsigned> fieldIndices;
   llvm::DenseMap<EnumElementDecl *, unsigned> enumCaseIndices;
 
-  /// The stage of processing this module is at.
-  SILStage Stage;
+  /// A lower bound on the stage of every function in the module. This is a
+  /// module-wide commitment, not a per-function stage.
+  SILStage StageFloor;
 
   /// The set of deserialization notification handlers.
   DeserializationNotificationHandlerSet deserializationNotificationHandlers;
@@ -1001,12 +1002,27 @@ public:
       ArrayRef<SILDefaultOverrideTable::Entry> entries);
 
   /// Return a lower bound on the stage of every function in the function list.
-  /// SILFunction::create() seeds a new function from it and setStage() sweeps
+  /// SILFunction::create() seeds a new function from it and commitStage() sweeps
   /// the list up to it.
   ///
-  /// For a per-function query, read SILFunction::getFunctionStage(), which may
-  /// be ahead of this.
-  SILStage getStage() const { return Stage; }
+  /// Read the floor only for a module-wide question, such as the Lowered cutoff
+  /// for deserialization and linking. For a per-function query, read
+  /// SILFunction::getFunctionStage(), which may be ahead of the floor. The
+  /// hasCommitted* helpers below cover the Canonical and Lowered thresholds.
+  /// Compare the floor directly only for the still-Raw case.
+  SILStage getStageFloor() const { return StageFloor; }
+
+  /// True once the module has committed to at least Canonical, so the mandatory
+  /// pipeline will not run. It may have completed, or the input may have been
+  /// canonical already. Every function in the list is then at least Canonical.
+  bool hasCommittedCanonical() const {
+    return StageFloor >= SILStage::Canonical;
+  }
+
+  /// True once the module has committed to Lowered. LoadableByAddress has
+  /// rewritten function types module-wide, so canonical bodies can no longer be
+  /// deserialized or linked in.
+  bool hasCommittedLowered() const { return StageFloor >= SILStage::Lowered; }
 
   /// Advance the module to s and sweep every function behind it up to it.
   /// The stage only ever moves forward.
@@ -1014,9 +1030,9 @@ public:
   /// The sweep is what makes the floor a lower bound over the function list. A
   /// per-function query therefore never has to be reconciled against the
   /// module.
-  void setStage(SILStage s) {
-    assert(s >= Stage && "regressing stage?!");
-    Stage = s;
+  void commitStage(SILStage s) {
+    assert(s >= StageFloor && "regressing stage floor?!");
+    StageFloor = s;
     for (SILFunction &f : *this)
       if (f.getFunctionStage() < s)
         f.setFunctionStage(s);
@@ -1223,7 +1239,7 @@ void verificationFailure(
     llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
 
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
-  switch (mod.getStage()) {
+  switch (mod.getStageFloor()) {
   case SILStage::Raw:
     // In raw SIL, lexical markers are used for diagnostics and are always
     // present.

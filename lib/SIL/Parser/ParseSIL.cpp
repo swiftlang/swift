@@ -7859,7 +7859,7 @@ bool SILParserState::parseDeclSILStage(Parser &P) {
     return false;
   }
 
-  M.setStage(stage);
+  M.commitStage(stage);
   DidParseSILStage = true;
   return false;
 }
