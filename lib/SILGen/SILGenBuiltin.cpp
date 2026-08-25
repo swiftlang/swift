@@ -460,7 +460,7 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   
   // The substitution determines the destination type.
   auto &destLowering =
-      SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
+    SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
   if (destLowering.isAddress())
     return emitAddressOnlyFromRawPointer(
         SGF, loc, destLowering, args[0], C, IsNotTake);
@@ -495,6 +495,9 @@ static ManagedValue emitBuiltinTakeFromRawPointer(SILGenFunction &SGF,
   assert(args.size() == 1 && "take should have a single argument");
 
   auto &lowering = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
+  if (lowering.isAddress())
+    return emitAddressOnlyFromRawPointer(SGF, loc, lowering, args[0], C, IsTake);
+
   auto type = lowering.getLoweredType();
   if (!lowering.isLoadable() ||
       (!type.getASTType().isCOMExistentialType() &&
