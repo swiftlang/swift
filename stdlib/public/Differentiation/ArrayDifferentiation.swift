@@ -17,163 +17,241 @@ import Swift
 //===----------------------------------------------------------------------===//
 
 extension Array where Element: Differentiable {
-  /// The view of an array as the differentiable product manifold of `Element`
-  /// multiplied with itself `count` times.
   @frozen
-  public struct DifferentiableView {
-    @usableFromInline
-    var _base: [Element]
-  }
-}
-
-extension Array.DifferentiableView: Differentiable
-where Element: Differentiable {
-  /// The viewed array.
-  @inlinable
-  public var base: [Element] {
-    get { _base }
-    _modify { yield &_base }
-  }
-
-  @inlinable
-  @derivative(of: base)
-  func _vjpBase() -> (
-    value: [Element], pullback: (Array<Element>.TangentVector) -> TangentVector
-  ) {
-    return (base, { $0 })
-  }
-
-  @inlinable
-  @derivative(of: base)
-  func _jvpBase() -> (
-    value: [Element], differential: (Array<Element>.TangentVector) -> TangentVector
-  ) {
-    return (base, { $0 })
-  }
-
-  /// Creates a differentiable view of the given array.
-  @inlinable
-  public init(_ base: [Element]) { self._base = base }
-
-  @inlinable
-  @derivative(of: init(_:))
-  static func _vjpInit(_ base: [Element]) -> (
-    value: Array.DifferentiableView, pullback: (TangentVector) -> TangentVector
-  ) {
-    return (Array.DifferentiableView(base), { $0 })
-  }
-
-  @inlinable
-  @derivative(of: init(_:))
-  static func _jvpInit(_ base: [Element]) -> (
-    value: Array.DifferentiableView, differential: (TangentVector) -> TangentVector
-  ) {
-    return (Array.DifferentiableView(base), { $0 })
-  }
-
-  public typealias TangentVector =
-    Array<Element.TangentVector>.DifferentiableView
-
-  @inlinable
-  public mutating func move(by offset: TangentVector) {
-    if offset.base.isEmpty {
-      return
+  public struct ArrayTangentVector {
+    @frozen
+    public enum Storage {
+      case zero
+      case oneHot(index: Int, value: Element, count: Int)
+      case full([Element])
     }
-    precondition(
-      base.count == offset.base.count, """
-        Count mismatch: \(base.count) ('self') and \(offset.base.count) \
-        ('direction')
-        """)
-    for i in offset.base.indices {
-      base[i].move(by: offset.base[i])
+    
+    public var storage: Storage
+    
+    @inlinable
+    public init(_ storage: Storage) {
+      self.storage = storage
     }
   }
 }
 
-extension Array.DifferentiableView: Equatable
-where Element: Differentiable & Equatable {
+extension Array.ArrayTangentVector {
   @inlinable
-  public static func == (
-    lhs: Array.DifferentiableView,
-    rhs: Array.DifferentiableView
-  ) -> Bool {
-    return lhs.base == rhs.base
-  }
-}
-
-extension Array.DifferentiableView: ExpressibleByArrayLiteral
-where Element: Differentiable {
-  @inlinable
-  public init(arrayLiteral elements: Element...) {
-    self.init(elements)
-  }
-}
-
-extension Array.DifferentiableView: CustomStringConvertible
-where Element: Differentiable {
-  public var description: String {
-    return base.description
-  }
-}
-
-extension Array.DifferentiableView: CustomReflectable {
-  public var customMirror: Mirror {
-    return base.customMirror
-  }
-}
-
-/// Makes `Array.DifferentiableView` additive as the product space.
-///
-/// Note that `Array.DifferentiableView([])` is the zero in the product spaces
-/// of all counts.
-extension Array.DifferentiableView: AdditiveArithmetic
-where Element: AdditiveArithmetic & Differentiable {
-
-  @inlinable
-  public static var zero: Array.DifferentiableView {
-    return Array.DifferentiableView([])
+  public var isEmpty: Bool {
+    switch self.storage {
+    case .zero:
+      return true
+    case .oneHot:
+      return false // what if value == 0.0?
+    case .full(let arr):
+      return arr.isEmpty
+    }
   }
   
   @inlinable
-  public static func + (
-    lhs: Array.DifferentiableView,
-    rhs: Array.DifferentiableView
-  ) -> Array.DifferentiableView {
-    if lhs.base.count == 0 {
+  var count: Int {
+    switch self.storage {
+    case .zero:
+      return 0
+    case .oneHot(_, _, let n):
+      return n
+    case .full(let arr):
+      return arr.count
+    }
+  }
+  
+  @inlinable
+  mutating func removeLast(_ k: Int = 1) {
+    switch self.storage {
+    case .zero:
+      return
+    case .oneHot(index: let i, value: let v, count: let n):
+      precondition(n > k)
+      if i >= n - k {
+        self = .init(.zero)
+      } else {
+        self = .init(.oneHot(index: i, value: v, count: n - k))
+      }
+    case .full(var arr):
+      arr.removeLast(k)
+      self.storage = .full(arr)
+    }
+  }
+  
+  @inlinable
+  func dropFirst(_ k: Int = 1) -> Self {
+    switch self.storage {
+    case .zero:
+      return .init(.zero)
+    case .oneHot(index: let i, value: let v, count: let n):
+      if i < k {
+        return .init(.zero)
+      } else {
+        return .init(.oneHot(index: i - k, value: v, count: n - k))
+      }
+    case .full(let arr):
+      return .init(.full(Array(arr.dropFirst(k))))
+    }
+  }
+}
+
+extension Array.ArrayTangentVector where Element: AdditiveArithmetic {
+  @inlinable
+  subscript(index: Int) -> Element {
+    switch storage {
+    case .zero:
+      return .zero
+    case .oneHot(index: let i, value: let v, count: _):
+      if index == i { return v }
+      else { return .zero }
+    case .full(let arr):
+      return arr[index]
+    }
+  }
+  
+  @inlinable
+  subscript(range: Range<Int>) -> Array<Element> {
+    fatalError()
+  }
+}
+
+extension Array.ArrayTangentVector: ExpressibleByArrayLiteral where Element: Differentiable {
+  @inlinable
+  public init(arrayLiteral elements: Element...) {
+    self.init(.full(elements))
+  }
+}
+
+extension Array.ArrayTangentVector: Equatable where Element: Equatable {
+  @inlinable
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    switch (lhs.storage, rhs.storage) {
+    case (.zero, .zero):
+      return true
+    case (.oneHot(let il, let vl, let nl), .oneHot(let ir, let vr, let nr)):
+      return il == ir && vl == vr && nl == nr
+    case (.full(let lhs), .full(let rhs)):
+      return lhs == rhs
+    default:
+      // we should consider also comparing:
+      // - .oneHot to a .full array of zeroes with one non-zero value.
+      // - .zero to .oneHot with a .zero value
+      // - .zero to a .full array of .zero values.
+      return false
+    }
+  }
+}
+
+extension Array.ArrayTangentVector: AdditiveArithmetic where Element: AdditiveArithmetic {
+  @inlinable
+  public static var zero: Self { .init(.zero) }
+  
+  @inlinable
+  public static func + (lhs: Self, rhs: Self) -> Self {
+    switch (lhs.storage, rhs.storage) {
+    case (_, .zero):
+      return lhs
+    case (.zero, _):
       return rhs
+    case (.oneHot(let il, let vl, let nl), .oneHot(let ir, let vr, let nr)):
+      precondition(nl == nr)
+      if il == ir {
+        return .init(.oneHot(index: il, value: vl + vr, count: nl))
+      } else {
+        var arr = [Element](repeating: .zero, count: nl)
+        arr[il] = vl
+        arr[ir] = vr
+        return .init(.full(arr))
+      }
+    case (.oneHot(let il, let vl, let nl), .full(var rhs)):
+      precondition(nl == rhs.count)
+      rhs[il] += vl
+      return .init(.full(rhs))
+    case (.full(var lhs), .oneHot(let ir, let vr, let nr)):
+      precondition(lhs.count == nr)
+      lhs[ir] += vr
+      return .init(.full(lhs))
+    case (.full(let lhs), .full(let rhs)):
+      precondition(lhs.count == rhs.count, "Count mismatch: \(lhs.count) and \(rhs.count)")
+      return .init(.full(zip(lhs, rhs).map(+)))
     }
-    if rhs.base.count == 0 {
-      return lhs
-    }
-    precondition(
-      lhs.base.count == rhs.base.count,
-      "Count mismatch: \(lhs.base.count) and \(rhs.base.count)")
-    return Array.DifferentiableView(zip(lhs.base, rhs.base).map(+))
   }
-
+  
   @inlinable
-  public static func - (
-    lhs: Array.DifferentiableView,
-    rhs: Array.DifferentiableView
-  ) -> Array.DifferentiableView {
-    if lhs.base.count == 0 {
-      return Array.DifferentiableView(rhs.base.map { .zero - $0 })
-    }
-    if rhs.base.count == 0 {
+  public static func - (lhs: Self, rhs: Self) -> Self {
+    switch (lhs.storage, rhs.storage) {
+    case (_, .zero):
       return lhs
+    case (.zero, .oneHot(let ir, let vr, let nr)):
+      return .init(.oneHot(index: ir, value: .zero - vr, count: nr))
+    case (.zero, .full(let rhs)):
+      return .init(.full(rhs.map { .zero - $0 }))
+    case (.oneHot(let il, let vl, let nl), .oneHot(let ir, let vr, let nr)):
+      precondition(nl == nr)
+      if il == ir {
+        return .init(.oneHot(index: il, value: vl - vr, count: nl))
+      } else {
+        var arr = [Element](repeating: .zero, count: nl)
+        arr[il] = vl
+        arr[ir] = .zero - vr
+        return .init(.full(arr))
+      }
+    case (.oneHot(let il, let vl, let nl), .full(let rhs)):
+      precondition(nl == rhs.count)
+      var result = rhs.map { .zero - $0 }
+      result[il] += vl
+      return .init(.full(result))
+    case (.full(var lhs), .oneHot(let ir, let vr, let nr)):
+      precondition(lhs.count == nr)
+      lhs[ir] -= vr
+      return .init(.full(lhs))
+    case (.full(let lhs), .full(let rhs)):
+      precondition(lhs.count == rhs.count, "Count mismatch: \(lhs.count) and \(rhs.count)")
+      return .init(.full(zip(lhs, rhs).map(-)))
     }
-    precondition(
-      lhs.base.count == rhs.base.count,
-      "Count mismatch: \(lhs.base.count) and \(rhs.base.count)")
-    return Array.DifferentiableView(zip(lhs.base, rhs.base).map(-))
   }
+}
 
+extension Array.ArrayTangentVector: Differentiable where Element: AdditiveArithmetic & Differentiable {
+  public typealias TangentVector = Array<Element.TangentVector>.ArrayTangentVector
+  
   @inlinable
-  public subscript(_ index: Int) -> Element {
-    if index < base.count {
-      return base[index]
-    } else {
-      return Element.zero
+  public mutating func move(by offset: TangentVector) {
+    switch (self.storage, offset.storage) {
+    case (_, .zero):
+      return
+    case (.zero, .oneHot(let iOffset, let vOffset, let nOffset)):
+      var v = Element.zero
+      v.move(by: vOffset)
+      self = .init(.oneHot(index: iOffset, value: v, count: nOffset))
+    case (.oneHot(let i, var v, let n), .oneHot(let iOffset, let vOffset, let nOffset)):
+      precondition(n == nOffset)
+      if i == iOffset {
+        v.move(by: vOffset)
+        self = .init(.oneHot(index: i, value: v, count: n))
+      } else {
+        var arr = [Element](repeating: .zero, count: n)
+        arr[i] = v
+        arr[iOffset].move(by: vOffset)
+        self = .init(.full(arr))
+      }
+    case (.full(var arr), .oneHot(let iOffset, let vOffset, let nOffset)):
+      precondition(arr.count == nOffset)
+      arr[iOffset].move(by: vOffset)
+      self = .init(.full(arr))
+    case (.zero, .full(let arrOffset)):
+      var result = [Element](repeating: .zero, count: arrOffset.count)
+      for i in arrOffset.indices { result[i].move(by: arrOffset[i]) }
+      self = .init(.full(result))
+    case (.oneHot(let i, let v, let n), .full(let arrOffset)):
+      precondition(n == arrOffset.count)
+      var arr = [Element](repeating: .zero, count: n)
+      arr[i] = v
+      for j in arrOffset.indices { arr[j].move(by: arrOffset[j]) }
+      self = .init(.full(arr))
+    case (.full(var arr), .full(let arrOffset)):
+      for i in arr.indices { arr[i].move(by: arrOffset[i]) }
+      self = .init(.full(arr))
     }
   }
 }
@@ -187,13 +265,21 @@ extension Array: Differentiable where Element: Differentiable {
   // different semantics from `AdditiveArithmetic.+`. So we use
   // `Array.DifferentiableView` for all these associated types.
   public typealias TangentVector =
-    Array<Element.TangentVector>.DifferentiableView
+    Array<Element.TangentVector>.ArrayTangentVector
 
   @inlinable
   public mutating func move(by offset: TangentVector) {
-    var view = DifferentiableView(self)
-    view.move(by: offset)
-    self = view.base
+    switch offset.storage {
+    case .zero:
+      return
+    case .oneHot(let i, let v, let n):
+      precondition(self.count == n)
+      self[i].move(by: v)
+    case .full(let arr):
+      for i in self.indices {
+        self[i].move(by: arr[i])
+      }
+    }
   }
 }
 
@@ -203,29 +289,17 @@ extension Array: Differentiable where Element: Differentiable {
 
 extension Array where Element: Differentiable {
   @inlinable
-  @derivative(of: subscript)
-  func _vjpSubscript(index: Int) -> (
+  @derivative(of: subscript.get)
+  func _vjpSubscriptGet(index: Int) -> (
     value: Element, pullback: (Element.TangentVector) -> TangentVector
   ) {
-    func pullback(_ v: Element.TangentVector) -> TangentVector {
-      var dSelf = [Element.TangentVector](
-        repeating: .zero,
-        count: count)
-      dSelf[index] = v
-      return TangentVector(dSelf)
-    }
-    return (self[index], pullback)
-  }
-
-  @inlinable
-  @derivative(of: subscript)
-  func _jvpSubscript(index: Int) -> (
-    value: Element, differential: (TangentVector) -> Element.TangentVector
-  ) {
-    func differential(_ v: TangentVector) -> Element.TangentVector {
-      return v[index]
-    }
-    return (self[index], differential)
+    let n = self.count
+    return (
+      value: self[index],
+      pullback: { v in
+          .init(.oneHot(index: index, value: v, count: n))
+      }
+    )
   }
 
   @inlinable
@@ -235,37 +309,20 @@ extension Array where Element: Differentiable {
     pullback: (TangentVector) -> (TangentVector, TangentVector)
   ) {
     func pullback(_ v: TangentVector) -> (TangentVector, TangentVector) {
-      if v.base.isEmpty {
+      if v.isEmpty {
         return (.zero, .zero)
       }
       precondition(
-        v.base.count == lhs.count + rhs.count, """
-          Tangent vector with invalid count \(v.base.count); expected to \
+        v.count == lhs.count + rhs.count, """
+          Tangent vector with invalid count \(v.count); expected to \
           equal the sum of operand counts \(lhs.count) and \(rhs.count)
           """)
       return (
-        TangentVector([Element.TangentVector](v.base[0..<lhs.count])),
-        TangentVector([Element.TangentVector](v.base[lhs.count...]))
+        TangentVector(.full([Element.TangentVector](v[0..<lhs.count]))),
+        TangentVector(.full([Element.TangentVector](v[lhs.count..<(lhs.count + rhs.count)])))
       )
     }
     return (lhs + rhs, pullback)
-  }
-
-  @inlinable
-  @derivative(of: +)
-  static func _jvpConcatenate(_ lhs: Self, _ rhs: Self) -> (
-    value: Self,
-    differential: (TangentVector, TangentVector) -> TangentVector
-  ) {
-    func differential(_ l: TangentVector, _ r: TangentVector) -> TangentVector {
-      precondition(
-        l.base.count == lhs.count && r.base.count == rhs.count, """
-          Tangent vectors with invalid count; expected to equal the \
-          operand counts \(lhs.count) and \(rhs.count)
-          """)
-      return .init(l.base + r.base)
-    }
-    return (lhs + rhs, differential)
   }
 }
 
@@ -279,19 +336,9 @@ extension Array where Element: Differentiable {
     let appendedElementIndex = count
     append(element)
     return ((), { v in
-      defer { v.base.removeLast() }
-      return v.base[appendedElementIndex]
+      defer { v.removeLast() }
+      return v[appendedElementIndex]
     })
-  }
-
-  @inlinable
-  @derivative(of: append)
-  mutating func _jvpAppend(_ element: Element) -> (
-    value: Void,
-    differential: (inout TangentVector, Element.TangentVector) -> Void
-  ) {
-    append(element)
-    return ((), { $0.base.append($1) })
   }
 }
 
@@ -304,21 +351,11 @@ extension Array where Element: Differentiable {
     let lhsCount = lhs.count
     lhs += rhs
     return ((), { v in
-      let drhs =
-        TangentVector(.init(v.base.dropFirst(lhsCount)))
-      let rhsCount = drhs.base.count
-      v.base.removeLast(rhsCount)
+      let drhs = TangentVector(v.dropFirst(lhsCount).storage)
+      let rhsCount = drhs.count
+      v.removeLast(rhsCount)
       return drhs
     })
-  }
-
-  @inlinable
-  @derivative(of: +=)
-  static func _jvpAppend(_ lhs: inout Self, _ rhs: Self) -> (
-    value: Void, differential: (inout TangentVector, TangentVector) -> Void
-  ) {
-    lhs += rhs
-    return ((), { $0.base += $1.base })
   }
 }
 
@@ -331,19 +368,15 @@ extension Array where Element: Differentiable {
     (
       value: Self(repeating: repeatedValue, count: count),
       pullback: { v in
-        v.base.reduce(.zero, +)
+        switch v.storage {
+        case .zero:
+          return .zero
+        case .oneHot(_, let value, _):
+          return value
+        case .full(let arr):
+          return arr.reduce(.zero, +)
+        }
       }
-    )
-  }
-
-  @inlinable
-  @derivative(of: init(repeating:count:))
-  static func _jvpInit(repeating repeatedValue: Element, count: Int) -> (
-    value: Self, differential: (Element.TangentVector) -> TangentVector
-  ) {
-    (
-      value: Self(repeating: repeatedValue, count: count),
-      differential: { v in TangentVector(.init(repeating: v, count: count)) }
     )
   }
 }
@@ -380,30 +413,16 @@ extension Array where Element: Differentiable {
       pullbacks.append(pb)
     }
     func pullback(_ tans: Array<Result>.TangentVector) -> Array.TangentVector {
-      .init(zip(tans.base, pullbacks).map { tan, pb in pb(tan) })
+      switch tans.storage {
+      case .zero:
+        return .zero
+      case .oneHot(index: let index, value: let value, count: let count):
+        return .init(.oneHot(index: index, value: pullbacks[index](value), count: count))
+      case .full(let arr):
+        return .init(.full(zip(arr, pullbacks).map { tan, pb in pb(tan) }))
+      }
     }
     return (value: values, pullback: pullback)
-  }
-
-  @inlinable
-  @derivative(of: differentiableMap)
-  internal func _jvpDifferentiableMap<Result: Differentiable>(
-    _ body: @differentiable(reverse) (Element) -> Result
-  ) -> (
-    value: [Result],
-    differential: (Array.TangentVector) -> Array<Result>.TangentVector
-  ) {
-    var values: [Result] = []
-    var differentials: [(Element.TangentVector) -> Result.TangentVector] = []
-    for x in self {
-      let (y, df) = valueWithDifferential(at: x, of: body)
-      values.append(y)
-      differentials.append(df)
-    }
-    func differential(_ tans: Array.TangentVector) -> Array<Result>.TangentVector {
-      .init(zip(tans.base, differentials).map { tan, df in df(tan) })
-    }
-    return (value: values, differential: differential)
   }
 }
 
@@ -434,8 +453,7 @@ extension Array where Element: Differentiable {
     pullbacks.reserveCapacity(count)
     var result = initialResult
     for element in self {
-      let (y, pb) =
-        valueWithPullback(at: result, element, of: nextPartialResult)
+      let (y, pb) = valueWithPullback(at: result, element, of: nextPartialResult)
       result = y
       pullbacks.append(pb)
     }
@@ -443,44 +461,18 @@ extension Array where Element: Differentiable {
       value: result,
       pullback: { tangent in
         var resultTangent = tangent
-        var elementTangents = TangentVector([])
-        elementTangents.base.reserveCapacity(count)
+        var elementTangents: [Element.TangentVector] = []
+        elementTangents.reserveCapacity(count)
         for pullback in pullbacks.reversed() {
           let (newResultTangent, elementTangent) = pullback(resultTangent)
           resultTangent = newResultTangent
-          elementTangents.base.append(elementTangent)
+          elementTangents.append(elementTangent)
         }
-        return (TangentVector(elementTangents.base.reversed()), resultTangent)
+        return (
+          TangentVector(.full(Array<Element.TangentVector>(elementTangents.reversed()))),
+          resultTangent
+        )
       }
     )
-  }
-
-  @inlinable
-  @derivative(of: differentiableReduce, wrt: (self, initialResult))
-  func _jvpDifferentiableReduce<Result: Differentiable>(
-    _ initialResult: Result,
-    _ nextPartialResult: @differentiable(reverse) (Result, Element) -> Result
-  ) -> (value: Result,
-        differential: (Array.TangentVector, Result.TangentVector)
-          -> Result.TangentVector) {
-    var differentials:
-      [(Result.TangentVector, Element.TangentVector) -> Result.TangentVector]
-        = []
-    let count = self.count
-    differentials.reserveCapacity(count)
-    var result = initialResult
-    for element in self {
-      let (y, df) =
-        valueWithDifferential(at: result, element, of: nextPartialResult)
-      result = y
-      differentials.append(df)
-    }
-    return (value: result, differential: { dSelf, dInitial in
-      var dResult = dInitial
-      for (dElement, df) in zip(dSelf.base, differentials) {
-        dResult = df(dResult, dElement)
-      }
-      return dResult
-    })
   }
 }
