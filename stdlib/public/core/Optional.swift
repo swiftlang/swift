@@ -421,8 +421,8 @@ extension Optional where Wrapped: ~Copyable & Escapable {
   @_lifetime(borrow self)
   public func _span() -> Span<Wrapped> { span }
 
+  @export(implementation)
   public var span: Span<Wrapped> {
-    @export(implementation)
     @_addressableSelf
     @_lifetime(borrow self)
     borrowing get {
@@ -435,8 +435,8 @@ extension Optional where Wrapped: ~Copyable & Escapable {
     }
   }
 
+  @export(implementation)
   public var mutableSpan: MutableSpan<Wrapped> {
-    @export(implementation)
     @_lifetime(&self)
     mutating get {
       let count = (self == nil) ? 0 : 1
