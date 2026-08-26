@@ -8,6 +8,8 @@
 // RUN: rm %t/mixed-target/header.h
 // RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t -I %S/../Inputs/custom-modules -enable-objc-interop -typecheck %s 2>&1 | %FileCheck %s -check-prefix=USE-SERIALIZED-HEADER
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // USE-SERIALIZED-HEADER: redefinition of 'Point2D'
 // USE-SERIALIZED-HEADER: previous definition is here
 

@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift %clang-importer-sdk -swift-version 4
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import ctypes
 
 func testArrays() {

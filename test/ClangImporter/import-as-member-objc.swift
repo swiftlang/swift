@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/../IDE/Inputs/custom-modules %s -verify -enable-objc-interop
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import ImportAsMember.Class
 
 func doIt(s: SomeClass) {

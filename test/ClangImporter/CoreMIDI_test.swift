@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift %clang-importer-sdk -enable-objc-interop
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import CoreMIDI
 
 func test() -> String {

@@ -6,6 +6,9 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib -target x86_64-unknown-linux-gnu
 // RUN: %target-typecheck-verify-swift -parse-stdlib -target x86_64-unknown-windows-msvc
 
+// expected-warning@<unknown> * {{libc not found for }}
+// expected-warning@<unknown> * {{using sysroot for }}
+
 @available(anyAppleOS 26.1, *)
 func availableInAnyAppleOS26_1() { }
 

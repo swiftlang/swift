@@ -183,20 +183,16 @@ Note: If your diagnostic could apply to accessors, be careful how you format the
 
 If the `-verify` frontend flag is used, the Swift compiler will check emitted diagnostics against specially formatted comments in the source. This feature is used extensively throughout the test suite to ensure diagnostics are emitted with the correct message and source location.
   
-`-verify` parses all ordinary source files passed as inputs to the compiler to look for expectation comments. If you'd like to check for diagnostics in additional files, like swiftinterfaces or even Objective-C headers, specify them with `-verify-additional-file <filename>`. By default, `-verify` considers any diagnostic at `<unknown>:0` (that is, any diagnostic emitted with an invalid source location) to be unexpected; you can disable this by passing `-verify-ignore-unknown`.
+`-verify` parses all ordinary source files passed as inputs to the compiler to look for expectation comments. If you'd like to check for diagnostics in additional files, like swiftinterfaces or even Objective-C headers, specify them with `-verify-additional-file <filename>`. By default, `-verify` considers any diagnostic at `<unknown>:0` (that is, any diagnostic emitted with an invalid source location) to be unexpected; you can disable this by passing `-verify-ignore-unknown`, or you can write an expectation with `@<unknown>` as specified below. 
 
 An expected diagnostic is denoted by a comment which begins with `expected-error`, `expected-warning`, `expected-note`, or `expected-remark`. (You can use `-verify-additional-prefix <string>` to add expectations with additional prefixes, e.g. `-verify-additional-prefix foo-` will pick up both `expected-error` and `expected-foo-error`.) It is followed by:
 
-- (Optional) Location information. By default, the comment will match any diagnostic emitted on the same line. However, it's possible to override this behavior and/or specify column information as well. `// expected-error@-1 ...` looks for an error on the previous line, `// expected-warning@+1:3 ...` looks for a warning on the next line at the third column, and `// expected-note@:7 ...` looks for a note on the same line at the seventh column.
-
-  Named location markers can also be used instead of line offsets. A marker is defined by placing `// #name` in a comment (where `name` consists of alphanumeric characters, hyphens, or underscores, and must be the only content in the comment). The marker can then be referenced with `@#name`:
-
-  ```swift
-  let x: Int = "hello" // #myMarker
-  // expected-error@#myMarker {{cannot convert value}}
-  ```
-
-  Markers are especially useful when the diagnostic and its expectation are far apart, when lines are frequently added or removed nearby, or when referring to diagnostics in a different file. An optional column can also be specified: `// expected-error@#myMarker:14 ...`.
+- (Optional) Location information. By default, the comment will match any diagnostic emitted on the same line. However, it's possible to override this behavior and/or specify column information as well by specifying location information after an `@` sign, like `// expected-warning@+1:3 ...`. The full set of features you can use here include:
+  - `-1` looks for a diagnostic on the line above; `+2` looks for one two lines below.
+  - `:3` looks for a diagnostic emitted at column 3. You may use a line offset and column number together, like `-1:42` (one line up, column 42).
+  - `some-header.h:14` looks for a diagnostic at line 14 of `some-header.h`. The filename may be surrounded by single quotes (this is necessary if a Windows drive letter might appear in it). You may also add a column number.
+  - `#name` is a line specified by a named location maker, and `#name:3` is column 3 of that line. The marker is defined by placing `// #name` (where `name` consists of alphanumeric characters, hyphens, or underscores, and must be the only content in the comment) on the line you want it to refer to, and may be placed in a different source file. This feature is useful when the expectation and the diagnostic it tests for are far apart and unrelated edits might change the line numbers.
+  - `<unknown>` looks for a diagnostic at `<unknown>:0` (i.e. an invalid source location). Note that the compiler may emit some invalid-location diagnostics too early for the diagnostic verifier to capture them; this is especially common with diagnostics about command line arguments.
 
 - (Optional) A match count which specifies how many times the diagnostic is expected to appear. This may be a positive integer or `*`, which allows for zero or more matches. The match count must be surrounded by whitespace if present. For example, `// expected-error 2 ...` looks for two matching errors, and `// expected-warning * ...` looks for any number of matching warnings.
 

@@ -4,6 +4,8 @@
 // RUN: echo 'import submodules; let s = "\(x), \(y)"' | %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck - -I %t -I %S/Inputs/custom-modules/
 // RUN: echo 'import submodules; let s = "\(x), \(y)"' | not %target-swift-frontend -enable-objc-interop -typecheck - -I %t -I %S/Inputs/custom-modules/ 2>&1 | %FileCheck -check-prefix=MISSING %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import ctypes_bits_exported
 // MISSING: could not build Objective-C module 'ctypes_bits_exported'
 
