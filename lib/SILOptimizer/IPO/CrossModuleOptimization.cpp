@@ -158,11 +158,33 @@ private:
   VisitMode mode;
   bool isInstSerializable = true;
 
+  /// Temporary blocks created by `remapBasicBlock`, which are deleted again in
+  /// `postProcess`.
+  llvm::SmallVector<SILBasicBlock *, 2> tempBlocks;
+
+  void eraseTempBlocks() {
+    if (tempBlocks.empty())
+      return;
+
+    SILFunction *f = &getBuilder().getFunction();
+    // Deleting a block sets the `needBreakInfiniteLoops` flag. But the temporary
+    // blocks are empty and not reachable, so they cannot create infinite loops.
+    bool origFlag = f->needBreakInfiniteLoops();
+    for (SILBasicBlock *tempBlock : tempBlocks)
+      tempBlock->eraseFromParent();
+    tempBlocks.clear();
+    f->setNeedBreakInfiniteLoops(origFlag);
+  }
+
 public:
   InstructionVisitor(SILFunction &F, CrossModuleOptimization &CMS, VisitMode visitMode) :
     SILCloner(F), CMS(CMS), mode(visitMode) {}
 
   ~InstructionVisitor() {
+    // In case a visited instruction was not recorded as cloned instruction,
+    // `postProcess` didn't run and the temporary blocks are still around.
+    eraseTempBlocks();
+
     // We use the cloner for type visiting which may clone `unreachable` instructions.
     // However, this does not introduce any incomplete lifetimes.
     Builder.getFunction().setNeedCompleteLifetimes(false);
@@ -255,6 +277,10 @@ public:
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     SILCloner<InstructionVisitor>::postProcess(Orig, Cloned);
     Cloned->eraseFromParent();
+
+    // The cloned instruction was the only user of the temporary blocks which
+    // `remapBasicBlock` created for it.
+    eraseTempBlocks();
   }
 
   // This method retrieves the operand passed as \p Value as mapped
@@ -296,7 +322,30 @@ public:
     return Value;
   }
 
-  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
+  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) {
+    // The successor blocks of a cloned terminator are not cloned - we return
+    // the original blocks here. Therefore their arguments still refer to the
+    // original local archetypes, whereas the terminator's operands are
+    // re-mapped (see `getMappedValue`). That would create terminators whose
+    // successor argument types don't match the types of its operands, which
+    // some SILBuilder APIs check, e.g. `createCheckedCastBranch`.
+    // Therefore use a temporary block with re-mapped argument types in this
+    // case. It's deleted again in `postProcess`, together with the cloned
+    // terminator.
+    if (llvm::none_of(BB->getArguments(), [&](SILArgument *arg) {
+          return substLocalArchetypes(arg->getType()) != arg->getType();
+        })) {
+      return BB;
+    }
+
+    SILBasicBlock *tempBlock = getBuilder().getFunction().createBasicBlock();
+    for (SILArgument *arg : BB->getArguments()) {
+      tempBlock->createPhiArgument(substLocalArchetypes(arg->getType()),
+                                   arg->getOwnershipKind());
+    }
+    tempBlocks.push_back(tempBlock);
+    return tempBlock;
+  }
 
   bool canSerializeTypesInInst(SILInstruction *inst) {
     return isInstSerializable;
