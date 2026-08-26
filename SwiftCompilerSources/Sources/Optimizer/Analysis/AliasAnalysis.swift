@@ -347,12 +347,18 @@ struct AliasAnalysis {
       return .noEffects
 
     case let destroy as DestroyValueInst:
-      if destroy.destroyedValue.type.isNoEscapeFunction {
+      let type = destroy.destroyedValue.type
+      if type.isNoEscapeFunction {
         return .noEffects
       }
       if destroy.isDeadEnd {
         // We don't have to take deinit effects into account for a `destroy_value [dead_end]`.
         // Such destroys are lowered to no-ops and will not call any deinit.
+        return .noEffects
+      }
+      if type.isNonTrivialOnlyBecauseNonEscapable(in: destroy.parentFunction) {
+        // If the type is only non-trivial because it is ~Escapable,
+        // destroy_value is still a no-op.
         return .noEffects
       }
       return defaultEffects(of: destroy, on: memLoc)
