@@ -361,14 +361,14 @@ enum WithArgumentLabels: Hashable {
 enum WithRawIdentifiers: Hashable {
   // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
   // CHECK-NEXT:     switch (lhs, rhs) {
-  // CHECK-NEXT:     case (.foo bar, .foo bar):
+  // CHECK-NEXT:     case (.`foo bar`, .`foo bar`):
   // CHECK-NEXT:       return true
-  // CHECK-NEXT:     case (.default(let l0), .default(let r0)):
+  // CHECK-NEXT:     case (.`default`(let l0), .`default`(let r0)):
   // CHECK-NEXT:       guard l0 == r0 else {
   // CHECK-NEXT:         return false
   // CHECK-NEXT:       }
   // CHECK-NEXT:       return true
-  // CHECK-NEXT:     case (.a(foo bar: let l0), .a(foo bar: let r0)):
+  // CHECK-NEXT:     case (.a(`foo bar`: let l0), .a(`foo bar`: let r0)):
   // CHECK-NEXT:       guard l0 == r0 else {
   // CHECK-NEXT:         return false
   // CHECK-NEXT:       }
@@ -387,12 +387,12 @@ enum WithRawIdentifiers: Hashable {
 
   // CHECK:        internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:     switch self {
-  // CHECK-NEXT:     case .foo bar:
+  // CHECK-NEXT:     case .`foo bar`:
   // CHECK-NEXT:       hasher.combine(0)
-  // CHECK-NEXT:     case .default(let a0):
+  // CHECK-NEXT:     case .`default`(let a0):
   // CHECK-NEXT:       hasher.combine(1)
   // CHECK-NEXT:       hasher.combine(a0)
-  // CHECK-NEXT:     case .a(let a0):
+  // CHECK-NEXT:     case .a(`foo bar`: let a0):
   // CHECK-NEXT:       hasher.combine(2)
   // CHECK-NEXT:       hasher.combine(a0)
   // CHECK-NEXT:     }

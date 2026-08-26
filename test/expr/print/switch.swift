@@ -56,3 +56,24 @@ func foo(_ x: Int?) {
 // CHECK-LABEL:     break
 // CHECK-LABEL:   }
 // CHECK-LABEL: }
+
+func guarded(payload: Payload) -> Int {
+  switch payload {
+  case .int(let int) where int > 0:
+    return int
+  case .keyValue(let key, let value) where key.isEmpty, .keyValue(let key, let value) where value < 0:
+    return value + key.count
+  default:
+    return 0
+  }
+}
+// CHECK-LABEL: internal func guarded(payload: Payload) -> Int {
+// CHECK-NEXT:    switch payload {
+// CHECK-NEXT:    case .int(let int) where int > 0:
+// CHECK-NEXT:      return int
+// CHECK-NEXT:    case .keyValue(let key, let value) where key.isEmpty, .keyValue(let key, let value) where value < 0:
+// CHECK-NEXT:      return value + key.count
+// CHECK-NEXT:    default:
+// CHECK-NEXT:      return 0
+// CHECK-NEXT:    }
+// CHECK-NEXT:  }
