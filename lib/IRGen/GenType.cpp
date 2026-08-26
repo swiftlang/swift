@@ -3244,6 +3244,10 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
   // If we do not have a deinit table already deserialized, call the value
   // witness instead.
   if (!deinitTable) {
+    // In embedded Swift calling the value witness would recurse infinitely,
+    // therefore it's required to have the deinitTable.
+    ASSERT(!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+           "no deinit available for non-copyable type in embedded Swift");
     irgen::emitDestroyCall(IGF, T, indirect());
     indirectCleanup();
     return true;
