@@ -6328,16 +6328,16 @@ void PrintAST::visitCaseStmt(CaseStmt *CS) {
   if (CS->isDefault()) {
     Printer << tok::kw_default;
   } else {
-    auto PrintCaseLabelItem = [&](const CaseLabelItem &CLI) {
+    auto PrintCaseLabelItem = [&](CaseLabelItem &CLI) {
       if (auto *P = CLI.getPattern())
         printPattern(P);
-      if (CLI.getGuardExpr()) {
+      if (auto *guardExpr = CLI.getGuardExpr()) {
         Printer << " " << tok::kw_where << " ";
-        // FIXME: print guard expr
+        visit(guardExpr);
       }
     };
     Printer << tok::kw_case << " ";
-    interleave(CS->getCaseLabelItems(), PrintCaseLabelItem,
+    interleave(CS->getMutableCaseLabelItems(), PrintCaseLabelItem,
                [&] { Printer << ", "; });
   }
   Printer << ":";
