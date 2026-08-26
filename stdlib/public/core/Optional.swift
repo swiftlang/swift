@@ -177,15 +177,17 @@ extension Optional where Wrapped: ~Copyable {
   /// is one.
   @available(StdlibDeploymentTarget 6.4, *)
   @export(implementation)
-  @_lifetime(borrow self)
   @_transparent
   public var ref: Ref<Wrapped>? {
-    switch self {
-    case .some(let wrapped):
-      return Ref(wrapped)
-
-    case .none:
-      return nil
+    @_lifetime(borrow self)
+    get {
+      switch self {
+      case .some(let wrapped):
+        return Ref(wrapped)
+  
+      case .none:
+        return nil
+      }
     }
   }
 
@@ -216,7 +218,7 @@ extension Optional where Wrapped: ~Copyable {
   /// - Parameter new: The new payload value to put into the optional.
   /// - Returns: A mutable reference inside the optional to its newly inserted
   ///   payload.
-  @available(SwiftStdlib 6.4, *)
+  @available(StdlibDeploymentTarget 6.4, *)
   @export(implementation)
   @_lifetime(&self)
   @_transparent
@@ -388,7 +390,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   }
 }
 
-extension Optional where Wrapped: ~Escapable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// The wrapped value of this instance, unwrapped without checking whether
   /// the instance is `nil`.
   ///
@@ -427,7 +429,7 @@ extension Optional where Wrapped: ~Escapable {
   }
 }
 
-extension Optional where Wrapped: ~Escapable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// - Returns: `unsafelyUnwrapped`.
   ///
   /// This version is for internal stdlib use; it avoids any checking
