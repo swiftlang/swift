@@ -92,13 +92,6 @@ if not "%DEBUG_INFO%"=="" set "DebugInfoArg=-DebugInfo"
 
 call :CloneRepositories || (exit /b 1)
 
-:: XXX: TEMPORARY FOR TESTING DO NOT MERGE
-set SMOKE_TEST=true
-:: XXX: TEMPORARY FOR TESTING DO NOT MERGE
-if not exist "%SourceRoot%\swift-docker" (
-  git clone --depth 1 https://github.com/swiftlang/swift-docker "%SourceRoot%\swift-docker" || (exit /b 1)
-)
-
 if not "%SMOKE_TEST%"=="" if "%INCLUDE_PACKAGING%"=="" (
   echo SMOKE_TEST needs INCLUDE_PACKAGING
   exit /b 1
