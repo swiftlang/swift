@@ -142,6 +142,13 @@ func testTryIncompatibleTyped(cond: Bool) throws(HomeworkError) {
   } // expected-error {{thrown expression type 'any Error' cannot be converted to error type 'HomeworkError'}}
 }
 
+func throwsGenericError() throws(GenericError<Int>) {}
+
+func testGenericThrownErrorMismatch() throws(GenericError<String>) {
+  try throwsGenericError() // expected-error{{thrown expression type 'GenericError<Int>' cannot be converted to error type 'GenericError<String>'}}
+  throw GenericError<Int>() // expected-error{{thrown expression type 'GenericError<Int>' cannot be converted to error type 'GenericError<String>'}}
+}
+
 func doSomethingWithoutThrowing() { }
 
 func testDoCatchWithoutThrowing() {

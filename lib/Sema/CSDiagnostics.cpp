@@ -1002,6 +1002,9 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       auto purpose = getContextualTypePurpose();
       assert(purpose != CTP_Unused);
 
+      if (diagnoseThrowsTypeMismatch())
+        return true;
+
       // If this is call to a closure e.g. `let _: A = { B() }()`
       // let's point diagnostic to its result.
       if (auto *call = getAsExpr<CallExpr>(anchor)) {
