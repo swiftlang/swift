@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library %S/Inputs/has_symbol/has_symbol_helper.swift -enable-library-evolution
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -disable-availability-checking -I %t
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library %S/Inputs/has_symbol/has_symbol_helper.swift -enable-library-evolution -target %target-swift-5.1-abi-triple
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -target %target-swift-5.1-abi-triple -swift-version 5
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -target %target-swift-5.1-abi-triple -swift-version 6
 
 // UNSUPPORTED: OS=windows-msvc
 
@@ -8,11 +9,15 @@
 
 func testGlobalFunctions() {
   if #_hasSymbol(noArgFunc) {}
+  if #_hasSymbol(noArgFunc as () throws -> Void) {}
+  if #_hasSymbol(noArgFunc as () async -> Void) {}
   if #_hasSymbol(function(with:)) {}
   if #_hasSymbol(throwingFunc) {}
   if #_hasSymbol(ambiguousFunc) {} // expected-error {{ambiguous use of 'ambiguousFunc()'}}
   if #_hasSymbol(ambiguousFunc as () -> Int) {}
   if #_hasSymbol(genericFunc(_:) as (S) -> Void) {}
+  if #_hasSymbol(mainActorFunc) {}
+  if #_hasSymbol(mainActorFunction(with:)) {}
 }
 
 func testVars() {
@@ -23,12 +28,25 @@ func testVars() {
 func testStruct(_ s: S) {
   if #_hasSymbol(s.member) {}
   if #_hasSymbol(s.noArgsMethod) {}
+  if #_hasSymbol(s.noArgsMethod as () throws -> Void) {}
+  if #_hasSymbol(s.noArgsMethod as () async -> Void) {}
+  if #_hasSymbol(S.noArgsMethod) {}
+  if #_hasSymbol(S.noArgsMethod as (S) -> () throws -> Void) {}
   if #_hasSymbol(s.method(with:)) {}
+  if #_hasSymbol(s.method(with:) as (Int) -> Void) {}
+  if #_hasSymbol(S.method(with:)) {}
+  if #_hasSymbol(s.ambiguousMethod) {} // expected-error {{ambiguous use of 'ambiguousMethod()'}}
+  if #_hasSymbol(s.ambiguousMethod as () -> Int) {}
+  if #_hasSymbol(s.ambiguousMethod as () throws -> Int) {}
+  if #_hasSymbol(S.ambiguousMethod as (S) -> () -> Int) {}
   if #_hasSymbol(s.genericFunc(_:)) {} // expected-error {{generic parameter 'T' could not be inferred}}
   if #_hasSymbol(s.genericFunc(_:) as (S) -> ()) {}
   if #_hasSymbol(s.requirement) {}
+  if #_hasSymbol(S.requirement) {}
   if #_hasSymbol(s.requirementWithDefaultImpl) {}
-
+  if #_hasSymbol(s.mainActorMethod) {}
+  if #_hasSymbol(S.mainActorMethod) {}
+  if #_hasSymbol(S.mainActorStaticFunc) {}
   if #_hasSymbol(S.staticFunc) {}
   if #_hasSymbol(S.staticMember) {}
   if #_hasSymbol(S.init(member:)) {}
@@ -37,19 +55,30 @@ func testStruct(_ s: S) {
 func testGenericStruct(_ s: GenericS<S>) {
   if #_hasSymbol(s.member) {}
   if #_hasSymbol(s.noArgsMethod) {}
+  if #_hasSymbol(GenericS<S>.noArgsMethod) {}
   if #_hasSymbol(s.method(with:)) {}
 }
 
-func testClass(_ c: C) {
+func testClass(_ c: C, _ sub: SubC) {
   if #_hasSymbol(c.member) {}
   if #_hasSymbol(c.noArgsMethod) {}
+  if #_hasSymbol(C.noArgsMethod) {}
   if #_hasSymbol(c.method(with:)) {}
   if #_hasSymbol(c.requirement) {}
   if #_hasSymbol(c.requirementWithDefaultImpl) {}
-
+  if #_hasSymbol(c.mainActorMethod) {}
+  if #_hasSymbol(C.mainActorMethod) {}
   if #_hasSymbol(C.classFunc) {}
   if #_hasSymbol(C.staticMember) {}
   if #_hasSymbol(C.init(member:)) {}
+  if #_hasSymbol(c.methodReturningSelf) {}
+  if #_hasSymbol(C.methodReturningSelf) {}
+
+  if #_hasSymbol(sub.mainActorMethodReturningSelf) {}
+  if #_hasSymbol(sub.methodReturningSelf) {}
+  if #_hasSymbol(sub.methodReturningSelf as () -> SubC) {}
+  if #_hasSymbol(sub.methodReturningSelf as () -> any P) {}
+  if #_hasSymbol(SubC.methodReturningSelf) {}
 }
 
 func testEnum(_ e: E) {
@@ -57,6 +86,27 @@ func testEnum(_ e: E) {
   if #_hasSymbol(E.payloadCase) {}
   if #_hasSymbol(E.payloadCase(_:)) {}
   if #_hasSymbol(e.method) {}
+  if #_hasSymbol(E.method) {}
+}
+
+extension S {
+  func testImplicitSelf() {
+    if #_hasSymbol(noArgsMethod) {}
+    if #_hasSymbol(noArgsMethod as () throws -> Void) {}
+    if #_hasSymbol(noArgsMethod as () async -> Void) {}
+    if #_hasSymbol(method(with:) as (Int) -> Void) {}
+    if #_hasSymbol(ambiguousMethod) {} // expected-error {{ambiguous use of 'ambiguousMethod()'}}
+    if #_hasSymbol(ambiguousMethod as () -> Int) {}
+  }
+}
+
+@MainActor
+func testFromActorIsolatedContext(_ s: S) {
+  if #_hasSymbol(mainActorFunc) {}
+  if #_hasSymbol(s.mainActorMethod) {}
+  if #_hasSymbol(s.mainActorMember) {}
+  if #_hasSymbol(S.mainActorStaticMember) {}
+  if #_hasSymbol(s[0]) {}
 }
 
 func testOpaqueParameter<T: PAT>(_ p: T) {
@@ -69,6 +119,10 @@ func testOpaqueParameter<T: PAT>(_ p: T) {
 func testExistentialParameter(_ p: any P) {
   if #_hasSymbol(p.requirement) {}
   if #_hasSymbol(p.requirementWithDefaultImpl) {}
+
+  // An uncurried reference to a protocol requirement.
+  if #_hasSymbol(P.requirement) {}
+  if #_hasSymbol(P.requirementWithDefaultImpl) {}
 }
 
 func testMetatypes() {
@@ -80,7 +134,7 @@ func testMetatypes() {
   if #_hasSymbol(E.self) {}
 }
 
-var localGlobal: Int = 0
+nonisolated(unsafe) var localGlobal: Int = 0
 
 func localFunc() {}
 
@@ -126,6 +180,7 @@ func testWhile() {
   while #_hasSymbol(localFunc) { break } // expected-warning {{global function 'localFunc()' is not a weakly linked declaration}}
 }
 
+@usableFromInline
 func doIt(_ closure: () -> ()) {
   closure()
 }

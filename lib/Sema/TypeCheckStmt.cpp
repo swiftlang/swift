@@ -792,6 +792,17 @@ static Expr *getDeclRefProvidingExpressionForHasSymbol(Expr *E) {
   if (auto CE = dyn_cast<CoerceExpr>(E))
     return getDeclRefProvidingExpressionForHasSymbol(CE->getSubExpr());
 
+  // Strip implicit function conversions, which may be inserted to adjust the
+  // type or isolation of the reference:
+  //
+  //   if #_hasSymbol(foo as () throws -> ()) { ... }
+  //
+  if (isa<FunctionConversionExpr>(E) ||
+      isa<CovariantFunctionConversionExpr>(E) ||
+      isa<ActorIsolationErasureExpr>(E))
+    return getDeclRefProvidingExpressionForHasSymbol(
+        cast<ImplicitConversionExpr>(E)->getSubExpr());
+
   // Unwrap curry thunks which are injected into the AST to wrap some forms of
   // unapplied method references, e.g.
   //
@@ -808,6 +819,14 @@ static Expr *getDeclRefProvidingExpressionForHasSymbol(Expr *E) {
   //
   if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(E))
     return getDeclRefProvidingExpressionForHasSymbol(DSCE->getFn());
+
+  // Drill into the right hand side of a DotSyntaxBaseIgnoredExpr, which wraps
+  // an uncurried reference to an instance member, e.g.
+  //
+  //   if #_hasSymbol(SomeStruct.foo) { ... }
+  //
+  if (auto DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(E))
+    return getDeclRefProvidingExpressionForHasSymbol(DSBIE->getRHS());
 
   return E;
 }
