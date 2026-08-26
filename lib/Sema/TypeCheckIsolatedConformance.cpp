@@ -30,32 +30,6 @@ using namespace swift;
 
 namespace {
 
-static void
-forAllRequirementTypes(WhereClauseOwner &&source,
-                       llvm::function_ref<void(Type, TypeRepr *)> callback) {
-  std::move(source).visitRequirements(
-      TypeResolutionStage::Interface,
-      [&](const Requirement &req, RequirementRepr *reqRepr) {
-        switch (req.getKind()) {
-        case RequirementKind::SameShape:
-        case RequirementKind::Conformance:
-        case RequirementKind::SameType:
-        case RequirementKind::Superclass:
-          callback(req.getFirstType(),
-                   RequirementRepr::getFirstTypeRepr(reqRepr));
-          callback(req.getSecondType(),
-                   RequirementRepr::getSecondTypeRepr(reqRepr));
-          break;
-
-        case RequirementKind::Layout:
-          callback(req.getFirstType(),
-                   RequirementRepr::getFirstTypeRepr(reqRepr));
-          break;
-        }
-        return false;
-      });
-}
-
 class IsolatedConformanceUseChecker
     : public DeclVisitor<IsolatedConformanceUseChecker> {
   void checkType(Type type, const TypeRepr *typeRepr, const Decl *context) {
@@ -83,9 +57,8 @@ class IsolatedConformanceUseChecker
     }
 
     if (ownerCtx->getTrailingWhereClause()) {
-      forAllRequirementTypes(
-          WhereClauseOwner(const_cast<GenericContext *>(ownerCtx)),
-          [&](Type type, TypeRepr *typeRepr) {
+      WhereClauseOwner(const_cast<GenericContext *>(ownerCtx))
+          .forAllRequirementTypes([&](Type type, TypeRepr *typeRepr) {
             checkType(type, typeRepr, ownerDecl);
           });
     }
@@ -221,9 +194,10 @@ public:
               assocType->getDefaultDefinitionTypeRepr(), assocType);
 
     if (assocType->getTrailingWhereClause()) {
-      forAllRequirementTypes(assocType, [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, assocType);
-      });
+      WhereClauseOwner(assocType).forAllRequirementTypes(
+          [&](Type type, TypeRepr *typeRepr) {
+            checkType(type, typeRepr, assocType);
+          });
     }
   }
 
@@ -241,9 +215,10 @@ public:
     }
 
     if (proto->getTrailingWhereClause()) {
-      forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, proto);
-      });
+      WhereClauseOwner(proto).forAllRequirementTypes(
+          [&](Type type, TypeRepr *typeRepr) {
+            checkType(type, typeRepr, proto);
+          });
     }
   }
 
@@ -309,9 +284,8 @@ public:
     if (!ED->getTrailingWhereClause())
       return;
 
-    forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, ED);
-    });
+    WhereClauseOwner(ED).forAllRequirementTypes(
+        [&](Type type, TypeRepr *typeRepr) { checkType(type, typeRepr, ED); });
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
