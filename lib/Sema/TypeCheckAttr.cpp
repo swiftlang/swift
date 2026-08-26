@@ -1772,6 +1772,8 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     D->getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
   if (!langAttr)
     langAttr = D->getAttrs().getAttribute<CDeclAttr>(/*AllowInvalid=*/true);
+  if (!langAttr)
+    langAttr = D->getAttrs().getAttribute<CxxDeclAttr>(/*AllowInvalid=*/true);
 
   if (!langAttr) {
     diagnose(attr->getLocation(), diag::attr_implementation_requires_language);
@@ -2411,7 +2413,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
   }
 }
 
-static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
+bool swift::canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // The Swift standard library needs to be able to define reserved symbols.
   if (fromModule->isStdlibModule()
       || fromModule->getName() == fromModule->getASTContext().Id_Concurrency
