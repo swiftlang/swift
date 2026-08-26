@@ -939,7 +939,13 @@ DECL_ATTR(called, Called,
   177)
 DECL_ATTR_FEATURE_REQUIREMENT(Called, CalledAttribute)
 
-LAST_DECL_ATTR(Called)
+DECL_ATTR(cxx, CxxDecl,
+  OnFunc,
+  LongAttribute | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  178)
+DECL_ATTR_FEATURE_REQUIREMENT(CxxDecl, CxxImplementation)
+
+LAST_DECL_ATTR(CxxDecl)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

@@ -563,6 +563,9 @@ struct AddressLoweringState {
 
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> exitingInsts;
+  
+  // All program-terminating instructions (unreachable instruction).
+  SmallVector<TermInst *, 8> terminatingInsts;
 
   // All instructions that yield values to callees.
   TinyPtrVector<YieldInst *> yieldInsts;
@@ -585,6 +588,9 @@ struct AddressLoweringState {
     for (auto &block : *function) {
       if (block.getTerminator()->isFunctionExiting())
         exitingInsts.push_back(block.getTerminator());
+      
+      if (block.getTerminator()->isProgramTerminating())
+        terminatingInsts.push_back(block.getTerminator());
     }
   }
 
@@ -694,6 +700,10 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       } else {
         load = argBuilder.createLoadBorrow(loc, undefAddress);
         for (SILInstruction *termInst : pass.exitingInsts) {
+          pass.getBuilder(termInst->getIterator())
+              .createEndBorrow(pass.genLoc(), load);
+        }
+        for (SILInstruction *termInst : pass.terminatingInsts) {
           pass.getBuilder(termInst->getIterator())
               .createEndBorrow(pass.genLoc(), load);
         }

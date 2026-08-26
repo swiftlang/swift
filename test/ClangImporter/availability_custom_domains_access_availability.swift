@@ -12,6 +12,8 @@
 // RUN:   -experimental-spi-only-imports -parse-as-library -swift-version 5 \
 // RUN:   %s -verify-additional-prefix swift5-
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // REQUIRES: swift_feature_CustomAvailability
 
 private import Rivers // also re-exported by Oceans

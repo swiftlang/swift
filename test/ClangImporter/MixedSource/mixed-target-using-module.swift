@@ -4,6 +4,8 @@
 // RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %S/Inputs/mixed-target/ -module-name WrongName -import-underlying-module -typecheck %s  -enable-objc-interop -disable-objc-attr-requires-foundation-module 2>&1 | %FileCheck -check-prefix=CHECK-WRONG-NAME %s
 // RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %S/Inputs/mixed-target/ -module-name WrongName -DOVERLAY_STYLE_WRONG -typecheck %s  -enable-objc-interop -disable-objc-attr-requires-foundation-module 2>&1 | %FileCheck -check-prefix=CHECK-WRONG-NAME %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 #if OVERLAY_STYLE_RIGHT
 @_exported import Mixed
 #elseif OVERLAY_STYLE_WRONG

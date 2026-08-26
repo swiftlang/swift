@@ -596,12 +596,15 @@ private:
 void simple_display(raw_ostream &out, GenericSignature sig);
 
 inline bool CanGenericSignature::isActuallyCanonicalOrNull() const {
-  return getPointer() == nullptr ||
-         getPointer() ==
-             llvm::DenseMapInfo<GenericSignatureImpl *>::getEmptyKey() ||
-         getPointer() ==
-             llvm::DenseMapInfo<GenericSignatureImpl *>::getTombstoneKey() ||
-         getPointer()->isCanonical();
+#if LLVM_VERSION_MAJOR <= 21
+  if (getPointer() ==
+          llvm::DenseMapInfo<GenericSignatureImpl *>::getEmptyKey() ||
+      getPointer() ==
+          llvm::DenseMapInfo<GenericSignatureImpl *>::getTombstoneKey())
+    return true;
+#endif
+
+  return getPointer() == nullptr || getPointer()->isCanonical();
 }
 
 int compareAssociatedTypes(AssociatedTypeDecl *assocType1,

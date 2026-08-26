@@ -489,6 +489,7 @@ UNINTERESTING_FEATURE(ImportCxxMembersLazily)
 UNINTERESTING_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe)
 UNINTERESTING_FEATURE(LibkernOwnershipConventions)
 UNINTERESTING_FEATURE(ForeignReferenceTypeInheritance)
+UNINTERESTING_FEATURE(CxxImplementation)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -764,6 +765,8 @@ static bool usesFeatureCalledAttribute(Decl *D) {
 
   return usesTypeMatching(D, hasCalled);
 }
+
+UNINTERESTING_FEATURE(BuiltinExtendVectorLanes)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
