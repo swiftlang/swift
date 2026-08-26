@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -o /dev/null %s -O -cross-module-optimization -sil-verify-all
+// RUN: %target-swift-frontend -emit-sil -o /dev/null %s -O -enable-cmo-everything -sil-verify-all
 
 // Check that the cross-module-optimization pass can handle instructions which
 // operate on local archetypes, like `value_metatype` on an opened existential
@@ -33,4 +34,18 @@ func nameOfValue<T: P>(_ value: T) -> String {
 // existential archetype.
 public func nameOfExistential(_ value: any P) -> String {
   return nameOfValue(value)
+}
+
+public protocol Q: AnyObject {}
+public class C: Q {}
+
+@inline(__always)
+func castToC<T: Q>(_ value: T) -> C? {
+  return value as? C
+}
+
+// After inlining `castToC`, the `checked_cast_br` operates on an opened
+// existential archetype - and so does the argument of its failure block.
+public func castExistentialToClass(_ value: any Q) -> C? {
+  return castToC(value)
 }
