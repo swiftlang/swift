@@ -655,7 +655,7 @@ EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 
 /// Allow use of macros to derive various conformances
-EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, false)
+EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, true)
 
 /// Allow use of `@called(...)` on function types.
 EXPERIMENTAL_FEATURE(CalledAttribute, false)
