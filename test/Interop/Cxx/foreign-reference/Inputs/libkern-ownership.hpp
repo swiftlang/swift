@@ -164,6 +164,13 @@ public:
   }
 
   virtual void LIBKERN_CONSUMES_THIS consumeMyself() { release(); }
+
+  // _RETURNS_RETAINED and _RETURNS_UNRETAINED attributes are ignored on out
+  // parameters
+  static bool initializeService(int id, Service **service) {
+    *service = new Service(id);
+    return (*service)->getID() == id;
+  }
 };
 
 class NastyService : public Service {
