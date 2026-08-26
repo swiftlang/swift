@@ -2,7 +2,6 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 
-import Foundation
 import StdlibUnittest
 
 let SIMDGenericFPTests = TestSuite("SIMD Generic FP")
@@ -13,7 +12,7 @@ where T: SIMD, T.Scalar: BinaryFloatingPoint {
 }
 
 SIMDGenericFPTests.test("negation") {
-  let negZero = -getNegativeZero(of: SIMD4<Float>)
+  let negZero = getNegativeZero(of: SIMD4<Float>.self)
   expectEqual(negZero[0].sign, .minus)
   expectEqual(negZero[1].sign, .minus)
   expectEqual(negZero[2].sign, .minus)
