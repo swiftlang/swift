@@ -349,6 +349,13 @@ void diagnoseMissingExplicitSendable(NominalTypeDecl *nominal);
 /// Warn about deprecated `Executor.enqueue` implementations.
 void tryDiagnoseExecutorConformance(ASTContext &C, const NominalTypeDecl *nominal, ProtocolDecl *proto);
 
+/// Check all of the bound generic types that were written explicitly
+/// and make sure that no generic arguments violate isolated conformance
+/// use rules (i.e. substitute a generic parameter that has `Sendable` or
+/// `SendableMetatype` requirement).
+void diagnoseInvalidIsolatedConformancesUses(const Expr *E,
+                                             const DeclContext *DC);
+
 // Get a concrete reference to a declaration
 ConcreteDeclRef getDeclRefInContext(ValueDecl *value);
 

@@ -356,7 +356,7 @@ class ComputedGetSetWitness: HasMutableVar {
 
 // Check cases where generic parameter prohibits use of isolated conformances by conforming to Sendable/SendableMetatype
 
-// expected-note@+1 20 {{requirement specified as 'T' : 'P' [with T = C]}}
+// expected-note@+1 28 {{requirement specified as 'T' : 'P' [with T = C]}}
 struct SendableWrapper<T: P & Sendable> { }
 
 typealias GlobalTypeAliasTest = SendableWrapper<C> // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
@@ -489,5 +489,47 @@ struct TestExt<T> {
 }
 
 extension TestExt where T == SendableWrapper<C> {
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+func testExpressionContext<T>(v: T) {
+  _ = SendableWrapper<C>.self
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  _ = (v as? SendableWrapper<C>)
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  _ = v as! SendableWrapper<C>
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  func test<U>() -> SendableWrapper<U> { // expected-note 2 {{'test()' declared here}}
+  }
+
+  guard let _: SendableWrapper<C> = test() else {
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+    return
+  }
+
+  let _ = {
+    guard let _: SendableWrapper<C> = test() else {
+      // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+      return
+    }
+  }
+
+  let _ = { (a: SendableWrapper<C>) in
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  }
+
+  let _ = { () -> SendableWrapper<C> in
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  }
+
+  func makeWrapper() -> SendableWrapper<C> { fatalError() }
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  let inferredGlobal = makeWrapper()
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  typealias X<U: P> = SendableWrapper<U>
+  _ = X<C>.self
   // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
 }
