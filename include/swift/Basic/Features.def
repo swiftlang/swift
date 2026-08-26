@@ -675,6 +675,9 @@ LANGUAGE_FEATURE(BuiltinExtendVectorLanes, 0, "Support for accessing LLVM Builti
 /// conventions.
 EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
 
+/// Emit `resignRemoteID` calls in remote distributed actor deinits.
+EXPERIMENTAL_FEATURE(DistributedActorResignRemoteID, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

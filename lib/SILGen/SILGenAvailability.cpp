@@ -316,6 +316,11 @@ SILGenFunction::emitIfAvailableQuery(SILLocation loc,
   return emitAvailabilityCheck(*this, loc, *query);
 }
 
+SILValue SILGenFunction::emitAvailabilityQuery(SILLocation loc,
+                                               const AvailabilityQuery &query) {
+  return emitAvailabilityCheck(*this, loc, query);
+}
+
 bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
                                                ResilienceExpansion expansion) {
   auto &ctx = getASTContext();
