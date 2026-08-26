@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -verify -verify-ignore-unrelated
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // Codable enum with non-Codable parameter.
 enum E1 : Codable {
 // expected-error@-1 {{type 'E1' does not conform to protocol 'Decodable'}}

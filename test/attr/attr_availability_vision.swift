@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib -target arm64-apple-xros2.0 %s
 
+// expected-warning@<unknown> * {{using sysroot for }}
+
 @available(visionOS, introduced: 1.0, deprecated: 1.5, obsoleted: 2.0,
            message: "you don't want to do that anyway")
 public func doSomething() { }

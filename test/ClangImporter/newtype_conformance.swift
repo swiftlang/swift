@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import SimpleSwiftNewtypes
 
 func acceptEquatable<T: Equatable>(_: T) {}

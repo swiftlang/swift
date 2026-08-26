@@ -17,6 +17,7 @@
 // RUN:   -isysroot %S/../Inputs/clang-importer-sdk
 
 //--- Lib.swift
+// expected-warning@<unknown> * {{libc not found for }}
 
 // CHECK-NOT: assume_nonnull
 

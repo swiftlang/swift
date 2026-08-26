@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib -target i386-apple-tvos9.0 %s
 
+// expected-warning@<unknown> * {{using sysroot for }}
+
 @available(tvOS, introduced: 1.0, deprecated: 2.0, obsoleted: 9.0,
               message: "you don't want to do that anyway")
 func doSomething() { }

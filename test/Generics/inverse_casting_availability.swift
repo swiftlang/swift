@@ -7,6 +7,8 @@
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchOS || OS=xros
 // REQUIRES: SWIFT_STDLIB_ARCH=arm64
 
+// expected-warning@<unknown> * {{using sysroot for }}
+
 protocol P {}
 struct NCG<T: ~Copyable> {}
 extension NCG: P where T: Copyable {} // expected-note 2{{requirement_implied_by_conditional_conformance}}

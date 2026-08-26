@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib -target aarch64-unknown-linux-android28 %s
 
+// expected-warning@<unknown> * {{libc not found for 'aarch64-unknown-linux-android28'; C stdlib may be unavailable}}
+
 @available(Android, introduced: 1.0, deprecated: 2.0, obsoleted: 28.0,
               message: "you don't want to do that anyway")
 func doSomething() { }

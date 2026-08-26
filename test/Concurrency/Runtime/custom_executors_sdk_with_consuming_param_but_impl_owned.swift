@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-concurrency-consuming-job-param) -emit-sil -parse-as-library %s -verify
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
