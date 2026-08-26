@@ -703,6 +703,15 @@ func CImplFuncAvailable1(_: Int32) { }
 @implementation @_cdecl("CImplFuncAvailable2")
 func CImplFuncAvailable2(_: Int32) { }
 
+// When the '@objc' (not '@_cdecl') spelling is used, there is no C name to
+// mention, so the diagnostic should fall back to the Swift name rather than
+// printing an empty '' name.
+class SwiftSubclassWithImplMethod: ObjCClass {
+  @objc @implementation
+  func unimplementedMethod(_: CInt) {}
+  // expected-error@-2 {{could not find imported function 'unimplementedMethod' matching instance method 'unimplementedMethod'; make sure you import the module or header that declares it}}
+}
+
 //
 // TODO: @_cdecl for global functions imported as computed vars
 //
