@@ -6904,7 +6904,6 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseMissingMemberImports(E, DC);
   diagnoseCxxFunctionCalls(E, DC);
   diagnoseInvalidSendingCaptureDeclarations(E, DC);
-  diagnoseInvalidIsolatedConformancesUses(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {

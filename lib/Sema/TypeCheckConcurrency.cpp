@@ -3189,6 +3189,18 @@ namespace {
       if (!expr->getType() || expr->getType()->hasError())
         return Action::SkipNode(expr);
 
+      if (auto *T = dyn_cast<TypeExpr>(expr)) {
+        if (!T->isImplicit()) {
+          checkIsolatedConformancesInType(T->getType(), T->getTypeRepr(),
+                                          expr->getLoc());
+        }
+      }
+
+      if (auto *cast = dyn_cast<ExplicitCastExpr>(expr)) {
+        checkIsolatedConformancesInType(
+            cast->getCastType(), cast->getCastTypeRepr(), expr->getLoc());
+      }
+
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
         opaqueValues.push_back({
             openExistential->getOpaqueValue(),
@@ -3222,6 +3234,20 @@ namespace {
 
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         determineClosureIsolationInContext(closure, Parent.getAsExpr());
+
+        if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+        for (auto *param : *explicitClosure->getParameters()) {
+          checkIsolatedConformancesInType(param->getInterfaceType(),
+                                          param->getTypeRepr(), expr->getLoc());
+        }
+
+        checkIsolatedConformancesInType(
+            explicitClosure->getResultType(),
+            explicitClosure->hasExplicitResultType()
+                ? explicitClosure->getExplicitResultTypeRepr()
+                : nullptr,
+            expr->getLoc());
+        }
 
         checkLocalCaptures(closure);
         contextStack.push_back(closure);
@@ -4775,6 +4801,10 @@ namespace {
           return globalActor;
       }
       return Type();
+    }
+
+    void checkIsolatedConformancesInType(Type T, TypeRepr *TR, SourceLoc loc) {
+      TypeChecker::checkIsolatedConformancesInType(T, TR ? TR->getLoc() : loc);
     }
 
   public:

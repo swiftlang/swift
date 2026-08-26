@@ -302,65 +302,6 @@ public:
     checkConstrainedExtensionRequirements(ED);
   }
 };
-
-class ExprIsolatedConformanceUseChecker : public BaseDiagnosticWalker {
-  DeclContext *DC;
-
-  void checkType(Type T, TypeRepr *TR, SourceLoc loc) {
-    TypeChecker::checkIsolatedConformancesInType(T, TR ? TR->getLoc() : loc);
-  }
-
-public:
-  ExprIsolatedConformanceUseChecker(DeclContext *DC) : DC(DC) {}
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    if (auto T = dyn_cast<TypeExpr>(E)) {
-      if (!T->isImplicit()) {
-        checkType(T->getType(), T->getTypeRepr(), E->getLoc());
-      }
-    }
-
-    if (auto CE = dyn_cast<ClosureExpr>(E)) {
-      for (auto *param : *CE->getParameters()) {
-        checkType(param->getInterfaceType(), param->getTypeRepr(), E->getLoc());
-      }
-      checkType(CE->getResultType(),
-                CE->hasExplicitResultType() ? CE->getExplicitResultTypeRepr()
-                                            : nullptr,
-                E->getLoc());
-    }
-
-    if (AbstractClosureExpr *closure = dyn_cast<AbstractClosureExpr>(E)) {
-      // Walk into the closure body as well.
-      closure->getBody()->walk(*this);
-      return Action::SkipChildren(E);
-    }
-
-    if (auto CE = dyn_cast<ExplicitCastExpr>(E)) {
-      checkType(CE->getCastType(), CE->getCastTypeRepr(), E->getLoc());
-    }
-
-    return Action::Continue(E);
-  }
-
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    // We need to recursively call diagnoseInvalidIsolatedConformancesUses
-    // for any sub-expressions in the statement.
-    class StmtRecurseWalker : public BaseDiagnosticWalker {
-      DeclContext *DC;
-
-    public:
-      StmtRecurseWalker(DeclContext *DC) : DC(DC) {}
-
-      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-        diagnoseInvalidIsolatedConformancesUses(E, DC);
-        return Action::SkipNode(E);
-      }
-    };
-    StmtRecurseWalker W(DC);
-    S->walk(W);
-    return Action::SkipNode(S);
-  }
-};
 } // end namespace
 
 void TypeChecker::checkIsolatedConfromancesInDecl(Decl *D) {
@@ -440,10 +381,4 @@ TypeChecker::checkIsolatedConformancesForDiagnostics(
   }
 
   return CheckGenericArgumentsResult::createSuccess();
-}
-
-void swift::diagnoseInvalidIsolatedConformancesUses(const Expr *E,
-                                                    const DeclContext *DC) {
-  ExprIsolatedConformanceUseChecker checker(const_cast<DeclContext *>(DC));
-  const_cast<Expr *>(E)->walk(checker);
 }
