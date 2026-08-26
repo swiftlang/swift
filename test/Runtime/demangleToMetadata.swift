@@ -289,6 +289,12 @@ DemangleToMetadataTests.test("demangle built-in types") {
   expectNotNil(_typeByName("BD"))
   expectNotNil(_typeByName("Bd")) // NonDefaultDistributedActor storage
   expectEqual(Builtin.Job.self, _typeByName("Bj")!)
+
+  // The demangler accepts `Builtin.Borrow`, but the runtime can't build borrow
+  // metadata yet, so the lookup has to fail. rdar://185659741
+  expectNil(_typeByName("SiBW"))
+  expectNil(_typeByName("SiBWBW"))
+  expectNil(_typeByName("SaySiBWG"))
 }
 
 class CG4<T: P1, U: P2> {
