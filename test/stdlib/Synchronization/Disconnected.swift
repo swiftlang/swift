@@ -16,15 +16,16 @@ final class Box {
 
 struct Counter: ~Copyable {
   let id: Int
-  nonisolated(unsafe) static var liveCount = 0
+  private static let _liveCount = Atomic<Int>(0)
+  static var liveCount: Int { _liveCount.load(ordering: .relaxed) }
 
   init(id: Int) {
     self.id = id
-    Counter.liveCount += 1
+    Counter._liveCount.add(1, ordering: .relaxed)
   }
 
   deinit {
-    Counter.liveCount -= 1
+    Counter._liveCount.subtract(1, ordering: .relaxed)
   }
 }
 
