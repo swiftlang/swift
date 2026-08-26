@@ -24,7 +24,7 @@ distributed actor DA {
 
 // The remote branch performs an availability check before calling `resignRemoteID`
 // CHECK: // remoteActorDeinitBB
-// CHECK: [[STDLIB_AVAIL_FN:%[0-9]+]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF
+// CHECK: [[STDLIB_AVAIL_FN:%[0-9]+]] = function_ref @{{.*}}_stdlib_isOSVersionAtLeast{{.*}}
 // CHECK: [[IS_AVAIL:%[0-9]+]] = apply [[STDLIB_AVAIL_FN]]
 // CHECK: cond_br [[IS_AVAIL]], [[AVAIL_BB:bb[0-9]+]], [[UNAVAIL_BB:bb[0-9]+]]
 
