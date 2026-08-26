@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift
-// RUN: %target-swift-frontend -emit-sil -O -sil-verify-all %s -o /dev/null
+// RUN: %target-run-simple-swift(-swift-version 6)
+// RUN: %target-swift-frontend -emit-sil -O -sil-verify-all -swift-version 6 %s -o /dev/null
 
 // REQUIRES: executable_test
 // REQUIRES: synchronization
