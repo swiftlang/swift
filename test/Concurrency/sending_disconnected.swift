@@ -13,6 +13,11 @@ class NonSendableKlass {}
 
 func useValue<T>(_ t: T) {}
 
+final class Inner {}
+final class Outer {
+  var inner = Inner()
+}
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -80,11 +85,6 @@ func disconnected_exchange_isSending() {
 // values constructed independently of the wrapped value (Sendable results,
 // fresh `Disconnected` wrappers, or values captured from the caller's
 // region).
-
-final class Inner {}
-final class Outer {
-  var inner = Inner()
-}
 
 // Returning a reference that aliases the wrapped value's storage is
 // rejected. Without this rejection, the caller would hold a non-Sendable

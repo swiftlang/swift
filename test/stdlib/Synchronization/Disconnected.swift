@@ -16,7 +16,7 @@ final class Box {
 
 struct Counter: ~Copyable {
   let id: Int
-  static var liveCount = 0
+  nonisolated(unsafe) static var liveCount = 0
 
   init(id: Int) {
     self.id = id
@@ -123,11 +123,6 @@ if #available(SwiftStdlib 6.5, *) {
     expectEqual(0, Counter.liveCount)
   }
 
-  // Regression guard: primitive `Value` types exercise the trivially-sized /
-  // zero-sized paths through the wrapper's `consume`-based SIL. If the SIL
-  // verifier rejects the lowering of `consume _value` on a trivial field, or
-  // IRGen mishandles a zero-size payload, these tests will fail to compile or
-  // produce wrong values.
   suite.test("primitive Value: Int round-trips through consume") {
     let wrapper = Disconnected(42)
     expectEqual(42, wrapper.consume())

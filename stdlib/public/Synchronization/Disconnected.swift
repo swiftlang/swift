@@ -12,33 +12,31 @@
 
 /// A wrapper that holds a value in a disconnected isolation region.
 ///
-/// A value of `Disconnected<Value>` lives in a disconnected region: it has no
-/// references to or from any other isolation region. That guarantee lets you
-/// store such values in generic containers and later transfer them across
-/// isolation boundaries without losing the information that the value was
-/// in a disconnected region.
+/// The value stored in `Disconnected<Value>` lives in a disconnected region:
+/// it has no references to or from any other isolation region. That
+/// guarantee lets you store such values in generic containers and later
+/// transfer them across isolation boundaries without losing the information
+/// that the value was in a disconnected region.
 ///
 /// ## What is a disconnected region?
 ///
-/// Region-based isolation partitions the values that exist at any point
-/// during a program's execution into *isolation regions* based on which
-/// references reach which storage. A value is in a *disconnected region*
-/// when no reference reaches into or out of its storage from any other
-/// region. Such a value is safe to transfer to a different isolation
-/// region, such as an actor, a `Task`, or another concurrent context,
-/// because the act of transferring it cannot create a data race.
+/// Region-based isolation partitions the values in a program into
+/// *isolation regions* based on which references reach which storage. A
+/// value is in a *disconnected region* when no reference reaches into or
+/// out of its storage from any other region. Such a value is safe to
+/// transfer to a different isolation region, such as an actor, a `Task`, or
+/// another concurrent context, because the act of sending it cannot create
+/// a data race.
 ///
 /// In practice, a disconnected region typically arises from one of:
 ///
 /// - A freshly constructed value whose initializer arguments were
 ///   themselves disconnected.
 /// - A value that was just removed from another disconnected container.
-/// - A `sending` parameter at a function boundary, which the callee
-///   receives in a disconnected region.
-/// - A `sending` return value from a function, which the caller receives
-///   in a disconnected region.
+/// - A `sending` parameter at a function boundary.
+/// - A `sending` return value from a function.
 ///
-/// The disconnected property is normally only tracked at `sending`
+/// Usually, the disconnected property is only tracked at `sending`
 /// boundaries. `Disconnected<Value>` lets you preserve it across storage
 /// boundaries (generic containers, stored properties, queues) that would
 /// otherwise lose region information once the value is no longer at a
@@ -46,11 +44,11 @@
 ///
 /// ## Operations
 ///
-/// Values enter the wrapper through ``init(_:)``, which requires a `sending`
-/// argument. They leave through ``consume()`` or ``exchange(newValue:)``,
-/// both of which return `sending Value`. ``withValue(body:)`` lends the
-/// wrapped value in place to a closure that receives an `inout sending
-/// Value`.
+/// Values enter the `Disconnected` wrapper through ``init(_:)``, which
+/// requires a `sending` argument. They leave through ``consume()`` or
+/// ``exchange(newValue:)``, both of which return `sending Value`.
+/// ``withValue(body:)`` lends the wrapped value in place to a closure that
+/// receives an `inout sending Value`.
 ///
 /// Every operation either consumes the wrapper or replaces the wrapped value
 /// through a `sending` boundary, so no alias into the wrapper's storage can
@@ -129,7 +127,7 @@
 @frozen
 @safe
 public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
-  // This is safe since the only values assigned are send into `Disconnected``.
+  // This is safe since the only values assigned are sent into `Disconnected`.
   @usableFromInline
   internal nonisolated(unsafe) var _value: Value
 
@@ -147,7 +145,7 @@ public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
   /// - Parameter value: The value to wrap. The wrapper takes ownership of
   ///   it.
   @available(SwiftStdlib 6.5, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public init(_ value: consuming sending Value) {
     self._value = value
@@ -169,7 +167,7 @@ public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
   ///
   /// - Returns: The previously wrapped value, in a disconnected region.
   @available(SwiftStdlib 6.5, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public consuming func consume() -> sending Value {
     let value = consume _value
@@ -191,7 +189,7 @@ public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
   /// - Parameter newValue: The replacement value.
   /// - Returns: The previously wrapped value, in a disconnected region.
   @available(SwiftStdlib 6.5, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @discardableResult
   public mutating func exchange(
@@ -224,7 +222,7 @@ public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
   /// - Returns: The value returned by `body`.
   /// - Throws: Any error thrown by `body`.
   @available(SwiftStdlib 6.5, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public mutating func withValue<Return: ~Copyable, Failure>(
     body: (inout sending Value) throws(Failure) -> Return
