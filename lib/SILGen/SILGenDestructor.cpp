@@ -65,7 +65,11 @@ void SILGenFunction::emitDistributedRemoteActorDeinit(
       // Note that we do NOT execute user-declared the deinit body.
       // They would be free to access state which does not exist in a remote DA
 
-      // we are a remote instance,
+      emitDistributedActorSystemResignIDCall(
+        cleanupLoc, cd, borrowedSelf,
+        DistributedResignIDKind::ResignRemoteID);
+
+      // Since we are a remote instance,
       // the only properties we can destroy are the id and system properties.
       for (VarDecl *vd : cd->getStoredProperties()) {
         if (getActorIsolation(vd) == ActorIsolation::ActorInstance)
@@ -203,7 +207,8 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     // just before returning; this is guaranteed to only be executed in the local
     // actor case - because the body is never executed for a remote proxy either.
     emitDistributedActorSystemResignIDCall(
-        cleanupLoc, cd, ManagedValue::forBorrowedRValue(selfValue));
+        cleanupLoc, cd, ManagedValue::forBorrowedRValue(selfValue),
+        DistributedResignIDKind::ResignID);
   }
 
   // Release our members.
