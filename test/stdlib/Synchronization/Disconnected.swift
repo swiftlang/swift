@@ -2,9 +2,9 @@
 //
 // Also compile at -O with the SIL verifier on, so that the open Mem2Reg bug
 // at swiftlang/swift#89533 is visible on every CI run until it's fixed.
-// Today: this RUN line crashes the compiler on `take()` (any payload type)
-// and the test fails.  Once the upstream fix lands, both RUN lines succeed
-// and this becomes a permanent regression guard.
+// Today: this RUN line crashes the compiler on `consume()` (any payload
+// type) and the test fails.  Once the upstream fix lands, both RUN lines
+// succeed and this becomes a permanent regression guard.
 // RUN: %target-swift-frontend -emit-sil -O -sil-verify-all %s -o /dev/null
 
 // REQUIRES: executable_test
@@ -35,23 +35,23 @@ struct Counter: ~Copyable {
 }
 
 if #available(SwiftStdlib 6.5, *) {
-  suite.test("take returns wrapped value") {
+  suite.test("consume returns wrapped value") {
     let wrapper = Disconnected(Box(42))
-    let value = wrapper.take()
+    let value = wrapper.consume()
     expectEqual(42, value.value)
   }
 
-  suite.test("swap returns previous value and stores new one") {
+  suite.test("exchange returns previous value and stores new one") {
     var wrapper = Disconnected(Box(1))
-    let previous = wrapper.swap(newValue: Box(2))
+    let previous = wrapper.exchange(newValue: Box(2))
     expectEqual(1, previous.value)
-    expectEqual(2, wrapper.take().value)
+    expectEqual(2, wrapper.consume().value)
   }
 
-  suite.test("swap is discardable") {
+  suite.test("exchange is discardable") {
     var wrapper = Disconnected(Box(1))
-    wrapper.swap(newValue: Box(2))
-    expectEqual(2, wrapper.take().value)
+    wrapper.exchange(newValue: Box(2))
+    expectEqual(2, wrapper.consume().value)
   }
 
   suite.test("withValue can mutate in place") {
@@ -61,7 +61,7 @@ if #available(SwiftStdlib 6.5, *) {
       return value.value
     }
     expectEqual(15, returned)
-    expectEqual(15, wrapper.take().value)
+    expectEqual(15, wrapper.consume().value)
   }
 
   suite.test("withValue propagates typed throws and restores wrapper") {
@@ -81,27 +81,27 @@ if #available(SwiftStdlib 6.5, *) {
     }
 
     // The wrapper must still hold the (mutated) value after the throw.
-    expectEqual(99, wrapper.take().value)
+    expectEqual(99, wrapper.consume().value)
   }
 
-  suite.test("works with ~Copyable Value: take consumes exactly once") {
+  suite.test("works with ~Copyable Value: consume consumes exactly once") {
     expectEqual(0, Counter.liveCount)
     do {
       let wrapper = Disconnected(Counter(id: 1))
       expectEqual(1, Counter.liveCount)
-      let value = wrapper.take()
+      let value = wrapper.consume()
       expectEqual(1, Counter.liveCount)
       _ = consume value
     }
     expectEqual(0, Counter.liveCount)
   }
 
-  suite.test("works with ~Copyable Value: swap drops the old value") {
+  suite.test("works with ~Copyable Value: exchange drops the old value") {
     expectEqual(0, Counter.liveCount)
     do {
       var wrapper = Disconnected(Counter(id: 1))
       expectEqual(1, Counter.liveCount)
-      let old = wrapper.swap(newValue: Counter(id: 2))
+      let old = wrapper.exchange(newValue: Counter(id: 2))
       expectEqual(2, Counter.liveCount)
       _ = consume old
       expectEqual(1, Counter.liveCount)
@@ -134,43 +134,43 @@ if #available(SwiftStdlib 6.5, *) {
   // verifier rejects the lowering of `consume _value` on a trivial field, or
   // IRGen mishandles a zero-size payload, these tests will fail to compile or
   // produce wrong values.
-  suite.test("primitive Value: Int round-trips through take") {
+  suite.test("primitive Value: Int round-trips through consume") {
     let wrapper = Disconnected(42)
-    expectEqual(42, wrapper.take())
+    expectEqual(42, wrapper.consume())
   }
 
-  suite.test("primitive Value: Int swap and withValue") {
+  suite.test("primitive Value: Int exchange and withValue") {
     var wrapper = Disconnected(1)
-    expectEqual(1, wrapper.swap(newValue: 2))
+    expectEqual(1, wrapper.exchange(newValue: 2))
     let result = wrapper.withValue { value -> Int in
       value &+= 10
       return value
     }
     expectEqual(12, result)
-    expectEqual(12, wrapper.take())
+    expectEqual(12, wrapper.consume())
   }
 
   suite.test("primitive Value: Void round-trips") {
     let wrapper = Disconnected(())
-    wrapper.take()
+    wrapper.consume()
   }
 
-  suite.test("primitive Value: Void swap and withValue") {
+  suite.test("primitive Value: Void exchange and withValue") {
     var wrapper = Disconnected(())
-    wrapper.swap(newValue: ())
+    wrapper.exchange(newValue: ())
     wrapper.withValue { _ in }
-    wrapper.take()
+    wrapper.consume()
   }
 
   suite.test("primitive Value: Optional<Int>") {
     var wrapper = Disconnected(Int?.some(7))
-    expectEqual(.some(7), wrapper.swap(newValue: nil))
-    expectNil(wrapper.take())
+    expectEqual(.some(7), wrapper.exchange(newValue: nil))
+    expectNil(wrapper.consume())
   }
 
   suite.test("primitive Value: tuple of trivials") {
     let wrapper = Disconnected((11, 22))
-    let (a, b) = wrapper.take()
+    let (a, b) = wrapper.consume()
     expectEqual(11, a)
     expectEqual(22, b)
   }

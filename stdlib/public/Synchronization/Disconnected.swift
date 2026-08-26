@@ -47,9 +47,10 @@
 /// ## Operations
 ///
 /// Values enter the wrapper through ``init(_:)``, which requires a `sending`
-/// argument. They leave through ``take()`` or ``swap(newValue:)``, both of
-/// which return `sending Value`. ``withValue(body:)`` lends the wrapped value
-/// in place to a closure that receives an `inout sending Value`.
+/// argument. They leave through ``consume()`` or ``exchange(newValue:)``,
+/// both of which return `sending Value`. ``withValue(body:)`` lends the
+/// wrapped value in place to a closure that receives an `inout sending
+/// Value`.
 ///
 /// Every operation either consumes the wrapper or replaces the wrapped value
 /// through a `sending` boundary, so no alias into the wrapper's storage can
@@ -58,7 +59,7 @@
 ///
 /// ## Producing values that can cross isolation boundaries
 ///
-/// Use ``take()`` to remove the wrapped value. The call consumes the
+/// Use ``consume()`` to remove the wrapped value. The call consumes the
 /// wrapper, so no further operations on it are possible. The returned
 /// value is in a disconnected region, so you can transfer it across an
 /// isolation boundary in the same expression, or store it and transfer it
@@ -71,7 +72,7 @@
 /// // `Disconnected<Resource>` values, so the resource it holds is
 /// // already known to be disconnected from the surrounding context.
 /// func process(wrapper: consuming Disconnected<Resource>) async {
-///     let resource = wrapper.take()
+///     let resource = wrapper.consume()
 ///     await Task.detached {
 ///         use(resource) // OK: `resource` is in a disconnected region.
 ///     }.value
@@ -84,23 +85,23 @@
 ///
 /// ## Replacing the wrapped value in place
 ///
-/// Use ``swap(newValue:)`` to exchange the held value for a new one in a
+/// Use ``exchange(newValue:)`` to exchange the held value for a new one in a
 /// single step. The `newValue` argument is required to be in a disconnected
-/// region. `swap` returns the previously stored value, which is in a
+/// region. `exchange` returns the previously stored value, which is in a
 /// disconnected region:
 ///
 /// ```swift
 /// final class Resource: ~Sendable {}
 ///
-/// func swapResources(in wrapper: inout Disconnected<Resource>) async {
-///     let old = wrapper.swap(newValue: Resource())
+/// func exchangeResources(in wrapper: inout Disconnected<Resource>) async {
+///     let old = wrapper.exchange(newValue: Resource())
 ///     await Task.detached {
 ///         dispose(old) // OK: `old` is in a disconnected region.
 ///     }.value
 /// }
 /// ```
 ///
-/// Both directions of the swap cross a disconnected-region boundary: the
+/// Both directions of the exchange cross a disconnected-region boundary: the
 /// new value is required to be disconnected when it goes in, and the old
 /// value is known to be disconnected when it comes out.
 ///
@@ -159,18 +160,18 @@ public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
   ///
   /// ```swift
   /// let wrapper = Disconnected(Resource())
-  /// let resource = wrapper.take()
+  /// let resource = wrapper.consume()
   /// // `resource` can now be sent to another isolation region.
   /// ```
   ///
-  /// After `take()` returns, the wrapper has been consumed and no further
-  /// operations on it are possible.
+  /// After `consume()` returns, the wrapper has been consumed and no
+  /// further operations on it are possible.
   ///
   /// - Returns: The previously wrapped value, in a disconnected region.
   @available(SwiftStdlib 6.5, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public consuming func take() -> sending Value {
+  public consuming func consume() -> sending Value {
     let value = consume _value
     return value
   }
@@ -183,7 +184,7 @@ public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
   ///
   /// ```swift
   /// var wrapper = Disconnected(Resource())
-  /// let old = wrapper.swap(newValue: Resource())
+  /// let old = wrapper.exchange(newValue: Resource())
   /// // `old` can now be sent to another isolation region.
   /// ```
   ///
@@ -193,7 +194,7 @@ public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
   @_alwaysEmitIntoClient
   @_transparent
   @discardableResult
-  public mutating func swap(
+  public mutating func exchange(
     newValue: consuming sending Value
   ) -> sending Value {
     let old = consume _value

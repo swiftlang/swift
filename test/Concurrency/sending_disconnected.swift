@@ -24,23 +24,23 @@ func disconnected_construct_freshValue() {
   _ = Disconnected(NonSendableKlass())
 }
 
-// `take()`'s result is `sending`, so it can cross an isolation boundary.
+// `consume()`'s result is `sending`, so it can cross an isolation boundary.
 @available(SwiftStdlib 6.5, *)
 @MainActor
-func disconnected_takeProducesSending() async {
+func disconnected_consumeProducesSending() async {
   let d = Disconnected(NonSendableKlass())
-  let v = d.take()
+  let v = d.consume()
   await Task.detached {
     useValue(v)
   }.value
 }
 
-// `swap()`'s result is `sending`, so it can cross an isolation boundary.
+// `exchange()`'s result is `sending`, so it can cross an isolation boundary.
 @available(SwiftStdlib 6.5, *)
 @MainActor
-func disconnected_swapProducesSending() async {
+func disconnected_exchangeProducesSending() async {
   var d = Disconnected(NonSendableKlass())
-  let old = d.swap(newValue: NonSendableKlass())
+  let old = d.exchange(newValue: NonSendableKlass())
   await Task.detached {
     useValue(old)
   }.value
@@ -59,14 +59,14 @@ func disconnected_init_isSending() {
   _ = d
 }
 
-// `swap`'s `newValue` parameter is `sending`. Touching the argument after the
-// swap is a region-isolation violation.
+// `exchange`'s `newValue` parameter is `sending`. Touching the argument
+// after the exchange is a region-isolation violation.
 @available(SwiftStdlib 6.5, *)
 @MainActor
-func disconnected_swap_isSending() {
+func disconnected_exchange_isSending() {
   var d = Disconnected(NonSendableKlass())
   let y = NonSendableKlass()
-  d.swap(newValue: y)
+  d.exchange(newValue: y)
   // expected-error @-1 {{sending 'y' risks causing data races}}
   // expected-note @-2 {{'y' used after being passed as a 'sending' parameter}}
   useValue(y) // expected-note {{access can happen concurrently}}
@@ -128,7 +128,7 @@ func disconnected_withValue_allowsFreshDisconnectedReturn() {
   let result: Disconnected<Inner> = wrapper.withValue { _ in
     return Disconnected(Inner())
   }
-  useValue(result.take())
+  useValue(result.consume())
 }
 
 // Returning a value tied to the caller's isolation region is permitted.
