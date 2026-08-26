@@ -3719,6 +3719,68 @@ function(add_swift_target_executable name)
   endforeach()
 endfunction()
 
+# Determine whether an embedded target triple has a C++ standard library that
+# can be built against, and what extra header-search flags reaching it needs.
+#
+#   swift_embedded_libcxx_support(<arch> <mod> <triple>
+#                                 <out_supported> <out_cxx_flags>)
+#
+# Sets <out_supported> to TRUE/FALSE and <out_cxx_flags> to the C/C++ compile
+# flags needed to find that library's headers (empty when the target's own SDK
+# already provides them).
+#
+# On a macOS host there is only ever a macOS SDK available, so targets that are
+# not themselves Darwin -- and the bare-metal Apple ones, which have no usable
+# SDK of their own -- are built against that SDK's libc++ with -D__APPLE__ and
+# the TARGET_CPU_* macros that TargetConditionals.h used to supply before
+# Xcode 26.4.
+#
+# Callers that compile C or C++ sources pass the flags through
+# C_COMPILE_FLAGS. A caller that only builds Swift needs the headers on the
+# clang importer instead, which the fixup flags above cannot provide: the macOS
+# SDK module maps refuse to be reached from a foreign target that way. Such a
+# caller should require an empty flags list, i.e. a target whose own SDK
+# supplies the C++ standard library.
+function(swift_embedded_libcxx_support arch mod triple out_supported out_cxx_flags)
+  set(_flags)
+  set(_supported TRUE)
+
+  # Freestanding Wasm has neither libc nor libc++.
+  if("${triple}" MATCHES "-none-wasm$")
+    set(_supported FALSE)
+  elseif(SWIFT_HOST_VARIANT STREQUAL "linux")
+    if(NOT "${mod}" MATCHES "-linux-gnu$")
+      set(_supported FALSE)
+    endif()
+  elseif(SWIFT_HOST_VARIANT STREQUAL "macosx")
+    if(NOT "${mod}" MATCHES "x86_64|arm64|arm64e|armv7|armv7m|armv7em|armv8m.main|armv8.1m.main")
+      set(_supported FALSE)
+    elseif(NOT "${mod}" MATCHES "-apple-" OR "${mod}" MATCHES "-none-macho"
+           OR "${arch}" STREQUAL "armv7m" OR "${arch}" STREQUAL "armv7em"
+           OR "${arch}" STREQUAL "armv8m.main" OR "${arch}" STREQUAL "armv8.1m.main")
+      set(_flags -stdlib=libc++
+                 -isystem${SWIFT_SDK_OSX_PATH}/usr/include/c++/v1
+                 -isystem${SWIFT_SDK_OSX_PATH}/usr/include
+                 -D__APPLE__)
+      if("${arch}" MATCHES "armv7")
+        list(APPEND _flags -DTARGET_CPU_ARM=1)
+      elseif("${arch}" MATCHES "armv8")
+        list(APPEND _flags -DTARGET_CPU_ARM=1)
+      elseif("${arch}" MATCHES "arm64")
+        list(APPEND _flags -DTARGET_CPU_ARM64=1)
+      elseif("${arch}" MATCHES "x86_64")
+        list(APPEND _flags -DTARGET_CPU_X86_64=1)
+      endif()
+    endif()
+  else()
+    # No determination has been made for other hosts (e.g. Windows); leave the
+    # target's own SDK to provide the C++ standard library.
+  endif()
+
+  set(${out_supported} "${_supported}" PARENT_SCOPE)
+  set(${out_cxx_flags} "${_flags}" PARENT_SCOPE)
+endfunction()
+
 # Build an embedded Swift library across every entry of
 # EMBEDDED_STDLIB_TARGET_TRIPLES, calling add_swift_target_library_single()
 # for each target triple.
@@ -3746,6 +3808,7 @@ endfunction()
 #     [NO_FREESTANDING_CXX]
 #     [NON_EMPTY_OBJECT_FILE]
 #     [DETECT_MALLOC_TYPE]
+#     [NEEDS_TARGET_SDK]
 #     <sources>...
 #     [GYB_SOURCES <sources>...]
 #     [SWIFT_COMPILE_FLAGS <flags>...]
@@ -3783,12 +3846,21 @@ endfunction()
 # (inside this function's loop) rather than in the caller, since the
 # result depends on ${mod}/${triple}.
 #
+# When NEEDS_TARGET_SDK is set, target triples that name a real OS are built
+# against that OS's SDK. Embedded libraries are otherwise built with no SDK at
+# all, which is what freestanding targets want but leaves the clang importer
+# unable to find hosted headers. Use this only for a library that wraps a
+# hosted C or C++ library, such as the C++ standard library overlay; the caller
+# is responsible for not offering triples that have no such SDK (see
+# swift_embedded_libcxx_support). An SDK configured explicitly through
+# SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES always takes precedence.
+#
 # SKIP_*_REGEX and ONLY_*_REGEX are both multi-valued. An entry is processed
 # only when *every* ONLY_*_REGEX category that has at least one pattern has
 # at least one match, AND no SKIP_*_REGEX pattern matches.
 function(add_embedded_swift_target_library prefix library_name)
   cmake_parse_arguments(EMBLIB
-    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE;DETECT_MALLOC_TYPE"
+    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE;DETECT_MALLOC_TYPE;NEEDS_TARGET_SDK"
     "INSTALL_IN_COMPONENT;ARCHITECTURE_KEY"
     "GYB_SOURCES;SWIFT_COMPILE_FLAGS;C_COMPILE_FLAGS;FILE_DEPENDS;DEPENDS;SKIP_ARCH_REGEX;SKIP_MOD_REGEX;SKIP_TRIPLE_REGEX;ONLY_ARCH_REGEX;ONLY_MOD_REGEX;ONLY_TRIPLE_REGEX"
     ${ARGN})
@@ -3894,6 +3966,13 @@ function(add_embedded_swift_target_library prefix library_name)
     if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
       set(SWIFT_SDK_embedded_ARCH_${arch_key}_PATH
           "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+    elseif(EMBLIB_NEEDS_TARGET_SDK)
+      # macOS and Mac Catalyst embedded triples both build against the macOS
+      # SDK. Leave the path empty for any other triple, which keeps the build
+      # freestanding rather than silently picking the wrong sysroot.
+      if("${triple}" MATCHES "-apple-macos" OR "${triple}" MATCHES "-apple-ios.*-macabi")
+        set(SWIFT_SDK_embedded_ARCH_${arch_key}_PATH "${SWIFT_SDK_OSX_PATH}")
+      endif()
     endif()
 
     # Non-core embedded libraries always need the embedded swiftCore for the
