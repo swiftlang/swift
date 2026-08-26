@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-builtin-module -module-name builtins -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime --dump-input=always
+// RUN: %target-swift-frontend -enable-builtin-module -module-name builtins -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime --check-prefix=CHECK-%target-arch --dump-input=always
 
 // REQUIRES: CPU=x86_64 || CPU=arm64 || CPU=arm64e
 
@@ -225,7 +225,7 @@ func deinterleave_test(
 }
 
 func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
-                    _ v8i16: Builtin.Vec8xInt16) {
+                    _ v8i16: Builtin.Vec8xInt16, _ v4i16: Builtin.Vec4xInt16) {
   // CHECK: intrinsic_test
   i32 = Builtin.int_bswap_Int32(i32) // CHECK: llvm.bswap.i32(
 
@@ -234,6 +234,11 @@ func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
   var x = Builtin.int_sadd_with_overflow_Int16(i16, i16) // CHECK: call { i16, i1 } @llvm.sadd.with.overflow.i16(
   
   i16 = Builtin.int_vector_reduce_smin_Vec8xInt16(v8i16) // CHECK: llvm.vector.reduce.smin.v8i16(
+  
+  #if arch(arm64)
+  let sqxtn = Builtin.int_aarch64_neon_sqxtn_Vec8xInt8(v8i16) // CHECK-arm64: llvm.aarch64.neon.sqxtn.v8i8(
+  let smull = Builtin.int_aarch64_neon_smull_Vec4xInt32(v4i16, v4i16) // CHECK-arm64: llvm.aarch64.neon.smull.v4i32(
+  #endif
   
   Builtin.int_trap() // CHECK: llvm.trap()
 }

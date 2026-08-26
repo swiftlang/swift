@@ -57,11 +57,13 @@ template<> struct DenseMapInfo<DefaultCacheKey> {
   static bool isEqual(const DefaultCacheKey &LHS, const DefaultCacheKey &RHS) {
     if (LHS.Key == RHS.Key)
       return true;
+#if LLVM_VERSION_MAJOR <= 21
     if (LHS.Key == DenseMapInfo<void*>::getEmptyKey() ||
         LHS.Key == DenseMapInfo<void*>::getTombstoneKey() ||
         RHS.Key == DenseMapInfo<void*>::getEmptyKey() ||
         RHS.Key == DenseMapInfo<void*>::getTombstoneKey())
       return false;
+#endif
     return LHS.CBs->keyIsEqualCB(LHS.Key, RHS.Key, nullptr);
   }
 };

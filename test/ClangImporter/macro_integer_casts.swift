@@ -7,6 +7,8 @@
 // Failing for Android since #91256
 // XFAIL: OS=linux-android, OS=linux-androideabi
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import macros
 
 let _: CUnsignedInt = CAST_UNSIGNED_MINUS_ONE

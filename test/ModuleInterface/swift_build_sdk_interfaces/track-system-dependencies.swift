@@ -30,6 +30,8 @@
 // RUN: %target-typecheck-verify-swift -sdk %t/sdk -I %t/sdk/usr/lib/swift/ -module-cache-path %t/MCP
 // RUN: not %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Swifty-*.swiftmodule
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import Swifty
 
 usesCStruct(nil)

@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/CrossCompiler.framework %t/
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %S/../Inputs/empty.swift -typecheck -verify -emit-objc-header-path %t/CrossCompiler.framework/Headers/empty.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %S/../Inputs/empty.swift -typecheck -verify -verify-ignore-unknown -emit-objc-header-path %t/CrossCompiler.framework/Headers/empty.h
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-module-path %t/CrossCompiler.framework/Modules/CrossCompiler.swiftmodule/%target-swiftmodule-name -import-underlying-module -F %t -F %clang-importer-sdk-path/frameworks -module-name CrossCompiler -disable-objc-attr-requires-foundation-module -parse-as-library %s -Xcc -Werror
+
+// expected-warning@<unknown> * {{libc not found for }}
 
 // Ensure that building with multiple compatibility headers from different compilers doesn't
 // trigger "macro redefinition" errors (rdar://106087804)
