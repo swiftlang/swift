@@ -2681,9 +2681,11 @@ public:
   }
 
   TypeLookupErrorOr<BuiltType> createBuiltinBorrowType(BuiltType referent) {
-    llvm_unreachable("not implemented");
+    // TODO: when borrow layout is complete, build the metadata:
     // return BuiltType(swift_getBorrowTypeMetadata(MetadataState::Abstract,
-    //                                                  referent.getValue());
+    //                                              referent.getMetadata()));
+    return TYPE_LOOKUP_ERROR_FMT("Builtin.Borrow is not supported in runtime "
+                                 "type lookup");
   }
 };
 
