@@ -13,6 +13,7 @@
 // RUN: %target-run-stdlib-swift
 
 // REQUIRES: executable_test
+// REQUIRES: rdar185887158
 // REQUIRES: objc_interop
 
 import StdlibUnittest
