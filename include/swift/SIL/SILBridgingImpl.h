@@ -373,6 +373,10 @@ bool BridgedType::isTrivial(BridgedFunction f) const {
   return unbridged().isTrivial(f.getFunction());
 }
 
+bool BridgedType::isNonTrivialOnlyBecauseNonEscapable(BridgedFunction f) const {
+  return unbridged().isNonTrivialOnlyBecauseNonEscapable(*f.getFunction());
+}
+
 bool BridgedType::isNonTrivialOrContainsRawPointer(BridgedFunction f) const {
   return unbridged().isNonTrivialOrContainsRawPointer(f.getFunction());
 }

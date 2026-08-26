@@ -357,6 +357,10 @@ public:
 
   bool isTrivial(const SILFunction *f) const { return isTrivial(*f); }
 
+  /// True if the underlying AST type is non-trivial only because it is
+  /// non-Escapable.
+  bool isNonTrivialOnlyBecauseNonEscapable(const SILFunction &F) const;
+
   /// True if the type is the Builtin.RawPointer or a struct/tuple/enum which
   /// contains a Builtin.RawPointer.
   /// Returns false for types for which this property is not known, e.g. generic
