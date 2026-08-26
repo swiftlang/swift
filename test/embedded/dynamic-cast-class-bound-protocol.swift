@@ -46,3 +46,29 @@ public func classToSubclass(_ c: C) -> Bool {
 public func upcast(_ c: C) -> any ClassBound {
   return c as any ClassBound
 }
+
+// Code that is stripped during lowering is never emitted for Embedded Swift,
+// so it is free to use casts Embedded Swift cannot support.
+@_unavailableInEmbedded
+public func unavailableInEmbedded(_ e: any ClassBound) -> Bool {
+  return e is any Other
+}
+
+@available(*, unavailable)
+public func universallyUnavailable(_ e: any ClassBound) -> Bool {
+  return e is any Other
+}
+
+@_unavailableInEmbedded
+extension C {
+  public func inUnavailableExtension(_ e: any ClassBound) -> Bool {
+    return e is any Other
+  }
+}
+
+// A nested function inherits its enclosing declaration's unavailability.
+@_unavailableInEmbedded
+public func unavailableWithNestedFunction(_ e: any ClassBound) -> Bool {
+  func nested() -> Bool { return e is any Other }
+  return nested()
+}

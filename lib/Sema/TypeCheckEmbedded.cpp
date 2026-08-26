@@ -37,9 +37,27 @@ defaultEmbeddedLimitationForError(const DeclContext *dc, SourceLoc loc) {
   return DiagnosticBehavior::Warning;
 }
 
+/// Determine whether the code in this declaration context will never be
+/// emitted when compiling for Embedded Swift, in which case there is no point
+/// in diagnosing Embedded Swift limitations within it.
+static bool isNeverEmittedForEmbedded(const DeclContext *dc) {
+  auto decl = dc->getInnermostDeclarationDeclContext();
+  if (!decl)
+    return false;
+
+  // A declaration that is not available during lowering never reaches SILGen,
+  // so its restrictions can never be hit.
+  return !decl->isAvailableDuringLowering();
+}
+
 std::optional<DiagnosticBehavior>
 swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
                                          bool wasAlwaysEmbeddedError) {
+  // Code that is never emitted for Embedded Swift is free to use constructs
+  // Embedded Swift cannot support.
+  if (isNeverEmittedForEmbedded(dc))
+    return std::nullopt;
+
   // In Embedded Swift, things that were always errors will still be emitted
   // as errors. Use "unspecified" so we don't change anything.
   if (dc->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
