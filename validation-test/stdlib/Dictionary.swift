@@ -6,6 +6,7 @@
 //
 // RUN: %target-codesign %t/Dictionary && %line-directive %t/main.swift -- %target-run %t/Dictionary
 // REQUIRES: executable_test
+// REQUIRES: rdar183479588
 
 import StdlibUnittest
 import StdlibCollectionUnittest
