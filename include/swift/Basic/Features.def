@@ -538,7 +538,7 @@ EXPERIMENTAL_FEATURE(ImportCxxMembersLazily, true)
 
 /// Import a C++ foreign reference type's primary FRT base as a Swift
 /// superclass.
-EXPERIMENTAL_FEATURE(ForeignReferenceTypeInheritance, true)
+LANGUAGE_FEATURE(ForeignReferenceTypeInheritance, 0, "foreign reference type inheritance hierarchy")
 
 /// Enable @cxx @implementation for implementing C++ functions in Swift.
 EXPERIMENTAL_FEATURE(CxxImplementation, true)
