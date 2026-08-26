@@ -1773,6 +1773,10 @@ void PrintAST::printPattern(const Pattern *pattern) {
       if (i != 0)
         Printer << ", ";
 
+      if (!Elt.getLabel().empty()) {
+        Printer.printName(Elt.getLabel(), PrintNameContext::TupleElement);
+        Printer << ": ";
+      }
       printPattern(Elt.getPattern());
     }
     Printer << ")";
