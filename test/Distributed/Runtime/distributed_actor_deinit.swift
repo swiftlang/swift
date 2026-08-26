@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -target %target-future-triple %import-libdispatch -parse-stdlib -parse-as-library -module-name=main %s -o %t/a.out
+// RUN: %target-build-swift -target %target-future-triple %import-libdispatch -parse-stdlib -parse-as-library -module-name=main -enable-experimental-feature DistributedActorResignRemoteID %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: env %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out | %FileCheck %s
 
@@ -7,6 +7,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
+// REQUIRES: swift_feature_DistributedActorResignRemoteID
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
@@ -200,6 +201,10 @@ final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
     print("resign address:\(id)")
   }
 
+  func resignRemoteID(_ id: ActorID) {
+    print("resignRemoteID address:\(id)")
+  }
+
   @inlinable func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
@@ -363,7 +368,7 @@ func test() {
   // CHECK-NEXT: resign address:ActorAddress(address: "[[ADDR6]]")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=false mainThread=false
 
-  // a remote actor should not resign it's address, it was never "assigned" it
+  // a remote actor will trigger a `resignRemoteID` on deinit.
   check {
     let address = ActorAddress(parse: "remote-1")
     return try! DA_userDefined_nonisolated.resolve(id: address, using: DefaultDistributedActorSystem(group: group))
@@ -371,9 +376,10 @@ func test() {
   // CHECK-NEXT: resolve type:DA_userDefined_nonisolated, address:ActorAddress(address: "remote-1")
   // MUST NOT run deinit body for a remote distributed actor
   // CHECK-NOT: Deinitializing ActorAddress(address: "remote-1")
+  // CHECK-NEXT: resignRemoteID address:ActorAddress(address: "remote-1")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
-  
-  // a remote actor should not resign it's address, it was never "assigned" it
+
+  // a remote actor should `resignRemoteID` its id
   check {
     let address = ActorAddress(parse: "remote-2")
     return try! DA_userDefined_isolated.resolve(id: address, using: DefaultDistributedActorSystem(group: group))
@@ -381,9 +387,10 @@ func test() {
   // CHECK-NEXT: resolve type:DA_userDefined_isolated, address:ActorAddress(address: "remote-2")
   // MUST NOT run deinit body for a remote distributed actor
   // CHECK-NOT: Deinitializing ActorAddress(address: "remote-2")
+  // CHECK-NEXT: resignRemoteID address:ActorAddress(address: "remote-2")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
-  
-  // a remote actor should not resign it's address, it was never "assigned" it
+
+  // a remote actor should `resignRemoteID` its id
   check {
     let address = ActorAddress(parse: "remote-3")
     return try! DA_state_isolated_on_another.resolve(id: address, using: DefaultDistributedActorSystem(group: group))
@@ -391,6 +398,7 @@ func test() {
   // CHECK-NEXT: resolve type:DA_state_isolated_on_another, address:ActorAddress(address: "remote-3")
   // MUST NOT run deinit body for a remote distributed actor
   // CHECK-NOT: Deinitializing ActorAddress(address: "remote-3")
+  // CHECK-NEXT: resignRemoteID address:ActorAddress(address: "remote-3")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
 
   print("DONE")
