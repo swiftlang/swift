@@ -1057,6 +1057,10 @@ bool Decl::isInMacroExpansionInContext() const {
   return swift::isMacroExpansionInContext(getStartLoc(), parentSF);
 }
 
+bool Decl::isFromSyntheticMacroExpansion() const {
+  return ::isFromSyntheticMacroExpansion(getModuleContext(), getStartLoc());
+}
+
 Decl *Decl::getMacroExpansionOriginatingDecl() const {
   SourceLoc loc = getLoc();
   auto *sf = getModuleContext()->getSourceFileContainingLocation(loc);

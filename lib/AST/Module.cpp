@@ -1198,6 +1198,18 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
 
+bool swift::isFromSyntheticMacroExpansion(ModuleDecl *module, SourceLoc loc) {
+  if (loc.isInvalid())
+    return false;
+  auto *sf = module->getSourceFileContainingLocation(loc);
+  if (!sf)
+    return false;
+  auto *enclosing = sf->getEnclosingSourceFile();
+  if (!enclosing)
+    return false;
+  return enclosing->Kind == SourceFileKind::SyntheticMacro;
+}
+
 ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
   if (Kind != SourceFileKind::MacroExpansion &&
       Kind != SourceFileKind::DefaultArgument &&

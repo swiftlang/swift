@@ -27,6 +27,7 @@ class AbstractFunctionDecl;
 class AccessorDecl;
 class AssociatedTypeDecl;
 class ASTContext;
+enum class BuiltinDerivedConformanceMacroKind : uint8_t;
 struct ASTNode;
 class CallExpr;
 class CaseStmt;
@@ -467,12 +468,15 @@ bool memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal);
 
 /// Returns the value decl expanded from the macro in `code` in the context of
 /// the \p derived derived conformance for the \p requirement requirement.
-ValueDecl *deriveRequirementViaMacro(DerivedConformance &derived,
-                                     ValueDecl *requirement, StringRef code);
-  
+ValueDecl *
+deriveRequirementViaMacro(DerivedConformance &derived, ValueDecl *requirement,
+                          StringRef code,
+                          BuiltinDerivedConformanceMacroKind macroKind);
+
 /// Get a string describing the nominal type we are deriving a conformance
 /// for by producing valid swift syntax.
 std::string getNominalTypeInfoString(DerivedConformance &derived);
+
 
 } // namespace swift
 

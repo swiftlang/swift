@@ -1,4 +1,7 @@
 // RUN: %target-swift-frontend -print-ast-decl %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -print-ast-decl %s -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 // Check that synthesized members show up as 'fileprivate', not 'private.
 
