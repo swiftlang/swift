@@ -6843,30 +6843,51 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
 }
 
 static void lookupRelatedFuncs(AbstractFunctionDecl *func,
-                               SmallVectorImpl<ValueDecl *> &results) {
+                               llvm::SmallSetVector<ValueDecl *, 4> &results) {
   DeclName swiftName;
   if (auto accessor = dyn_cast<AccessorDecl>(func))
     swiftName = accessor->getStorage()->getName();
   else
     swiftName = func->getName();
 
-  if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
-    NLOptions options = {NLFlags::IgnoreAccessControl, NLFlags::IgnoreMissingImports};
-    ty->lookupQualified({ ty }, DeclNameRef(swiftName), func->getLoc(),
-                        (NLFlags::QualifiedDefault) | options, results);
+  ASTContext &ctx = func->getASTContext();
+
+  // When the explicit C++ name differs from the Swift base name, also look
+  // candidates up under that C++ base name.
+  DeclName foreignName;
+  if (auto cxxAttr = func->getAttrs().getAttribute<CxxDeclAttr>()) {
+    if (!cxxAttr->Name.empty() &&
+        cxxAttr->Name != swiftName.getBaseName().userFacingName())
+      foreignName = DeclName(ctx.getIdentifier(cxxAttr->Name));
   }
-  else {
-    ASTContext &ctx = func->getASTContext();
+
+  if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
+    NLOptions options = {NLFlags::IgnoreAccessControl,
+                         NLFlags::IgnoreMissingImports};
+    auto doLookup = [&](DeclName name) {
+      SmallVector<ValueDecl *, 4> found;
+      ty->lookupQualified({ty}, DeclNameRef(name), func->getLoc(),
+                          (NLFlags::QualifiedDefault) | options, found);
+      results.insert(found.begin(), found.end());
+    };
+    doLookup(swiftName);
+    if (foreignName)
+      doLookup(foreignName);
+  } else {
     UnqualifiedLookupOptions options =
-      UnqualifiedLookupFlags::IgnoreAccessControl;
-    UnqualifiedLookupDescriptor descriptor(
-        DeclNameRef(ctx, Identifier(), swiftName), func->getDeclContext(),
-        func->getLoc(), options);
-    auto lookup = evaluateOrDefault(func->getASTContext().evaluator,
-                                    UnqualifiedLookupRequest{descriptor}, {});
-    for (const auto &result : lookup) {
-      results.push_back(result.getValueDecl());
-    }
+        UnqualifiedLookupFlags::IgnoreAccessControl;
+    auto doLookup = [&](DeclName name) {
+      UnqualifiedLookupDescriptor descriptor(
+          DeclNameRef(ctx, Identifier(), name), func->getDeclContext(),
+          func->getLoc(), options);
+      auto lookup = evaluateOrDefault(ctx.evaluator,
+                                      UnqualifiedLookupRequest{descriptor}, {});
+      for (const auto &result : lookup)
+        results.insert(result.getValueDecl());
+    };
+    doLookup(swiftName);
+    if (foreignName)
+      doLookup(foreignName);
   }
 }
 
@@ -6888,7 +6909,7 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
   if (clangName.empty())
     return {};
 
-  SmallVector<ValueDecl *, 4> results;
+  llvm::SmallSetVector<ValueDecl *, 4> results;
   lookupRelatedFuncs(func, results);
 
   // Classify the `results` as either the interface or an implementation.
