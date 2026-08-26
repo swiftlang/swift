@@ -18,6 +18,7 @@
 // RUN:   -module-name Main -I %t -I %t/Inputs %t/Main.swift | %FileCheck %s
 
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: embedded_stdlib
 // REQUIRES: OS=macosx
 
 //--- Inputs/module.modulemap
