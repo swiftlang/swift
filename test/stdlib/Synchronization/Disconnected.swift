@@ -1,10 +1,4 @@
 // RUN: %target-run-simple-swift
-//
-// Also compile at -O with the SIL verifier on, so that the open Mem2Reg bug
-// at swiftlang/swift#89533 is visible on every CI run until it's fixed.
-// Today: this RUN line crashes the compiler on `consume()` (any payload
-// type) and the test fails.  Once the upstream fix lands, both RUN lines
-// succeed and this becomes a permanent regression guard.
 // RUN: %target-swift-frontend -emit-sil -O -sil-verify-all %s -o /dev/null
 
 // REQUIRES: executable_test
