@@ -2232,6 +2232,14 @@ ERROR(cxx_incompatible_with_cdecl,none,
 ERROR(cxx_attr_requires_implementation,none,
       "'@cxx' must be combined with '@implementation'",
       ())
+ERROR(cxx_func_defined,none,
+      "%kind0 cannot implement C++ function '%1' because it "
+      "%select{already has a definition|is declared 'inline'|is 'constexpr' (implicitly 'inline')}2",
+      (ValueDecl *, StringRef, unsigned))
+ERROR(cxx_references_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because reference "
+      "parameters and return types are not yet supported",
+      (ValueDecl *, StringRef))
 
 // @used and @section
 ERROR(section_empty_name,none,
