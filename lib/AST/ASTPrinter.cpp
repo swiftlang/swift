@@ -1792,7 +1792,10 @@ void PrintAST::printPattern(const Pattern *pattern) {
 
   case PatternKind::EnumElement: {
     auto elt = cast<EnumElementPattern>(pattern);
-    Printer << "." << elt->getElementDecl()->getBaseName();
+    auto *decl = elt->getElementDecl();
+    Printer << ".";
+    Printer.printName(decl->getBaseIdentifier(),
+                      getTypeMemberPrintNameContext(decl));
     if (elt->hasSubPattern())
       printPattern(elt->getSubPattern());
     break;
@@ -5395,7 +5398,7 @@ void PrintAST::visitCallExpr(CallExpr *expr) {
 void PrintAST::printArgument(const Argument &arg) {
   auto label = arg.getLabel();
   if (!label.empty()) {
-    Printer << label.str();
+    Printer.printName(label, PrintNameContext::FunctionParameterExternal);
     Printer << ": ";
   }
   if (arg.isInOut()) {
@@ -5582,8 +5585,25 @@ void PrintAST::visitClosureExpr(ClosureExpr *expr) {
   Printer << "\n}";
 }
 
+/// Print a reference to a value by name, escaping it if needed. 'self' is
+/// never escaped, since it always refers to the implicit base.
+static void printValueRefName(ASTPrinter &Printer, Identifier name,
+                              PrintNameContext context) {
+  if (name.str() == "self")
+    Printer << name;
+  else
+    Printer.printName(name, context);
+}
+
 void PrintAST::visitDeclRefExpr(DeclRefExpr *expr) {
-  Printer << expr->getDecl()->getBaseName();
+  auto *decl = expr->getDecl();
+  auto baseName = decl->getBaseName();
+  if (baseName.isSpecial()) {
+    Printer << baseName;
+    return;
+  }
+  printValueRefName(Printer, baseName.getIdentifier(),
+                    getTypeMemberPrintNameContext(decl));
 }
 
 void PrintAST::visitDotSelfExpr(DotSelfExpr *expr) {
@@ -5702,7 +5722,9 @@ void PrintAST::visitSuperRefExpr(SuperRefExpr *expr) {
 void PrintAST::visitMemberRefExpr(MemberRefExpr *expr) {
   visit(expr->getBase());
   Printer << ".";
-  Printer << expr->getMember().getDecl()->getName();
+  auto *decl = expr->getMember().getDecl();
+  Printer.printName(decl->getName().getBaseIdentifier(),
+                    getTypeMemberPrintNameContext(decl));
 }
 
 void PrintAST::visitSubscriptExpr(SubscriptExpr *expr) {
@@ -5823,7 +5845,8 @@ void PrintAST::visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
 void PrintAST::visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
   visit(expr->getBase());
   Printer << ".";
-  Printer << expr->getName().getBaseName();
+  Printer.printName(expr->getName().getBaseIdentifier(),
+                    PrintNameContext::Normal);
 }
 
 void PrintAST::visitArrayToPointerExpr(ArrayToPointerExpr *expr) {
@@ -5885,7 +5908,9 @@ void PrintAST::visitDestructureTupleExpr(DestructureTupleExpr *expr) {
 void PrintAST::visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
   visit(expr->getBase());
   Printer << ".";
-  Printer << expr->getMember().getDecl()->getName();
+  auto *decl = expr->getMember().getDecl();
+  Printer.printName(decl->getName().getBaseIdentifier(),
+                    getTypeMemberPrintNameContext(decl));
 }
 
 void PrintAST::visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
@@ -5899,7 +5924,8 @@ void PrintAST::visitPointerToPointerExpr(PointerToPointerExpr *expr) {
 
 void PrintAST::visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
   Printer << ".";
-  Printer << expr->getName();
+  Printer.printName(expr->getName().getBaseIdentifier(),
+                    PrintNameContext::Normal);
 }
 
 void PrintAST::visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
@@ -5926,12 +5952,14 @@ void PrintAST::visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
   if (expr->getNameLoc().isCompound()) {
     Printer << expr->getDecls().front()->getName();
   } else {
-    Printer << expr->getDecls().front()->getBaseName();
+    Printer.printName(expr->getDecls().front()->getName().getBaseIdentifier(),
+                      PrintNameContext::Normal);
   }
 }
 
 void PrintAST::visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
-  Printer << expr->getName();
+  printValueRefName(Printer, expr->getName().getBaseIdentifier(),
+                    PrintNameContext::Normal);
 }
 
 void PrintAST::visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
