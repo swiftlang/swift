@@ -49,11 +49,12 @@ bool BuiltinInfo::isReadNone() const {
 
 const llvm::AttributeSet &
 IntrinsicInfo::getOrCreateFnAttributes(ASTContext &Ctx) const {
-  if (!FnAttrs) {
+  using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeSet>;
+  if (DenseMapInfo::isEqual(FnAttrs, DenseMapInfo::getEmptyKey())) {
     FnAttrs =
         llvm::Intrinsic::getFnAttributes(Ctx.getIntrinsicScratchContext(), ID);
   }
-  return FnAttrs.value();
+  return FnAttrs;
 }
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
