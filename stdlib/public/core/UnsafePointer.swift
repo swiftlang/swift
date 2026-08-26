@@ -279,7 +279,11 @@ extension UnsafePointer where Pointee: ~Copyable {
     // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
     // always uses the "aligned allocation" path, this ensures that the
     // runtime's allocation and deallocation paths are compatible.
+#if $BuiltinAllocRawTyped
     Builtin.deallocRawTyped(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue, Pointee.self)
+#else
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
+#endif
   }
 
   @export(implementation)
@@ -290,7 +294,11 @@ extension UnsafePointer where Pointee: ~Copyable {
     // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
     // always uses the "aligned allocation" path, this ensures that the
     // runtime's allocation and deallocation paths are compatible.
+#if $BuiltinAllocRawTyped
     Builtin.deallocRawTyped(_rawValue, size._builtinWordValue, (0)._builtinWordValue, Pointee.self)
+#else
+    Builtin.deallocRaw(_rawValue, size._builtinWordValue, (0)._builtinWordValue)
+#endif
   }
 }
 
@@ -839,7 +847,11 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     if Int(align) <= _minAllocationAlignment() {
       align = (0)._builtinWordValue
     }
+#if $BuiltinAllocRawTyped
     let rawPtr = Builtin.allocRawTyped(size._builtinWordValue, align, Pointee.self)
+#else
+    let rawPtr = Builtin.allocRaw(size._builtinWordValue, align)
+#endif
     Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
     return unsafe UnsafeMutablePointer(rawPtr)
   }
@@ -856,7 +868,11 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
     // always uses the "aligned allocation" path, this ensures that the
     // runtime's allocation and deallocation paths are compatible.
+#if $BuiltinAllocRawTyped
     Builtin.deallocRawTyped(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue, Pointee.self)
+#else
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
+#endif
   }
 
   @export(implementation)
@@ -867,7 +883,11 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
     // always uses the "aligned allocation" path, this ensures that the
     // runtime's allocation and deallocation paths are compatible.
+#if $BuiltinAllocRawTyped
     Builtin.deallocRawTyped(_rawValue, size._builtinWordValue, (0)._builtinWordValue, Pointee.self)
+#else
+    Builtin.deallocRaw(_rawValue, size._builtinWordValue, (0)._builtinWordValue)
+#endif
   }
 }
 
