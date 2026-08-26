@@ -41,6 +41,9 @@ public:
 
   Address(llvm::Value *addr, llvm::Type *elementType, Alignment align)
       : Addr(addr), ElementType(elementType), Align(align) {
+    if (addr == llvm::DenseMapInfo<llvm::Value *>::getEmptyKey() ||
+        llvm::DenseMapInfo<llvm::Value *>::getTombstoneKey())
+      return;
     assert(addr != nullptr && "building an invalid address");
   }
 

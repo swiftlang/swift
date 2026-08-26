@@ -132,7 +132,8 @@ public:
 
 /// The information identifying the llvm intrinsic - its id and types.
 class IntrinsicInfo {
-  mutable std::optional<llvm::AttributeSet> FnAttrs;
+  mutable llvm::AttributeSet FnAttrs =
+      llvm::DenseMapInfo<llvm::AttributeSet>::getEmptyKey();
 
 public:
   llvm::Intrinsic::ID ID;
