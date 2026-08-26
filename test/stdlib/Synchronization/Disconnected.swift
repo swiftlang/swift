@@ -14,6 +14,7 @@ final class Box {
   init(_ value: Int) { self.value = value }
 }
 
+@available(SwiftStdlib 6.5, *)
 struct Counter: ~Copyable {
   let id: Int
   private static let _liveCount = Atomic<Int>(0)
