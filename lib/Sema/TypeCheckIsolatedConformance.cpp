@@ -22,6 +22,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
@@ -320,6 +321,11 @@ void TypeChecker::checkIsolatedConformancesInType(Type type, SourceLoc loc) {
     explicit IsolatedConformanceInTypeWalker(SourceLoc loc) : loc(loc) {}
 
     Action walkToTypePre(Type ty) override {
+      if (auto *TA = dyn_cast<TypeAliasType>(ty.getPointer())) {
+        check(TA->getDecl(), TA, TA->getGenericSignature(),
+              TA->getSubstitutionMap());
+      }
+
       auto boundGeneric = ty->getAs<BoundGenericType>();
       if (!boundGeneric)
         return Action::Continue;
@@ -329,17 +335,20 @@ void TypeChecker::checkIsolatedConformancesInType(Type type, SourceLoc loc) {
       if (!signature)
         return Action::Continue;
 
-      auto substitutions =
-          QuerySubstitutionMap{boundGeneric->getContextSubstitutionMap()};
+      check(decl, ty, signature, boundGeneric->getContextSubstitutionMap()); 
+      return Action::Continue;
+    }
+
+    void check(Decl *source, Type type, GenericSignature signature,
+               SubstitutionMap substitutions) {
+      QuerySubstitutionMap subs{substitutions};
       const auto result = TypeChecker::checkIsolatedConformancesForDiagnostics(
-          signature, signature.getRequirements(), substitutions);
+          signature, signature.getRequirements(), subs);
       if (result.getKind() == CheckRequirementsResult::RequirementFailure) {
         TypeChecker::diagnoseRequirementFailure(
-            result.getRequirementFailureInfo(), loc, decl->getLoc(), ty,
-            signature.getGenericParams(), substitutions);
+            result.getRequirementFailureInfo(), loc, source->getLoc(), type,
+            signature.getGenericParams(), subs);
       }
-
-      return Action::Continue;
     }
   };
 
