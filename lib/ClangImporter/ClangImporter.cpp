@@ -95,6 +95,8 @@
 #include "clang/Sema/Sema.h"
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
+#include "clang/Serialization/InMemoryModuleCache.h"
+#include "clang/Serialization/ModuleCache.h"
 #include "clang/Serialization/ObjectFilePCHContainerReader.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -243,7 +245,8 @@ namespace {
       return std::make_unique<HeaderParsingASTConsumer>(Impl);
     }
     bool BeginSourceFileAction(clang::CompilerInstance &CI) override {
-      auto PCH = Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash);
+      auto PCH =
+          Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash, /*Cached=*/true);
       if (PCH.has_value()) {
         Impl.getClangInstance()->getPreprocessorOpts().ImplicitPCHInclude =
             PCH.value();
@@ -1227,7 +1230,7 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
 
 std::optional<std::string>
 ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
-                              StringRef SwiftPCHHash) {
+                              StringRef SwiftPCHHash, bool Cached) {
   bool isExplicit;
   auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash,
                                     isExplicit);
@@ -1244,7 +1247,7 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
       return std::nullopt;
     }
     auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
-                                        PCHFilename.value());
+                                        PCHFilename.value(), Cached);
     if (FailedToEmit) {
       return std::nullopt;
     }
@@ -2292,8 +2295,41 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   return clonedInstance;
 }
 
+/// Publishes the precompiled header just written to \p pchPath in the
+/// in-memory module cache of \p instance, marking it as final.
+///
+/// Clang used to do this from \c clang::ASTWriter::WriteAST whenever
+/// \c clang::LangOptions::CacheGeneratedPCH was set. That option is gone;
+/// \c clang::GeneratePCHAction no longer touches the module cache at all, so
+/// the client that asked for the PCH has to publish it itself, the way
+/// \c clang::CompilerInstance does for implicitly built modules.
+///
+/// This is not merely an optimization that saves a read from the file system.
+/// \c ClangImporter::canReadPCH probes an existing PCH with a throwaway
+/// \c clang::ASTReader that shares this module cache. A failed probe leaves
+/// the entry for \p pchPath in the \c clang::InMemoryModuleCache::ToBuild
+/// state, and \c clang::ModuleManager::addModule reports any later load of a
+/// \c ToBuild path as out of date without even looking at the file on disk.
+/// Publishing the rebuilt PCH supersedes that entry.
+static void publishBuiltPCH(clang::CompilerInstance &instance,
+                            StringRef pchPath) {
+  auto &fs = instance.getVirtualFileSystem();
+  auto status = fs.status(pchPath);
+  if (!status)
+    return;
+  auto buffer = fs.getBufferForFile(pchPath, /*FileSize=*/-1,
+                                    /*RequiresNullTerminator=*/false,
+                                    /*IsVolatile=*/false, /*IsText=*/false);
+  if (!buffer)
+    return;
+
+  instance.getModuleCache().getInMemoryModuleCache().addBuiltPCM(
+      pchPath, std::move(*buffer), status->getSize(),
+      llvm::sys::toTimeT(status->getLastModificationTime()));
+}
+
 bool ClangImporter::emitBridgingPCH(
-    StringRef headerPath, StringRef outputPCHPath) {
+    StringRef headerPath, StringRef outputPCHPath, bool cached) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
 
@@ -2319,6 +2355,10 @@ bool ClangImporter::emitBridgingPCH(
                   outputPCHPath, headerPath);
     return true;
   }
+
+  if (cached)
+    publishBuiltPCH(*emitInstance, outputPCHPath);
+
   return false;
 }
 
