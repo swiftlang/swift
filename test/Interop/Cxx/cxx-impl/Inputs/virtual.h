@@ -1,23 +1,20 @@
 #ifndef TEST_INTEROP_CXX_CXX_IMPL_VIRTUAL_H
 #define TEST_INTEROP_CXX_CXX_IMPL_VIRTUAL_H
 
-// A simple polymorphic class.
+// The key function is implemented in Swift, so Swift emits the vtable and RTTI.
 
 struct Shape {
   int sides;
 
-  // The key function: the first out-of-line, non-pure virtual method. Its body
-  // must stay in C++; it anchors the vtable that dispatches to the
-  // Swift-implemented methods below.
-  // expected-note@+1{{to implement 'keyFunction' in Swift, declare another non-inline virtual method before it and define that method in C++}}
-  virtual int keyFunction() const;
+  // The key function.
   virtual int area() const;
   virtual void scale(int factor);
+  // Emitted along with the vtable, which names it.
+  virtual int perimeter() const { return 4 * sides; }
 };
 
-// Along a single-inheritance chain with an unchanged return type, every
-// overridden slot sits at offset zero: no vtable entry can need an adjusting
-// thunk, and the override is accepted.
+// The key functions stay in C++, so Swift emits no vtables. The override needs
+// no thunk.
 
 struct SimpleBase {
   int stored;
@@ -32,17 +29,17 @@ struct SimpleDerived : SimpleBase {
   int simple() const override;
 };
 
-// A pure virtual method's vtable slot dispatches to an overriding method,
-// never to a definition of the method itself.
+// A pure virtual method cannot be implemented; the key function can.
 
 struct Abstract {
+  // The key function.
   virtual int anchor() const;
   // expected-note@+1{{'pureMethod' declared pure virtual here}}
   virtual int pureMethod() const = 0;
 };
 
-// A covariant return type crossing to a base at a nonzero offset makes the
-// overridden slot need a return-adjusting thunk.
+// A covariant return to a base at a nonzero offset needs a return-adjusting
+// thunk.
 
 struct RetA {
   int a;
@@ -52,47 +49,57 @@ struct RetB {
 };
 struct RetC : RetA, RetB {};
 
+RetC *_Nonnull sharedRetC();
+
 struct CloneBase {
   virtual RetB *_Nonnull clone();
 };
 struct CloneDerived : CloneBase {
+  // The key function; its body stays in C++ (the execution test's main file).
   virtual void cloneAnchor();
   RetC *_Nonnull clone() override;
 };
 
-// An override of a method of a non-primary base needs a this-adjusting thunk
-// in that base's secondary vtable; under multiple inheritance even an
-// override of the primary base's method is conservatively rejected.
+// Multiple inheritance: overriding the non-primary base's method needs a
+// this-adjusting thunk. Swift also emits the implicit destructor.
+
+extern int destroyedMIBaseA;
 
 struct MIBaseA {
   int a;
+
+  virtual ~MIBaseA() { ++destroyedMIBaseA; }
   virtual void firstA();
 };
 struct MIBaseB {
   int b;
+
   virtual int fromB() const;
 };
 struct MIDerived : MIBaseA, MIBaseB {
+  // The key function.
   virtual void miAnchor();
   void firstA() override;
   int fromB() const override;
 };
 
-// An override of a method of a virtual base needs a this-adjusting thunk with
-// a virtual (vcall-offset) adjustment.
+// Virtual inheritance: the override needs a vcall-offset thunk, and Swift emits
+// the VTT.
 
 struct VBase {
   int vb;
+
   virtual int vbMethod() const;
 };
 struct VDerived : virtual VBase {
+  int vd;
+
+  // The key function.
   virtual void vAnchor();
   int vbMethod() const override;
 };
 
-// A foreign reference type: Swift calls dispatch dynamically through the
-// importer's synthesized thunk, while the Swift implementation provides the
-// body the vtable slot names.
+// A foreign reference type: Swift calls dispatch through the importer's thunk.
 
 struct Engine;
 void retainEngine(Engine *_Nonnull);
@@ -103,9 +110,7 @@ __attribute__((swift_attr("retain:retainEngine")))
 __attribute__((swift_attr("release:releaseEngine"))) Engine {
   int rpm;
 
-  // The key function; its body stays in C++ (the execution test's main file).
-  // expected-note@+1{{to implement 'keyAnchor' in Swift, declare another non-inline virtual method before it and define that method in C++}}
-  virtual void keyAnchor();
+  // The key function.
   virtual int status() const;
   virtual void boost(int amount);
 };
@@ -119,7 +124,8 @@ void releaseAbstractEngine(AbstractEngine *_Nonnull);
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:retainAbstractEngine")))
 __attribute__((swift_attr("release:releaseAbstractEngine"))) AbstractEngine {
-  virtual void aeAnchor();
+  // The key function.
+  virtual int aeAnchor() const;
   // expected-note@+1{{'pureStatus' declared pure virtual here}}
   virtual int pureStatus() const = 0;
 };
