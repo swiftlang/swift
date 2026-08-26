@@ -600,6 +600,9 @@ public:
   /// Whether this expression is a valid parent for a given TypeExpr.
   bool isValidParentOfTypeExpr(Expr *typeExpr) const;
 
+  /// Returns whether this expression comes from expanding a synthetic macro.
+  bool isFromSyntheticMacroExpansion(const DeclContext *DC) const;
+
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   void dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getType,

@@ -1261,6 +1261,9 @@ public:
   /// constructed from a serialized module.
   bool isInMacroExpansionInContext() const;
 
+  /// Returns whether this declaration comes from expanding a synthetic macro.
+  bool isFromSyntheticMacroExpansion() const;
+
   /// Whether this declaration is within a macro expansion relative to
   /// its decl context, and the macro was attached to a node imported from clang.
   bool isInMacroExpansionFromClangHeader() const;

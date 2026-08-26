@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Unicode.h"
@@ -3079,6 +3080,10 @@ const Expr *Expr::findOriginalValue() const {
 Type Expr::findOriginalType() const {
   auto *expr = findOriginalValue();
   return expr->getType()->getRValueType();
+}
+
+bool Expr::isFromSyntheticMacroExpansion(const DeclContext *DC) const {
+  return ::isFromSyntheticMacroExpansion(DC->getParentModule(), getStartLoc());
 }
 
 ThrownErrorDestination
