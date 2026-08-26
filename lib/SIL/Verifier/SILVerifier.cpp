@@ -4132,6 +4132,16 @@ public:
             "value_metatype instruction must have a metatype representation");
     require(MI->getOperand()->getType().isAnyExistentialType(),
             "existential_metatype operand must be of protocol type");
+    // Only an opaque existential container can be inspected in place. A class,
+    // boxed, or metatype container is read as a value, and IRGen has no way to
+    // interpret an address as one of those.
+    require(!MI->getOperand()->getType().isAddress() ||
+                MI->getOperand()
+                        ->getType()
+                        .getPreferredExistentialRepresentation() ==
+                    ExistentialRepresentation::Opaque,
+            "existential_metatype operand may only be an address when the "
+            "existential uses opaque representation");
 
     // The result of an existential_metatype instruction is an existential
     // metatype with the same constraint type as its existential operand.
