@@ -3,6 +3,14 @@
 // REQUIRES: swift_feature_NoncopyableCasting
 // REQUIRES: executable_test
 
+// Casting a noncopyable payload out of an existential requires the
+// take-instead-of-copy support added to swift_dynamicCast (see
+// tryCastUnwrappingExistentialSource). An older, OS-resident runtime copies
+// the payload instead, which traps in the noncopyable type's copy value
+// witness -- so this cannot run against the OS stdlib or a back-deployed one.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 // End-to-end verification that `is`/`as?`/`as!` work correctly on a
 // noncopyable existential value: SILGen and the move-only checker must
 // agree that the cast fully consumes its source (a `checked_cast_addr_br`
