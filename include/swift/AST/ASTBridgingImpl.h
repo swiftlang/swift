@@ -673,6 +673,10 @@ bool BridgedASTType::isBuiltinFixedArray() const {
   return unbridged()->is<swift::BuiltinFixedArrayType>();
 }
 
+bool BridgedASTType::isBuiltinBridgeObject() const {
+  return unbridged()->is<swift::BuiltinBridgeObjectType>();
+}
+
 bool BridgedASTType::isBox() const {
   return unbridged()->is<swift::SILBoxType>();
 }

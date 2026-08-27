@@ -153,6 +153,7 @@ extension TypeProperties {
   public var isBuiltinFloat: Bool { rawType.bridged.isBuiltinFloat() }
   public var isBuiltinVector: Bool { rawType.bridged.isBuiltinVector() }
   public var isBuiltinFixedArray: Bool { rawType.bridged.isBuiltinFixedArray() }
+  public var isBuiltinBridgeObject: Bool { rawType.bridged.isBuiltinBridgeObject() }
 
   public var isClass: Bool {
     if let nominal = nominal, nominal is ClassDecl {
