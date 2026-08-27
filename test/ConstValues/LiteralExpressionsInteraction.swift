@@ -9,6 +9,7 @@
 // REQUIRES: swift_feature_CompileTimeValues
 // REQUIRES: swift_feature_CompileTimeValuesPreview
 // REQUIRES: swift_feature_LiteralExpressions
+// REQUIRES: optimized_stdlib
 // RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -verify -verify-additional-prefix preview- -enable-experimental-feature CompileTimeValues -enable-experimental-feature CompileTimeValuesPreview
 // RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -verify -verify-additional-prefix preview- -enable-experimental-feature CompileTimeValues -enable-experimental-feature CompileTimeValuesPreview -enable-experimental-feature LiteralExpressions
 // RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -verify -verify-additional-prefix const- -enable-experimental-feature CompileTimeValues
