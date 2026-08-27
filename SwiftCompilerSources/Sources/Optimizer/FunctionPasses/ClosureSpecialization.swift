@@ -272,8 +272,8 @@ private func trySpecialize(apply: ApplySite, isRootInvocation: Bool, _ context: 
     /// Running `runClosureSpecialization` synchronously on the cloned callee we've just produced fully specializes it
     /// before the caller's next specialization round, so the caller re-inspects the same apply, now sees `closure0` as
     /// transitively applied, and specializes it - leaving no `partial_apply` of a specializable closure in the caller.
-    /// This recursion terminates: `runClosureSpecialization` performs at most 5 rounds per function, and
-    /// `findSpecializableClosure` only specializes closures whose callee has `specializationLevel <= 2`.
+    /// This recursion terminates: recursive specialization run on the just-specialized callee is only triggered from the
+    /// actual pass invocation (`isRootInvocation`), so we won't trigger specialization of callees nested deeper.
     ///
     /// Round 2 for caller: specialize apply of specialized_callee_r1.
     ///
