@@ -4,6 +4,8 @@
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
+// FIXME: Re-enable -fmodules-decluse after the dependency scanner can supply
+// the Swift Windows SDK overlay's direct dependencies for Clang builtin modules.
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test \
 // RUN:   -module-cache-path %t/clang-module-cache -disable-objc-interop \
 // RUN:   -cxx-interoperability-mode=default \
