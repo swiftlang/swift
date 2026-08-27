@@ -98,10 +98,12 @@ bb3:
   return %30 : $()
 }
 
-// The assume itself is not loop invariant code: it must stay where it is.
+// The assume's loop-invariant condition is hoisted like any other side-effect-free
+// instruction, but the assume itself must stay in the loop: it is not safe to speculate.
 //CHECK-LABEL: sil @dont_hoist_assume
+//CHECK:   [[CMP:%[0-9]+]] = builtin "cmp_sgt_Int64"
 //CHECK: bb1:
-//CHECK:   builtin "assume_Int1"
+//CHECK-NEXT:   builtin "assume_Int1"([[CMP]] : $Builtin.Int1)
 //CHECK: bb2:
 sil @dont_hoist_assume : $@convention(thin) (Int64, @inout Int64) -> () {
 bb0(%0 : $Int64, %1 : $*Int64):

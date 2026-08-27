@@ -214,7 +214,7 @@ public struct Range<Bound: Comparable> {
 
   /// Specifies that the range's lower bound is not greater than its upper bound.
   /// It has only an effect on the optimizer; no code is generated.
-  @_transparent
+  @export(implementation) @_transparent
   public func _assumeValid() {
     _internalInvariant(lowerBound <= upperBound)
     unsafe _uncheckedUnsafeAssume(lowerBound <= upperBound)
