@@ -1098,7 +1098,17 @@ public:
   BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
     auto mask = spareBitsMask;
     // Bits we've used for our tag can't be re-used by a containing enum...
-    mask.andNotMask(getMultiPayloadTagBitsMask(), 0);
+    auto payloadTagBitsMask = getMultiPayloadTagBitsMask();
+    mask.andNotMask(payloadTagBitsMask, 0);
+    // ...and neither can the low bits of the extra discriminator, which hold
+    // whatever part of the tag didn't fit in the payload's spare bits.
+    unsigned payloadSize = getPayloadSize();
+    unsigned extraTagSize = getSize() - payloadSize;
+    if (extraTagSize > 0) {
+      unsigned extraTagBits =
+        getNumTagBits() - payloadTagBitsMask.countSetBits();
+      mask.andNotMask(lowBitsMask(extraTagSize, extraTagBits), payloadSize);
+    }
     return mask;
   }
 
@@ -1125,6 +1135,13 @@ public:
     uint64_t payloadTag = 0;
     if (!payloadTagMask.readMaskedInteger(reader, address, &payloadTag)) {
       return false;
+    }
+
+    // Strip any high bits of the extra discriminator that a containing enum
+    // may be using for its own tag.
+    int numExtraTagBits = getNumTagBits() - numPayloadTagBits;
+    if (numExtraTagBits < 32) {
+      extraTag &= (1U << numExtraTagBits) - 1;
     }
 
     // Combine the extra tag and payload tag info:
@@ -1171,8 +1188,8 @@ public:
   // * A separate "discriminator" tag appended to the payload (if necessary)
   // * A "payload tag" that uses (a subset of) the spare bits in the payload
   // * The remainder of the payload bits (for non-payload cases)
-  // This computes the bits used for the payload tag.
-  BitMask getMultiPayloadTagBitsMask() const {
+  // This computes the total number of bits in the first two pieces.
+  int getNumTagBits() const {
     auto payloadTagValues = NumEffectivePayloadCases - 1;
     if (getNumCases() > NumEffectivePayloadCases) {
       // How many payload bits are there?
@@ -1190,15 +1207,33 @@ public:
 	payloadTagValues += (numNonPayloadCases + numNonPayloadCasesPerTag - 1) / numNonPayloadCasesPerTag;
       }
     }
-    int payloadTagBits = 0;
+    int tagBits = 0;
     while (payloadTagValues > 0) {
       payloadTagValues >>= 1;
-      payloadTagBits += 1;
+      tagBits += 1;
     }
+    return tagBits;
+  }
+
+  // The bits of the payload area used for the payload tag.  This is the
+  // most-significant spare bits, up to however many the tag needs; a tag too
+  // wide to fit spills the rest into the extra discriminator.
+  BitMask getMultiPayloadTagBitsMask() const {
     BitMask payloadTagBitsMask = spareBitsMask;
     payloadTagBitsMask.keepOnlyLeastSignificantBytes(getPayloadSize());
-    payloadTagBitsMask.keepOnlyMostSignificantBits(payloadTagBits);
+    payloadTagBitsMask.keepOnlyMostSignificantBits(getNumTagBits());
     return payloadTagBitsMask;
+  }
+
+  // A mask of the `n` least-significant bits, in a field of `sizeInBytes`.
+  static BitMask lowBitsMask(unsigned sizeInBytes, unsigned n) {
+    auto mask = BitMask::oneMask(sizeInBytes);
+    if (n < sizeInBytes * 8) {
+      auto highBits = BitMask::oneMask(sizeInBytes);
+      highBits.keepOnlyMostSignificantBits(sizeInBytes * 8 - n);
+      mask.andNotMask(highBits, 0);
+    }
+    return mask;
   }
 };
 
