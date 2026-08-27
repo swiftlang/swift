@@ -576,6 +576,11 @@ SILType::getPreferredExistentialRepresentation(Type containedType) const {
     }
   }
 
+  // A COM interface existential is already its foreign object-model projection.
+  // It is neither a Swift class reference nor an opaque existential constraint.
+  if (layout.getCOMInterface())
+    return ExistentialRepresentation::COM;
+
   // A class-constrained protocol composition can adopt the conforming
   // class reference directly.
   if (layout.requiresClass())
@@ -590,6 +595,9 @@ bool
 SILType::canUseExistentialRepresentation(ExistentialRepresentation repr,
                                          Type containedType) const {
   switch (repr) {
+  case ExistentialRepresentation::COM:
+    return isExistentialType() &&
+      getASTType().getExistentialLayout().getCOMInterface();
   case ExistentialRepresentation::None:
     return !isAnyExistentialType();
   case ExistentialRepresentation::Opaque:
