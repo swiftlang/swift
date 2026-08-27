@@ -12,12 +12,13 @@ public func test() -> Int {
 }
 
 func castToExistential<T>(x: T) {
-  if x is any FixedWidthInteger {    // expected-error {{cannot do dynamic casting in embedded Swift}}
-    // expected-warning@-1{{cannot perform a dynamic cast to a type involving protocol 'FixedWidthInteger' in Embedded Swift}}
+  // A cast to a type involving a protocol is rejected during type checking, so
+  // compilation stops before the SIL-level check would run.
+  if x is any FixedWidthInteger {    // expected-error {{cannot perform a dynamic cast to a type involving protocol 'FixedWidthInteger' in Embedded Swift}}
   }
 }
 
 public func callCastToExistential() {
-  castToExistential(x: 42)    // expected-note {{generic specialization called here}}
+  castToExistential(x: 42)
 }
 
