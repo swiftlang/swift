@@ -13,8 +13,9 @@
 // RUN: %target-run-stdlib-swift
 
 // REQUIRES: executable_test
-// REQUIRES: rdar185887158
 // REQUIRES: objc_interop
+
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 
