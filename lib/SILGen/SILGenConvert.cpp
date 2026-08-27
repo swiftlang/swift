@@ -612,6 +612,7 @@ public:
       break;
     }
     case ExistentialRepresentation::Class:
+    case ExistentialRepresentation::COM:
     case ExistentialRepresentation::Metatype:
     case ExistentialRepresentation::None:
       llvm_unreachable("not supported");
@@ -814,6 +815,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     return B.createInitExistentialRef(loc, existentialTL.getLoweredType(),
                                       concreteFormalType, sub, conformances);
   }
+  case ExistentialRepresentation::COM:
+    llvm_unreachable("COM interface projection is not implemented");
   case ExistentialRepresentation::Boxed: {
     // We defer allocation of the box to when the address is demanded.
     // Create a stack slot to hold the box once it's allocated.
@@ -1005,6 +1008,8 @@ SILGenFunction::emitOpenExistential(
 
   SILType existentialType = existentialValue.getType();
   switch (existentialType.getPreferredExistentialRepresentation()) {
+  case ExistentialRepresentation::COM:
+    llvm_unreachable("opening a COM existential is not implemented");
   case ExistentialRepresentation::Opaque: {
     // With CoW existentials we can't consume the boxed value inside of
     // the existential. (We could only do so after a uniqueness check on

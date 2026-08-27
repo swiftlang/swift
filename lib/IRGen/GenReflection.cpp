@@ -1071,7 +1071,9 @@ private:
   void layoutProtocol() {
     auto PD = cast<ProtocolDecl>(NTD);
     FieldDescriptorKind Kind;
-    if (PD->isObjC())
+    if (PD->isCOMInterface())
+      Kind = FieldDescriptorKind::COMProtocol;
+    else if (PD->isObjC())
       Kind = FieldDescriptorKind::ObjCProtocol;
     else if (PD->requiresClass())
       Kind = FieldDescriptorKind::ClassProtocol;
