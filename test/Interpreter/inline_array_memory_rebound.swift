@@ -5,9 +5,6 @@
 
 // UNSUPPORTED: back_deployment_runtime || use_os_stdlib
 
-// Reading an InlineArray element is not supported with opaque values, yet.
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
-
 typealias Tuple16 = (UInt8,UInt8,UInt8,UInt8,UInt8,UInt8,UInt8,UInt8,
                      UInt8,UInt8,UInt8,UInt8,UInt8,UInt8,UInt8,UInt8)
 
