@@ -43,6 +43,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -3139,6 +3140,8 @@ namespace {
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
+      checkIsolatedConformancesInPattern(pattern);
+
       // Walking into patterns leads to nothing good because then we
       // end up visiting the AccessorDecls of a top-level
       // PatternBindingDecl twice.
@@ -4803,7 +4806,32 @@ namespace {
       return Type();
     }
 
-    void checkIsolatedConformancesInType(Type T, TypeRepr *TR, SourceLoc loc) {
+    void checkIsolatedConformancesInPattern(Pattern *P) {
+      class Walker : public ASTWalker {
+      public:
+        PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+          if (P->isImplicit())
+            return Action::Continue(P);
+
+          if (auto *I = dyn_cast<IsPattern>(P)) {
+            checkIsolatedConformancesInType(I->getCastType(),
+                                            I->getCastTypeRepr(), I->getLoc());
+          }
+
+          if (auto *E = dyn_cast<EnumElementPattern>(P)) {
+            checkIsolatedConformancesInType(
+                E->getParentType(), E->getParentTypeRepr(), E->getLoc());
+          }
+
+          return Action::Continue(P);
+        }
+      };
+
+      Walker W;
+      P->walk(W);
+    }
+
+    static void checkIsolatedConformancesInType(Type T, TypeRepr *TR, SourceLoc loc) {
       TypeChecker::checkIsolatedConformancesInType(T, TR ? TR->getLoc() : loc);
     }
 

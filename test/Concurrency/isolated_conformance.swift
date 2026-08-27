@@ -356,7 +356,7 @@ class ComputedGetSetWitness: HasMutableVar {
 
 // Check cases where generic parameter prohibits use of isolated conformances by conforming to Sendable/SendableMetatype
 
-// expected-note@+1 29 {{requirement specified as 'T' : 'P' [with T = C]}}
+// expected-note@+1 32 {{requirement specified as 'T' : 'P' [with T = C]}}
 struct SendableWrapper<T: P & Sendable> { }
 
 typealias GlobalTypeAliasTest = SendableWrapper<C> // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
@@ -516,6 +516,25 @@ func testExpressionContext<T>(v: T) {
     }
   }
 
+  if case is SendableWrapper<C> = v {
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  }
+
+  let _ = {
+    switch v {
+    case is SendableWrapper<C>:
+      // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+      break
+    default:
+      break
+    }
+
+    guard case is SendableWrapper<C> = v else {
+      // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+      return
+    }
+  }
+
   let _ = { (a: SendableWrapper<C>) in
     // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
   }
@@ -537,4 +556,34 @@ func testExpressionContext<T>(v: T) {
   _ = Y<C>.self
   // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'SendableMetatype' type parameter 'U'}}
   // expected-error@-2 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+struct SendableWrapperError<T: P & Sendable>: Error { }
+// expected-note@-1 {{'init()' declared here}}
+// expected-note@-2 {{requirement specified as 'T' : 'P' [with T = C]}}
+
+func testCatchAsPattern() {
+  do {
+    throw SendableWrapperError<C>()
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  } catch let e as SendableWrapperError<C> {
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+    _ = e
+  } catch {
+  }
+}
+
+enum GenericPatternEnum<T: P & Sendable> { // expected-note {{requirement specified as 'T' : 'P' [with T = C]}}
+  case foo(T)
+  case bar
+}
+
+func testEnumElementPatternParentType(_ x: Any) {
+  switch x {
+  case GenericPatternEnum<C>.bar:
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+    break
+  default:
+    break
+  }
 }
