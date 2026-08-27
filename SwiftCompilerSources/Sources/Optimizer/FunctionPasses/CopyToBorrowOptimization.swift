@@ -104,11 +104,33 @@ private func optimize(load: LoadInst, _ context: FunctionPassContext) -> Bool {
     return false
   }
 
-  if mayWrite(toAddressOf: load, within: collectedUses.destroys, context) {
-    return false
+  // If the loaded address is a projection of a borrowed reference, the borrow scope of that reference
+  // must enclose the whole lifetime of the new `load_borrow`.
+  if let baseReference = load.address.accessBase.reference,
+     let baseBorrow = BeginBorrowValue(baseReference.lookThroughForwardingInstructions)
+  {
+    // The `end_borrow`s of `baseBorrow` are not considered to be writes here, because that borrow scope is
+    // extended beyond the load's liverange below. If it cannot be extended, this function bails out.
+    if mayWrite(toAddressOf: load, within: collectedUses.destroys, ignoreEndBorrowsOf: baseBorrow, context) {
+      return false
+    }
+
+    var liverange = InstructionRange(begin: load, context)
+    defer { liverange.deinitialize() }
+    liverange.insert(contentsOf: collectedUses.destroys.lazy.map { $0.next! })
+
+    guard extendBorrowScope(of: baseBorrow.value, toOverlap: liverange, context) else {
+      return false
+    }
+    load.replaceWithLoadBorrow(collectedUses: collectedUses, enclosingBorrow: baseBorrow.value)
+  } else {
+    // The address is not derived from a borrowed reference.
+    if mayWrite(toAddressOf: load, within: collectedUses.destroys, context) {
+      return false
+    }
+    load.replaceWithLoadBorrow(collectedUses: collectedUses)
   }
 
-  load.replaceWithLoadBorrow(collectedUses: collectedUses)
   return true
 }
 
@@ -383,6 +405,7 @@ private struct AllocStackUsesWalker : AddressDefUseWalker {
 private func mayWrite(
   toAddressOf load: LoadInst,
   within destroys: Stack<Instruction>,
+  ignoreEndBorrowsOf borrowToIgnore: BeginBorrowValue? = nil,
   _ context: FunctionPassContext
 ) -> Bool {
   let aliasAnalysis = context.aliasAnalysis
@@ -395,7 +418,9 @@ private func mayWrite(
 
   // Visit all instructions starting from the destroys in backward order.
   while let inst = worklist.pop() {
-    if inst.mayWrite(toAddress: load.address, aliasAnalysis) {
+    if inst.mayWrite(toAddress: load.address, aliasAnalysis),
+       !inst.isEndBorrow(ofScope: borrowToIgnore)
+    {
       return true
     }
     worklist.pushPredecessors(of: inst, ignoring: load)
@@ -404,7 +429,7 @@ private func mayWrite(
 }
 
 private extension LoadInst {
-  func replaceWithLoadBorrow(collectedUses: Uses) {
+  func replaceWithLoadBorrow(collectedUses: Uses, enclosingBorrow: Value? = nil) {
     let context = collectedUses.context
     let builder = Builder(before: self, context)
     let loadBorrow = builder.createLoadBorrow(fromAddress: address)
@@ -412,7 +437,8 @@ private extension LoadInst {
     var liverange = InstructionRange(begin: self, ends: collectedUses.destroys, context)
     defer { liverange.deinitialize() }
 
-    createEndBorrows(for: loadBorrow, atEndOf: liverange, collectedUses: collectedUses)
+    createEndBorrows(for: loadBorrow, atEndOf: liverange, collectedUses: collectedUses,
+                     enclosingBorrow: enclosingBorrow)
 
     uses.replaceAll(with: loadBorrow, context)
     context.erase(instruction: self)
@@ -440,7 +466,11 @@ private func remove(copy: CopyValueInst, collectedUses: Uses, liverange: Instruc
   }
 }
 
-private func createEndBorrows(for beginBorrow: Value, atEndOf liverange: InstructionRange, collectedUses: Uses) {
+private func createEndBorrows(for beginBorrow: Value,
+                              atEndOf liverange: InstructionRange,
+                              collectedUses: Uses,
+                              enclosingBorrow: Value? = nil
+) {
   let context = collectedUses.context
 
   // There can be multiple destroys in a row in case of decomposing an aggregate, e.g.
@@ -461,9 +491,28 @@ private func createEndBorrows(for beginBorrow: Value, atEndOf liverange: Instruc
 
   while let endInst = allLifetimeEndingInstructions.pop() {
     if !liverange.contains(endInst) {
-      let builder = Builder(before: endInst, context)
+      var insertionPoint = endInst
+      if let enclosingBorrow {
+        // If we already inserted `end_borrow`s for an enclosing scope - e.g. when the borrow scope of the
+        // load's base was extended - we need to make sure that the `end_borrow`s for this (inner) scope are
+        // inserted before the `end_borrow`s of the enclosing scope.
+        while let prev = insertionPoint.previous as? EndBorrowInst, prev.borrow == enclosingBorrow {
+          insertionPoint = prev
+        }
+      }
+      let builder = Builder(before: insertionPoint, context)
       builder.createEndBorrow(of: beginBorrow)
     }
+  }
+}
+
+private extension Instruction {
+  /// True if this is an `end_borrow` which ends the borrow scope of `beginBorrow`.
+  func isEndBorrow(ofScope beginBorrow: BeginBorrowValue?) -> Bool {
+    guard let beginBorrow, let endBorrow = self as? EndBorrowInst else {
+      return false
+    }
+    return endBorrow.borrow == beginBorrow.value
   }
 }
 
