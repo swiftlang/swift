@@ -1536,6 +1536,10 @@ bool BridgedInstruction::EndCOWMutationInst_doKeepUnique() const {
   return getAs<swift::EndCOWMutationInst>()->doKeepUnique();
 }
 
+void BridgedInstruction::EndCOWMutationInst_setKeepUnique(bool keepUnique) const {
+  getAs<swift::EndCOWMutationInst>()->setKeepUnique(keepUnique);
+}
+
 bool BridgedInstruction::DestroyValueInst_isDeadEnd() const {
   return getAs<swift::DestroyValueInst>()->isDeadEnd();
 }
