@@ -5,9 +5,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// The opaque-values test mode hits an unrelated AddressLowering verifier failure.
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
-
 // Check that ARCSequenceOpts does not remove the retain/release which keeps a
 // Span's owner alive.
 // https://github.com/swiftlang/swift/issues/94047
