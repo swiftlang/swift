@@ -3239,17 +3239,30 @@ namespace {
         determineClosureIsolationInContext(closure, Parent.getAsExpr());
 
         if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
-        for (auto *param : *explicitClosure->getParameters()) {
-          checkIsolatedConformancesInType(param->getInterfaceType(),
-                                          param->getTypeRepr(), expr->getLoc());
-        }
+          if (auto globalActor = getExplicitGlobalActor(explicitClosure)) {
+            checkIsolatedConformancesInType(globalActor,
+                                            /*TR=*/nullptr, expr->getLoc());
+          }
 
-        checkIsolatedConformancesInType(
-            explicitClosure->getResultType(),
-            explicitClosure->hasExplicitResultType()
-                ? explicitClosure->getExplicitResultTypeRepr()
-                : nullptr,
-            expr->getLoc());
+          for (auto *param : *explicitClosure->getParameters()) {
+            checkIsolatedConformancesInType(param->getInterfaceType(),
+                                            param->getTypeRepr(),
+                                            expr->getLoc());
+          }
+
+          if (auto *thrownTypeRepr =
+                  explicitClosure->getExplicitThrownTypeRepr()) {
+            checkIsolatedConformancesInType(
+                explicitClosure->getExplicitThrownType(), thrownTypeRepr,
+                thrownTypeRepr->getLoc());
+          }
+
+          checkIsolatedConformancesInType(
+              explicitClosure->getResultType(),
+              explicitClosure->hasExplicitResultType()
+                  ? explicitClosure->getExplicitResultTypeRepr()
+                  : nullptr,
+              expr->getLoc());
         }
 
         checkLocalCaptures(closure);

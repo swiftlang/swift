@@ -13,7 +13,6 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 
-// Emits `var wrapped: SendableWrapper<C> { fatalError() }`.
 public struct AddWrappedPropertyMacro: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -24,6 +23,26 @@ public struct AddWrappedPropertyMacro: MemberMacro {
     return [
       "var wrapped: SendableWrapper<C> { fatalError() }"
     ]
+  }
+}
+
+public struct IdentityMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    return node.arguments.first!.expression
+  }
+}
+
+public struct EmptyMemberMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return []
   }
 }
 
@@ -51,3 +70,20 @@ expected-expansion@-2:21{{
   expected-error@1:14{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
 }}
 */
+
+@freestanding(expression)
+macro identity<T: P & Sendable>(_ x: T) -> T = #externalMacro(module: "MacroDefinition", type: "IdentityMacro")
+// expected-note@-1 {{'identity' declared here}}
+
+func testExpressionMacro(c: C) {
+  _ = #identity<C>(c)
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+}
+
+@attached(member)
+macro AddMember<T: P & Sendable>() = #externalMacro(module: "MacroDefinition", type: "EmptyMemberMacro")
+// expected-note@-1 {{'AddMember()' declared here}}
+
+@AddMember<C>
+// expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+struct UsesAddMember {}

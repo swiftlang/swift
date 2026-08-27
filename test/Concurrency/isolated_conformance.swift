@@ -427,7 +427,7 @@ actor GlobalActorBackingActor {
 }
 
 @globalActor
-struct GenGlobalActor<T: P & Sendable> { // expected-note{{requirement specified as 'T' : 'P' [with T = C]}}
+struct GenGlobalActor<T: P & Sendable> { // expected-note 2 {{requirement specified as 'T' : 'P' [with T = C]}}
   static var shared: GlobalActorBackingActor { GlobalActorBackingActor.shared }
   // expected-warning@-1 {{GlobalActor witness static property 'shared' may return different actor instances, which would lead to global actor isolation violations}}
   // expected-note@-2 {{declare it as 'static let' to guarantee a stable instance}}
@@ -492,6 +492,9 @@ extension TestExt where T == SendableWrapper<C> {
   // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
 }
 
+struct ClosureThrownTypeError<E: P & Sendable>: Error { }
+// expected-note@-1 {{requirement specified as 'E' : 'P' [with E = C]}}
+
 func testExpressionContext<T>(v: T) {
   _ = SendableWrapper<C>.self
   // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
@@ -540,6 +543,14 @@ func testExpressionContext<T>(v: T) {
   }
 
   let _ = { () -> SendableWrapper<C> in
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  }
+
+  let _ = { () throws(ClosureThrownTypeError<C>) -> Void in
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  }
+
+  let _ = { @GenGlobalActor<C> () -> Void in
     // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
   }
 
