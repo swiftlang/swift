@@ -187,6 +187,7 @@ class Target {
   var exceptionCode: DWORD
   var faultAddress: Address
   var exceptionInfo: Address
+  var concurrencyTaskRegistryAddr: UInt64?
 
   var images: ImageMap
 
@@ -309,6 +310,7 @@ class Target {
     exceptionCode = DWORD(crashInfo.signal)
     faultAddress = Address(truncatingIfNeeded: crashInfo.fault_address)
     exceptionInfo = Address(truncatingIfNeeded: crashInfo.exception_info)
+    concurrencyTaskRegistryAddr = crashInfo.concurrency_task_registry_addr
 
     images = ImageMap.capture(for: UInt(bitPattern: hProcess))
 

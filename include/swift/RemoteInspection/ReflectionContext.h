@@ -214,6 +214,7 @@ public:
     std::vector<StoredPointer> WaitingTasks;
     std::vector<StoredPointer> AsyncBacktraceFrames;
     StoredPointer ResumeAsyncContext;
+    StoredPointer RegistryNext;
 
     std::string Name;
   };
@@ -2035,6 +2036,7 @@ private:
         AsyncTaskObj->Id | ((uint64_t)AsyncTaskObj->PrivateStorage.Id << 32);
     Info.AllocatorSlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
     Info.RunJob = getRunJob(AsyncTaskObj.get());
+    Info.RegistryNext = AsyncTaskObj->PrivateStorage.RegistryNext;
 
     Info.ParentTask = 0;
     if (Info.IsChildTask && asyncTaskSize != 0) {

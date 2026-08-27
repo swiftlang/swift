@@ -50,6 +50,8 @@
 #include <cstring>
 #include <cerrno>
 
+extern "C" SWIFT_RUNTIME_EXPORT uint64_t _swift_concurrency_task_registry_addr = 0;
+
 #ifdef _WIN32
 // We'll probably want dbghelp.h here
 #else
@@ -1445,6 +1447,9 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   _swift_formatUnsigned(_swift_backtraceSettings.top, top_buf);
   _swift_formatAddress(crashInfo, addr_buf);
+  
+  crashInfo->concurrency_task_registry_addr = _swift_concurrency_task_registry_addr;
+  
   #ifdef _WIN32
   _swift_formatUnsigned(GetCurrentProcessId(), pid_buf);
   #endif
