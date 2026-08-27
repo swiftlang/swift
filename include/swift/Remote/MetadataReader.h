@@ -1278,6 +1278,18 @@ public:
       TypeCache[TypeCacheKey] = BuiltFixedArray;
       return BuiltFixedArray;
     }
+    case MetadataKind::Borrow: {
+      auto borrow = cast<TargetBorrowTypeMetadata<Runtime>>(Meta);
+      auto referentAddress =
+          RemoteAddress(borrow->Referent, MetadataAddress.getAddressSpace());
+      auto Referent =
+          readTypeFromMetadata(referentAddress, false, recursion_limit);
+      if (!Referent) return BuiltType();
+
+      auto BuiltBorrow = Builder.createBuiltinBorrowType(Referent);
+      TypeCache[TypeCacheKey] = BuiltBorrow;
+      return BuiltBorrow;
+    }
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:

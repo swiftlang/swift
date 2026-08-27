@@ -277,7 +277,7 @@ static unsigned intTypeBitSize(std::string name) {
   llvm::StringRef nameRef(name);
   if (nameRef.starts_with("Bi") && nameRef.ends_with("_")) {
     llvm::StringRef naturalRef = nameRef.drop_front(2).drop_back();
-    uint8_t natural;
+    unsigned natural;
     if (naturalRef.getAsInteger(10, natural)) {
       return 0;
     }
@@ -502,7 +502,10 @@ ArrayTypeInfo::ArrayTypeInfo(intptr_t size, const TypeRef *elementTR,
                /* size */ elementTI->getStride() * size,
                /* alignment */ elementTI->getAlignment(),
                /* stride */ elementTI->getStride() * size,
-               /* numExtraInhabitants */ elementTI->getNumExtraInhabitants(),
+               // An empty array has nowhere to store an extra inhabitant; a
+               // non-empty one takes them from its first element.
+               /* numExtraInhabitants */
+               size == 0 ? 0 : elementTI->getNumExtraInhabitants(),
                /* borrowability */ elementTI->getBorrowability(),
                /* FixedArray is always afd */ true),
       ElementTR(elementTR), ElementTI(elementTI), ElementCount(size) {}
@@ -510,12 +513,27 @@ ArrayTypeInfo::ArrayTypeInfo(intptr_t size, const TypeRef *elementTR,
 bool ArrayTypeInfo::readExtraInhabitantIndex(
     remote::MemoryReader &reader, remote::RemoteAddress address,
     int *extraInhabitantIndex) const {
+  if (ElementCount == 0) {
+    *extraInhabitantIndex = -1;
+    return true;
+  }
   return ElementTI->readExtraInhabitantIndex(reader, address,
                                              extraInhabitantIndex);
 }
 
 BitMask ArrayTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
-  return ElementTI->getSpareBits(TC, hasAddrOnly);
+  if (ElementCount == 0)
+    return BitMask::zeroMask(getSize());
+
+  // Only the first element contributes spare bits, along with any padding out
+  // to its stride. The remaining elements hold values of their own, so an
+  // enclosing enum can't put its tag there.
+  auto mask = BitMask::oneMask(getSize());
+  mask.andMask(ElementTI->getSpareBits(TC, hasAddrOnly), 0);
+  unsigned elementStride = ElementTI->getStride();
+  if (getSize() > elementStride)
+    mask.andNotMask(BitMask::oneMask(getSize() - elementStride), elementStride);
+  return mask;
 }
 
 class UnsupportedEnumTypeInfo: public EnumTypeInfo {
@@ -884,7 +902,6 @@ public:
                        remote::RemoteAddress address,
                        int *extraInhabitantIndex) const override {
     unsigned long PayloadSize = getPayloadSize();
-    unsigned PayloadCount = getNumPayloadCases();
     unsigned TagSize = getSize() - PayloadSize;
     unsigned tag = 0;
     if (!reader.readInteger(address + PayloadSize,
@@ -892,7 +909,7 @@ public:
                             &tag)) {
       return false;
     }
-    if (tag < PayloadCount + 1) {
+    if (tag < getNumInhabitedTags()) {
       *extraInhabitantIndex = -1; // Valid payload, not an XI
     } else {
       // XIs are coded starting from the highest value that fits
@@ -901,6 +918,21 @@ public:
       *extraInhabitantIndex = maxTag - tag;
     }
     return true;
+  }
+
+  // The number of tag values that hold valid content: one per payload case,
+  // plus however many are needed to number the non-payload cases in the
+  // payload area.
+  unsigned getNumInhabitedTags() const {
+    unsigned NonPayloadCases = getNumCases() - NumEffectivePayloadCases;
+    if (NonPayloadCases == 0)
+      return NumEffectivePayloadCases;
+    unsigned PayloadSize = getPayloadSize();
+    if (PayloadSize >= 4)
+      return NumEffectivePayloadCases + 1;
+    unsigned CasesPerTag = 1U << (PayloadSize * 8U);
+    return NumEffectivePayloadCases
+      + (NonPayloadCases + CasesPerTag - 1) / CasesPerTag;
   }
 
   BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
@@ -1039,7 +1071,7 @@ public:
     tagBits += extraTagSize * 8;
 
     // Check whether this tag is used for valid content
-    auto payloadCases = getNumPayloadCases();
+    auto payloadCases = NumEffectivePayloadCases;
     auto nonPayloadCases = getNumCases() - payloadCases;
     uint32_t inhabitedTags;
     if (nonPayloadCases == 0) {
@@ -2809,8 +2841,14 @@ public:
       return nullptr;
     }
 
-    return TC.makeTypeInfo<ArrayTypeInfo>(sizeInt->getValue(),
-                                          BA->getElementType(), elementTI);
+    // A negative count makes the array uninhabited, and IRGen lays both it and
+    // a zero count out as empty.
+    auto count = sizeInt->getValue();
+    if (count < 0)
+      count = 0;
+
+    return TC.makeTypeInfo<ArrayTypeInfo>(count, BA->getElementType(),
+                                          elementTI);
   }
 
   const TypeInfo *visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
