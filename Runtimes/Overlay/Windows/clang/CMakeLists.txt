@@ -4,6 +4,8 @@ file(TO_CMAKE_PATH "$ENV{WindowsSDKVersion}" WindowsSDKVersion)
 file(TO_CMAKE_PATH "$ENV{UniversalCRTSdkDir}" UniversalCRTSdkDir)
 file(TO_CMAKE_PATH "$ENV{UCRTVersion}" UCRTVersion)
 file(TO_CMAKE_PATH "$ENV{VCToolsInstallDir}" VCToolsInstallDir)
+string(REGEX REPLACE "/+$" "" WindowsSDKVersion "${WindowsSDKVersion}")
+string(REGEX REPLACE "/+$" "" UCRTVersion "${UCRTVersion}")
 
 file(CONFIGURE
   OUTPUT windows-sdk-overlay.yaml

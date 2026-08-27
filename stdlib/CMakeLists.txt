@@ -33,6 +33,9 @@ endif()
 function(generate_windows_vfs_overlay)
   file(TO_CMAKE_PATH ${VCToolsInstallDir} VCToolsInstallDir)
   file(TO_CMAKE_PATH ${UniversalCRTSdkDir} UniversalCRTSdkDir)
+  file(TO_CMAKE_PATH ${WindowsSdkDir} WindowsSdkDir)
+  string(REGEX REPLACE "[/\\\\]+$" "" WindowsSDKVersion
+         "${WindowsSDKVersion}")
   configure_file("${PROJECT_SOURCE_DIR}/cmake/WindowsVFS.yaml.in"
                  "${CMAKE_CURRENT_BINARY_DIR}/windows-vfs-overlay.yaml"
                  @ONLY)
