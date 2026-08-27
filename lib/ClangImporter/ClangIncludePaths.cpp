@@ -522,8 +522,7 @@ std::string GetPlatformAuxiliaryFile(StringRef Platform, StringRef File,
 
 void GetWindowsFileMappings(
     ClangInvocationFileMapping &fileMapping, const ASTContext &Context,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &driverVFS,
-    bool &requiresBuiltinHeadersInSystemModules) {
+    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &driverVFS) {
   const llvm::Triple &Triple = Context.LangOpts.Target;
   const SearchPathOptions &SearchPathOpts = Context.SearchPathOpts;
   std::string AuxiliaryFile;
@@ -581,6 +580,7 @@ void GetWindowsFileMappings(
                                                AuxiliaryFile);
   }
 
+  llvm::SmallString<261> UCRTInclude;
   struct {
     std::string Path;
     std::string Version;
@@ -594,24 +594,22 @@ void GetWindowsFileMappings(
 
     AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "ucrt.modulemap", VFS,
                                              SearchPathOpts);
-    if (!AuxiliaryFile.empty()) {
-      // The ucrt module map has the C standard library headers all together.
-      // That leads to module cycles with the clang _Builtin_ modules. e.g.
-      // <fenv.h> on ucrt includes <float.h>. The clang builtin <float.h>
-      // include-nexts <float.h>. When both of those UCRT headers are in the
-      // ucrt module, there's a module cycle ucrt -> _Builtin_float -> ucrt
-      // (i.e. fenv.h (ucrt) -> float.h (builtin) -> float.h (ucrt)). Until the
-      // ucrt module map is updated, the builtin headers need to join the system
-      // modules. i.e. when the builtin float.h is in the ucrt module too, the
-      // cycle goes away. Note that -fbuiltin-headers-in-system-modules does
-      // nothing to fix the same problem with C++ headers, and is generally
-      // fragile.
+    if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(UCRTInjection),
                                                AuxiliaryFile);
-      requiresBuiltinHeadersInSystemModules = true;
-    }
+
+    UCRTInclude.assign(UCRTInjection);
+    llvm::sys::path::remove_filename(UCRTInclude);
+    llvm::SmallString<261> SwiftUCRT{UCRTInclude};
+    llvm::sys::path::append(SwiftUCRT, "SwiftUCRT.h");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "SwiftUCRT.h", VFS,
+                                             SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(std::string(SwiftUCRT),
+                                               AuxiliaryFile);
   }
 
+  llvm::SmallString<261> VCToolsInclude;
   struct {
     std::string Path;
     llvm::ToolsetLayout Layout;
@@ -626,9 +624,10 @@ void GetWindowsFileMappings(
     assert(VCTools.Layout == llvm::ToolsetLayout::VS2017OrNewer &&
            "unsupported toolset layout (VS2017+ required)");
 
-    llvm::SmallString<261> VCToolsInjection{VCTools.Path};
-    llvm::sys::path::append(VCToolsInjection, "include");
+    VCToolsInclude.assign(VCTools.Path);
+    llvm::sys::path::append(VCToolsInclude, "include");
 
+    llvm::SmallString<261> VCToolsInjection{VCToolsInclude};
     llvm::sys::path::append(VCToolsInjection, "module.modulemap");
     AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "vcruntime.modulemap",
                                              VFS, SearchPathOpts);
@@ -643,46 +642,51 @@ void GetWindowsFileMappings(
     if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(VCToolsInjection),
                                                AuxiliaryFile);
+  }
 
-    // Because we wish to be backwards compatible with older Visual Studio
-    // releases, we inject empty headers which allow us to have definitions for
-    // modules referencing headers which may not exist. We stub out the headers
-    // with empty files to allow a single module definition to work across
-    // different MSVC STL releases.
-    //
-    // Each entry is annotated with the STL release that introduced the header.
-    // Once we no longer support Visual Studio releases older than a given
-    // release, the corresponding entries can be removed from this list.
-    static const char * const kInjectedHeaders[] = {
-      "__msvc_bit_utils.hpp",                    // VS 2022 17.8
-      "__msvc_chrono.hpp",                       // VS 2022 17.3
-      "__msvc_cxx_stdatomic.hpp",                // VS 2022 17.5
-      "__msvc_filebuf.hpp",                      // VS 2022 17.7
-      "__msvc_format_ucd_tables.hpp",            // VS 2022 17.3
-      "__msvc_formatter.hpp",                    // VS 2022 17.10
-      "__msvc_heap_algorithms.hpp",              // VS 2022 17.12
-      "__msvc_int128.hpp",                       // VS 2022 17.2
-      "__msvc_iter_core.hpp",                    // VS 2022 17.4
-      "__msvc_minmax.hpp",                       // VS 2022 17.10
-      "__msvc_ostream.hpp",                      // VS 2022 17.13
-      "__msvc_print.hpp",                        // VS 2022 17.7
-      "__msvc_ranges_to.hpp",                    // VS 2022 17.12
-      "__msvc_ranges_tuple_formatter.hpp",       // VS 2022 17.13
-      "__msvc_sanitizer_annotate_container.hpp", // VS 2022 17.6
-      "__msvc_string_view.hpp",                  // VS 2022 17.11
-      "__msvc_system_error_abi.hpp",             // VS 2019 16.6
-      "__msvc_threads_core.hpp",                 // VS 2022 17.11
-      "__msvc_tzdb.hpp",                         // VS 2019 16.10
-      "__msvc_xlocinfo_types.hpp",               // VS 2022 17.0
-    };
+  // Inject empty headers for APIs introduced after the oldest supported SDK
+  // and toolset releases, allowing one module definition to cover all of them.
+  // Once an older release is no longer supported, its entries can be removed.
+  enum class HeaderRoot { UCRT, VCTools };
+  static constexpr struct {
+    HeaderRoot Root;
+    StringLiteral Header;
+  } kInjectedHeaders[] = {
+      {HeaderRoot::UCRT, "stdalign.h"},                                 // Windows SDK 10.0.20348
+      {HeaderRoot::UCRT, "stdnoreturn.h"},                              // Windows SDK 10.0.20348
+      {HeaderRoot::VCTools, "__msvc_bit_utils.hpp"},                    // VS 2022 17.8
+      {HeaderRoot::VCTools, "__msvc_chrono.hpp"},                       // VS 2022 17.3
+      {HeaderRoot::VCTools, "__msvc_cxx_stdatomic.hpp"},                // VS 2022 17.5
+      {HeaderRoot::VCTools, "__msvc_filebuf.hpp"},                      // VS 2022 17.7
+      {HeaderRoot::VCTools, "__msvc_format_ucd_tables.hpp"},            // VS 2022 17.3
+      {HeaderRoot::VCTools, "__msvc_formatter.hpp"},                    // VS 2022 17.10
+      {HeaderRoot::VCTools, "__msvc_heap_algorithms.hpp"},              // VS 2022 17.12
+      {HeaderRoot::VCTools, "__msvc_int128.hpp"},                       // VS 2022 17.2
+      {HeaderRoot::VCTools, "__msvc_iter_core.hpp"},                    // VS 2022 17.4
+      {HeaderRoot::VCTools, "__msvc_minmax.hpp"},                       // VS 2022 17.10
+      {HeaderRoot::VCTools, "__msvc_ostream.hpp"},                      // VS 2022 17.13
+      {HeaderRoot::VCTools, "__msvc_print.hpp"},                        // VS 2022 17.7
+      {HeaderRoot::VCTools, "__msvc_ranges_to.hpp"},                    // VS 2022 17.12
+      {HeaderRoot::VCTools, "__msvc_ranges_tuple_formatter.hpp"},       // VS 2022 17.13
+      {HeaderRoot::VCTools, "__msvc_sanitizer_annotate_container.hpp"}, // VS 2022 17.6
+      {HeaderRoot::VCTools, "__msvc_string_view.hpp"},                  // VS 2022 17.11
+      {HeaderRoot::VCTools, "__msvc_system_error_abi.hpp"},             // VS 2019 16.6
+      {HeaderRoot::VCTools, "__msvc_threads_core.hpp"},                 // VS 2022 17.11
+      {HeaderRoot::VCTools, "__msvc_tzdb.hpp"},                         // VS 2019 16.10
+      {HeaderRoot::VCTools, "__msvc_xlocinfo_types.hpp"},               // VS 2022 17.0
+  };
 
-    for (const char * const header : kInjectedHeaders) {
-      llvm::sys::path::remove_filename(VCToolsInjection);
-      llvm::sys::path::append(VCToolsInjection, header);
-      if (!VFS.exists(VCToolsInjection))
-        fileMapping.overridenFiles.emplace_back(
-            llvm::MemoryBuffer::getMemBufferCopy("", VCToolsInjection));
-    }
+  for (const auto &[Root, Header] : kInjectedHeaders) {
+    StringRef IncludeRoot =
+        Root == HeaderRoot::UCRT ? UCRTInclude : VCToolsInclude;
+    if (IncludeRoot.empty())
+      continue;
+
+    llvm::SmallString<261> InjectedHeader{IncludeRoot};
+    llvm::sys::path::append(InjectedHeader, Header);
+    if (!VFS.exists(InjectedHeader))
+      fileMapping.overridenFiles.emplace_back(
+          llvm::MemoryBuffer::getMemBufferCopy("", InjectedHeader));
   }
 }
 } // namespace
@@ -762,8 +766,7 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   if (ctx.LangOpts.EnableCXXInterop)
     getLibStdCxxFileMapping(result, ctx, vfs, suppressDiagnostic);
 
-  GetWindowsFileMappings(result, ctx, vfs,
-                         result.requiresBuiltinHeadersInSystemModules);
+  GetWindowsFileMappings(result, ctx, vfs);
 
   // push the redirect files into a YAML vfs overlay file.
   if (!result.redirectedFiles.empty()) {
