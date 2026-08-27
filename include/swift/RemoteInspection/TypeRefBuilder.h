@@ -2168,7 +2168,13 @@ private:
         remote::RemoteAddress contextDescriptorAddress,
         const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
             *contextDescriptor,
-        std::vector<ContextNameInfo> &chain) {
+        std::vector<ContextNameInfo> &chain,
+        int recursion_limit = remote::defaultTypeRecursionLimit) {
+      if (recursion_limit <= 0) {
+        Error = "Parent context chain is too deep.";
+        return;
+      }
+
       const auto parentDescriptorAddress = getParentDescriptorAddress(
           contextDescriptorAddress, contextDescriptor);
 
@@ -2193,7 +2199,7 @@ private:
         chain.push_back(parentNameInfo.value());
         if (!isModuleDescriptor(parentDescriptor)) {
           getParentContextChain(parentContextDescriptorAddress,
-                                parentDescriptor, chain);
+                                parentDescriptor, chain, recursion_limit - 1);
         }
       };
 
