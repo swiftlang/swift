@@ -131,20 +131,31 @@ RemoteRef<char> TypeRefBuilder::ReflectionTypeDescriptorFinder::readTypeRef(
   return nullptr;
 
 found_type_ref:
-  // Make sure there's a valid mangled string within the bounds of the
-  // section.
-  for (auto i = foundTypeRef;
-       i.getRemoteAddress() < limitAddress.getRemoteAddress();) {
-    auto c = *i.getLocalBuffer();
-    if (c == '\0')
-      goto valid_type_ref;
+  // Make sure there's a valid mangled string within the bounds of the section.
+  // Count down the bytes remaining rather than comparing remote addresses: the
+  // section bounds come from the target process, and a section reaching the top
+  // of the address space makes the remote address wrap around and still compare
+  // as in bounds while the local buffer pointer runs off the end.
+  {
+    uint64_t remaining =
+        limitAddress.getRemoteAddress() - foundTypeRef.getRemoteAddress();
+    for (auto i = foundTypeRef; remaining > 0;) {
+      auto c = *i.getLocalBuffer();
+      if (c == '\0')
+        goto valid_type_ref;
 
-    if (c >= '\1' && c <= '\x17')
-      i = i.atByteOffset(5);
-    else if (c >= '\x18' && c <= '\x1F') {
-      i = i.atByteOffset(Builder.PointerSize + 1);
-    } else {
-      i = i.atByteOffset(1);
+      uint64_t step;
+      if (c >= '\1' && c <= '\x17')
+        step = 5;
+      else if (c >= '\x18' && c <= '\x1F')
+        step = Builder.PointerSize + 1;
+      else
+        step = 1;
+
+      if (step > remaining)
+        break;
+      remaining -= step;
+      i = i.atByteOffset(step);
     }
   }
 
