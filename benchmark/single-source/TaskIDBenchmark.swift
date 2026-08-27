@@ -25,13 +25,8 @@ public var benchmarks: [BenchmarkInfo] {
       tags: [.concurrency]
     ),
     BenchmarkInfo(
-      name: "TaskID.withUnsafeCurrentTask.id",
+      name: "TaskID.unsafeCurrent.id",
       runFunction: run_TaskID_withUnsafeCurrentTask,
-      tags: [.concurrency]
-    ),
-    BenchmarkInfo(
-      name: "TaskID.directBuiltins",
-      runFunction: run_TaskID_directBuiltins,
       tags: [.concurrency]
     ),
   ]
@@ -41,7 +36,7 @@ public var benchmarks: [BenchmarkInfo] {
 @available(anyAppleOS 9999, *)
 private func run_TaskID_currentID(_ n: Int) async {
   for _ in 0..<n {
-    for _ in 0..<10_000 {
+    for _ in 0..<80_000 {
       blackHole(Task.currentID)
     }
   }
@@ -51,42 +46,10 @@ private func run_TaskID_currentID(_ n: Int) async {
 @available(anyAppleOS 9999, *)
 private func run_TaskID_withUnsafeCurrentTask(_ n: Int) async {
   for _ in 0..<n {
-    for _ in 0..<10_000 {
+    for _ in 0..<32_000 {
       withUnsafeCurrentTask { task in
         blackHole(task?.id)
       }
     }
   }
 }
-
-#if canImport(Darwin)
-import Darwin
-
-private typealias _GetCurrentTaskFn = @convention(c) () -> OpaquePointer?
-private typealias _GetJobTaskIdFn = @convention(c) (OpaquePointer) -> UInt64
-
-private let _bench_swift_task_getCurrent: _GetCurrentTaskFn = unsafeBitCast(
-  dlsym(UnsafeMutableRawPointer(bitPattern: -2), "swift_task_getCurrent")!,
-  to: _GetCurrentTaskFn.self
-)
-private let _bench_swift_task_getJobTaskId: _GetJobTaskIdFn = unsafeBitCast(
-  dlsym(UnsafeMutableRawPointer(bitPattern: -2), "swift_task_getJobTaskId")!,
-  to: _GetJobTaskIdFn.self
-)
-
-@available(anyAppleOS 9999, *)
-private func run_TaskID_directBuiltins(_ n: Int) async {
-  for _ in 0..<n {
-    for _ in 0..<10_000 {
-      if let task = _bench_swift_task_getCurrent() {
-        blackHole(_bench_swift_task_getJobTaskId(task))
-      } else {
-        blackHole(UInt64(0))
-      }
-    }
-  }
-}
-#else
-@available(anyAppleOS 9999, *)
-private func run_TaskID_directBuiltins(_ n: Int) async {}
-#endif
