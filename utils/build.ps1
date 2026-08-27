@@ -217,6 +217,9 @@ param
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version 3.0
 $WindowsSxSAssemblyPublicKeyToken = $WindowsSxSAssemblyPublicKeyToken.ToLowerInvariant()
+# Share Clang modules across build phases without using the per-user cache.
+$ModuleCache = "$BinaryCache\ModuleCache"
+$env:CLANG_MODULE_CACHE_PATH = $ModuleCache
 
 # Avoid being run in a "Developer" shell since this script launches its own sub-shells targeting
 # different architectures, and these variables cause confusion.
@@ -2278,6 +2281,12 @@ function Build-CMakeProject {
         # change the RPATH on the dynamic libraries.
         Add-FlagsDefine $Defines CMAKE_EXECUTABLE_FORMAT "ELF"
       }
+    }
+
+    if ($UseSwift) {
+      Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @(
+        "-module-cache-path", $ModuleCache
+      )
     }
 
     if ($EnableCaching) {
