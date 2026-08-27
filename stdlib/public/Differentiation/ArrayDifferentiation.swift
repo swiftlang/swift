@@ -32,6 +32,38 @@ extension Array where Element: Differentiable {
     public init(_ storage: Storage) {
       self.storage = storage
     }
+    
+    @inlinable
+    public init(_ arr: [Element]) {
+      self.storage = .full(arr)
+    }
+  }
+}
+
+extension Array.ArrayTangentVector where Element: AdditiveArithmetic {
+  @inlinable
+  public func asArray() -> [Element] {
+    switch self.storage {
+    case .zero:
+      return []
+    case .oneHot(let index, let value, let count):
+      var result = [Element](repeating: Element.zero, count: count)
+      result[index] = value
+      return result
+    case .full(let array):
+      return array
+    }
+  }
+  
+  @derivative(of: asArray)
+  @inlinable
+  public func _vjpAsArray() -> (value: [Element], pullback: ([Element].TangentVector) -> [Element].ArrayTangentVector.TangentVector) {
+    return (
+      value: self.asArray(),
+      pullback: { v in
+        v
+      }
+    )
   }
 }
 
@@ -97,7 +129,7 @@ extension Array.ArrayTangentVector {
 
 extension Array.ArrayTangentVector where Element: AdditiveArithmetic {
   @inlinable
-  subscript(index: Int) -> Element {
+  public subscript(index: Int) -> Element {
     switch storage {
     case .zero:
       return .zero
@@ -110,7 +142,7 @@ extension Array.ArrayTangentVector where Element: AdditiveArithmetic {
   }
   
   @inlinable
-  subscript(range: Range<Int>) -> Array<Element> {
+  public subscript(range: Range<Int>) -> Array<Element> {
     fatalError()
   }
 }
