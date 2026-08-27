@@ -872,6 +872,7 @@ struct BridgedInstruction {
 
   BRIDGED_INLINE SwiftInt ProjectBoxInst_fieldIndex() const;
   BRIDGED_INLINE bool EndCOWMutationInst_doKeepUnique() const;
+  BRIDGED_INLINE void EndCOWMutationInst_setKeepUnique(bool keepUnique) const;
   BRIDGED_INLINE bool DestroyValueInst_isDeadEnd() const;
   BRIDGED_INLINE SwiftInt EnumInst_caseIndex() const;
   BRIDGED_INLINE SwiftInt UncheckedEnumDataInst_caseIndex() const;
