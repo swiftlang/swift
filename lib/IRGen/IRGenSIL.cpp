@@ -3433,22 +3433,37 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   SILValue op = i->getOperand();
   SILType opType = op->getType();
 
+  // An existential_metatype does not consume its operand; it only inspects the
+  // dynamic type the operand designates. For a loadable existential SILGen may
+  // hand us either a loaded value or, when it borrows the operand's storage in
+  // place (e.g. `type(of:)` applied to a mutable variable), the address of one.
+  // Load the value from memory in the latter case; the load is non-consuming,
+  // so it introduces no reference-count operations.
+  auto getExistentialOperand = [&]() -> Explosion {
+    if (!opType.isAddress())
+      return getLoweredExplosion(op);
+    Explosion e;
+    Address addr = getLoweredAddress(op);
+    getTypeInfo(opType).as<LoadableTypeInfo>().loadAsTake(*this, addr, e);
+    return e;
+  };
+
   switch (opType.getPreferredExistentialRepresentation()) {
   case ExistentialRepresentation::COM:
     llvm_unreachable("COM existential metatype projection is not implemented");
   case ExistentialRepresentation::Metatype: {
-    Explosion existential = getLoweredExplosion(op);
+    Explosion existential = getExistentialOperand();
     emitMetatypeOfMetatype(*this, existential, opType, result);
     break;
   }
   case ExistentialRepresentation::Class: {
-    Explosion existential = getLoweredExplosion(op);
+    Explosion existential = getExistentialOperand();
     emitMetatypeOfClassExistential(*this, existential, i->getType(),
                                    opType, result);
     break;
   }
   case ExistentialRepresentation::Boxed: {
-    Explosion existential = getLoweredExplosion(op);
+    Explosion existential = getExistentialOperand();
     emitMetatypeOfBoxedExistential(*this, existential, opType, result);
     break;
   }
