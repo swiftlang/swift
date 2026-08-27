@@ -104,21 +104,19 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND TARGET embedded-libraries)
   add_dependencies(embedded-libraries embedded-cxxstdlib)
 
   # Unlike the `Cxx` module, this overlay wraps the C++ standard library, so it
-  # can only be built for targets that have one. Reuse the same check embedded
-  # Concurrency uses rather than a triple list of our own -- but require in
-  # addition that the target's *own* SDK provides the library, which is what
-  # "supported with no header fixups" means.
+  # can only be built for a target whose SDK we can point the clang importer at.
+  # Note that this is a stricter condition than the one embedded Concurrency
+  # uses: Concurrency only needs to compile C++ sources, which works for
+  # bare-metal targets via -isystem into the host SDK, whereas building Clang
+  # modules for those headers does not. See swift_embedded_cxx_stdlib_sdk.
   set(_embedded_cxxstdlib_all_triples "${EMBEDDED_STDLIB_TARGET_TRIPLES}")
 
   foreach(entry ${_embedded_cxxstdlib_all_triples})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
-    list(GET list 0 arch)
-    list(GET list 1 mod)
     list(GET list 2 triple)
 
-    swift_embedded_libcxx_support("${arch}" "${mod}" "${triple}"
-      _embedded_cxxstdlib_has_libcxx _embedded_cxxstdlib_cxx_flags)
-    if(NOT _embedded_cxxstdlib_has_libcxx OR _embedded_cxxstdlib_cxx_flags)
+    swift_embedded_cxx_stdlib_sdk("${triple}" _embedded_cxxstdlib_sdk)
+    if(NOT _embedded_cxxstdlib_sdk)
       continue()
     endif()
 

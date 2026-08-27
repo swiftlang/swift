@@ -3736,11 +3736,11 @@ endfunction()
 # Xcode 26.4.
 #
 # Callers that compile C or C++ sources pass the flags through
-# C_COMPILE_FLAGS. A caller that only builds Swift needs the headers on the
-# clang importer instead, which the fixup flags above cannot provide: the macOS
-# SDK module maps refuse to be reached from a foreign target that way. Such a
-# caller should require an empty flags list, i.e. a target whose own SDK
-# supplies the C++ standard library.
+# C_COMPILE_FLAGS. This predicate is *not* sufficient for a caller that only
+# builds Swift, because the clang importer has to build Clang modules for the
+# headers and the fixup flags above cannot make that work -- see
+# swift_embedded_cxx_stdlib_sdk, which the C++ standard library overlay uses
+# instead.
 function(swift_embedded_libcxx_support arch mod triple out_supported out_cxx_flags)
   set(_flags)
   set(_supported TRUE)
@@ -3779,6 +3779,40 @@ function(swift_embedded_libcxx_support arch mod triple out_supported out_cxx_fla
 
   set(${out_supported} "${_supported}" PARENT_SCOPE)
   set(${out_cxx_flags} "${_flags}" PARENT_SCOPE)
+endfunction()
+
+# Determine the SDK that supplies the C++ standard library for an embedded
+# target triple, or the empty string when this build cannot supply one.
+#
+#   swift_embedded_cxx_stdlib_sdk(<triple> <out_sdk_path>)
+#
+# Embedded libraries are built freestanding, with no SDK at all. The C++
+# standard library overlay is the exception: because it is Swift, the clang
+# importer has to find *and build Clang modules for* <string>, <chrono>, and
+# friends, which only works with the target's own SDK. Merely pointing -isystem
+# at another target's SDK -- what swift_embedded_libcxx_support does for
+# bare-metal C++ compiles -- is not enough here; the macOS SDK module maps
+# reject being reached from a foreign target ("module
+# '_c_standard_library_obsolete' requires feature
+# 'found_incompatible_headers__check_search_paths'").
+#
+# Only macOS and Mac Catalyst are supported today, both via the macOS SDK.
+# Extending this needs, per platform:
+#   * other Apple platforms: that SDK configured in SWIFT_SDKS, and the
+#     corresponding SWIFT_SDK_<platform>_PATH plumbed in below;
+#   * Linux: the flags and modulemap the non-embedded overlay gets from
+#     SWIFT_SDK_LINUX_CXX_OVERLAY_SWIFT_COMPILE_FLAGS and libstdcxx-modulemap;
+#   * Windows: the equivalent modulemap plumbing for the MSVC C++ library.
+# Returning empty for those keeps the overlay out of the build rather than
+# failing it.
+function(swift_embedded_cxx_stdlib_sdk triple out_sdk_path)
+  set(_sdk_path "")
+
+  if("${triple}" MATCHES "-apple-macos" OR "${triple}" MATCHES "-apple-ios.*-macabi")
+    set(_sdk_path "${SWIFT_SDK_OSX_PATH}")
+  endif()
+
+  set(${out_sdk_path} "${_sdk_path}" PARENT_SCOPE)
 endfunction()
 
 # Build an embedded Swift library across every entry of
@@ -3846,13 +3880,13 @@ endfunction()
 # (inside this function's loop) rather than in the caller, since the
 # result depends on ${mod}/${triple}.
 #
-# When NEEDS_TARGET_SDK is set, target triples that name a real OS are built
-# against that OS's SDK. Embedded libraries are otherwise built with no SDK at
-# all, which is what freestanding targets want but leaves the clang importer
-# unable to find hosted headers. Use this only for a library that wraps a
-# hosted C or C++ library, such as the C++ standard library overlay; the caller
-# is responsible for not offering triples that have no such SDK (see
-# swift_embedded_libcxx_support). An SDK configured explicitly through
+# When NEEDS_TARGET_SDK is set, a target triple that swift_embedded_cxx_stdlib_sdk
+# knows an SDK for is built against that SDK. Embedded libraries are otherwise
+# built with no SDK at all, which is what freestanding targets want but leaves
+# the clang importer unable to find hosted headers. Use this only for a library
+# that wraps a hosted C or C++ library, such as the C++ standard library
+# overlay; the caller should gate on the same function so it does not offer
+# triples that would silently get no SDK. An SDK configured explicitly through
 # SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES always takes precedence.
 #
 # SKIP_*_REGEX and ONLY_*_REGEX are both multi-valued. An entry is processed
@@ -3967,11 +4001,11 @@ function(add_embedded_swift_target_library prefix library_name)
       set(SWIFT_SDK_embedded_ARCH_${arch_key}_PATH
           "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
     elseif(EMBLIB_NEEDS_TARGET_SDK)
-      # macOS and Mac Catalyst embedded triples both build against the macOS
-      # SDK. Leave the path empty for any other triple, which keeps the build
-      # freestanding rather than silently picking the wrong sysroot.
-      if("${triple}" MATCHES "-apple-macos" OR "${triple}" MATCHES "-apple-ios.*-macabi")
-        set(SWIFT_SDK_embedded_ARCH_${arch_key}_PATH "${SWIFT_SDK_OSX_PATH}")
+      # Leave the path empty for a triple we have no SDK for, which keeps the
+      # build freestanding rather than silently picking the wrong sysroot.
+      swift_embedded_cxx_stdlib_sdk("${triple}" _emblib_target_sdk)
+      if(_emblib_target_sdk)
+        set(SWIFT_SDK_embedded_ARCH_${arch_key}_PATH "${_emblib_target_sdk}")
       endif()
     endif()
 
