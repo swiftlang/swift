@@ -24,6 +24,9 @@ roots:
       - name: module.modulemap
         type: file
         external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\ucrt.modulemap"
+      - name: SwiftUCRT.h
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\SwiftUCRT.h"
   - name: "@VCToolsInstallDir@\\include"
     type: directory
     contents:
