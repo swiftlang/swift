@@ -5704,15 +5704,14 @@ static bool checkConditionalParams(
 static ConditionalAttrParams
 getConditionalAttrParams(clang::SwiftAttrAttr *swiftAttr, StringRef attrName) {
   ConditionalAttrParams result;
-  StringRef params = swiftAttr->getAttribute();
-  if (params.consume_front(attrName)) {
-    auto commaPos = params.find(',');
-    StringRef nextParam = params.take_front(commaPos);
-    while (!nextParam.empty() && commaPos != StringRef::npos) {
-      result.insert(nextParam.trim());
-      params = params.drop_front(nextParam.size() + 1);
-      commaPos = params.find(',');
-      nextParam = params.take_front(commaPos);
+  StringRef attribute = swiftAttr->getAttribute();
+  if (attribute.consume_front(attrName)) {
+    SmallVector<StringRef, 2> params;
+    attribute.split(params, ',');
+    for (auto param : params) {
+      param = param.trim();
+      if (!param.empty())
+        result.insert(param);
     }
   }
   return result;
@@ -9384,6 +9383,11 @@ void ClangImporter::Implementation::validateSwiftAttributes(
             }
             auto conditionalParams =
                 getConditionalAttrParams(swiftAttr, attrName);
+
+            if (conditionalParams.empty())
+              diagnose(HeaderLoc{decl->getLocation()},
+                       diag::empty_conditional_params, annotationName);
+
             while (specDecl && !conditionalParams.empty()) {
               auto templateDecl = specDecl->getSpecializedTemplate();
               for (auto [idx, param] :
