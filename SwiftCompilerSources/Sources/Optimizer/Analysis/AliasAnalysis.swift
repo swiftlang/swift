@@ -317,6 +317,12 @@ struct AliasAnalysis {
       return getBuiltinEffect(of: builtin, on: memLoc)
 
     case let endBorrow as EndBorrowInst:
+      let type = endBorrow.borrow.type
+      if type.isNonTrivialOnlyBecauseNonEscapable(in: endBorrow.parentFunction) {
+        // Ending a borrow of a non-Escapable type that is otherwise trivial can
+        // be considered to have no effects.
+        return .noEffects
+      }
       switch endBorrow.borrow {
       case let storeBorrow as StoreBorrowInst:
         precondition(endBorrow.borrow.type.isAddress)
