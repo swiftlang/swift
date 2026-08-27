@@ -571,6 +571,19 @@ void GetWindowsFileMappings(
     if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
 
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "winrt", "module.modulemap");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winrt.modulemap", VFS,
+                                             SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
+
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "winrt", "SwiftWinRT.h");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "SwiftWinRT.h", VFS,
+                                             SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
   }
 
   struct {

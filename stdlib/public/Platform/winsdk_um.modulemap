@@ -751,9 +751,4 @@ module WinSDK.UM [system] {
     link "wlanapi.lib"
   }
 
-  module RoApi {
-    header "../winrt/roapi.h"
-    export *
-  }
-
 }

@@ -1,4 +1,4 @@
-//===--- WinSDK.modulemap -------------------------------------------------===//
+//===--- WinRT.modulemap -------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-module WinSDK [system] {
-  extern module UM "um/module.modulemap"
-  extern module Shared "shared/module.modulemap"
-  extern module WinRT "winrt/module.modulemap"
+module WinSDK.WinRT [system] {
+  // The shim breaks the unavoidable Windows.h/roapi.h dependency across the
+  // UM and WinRT SDK directories without assigning either header to two
+  // modules.
+  header "SwiftWinRT.h"
+  export *
 }
