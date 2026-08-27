@@ -30,6 +30,15 @@ roots:
       - name: shared.modulemap
         type: file
         external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/shared.modulemap"
+  - name: "@WindowsSdkDir@/Include/@WindowsSDKVersion@/winrt"
+    type: directory
+    contents:
+      - name: module.modulemap
+        type: file
+        external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/winrt.modulemap"
+      - name: SwiftWinRT.h
+        type: file
+        external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/SwiftWinRT.h"
   - name: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/ucrt"
     type: directory
     contents:
@@ -61,9 +70,11 @@ install(TARGETS ClangModules
 install(FILES
   SwiftUCRT.h
   ucrt.modulemap
+  SwiftWinRT.h
   WinSDK.apinotes
   vcruntime.apinotes
   vcruntime.modulemap
+  winrt.modulemap
   winsdk.modulemap
   um.modulemap
   shared.modulemap

@@ -213,7 +213,9 @@ copy_files(public/Platform Overlay/Windows/clang
   FILES
     ucrt.modulemap
     SwiftUCRT.h
+    SwiftWinRT.h
     WinSDK.apinotes
+    winrt.modulemap
     winsdk.modulemap
     um.modulemap
     shared.modulemap
