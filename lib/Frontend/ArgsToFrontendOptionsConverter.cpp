@@ -338,6 +338,11 @@ bool ArgsToFrontendOptionsConverter::convert(
       computeMainAndSupplementaryOutputFilenames())
     return true;
 
+  Opts.EmitSymbolGraph |= Args.hasArg(OPT_emit_symbol_graph);
+  if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {
+    Opts.SymbolGraphOutputDir = A->getValue();
+  }
+
   if (checkUnusedSupplementaryOutputPaths())
     return true;
 
@@ -451,12 +456,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
   computeImplicitImportModuleNames(OPT_testable_import_module, /*isTestable=*/true);
   computeLLVMArgs();
-
-  Opts.EmitSymbolGraph |= Args.hasArg(OPT_emit_symbol_graph);
-
-  if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {
-    Opts.SymbolGraphOutputDir = A->getValue();
-  }
 
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbolsInSymbolGraph = Args.hasArg(OPT_include_spi_symbols);
@@ -938,8 +937,12 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_summary);
     return true;
   }
-  if (!FrontendOptions::canActionEmitModule(Opts.RequestedAction) &&
-      !Opts.SymbolGraphOutputDir.empty()) {
+  if (!Opts.SymbolGraphOutputDir.empty() &&
+      !FrontendOptions::doesActionTypeCheckWholeModule(Opts.RequestedAction) &&
+      // Dependency scanning forwards -emit-symbol-graph in the module build
+      // commands it produces, so it must be allowed to carry the flag even
+      // though it does not typecheck the whole module.
+      Opts.RequestedAction != FrontendOptions::ActionType::ScanDependencies) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_symbol_graph);
     return true;
   }
