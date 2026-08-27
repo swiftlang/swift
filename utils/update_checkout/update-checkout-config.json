@@ -196,7 +196,7 @@
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
                 "brotli": "v1.2.0",
-                "mimalloc": "v3.0.3",
+                "mimalloc": "v3.5.0",
                 "swift-subprocess": "0.5",
                 "boringssl": "0226f30467f540a3f62ef48d453f93927da199b6"
             }
@@ -991,7 +991,7 @@
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
                 "brotli": "v1.2.0",
-                "mimalloc": "v3.0.3",
+                "mimalloc": "v3.5.0",
                 "swift-subprocess": "0.5",
                 "boringssl": "0226f30467f540a3f62ef48d453f93927da199b6"
             }
