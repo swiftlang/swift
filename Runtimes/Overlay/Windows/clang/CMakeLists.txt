@@ -4,6 +4,8 @@ file(TO_CMAKE_PATH "$ENV{WindowsSDKVersion}" WindowsSDKVersion)
 file(TO_CMAKE_PATH "$ENV{UniversalCRTSdkDir}" UniversalCRTSdkDir)
 file(TO_CMAKE_PATH "$ENV{UCRTVersion}" UCRTVersion)
 file(TO_CMAKE_PATH "$ENV{VCToolsInstallDir}" VCToolsInstallDir)
+string(REGEX REPLACE "/+$" "" WindowsSDKVersion "${WindowsSDKVersion}")
+string(REGEX REPLACE "/+$" "" UCRTVersion "${UCRTVersion}")
 
 file(CONFIGURE
   OUTPUT windows-sdk-overlay.yaml
@@ -34,6 +36,9 @@ roots:
       - name: module.modulemap
         type: file
         external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/ucrt.modulemap"
+      - name: SwiftUCRT.h
+        type: file
+        external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/SwiftUCRT.h"
   - name: "@VCToolsInstallDir@/include"
     type: directory
     contents:
@@ -53,6 +58,7 @@ target_compile_options(ClangModules INTERFACE
 install(TARGETS ClangModules
   EXPORT SwiftOverlayTargets)
 install(FILES
+  SwiftUCRT.h
   ucrt.modulemap
   WinSDK.apinotes
   vcruntime.apinotes
