@@ -2441,15 +2441,14 @@ public:
     checkRedeclaration(OD);
     if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD))
       (void)IOD->getPrecedenceGroup();
-    checkAccessControl(OD);
-    TypeChecker::checkIsolatedConfromancesInDecl(OD);
+    checkDeclCommon(OD);
   }
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
     TypeChecker::checkDeclAttributes(PGD);
     validatePrecedenceGroup(PGD);
     checkRedeclaration(PGD);
-    checkAccessControl(PGD);
+    checkDeclCommon(PGD);
   }
 
   void visitMissingDecl(MissingDecl *missing) {  }
@@ -2471,8 +2470,7 @@ public:
 
   void visitMacroDecl(MacroDecl *MD) {
     TypeChecker::checkDeclAttributes(MD);
-    checkAccessControl(MD);
-    TypeChecker::checkIsolatedConfromancesInDecl(MD);
+    checkDeclCommon(MD);
 
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
@@ -2868,11 +2866,8 @@ public:
 
     TypeChecker::checkDeclAttributes(PBD);
 
-    checkAccessControl(PBD);
-
+    checkDeclCommon(PBD);
     checkExplicitAvailability(PBD);
-
-    TypeChecker::checkIsolatedConfromancesInDecl(PBD);
 
     // If the initializers in the PBD aren't checked yet, do so now.
     for (auto i : range(PBD->getNumPatternEntries())) {
@@ -2971,7 +2966,7 @@ public:
 
     TypeChecker::checkDeclAttributes(SD);
 
-    checkAccessControl(SD);
+    checkDeclCommon(SD);
 
     checkExplicitAvailability(SD);
 
@@ -3008,8 +3003,6 @@ public:
 
     checkDefaultArguments(SD->getIndices());
     checkVariadicParameters(SD->getIndices(), SD);
-
-    TypeChecker::checkIsolatedConfromancesInDecl(SD);
 
     if (DC->getSelfClassDecl()) {
       checkDynamicSelfType(SD, SD->getValueInterfaceType());
@@ -3060,9 +3053,8 @@ public:
     (void) TAD->getUnderlyingType();
 
     TypeChecker::checkDeclAttributes(TAD);
-    checkAccessControl(TAD);
+    checkDeclCommon(TAD);
     checkGenericParams(TAD);
-    TypeChecker::checkIsolatedConfromancesInDecl(TAD);
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
@@ -3084,12 +3076,10 @@ public:
       AT->diagnose(diag::associated_type_objc, AT->getName(), proto->getName());
     }
 
-    checkAccessControl(AT);
+    checkDeclCommon(AT);
 
     // Trigger the checking for overridden declarations.
-    (void) AT->getOverriddenDecls();
-
-    TypeChecker::checkIsolatedConfromancesInDecl(AT);
+    (void)AT->getOverriddenDecls();
 
     auto defaultType = AT->getDefaultDefinitionType();
     if (defaultType && !defaultType->hasError()) {
@@ -3216,8 +3206,7 @@ public:
 
     checkInheritanceClause(ED);
     diagnoseMissingExplicitSendable(ED);
-    checkAccessControl(ED);
-    TypeChecker::checkIsolatedConfromancesInDecl(ED);
+    checkDeclCommon(ED);
 
     auto &DE = Ctx.Diags;
     if (auto rawTy = ED->getRawType()) {
@@ -3256,7 +3245,6 @@ public:
     TypeChecker::checkDeclCircularity(ED);
 
     TypeChecker::checkConformancesInContext(ED);
-    TypeChecker::checkIsolatedConfromancesInDecl(ED);
 
     // If our enum is marked as move only, it cannot be indirect or have any
     // indirect cases.
@@ -3298,14 +3286,12 @@ public:
     checkInheritanceClause(SD);
     diagnoseMissingExplicitSendable(SD);
 
-    checkAccessControl(SD);
-
+    checkDeclCommon(SD);
     checkExplicitAvailability(SD);
 
     TypeChecker::checkDeclCircularity(SD);
 
     TypeChecker::checkConformancesInContext(SD);
-    TypeChecker::checkIsolatedConfromancesInDecl(SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -3598,14 +3584,14 @@ public:
       com::validateImplementation(CD);
     diagnoseMissingExplicitSendable(CD);
 
-    checkAccessControl(CD);
+
+    checkDeclCommon(CD);
 
     checkExplicitAvailability(CD);
 
     TypeChecker::checkDeclCircularity(CD);
 
     TypeChecker::checkConformancesInContext(CD);
-    TypeChecker::checkIsolatedConfromancesInDecl(CD);
 
     maybeDiagnoseClassWithoutInitializers(CD);
 
@@ -3640,7 +3626,7 @@ public:
     for (auto Member : PD->getMembers())
       visit(Member);
 
-    checkAccessControl(PD);
+    checkDeclCommon(PD);
 
     checkProtocolRefinementRequirements(PD);
 
@@ -3681,8 +3667,6 @@ public:
     if (PD->getParentSourceFile())
       TypeChecker::checkConformancesInContext(PD);
 
-    TypeChecker::checkIsolatedConfromancesInDecl(PD);
-
     checkDeprecatedSuppressedAssociatedTypes(PD);
   }
 
@@ -3716,13 +3700,11 @@ public:
       TypeChecker::checkParameterList(FD->getParameters(), FD);
     }
 
-    checkAccessControl(FD);
+    checkDeclCommon(FD);
 
     TypeChecker::checkDeclAttributes(FD);
     TypeChecker::checkDistributedFunc(FD);
     checkEmbeddedRestrictionsInSignature(FD);
-
-    TypeChecker::checkIsolatedConfromancesInDecl(FD);
 
     // Untyped throws might need to be diagnosed.
     SourceLoc throwsLoc = FD->getThrowsLoc();
@@ -3859,8 +3841,7 @@ public:
       EED->setInvalid();
     }
 
-    checkAccessControl(EED);
-    TypeChecker::checkIsolatedConfromancesInDecl(EED);
+    checkDeclCommon(EED);
   }
 
   /// The extended type must be '(repeat each Element)' or a generic
@@ -4110,7 +4091,7 @@ public:
 
     TypeChecker::checkConformancesInContext(ED);
 
-    checkAccessControl(ED);
+    checkDeclCommon(ED);
 
     checkExplicitAvailability(ED);
 
@@ -4121,8 +4102,6 @@ public:
     checkTupleExtension(ED);
 
     checkExtensionAddsSoloInvertibleProtocol(ED);
-
-    TypeChecker::checkIsolatedConfromancesInDecl(ED);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
@@ -4266,7 +4245,7 @@ public:
       }
     }
 
-    checkAccessControl(CD);
+    checkDeclCommon(CD);
 
     checkExplicitAvailability(CD);
 
@@ -4281,7 +4260,6 @@ public:
     checkVariadicParameters(CD->getParameters(), CD);
 
     TypeChecker::checkObjCImplementation(CD);
-    TypeChecker::checkIsolatedConfromancesInDecl(CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -4315,6 +4293,11 @@ public:
 
   void visitBuiltinTupleDecl(BuiltinTupleDecl *BTD) {
     llvm_unreachable("BuiltinTupleDecl should not show up here");
+  }
+
+  void checkDeclCommon(Decl *D) {
+    checkAccessControl(D);
+    TypeChecker::checkIsolatedConfromancesInDecl(D);
   }
 };
 } // end anonymous namespace
