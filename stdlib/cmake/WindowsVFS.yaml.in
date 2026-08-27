@@ -24,6 +24,15 @@ roots:
       - name: module.modulemap
         type: file
         external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\winsdk_shared.modulemap"
+  - name: "@WindowsSdkDir@\\Include\\@WindowsSDKVersion@\\winrt"
+    type: directory
+    contents:
+      - name: module.modulemap
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\winrt.modulemap"
+      - name: SwiftWinRT.h
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\SwiftWinRT.h"
   - name: "@UniversalCRTSdkDir@\\Include\\@UCRTVersion@\\ucrt"
     type: directory
     contents:

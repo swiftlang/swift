@@ -1,4 +1,4 @@
-//===--- WinSDK.modulemap -------------------------------------------------===//
+//===--- SwiftWinRT.h -----------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-module WinSDK [system] {
-  use _Builtin_limits
-  use _Builtin_stdarg
-  use _stdlib
-  use SAL
-  use ucrt
+#ifndef SWIFT_WINRT_H
+#define SWIFT_WINRT_H
 
-  extern module UM "um/module.modulemap"
-  extern module Shared "shared/module.modulemap"
-  extern module WinRT "winrt/module.modulemap"
-}
+#include <Windows.h>
+#include <roapi.h>
+
+#endif
