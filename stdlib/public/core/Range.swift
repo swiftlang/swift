@@ -211,6 +211,14 @@ public struct Range<Bound: Comparable> {
   public var isEmpty: Bool {
     return lowerBound == upperBound
   }
+
+  /// Specifies that the range's lower bound is not greater than its upper bound.
+  /// It has only an effect on the optimizer; no code is generated.
+  @_transparent
+  public func _assumeValid() {
+    _internalInvariant(lowerBound <= upperBound)
+    unsafe _uncheckedUnsafeAssume(lowerBound <= upperBound)
+  }
 }
 
 extension Range: Sequence
@@ -228,10 +236,16 @@ where Bound: Strideable, Bound.Stride: SignedInteger
   public typealias SubSequence = Range<Bound>
 
   @inlinable
-  public var startIndex: Index { return lowerBound }
+  public var startIndex: Index {
+    _assumeValid()
+    return lowerBound
+  }
 
   @inlinable
-  public var endIndex: Index { return upperBound }
+  public var endIndex: Index {
+    _assumeValid()
+    return upperBound
+  }
 
   @inlinable
   @inline(__always)

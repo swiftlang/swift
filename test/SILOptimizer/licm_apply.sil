@@ -59,6 +59,69 @@ bb3:
   return %15 : $()
 }
 
+// An assume in the loop body must not stop the read-only apply from being hoisted.
+//CHECK-LABEL: sil @licm_readonly_apply_with_assume
+//CHECK:   %{{[0-9]+}} = apply
+//CHECK: bb1({{.*}} : $Int64):
+//CHECK-NOT: {{ apply}}
+//CHECK: bb2:
+sil @licm_readonly_apply_with_assume : $@convention(thin) (Int64, @inout Int64) -> () {
+bb0(%0 : $Int64, %1 : $*Int64):
+  %2 = alloc_stack $Int64
+  store %0 to %2 : $*Int64
+  %9 = function_ref @read_from_param : $@convention(thin) (@inout Int64, Int64) -> Int64
+  %10 = integer_literal $Builtin.Int64, 3
+  %11 = struct $Int64 (%10 : $Builtin.Int64)
+  %12 = struct_element_addr %1 : $*Int64, #Int64._value
+  %13 = integer_literal $Builtin.Int1, -1
+  %14 = struct_extract %0 : $Int64, #Int64._value
+  br bb1
+
+bb1:
+  %20 = builtin "cmp_sgt_Int64"(%14 : $Builtin.Int64, %10 : $Builtin.Int64) : $Builtin.Int1
+  %21 = builtin "assume_Int1"(%20 : $Builtin.Int1) : $Builtin.Int1
+  %22 = apply %9(%2, %11) : $@convention(thin) (@inout Int64, Int64) -> Int64
+  %23 = load %12 : $*Builtin.Int64
+  %24 = struct_extract %22 : $Int64, #Int64._value
+  %25 = builtin "sadd_with_overflow_Int64"(%23 : $Builtin.Int64, %24 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %26 = tuple_extract %25 : $(Builtin.Int64, Builtin.Int1), 0
+  %27 = struct $Int64 (%26 : $Builtin.Int64)
+  store %27 to %1 : $*Int64
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %30 = tuple ()
+  dealloc_stack %2 : $*Int64
+  return %30 : $()
+}
+
+// The assume itself is not loop invariant code: it must stay where it is.
+//CHECK-LABEL: sil @dont_hoist_assume
+//CHECK: bb1:
+//CHECK:   builtin "assume_Int1"
+//CHECK: bb2:
+sil @dont_hoist_assume : $@convention(thin) (Int64, @inout Int64) -> () {
+bb0(%0 : $Int64, %1 : $*Int64):
+  %10 = integer_literal $Builtin.Int64, 3
+  %14 = struct_extract %0 : $Int64, #Int64._value
+  br bb1
+
+bb1:
+  %20 = builtin "cmp_sgt_Int64"(%14 : $Builtin.Int64, %10 : $Builtin.Int64) : $Builtin.Int1
+  %21 = builtin "assume_Int1"(%20 : $Builtin.Int1) : $Builtin.Int1
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %30 = tuple ()
+  return %30 : $()
+}
+
 //CHECK-LABEL: sil @dont_licm_readonly_apply
 //CHECK: bb1:
 //CHECK: %{{[0-9]+}} = apply

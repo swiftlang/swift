@@ -61,6 +61,13 @@ sil_global hidden [let] @$trivialglobal : $TStruct
 sil_global private @globalinit_trivialglobal_token : $Builtin.Word
 
 
+// CHECK-LABEL: sil_global hidden [let] @$assumeglobal : $TStruct = {
+// CHECK:  [[CONST:%.*]] = integer_literal $Builtin.Int32, 27
+// CHECK:  [[INT:%.*]] = struct $Int32 ([[CONST]])
+// CHECK:  %initval = struct $TStruct ([[INT]])
+sil_global hidden [let] @$assumeglobal : $TStruct
+sil_global private @globalinit_assumeglobal_token : $Builtin.Word
+
 // CHECK-LABEL: sil_global hidden [let] @$nontrivialglobal : $TClass{{$}}
 sil_global hidden [let] @$nontrivialglobal : $TClass
 sil_global private @globalinit_nontrivialglobal_token : $Builtin.Word
@@ -214,6 +221,25 @@ bb0:
   store %4 to [trivial] %1 : $*TStruct
   %6 = tuple ()
   return %6 : $()
+}
+
+// An assume is not a side effect which prevents static initialization.
+// CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_assumeglobal_func :
+// CHECK-NOT:     store
+// CHECK:       } // end sil function 'globalinit_assumeglobal_func'
+sil [global_init_once_fn] [ossa] @globalinit_assumeglobal_func : $@convention(c) () -> () {
+bb0:
+  alloc_global @$assumeglobal
+  %1 = global_addr @$assumeglobal : $*TStruct
+  %2 = integer_literal $Builtin.Int32, 27
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = builtin "cmp_sgt_Int32"(%2 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+  %5 = builtin "assume_Int1"(%4 : $Builtin.Int1) : $Builtin.Int1
+  %6 = struct $Int32 (%2 : $Builtin.Int32)
+  %7 = struct $TStruct (%6 : $Int32)
+  store %7 to [trivial] %1 : $*TStruct
+  %9 = tuple ()
+  return %9 : $()
 }
 
 // CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_nontrivialglobal_func :
