@@ -19,6 +19,7 @@
 #include "Scope.h"
 #include "TupleGenerators.h"
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -212,6 +213,74 @@ struct WritebackReabstractedInoutCleanup final : Cleanup {
   }
 };
 
+/// Conservatively determine whether the body of the function or closure
+/// declaring \p pd contains anything that could mutate the parameter.
+///
+/// Only a plain read — a DeclRefExpr immediately consumed by a LoadExpr,
+/// outside of any nested closure — is treated as non-mutating. Every other
+/// use (assignment, passing it inout again, a mutating member access, or any
+/// appearance inside a nested closure) counts as a potential mutation, as
+/// does any context whose body isn't available.
+static bool mayMutateInoutParameterInBody(ParamDecl *pd) {
+  BraceStmt *body = nullptr;
+  auto *dc = pd->getDeclContext();
+  if (auto *ace = dyn_cast<AbstractClosureExpr>(dc))
+    body = ace->getBody();
+  else if (auto *afd = dyn_cast<AbstractFunctionDecl>(dc))
+    body = afd->getBody();
+  if (!body)
+    return true;
+
+  class Walker final : public ASTWalker {
+    ParamDecl *Param;
+    llvm::SmallPtrSet<Expr *, 8> LoadedRefs;
+    unsigned ClosureDepth = 0;
+
+  public:
+    bool MayMutate = false;
+
+    Walker(ParamDecl *param) : Param(param) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (isa<AbstractClosureExpr>(E))
+        ++ClosureDepth;
+
+      // Remember parameter references that are immediately loaded; those
+      // are the reads.
+      if (auto *load = dyn_cast<LoadExpr>(E)) {
+        if (ClosureDepth == 0)
+          if (auto *ref = dyn_cast<DeclRefExpr>(
+                  load->getSubExpr()->getSemanticsProvidingExpr()))
+            if (ref->getDecl() == Param)
+              LoadedRefs.insert(ref);
+      }
+
+      if (auto *ref = dyn_cast<DeclRefExpr>(E)) {
+        if (ref->getDecl() == Param &&
+            (ClosureDepth > 0 || !LoadedRefs.count(ref))) {
+          MayMutate = true;
+          return Action::Stop();
+        }
+      }
+      return Action::Continue(E);
+    }
+
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+      if (isa<AbstractClosureExpr>(E))
+        --ClosureDepth;
+      return Action::Continue(E);
+    }
+  };
+
+  Walker walker(pd);
+  body->walk(walker);
+  return walker.MayMutate;
+}
+
 class EmitBBArguments {
 public:
   SILGenFunction &SGF;
@@ -229,7 +298,7 @@ public:
                            ParamDecl *pd, bool isAddressable) {
     // Note: inouts of tuples are not exploded, so we bypass visit().
     if (pd->isInOut()) {
-      return handleInOut(origType, substType, pd->isAddressable());
+      return handleInOut(origType, substType, pd);
     }
     // Addressability also suppresses exploding the parameter.
     if (isAddressable) {
@@ -337,18 +406,19 @@ public:
   }
 
   ManagedValue handleInOut(AbstractionPattern orig, CanType t,
-                           bool isAddressable) {
+                           ParamDecl *pd) {
     auto mv = claimNextParameter();
     return handleScalar(mv, orig, t, /*emitInto*/ nullptr,
                         /*inout*/ true,
-                        isAddressable);
+                        pd->isAddressable(), pd);
   }
 
   ManagedValue handleScalar(ManagedValue mv,
                             AbstractionPattern orig, CanType t,
                             Initialization *emitInto,
                             bool isInOut,
-                            bool isAddressable) {
+                            bool isAddressable,
+                            ParamDecl *inOutParam = nullptr) {
     assert(!(isInOut && emitInto != nullptr));
 
     auto argType = SGF.getLoweredType(t, mv.getType().getCategory());
@@ -391,16 +461,33 @@ public:
       // If the value needs to be reabstracted, set up a shadow copy with
       // writeback here.
       if (argType.getASTType() != mv.getType().getASTType()) {
+        // If the body never mutates the parameter, load by copy so the
+        // original stays in place: there is then nothing to write back, and
+        // the caller's value keeps its original representation.
+        // Reabstracting the unmodified value back would wrap it in a fresh
+        // pair of reabstraction thunks on every call
+        // (https://github.com/swiftlang/swift/issues/91348).
+        // Reabstraction differences only arise for values involving function
+        // types, which are copyable; guard the copy anyway in case that
+        // ever changes.
+        bool inOutIsOnlyRead = inOutParam && !mv.getType().isMoveOnly() &&
+                               !mayMutateInoutParameterInBody(inOutParam);
         // Load the value coming in.
         auto origBuf = mv.getValue();
-        mv = SGF.emitLoad(loc, origBuf, SGF.getTypeLowering(mv.getType()), SGFContext(), IsTake);
+        mv = SGF.emitLoad(loc, origBuf, SGF.getTypeLowering(mv.getType()),
+                          SGFContext(), inOutIsOnlyRead ? IsNotTake : IsTake);
         // Reabstract the value if necessary.
         mv = SGF.emitOrigToSubstValue(loc, mv.ensurePlusOne(SGF, loc), orig, t);
         // Store the value to a local buffer.
         auto substBuf = SGF.emitTemporaryAllocation(loc, argType);
         SGF.B.createStore(loc, mv.forward(SGF), substBuf, StoreOwnershipQualifier::Init);
-        // Introduce a writeback to put the final value back in the inout.
-        SGF.Cleanups.pushCleanup<WritebackReabstractedInoutCleanup>(origBuf, substBuf, orig, t);
+        if (inOutIsOnlyRead) {
+          // The shadow copy is owned by this function; destroy it on exit.
+          SGF.enterDestroyCleanup(substBuf);
+        } else {
+          // Introduce a writeback to put the final value back in the inout.
+          SGF.Cleanups.pushCleanup<WritebackReabstractedInoutCleanup>(origBuf, substBuf, orig, t);
+        }
         mv = ManagedValue::forLValue(substBuf);
       }
 
