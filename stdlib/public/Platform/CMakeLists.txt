@@ -575,8 +575,9 @@ if(WINDOWS IN_LIST SWIFT_SDKS)
       WinSDK.apinotes
       vcruntime.apinotes
       vcruntime.modulemap
-      winsdk_um.modulemap
-      winsdk_shared.modulemap
+      winsdk.modulemap
+      um.modulemap
+      shared.modulemap
     DESTINATION "share"
     COMPONENT sdk-overlay)
 endif()

@@ -214,8 +214,9 @@ copy_files(public/Platform Overlay/Windows/clang
     ucrt.modulemap
     SwiftUCRT.h
     WinSDK.apinotes
-    winsdk_um.modulemap
-    winsdk_shared.modulemap
+    winsdk.modulemap
+    um.modulemap
+    shared.modulemap
     vcruntime.modulemap
     vcruntime.apinotes)
 
