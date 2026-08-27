@@ -2304,6 +2304,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   }
   case Node::Kind::AutoDiffSubsetParametersThunk: {
+    // The four trailing children are the kind and three index subsets, and at
+    // least one child ahead of them names the thing being thunked.
+    if (Node->getNumChildren() < 5) {
+      setInvalid();
+      return nullptr;
+    }
     Printer << "autodiff subset parameters thunk for ";
     auto currentIndex = Node->getNumChildren() - 1;
     auto toParamIndices = Node->getChild(currentIndex--);
