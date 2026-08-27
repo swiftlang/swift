@@ -195,4 +195,62 @@ StdSetTestSuite.test("SetOfCIntWithCustomComparator") {
 //     expectTrue(s.contains(5))
 }
 
+StdSetTestSuite.test("SetOfCInt Borrowing Iterators").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+
+    let constSet = initSetOfCInt()
+    expectTrue(constSet.contains(1))
+    expectFalse(constSet.contains(2))
+    expectTrue(constSet.contains(3))
+
+    let arr : [Int32] = [1, 3, 5]
+    var counter = 0
+    for el in constSet {
+        expectEqual(el, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+
+    var mutSet = initSetOfCInt()
+    expectTrue(mutSet.contains(1))
+    expectFalse(mutSet.contains(2))
+    expectTrue(mutSet.contains(3))
+
+    counter = 0
+    for el in mutSet {
+        expectEqual(el, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+}
+
+StdSetTestSuite.test("MultisetOfCInt Borrowing Iterators").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+
+    let constSet = initMultisetOfCInt()
+    expectTrue(constSet.contains(2))
+    expectFalse(constSet.contains(3))
+    expectTrue(constSet.contains(4))
+
+    let arr : [Int32] = [2, 2, 4, 6]
+    var counter = 0
+    for el in constSet {
+        expectEqual(el, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 4)
+
+    var mutSet = initMultisetOfCInt()
+    expectTrue(mutSet.contains(2))
+    expectFalse(mutSet.contains(3))
+    expectTrue(mutSet.contains(4))
+
+    counter = 0
+    for el in mutSet {
+        expectEqual(el, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 4)
+}
+
 runAllTests()

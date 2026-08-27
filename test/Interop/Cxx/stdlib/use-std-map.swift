@@ -640,6 +640,18 @@ StdMapTestSuite.test("UnorderedMap.merge(CxxDictionary)") {
   expectEqual(map[4], 7)
 }
 
+StdMapTestSuite.test("MapNonCopyableValue Borrowing Iterators").require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let map = initMapNonCopyableValue()
+  var counter = 0
+  for el in map {
+    expectEqual(el.first, el.second.number)
+    counter += 1
+  }
+  expectEqual(counter, 3)
+}
+
 // `merging` is implemented by calling `merge`, so we can skip this test
 
 runAllTests()
