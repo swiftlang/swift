@@ -4,7 +4,7 @@
 // Producer: build Lib.swiftmodule with C++ interop and Embedded Swift so that
 // the synthesized base getter accessor is serialized into its SIL.
 // RUN: %target-swift-frontend -emit-module -o %t/Lib.swiftmodule \
-// RUN:   -target %target-cpu-apple-macos14 -disable-availability-checking \
+// RUN:   -disable-availability-checking \
 // RUN:   -enable-experimental-feature Embedded -wmo \
 // RUN:   -cxx-interoperability-mode=default -parse-as-library \
 // RUN:   -module-name Lib -I %t/Inputs %t/Lib.swift
@@ -12,7 +12,7 @@
 // Consumer: compiling Main must deserialize Lib's serialized SIL, which
 // cross-references the synthesized base getter accessor on Derived.
 // RUN: %target-swift-frontend -emit-sil \
-// RUN:   -target %target-cpu-apple-macos14 -disable-availability-checking \
+// RUN:   -disable-availability-checking \
 // RUN:   -enable-experimental-feature Embedded -wmo \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -module-name Main -I %t -I %t/Inputs %t/Main.swift | %FileCheck %s
