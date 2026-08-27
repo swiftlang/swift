@@ -305,6 +305,42 @@ extension Task: Equatable {
   }
 }
 
+// ==== -----------------------------------------------------------------------
+// MARK: Task ID
+
+/// An opaque, process-unique identifier for a Swift ``Task``.
+///
+/// A `TaskID` is assigned at task creation, never changes for the lifetime
+/// of the task, and is never reused once a task has completed. IDs are
+/// scoped to the current process and are not suitable for cross-process
+/// correlation.
+///
+/// - SeeAlso: ``Task/currentID``
+/// - SeeAlso: ``Task/id``
+/// - SeeAlso: ``UnsafeCurrentTask/id``
+@available(StdlibDeploymentTarget 6.5, *)
+@frozen
+public struct TaskID: Sendable, Hashable {
+  @usableFromInline
+  internal var _rawValue: UInt64
+
+  @export(implementation)
+  internal init(_rawValue: UInt64) {
+    self._rawValue = _rawValue
+  }
+
+  /// The raw 64-bit value of this TaskID.
+  @export(implementation)
+  public var rawValue: UInt64 { _rawValue }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+extension Task {
+  /// A type alias for ``TaskID``, providing the spelling
+  /// `Task.ID` at the use site.
+  public typealias ID = TaskID
+}
+
 // ==== Task Priority ----------------------------------------------------------
 
 /// The priority of a task.
@@ -452,6 +488,25 @@ extension Task where Success == Never, Failure == Never {
       }
       return nil
     }
+  }
+
+  /// The stable ID of the currently-executing task.
+  ///
+  /// If you access this static property outside the execution context of a
+  /// task, it will return `nil`.
+  ///
+  /// This ID is quick to obtain and can be used to reliably identify a
+  /// task, instead of its memory address which may be reused once the task
+  /// has been destroyed. No guarantees are made about its exact numeric
+  /// value.
+  ///
+  /// - SeeAlso: ``Task/id``
+  /// - SeeAlso: ``UnsafeCurrentTask/id``
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
+  public static var currentID: Task.ID? {
+    let id = _getCurrentTaskId()
+    return id == 0 ? nil : TaskID(_rawValue: id)
   }
 
 }
@@ -657,6 +712,26 @@ extension Task {
     } else {
       nil
     }
+  }
+
+  /// A stable ID for this task.
+  ///
+  /// This ID is quick to obtain and can be used to reliably identify a
+  /// task, instead of its memory address which may be reused once the task
+  /// has been destroyed. No guarantees are made about its exact numeric
+  /// value.
+  ///
+  /// The same ID is visible in tools such as `swift-inspect` and
+  /// Instruments, which makes it a convenient correlation key for tracing
+  /// and logging.
+  ///
+  /// - SeeAlso: ``Task/currentID``
+  /// - SeeAlso: ``UnsafeCurrentTask/id``
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
+  public var id: ID {
+    unsafe .init(
+      _rawValue: _getJobTaskId(unsafeBitCast(_task, to: UnownedJob.self)))
   }
 }
 
@@ -1015,6 +1090,24 @@ public struct UnsafeCurrentTask {
     } else {
       nil
     }
+  }
+
+  /// A stable ID for the current task.
+  ///
+  /// This ID is quick to obtain and can be used to reliably identify a
+  /// task, instead of its memory address which may be reused once the task
+  /// has been destroyed. No guarantees are made about its exact numeric
+  /// value.
+  ///
+  /// Returns the same value as ``Task/id`` read on the owning task.
+  ///
+  /// - SeeAlso: ``Task/id``
+  /// - SeeAlso: ``Task/currentID``
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
+  public var id: Task.ID {
+    unsafe TaskID(
+      _rawValue: _getJobTaskId(unsafeBitCast(_task, to: UnownedJob.self)))
   }
 }
 
