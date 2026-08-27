@@ -537,32 +537,40 @@ void GetWindowsFileMappings(
                              WindowsSDK.LibraryVersion)) {
     assert(WindowsSDK.MajorVersion > 8);
     llvm::SmallString<261> WinSDKInjection{WindowsSDK.Path};
-    llvm::sys::path::append(WinSDKInjection, "Include");
-    llvm::sys::path::append(WinSDKInjection, WindowsSDK.IncludeVersion, "um");
-    llvm::sys::path::append(WinSDKInjection, "module.modulemap");
+    llvm::sys::path::append(WinSDKInjection, "Include",
+                            WindowsSDK.IncludeVersion);
+
+    llvm::SmallString<261> path{WinSDKInjection};
+
+    llvm::sys::path::append(path, "module.modulemap");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winsdk.modulemap",
+                                             VFS, SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
+
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "um", "module.modulemap");
 
     AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winsdk_um.modulemap",
                                              VFS, SearchPathOpts);
     if (!AuxiliaryFile.empty())
-      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
-                                               AuxiliaryFile);
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
 
-    llvm::sys::path::remove_filename(WinSDKInjection);
-    llvm::sys::path::append(WinSDKInjection, "WinSDK.apinotes");
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "WinSDK.apinotes");
     AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "WinSDK.apinotes",
                                              VFS, SearchPathOpts);
     if (!AuxiliaryFile.empty())
-      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
-                                               AuxiliaryFile);
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
 
-    llvm::sys::path::remove_filename(WinSDKInjection);
-    llvm::sys::path::remove_filename(WinSDKInjection);
-    llvm::sys::path::append(WinSDKInjection, "shared", "module.modulemap");
-    AuxiliaryFile = GetPlatformAuxiliaryFile(
-        "windows", "winsdk_shared.modulemap", VFS, SearchPathOpts);
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "shared", "module.modulemap");
+    AuxiliaryFile =
+        GetPlatformAuxiliaryFile("windows", "winsdk_shared.modulemap", VFS,
+                                 SearchPathOpts);
     if (!AuxiliaryFile.empty())
-      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
-                                               AuxiliaryFile);
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
+
   }
 
   struct {

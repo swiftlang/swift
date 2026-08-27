@@ -1344,6 +1344,15 @@ ClangImporter::getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget) 
       /*needSystemVFSOverlay=*/!clangFileMapping.redirectedFiles.empty() &&
           !ctx.CASOpts.HasImmutableFileSystem,
       ignoreClangTarget);
+  if (ctx.LangOpts.Target.isWindowsMSVCEnvironment()) {
+    auto iterator = llvm::find_if(clangFileMapping.redirectedFiles,
+                                  [](const auto &mapping) {
+        return llvm::sys::path::filename(mapping.second) == "winsdk.modulemap";
+    });
+    if (iterator != clangFileMapping.redirectedFiles.end())
+      invocationArgStrs
+          .push_back((Twine("-fmodule-map-file=") + iterator->first).str());
+  }
   return invocationArgStrs;
 }
 

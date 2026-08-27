@@ -574,6 +574,7 @@ if(WINDOWS IN_LIST SWIFT_SDKS)
       WinSDK.apinotes
       vcruntime.apinotes
       vcruntime.modulemap
+      winsdk.modulemap
       winsdk_um.modulemap
       winsdk_shared.modulemap
     DESTINATION "share"

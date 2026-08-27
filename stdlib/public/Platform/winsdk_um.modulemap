@@ -10,13 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 
-module WinSDK [system] {
+module WinSDK.UM [system] {
   module WinSock2 {
-    header "WinSock2.h"
-    header "WS2tcpip.h"
-    header "MSWSock.h"
-    header "../shared/afunix.h"
     export *
+
+    module Core {
+      header "WinSock2.h"
+      export *
+    }
+
+    module TCPIP {
+      header "WS2tcpip.h"
+      export *
+    }
+
+    module Extensions {
+      header "MSWSock.h"
+      export *
+    }
 
     link "WS2_32.Lib"
   }
@@ -42,10 +53,22 @@ module WinSDK [system] {
     }
 
     module console {
-      header "consoleapi.h"
-      header "consoleapi2.h"
-      header "consoleapi3.h"
       export *
+
+      module Base {
+        header "consoleapi.h"
+        export *
+      }
+
+      module V2 {
+        header "consoleapi2.h"
+        export *
+      }
+
+      module V3 {
+        header "consoleapi3.h"
+        export *
+      }
     }
 
     // api-ms-win-appmodel-runtime-l1
@@ -176,12 +199,32 @@ module WinSDK [system] {
 
   explicit module DirectX {
     module Direct3D11 {
-      header "d3d11.h"
-      header "d3d11_1.h"
-      header "d3d11_2.h"
-      header "d3d11_3.h"
-      header "d3d11_4.h"
       export *
+
+      module Base {
+        header "d3d11.h"
+        export *
+      }
+
+      module V1 {
+        header "d3d11_1.h"
+        export *
+      }
+
+      module V2 {
+        header "d3d11_2.h"
+        export *
+      }
+
+      module V3 {
+        header "d3d11_3.h"
+        export *
+      }
+
+      module V4 {
+        header "d3d11_4.h"
+        export *
+      }
 
       link "d3d11.lib"
       link "dxgi.lib"
@@ -196,11 +239,27 @@ module WinSDK [system] {
     }
 
     module Direct2D {
-      header "d2d1.h"
-      header "d2d1_1.h"
-      header "d2d1_2.h"
-      header "d2d1_3.h"
       export *
+
+      module Base {
+        header "d2d1.h"
+        export *
+      }
+
+      module V1 {
+        header "d2d1_1.h"
+        export *
+      }
+
+      module V2 {
+        header "d2d1_2.h"
+        export *
+      }
+
+      module V3 {
+        header "d2d1_3.h"
+        export *
+      }
 
       link "d2d1.lib"
       link "dxgi.lib"
@@ -210,7 +269,6 @@ module WinSDK [system] {
     // should split it out, but because it is part of the D3D11 interfaces, this
     // separate module is meant to augment the uncovered portions only.
     module _DXGI {
-      header "../shared/dxgi1_6.h"
       header "dxgidebug.h"
       export *
 
@@ -225,9 +283,17 @@ module WinSDK [system] {
     }
 
     module XAudio29 {
-      header "xaudio2.h"
-      header "xaudio2fx.h"
       export *
+
+      module Core {
+        header "xaudio2.h"
+        export *
+      }
+
+      module Effects {
+        header "xaudio2fx.h"
+        export *
+      }
 
       link "xaudio2.lib"
 
@@ -242,7 +308,7 @@ module WinSDK [system] {
 
       link "xinput.lib"
     }
-    
+
     module DirectInput8 {
       header "dinput.h"
       export *
@@ -260,15 +326,31 @@ module WinSDK [system] {
   }
 
   module DDE {
-    header "dde.h"
-    header "ddeml.h"
     export *
+
+    module Core {
+      header "dde.h"
+      export *
+    }
+
+    module Management {
+      header "ddeml.h"
+      export *
+    }
   }
 
   module DFS {
-    header "LMDFS.h"
-    header "LM.h"
     export *
+
+    module DFS {
+      header "LMDFS.h"
+      export *
+    }
+
+    module Management {
+      header "LM.h"
+      export *
+    }
 
     link "NetAPI32.Lib"
   }
@@ -303,9 +385,17 @@ module WinSDK [system] {
     }
 
     module IMM {
-      header "immdev.h"
-      header "imm.h"
       export *
+
+      module Device {
+        header "immdev.h"
+        export *
+      }
+
+      module Core {
+        header "imm.h"
+        export *
+      }
 
       link "Imm32.lib"
     }
@@ -331,12 +421,35 @@ module WinSDK [system] {
       link "Vfw32.Lib"
     }
 
-    header "mmeapi.h"
-    header "mmddk.h"
-    header "mmsystem.h"
-    header "mmiscapi.h"
-    header "timeapi.h"
-    header "joystickapi.h"
+    module MME {
+      header "mmeapi.h"
+      export *
+    }
+
+    module DDK {
+      header "mmddk.h"
+      export *
+    }
+
+    module System {
+      header "mmsystem.h"
+      export *
+    }
+
+    module Misc {
+      header "mmiscapi.h"
+      export *
+    }
+
+    module Time {
+      header "timeapi.h"
+      export *
+    }
+
+    module Joystick {
+      header "joystickapi.h"
+      export *
+    }
     export *
 
     link "WinMM.Lib"
@@ -355,8 +468,6 @@ module WinSDK [system] {
   }
 
   module Security {
-    header "../shared/sddl.h"
-
     module AuthZ {
       header "AuthZ.h"
       export *
@@ -392,9 +503,17 @@ module WinSDK [system] {
   }
 
   module ShellAPI {
-    header "shellapi.h"
-    header "Shlwapi.h"
     export *
+
+    module Shell {
+      header "shellapi.h"
+      export *
+    }
+
+    module Lightweight {
+      header "Shlwapi.h"
+      export *
+    }
 
     link "shell32.lib"
     link "ShLwApi.Lib"
@@ -434,9 +553,17 @@ module WinSDK [system] {
   }
 
   module OLE32 {
-    header "oaidl.h"
-    header "oleauto.h"
     export *
+
+    module AutomationInterface {
+      header "oaidl.h"
+      export *
+    }
+
+    module Automation {
+      header "oleauto.h"
+      export *
+    }
 
     link "OleAut32.Lib"
   }
@@ -456,7 +583,10 @@ module WinSDK [system] {
       link "Pdh.Lib"
     }
 
-    header "winperf.h"
+    module Core {
+      header "winperf.h"
+      export *
+    }
     export *
   }
 
@@ -480,9 +610,17 @@ module WinSDK [system] {
   }
 
   module Sensors {
-    header "sensors.h"
-    header "SensorsApi.h"
     export *
+
+    module Types {
+      header "sensors.h"
+      export *
+    }
+
+    module API {
+      header "SensorsApi.h"
+      export *
+    }
 
     link "sensorsapi.lib"
   }
@@ -571,14 +709,6 @@ module WinSDK [system] {
     link "AdvAPI32.Lib"
   }
 
-  module WinRPC {
-    header "../shared/rpc.h"
-    header "../shared/rpcndr.h"
-    export *
-
-    link "RpcRT4.Lib"
-  }
-
   module WinSVC {
     header "winsvc.h"
     export *
@@ -592,32 +722,33 @@ module WinSDK [system] {
 
     link "AdvAPI32.Lib"
   }
-  
+
   module WinUSB {
     header "winusb.h"
     export *
-    
+
     link "winusb.lib"
   }
 
   // TODO(compnerd) does it make sense to implicitly export this API surface?
   // It seems to be meant for device drivers.
   module WLANAPI {
-    header "wlanapi.h"
-    header "wlanihv.h"
-    header "wlclient.h"
+    module API {
+      header "wlanapi.h"
+      export *
+    }
+
+    module IHV {
+      header "wlanihv.h"
+      export *
+    }
+
+    module Client {
+      header "wlclient.h"
+      export *
+    }
 
     link "wlanapi.lib"
-  }
-
-  module WTypesBase {
-    header "../shared/wtypesbase.h"
-    export *
-  }
-
-  module WTypes {
-    header "../shared/wtypes.h"
-    export *
   }
 
   module RoApi {
@@ -625,19 +756,4 @@ module WinSDK [system] {
     export *
   }
 
-  module MinWinDef {
-    header "../shared/minwindef.h"
-    export *
-  }
-
-  module SDKDDKVer {
-    header "../shared/sdkddkver.h"
-    export *
-  }
-
-  module WinError {
-    header "../shared/winerror.h"
-    export *
-  }
 }
-
