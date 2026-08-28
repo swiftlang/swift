@@ -882,7 +882,6 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj InjectEnumAddrInst_element() const;
   BRIDGED_INLINE SwiftInt RefElementAddrInst_fieldIndex() const;
   BRIDGED_INLINE bool RefElementAddrInst_fieldIsLet() const;
-  BRIDGED_INLINE bool RefElementAddrInst_fieldIsStrongReference() const;
   BRIDGED_INLINE bool RefElementAddrInst_isImmutable() const;
   BRIDGED_INLINE void RefElementAddrInst_setImmutable(bool isImmutable) const;
   BRIDGED_INLINE bool RefTailAddrInst_isImmutable() const;

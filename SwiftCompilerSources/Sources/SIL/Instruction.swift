@@ -1348,10 +1348,6 @@ final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction
 
   public var fieldIsLet: Bool { bridged.RefElementAddrInst_fieldIsLet() }
 
-  /// True if the field holds a strong reference. False for `weak`, `unowned`, and `unowned(unsafe)` fields, none of
-  /// which keep their referent alive, so nothing may assume the referent outlives whatever holds this field.
-  public var fieldIsStrongReference: Bool { bridged.RefElementAddrInst_fieldIsStrongReference() }
-
   public var isImmutable: Bool { bridged.RefElementAddrInst_isImmutable() }
 
   public func set(isImmutable: Bool, _ context: some MutatingContext) {
