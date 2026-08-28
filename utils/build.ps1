@@ -592,7 +592,7 @@ function Get-Ninja {
 
 $ninja = Get-Ninja
 
-$NugetRoot = "$BinaryCache\nuget"
+$NugetRoot = "$ArtifactCache\nuget"
 
 ## Select and prepare build tools, platforms, parameters, etc.
 
@@ -1820,20 +1820,22 @@ function Get-Dependencies {
         Invoke-IsolatingEnvVars { Invoke-VsDevShell $HostPlatform }
       } catch {
         Write-Output "Windows SDK $WinSDKVersion not found. Downloading from nuget.org ..."
-        Invoke-Program nuget install Microsoft.Windows.SDK.CPP -Version $WinSDKVersion -OutputDirectory $NugetRoot
+        Invoke-WithArtifactLock "WindowsSDK-$WinSDKVersion" {
+          Invoke-Program nuget install Microsoft.Windows.SDK.CPP -Version $WinSDKVersion -OutputDirectory $NugetRoot
 
-        # Set to script scope so Invoke-VsDevShell can read it.
-        $script:CustomWinSDKRoot = "$NugetRoot\Microsoft.Windows.SDK.CPP.$WinSDKVersion\c"
+          # Set to script scope so Invoke-VsDevShell can read it.
+          $script:CustomWinSDKRoot = "$NugetRoot\Microsoft.Windows.SDK.CPP.$WinSDKVersion\c"
 
-        # Install each required architecture package and move files under the base /lib directory.
-        $Builds = $WindowsSDKBuilds.Clone()
-        if (-not ($HostPlatform -in $Builds)) {
-          $Builds += $HostPlatform
-        }
+          # Install each required architecture package and move files under the base /lib directory.
+          $Builds = $WindowsSDKBuilds.Clone()
+          if (-not ($HostPlatform -in $Builds)) {
+            $Builds += $HostPlatform
+          }
 
-        foreach ($Build in $Builds) {
-          Invoke-Program nuget install Microsoft.Windows.SDK.CPP.$($Build.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
-          Copy-Directory "$NugetRoot\Microsoft.Windows.SDK.CPP.$($Build.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
+          foreach ($Build in $Builds) {
+            Invoke-Program nuget install Microsoft.Windows.SDK.CPP.$($Build.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
+            Copy-Directory "$NugetRoot\Microsoft.Windows.SDK.CPP.$($Build.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
+          }
         }
       }
     }
