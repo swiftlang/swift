@@ -761,7 +761,7 @@ function Get-AndroidNDK {
 }
 
 function Get-AndroidNDKPath {
-  return Join-Path -Path $BinaryCache -ChildPath "android-ndk-$AndroidNDKVersion"
+  return Join-Path -Path $ArtifactCache -ChildPath "android-ndk-$AndroidNDKVersion"
 }
 
 function Get-FlexExecutable {
@@ -1583,7 +1583,9 @@ function Get-Dependencies {
       Expand-Archive -Path $Source -DestinationPath $Destination -Force
     }
 
-    function Expand-ArtifactZip([string] $ZipFileName, [string] $ExtractPath) {
+    function Expand-ArtifactZip([string] $ZipFileName,
+                                [string] $ExtractPath,
+                                [string] $ArchiveRoot = "") {
       $Source = Join-Path -Path $ArtifactCache -ChildPath $ZipFileName
       $Destination = Join-Path -Path $ArtifactCache -ChildPath $ExtractPath
       if (Test-Path $Destination) { return }
@@ -1591,8 +1593,13 @@ function Get-Dependencies {
       $TemporaryDestination = Join-Path -Path $ArtifactCache -ChildPath ".$ExtractPath.$PID.$([Guid]::NewGuid()).tmp"
       try {
         Expand-Archive -LiteralPath $Source -DestinationPath $TemporaryDestination
+        $PublishedSource = if ($ArchiveRoot) {
+          Join-Path -Path $TemporaryDestination -ChildPath $ArchiveRoot
+        } else {
+          $TemporaryDestination
+        }
         try {
-          [IO.Directory]::Move($TemporaryDestination, $Destination)
+          [IO.Directory]::Move($PublishedSource, $Destination)
         } catch {
           if (-not (Test-Path $Destination)) { throw }
         }
@@ -1768,8 +1775,8 @@ function Get-Dependencies {
 
     if ($Android) {
       $NDK = Get-AndroidNDK
-      DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
-      Expand-ZipFile "android-ndk-$AndroidNDKVersion-windows.zip" -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
+      DownloadAndVerify $NDK.URL "$ArtifactCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
+      Expand-ArtifactZip "android-ndk-$AndroidNDKVersion-windows.zip" "android-ndk-$AndroidNDKVersion" "android-ndk-$AndroidNDKVersion"
       Write-Success "Android NDK $AndroidNDKVersion"
     }
 
