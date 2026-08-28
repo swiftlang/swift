@@ -426,18 +426,15 @@ extension InlineArray where Element: ~Copyable {
   public consuming func consumeAll<E: Error, R: ~Copyable>(
     consumingWith consumer: (consuming InputSpan<Element>) throws(E) -> R
   ) throws(E) -> R {
-    // If the closure to `withTemporaryAllocation` were known by the compiler
-    // to run exactly once, we could consume `self` into it. As it is, we
-    // use a mutable `Optional` to transfer the array into the closure;
-    // the optimizer handles the pattern correctly.
-    // TODO: use `Optional.edit()` instead (SE-0561)
     var box: Optional = consume self
     defer {
-      _precondition(box == nil)
+      _internalInvariant(box == nil)
     }
-    return try withTemporaryAllocation(of: Self.self, capacity: 1) {
+    return try box.edit {
       span throws(E) -> R in
-      span.append(box.take()!)
+      defer {
+        _internalInvariant(span.count == 0)
+      }
       return try unsafe span.withUnsafeMutableBufferPointer {
         (buffer, count) throws(E) -> R in
         count = 0
