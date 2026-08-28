@@ -21,6 +21,19 @@
  * by POSIX. This is deliberate, because it allows simple pass-through
  * implementations for POSIX systems.
  *
+ * An execution context is the platform entity that owns context-local runtime
+ * state, including TLS and recursive-mutex ownership. On an OS or RTOS this is
+ * normally a software thread, whose state follows it when it moves between
+ * CPUs. On a bare-metal platform it can instead be a hardware thread (logical
+ * CPU, including a RISC-V hart). A physical core can contain multiple hardware
+ * threads. The platform must use a consistent ownership model for these APIs.
+ *
+ * An execution context is not a Swift task or executor. Tasks can move between
+ * contexts. A context's identity and lifetime must remain distinct from a
+ * debugger's numeric thread ID or a bounded storage-table index. A known single
+ * hardware context can be assigned index zero; missing identity information
+ * does not establish that there is only one context.
+ *
  *===----------------------------------------------------------------------===*/
 
 #ifndef EMBEDDED_SWIFT_PLATFORM_H

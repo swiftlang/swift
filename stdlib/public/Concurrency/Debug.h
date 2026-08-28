@@ -70,6 +70,10 @@ bool _swift_concurrency_debug_supportsPriorityEscalation;
 ///     tail allocated just after the AsyncTask itself.
 /// 3 - The top 8 bits of this value have been reserved to expose how runtimes
 ///     store the current task (swift_concurrency_current_task_storage_kind).
+/// 4 - Added context-indexed, platform-function, and slot-address-function
+///     storage.
+/// 5 - Platform lookups use typed execution-context indexes. Tables advertise
+///     their expected context kind; helpers receive the index and kind.
 SWIFT_EXPORT_FROM(swift_Concurrency)
 uint32_t _swift_concurrency_debug_internal_layout_version;
 
