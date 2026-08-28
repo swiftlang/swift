@@ -4568,6 +4568,19 @@ namespace {
           "'returns_twice' attribute) are unavailable in Swift");
       }
 
+      bool hasConsumedAttr =
+          llvm::any_of(decl->parameters(), [](const clang::ParmVarDecl *param) {
+            return param->hasAttr<clang::OSConsumedAttr>();
+          });
+
+      if (hasConsumedAttr)
+        Impl.markUnavailable(result,
+                             "LIBKERN_CONSUMED annotation is not supported");
+
+      if (decl->hasAttr<clang::OSConsumesThisAttr>())
+        Impl.markUnavailable(
+            result, "LIBKERN_CONSUMES_THIS annotation is not supported");
+
       recordObjCOverride(result);
       Impl.swiftify(result);
     }
@@ -4794,6 +4807,13 @@ namespace {
                            Impl.SwiftContext.getIdentifier(staticCallName),
                            funcDecl->getName().getArgumentNames()));
               Impl.virtualThunkToOriginal[result] = funcDecl;
+
+              // Propagate availability attributes from the original Swift
+              // funcDecl.
+              if (auto unavailable = funcDecl->getUnavailableAttr())
+                result->addAttribute(unavailable->getParsedAttr()->clone(
+                    Impl.SwiftContext, /*implicit=*/true));
+
               // swiftify is called on import, but the virtualThunkToOriginal
               // mapping is not yet ready at that time, so call it again.
               Impl.swiftify(result);
