@@ -9,4 +9,8 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
       SwiftSyntaxMacros
     PACKAGE_NAME Toolchain
   )
+
+  set_target_properties(swift-function-caller-generator PROPERTIES
+    Swift_MODULE_NAME SwiftFunctionCallerGenerator
+  )
 endif()

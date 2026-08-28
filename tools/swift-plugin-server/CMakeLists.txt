@@ -8,6 +8,9 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
       SwiftLibraryPluginProvider
     PACKAGE_NAME Toolchain
   )
+  set_target_properties(swift-plugin-server PROPERTIES
+    Swift_MODULE_NAME SwiftPluginServer
+  )
 
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
