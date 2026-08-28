@@ -229,6 +229,39 @@ extension LifetimeDependence {
   }
 }
 
+/// If `reference` is a copy or borrow of a value loaded out of memory,
+/// the address it was loaded from.
+///
+/// A loaded reference is a temporary whose  lifetime is typically narrower
+/// than that of the storage it came from: walking a chain like `a.b.c`
+/// destroys each intermediate reference as soon as the next one has been
+/// loaded. A dependence must therefore be rooted in the storage rather than
+/// in the temporary.
+private func loadedAddress(of reference: Value) -> Value? {
+  // `referenceRoot` skips ownership forwarding and transitions, so this sees through the copy_value/begin_borrow that a
+  // load of a class reference is typically wrapped in.
+  var value = reference.referenceRoot
+  while true {
+    switch value.definingInstruction {
+    case let load as LoadInstruction:
+      return load.address
+    // `referenceRoot` stops at the instructions that strengthen a weak or
+    // unowned reference, so look through those as well: the strengthened
+    // reference still originates in the weak or unowned storage, and reaching
+    // that storage is what lets the caller recognize the field as a
+    // non-strong one.
+    case let strengthen as StrongCopyUnownedValueInst:
+      value = strengthen.operand.value.referenceRoot
+    case let strengthen as StrongCopyUnmanagedValueInst:
+      value = strengthen.operand.value.referenceRoot
+    case let strengthen as StrongCopyWeakValueInst:
+      value = strengthen.operand.value.referenceRoot
+    default:
+      return nil
+    }
+  }
+}
+
 // Scope initialization.
 extension LifetimeDependence.Scope {
   /// Construct a lifetime dependence scope from the base value that other values depend on. This derives the kind of
@@ -275,7 +308,29 @@ extension LifetimeDependence.Scope {
     case let .box(projectBox):
       // Note: the box may be in a borrow scope.
       self.init(base: projectBox.operand.value, context)
-    case .class, .tail, .pointer, .index:
+    case let .class(refElementAddr):
+      // A class instance holds its stored properties at a stable address for
+      // as long as the instance is alive, so a borrow of one of them is valid
+      // for as long as the reference is. Attribute the dependence to that
+      // reference,which has a scope, rather than to the property's storage,
+      // which does not. This requires the field to be:
+      //
+      // - a `let`, so the storage can never be reassigned out from under the
+      //   borrow, and
+      // - a strong reference, so the parent actually keeps the referent alive.
+      guard refElementAddr.fieldIsLet, refElementAddr.fieldIsStrongReference else {
+        self = .unknown(accessBase.address!)
+        return
+      }
+      if let parentStorage = loadedAddress(of: refElementAddr.instance) {
+        // The reference was itself loaded out of memory, so recur to root the dependence in that storage. Each
+        // intermediate reference in a chain like `a.b.c` is destroyed as soon as the next one has been loaded, which
+        // would give a scope too narrow to contain the dependent value.
+        self.init(base: parentStorage, context)
+      } else {
+        self.init(base: refElementAddr.instance, context)
+      }
+    case .tail, .pointer, .index:
       self = .unknown(accessBase.address!)
     case .unidentified:
       self = .unknown(address)
