@@ -752,6 +752,11 @@ struct WhereClauseOwner {
   visitRequirements(TypeResolutionStage stage,
                     llvm::function_ref<bool(Requirement, RequirementRepr *)>
                         callback) const &&;
+
+  /// Visit each of the requirements and call \p callback for all of
+  /// their types.
+  void forAllRequirementTypes(
+      llvm::function_ref<void(Type, TypeRepr *)> callback) const &&;
 };
 
 void simple_display(llvm::raw_ostream &out, const WhereClauseOwner &owner);
