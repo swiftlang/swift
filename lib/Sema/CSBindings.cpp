@@ -78,6 +78,13 @@ static Type applyElementTypeToBinding(Type containerTy, Type elementTy) {
   if (!boundTy)
     return containerTy;
 
+  // We should never form a type like Array<@noescape () -> ()>, because
+  // the non-escaping-ness is not a recursive property, and such types
+  // can silently leak into SILGen because there's no good way to detect
+  // them. Catch one spot where we might do this on accident, but it is
+  // not perfect.
+  ASSERT(elementTy->mayEscape());
+
   auto &ctx = boundTy->getASTContext();
   auto *decl = boundTy->getDecl();
   if (decl == ctx.getArrayDecl())
