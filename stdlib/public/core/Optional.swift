@@ -447,6 +447,32 @@ extension Optional where Wrapped: ~Copyable & Escapable {
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }
+
+  @export(implementation)
+  mutating public func edit<E: Error, R: ~Copyable>(
+    _ body: (inout OutputSpan<Wrapped>) throws(E) -> R
+  ) throws(E) -> R {
+    let count = (self == nil) ? 0 : 1
+    let address = Builtin.unprotectedAddressOfBorrow(self)
+    let storage = unsafe UnsafeMutableBufferPointer<Wrapped>(
+      start: .init(address), count: 1
+    )
+    var span = unsafe OutputSpan(buffer: storage, initializedCount: count)
+    defer {
+      let initializedCount = unsafe span.finalize(for: storage)
+      span = OutputSpan()
+
+      let sp = unsafe UnsafeMutablePointer<Self>(address)
+      if initializedCount == 0 {
+        // storage was deinitialized, reinitialize it with `nil`.
+        unsafe sp.initialize(to: nil)
+      } else {
+        let newValue = unsafe storage.moveElement(from: 0)
+        unsafe sp.initialize(to: consume newValue)
+      }
+    }
+    return try body(&span)
+  }
 }
 
 extension Optional where Wrapped: ~Copyable & ~Escapable {
