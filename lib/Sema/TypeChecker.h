@@ -900,7 +900,12 @@ ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 /// Simplify generic argument expressions which are type sugar productions that
 /// got parsed as expressions due to the parser not knowing which identifiers
 /// are type names.
-TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E);
+///
+/// \param preferTypeLookup Resolve an identifier that names a type as a type,
+/// without performing unqualified value lookup. Use this where value lookup is
+/// not available, such as while computing a protocol's structural requirements.
+TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E,
+                                          bool preferTypeLookup = false);
 
 /// \name Name lookup
 ///
