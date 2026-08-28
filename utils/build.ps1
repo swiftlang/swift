@@ -60,6 +60,10 @@ tracking.
 The number of attempts to make when downloading a dependency before giving up.
 Default: 3
 
+.PARAMETER ArtifactLockTimeoutSeconds
+The maximum time to wait for another process to release an artifact lock.
+Default: 1800
+
 .PARAMETER ProductVersion
 The product version to be used when building the installer. Supports semantic
 version strings (e.g., "1.0.0"). Default: "0.0.0"
@@ -171,6 +175,10 @@ param
   # Dependency Download Retries
   [ValidateRange(1, [int]::MaxValue)]
   [int] $DownloadRetryCount = 3,
+
+  # Artifact Lock Timeout
+  [ValidateRange(1, [int]::MaxValue)]
+  [int] $ArtifactLockTimeoutSeconds = 1800,
 
   # Dependencies
   [ValidatePattern('^\d+(\.\d+)*$')]
@@ -779,11 +787,11 @@ function Get-BisonExecutable {
 }
 
 function Get-PythonPath([Hashtable] $Platform) {
-  return [IO.Path]::Combine("$BinaryCache\", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
+  return [IO.Path]::Combine("$ArtifactCache\", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
 }
 
 function Get-EmbeddedPythonPath([Hashtable] $Platform) {
-  return [IO.Path]::Combine("$BinaryCache\", "EmbeddedPython$($Platform.Architecture.CMakeName)-$PythonVersion")
+  return [IO.Path]::Combine("$ArtifactCache\", "EmbeddedPython$($Platform.Architecture.CMakeName)-$PythonVersion")
 }
 
 function Get-PythonExecutable {
@@ -1569,26 +1577,6 @@ function Get-Dependencies {
       }
     }
 
-    function Expand-ZipFile {
-      param
-      (
-          [string]$ZipFileName,
-          [string]$ExtractPath,
-          [bool]$CreateExtractPath = $true
-      )
-
-      $Source = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
-      $Destination = Join-Path -Path $BinaryCache -ChildPath $ExtractPath
-
-      if (Test-Path $Destination) { return }
-
-      $Destination = if ($CreateExtractPath) { $Destination } else { $BinaryCache }
-
-      # Write-Output "Extracting '$ZipFileName' ..."
-      New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
-      Expand-Archive -Path $Source -DestinationPath $Destination -Force
-    }
-
     function Expand-ArtifactZip([string] $ZipFileName,
                                 [string] $ExtractPath,
                                 [string] $ArchiveRoot = "") {
@@ -1611,6 +1599,35 @@ function Get-Dependencies {
         }
       } finally {
         Remove-Item -LiteralPath $TemporaryDestination -Recurse -Force -ErrorAction Ignore
+      }
+    }
+
+    function Invoke-WithArtifactLock([string] $Name, [ScriptBlock] $ScriptBlock) {
+      $LockRoot = Join-Path -Path $ArtifactCache -ChildPath ".locks"
+      New-Item -ItemType Directory -Path $LockRoot -ErrorAction Ignore | Out-Null
+      $LockPath = Join-Path -Path $LockRoot -ChildPath "$Name.lock"
+
+      $Lock = $null
+      $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+      while (-not $Lock) {
+        try {
+          $Lock = [IO.File]::Open($LockPath, [IO.FileMode]::OpenOrCreate,
+                                  [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        } catch [IO.IOException] {
+          $ErrorCode = $_.Exception.HResult -band 0xffff
+          if ($ErrorCode -notin 32, 33) { throw }
+          if ($Stopwatch.Elapsed.TotalSeconds -ge $ArtifactLockTimeoutSeconds) {
+            throw "Timed out after $ArtifactLockTimeoutSeconds seconds waiting for artifact lock '$LockPath'"
+          }
+          Start-Sleep -Milliseconds 100
+        }
+      }
+      $Stopwatch.Stop()
+
+      try {
+        & $ScriptBlock
+      } finally {
+        $Lock.Dispose()
       }
     }
 
@@ -1679,8 +1696,8 @@ function Get-Dependencies {
     function Install-Python([string] $ArchName, [bool] $EmbeddedPython = $false) {
       $Python = Get-KnownPython $ArchName $EmbeddedPython
       $FileName = $(if ($EmbeddedPython) { "EmbeddedPython$ArchName-$PythonVersion" } else { "Python$ArchName-$PythonVersion" })
-      DownloadAndVerify $Python.URL "$BinaryCache\$FileName.zip" $Python.SHA256
-      Expand-ZipFile "$FileName.zip" -ExtractPath "$FileName"
+      DownloadAndVerify $Python.URL "$ArtifactCache\$FileName.zip" $Python.SHA256
+      Expand-ArtifactZip "$FileName.zip" $FileName
       Write-Success "$ArchName Python $PythonVersion"
     }
 
@@ -1739,7 +1756,9 @@ function Get-Dependencies {
       Install-Python $BuildArchName
       Install-Python $BuildArchName $true
     }
-    Install-PythonModules
+    Invoke-WithArtifactLock (Split-Path -Leaf (Get-PythonPath $BuildPlatform)) {
+      Install-PythonModules
+    }
 
     # WiX is needed both for packaging and for extracting the pinned toolchain
     # installer that bootstraps toolchain builds.
