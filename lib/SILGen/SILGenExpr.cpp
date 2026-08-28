@@ -3145,6 +3145,12 @@ static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
 /// retain/release, and it's what lets `type(of:)` apply to a noncopyable value,
 /// where the copy would otherwise be diagnosed as a consume.
 ///
+/// Only an address-only operand may be left in memory. `existential_metatype`
+/// accepts an address only for an address-only (opaque) existential; for a
+/// class, boxed, or metatype existential it reads the container as a value, and
+/// IRGen has no way to interpret an address there. So a loadable operand is
+/// loaded -- with `load_borrow`, which still doesn't consume it.
+///
 /// The caller must have established a `FormalEvaluationScope` covering the use
 /// of the returned value.
 static ManagedValue emitMetatypeOperand(SILGenFunction &SGF, Expr *baseExpr) {
@@ -3153,7 +3159,13 @@ static ManagedValue emitMetatypeOperand(SILGenFunction &SGF, Expr *baseExpr) {
                           ? SGFAccessKind::BorrowedAddressRead
                           : SGFAccessKind::BorrowedObjectRead;
     LValue lv = SGF.emitLValue(load->getSubExpr(), accessKind);
-    return SGF.emitBorrowedLValue(load, std::move(lv));
+    auto base = SGF.emitBorrowedLValue(load, std::move(lv));
+
+    // A borrowed read of physical storage comes back as the address of that
+    // storage, whether or not the type is loadable, so the load happens here.
+    if (base.getType().isAddress() && base.getType().isLoadable(SGF.F))
+      base = SGF.B.createFormalAccessLoadBorrow(load, base);
+    return base;
   }
 
   // Otherwise the operand produces a temporary of its own, which we can just
