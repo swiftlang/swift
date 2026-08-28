@@ -566,6 +566,31 @@ bool WhereClauseOwner::visitRequirements(
   return false;
 }
 
+void WhereClauseOwner::forAllRequirementTypes(
+    llvm::function_ref<void(Type, TypeRepr *)> callback) const && {
+  std::move(*this).visitRequirements(
+      TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr *reqRepr) {
+        switch (req.getKind()) {
+        case RequirementKind::SameShape:
+        case RequirementKind::Conformance:
+        case RequirementKind::SameType:
+        case RequirementKind::Superclass:
+          callback(req.getFirstType(),
+                   RequirementRepr::getFirstTypeRepr(reqRepr));
+          callback(req.getSecondType(),
+                   RequirementRepr::getSecondTypeRepr(reqRepr));
+          break;
+
+        case RequirementKind::Layout:
+          callback(req.getFirstType(),
+                   RequirementRepr::getFirstTypeRepr(reqRepr));
+          break;
+        }
+        return false;
+      });
+}
+
 RequirementRepr &RequirementRequest::getRequirement() const {
   auto owner = std::get<0>(getStorage());
   auto index = std::get<1>(getStorage());
