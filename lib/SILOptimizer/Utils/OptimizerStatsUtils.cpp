@@ -62,6 +62,8 @@
 ///       Symbol is e.g. the name of a function.
 ///       StageName and TransformName are the names of the current optimizer
 ///       pipeline stage and current transform.
+///       TransformPassNumber is the number of the pass run, followed by the
+///       number of the subpass when the counter is attributed to one.
 ///       Duration is the duration of the transformation.
 //===----------------------------------------------------------------------===//
 
@@ -458,6 +460,11 @@ class TransformationContext {
   int Duration;
   /// The pass number in the optimizer pipeline.
   int PassNumber;
+  /// The subpass of the transformation the statistics are attributed to, or
+  /// nothing if they are attributed to the transformation itself.
+  StringRef SubpassLabel;
+  /// The number of subpasses the transformation ran before that subpass.
+  unsigned SubpassNumber = 0;
 
 public:
   TransformationContext(SILModule &M, SILPassManager &PM,
@@ -475,6 +482,23 @@ public:
 
   StringRef getTransformId() const {
     return Transform->getID();
+  }
+
+  /// Attributes the statistics reported with this context to the subpass
+  /// identified by \p Label and \p Number.
+  void setSubpass(StringRef Label, unsigned Number) {
+    SubpassLabel = Label;
+    SubpassNumber = Number;
+  }
+
+  /// Printed right after the name of the transformation, so that a subpass has
+  /// its own statistics.
+  StringRef getSubpassLabel() const {
+    return SubpassLabel;
+  }
+
+  unsigned getSubpassNumber() const {
+    return SubpassNumber;
   }
 
   StringRef getStageName() const {
@@ -514,12 +538,47 @@ public:
   }
 };
 
+/// A counter which increases every time an instruction is created or removed
+/// from its basic block, anywhere in \p M.
+///
+/// This is used for subpasses, when deleted instructions haven't been flushed
+/// yet, so instructions scheduled for deletion are counted too.
+size_t getInstructionChangeCount(SILModule &M) {
+  return (size_t)SILInstruction::getNumCreatedInstructions() +
+         (size_t)SILInstruction::getNumDeletedInstructions() +
+         M.getNumInstructionsScheduledForDeletion();
+}
+
 /// A helper class to represent the module stats as an analysis,
 /// so that it is preserved across multiple passes.
 class OptimizerStatsAnalysis : public SILAnalysis {
   SILModule &M;
   /// The actual cache holding all the statistics.
   std::unique_ptr<AccumulatedOptimizerStats> Cache;
+
+  /// The subpass which is currently running, if any. The debug variables which
+  /// disappear while it runs are attributed to it instead of to its whole pass.
+  struct {
+    /// The function the running subpass is transforming, or null if no subpass
+    /// is running.
+    SILFunction *F = nullptr;
+    /// Identifies the running subpass within its transformation. It is printed
+    /// as a suffix of the transformation name, and has a space prefixed.
+    std::string Label;
+    /// The number of subpasses the transformation ran before this one.
+    unsigned Number = 0;
+    /// The instruction change count (from `getInstructionChangeCount`), for
+    /// the last time the FunctionStats for `F` were changed.
+    size_t ChangeCount = 0;
+  } CurrentSubpass;
+
+  /// Reports the debug variables which disappeared from \p F since its debug
+  /// variables were last refreshed, attributing them to the running subpass.
+  ///
+  /// Debug variables are the only counter tracked per subpass: the other ones
+  /// are aggregated in the module stats, which are only consistent at the
+  /// boundaries of a pass run.
+  void reportSubpassStats(SILFunction *F, TransformationContext &Ctx);
 
   /// Sets of functions changed, deleted or added since the last
   /// computation of statistics. These sets are used to avoid complete
@@ -585,6 +644,17 @@ public:
     return Cache->getModuleStat();
   }
 
+  /// Ends the running subpass, if any, and starts a new one, which transforms
+  /// \p F and is identified by \p Label and \p SubpassNumber.
+  void startSubpass(SILFunction *F, StringRef Label, unsigned SubpassNumber,
+                    TransformationContext &Ctx);
+
+  /// Ends the running subpass, if any.
+  ///
+  /// Must be called before the end of a pass run: afterwards the function the
+  /// subpass was running on may be deleted.
+  void endSubpass(TransformationContext &Ctx);
+
   /// Update module stats after running the Transform.
   void updateModuleStats(TransformationContext &Ctx);
 };
@@ -634,6 +704,13 @@ llvm::raw_ostream &stats_os() {
   return *stats_output_stream.get();
 }
 
+/// Prints the pass number with the subpass number, if applicable.
+void printPassNumber(TransformationContext &Ctx) {
+  stats_os() << Ctx.getPassNumber();
+  if (!Ctx.getSubpassLabel().empty())
+    stats_os() << "." << Ctx.getSubpassNumber();
+}
+
 /// A helper function to dump the counter value.
 void printCounterValue(StringRef Kind, StringRef CounterName, int CounterValue,
                        StringRef Symbol, TransformationContext &Ctx) {
@@ -647,9 +724,10 @@ void printCounterValue(StringRef Kind, StringRef CounterName, int CounterValue,
   stats_os() << ", ";
 
   stats_os() << Ctx.getTransformId();
+  stats_os() << Ctx.getSubpassLabel();
   stats_os() << ", ";
 
-  stats_os() << Ctx.getPassNumber();
+  printPassNumber(Ctx);
   stats_os() << ", ";
 
   stats_os() << CounterValue;
@@ -676,9 +754,10 @@ void printCounterChange(StringRef Kind, StringRef CounterName, double Delta,
   stats_os() << ", ";
 
   stats_os() << Ctx.getTransformId();
+  stats_os() << Ctx.getSubpassLabel();
   stats_os() << ", ";
 
-  stats_os() << Ctx.getPassNumber();
+  printPassNumber(Ctx);
   stats_os() << ", ";
 
   llvm::format_provider<double>::format(Delta, stats_os(), "f8");
@@ -797,6 +876,7 @@ int computeLostVariables(SILFunction *F, FunctionStat &Old, FunctionStat &New,
                 F->getASTContext().SourceMgr.getPresumedLineAndColumnForLoc(
                     std::get<2>(Var), 0);
           llvm::dbgs() << Ctx.getStageName() << ": " << Ctx.getTransformId()
+                       << Ctx.getSubpassLabel()
                        << ": Lost Variable: " << std::get<1>(Var) << " line "
                        << line << " col " << col << " in function "
                        << F->getName() << " in scope ";
@@ -1096,6 +1176,56 @@ FunctionStat::FunctionStat(SILFunction *F) {
   InstCount = V.getInstCount();
 }
 
+void OptimizerStatsAnalysis::reportSubpassStats(SILFunction *F,
+                                                TransformationContext &Ctx) {
+  FunctionStat &Stat = getFunctionStat(F);
+  // Transparent functions cannot be debugged, so dropping their variables is
+  // acceptable.
+  if (F->isTransparent())
+    return;
+  // Skip all computations if nothing changed during the subpass. Analyses are
+  // only invalidated once a pass ends, so invalidation cannot be used to
+  // detect this.
+  size_t ChangeCount = getInstructionChangeCount(F->getModule());
+  if (CurrentSubpass.ChangeCount == ChangeCount)
+    return;
+
+  FunctionStat NewStat(F);
+  // Report the statistics against the current subpass, not the new one.
+  TransformationContext SubpassCtx = Ctx;
+  SubpassCtx.setSubpass(CurrentSubpass.Label, CurrentSubpass.Number);
+  if (int LostVariables = computeLostVariables(F, Stat, NewStat, SubpassCtx))
+    printCounterValue("function", "lostvars", LostVariables, F->getName(),
+                      SubpassCtx);
+
+  // Only update lost variables statistics.
+  Stat.VarNames = std::move(NewStat.VarNames);
+  Stat.DebugVariables = std::move(NewStat.DebugVariables);
+  CurrentSubpass.ChangeCount = ChangeCount;
+}
+
+void OptimizerStatsAnalysis::startSubpass(SILFunction *F, StringRef Label,
+                                          unsigned SubpassNumber,
+                                          TransformationContext &Ctx) {
+  // If the new subpass is on a different function, end the old subpass.
+  if (CurrentSubpass.F != F)
+    endSubpass(Ctx);
+  // Then, report on the new function, attributing any change to the previous
+  // subpass, or to the pass itself when there was none or if it was ended.
+  reportSubpassStats(F, Ctx);
+  // Keeping the change count allows us to not recompute statistics if nothing
+  // changes between subpasses.
+  CurrentSubpass = {F, " " + Label.str(), SubpassNumber,
+                    CurrentSubpass.ChangeCount};
+}
+
+void OptimizerStatsAnalysis::endSubpass(TransformationContext &Ctx) {
+  if (!CurrentSubpass.F)
+    return;
+  reportSubpassStats(CurrentSubpass.F, Ctx);
+  CurrentSubpass = {};
+}
+
 } // end anonymous namespace
 
 /// Updates SILModule stats after finishing executing the
@@ -1113,7 +1243,22 @@ void swift::updateSILModuleStatsAfterTransform(SILModule &M,
     return;
   TransformationContext Ctx(M, PM, Transform, PassNumber, Duration);
   OptimizerStatsAnalysis *Stats = PM.getAnalysis<OptimizerStatsAnalysis>();
+  Stats->endSubpass(Ctx);
   Stats->updateModuleStats(Ctx);
+}
+
+void swift::updateSILModuleStatsBeforeSubpass(SILFunction *F, StringRef Label,
+                                              SILTransform *Transform,
+                                              SILPassManager &PM,
+                                              int PassNumber,
+                                              unsigned SubpassNumber) {
+  // Lost variables are the only statistics supported for subpasses.
+  if (!SILStatsLostVariables || !F || Label.empty())
+    return;
+  TransformationContext Ctx(F->getModule(), PM, Transform, PassNumber,
+                            /*Duration=*/0);
+  OptimizerStatsAnalysis *Stats = PM.getAnalysis<OptimizerStatsAnalysis>();
+  Stats->startSubpass(F, Label, SubpassNumber, Ctx);
 }
 
 // This is just a hook for possible extensions in the future.
