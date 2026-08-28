@@ -510,6 +510,12 @@ $KnownNDKs = @{
   }
 }
 
+$WinFlexBison = @{
+  Version = "2.5.25"
+  URL = "https://github.com/lexxmark/winflexbison/releases/download/v2.5.25/win_flex_bison-2.5.25.zip"
+  SHA256 = "8D324B62BE33604B2C45AD1DD34AB93D722534448F55A16CA7292DE32B6AC135"
+}
+
 $KnownSyft = @{
   "1.29.1" = @{
     AMD64 = @{
@@ -765,11 +771,11 @@ function Get-AndroidNDKPath {
 }
 
 function Get-FlexExecutable {
-  return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_flex.exe"
+  return Join-Path -Path $ArtifactCache -ChildPath "win_flex_bison-$($WinFlexBison.Version)\win_flex.exe"
 }
 
 function Get-BisonExecutable {
-  return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_bison.exe"
+  return Join-Path -Path $ArtifactCache -ChildPath "win_flex_bison-$($WinFlexBison.Version)\win_bison.exe"
 }
 
 function Get-PythonPath([Hashtable] $Platform) {
@@ -1781,13 +1787,10 @@ function Get-Dependencies {
     }
 
     if ($IncludeDS2) {
-      $WinFlexBisonVersion = "2.5.25"
-      $WinFlexBisonURL = "https://github.com/lexxmark/winflexbison/releases/download/v$WinFlexBisonVersion/win_flex_bison-$WinFlexBisonVersion.zip"
-      $WinFlexBisonHash = "8D324B62BE33604B2C45AD1DD34AB93D722534448F55A16CA7292DE32B6AC135"
-      DownloadAndVerify $WinFlexBisonURL "$BinaryCache\win_flex_bison-$WinFlexBisonVersion.zip" $WinFlexBisonHash
-
-      Expand-ZipFile "win_flex_bison-$WinFlexBisonVersion.zip" -BinaryCache $BinaryCache -ExtractPath "win_flex_bison"
-      Write-Success "flex/bison $WinFlexBisonVersion"
+      $Artifact = "win_flex_bison-$($WinFlexBison.Version)"
+      DownloadAndVerify $WinFlexBison.URL "$ArtifactCache\$Artifact.zip" $WinFlexBison.SHA256
+      Expand-ArtifactZip "$Artifact.zip" $Artifact
+      Write-Success "flex/bison $($WinFlexBison.Version)"
     }
 
     if ($WinSDKVersion) {
