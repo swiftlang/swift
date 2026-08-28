@@ -5270,6 +5270,17 @@ function Repair-Toolchain([string] $ToolchainInstallRoot) {
 function Build-Inspect([Hashtable] $Platform,
                        [Hashtable] $Compilers,
                        [string]    $SwiftSDK) {
+  $Defines = @{
+    CMAKE_Swift_FLAGS = @(
+      "-Xcc", "-I$SwiftSDK\usr\include",
+      "-Xcc", "-I$SwiftSDK\usr\lib\swift",
+      "-Xcc", "-I$SwiftSDK\usr\include\swift\SwiftRemoteMirror",
+      "-L$SwiftSDK\usr\lib\swift\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)"
+    );
+    ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
+  }
+  $Defines.SwiftOverlay_DIR = "$(Get-ProjectBinaryCache $Platform DynamicOverlay)\cmake\SwiftOverlay"
+
   Build-CMakeProject `
     -Src $SourceCache\swift\tools\swift-inspect `
     -Bin (Get-ProjectBinaryCache $Platform SwiftInspect)`
@@ -5279,15 +5290,7 @@ function Build-Inspect([Hashtable] $Platform,
     -CXXCompiler $Compilers.CXX `
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
-    -Defines @{
-      CMAKE_Swift_FLAGS = @(
-        "-Xcc", "-I$SwiftSDK\usr\include",
-        "-Xcc", "-I$SwiftSDK\usr\lib\swift",
-        "-Xcc", "-I$SwiftSDK\usr\include\swift\SwiftRemoteMirror",
-        "-L$SwiftSDK\usr\lib\swift\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)"
-      );
-      ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
-    }
+    -Defines $Defines
 }
 
 function Build-DocC() {
