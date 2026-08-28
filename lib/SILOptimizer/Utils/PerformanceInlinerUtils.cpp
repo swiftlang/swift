@@ -34,10 +34,10 @@ llvm::cl::list<std::string>
 //===----------------------------------------------------------------------===//
 
 void ConstantTracker::trackInst(SILInstruction *inst) {
-  if (auto *LI = dyn_cast<LoadInst>(inst)) {
-    SILValue baseAddr = scanProjections(LI->getOperand());
+  if (isa<LoadInst>(inst) || isa<LoadBorrowInst>(inst)) {
+    SILValue baseAddr = scanProjections(inst->getOperand(0));
     if (SILInstruction *loadLink = getMemoryContent(baseAddr))
-      links[LI] = loadLink;
+      links[inst] = loadLink;
   } else if (auto *SI = dyn_cast<StoreInst>(inst)) {
     SILValue baseAddr = scanProjections(SI->getOperand(1));
     memoryContent[baseAddr] = SI;
@@ -81,7 +81,8 @@ SILValue ConstantTracker::getStoredValue(SILInstruction *loadInst,
     store = callerTracker->links[loadInst];
   if (!store) return SILValue();
 
-  assert(isa<LoadInst>(loadInst) || isa<CopyAddrInst>(loadInst));
+  assert(isa<LoadInst>(loadInst) || isa<LoadBorrowInst>(loadInst) ||
+         isa<CopyAddrInst>(loadInst));
 
   // Push the address projections of the load onto the stack.
   SmallVector<Projection, 4> loadProjections;
@@ -139,6 +140,15 @@ SILValue swift::stripFunctionConversions(SILValue val) {
     } else if (auto md = dyn_cast<MarkDependenceInst>(val)) {
       val = md->getValue();
       result = val;
+    } else if (isa<CopyValueInst>(val) || isa<BeginBorrowInst>(val) ||
+               isa<MoveValueInst>(val) || isa<BorrowedFromInst>(val) ||
+               isa<UncheckedOwnershipInst>(val)) {
+      // In OSSA, function values can be wrapped in ownership instructions,
+      // e.g. a `convert_function` which produces an owned value is borrowed
+      // before it is passed to an apply. Look through them so that the
+      // underlying `function_ref`/`partial_apply` can be found.
+      val = cast<SingleValueInstruction>(val)->getOperand(0);
+      result = val;
     } else {
       break;
     }
@@ -167,11 +177,35 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
         // A value loaded from memory.
         val = loadedVal;
         continue;
+      } else if (auto *lbi = dyn_cast<LoadBorrowInst>(inst)) {
+        // A `load_borrow` which RLE could not eliminate records the loaded
+        // value in its value hint. It lets us continue the def-use walk
+        // without having to reason about the memory location.
+        if (!lbi->hasValueHint())
+          return inst;
+        val = lbi->getValueHint();
+        continue;
       } else if (auto base = stripFunctionConversions(inst)) {
         val = base;
         continue;
       }
       return inst;
+    } else if (auto *result = dyn_cast<MultipleValueInstructionResult>(val)) {
+      // In OSSA an owned aggregate is taken apart with a `destructure_struct`
+      // or `destructure_tuple` instead of a `struct_extract`/`tuple_extract`.
+      // Treat such a result like the corresponding object projection.
+      SILInstruction *parent = result->getParent();
+      if (isa<DestructureStructInst>(parent)) {
+        projStack.push_back(
+            Projection(ProjectionKind::Struct, result->getIndex()));
+      } else if (isa<DestructureTupleInst>(parent)) {
+        projStack.push_back(
+            Projection(ProjectionKind::Tuple, result->getIndex()));
+      } else {
+        return nullptr;
+      }
+      val = parent->getOperand(0);
+      continue;
     } else if (SILValue param = getParam(val)) {
       // Continue in the caller.
       val = param;

@@ -863,10 +863,10 @@ bool SILPerformanceInliner::isProfitableToInline(
                      FAI.getInstruction()->dumpInContext());
           BlockW.updateBenefit(Benefit, GenericSpecializationBenefit);
         }
-      } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
+      } else if (isa<LoadInst>(&I) || isa<LoadBorrowInst>(&I)) {
         // Check if it's a load from a stack location in the caller. Such a load
         // might be optimized away if inlined.
-        if (constTracker.isStackAddrInCaller(LI->getOperand()))
+        if (constTracker.isStackAddrInCaller(I.getOperand(0)))
           BlockW.updateBenefit(Benefit, RemovedLoadBenefit);
       } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
         // Check if it's a store to a stack location in the caller. Such a load
