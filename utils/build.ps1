@@ -1638,43 +1638,44 @@ function Get-Dependencies {
           [string]$ToolchainName
       )
 
-      $source = Join-Path -Path $BinaryCache -ChildPath $InstallerExeName
-      $destination = Join-Path -Path $BinaryCache -ChildPath toolchains\$ToolchainName
+      $source = Join-Path -Path $ArtifactCache -ChildPath $InstallerExeName
+      $ToolchainRoot = Join-Path -Path $ArtifactCache -ChildPath "toolchains"
+      $destination = Join-Path -Path $ToolchainRoot -ChildPath $ToolchainName
+      if (Test-Path $destination) { return }
 
-      # Check if the extracted directory already exists and is up to date.
-      if (Test-Path $destination) {
-          $installerWriteTime = (Get-Item $source).LastWriteTime
-          $extractedWriteTime = (Get-Item $destination).LastWriteTime
-          if ($installerWriteTime -le $extractedWriteTime) {
-              # Write-Output "'$InstallerExeName' is already extracted and up to date."
-              return
-          }
-      }
+      New-Item -ItemType Directory -Path $ToolchainRoot -ErrorAction Ignore | Out-Null
+      $TemporaryRoot = Join-Path -Path $ToolchainRoot -ChildPath ".$ToolchainName.$PID.$([Guid]::NewGuid()).tmp"
+      $BundleRoot = Join-Path -Path $TemporaryRoot -ChildPath "bundle"
+      $InstallRoot = Join-Path -Path $TemporaryRoot -ChildPath "root"
+      New-Item -ItemType Directory -Path $InstallRoot | Out-Null
 
-      # Write-Output "Extracting '$InstallerExeName' ..."
-
-      Invoke-WithDotNetRuntime {
-        Invoke-Program (Get-DotNet) "$($WiX.Path)\wix.dll" -- burn extract -acceptEula $WiX.EulaIdentifier $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
-      }
-      New-Item -ItemType Directory -Path $destination -Force | Out-Null
       $RuntimePath = "LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin"
-      $RuntimeDestination = Join-Path -Path $destination -ChildPath $RuntimePath
+      $RuntimeDestination = Join-Path -Path $InstallRoot -ChildPath $RuntimePath
       $RuntimeTarget = [IO.Path]::Combine("X:\", $RuntimePath)
       New-Item -ItemType Directory -Path $RuntimeDestination -Force | Out-Null
       $DriveMapped = $false
       try {
-        Invoke-Program -OutNull subst.exe X: "$destination"
+        Invoke-WithDotNetRuntime {
+          Invoke-Program (Get-DotNet) "$($WiX.Path)\wix.dll" -- burn extract -acceptEula $WiX.EulaIdentifier $source -out $BundleRoot -outba $BundleRoot
+        }
+
+        Invoke-Program -OutNull subst.exe X: "$InstallRoot"
         $DriveMapped = $true
-        Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
+        Get-ChildItem "$BundleRoot\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
           $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
           # Administrative installs do not run rtl.msi's SetDirectory actions.
           $TargetDirectory = if ($_.Name -eq "rtl.msi") { $RuntimeTarget } else { "X:\" }
-          Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TargetDirectory
+          Invoke-Program -OutNull msiexec.exe /lvx! $TemporaryRoot\$LogFile /qn /a $_.FullName ALLUSERS=0 TARGETDIR=$TargetDirectory
         }
+
+        subst.exe /d X: | Out-Null
+        $DriveMapped = $false
+        [IO.Directory]::Move($InstallRoot, $destination)
       } finally {
         if ($DriveMapped) {
           subst.exe /d X: | Out-Null
         }
+        Remove-Item -LiteralPath $TemporaryRoot -Recurse -Force -ErrorAction Ignore
       }
     }
 
@@ -1776,7 +1777,7 @@ function Get-Dependencies {
 
     if (-not $Toolchain) { return }
 
-    DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
+    DownloadAndVerify $PinnedBuild "$ArtifactCache\$PinnedToolchain.exe" $PinnedSHA256
 
     if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {
       # The make tool isn't part of MSYS
@@ -1787,9 +1788,10 @@ function Get-Dependencies {
       Write-Success "GNUWin32 make 4.4.1"
     }
 
-    # TODO(compnerd) stamp/validate that we need to re-extract
-    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
-    Extract-Toolchain "$PinnedToolchain.exe" -ToolchainName $ToolchainVersionIdentifier
+    $ToolchainArtifact = "$ToolchainVersionIdentifier-$($BuildArchName.ToLowerInvariant())"
+    Invoke-WithArtifactLock "SwiftToolchainExtraction" {
+      Extract-Toolchain "$PinnedToolchain.exe" -ToolchainName $ToolchainArtifact
+    }
     Write-Success "Swift Toolchain $PinnedVersion"
 
     # Install CMake.
@@ -1842,13 +1844,15 @@ function Get-Dependencies {
 }
 
 function Get-PinnedToolchainToolsDir() {
-  return [IO.Path]::Combine("$BinaryCache\toolchains", "$ToolchainVersionIdentifier",
+  $ToolchainArtifact = "$ToolchainVersionIdentifier-$($BuildArchName.ToLowerInvariant())"
+  return [IO.Path]::Combine("$ArtifactCache\toolchains", $ToolchainArtifact,
     "LocalApp", "Programs", "Swift", "Toolchains", "$PinnedVersion+Asserts",
     "usr", "bin")
 }
 
 function Get-PinnedToolchainSDK([OS] $OS = $BuildPlatform.OS, [string] $Identifier = $OS.ToString()) {
-  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainVersionIdentifier,
+  $ToolchainArtifact = "$ToolchainVersionIdentifier-$($BuildArchName.ToLowerInvariant())"
+  return [IO.Path]::Combine("$ArtifactCache", "toolchains", $ToolchainArtifact,
     "LocalApp", "Programs", "Swift", "Platforms", $PinnedVersion,
     "$($OS.ToString()).platform", "Developer", "SDKs", "$Identifier.sdk")
 }
