@@ -443,6 +443,100 @@ bb0(%0 : @owned $T):
   return %10 : $()
 }
 
+// A borrow accessor has a direct @guaranteed_address result and returns an
+// opaque object value. After lowering, it returns the value's storage address.
+// CHECK-LABEL: sil [ossa] @f062_borrow_accessor : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T {
+// CHECK: bb0(%0 : $*Box<T>):
+// CHECK:   [[ELT:%.*]] = struct_element_addr %0 : $*Box<T>, #Box.t
+// CHECK:   return [[ELT]] : $*T
+// CHECK-LABEL: } // end sil function 'f062_borrow_accessor'
+sil [ossa] @f062_borrow_accessor : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T {
+bb0(%0 : @guaranteed $Box<T>):
+  %1 = struct_extract %0 : $Box<T>, #Box.t
+  return %1 : $T
+}
+
+// A mutate accessor has a direct @inout result that is already an address value.
+// CHECK-LABEL: sil [ossa] @f063_mutate_accessor : $@convention(method) <T> (@inout Box<T>) -> @inout T {
+// CHECK: bb0(%0 : $*Box<T>):
+// CHECK:   [[ELT:%.*]] = struct_element_addr %0 : $*Box<T>, #Box.t
+// CHECK:   return [[ELT]] : $*T
+// CHECK-LABEL: } // end sil function 'f063_mutate_accessor'
+sil [ossa] @f063_mutate_accessor : $@convention(method) <T> (@inout Box<T>) -> @inout T {
+bb0(%0 : $*Box<T>):
+  %1 = struct_element_addr %0 : $*Box<T>, #Box.t
+  return %1 : $*T
+}
+
+sil @sink : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+// CHECK-LABEL: sil [ossa] @f064_call_borrow_accessor : $@convention(thin) <T> (@inout Box<T>) -> () {
+// CHECK: bb0(%0 : $*Box<T>):
+// CHECK:   [[TMP:%.*]] = alloc_stack $T
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Box<T>
+// CHECK:   [[FN:%.*]] = function_ref @f062_borrow_accessor : $@convention(method) <τ_0_0> (@in_guaranteed Box<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   [[BORROWED:%.*]] = apply [[FN]]<T>([[ACCESS]]) : $@convention(method) <τ_0_0> (@in_guaranteed Box<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   copy_addr [[BORROWED]] to [init] [[TMP]] : $*T
+// CHECK:   end_access [[ACCESS]] : $*Box<T>
+// CHECK-LABEL: } // end sil function 'f064_call_borrow_accessor'
+sil [ossa] @f064_call_borrow_accessor : $@convention(thin) <T> (@inout Box<T>) -> () {
+bb0(%0 : $*Box<T>):
+  %1 = begin_access [read] [static] %0 : $*Box<T>
+  %2 = function_ref @f062_borrow_accessor : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T
+  %3 = load_borrow %1 : $*Box<T>
+  %4 = apply %2<T>(%3) : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T
+  %5 = copy_value %4 : $T
+  end_access %1 : $*Box<T>
+  %6 = function_ref @sink : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %7 = apply %6<T>(%5) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_value %5 : $T
+  end_borrow %3 : $Box<T>
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f065_call_borrow_guaranteed_self : $@convention(thin) <T> (@in_guaranteed Box<T>) -> () {
+// CHECK: bb0(%0 : $*Box<T>):
+// CHECK:   [[TMP:%.*]] = alloc_stack $T
+// CHECK:   [[FN:%.*]] = function_ref @f062_borrow_accessor : $@convention(method) <τ_0_0> (@in_guaranteed Box<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   [[BORROWED:%.*]] = apply [[FN]]<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed Box<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   copy_addr [[BORROWED]] to [init] [[TMP]] : $*T
+// CHECK:   [[SINK:%.*]] = function_ref @sink : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// CHECK:   apply [[SINK]]<T>([[TMP]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// CHECK:   destroy_addr [[TMP]] : $*T
+// CHECK-LABEL: } // end sil function 'f065_call_borrow_guaranteed_self'
+sil [ossa] @f065_call_borrow_guaranteed_self : $@convention(thin) <T> (@in_guaranteed Box<T>) -> () {
+bb0(%0 : @guaranteed $Box<T>):
+  %1 = function_ref @f062_borrow_accessor : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T
+  %2 = apply %1<T>(%0) : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T
+  %3 = copy_value %2 : $T
+  %4 = function_ref @sink : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %5 = apply %4<T>(%3) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_value %3 : $T
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// A borrow accessor whose borrowed result comes from a computed address
+// (load_borrow of a dereferenced pointer) returns it via return_borrow. After
+// lowering, the load_borrow/return_borrow collapse into a direct return of the
+// borrowed address.
+// CHECK-LABEL: sil [ossa] @f066_return_borrow : $@convention(thin) <T> (Builtin.RawPointer) -> @guaranteed_address T {
+// CHECK: bb0(%0 : $Builtin.RawPointer):
+// CHECK:   [[ADR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[ADR]] : $*T
+// CHECK:   end_access [[ACCESS]] : $*T
+// CHECK:   return [[ACCESS]] : $*T
+// CHECK-LABEL: } // end sil function 'f066_return_borrow'
+sil [ossa] @f066_return_borrow : $@convention(thin) <T> (Builtin.RawPointer) -> @guaranteed_address T {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_address %0 to [strict] $*T
+  %2 = begin_access [read] [unsafe] %1 : $*T
+  %3 = load_borrow %2 : $*T
+  end_access %2 : $*T
+  return_borrow %3 from_scopes (%3)
+}
+
 // CHECK-LABEL: sil [ossa] @f070_mixedResult1 : $@convention(thin) <T> (@in T, @owned any C) -> (@out T, @owned any C) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : @owned $any C):
 // CHECK:   copy_addr [take] %1 to [init] %0 : $*T
