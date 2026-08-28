@@ -70,6 +70,12 @@ module StdPair {
   export *
 }
 
+module StdRanges {
+  header "std-ranges.h"
+  requires cplusplus
+  export *
+}
+
 module MsvcUseVecIt {
   header "msvc-std-vector-it.h"
   requires cplusplus
