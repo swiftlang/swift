@@ -6,6 +6,8 @@
 
 #define LIBKERN_RETURNS_RETAINED __attribute__((os_returns_retained))
 #define LIBKERN_RETURNS_NOT_RETAINED __attribute__((os_returns_not_retained))
+#define LIBKERN_CONSUMED __attribute__((os_consumed))
+#define LIBKERN_CONSUMES_THIS __attribute__((os_consumes_this))
 
 class ObjectManager {
   mutable int totalRetains = 0;
@@ -153,6 +155,21 @@ public:
 
   virtual Service *_Nonnull virtualNoAnnotationCopyService() const {
     return new Service(id);
+  }
+
+  static void consumesService(LIBKERN_CONSUMED Service *service) { 
+    // expected-note@-1 {{'consumesService' has been explicitly marked unavailable here}}
+    if (service)
+      service->release();
+  }
+
+  virtual void LIBKERN_CONSUMES_THIS consumeMyself() { release(); }
+
+  // _RETURNS_RETAINED and _RETURNS_UNRETAINED attributes are ignored on out
+  // parameters
+  static bool initializeService(int id, Service **service) {
+    *service = new Service(id);
+    return (*service)->getID() == id;
   }
 };
 

@@ -204,4 +204,15 @@ Tests.test("DerivedService") {
   expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
 }
 
+Tests.test("Out parameters are always assumed to return retained") {
+  manager.reset()
+
+  do {
+    var service: Service!
+    Service.initializeService(47, &service)
+  }
+
+  expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
+}
+
 runAllTests()
