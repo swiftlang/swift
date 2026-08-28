@@ -312,13 +312,15 @@ extension LifetimeDependence.Scope {
       // A class instance holds its stored properties at a stable address for
       // as long as the instance is alive, so a borrow of one of them is valid
       // for as long as the reference is. Attribute the dependence to that
-      // reference,which has a scope, rather than to the property's storage,
+      // reference, which has a scope, rather than to the property's storage,
       // which does not. This requires the field to be:
       //
       // - a `let`, so the storage can never be reassigned out from under the
       //   borrow, and
       // - a strong reference, so the parent actually keeps the referent alive.
-      guard refElementAddr.fieldIsLet, refElementAddr.fieldIsStrongReference else {
+      //   `weak`, `unowned`, and `unowned(unsafe)` fields, whose types are
+      //   `ReferenceStorageType`s, do not.
+      guard refElementAddr.fieldIsLet, !refElementAddr.type.isReferenceStorageType else {
         self = .unknown(accessBase.address!)
         return
       }
