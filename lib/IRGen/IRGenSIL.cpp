@@ -3564,6 +3564,12 @@ emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
   auto substConformance =
       substCalleeType->getWitnessMethodConformanceOrInvalid();
 
+  // For a conformance of a protocol metatype itself (e.g. from `T.Type: P`)
+  // the conforming type is the metatype, not its instance.
+  if (substConformance && substConformance.getType() &&
+      substConformance.getType()->is<AnyMetatypeType>())
+    substSelfType = substConformance.getType()->getCanonicalType();
+
   llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
   llvm::Value *wtable =
     emitWitnessTableRef(IGF, substSelfType, &argMetadata, substConformance);

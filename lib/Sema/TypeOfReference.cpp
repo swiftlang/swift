@@ -2050,7 +2050,19 @@ ConstraintSystem::getTypeOfMemberReferencePre(
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
-    addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
+
+    // A requirement found through 'T.Type: P' binds 'Self' to 'T.Type' rather
+    // than to 'T'.
+    Type selfBase = baseOpenedTy;
+    if (value->isInstanceMember() && baseRValueTy->is<AnyMetatypeType>()) {
+      if (auto *PD = dyn_cast<ProtocolDecl>(value->getDeclContext())) {
+        auto conformance = lookupConformance(baseRValueTy, PD);
+        if (conformance && !conformance.hasMissingConformance())
+          selfBase = baseRValueTy;
+      }
+    }
+
+    addConstraint(ConstraintKind::Bind, selfBase, selfObjTy,
                   getConstraintLocator(locator), /*isFavored=*/false,
                   preparedOverload);
   } else if (!isDynamicLookup && !isInvalidMetatypeExtensionMemberRef) {

@@ -523,3 +523,4 @@ $sIeg_BAIegHgIL_TR ---> {T:} reabstraction thunk helper from @escaping @callee_g
 $sSiBW ---> Builtin.Borrow<Swift.Int>
 $sBAIeNghHgIL_BAytIeNghHgILr_TR ---> {T:} reabstraction thunk helper from @escaping @caller_isolated @callee_guaranteed @Sendable @async (@guaranteed Builtin.ImplicitActor) -> () to @escaping @caller_isolated @callee_guaranteed @Sendable @async (@guaranteed Builtin.ImplicitActor) -> (@out ())
 $s4main12testCallOnceyyyyXOnF ---> main.testCallOnce(__owned @called(once) () -> ()) -> ()
+$s1M1fyyxmAA1PxmRQlF ---> M.f<A where A.Type: M.P>(A.Type) -> ()
