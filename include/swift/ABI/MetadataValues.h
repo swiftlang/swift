@@ -1824,6 +1824,10 @@ namespace SpecialPointerAuthDiscriminators {
   /// concurrency runtime.
   const uint16_t IsCurrentGlobalActorFunction = 0xd1b8; // = 53688
 
+  /// Concurrency hook variables. They are address-diversified, so one
+  /// discriminator covers all of them.
+  const uint16_t ConcurrencyHook = 0xc0a1; // = 49313
+
   /// Function pointers stored in the coro allocator struct.
   const uint16_t CoroAllocationFunction = 0x5f95;   // = 24469
   const uint16_t CoroDeallocationFunction = 0x9faf; // = 40879
