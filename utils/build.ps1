@@ -23,6 +23,11 @@ Default: 'S:\SourceCache'
 The path to a directory where to write build system files and outputs.
 Default: 'S:\b'
 
+.PARAMETER ArtifactCache
+The path to a directory containing downloaded build artifacts that can be
+shared by multiple build trees.
+Default: 'S:\ArtifactCache'
+
 .PARAMETER BuildRoot
 The path to the merged file system image populated by the build. The
 "Program Files" subdirectories will be created beneath this directory.
@@ -140,6 +145,7 @@ param
   # Build Paths
   [System.IO.FileInfo] $SourceCache = "S:\SourceCache",
   [System.IO.FileInfo] $BinaryCache = "S:\BinaryCache",
+  [System.IO.FileInfo] $ArtifactCache = "S:\ArtifactCache",
   [Alias("ImageRoot")]
   [System.IO.FileInfo] $BuildRoot = "S:",
   [Alias("Cache")]
@@ -507,21 +513,24 @@ $KnownNDKs = @{
 $KnownSyft = @{
   "1.29.1" = @{
     AMD64 = @{
+      Artifact = "syft-1.29.1-windows-amd64"
       URL = "https://github.com/anchore/syft/releases/download/v1.29.1/syft_1.29.1_windows_amd64.zip"
       SHA256 = "3C67CD9AF40CDCC7FFCE041C8349B4A77F33810184820C05DF23440C8E0AA1D7"
-      Path = [IO.Path]::Combine("$BinaryCache\syft-1.29.1", "syft.exe")
+      Path = [IO.Path]::Combine("$ArtifactCache\syft-1.29.1-windows-amd64", "syft.exe")
     }
   };
   "1.40.0" = @{
     AMD64 = @{
+      Artifact = "syft-1.40.0-windows-amd64"
       URL = "https://github.com/anchore/syft/releases/download/v1.40.0/syft_1.40.0_windows_amd64.zip"
       SHA256 = "3F4021EC098B4BCBAF19BBA7028CF7704FEF12936970778CEC3C6D669B740E6D"
-      Path = [IO.Path]::Combine("$BinaryCache\syft-1.40.0", "syft.exe")
+      Path = [IO.Path]::Combine("$ArtifactCache\syft-1.40.0-windows-amd64", "syft.exe")
     };
     ARM64 = @{
+      Artifact = "syft-1.40.0-windows-arm64"
       URL = "https://github.com/anchore/syft/releases/download/v1.40.0/syft_1.40.0_windows_arm64.zip"
       SHA256 = "CE7129DBCC39809542C9BC5032B179131DFEE72C68C5B3741E3270A3D9ED46E4"
-      Path = [IO.Path]::Combine("$BinaryCache\syft-1.40.0", "syft.exe")
+      Path = [IO.Path]::Combine("$ArtifactCache\syft-1.40.0-windows-arm64", "syft.exe")
     };
   }
 }
@@ -1526,20 +1535,28 @@ function Get-Dependencies {
       New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
 
       for ($Attempt = 1; $Attempt -le $DownloadRetryCount; $Attempt++) {
+        $TemporaryDestination = "$Destination.$PID.$([Guid]::NewGuid()).tmp"
         try {
-          $WebClient.DownloadFile($URL, $Destination)
-          $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
+          $WebClient.DownloadFile($URL, $TemporaryDestination)
+          $SHA256 = Get-FileHash -Path $TemporaryDestination -Algorithm SHA256
           if ($SHA256.Hash -ne $Hash) {
             throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
           }
+
+          try {
+            [IO.File]::Move($TemporaryDestination, $Destination)
+          } catch {
+            if (-not (Test-Path $Destination)) { throw }
+          }
           return
         } catch {
-          Remove-Item -Path $Destination -ErrorAction Ignore
           if ($Attempt -eq $DownloadRetryCount) {
             throw
           }
           Write-Warning "Download of $URL failed (attempt $Attempt/$DownloadRetryCount): $_"
           Start-Sleep -Seconds ([Math]::Pow(2, $Attempt))
+        } finally {
+          Remove-Item -LiteralPath $TemporaryDestination -ErrorAction Ignore
         }
       }
     }
@@ -1555,22 +1572,31 @@ function Get-Dependencies {
       $Source = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
       $Destination = Join-Path -Path $BinaryCache -ChildPath $ExtractPath
 
-      # Check if the extracted directory already exists and is up to date.
-      if (Test-Path $Destination) {
-          $ZipLastWriteTime = (Get-Item $Source).LastWriteTime
-          $ExtractedLastWriteTime = (Get-Item $Destination).LastWriteTime
-          # Compare the last write times
-          if ($ZipLastWriteTime -le $ExtractedLastWriteTime) {
-              # Write-Output "'$ZipFileName' is already extracted and up to date."
-              return
-          }
-      }
+      if (Test-Path $Destination) { return }
 
       $Destination = if ($CreateExtractPath) { $Destination } else { $BinaryCache }
 
       # Write-Output "Extracting '$ZipFileName' ..."
       New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
       Expand-Archive -Path $Source -DestinationPath $Destination -Force
+    }
+
+    function Expand-ArtifactZip([string] $ZipFileName, [string] $ExtractPath) {
+      $Source = Join-Path -Path $ArtifactCache -ChildPath $ZipFileName
+      $Destination = Join-Path -Path $ArtifactCache -ChildPath $ExtractPath
+      if (Test-Path $Destination) { return }
+
+      $TemporaryDestination = Join-Path -Path $ArtifactCache -ChildPath ".$ExtractPath.$PID.$([Guid]::NewGuid()).tmp"
+      try {
+        Expand-Archive -LiteralPath $Source -DestinationPath $TemporaryDestination
+        try {
+          [IO.Directory]::Move($TemporaryDestination, $Destination)
+        } catch {
+          if (-not (Test-Path $Destination)) { throw }
+        }
+      } finally {
+        Remove-Item -LiteralPath $TemporaryDestination -Recurse -Force -ErrorAction Ignore
+      }
     }
 
     function Extract-Toolchain {
@@ -1622,8 +1648,8 @@ function Get-Dependencies {
 
     if ($IncludeSBoM) {
       $syft = Get-Syft
-      DownloadAndVerify $syft.URL "$BinaryCache\syft-$SyftVersion.zip" $syft.SHA256
-      Expand-ZipFile syft-$SyftVersion.zip -ExtractPath syft-$SyftVersion
+      DownloadAndVerify $syft.URL "$ArtifactCache\$($syft.Artifact).zip" $syft.SHA256
+      Expand-ArtifactZip "$($syft.Artifact).zip" $syft.Artifact
       Write-Success "syft $SyftVersion"
     }
 
