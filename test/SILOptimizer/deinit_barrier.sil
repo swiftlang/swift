@@ -285,3 +285,32 @@ bb0(%42 : $Builtin.RawPointer, %9 : $Builtin.RawPointer):
   return %68 : $()
 }
 
+
+// Copying array elements only retains the elements. It cannot run user code and therefore
+// cannot observe a de-initializer running earlier.
+// CHECK-LABEL: begin running test {{.*}} on test_copy_array_builtin: is_deinit_barrier
+// CHECK:       builtin "copyArray"
+// CHECK:       false
+// CHECK-LABEL: end running test {{.*}} on test_copy_array_builtin: is_deinit_barrier
+sil [ossa] @test_copy_array_builtin : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word):
+  %3 = metatype $@thin Int32.Type
+  specify_test "is_deinit_barrier @instruction"
+  %4 = builtin "copyArray"<Int32>(%3 : $@thin Int32.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// In contrast, destroying array elements runs de-initializers and therefore is a barrier.
+// CHECK-LABEL: begin running test {{.*}} on test_destroy_array_builtin: is_deinit_barrier
+// CHECK:       builtin "destroyArray"
+// CHECK:       true
+// CHECK-LABEL: end running test {{.*}} on test_destroy_array_builtin: is_deinit_barrier
+sil [ossa] @test_destroy_array_builtin : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thin Int32.Type
+  specify_test "is_deinit_barrier @instruction"
+  %3 = builtin "destroyArray"<Int32>(%2 : $@thin Int32.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  %4 = tuple ()
+  return %4 : $()
+}
