@@ -61,8 +61,15 @@
 /// instance:
 ///
 ///   // This is an `UncheckedString<UInt16>`:
-///   let utf16Name = "Dagmar Karin Sørbøe".encode(as: UTF16.self)
+///   let utf16Name = "Dagmar Karin Sørbøe".encode(as: UTF16.self)!
 ///
+/// If you are encoding a string to an encoding that cannot represent the
+/// characters in that string, you will get `nil`.  If you would prefer,
+/// you can ask the `encode` method to substitute a character instead:
+///
+///   let asciiName = "Dagmar Karin Sørbøe".encode(as: ASCII.self,
+///                             onUnsupportedEncoding: .substitute)
+/// 
 /// You can also decode an `UncheckedString` using the `.decode()` method:
 ///
 ///   let name = utf16Name.decode(as: UTF16.self)!
@@ -71,15 +78,7 @@
 /// a replacement character, you can do
 ///
 ///   let name = utf16Name.decode(as: UTF16.self,
-///                               replacingInvalidCharactersWith: "?")
-///
-/// or you can provide a closure to handle replacements (perhaps by percent
-/// encoding, for instance):
-///
-///   let name = utf16Name.decode(as: UTF16.self,
-///                               replacingInvalidCharactersWith: { 
-///                                 "%\(String($0, radix: 16)"
-///                               })
+///                               onInvalidEncoding: .substitute)
 ///
 @available(SwiftStdlib 9999, *)
 public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
@@ -135,7 +134,7 @@ public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
   init(taking a: consuming Array<Element>) {
     if a.count == 0 {
       storage = .empty
-      consume a
+      _ = consume a
     } else if a.count <= SmallUncheckedStringStorage<Element>.capacity {
       storage = .small(
         SmallUncheckedStringStorage(a)
@@ -378,6 +377,38 @@ extension UncheckedString: BidirectionalCollection {
   }
 }
 
+@available(SwiftStdlib 9999, *)
+extension UncheckedString {
+  /// Returns a Boolean value indicating whether this string is trivially
+  /// identical to `other`.
+  ///
+  /// Comparing strings this way includes comparing (normally hidden)
+  /// implementation details such as the memory location of any underlying
+  /// storage. Therefore, identical strings are guaranteed to compare equal
+  /// with `==`, but not all equal strings are considered identical.
+  ///
+  /// - Complexity: O(1)
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    switch (storage, other.storage) {
+    case (.empty, .empty):
+      return true
+    case (.small(let lhs), .small(let rhs)):
+      return lhs.count == rhs.count &&
+        withUnsafeBytes(of: lhs.bytes) { lhsBytes in
+          withUnsafeBytes(of: rhs.bytes) { rhsBytes in
+            unsafe lhsBytes.elementsEqual(rhsBytes)
+          }
+        }
+    case (.immortal(let lhs), .immortal(let rhs)):
+      return unsafe lhs.characters == rhs.characters && lhs.count == rhs.count
+    case (.dynamic(let lhs), .dynamic(let rhs)):
+      return lhs.characters.isTriviallyIdentical(to: rhs.characters)
+    default:
+      return false
+    }
+  }
+}
+
 // MARK: UncheckedSubString
 
 @available(SwiftStdlib 9999, *)
@@ -428,6 +459,14 @@ public struct UncheckedSubString<E: FixedWidthInteger>
     return try base.withCharacterData { (data) throws(Failure) -> R in
       return try body(data.extracting(bounds))
     }
+  }
+
+  /// Returns a Boolean value indicating whether this string is trivially
+  /// identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    bounds == other.bounds && base.isTriviallyIdentical(to: other.base)
   }
 }
 

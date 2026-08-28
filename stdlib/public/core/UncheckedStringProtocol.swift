@@ -22,6 +22,8 @@ public protocol UncheckedStringProtocol
     Index == Int,
     SubSequence: UncheckedStringProtocol
 {
+  typealias SubSequence = UncheckedSubString<Element>
+
   /// Calls the given closure with a buffer of `Element`s,
   /// which are *not* necessarily NUL-terminated.
   func withCharacterData<R, E>(
@@ -101,3 +103,33 @@ extension UncheckedStringProtocol {
     }
   }
 }
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedStringProtocol {
+  /// Returns a Boolean value indicating whether this string begins with the
+  /// specified prefix.
+  public func hasPrefix<Other: UncheckedStringProtocol>(
+    _ prefix: Other
+  ) -> Bool where Other.Element == Element {
+    guard prefix.count <= count else { return false }
+    return withCharacterData { selfData in
+      prefix.withCharacterData { prefixData in
+        selfData.extracting(first: prefixData.count)._elementsEqual(to: prefixData)
+      }
+    }
+  }
+
+  /// Returns a Boolean value indicating whether this string ends with the
+  /// specified suffix.
+  public func hasSuffix<Other: UncheckedStringProtocol>(
+    _ suffix: Other
+  ) -> Bool where Other.Element == Element {
+    guard suffix.count <= count else { return false }
+    return withCharacterData { selfData in
+      suffix.withCharacterData { suffixData in
+        selfData.extracting(last: suffixData.count)._elementsEqual(to: suffixData)
+      }
+    }
+  }
+}
+

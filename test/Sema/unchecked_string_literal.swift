@@ -45,3 +45,83 @@ let plainTextWidened: UncheckedString<UInt16> = "no escapes here"
 // `String` itself is unaffected by any of the above -- ordinary string
 // literals still resolve to `ExpressibleByStringLiteral` as before.
 let ordinaryString: String = "no escapes here"
+
+// MARK: `as`-coercion and call-syntax routing
+//
+// A `let`/`var` binding's declared type registers a contextual type before
+// its initializer expression is visited, but `as`-coercion (`CoerceExpr`)
+// and call-syntax literal-init sugar (`T(literal)`) are different code
+// paths that don't automatically get the same treatment -- both need to
+// route a literal through `ExpressibleByUncheckedStringLiteral` just like
+// ordinary contextual typing does.
+
+// `as`-coercion, no escapes at all.
+let asCoercionPlain = "no escapes here" as UncheckedString<UInt16>
+
+// `as`-coercion with a `\x{hh}` escape that fits.
+let asCoercionRaw = "Ren\x{2041} Descartes" as UncheckedString<UInt16>
+
+// `as`-coercion with a `\x{hh}` escape that overflows -- the overflow
+// diagnostic must still fire through this path.
+let asCoercionOverflow = "\x{10000}" as UncheckedString<UInt16>
+// expected-error@-1 {{raw code unit escape does not fit in 'UInt16' (16-bit)}}
+
+// Call-syntax, no escapes at all.
+let callSyntaxPlain = UncheckedString<UInt16>("no escapes here")
+
+// Call-syntax with a `\x{hh}` escape that fits.
+let callSyntaxRaw = UncheckedString<UInt16>("Ren\x{2041} Descartes")
+
+// Call-syntax with a `\x{hh}` escape that overflows.
+let callSyntaxOverflow = UncheckedString<UInt16>("\x{10000}")
+// expected-error@-1 {{raw code unit escape does not fit in 'UInt16' (16-bit)}}
+
+// `String` itself is unaffected: `as String`/`String(...)` on an ordinary
+// literal still works, and still rejects a `\x{hh}` escape.
+let stringAsCoercion = "plain text" as String
+let stringCallSyntax = String("plain text")
+let stringAsCoercionInvalid = "Ren\x{e9} Descartes" as String
+// expected-error@-1 {{cannot convert value of type 'UncheckedString<UInt8>' to type 'String' in coercion}}
+
+// MARK: Local (closure/function-body) pattern bindings
+//
+// A local `let`/`var` binding's initializer -- checked as part of a
+// closure's or function's *joint* constraint system, rather than as its
+// own independent top-level expression -- goes through a different code
+// path (`CSSyntacticElement.cpp`'s `visitPatternBindingElement`) that
+// doesn't register the binding's contextual type before generating
+// constraints for its initializer the way top-level pattern bindings do.
+// Regression test: this must route through
+// `ExpressibleByUncheckedStringLiteral` exactly like a top-level binding.
+func localBindingInFunctionBody() {
+  let s: UncheckedString<UInt16> = "Ren\x{2041} Descartes"
+  _ = s
+}
+
+let localBindingInClosure: () -> Void = {
+  let s: UncheckedString<UInt16> = "Ren\x{2041} Descartes"
+  _ = s
+}
+
+// The overflow diagnostic must still fire for a local binding too.
+func localBindingOverflowInFunctionBody() {
+  let s: UncheckedString<UInt16> = "\x{10000}"
+  // expected-error@-1 {{raw code unit escape does not fit in 'UInt16' (16-bit)}}
+  _ = s
+}
+
+// A closure passed as a default parameter value is a separate contextual-
+// type-registration path (`CTP_DefaultParameter`) from a local pattern
+// binding's initializer (`CTP_Initialization`); make sure fixing the
+// latter didn't regress the former by double-registering contextual info
+// for the whole closure. (This isn't about `UncheckedString` routing at
+// all -- it's a plain closure body containing a local binding of any
+// type -- but it's exactly the shape that previously crashed the
+// compiler with an internal assertion failure.)
+func defaultParameterClosure(_ body: () -> Void = {
+  let x = 5
+  _ = x
+}) {
+  body()
+}
+

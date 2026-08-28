@@ -29,7 +29,7 @@ public extension UncheckedString {
   ///                character.
   ///
   /// - Returns a `String` if decoding was successful.
-  public func decode<Encoding: Unicode.Encoding>(
+  func decode<Encoding: Unicode.Encoding>(
     as encoding: Encoding.Type,
     onInvalidEncoding: UncheckedStringFailEncoding = .fail
   ) -> String? where Encoding.CodeUnit == Element {
@@ -57,7 +57,7 @@ public extension UncheckedString {
   ///                character.
   ///
   /// - Returns a `String` if decoding was successful.
-  public func decode<Encoding: Unicode.Encoding>(
+  func decode<Encoding: Unicode.Encoding>(
     as encoding: Encoding.Type,
     onInvalidEncoding: UncheckedStringSubstituteEncoding
   ) -> String where Encoding.CodeUnit == Element {
@@ -85,7 +85,7 @@ public extension String {
   ///                to use a substitution character.
   ///
   /// - Returns an `UncheckedString` if encoding was successful.
-  public func encode<Encoding: Unicode.Encoding>(
+  func encode<Encoding: Unicode.Encoding>(
     as encoding: Encoding.Type,
     onUnsupportedEncoding: UncheckedStringFailEncoding = .fail
   ) -> UncheckedString<Encoding.CodeUnit>? {
@@ -112,13 +112,13 @@ public extension String {
   ///                to use a substitution character.
   ///
   /// - Returns an `UncheckedString` if encoding was successful.
-  public func encode<Encoding: Unicode.Encoding>(
+  func encode<Encoding: Unicode.Encoding>(
     as encoding: Encoding.Type,
     onUnsupportedEncoding: UncheckedStringSubstituteEncoding
   ) -> UncheckedString<Encoding.CodeUnit> {
     var data: [Encoding.CodeUnit] = []
     data.reserveCapacity(self.utf8.count)
-    let repaired = transcode(
+    _ = transcode(
       self.utf8.makeIterator(),
       from: UTF8.self,
       to: Encoding.self,

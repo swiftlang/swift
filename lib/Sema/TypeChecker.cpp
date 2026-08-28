@@ -27,6 +27,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Identifier.h"
@@ -164,6 +165,38 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
   }
 
   return nullptr;
+}
+
+ProtocolDecl *TypeChecker::getLiteralProtocolForContextualType(
+    ASTContext &Context, Expr *expr, Type contextualType) {
+  auto *SLE = dyn_cast<StringLiteralExpr>(expr);
+  if (!SLE)
+    return TypeChecker::getLiteralProtocol(Context, expr);
+
+  // A literal with a `\x{hh}` raw code unit escape must always be typed via
+  // `ExpressibleByUncheckedStringLiteral` -- there is no other protocol it
+  // could conform to.
+  if (SLE->hasRawSplices())
+    return TypeChecker::getLiteralProtocol(Context, expr);
+
+  // Otherwise, if the contextual type is concrete and conforms to
+  // `ExpressibleByUncheckedStringLiteral`, prefer that over the default
+  // `ExpressibleByStringLiteral` -- this lets SILGen materialize a
+  // native-width constant directly instead of a UTF-8 constant that would
+  // need transcoding at runtime. See `CSGen.cpp`'s `visitStringLiteralExpr`
+  // for the analogous check used for ordinary (non-`as`/call-syntax)
+  // contextual typing, e.g. `let x: UncheckedString<UInt16> = "..."`.
+  if (contextualType && !contextualType->hasTypeVariable() &&
+      !contextualType->hasUnboundGenericType()) {
+    auto *uncheckedProto = TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByUncheckedStringLiteral);
+    auto lookupType = contextualType->lookThroughAllOptionalTypes();
+    if (uncheckedProto && lookupConformance(lookupType, uncheckedProto))
+      return uncheckedProto;
+  }
+
+  return TypeChecker::getLiteralProtocol(Context, expr);
 }
 
 DeclName TypeChecker::getObjectLiteralConstructorName(ASTContext &Context,

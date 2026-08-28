@@ -2794,10 +2794,6 @@ Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (!literal)
     return nullptr;
 
-  auto *protocol = TypeChecker::getLiteralProtocol(getASTContext(), literal);
-  if (!protocol)
-    return nullptr;
-
   Type castTy;
   if (auto precheckedTy = typeExpr->getInstanceType()) {
     castTy = precheckedTy;
@@ -2828,6 +2824,17 @@ Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
     if (castTy->isEqual(selectorTy))
       return nullptr;
   }
+
+  // Passing `castTy` here (rather than calling plain `getLiteralProtocol`)
+  // lets a splice-free string literal route to
+  // `ExpressibleByUncheckedStringLiteral` when `castTy` conforms to it, so
+  // e.g. `UncheckedString<UInt16>("...")` gets a native-width constant from
+  // SILGen instead of failing to find a matching initializer (`UncheckedString`
+  // doesn't conform to the default `ExpressibleByStringLiteral`).
+  auto *protocol = TypeChecker::getLiteralProtocolForContextualType(
+      getASTContext(), literal, castTy);
+  if (!protocol)
+    return nullptr;
 
   return lookupConformance(castTy, protocol)
              ? CoerceExpr::forLiteralInit(getASTContext(), literal,
