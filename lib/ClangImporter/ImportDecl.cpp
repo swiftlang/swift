@@ -9089,14 +9089,38 @@ void SwiftDeclConverter::importInheritedConstructors(
 
 std::pair<const clang::Decl *, ImportNameVersion>
 ClangImporter::Implementation::getImportedDeclsKey(
-    const clang::NamedDecl *ClangDecl, ImportNameVersion version,
-    bool UseCanonicalDecl) {
+    const clang::NamedDecl *clangDecl, ImportNameVersion version,
+    bool useCanonicalDecl) {
   // Some callers don't want to canonicalize.
-  if (!UseCanonicalDecl)
-    return {ClangDecl, version};
+  if (!useCanonicalDecl)
+    return {clangDecl, version};
 
-  auto *Canon = cast<clang::NamedDecl>(ClangDecl->getCanonicalDecl());
-  return {Canon, version};
+  auto *canonDecl = cast<clang::NamedDecl>(clangDecl->getCanonicalDecl());
+
+  // Sometimes two enum constants with different underlying types can end up in
+  // the same redeclaration chain even though they aren't interchangeable. When
+  // that happens, we instead "canonicalize" to the first decl we encountered
+  // that has the same integer type as this one.
+  if (clangDecl != canonDecl) {
+    auto getCaseIntegerType =
+          [](const clang::Decl *clangDecl) -> clang::QualType {
+      if (auto caseDecl = dyn_cast<clang::EnumConstantDecl>(clangDecl))
+        return cast<clang::EnumDecl>(caseDecl->getDeclContext())
+                    ->getIntegerType();
+      return clang::QualType();
+    };
+
+    auto caseType = getCaseIntegerType(clangDecl);
+    auto canonCaseType = getCaseIntegerType(canonDecl);
+    if (!caseType.isNull() && !canonCaseType.isNull()
+          && !getClangASTContext().hasSameType(caseType, canonCaseType)) {
+      auto altCanonKey = std::make_pair(canonDecl, caseType.getCanonicalType());
+      auto altCanonEntry = AltCanonDecls.try_emplace(altCanonKey, clangDecl);
+      canonDecl = altCanonEntry.first->second;
+    }
+  }
+
+  return {canonDecl, version};
 }
 
 std::optional<Decl *> ClangImporter::Implementation::importDeclCached(
@@ -10429,7 +10453,7 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   auto Key = getImportedDeclsKey(ClangDecl, version, UseCanonicalDecl);
   auto *Canon = cast<clang::NamedDecl>(Key.first);
 
-  auto Known = importDeclCached(Canon, version, UseCanonicalDecl);
+  auto Known = importDeclCached(ClangDecl, version, UseCanonicalDecl);
   if (Known.has_value()) {
     if (!SuperfluousTypedefsAreTransparent &&
         SuperfluousTypedefs.count(Canon))
@@ -10459,11 +10483,13 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
         ClangDecl->getNameForDiagnostic(out, {{}}, true);
         out << "' ";
         ClangDecl->getSourceRange().print(out, Instance->getSourceManager());
-        if (ClangDecl != Canon) {
-          out << "\nCanonical clang::Decl: '";
+        if (ClangDecl != Key.first) {
+          out << "\nImportedDecls key decl: '";
           Canon->getNameForDiagnostic(out, {{}}, true);
           out << "' ";
           Canon->getSourceRange().print(out, Instance->getSourceManager());
+          out << " version: ";
+          Key.second.dump(out);
         }
         out << "\nImported as Swift Decl:\n";
         if (Result)

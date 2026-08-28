@@ -41,6 +41,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/Type.h"
+#include "clang/AST/TypeOrdering.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -582,6 +583,13 @@ public:
 
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
+
+  /// Maps a canonical declaration and a type that only appears \em elsewhere
+  /// in its redeclaration chain to the declaration that should be used as part
+  /// of its \c ImportedDecls cache key. See \c getImportedDeclsKey()
+  /// for details.
+  llvm::DenseMap<std::pair<const clang::Decl *, clang::QualType>,
+                 const clang::NamedDecl *> AltCanonDecls;
 
   /// Per-module count of Clang decls actually deserialized (materialized) into
   /// the shared ASTContext, keyed by the owning serialized module. Populated by
