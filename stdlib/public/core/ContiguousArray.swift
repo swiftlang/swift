@@ -1122,8 +1122,9 @@ extension ContiguousArray {
       start: firstElementAddress, count: unsafeUninitializedCapacity)
     defer {
       _precondition(
-        initializedCount <= unsafeUninitializedCapacity,
-        "Initialized count set to greater than specified capacity."
+        UInt(truncatingIfNeeded: initializedCount) <=
+        UInt(truncatingIfNeeded: unsafeUninitializedCapacity),
+        "Initialized count must be in 0 ... unsafeUninitializedCapacity."
       )
       unsafe _precondition(
         buffer.baseAddress == firstElementAddress,
