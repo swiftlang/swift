@@ -733,14 +733,10 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   if (auto var = dyn_cast<VarDecl>(requirement)) {
-    ValueDecl *derivedValue = nullptr;
     if (var->getName() == Context.Id_unownedExecutor)
-      derivedValue = deriveDistributedActor_unownedExecutor(*this);
+      return deriveDistributedActor_unownedExecutor(*this);
 
-    if (derivedValue) {
-      assertRequiredSynthesizedPropertyOrder(Context, Nominal);
-    }
-    return derivedValue;
+    return nullptr;
   }
 
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
