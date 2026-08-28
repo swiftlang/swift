@@ -484,3 +484,116 @@ OptionalTests.test("MutableSpan from Optional.some")
 
   expectEqual(o, a)
 }
+
+struct TestError: Error, Equatable {}
+
+OptionalTests.test("edit")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  var o = Optional<LifetimeTracked>.none
+  o.edit {
+    expectEqual($0.count, 0)
+    expectEqual($0.capacity, 1)
+  }
+  expectNil(o)
+
+  o = LifetimeTracked(1)
+  o.edit {
+    expectEqual($0.count, 1)
+    expectEqual($0.capacity, 1)
+  }
+  expectEqual(o?.value, 1)
+
+  o.edit {
+    $0.removeAll()
+  }
+  expectNil(o)
+  expectEqual(LifetimeTracked.instances, 0)
+
+  o = LifetimeTracked(2)
+  o.edit {
+    $0.removeAll()
+    $0.append(LifetimeTracked(3))
+  }
+  expectEqual(o?.value, 3)
+  expectEqual(LifetimeTracked.instances, 1)
+  o = nil
+
+  let count = o.edit { $0.count }
+  expectEqual(count, 0)
+}
+
+OptionalTests.test("edit with throwing closure")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  var o: LifetimeTracked? = LifetimeTracked(1)
+  do throws(TestError) {
+    try o.edit {
+      span throws(TestError) in
+      span.removeAll()
+      throw TestError()
+    }
+    expectUnreachable()
+  } catch {
+    expectTrue(error == TestError())
+  }
+  expectNil(o)
+
+  do throws(TestError) {
+    try o.edit {
+      span throws(TestError)  in
+      span.append(LifetimeTracked(2))
+      throw TestError()
+    }
+    expectUnreachable()
+  } catch {
+    expectTrue(error == TestError())
+  }
+  expectEqual(o?.value, 2)
+  o = nil
+}
+
+OptionalTests.test("edit: wrapped type without spare bits")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  var o = Optional<Int>.none
+  o.edit { $0.append(42) }
+  expectEqual(o, 42)
+  o.edit { $0.removeAll() }
+  expectNil(o)
+  o.edit { _ in }
+  expectNil(o)
+}
+
+struct NCInt: ~Copyable {
+  let tracker: LifetimeTracked
+  init(_ value: Int) { tracker = LifetimeTracked(value) }
+}
+
+OptionalTests.test("edit: noncopyable wrapped type")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  var o: NCInt? = NCInt(1)
+  expectEqual(LifetimeTracked.instances, 1)
+  o.edit { $0.removeAll() }
+  expectNil(o)
+  expectEqual(LifetimeTracked.instances, 0)
+
+  o.edit { $0.append(NCInt(2)) }
+  o.edit { expectEqual($0.count, 1) }
+  expectEqual(LifetimeTracked.instances, 1)
+
+  // the worst way to write o.take()
+  let nci = o.edit { $0.removeLast() }
+  expectNil(o)
+  expectEqual(nci.tracker.value, 2)
+  _ = consume nci
+}
+
+OptionalTests.test("edit: capacity is one")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  var o = Optional<Int>.none
+  expectCrashLater()
+  o.edit {
+    $0.append(1)
+    $0.append(2)
+  }
+}
