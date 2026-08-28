@@ -1256,6 +1256,13 @@ public:
   /// \param decl The Clang record or function declaration to validate.
   void validateSwiftAttributes(const clang::NamedDecl *decl);
 
+  /// Determines the key that should be used to store or look up \p ClangDecl
+  /// in \c ImportedDecls . This will usually canonicalize the decl, although
+  /// there are rare exceptions.
+  std::pair<const clang::Decl *, Version>
+  getImportedDeclsKey(const clang::NamedDecl *ClangDecl, Version version,
+                      bool UseCanonicalDecl = true);
+
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
   std::optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl,
@@ -1284,8 +1291,7 @@ public:
   }
 
   Decl *lookupImportedDecl(const clang::NamedDecl *decl) {
-    auto Known = importDeclCached(
-        cast<clang::NamedDecl>(decl->getCanonicalDecl()), CurrentVersion, true);
+    auto Known = importDeclCached(decl, CurrentVersion, true);
     if (Known.has_value())
       return Known.value();
     return nullptr;
