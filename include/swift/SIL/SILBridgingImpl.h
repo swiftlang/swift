@@ -1576,6 +1576,14 @@ bool BridgedInstruction::RefElementAddrInst_fieldIsLet() const {
   return getAs<swift::RefElementAddrInst>()->getField()->isLet();
 }
 
+bool BridgedInstruction::RefElementAddrInst_fieldIsStrongReference() const {
+  // ReferenceStorageType covers 'weak', 'unowned', and 'unowned(unsafe)'. None
+  // of those keep their referent alive, so a dependence must not be attributed
+  // to whatever holds the field.
+  return !getAs<swift::RefElementAddrInst>()->getType()
+              .is<swift::ReferenceStorageType>();
+}
+
 bool BridgedInstruction::RefElementAddrInst_isImmutable() const {
   return getAs<swift::RefElementAddrInst>()->isImmutable();
 }
