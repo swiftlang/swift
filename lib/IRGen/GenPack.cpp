@@ -505,7 +505,7 @@ irgen::emitTypeMetadataPack(IRGenFunction &IGF, CanPackType packType,
 MetadataResponse
 irgen::emitTypeMetadataPackRef(IRGenFunction &IGF, CanPackType packType,
                                DynamicMetadataRequest request) {
-  if (auto result = tryGetLocalPackTypeMetadata(IGF, packType, request))
+  if (auto result = tryGetLocalPackTypeMetadata(IGF, packType, DynamicMetadataRequest(MetadataState::Abstract)))
     return result;
 
   StackAddress pack;
