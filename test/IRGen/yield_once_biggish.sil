@@ -122,10 +122,6 @@ entry(%flag : $Builtin.Int1):
   %0 = function_ref @test_simple : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @owned Biggish<T>)
   (%value, %token) = begin_apply %0<SomeSubclass>() : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @owned Biggish<T>)
 
-  // CHECK:         call void @swift_release(ptr [[R0_ORIG]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R1_ORIG]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R2_ORIG]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R3_ORIG]])
   //   Branch.
   // CHECK-NEXT:    br i1 %0,
   cond_br %flag, yes, no
@@ -137,6 +133,13 @@ yes:
   // CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
   end_apply %token as $()
 
+  //   The destroy of the yielded value must not be hoisted into the coroutine's
+  //   begin_apply/end_apply scope, so the releases happen here, after the resume.
+  // CHECK-NEXT:    call void @swift_release(ptr [[R0_ORIG]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R1_ORIG]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R2_ORIG]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R3_ORIG]])
+
   // CHECK-NEXT:    br label
   br cont
 
@@ -145,6 +148,8 @@ no:
   // CHECK-64-ptrauth-NEXT: ptrauth.blend
   // CHECK:    call swiftcc void [[CONTINUATION]](ptr noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]], i1 true)
   // CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R0_ORIG]])
+  // CHECK:         call void @swift_release(ptr [[R3_ORIG]])
   abort_apply %token
 
   // CHECK-NEXT:    br label
