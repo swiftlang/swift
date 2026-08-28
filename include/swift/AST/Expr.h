@@ -3216,12 +3216,23 @@ class StringToPointerExpr : public ImplicitConversionExpr {
 public:
   StringToPointerExpr(Expr *subExpr, Type ty)
     : ImplicitConversionExpr(ExprKind::StringToPointer, subExpr, ty) {}
-  
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::StringToPointer;
   }
 };
-  
+
+/// Convert an UncheckedString to an UnsafePointer of matching element type.
+class UncheckedStringToPointerExpr : public ImplicitConversionExpr {
+public:
+  UncheckedStringToPointerExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::UncheckedStringToPointer, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UncheckedStringToPointer;
+  }
+};
+
 /// Convert a pointer to a different kind of pointer.
 class PointerToPointerExpr : public ImplicitConversionExpr {
 public:

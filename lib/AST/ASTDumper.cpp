@@ -4083,6 +4083,12 @@ public:
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
   }
+  void visitUncheckedStringToPointerExpr(UncheckedStringToPointerExpr *E,
+                                         Label label) {
+    printCommon(E, "unchecked_string_to_pointer", label);
+    printRec(E->getSubExpr(), Label::optional("sub_expr"));
+    printFoot();
+  }
   void visitPointerToPointerExpr(PointerToPointerExpr *E, Label label) {
     printCommon(E, "pointer_to_pointer", label);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));

@@ -11,9 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 // MARK: Flags
+@usableFromInline
 struct UncheckedStringStorageFlags: OptionSet {
+  @usableFromInline
   let rawValue: UInt8
 
+  @usableFromInline
+  init(rawValue: UInt8) {
+    self.rawValue = rawValue
+  }
+
+  @usableFromInline
   static let nulTerminated = UncheckedStringStorageFlags(rawValue: 1 << 0)
 }
 
@@ -25,6 +33,7 @@ struct UncheckedStringStorageFlags: OptionSet {
 // structures must take up 15 bytes (because UncheckedStringStorage needs a
 // discriminator byte).
 
+@usableFromInline
 struct SmallUncheckedStringStorage<CharType: FixedWidthInteger> {
   typealias Bytes = (
     UInt8, UInt8, UInt8, UInt8,
@@ -41,17 +50,22 @@ struct SmallUncheckedStringStorage<CharType: FixedWidthInteger> {
 }
 
 @safe
+@usableFromInline
 struct ImmortalUncheckedStringStorage<CharType: FixedWidthInteger> {
+  @usableFromInline
   var characters: UnsafePointer<CharType>
   @safe
   var count: UInt32
   @safe
+  @usableFromInline
   var flags: UncheckedStringStorageFlags
   @safe
   var _reserved: (UInt8, UInt8) = (0, 0)
 }
 
+@usableFromInline
 struct DynamicUncheckedStringStorage<CharType: FixedWidthInteger> {
+  @usableFromInline
   var characters: [CharType]
   var _reserved: UInt32 = 0
   var flags: UncheckedStringStorageFlags
@@ -64,6 +78,7 @@ struct DynamicUncheckedStringStorage<CharType: FixedWidthInteger> {
 // structures must take up 7 bytes (because UncheckedStringStorage needs a
 // discriminator byte).
 
+@usableFromInline
 struct SmallUncheckedStringStorage<CharType: FixedWidthInteger> {
   typealias Bytes = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
 
@@ -72,15 +87,20 @@ struct SmallUncheckedStringStorage<CharType: FixedWidthInteger> {
 }
 
 @safe
+@usableFromInline
 struct ImmortalUncheckedStringStorage<CharType: FixedWidthInteger> {
+  @usableFromInline
   var characters: UnsafePointer<CharType>
   @safe
   var count: UInt16
   @safe
+  @usableFromInline
   var flags: UncheckedStringStorageFlags
 }
 
+@usableFromInline
 struct DynamicUncheckedStringStorage<CharType: FixedWidthInteger> {
+  @usableFromInline
   var characters: [CharType]
   var flags: UncheckedStringStorageFlags
   var _reserved: (UInt8, UInt8) = (0, 0)
@@ -117,6 +137,7 @@ extension SmallUncheckedStringStorage {
   }
 }
 
+@usableFromInline
 enum UncheckedStringStorage<CharType: FixedWidthInteger> {
   case empty
   case small(SmallUncheckedStringStorage<CharType>)

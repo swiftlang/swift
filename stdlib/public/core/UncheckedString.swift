@@ -84,9 +84,11 @@
 public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
   public typealias Element = E
 
+  @usableFromInline
   typealias Storage = UncheckedStringStorage<Element>
 
   @safe
+  @usableFromInline
   var storage: Storage
 
   public var count: Int { return storage.count }
@@ -205,6 +207,37 @@ extension UncheckedString {
           return try unsafe body(buffer.baseAddress!)
         }
     }
+  }
+}
+
+/// Derive a pointer argument from an `UncheckedString` value parameter.
+///
+/// This always produces a NUL-terminated buffer: reusing the string's
+/// existing storage directly when it's already NUL-terminated (`.dynamic`
+/// storage always is; `.immortal` storage sometimes is), and materializing a
+/// fresh NUL-terminated buffer otherwise -- mirroring `withCString`'s own
+/// switch over `storage` above.
+@available(SwiftStdlib 9999, *)
+@_transparent
+public // COMPILER_INTRINSIC
+func _convertConstUncheckedStringToPointerArgument<
+  Element: FixedWidthInteger,
+  ToPointer: _Pointer
+>(_ str: UncheckedString<Element>) -> (_ConvertedObject?, ToPointer) {
+  switch str.storage {
+  case .dynamic(let data):
+    // Already a heap-allocated, NUL-terminated buffer -- reuse it directly.
+    return _convertConstArrayToPointerArgument(data.characters)
+  case .immortal(let data) where data.flags.contains(.nulTerminated):
+    // Static, immortal, already NUL-terminated -- no owner needed.
+    return (nil, unsafe ToPointer(data.characters._rawValue))
+  default:
+    // Empty, small, or non-NUL-terminated immortal: materialize a fresh
+    // NUL-terminated buffer, mirroring `withCString`'s slow path for these
+    // same three cases.
+    var chars = Array(str)
+    chars.append(0)
+    return _convertConstArrayToPointerArgument(chars)
   }
 }
 

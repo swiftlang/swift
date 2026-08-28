@@ -2851,6 +2851,9 @@ public:
     /// A string r-value needs to be converted to a pointer type.
     RValueStringToPointer,
 
+    /// An UncheckedString r-value needs to be converted to a pointer type.
+    RValueUncheckedStringToPointer,
+
     /// A function conversion needs to occur.
     FunctionConversion,
 
@@ -2931,6 +2934,7 @@ private:
       return ValueMembers::indexOf<LValueStorage>();
     case RValueArrayToPointer:
     case RValueStringToPointer:
+    case RValueUncheckedStringToPointer:
     case FunctionConversion:
       return ValueMembers::indexOf<RValueStorage>();
     case DefaultArgument:
@@ -3108,6 +3112,7 @@ public:
     case LValueArrayToPointer:
     case RValueArrayToPointer:
     case RValueStringToPointer:
+    case RValueUncheckedStringToPointer:
     case FunctionConversion:
       args[argIndex++] = finishOriginalArgument(SGF);
       return;
@@ -3209,6 +3214,7 @@ private:
     assert(isa<InOutToPointerExpr>(expr) ||
            isa<ArrayToPointerExpr>(expr) ||
            isa<StringToPointerExpr>(expr) ||
+           isa<UncheckedStringToPointerExpr>(expr) ||
            isa<FunctionConversionExpr>(expr));
 
     switch (Kind) {
@@ -3243,6 +3249,15 @@ private:
         emitBindOptionals(SGF, optStringValue, pointerExpr->getSubExpr());
       return SGF.emitStringToPointer(pointerExpr, stringValue,
                                      pointerExpr->getType());
+    }
+    case RValueUncheckedStringToPointer: {
+      auto pointerExpr = cast<UncheckedStringToPointerExpr>(expr);
+      auto optStringValue = RV().RV;
+      auto stringValue =
+        emitBindOptionals(SGF, optStringValue, pointerExpr->getSubExpr());
+      return SGF.emitUncheckedStringToPointer(
+          pointerExpr, stringValue, pointerExpr->getSubExpr()->getType(),
+          pointerExpr->getType());
     }
     case FunctionConversion: {
       auto funcConv = cast<FunctionConversionExpr>(expr);
@@ -4818,7 +4833,13 @@ private:
     if (auto stringToPointer = dyn_cast<StringToPointerExpr>(expr)) {
       return emitDelayedConversion(stringToPointer, original);
     }
-    
+
+    // Delay accessing unchecked-string-to-pointer arguments until the call.
+    if (auto uncheckedStringToPointer =
+            dyn_cast<UncheckedStringToPointerExpr>(expr)) {
+      return emitDelayedConversion(uncheckedStringToPointer, original);
+    }
+
     // Delay function conversions involving the opened Self type of an
     // existential whose opening is itself delayed.
     //
@@ -4930,7 +4951,19 @@ private:
     Args.push_back(ManagedValue());
     return true;
   }
-  
+
+  /// Emit an rvalue-unchecked-string-to-pointer conversion as a delayed
+  /// argument.
+  bool emitDelayedConversion(UncheckedStringToPointerExpr *pointerExpr,
+                             OriginalArgument original) {
+    auto rvalueExpr = lookThroughBindOptionals(pointerExpr->getSubExpr());
+    ManagedValue value = SGF.emitRValueAsSingleValue(rvalueExpr);
+    DelayedArguments.emplace_back(
+        DelayedArgument::RValueUncheckedStringToPointer, value, original);
+    Args.push_back(ManagedValue());
+    return true;
+  }
+
   bool emitDelayedConversion(FunctionConversionExpr *funcConv,
                              OriginalArgument original) {
     auto rvalueExpr = lookThroughBindOptionals(funcConv->getSubExpr());

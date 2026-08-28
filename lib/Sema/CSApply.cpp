@@ -7480,6 +7480,22 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         result = cs.cacheType(new (ctx) InjectIntoOptionalExpr(result, toType));
       return result;
     }
+
+    case ConversionRestrictionKind::UncheckedStringToPointer: {
+      bool isOptional = false;
+      Type unwrappedTy = toType;
+      if (Type unwrapped = toType->getOptionalObjectType()) {
+        isOptional = true;
+        unwrappedTy = unwrapped;
+      }
+
+      TypeChecker::requirePointerArgumentIntrinsics(ctx, expr->getLoc());
+      Expr *result = cs.cacheType(
+          new (ctx) UncheckedStringToPointerExpr(expr, unwrappedTy));
+      if (isOptional)
+        result = cs.cacheType(new (ctx) InjectIntoOptionalExpr(result, toType));
+      return result;
+    }
     
     case ConversionRestrictionKind::PointerToPointer:
     case ConversionRestrictionKind::PointerToCPointer: {

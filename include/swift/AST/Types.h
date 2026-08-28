@@ -1044,6 +1044,10 @@ public:
   /// of the array.
   Type getArrayElementType();
 
+  /// Determine if this type is an UncheckedString<T> and, if so, provide the
+  /// element type of the string.
+  Type getUncheckedStringElementType();
+
   /// Determine if this type is an InlineArray<n, T> and, if so, provide the
   /// element type of the array.
   Type getInlineArrayElementType();

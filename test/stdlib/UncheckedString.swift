@@ -126,4 +126,44 @@ UncheckedStringTests.test("isTriviallyIdentical/substring") {
   expectFalse(sub1.isTriviallyIdentical(to: sub3))
 }
 
+UncheckedStringTests.test("pointerConversion") {
+  // Counts elements up to (but not including) the trailing NUL terminator
+  // that every `UnsafePointer<Element>`/`UnsafeRawPointer` conversion of an
+  // `UncheckedString` is required to produce.
+  func length<Element: FixedWidthInteger>(_ p: UnsafePointer<Element>) -> Int {
+    var n = 0
+    while p[n] != 0 { n += 1 }
+    return n
+  }
+
+  // `.small` storage.
+  let small: UncheckedString<UInt8> = "abc"
+  expectEqual(3, length(small))
+
+  // `.immortal` storage -- long enough to avoid the small-string
+  // optimization, and backed by a NUL-terminated literal.
+  let immortal: UncheckedString<UInt8> =
+    "this literal is long enough to not be small"
+  expectEqual(immortal.count, length(immortal))
+
+  // `.dynamic` storage -- grown past `SmallUncheckedStringStorage`'s
+  // capacity, so it's backed by a real heap-allocated, NUL-terminated array.
+  var dynamic: UncheckedString<UInt8> = "abc"
+  dynamic.append(contentsOf: "defghijklmnop" as UncheckedString<UInt8>)
+  expectEqual(16, length(dynamic))
+
+  // The conversion is generic over `Element`, not just `UInt8`.
+  let small16: UncheckedString<UInt16> = "abc"
+  expectEqual(3, length(small16))
+  var dynamic16: UncheckedString<UInt16> = "abc"
+  dynamic16.append(contentsOf: "defghijklmnop" as UncheckedString<UInt16>)
+  expectEqual(16, length(dynamic16))
+
+  // `UnsafeRawPointer` is also a valid conversion target.
+  func rawLength(_ p: UnsafeRawPointer) -> Int {
+    return length(p.assumingMemoryBound(to: UInt8.self))
+  }
+  expectEqual(3, rawLength(small))
+}
+
 runAllTests()
