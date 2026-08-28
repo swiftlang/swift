@@ -18,6 +18,9 @@ extension UncheckedString: _ExpressibleByBuiltinUncheckedStringLiteral {
   ///
   /// The pointee is permanently alive, backed by the executable's constant
   /// data, matching `init(immortalString:)`'s requirements.
+  @_specialize(where Element == UInt8)
+  @_specialize(where Element == CChar)
+  @_specialize(where Element == UInt16)
   @_effects(readonly)
   public init(
     _builtinUncheckedStringLiteral start: Builtin.RawPointer,

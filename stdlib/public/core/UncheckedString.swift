@@ -91,6 +91,7 @@ public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
   @usableFromInline
   var storage: Storage
 
+  @inlinable
   public var count: Int { return storage.count }
 
   internal init(_ storage: Storage) {
@@ -153,6 +154,33 @@ public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
   }
 }
 
+/// Unpacks a `.small` string's packed byte tuple into `buffer`, filling in
+/// `data.count` elements starting at `buffer[0]`.
+///
+/// `data.bytes` is a packed tuple of `UInt8`s with no alignment guarantee
+/// wider than 1 byte, so elements must be read with an alignment-agnostic
+/// load, not by rebinding to `Element`.
+///
+/// Factored out of `withCString`/`withCharacterData` (which are themselves
+/// generic over an unconstrained result/failure type and so cannot be
+/// fully `@_specialize`d) so that this loop -- the only part of those
+/// functions whose cost actually depends on `Element`'s width -- can be.
+@_specialize(where Element == UInt8)
+@_specialize(where Element == CChar)
+@_specialize(where Element == UInt16)
+fileprivate func _unpackSmallUncheckedString<Element: FixedWidthInteger>(
+  _ data: SmallUncheckedStringStorage<Element>,
+  into buffer: UnsafeMutableBufferPointer<Element>
+) {
+  withUnsafeBytes(of: data.bytes) { rawBuffer in
+    for i in 0..<Int(data.count) {
+      unsafe buffer[i] = rawBuffer.loadUnaligned(
+        fromByteOffset: i * MemoryLayout<Element>.stride,
+        as: Element.self)
+    }
+  }
+}
+
 @available(SwiftStdlib 9999, *)
 extension UncheckedString {
   /// Calls the given closure with a pointer to the contents of the string,
@@ -166,22 +194,13 @@ extension UncheckedString {
           return try unsafe body(nulptr)
         }
       case .small(let data):
-        return try unsafe withUnsafeBytes(of: data.bytes) { (rawBuffer) throws(Failure) -> R in
-          try unsafe withUnsafeTemporaryAllocation(
-            of: Element.self,
-            capacity: Int(data.count) + 1
-          ) { (buffer) throws(Failure) -> R in
-            // `rawBuffer` (a packed tuple of `UInt8`s) has no alignment
-            // guarantee wider than 1 byte, so `Element`s must be read with
-            // an alignment-agnostic load, not by rebinding to `Element`.
-            for i in 0..<Int(data.count) {
-              unsafe buffer[i] = rawBuffer.loadUnaligned(
-                fromByteOffset: i * MemoryLayout<Element>.stride,
-                as: Element.self)
-            }
-            unsafe buffer[Int(data.count)] = 0
-            return try unsafe body(buffer.baseAddress!)
-          }
+        return try unsafe withUnsafeTemporaryAllocation(
+          of: Element.self,
+          capacity: Int(data.count) + 1
+        ) { (buffer) throws(Failure) -> R in
+          unsafe _unpackSmallUncheckedString(data, into: buffer)
+          unsafe buffer[Int(data.count)] = 0
+          return try unsafe body(buffer.baseAddress!)
         }
       case .immortal(let data):
         if !data.flags.contains(.nulTerminated) {
@@ -235,7 +254,16 @@ func _convertConstUncheckedStringToPointerArgument<
     // Empty, small, or non-NUL-terminated immortal: materialize a fresh
     // NUL-terminated buffer, mirroring `withCString`'s slow path for these
     // same three cases.
-    var chars = Array(str)
+    //
+    // Bulk-copy via `withCharacterData`/`withUnsafeBufferPointer` rather
+    // than `Array(str)`, which would iterate element-by-element through
+    // `subscript(_:)` -- for `.small` storage, each such access re-unpacks
+    // the *entire* packed byte tuple just to extract one element.
+    var chars = str.withCharacterData { data in
+      data.withUnsafeBufferPointer { buffer in
+        unsafe Array(buffer)
+      }
+    }
     chars.append(0)
     return _convertConstArrayToPointerArgument(chars)
   }
@@ -261,6 +289,9 @@ extension UncheckedString where Element == UInt8 {
 @available(SwiftStdlib 9999, *)
 extension UncheckedString {
   /// Creates a string from a NUL-terminated sequence of characters.
+  @_specialize(where Element == UInt8)
+  @_specialize(where Element == CChar)
+  @_specialize(where Element == UInt16)
   public init(cString: UnsafePointer<Element>) {
     let len = unsafe fast_strlen(cString)
 
@@ -304,6 +335,9 @@ extension UncheckedString where Element == UInt8 {
 @available(SwiftStdlib 9999, *)
 extension UncheckedString {
   /// Creates a string from a NUL-terminated immortal string.
+  @_specialize(where Element == UInt8)
+  @_specialize(where Element == CChar)
+  @_specialize(where Element == UInt16)
   public init(immortalString: UnsafePointer<Element>) {
     let len = unsafe fast_strlen(immortalString)
 
@@ -327,6 +361,9 @@ extension UncheckedString {
   }
 
   // Creates a string from an immortal string that isn't NUL terminated.
+  @_specialize(where Element == UInt8)
+  @_specialize(where Element == CChar)
+  @_specialize(where Element == UInt16)
   public init(immortalString: UnsafeBufferPointer<Element>) {
     if immortalString.count == 0 {
       storage = .empty
@@ -355,21 +392,12 @@ extension UncheckedString {
       case .empty:
         return try body(Span<Element>())
       case .small(let data):
-        return try withUnsafeBytes(of: data.bytes) { (rawBuffer) throws(Failure) -> R in
-          // `rawBuffer` (a packed tuple of `UInt8`s) has no alignment
-          // guarantee wider than 1 byte, so `Element`s must be read with
-          // an alignment-agnostic load, not by rebinding to `Element`.
-          try unsafe withUnsafeTemporaryAllocation(
-            of: Element.self,
-            capacity: Int(data.count)
-          ) { (buffer) throws(Failure) -> R in
-            for i in 0..<Int(data.count) {
-              unsafe buffer[i] = rawBuffer.loadUnaligned(
-                fromByteOffset: i * MemoryLayout<Element>.stride,
-                as: Element.self)
-            }
-            return try body(unsafe UnsafeBufferPointer(buffer).span)
-          }
+        return try unsafe withUnsafeTemporaryAllocation(
+          of: Element.self,
+          capacity: Int(data.count)
+        ) { (buffer) throws(Failure) -> R in
+          unsafe _unpackSmallUncheckedString(data, into: buffer)
+          return try body(unsafe UnsafeBufferPointer(buffer).span)
         }
       case .immortal(let data):
         return try body(unsafe UnsafeBufferPointer(start: data.characters,
@@ -388,16 +416,21 @@ extension UncheckedString: BidirectionalCollection {
   public typealias SubSequence = UncheckedSubString<Element>
   public typealias Index = Int
 
+  @inlinable
   public var startIndex: Self.Index { 0 }
+  @inlinable
   public var endIndex: Self.Index { count }
 
+  @inlinable
   public func index(before i: Self.Index) -> Self.Index {
     return i - 1
   }
+  @inlinable
   public func index(after i: Self.Index) -> Self.Index {
     return i + 1
   }
 
+  @inlinable
   public subscript(_ ndx: Self.Index) -> Self.Element {
     precondition(ndx >= 0 && ndx < endIndex)
     return withCharacterData { data in
@@ -453,14 +486,19 @@ public struct UncheckedSubString<E: FixedWidthInteger>
   public typealias Index = Int
 
   public var base: UncheckedString<Element>
+  @usableFromInline
   var bounds: Range<Self.Index>
 
+  @inlinable
   public var startIndex: Self.Index { return bounds.lowerBound }
+  @inlinable
   public var endIndex: Self.Index { return bounds.upperBound }
 
+  @inlinable
   public func index(before i: Self.Index) -> Self.Index {
     return i - 1
   }
+  @inlinable
   public func index(after i: Self.Index) -> Self.Index {
     return i + 1
   }
@@ -475,6 +513,7 @@ public struct UncheckedSubString<E: FixedWidthInteger>
     self.bounds = bounds
   }
 
+  @inlinable
   public subscript(_ ndx: Self.Index) -> Self.Element {
     precondition(bounds.contains(ndx))
     return base[ndx]
@@ -505,6 +544,9 @@ public struct UncheckedSubString<E: FixedWidthInteger>
 
 // MARK: fast_strlen
 
+@_specialize(where T == UInt8)
+@_specialize(where T == CChar)
+@_specialize(where T == UInt16)
 @inline(always)
 fileprivate func fast_strlen<T: FixedWidthInteger>(_ str: UnsafePointer<T>) -> Int {
   // The compiler will optimize this to a call to C strlen() for UInt8

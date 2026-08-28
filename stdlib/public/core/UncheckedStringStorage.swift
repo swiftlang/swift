@@ -144,6 +144,7 @@ enum UncheckedStringStorage<CharType: FixedWidthInteger> {
   case immortal(ImmortalUncheckedStringStorage<CharType>)
   case `dynamic`(DynamicUncheckedStringStorage<CharType>)
 
+  @usableFromInline
   var count: Int {
     switch self {
       case .empty: return 0
