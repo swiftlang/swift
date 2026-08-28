@@ -3410,19 +3410,35 @@ function Patch-mimalloc() {
     $NoAssertBinaries = $Tools | ForEach-Object {[IO.Path]::Combine($Platform.NoAssertsToolchainInstallRoot, "usr", "bin", $_)}
     $Binaries = $Binaries + $NoAssertBinaries
   }
-  foreach ($Binary in $Binaries) {
-    $Name = [IO.Path]::GetFileName($Binary)
-    # Binary-patch in place
-    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-f" "-i" "$Binary"
-    # Log the import table
-    $LogFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name.txt"
-    $ErrorFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name-error.txt"
-    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-l" "$Binary" -OutFile $LogFile -ErrorFile $ErrorFile
-    # Verify patching
-    $Found = Select-String -Path $LogFile -Pattern "mimalloc"
-    if (-not $Found) {
-      Get-Content $ErrorFile
-      throw "Failed to patch mimalloc for $Name"
+
+  $minject = "$SourceCache\mimalloc\bin\minject$BuildSuffix"
+  # minject creates an intermediate path by extending the input filename.
+  # Stage the input under a short name to avoid its pathname-length bug.
+  $PatchBinary = [IO.Path]::Combine([IO.Path]::GetDirectoryName($minject), "binary.exe")
+
+  try {
+    foreach ($Binary in $Binaries) {
+      $Name = [IO.Path]::GetFileName($Binary)
+
+      Copy-Item -Force -LiteralPath $Binary -Destination $PatchBinary
+      Invoke-Program $minject "-f" "-i" "$PatchBinary"
+      Copy-Item -Force -LiteralPath $PatchBinary -Destination $Binary
+
+      # Log the import table
+      $LogFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name.txt"
+      $ErrorFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name-error.txt"
+      Invoke-Program "$minject" "-l" "$Binary" -OutFile $LogFile -ErrorFile $ErrorFile
+
+      # Verify patching
+      $Found = Select-String -Path $LogFile -Pattern "mimalloc"
+      if (-not $Found) {
+        Get-Content $ErrorFile
+        throw "Failed to patch mimalloc for $Name"
+      }
+    }
+  } finally {
+    if (Test-Path -LiteralPath $PatchBinary) {
+      Remove-Item -Force -LiteralPath $PatchBinary
     }
   }
 }
