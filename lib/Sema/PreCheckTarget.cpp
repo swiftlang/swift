@@ -2892,8 +2892,8 @@ Expr *PreCheckTarget::wrapMemberChainIfNeeded(Expr *E) {
   return wrapped;
 }
 
-TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
-                                                       Expr *E) {
+TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E,
+                                                      bool preferTypeLookup) {
   /// An ASTWalker for simplifying type expressions inside generic argument
   /// positions.
   /// The inner expression of a GenericArgumentExprTypeRepr is not walked by
@@ -2901,8 +2901,30 @@ TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
   /// so we use this walker to resolve names and fold type sugar.
   class GenericArgumentSimplifierWalker : public ASTWalker {
     DeclContext *DC;
+    bool PreferTypeLookup;
+
+    /// Resolve \p UDRE as a type reference, or return null if it does not name
+    /// a type. This never needs the enclosing protocol's requirement signature,
+    /// so it is safe at the structural stage.
+    TypeExpr *resolveAsTypeRef(UnresolvedDeclRefExpr *UDRE) {
+      auto name = UDRE->getName();
+      if (!name.isSimpleName() || name.getBaseName().isSpecial())
+        return nullptr;
+
+      auto lookup = TypeChecker::lookupUnqualifiedType(
+          DC, name, UDRE->getLoc(), defaultUnqualifiedLookupOptions);
+      if (lookup.empty())
+        return nullptr;
+
+      auto &ctx = DC->getASTContext();
+      auto *repr = UnqualifiedIdentTypeRepr::create(ctx, UDRE->getNameLoc(),
+                                                    name);
+      return new (ctx) TypeExpr(repr);
+    }
+
   public:
-    GenericArgumentSimplifierWalker(DeclContext *dc) : DC(dc) {}
+    GenericArgumentSimplifierWalker(DeclContext *dc, bool preferTypeLookup)
+        : DC(dc), PreferTypeLookup(preferTypeLookup) {}
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::ArgumentsAndExpansion;
     }
@@ -2922,6 +2944,10 @@ TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
 
       // Resolve unqualified name references
       if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+        if (PreferTypeLookup) {
+          if (auto *typeExpr = resolveAsTypeRef(unresolved))
+            return Action::SkipNode(typeExpr);
+        }
         auto *resolved = TypeChecker::resolveDeclRefExpr(unresolved, DC);
         if (!resolved)
           return Action::Stop();
@@ -2941,7 +2967,7 @@ TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
     }
   };
 
-  GenericArgumentSimplifierWalker walker(DC);
+  GenericArgumentSimplifierWalker walker(DC, preferTypeLookup);
   auto *walked = E->walk(walker);
   if (!walked)
     return nullptr;

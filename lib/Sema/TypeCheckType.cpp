@@ -6071,9 +6071,13 @@ NeverNullType TypeResolver::resolveGenericArgumentExprTypeRepr(
     return failedToResolveValue(
         diag::integer_generic_expr_closure_not_supported, closureLoc);
 
-  // Attempt to see if we can resolve the TypeExpr to a type
-  if (auto *simplifiedTyExpr =
-          TypeChecker::simplifyGenericArgumentTypeExpr(dc, originalValueExpr)) {
+  // Attempt to see if we can resolve the TypeExpr to a type. At the structural
+  // stage, an unqualified value lookup for a name in a protocol needs that
+  // protocol's requirement signature, which is what is being computed, so
+  // prefer a type interpretation of a name that has one.
+  if (auto *simplifiedTyExpr = TypeChecker::simplifyGenericArgumentTypeExpr(
+          dc, originalValueExpr,
+          /*preferTypeLookup=*/inStage(TypeResolutionStage::Structural))) {
     repr->setArgExpr(simplifiedTyExpr);
     return resolveType(simplifiedTyExpr->getTypeRepr(), options);
   }
