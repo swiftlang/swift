@@ -29,6 +29,11 @@ The path to the merged file system image populated by the build. The
 ImageRoot is retained as a compatibility alias.
 Default: 'S:\'
 
+.PARAMETER ObjectStore
+The path to the content-addressed object store used for build caching.
+Cache is retained as a compatibility alias.
+Default: 'S:\ObjectStore'
+
 .PARAMETER Stage
 The path to a directory where built msi's and the installer executable should be
 staged (for CI). Leave empty for local development builds.
@@ -137,7 +142,8 @@ param
   [System.IO.FileInfo] $BinaryCache = "S:\BinaryCache",
   [Alias("ImageRoot")]
   [System.IO.FileInfo] $BuildRoot = "S:",
-  [System.IO.FileInfo] $Cache = "S:\CAS",
+  [Alias("Cache")]
+  [System.IO.FileInfo] $ObjectStore = "S:\ObjectStore",
   [string] $Stage = "",
 
   # (Pinned) Bootstrap Toolchain
@@ -2314,7 +2320,7 @@ function Build-CMakeProject {
     }
 
     if ($EnableCaching) {
-      $env:LLVM_CACHE_CAS_PATH = "$Cache"
+      $env:LLVM_CACHE_CAS_PATH = "$ObjectStore"
       $SyntheticSourceCache = '\\swift\SourceCache$'
       $SyntheticBinaryCache = '\\swift\BinaryCache$'
       $CASPrefixMappings = [ordered]@{
@@ -2362,7 +2368,7 @@ function Build-CMakeProject {
         $SwiftCachingFlags = @(
           "-explicit-module-build",
           "-cache-compile-job",
-          "-cas-path", $Cache,
+          "-cas-path", $ObjectStore,
           "-incremental-dependency-scan",
           "-file-compilation-dir", $SyntheticBinaryCache,
           "-Xfrontend", "-prefix-map-sourceinfo"
