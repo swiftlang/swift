@@ -143,6 +143,9 @@ class LLVM(cmake_product.CMakeProduct):
                       ' into the local clang build directory {}.'.format(
                           host_cxx_builtins_dir, dest_builtins_dir), flush=True)
 
+                # Always strip i386 from copied host archives: Xcode 27's ld/strip
+                # reject i386, and copy_lib_stripping_architecture falls back to a
+                # plain copy when the source has no i386 slice.
                 for _os in ['ios', 'watchos', 'tvos', 'xros']:
                     # Copy over the device .a when necessary
                     lib_name = 'libclang_rt.{}.a'.format(_os)
@@ -150,15 +153,11 @@ class LLVM(cmake_product.CMakeProduct):
                     dest_lib_path = os.path.join(dest_builtins_dir, lib_name)
                     if not os.path.isfile(dest_lib_path):
                         if os.path.isfile(host_lib_path):
-                            if _os == 'tvos':
-                                print('{} -> {} (stripping i386)'.format(
-                                    host_lib_path, dest_lib_path))
-                                self.copy_lib_stripping_architecture(host_lib_path,
-                                                                     dest_lib_path,
-                                                                     'i386')
-                            else:
-                                print('{} -> {}'.format(host_lib_path, dest_lib_path))
-                                shutil.copy(host_lib_path, dest_lib_path)
+                            print('{} -> {} (stripping i386)'.format(
+                                host_lib_path, dest_lib_path))
+                            self.copy_lib_stripping_architecture(host_lib_path,
+                                                                 dest_lib_path,
+                                                                 'i386')
                         elif self.args.verbose_build:
                             print('no file exists at {}'.format(host_lib_path))
 
@@ -170,17 +169,10 @@ class LLVM(cmake_product.CMakeProduct):
 
                     if not os.path.isfile(dest_sim_lib_path):
                         if os.path.isfile(host_sim_lib_path):
-                            if _os == 'tvos':
-                                # This is to avoid strip failures when generating
-                                # a toolchain
-                                print('{} -> {} (stripping i386)'.format(
-                                    host_sim_lib_path, dest_sim_lib_path))
-                                self.copy_lib_stripping_architecture(
-                                    host_sim_lib_path, dest_sim_lib_path, 'i386')
-                            else:
-                                print('{} -> {}'.format(
-                                    host_sim_lib_path, dest_sim_lib_path))
-                                shutil.copy(host_sim_lib_path, dest_sim_lib_path)
+                            print('{} -> {} (stripping i386)'.format(
+                                host_sim_lib_path, dest_sim_lib_path))
+                            self.copy_lib_stripping_architecture(
+                                host_sim_lib_path, dest_sim_lib_path, 'i386')
 
                         elif os.path.isfile(host_lib_path):
                             # The simulator .a might not exist if the host
@@ -189,17 +181,11 @@ class LLVM(cmake_product.CMakeProduct):
                             # clang to find it. The device library has the simulator
                             # slices in Xcode that doesn't have the simulator .a, so
                             # the link is still valid.
-                            print('copying over faux-sim library {} to {}'.format(
-                                host_lib_path, sim_lib_name))
-                            if _os == 'tvos':
-                                print('Remove i386 from tvOS {}'.format(
-                                    dest_sim_lib_path))
-                                shell.call(['lipo', '-remove', 'i386', host_lib_path,
-                                            '-output', dest_sim_lib_path])
-                            else:
-                                print('{} -> {}'.format(host_lib_path,
-                                                        dest_sim_lib_path))
-                                shutil.copy(host_lib_path, dest_sim_lib_path)
+                            print('copying over faux-sim library {} to {} '
+                                  '(stripping i386)'.format(
+                                      host_lib_path, sim_lib_name))
+                            self.copy_lib_stripping_architecture(
+                                host_lib_path, dest_sim_lib_path, 'i386')
                         elif self.args.verbose_build:
                             print('no file exists at {}', host_sim_lib_path)
 
