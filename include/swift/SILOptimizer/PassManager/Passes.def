@@ -142,6 +142,9 @@ PASS(KillInvalidDebugValues, "kill-invalid-debug-values",
     "Kill debug_value instructions that appear after destroying consumers")
 PASS(DeadDebugVariableElimination, "dead-debug-variable-elimination",
     "Eliminate debug_value instructions in dead scopes")
+PASS(DebugValueSprinkler, "debug-value-sprinkler",
+    "Stress-test debug info by attaching a no-op debug reconstruction block to "
+    "every instruction result")
 PASS(NamedReturnValueOptimization, "named-return-value-optimization",
     "Optimize copies to an indirect return value")
 PASS(StripObjectHeaders, "strip-object-headers",

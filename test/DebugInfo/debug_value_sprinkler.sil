@@ -1,0 +1,102 @@
+// RUN: %target-sil-opt -sil-print-types -debug-value-sprinkler -enable-sil-verify-all %s | %FileCheck %s
+
+// Check that the sprinkler attaches a no-op debug reconstruction block to every
+// instruction result, and to debug_values that are already there.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct Point {
+  var x: Int
+  var y: Int
+}
+
+// An object-typed result gets a block argument of its own type, returned
+// directly.
+//
+// CHECK-LABEL: sil @object_results
+// CHECK:         [[X:%[0-9]+]] = struct_extract %0 : $Point, #Point.x
+// CHECK-NEXT:    debug_value [[X]] : $Int, let, name "sprinkle$
+// CHECK:         bb0(%0 : $Int):
+// CHECK-NEXT:      return %0 : $Int
+// CHECK-NEXT:    }
+// CHECK:       } // end sil function 'object_results'
+sil @object_results : $@convention(thin) (Point) -> Int {
+bb0(%0 : $Point):
+  %1 = struct_extract %0, #Point.x
+  return %1
+}
+
+// A loadable address result gets an address-typed block argument plus a
+// load [unqualified]; that load consumes the op_deref, so the debug_value itself
+// carries none.
+//
+// CHECK-LABEL: sil @loadable_address_result
+// CHECK:         [[ADR:%[0-9]+]] = struct_element_addr %0 : $*Point, #Point.y
+// CHECK-NEXT:    debug_value [[ADR]] : $*Int, let, name "sprinkle$
+// CHECK-NOT:     op_deref
+// CHECK:         bb0(%0 : $*Int):
+// CHECK-NEXT:      %1 = load %0 : $*Int
+// CHECK-NEXT:      return %1 : $Int
+// CHECK-NEXT:    }
+// CHECK:       } // end sil function 'loadable_address_result'
+sil @loadable_address_result : $@convention(thin) (@inout Point) -> () {
+bb0(%0 : $*Point):
+  %1 = struct_element_addr %0, #Point.y
+  %2 = tuple ()
+  return %2
+}
+
+// An address-only result keeps its op_deref and returns the address argument
+// directly, because no load can be inserted.
+//
+// CHECK-LABEL: sil @address_only_result
+// CHECK:         [[ADR:%[0-9]+]] = alloc_stack $T
+// CHECK-NEXT:    debug_value [[ADR]] : $*T, let, name "sprinkle$[[#]]", expr op_deref, transform {
+// CHECK:         bb0(%0 : $*T):
+// CHECK-NEXT:      return %0 : $*T
+// CHECK-NEXT:    }
+// CHECK:       } // end sil function 'address_only_result'
+sil @address_only_result : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  %1 = alloc_stack $T
+  dealloc_stack %1
+  %2 = tuple ()
+  return %2
+}
+
+// A debug_value that is already there gets a reconstruction block too, keeping
+// its own name, rather than a second synthetic variable being added for %0.
+//
+// CHECK-LABEL: sil @existing_debug_value
+// CHECK:         debug_value %0 : $Point, let, name "p", argno 1, transform {
+// CHECK:         bb0(%0 : $Point):
+// CHECK-NEXT:      return %0 : $Point
+// CHECK-NEXT:    }
+// CHECK:       } // end sil function 'existing_debug_value'
+sil @existing_debug_value : $@convention(thin) (Point) -> () {
+bb0(%0 : $Point):
+  debug_value %0, let, name "p", argno 1
+  %1 = tuple ()
+  return %1
+}
+
+// A begin_apply token cannot carry a debug variable. Its yielded value can.
+//
+// CHECK-LABEL: sil @coroutine_token
+// CHECK:         ([[YIELD:%[0-9]+]], [[TOKEN:%[0-9]+]]) = begin_apply
+// CHECK-NEXT:    debug_value [[YIELD]] : $Int, let, name "sprinkle$
+// CHECK-NOT:     debug_value [[TOKEN]]
+// CHECK:       } // end sil function 'coroutine_token'
+sil @yielder : $@convention(thin) @yield_once () -> @yields Int
+
+sil @coroutine_token : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @yielder : $@convention(thin) @yield_once () -> @yields Int
+  (%1, %2) = begin_apply %0() : $@convention(thin) @yield_once () -> @yields Int
+  end_apply %2 as $()
+  %3 = tuple ()
+  return %3
+}

@@ -70,6 +70,12 @@ static llvm::cl::opt<bool> SILPrintFinalModule(
     "sil-print-final-module", llvm::cl::init(false),
     llvm::cl::desc("Enable printing the module after all SIL passes"));
 
+static llvm::cl::opt<bool> EnableDebugValueSprinkler(
+    "enable-debug-value-sprinkler", llvm::cl::init(false),
+    llvm::cl::desc("Stress-test debug info by attaching a debug_value with a "
+                   "no-op debug reconstruction block to every instruction "
+                   "result. Never use in a production build"));
+
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
 //===----------------------------------------------------------------------===//
@@ -645,6 +651,10 @@ static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
 
 static void addPrepareOptimizationsPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("PrepareOptimizationPasses");
+
+  // Stress-testing pass.
+  if (EnableDebugValueSprinkler)
+    P.addDebugValueSprinkler();
 
   P.addForEachLoopUnroll();
   P.addSimplification();
