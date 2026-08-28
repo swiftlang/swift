@@ -816,6 +816,34 @@ bb0(%0 : @guaranteed $Klass):
   return %9999 : $()
 }
 
+sil [ossa] @convert_function_borrow_callee : $@convention(thin) (@in_guaranteed Builtin.Int32) -> @out Builtin.Int32
+
+// In OSSA the converted closure is owned and borrowed before it's passed to the
+// apply. Make sure that the function_ref is found through the begin_borrow and
+// through the chain of convert_functions.
+// CHECK-LABEL: sil [ossa] @convert_function_through_borrow : $@convention(thin) (@in_guaranteed Builtin.Int32) -> @out Builtin.Int32 {
+// CHECK:       [[FUNC:%.*]] = function_ref @convert_function_borrow_callee : $@convention(thin) (@in_guaranteed Builtin.Int32) -> @out Builtin.Int32
+// CHECK:       apply [[FUNC]]({{.*}}) : $@convention(thin) (@in_guaranteed Builtin.Int32) -> @out Builtin.Int32
+// CHECK: } // end sil function 'convert_function_through_borrow'
+sil [ossa] @convert_function_through_borrow : $@convention(thin) (@in_guaranteed Builtin.Int32) -> @out Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32):
+  %2 = function_ref @convert_function_borrow_callee : $@convention(thin) (@in_guaranteed Builtin.Int32) -> @out Builtin.Int32
+  %3 = thin_to_thick_function %2 : $@convention(thin) (@in_guaranteed Builtin.Int32) -> @out Builtin.Int32 to $@noescape @callee_guaranteed (@in_guaranteed Builtin.Int32) -> @out Builtin.Int32
+  %4 = convert_function %3 : $@noescape @callee_guaranteed (@in_guaranteed Builtin.Int32) -> @out Builtin.Int32 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Builtin.Int32, Builtin.Int32>, forwarding: @owned
+  %5 = begin_borrow %4 : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Builtin.Int32, Builtin.Int32>
+  // The borrow scope must span basic blocks, otherwise the begin_borrow is
+  // simplified away before this peephole gets a chance to run.
+  br bb1
+
+bb1:
+  %6 = convert_function %5 : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Builtin.Int32, Builtin.Int32> to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <Builtin.Int32, Builtin.Int32>
+  %7 = apply [nothrow] %6(%0, %1) : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <Builtin.Int32, Builtin.Int32>
+  end_borrow %5 : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Builtin.Int32, Builtin.Int32>
+  destroy_value %4 : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Builtin.Int32, Builtin.Int32>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 ///////////////////////////////////
 // (apply partial_apply()) tests //
 ///////////////////////////////////

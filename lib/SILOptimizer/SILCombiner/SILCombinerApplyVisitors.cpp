@@ -139,9 +139,45 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                 ConvertFunctionInst *CFI) {
   // We only handle simplification of static function references. If we don't
   // have one, bail.
+  //
+  // In OSSA the function value can be wrapped in several conversions and
+  // ownership instructions before it reaches the apply, e.g.
+  //   %1 = function_ref @f
+  //   %2 = thin_to_thick_function %1
+  //   %3 = convert_function %2, forwarding: @owned
+  //   %4 = begin_borrow %3
+  //   %5 = convert_function %4
+  //   apply %5(...)
+  // Look through all of them to find the underlying function reference.
   SILValue funcOper = CFI->getOperand();
-  if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(funcOper))
-    funcOper = TTI->getOperand();
+  bool strippedOwnershipInst = false;
+  for (;;) {
+    if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(funcOper)) {
+      funcOper = TTI->getOperand();
+      continue;
+    }
+    if (auto *subCFI = dyn_cast<ConvertFunctionInst>(funcOper)) {
+      // Bypassing a withoutActuallyEscaping conversion would loose the
+      // guarantee that the closure does not escape.
+      if (subCFI->withoutActuallyEscaping())
+        break;
+      funcOper = subCFI->getOperand();
+      continue;
+    }
+    if (isa<BeginBorrowInst>(funcOper) || isa<CopyValueInst>(funcOper) ||
+        isa<MoveValueInst>(funcOper) || isa<BorrowedFromInst>(funcOper)) {
+      funcOper = cast<SingleValueInstruction>(funcOper)->getOperand(0);
+      strippedOwnershipInst = true;
+      continue;
+    }
+    break;
+  }
+
+  // If we looked through an ownership instruction, the underlying value's
+  // lifetime does not necessarily cover the apply. This is only guaranteed if
+  // the value has no ownership at all, which is the case for a function_ref.
+  if (strippedOwnershipInst && !isa<FunctionRefInst>(funcOper))
+    return nullptr;
 
   if (!isa<FunctionRefInst>(funcOper) &&
       // Optimizing partial_apply will then enable the partial_apply -> apply peephole.
