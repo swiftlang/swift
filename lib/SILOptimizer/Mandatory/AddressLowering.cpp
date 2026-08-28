@@ -170,7 +170,7 @@
 using namespace swift;
 using llvm::SmallSetVector;
 
-/// A function's lowered-SIL convention, even while the SIL stage is Canonical.
+/// Compute what the function's convention would be after AddressLowering.
 static SILFunctionConventions getLoweredFnConv(SILFunction *function) {
   return SILFunctionConventions(
       function->getLoweredFunctionType(),
@@ -178,7 +178,7 @@ static SILFunctionConventions getLoweredFnConv(SILFunction *function) {
           function->getModule()));
 }
 
-/// A call's lowered-SIL convention, even while the SIL stage is Canonical.
+/// Compute what a call's function convention would be after AddressLowering.
 static SILFunctionConventions getLoweredCallConv(ApplySite call) {
   return SILFunctionConventions(
       call.getSubstCalleeType(),
@@ -1175,6 +1175,13 @@ static bool doesNotNeedStackAllocation(SILValue value) {
       (isa<BeginApplyInst>(defInst) &&
        value->getOwnershipKind() == OwnershipKind::Guaranteed))
     return true;
+
+  // A @guaranteed_address apply result should use the borrowed address
+  // returned by the callee after lowering. The ApplyRewriter will do that
+  // mapping instead of relying on a stack allocation to be synthesized.
+  if (auto *applyInst = dyn_cast<ApplyInst>(value))
+    if (getLoweredCallConv(ApplySite(applyInst)).hasGuaranteedAddressResult())
+      return true;
 
   return false;
 }
@@ -2732,6 +2739,14 @@ SILValue ApplyRewriter::materializeIndirectOutputAddress(ApplyOutput kind,
 void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
   auto *oldCall = cast<ApplyInst>(apply.getInstruction());
 
+  // A borrow accessor's @guaranteed_address result changes to returning a
+  // single direct address after lowering. We capture the old result value
+  // so that uses of it are redirected to that returned address.
+  SILValue guaranteedResult;
+  if (loweredCalleeConv.hasGuaranteedAddressResult()) {
+    guaranteedResult = apply.getResult();
+  }
+
   // Address lowering may change the rewritten apply's argument count
   // when opaque-value lowering inserts or merges operands. Forward the
   // original per-argument SILLocations only when the count is preserved;
@@ -2753,6 +2768,14 @@ void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
   // No need to delete this apply. It either has a single address-only result
   // and will be deleted at the end of the pass. Or it has multiple results and
   // will be deleted with its destructure_tuple.
+
+  // Redirect uses of the old @guaranteed_address result so it uses the
+  // address returned by the apply after lowering.
+  if (guaranteedResult) {
+    SILValue newResult = apply.getResult();
+    pass.valueStorageMap.setStorageAddress(guaranteedResult, newResult);
+    pass.valueStorageMap.getStorage(guaranteedResult).markRewritten();
+  }
 }
 
 /// Emit end_borrows for an incomplete BorrowedValue with only nonlifetime
@@ -3282,6 +3305,7 @@ public:
 
 protected:
   void rewriteReturn(ReturnInst *returnInst);
+  void rewriteReturnBorrow(ReturnBorrowInst *returnBorrowInst);
   void rewriteThrow(ThrowInst *throwInst);
 
   void rewriteElement(SILValue oldResult, SILArgument *newResultArg,
@@ -3292,6 +3316,8 @@ void ReturnRewriter::rewriteReturns() {
   for (SILInstruction *termInst : pass.exitingInsts) {
     if (auto *returnInst = dyn_cast<ReturnInst>(termInst))
       rewriteReturn(returnInst);
+    else if (auto *returnBorrowInst = dyn_cast<ReturnBorrowInst>(termInst))
+      rewriteReturnBorrow(returnBorrowInst);
     else
       assert(isa<ThrowInst>(termInst));
   }
@@ -3361,6 +3387,15 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
              // Assume that all original results are direct in SIL.
              assert(!opaqueFnConv.isSILIndirect(resultInfo));
              if (!pass.loweredFnConv.isSILIndirect(resultInfo)) {
+               // A @guaranteed_address's lowering directly returns an address.
+               if (pass.loweredFnConv.isAddressResult(resultInfo) &&
+                   oldResult->getType().isObject()) {
+                 ValueStorage &storage =
+                     pass.valueStorageMap.getStorage(oldResult);
+                 assert(storage.isRewritten);
+                 newDirectResults.push_back(storage.storageAddress);
+                 return;
+               }
                newDirectResults.push_back(oldResult);
                return;
              }
@@ -3397,6 +3432,23 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
   if (pseudoReturnVal) {
     pass.deleter.forceDelete(pseudoReturnVal);
   }
+}
+
+// A return_borrow returns a borrowed (guaranteed) value; under opaque values
+// its operand is an opaque object (e.g. a load_borrow of the borrowed storage).
+// After lowering, a @guaranteed_address result is returned directly as the
+// borrowed address, so replace the return_borrow with a return of the operand's
+// storage address.
+void ReturnRewriter::rewriteReturnBorrow(ReturnBorrowInst *returnBorrowInst) {
+  assert(pass.loweredFnConv.hasGuaranteedAddressResult() &&
+         "return_borrow requires a @guaranteed_address result");
+  SILValue oldResult = returnBorrowInst->getReturnValue();
+  ValueStorage &storage = pass.valueStorageMap.getStorage(oldResult);
+  assert(storage.isRewritten);
+
+  auto returnBuilder = pass.getBuilder(returnBorrowInst->getIterator());
+  returnBuilder.createReturn(returnBorrowInst->getLoc(), storage.storageAddress);
+  pass.deleter.forceDelete(returnBorrowInst);
 }
 
 void ReturnRewriter::rewriteElement(SILValue oldResult,
@@ -3825,6 +3877,11 @@ protected:
 
   void visitReturnInst(ReturnInst *returnInst) {
     // Returns are rewritten for any function with indirect results after
+    // opaque value rewriting.
+  }
+
+  void visitReturnBorrowInst(ReturnBorrowInst *returnBorrowInst) {
+    // Like returns, return_borrows are rewritten by the ReturnRewriter after
     // opaque value rewriting.
   }
 
@@ -4693,7 +4750,9 @@ static void rewriteFunction(AddressLoweringState &pass) {
   // Rewrite this function's return value now that all opaque values within the
   // function are rewritten. This still depends on a valid ValueStorage
   // projection operands.
-  if (pass.function->getLoweredFunctionType()->hasIndirectFormalResults())
+
+  if (pass.function->getLoweredFunctionType()->hasIndirectFormalResults() ||
+      pass.loweredFnConv.hasAddressResult())
     ReturnRewriter(pass).rewriteReturns();
   if (pass.function->getLoweredFunctionType()->hasIndirectFormalYields())
     YieldRewriter(pass).rewriteYields();
