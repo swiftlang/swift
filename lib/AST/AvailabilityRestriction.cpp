@@ -15,6 +15,7 @@
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/PlatformKindUtils.h"
 #include "swift/AST/ProtocolConformance.h"
 
 using namespace swift;
@@ -273,6 +274,33 @@ static bool canIgnoreRestrictionInUnavailableContexts(
   }
 }
 
+/// Returns the domain for the target platform if \p restriction may be narrowed
+/// to apply to that domain when determining whether the restriction may be
+/// ignored in an unavailable context. Returns `std::nullopt` otherwise.
+static std::optional<AvailabilityDomain>
+getSubstituteDomainForRestriction(const AvailabilityRestriction &restriction,
+                                  const ASTContext &ctx) {
+  // Only narrow anyAppleOS availability restrictions.
+  if (!restriction.getDomain().contains(
+          AvailabilityDomain::forPlatform(PlatformKind::anyAppleOS)))
+    return std::nullopt;
+
+  auto targetDomain = ctx.getTargetAvailabilityDomain();
+
+  // Don't narrow to an app extension domain. A module compiled with
+  // -application-extension cannot safely use declarations that are unavailable
+  // in the base platform domain.
+  if (auto platform = targetDomain.getPlatformKind()) {
+    if (auto basePlatform = basePlatformForExtensionPlatform(*platform))
+      targetDomain = AvailabilityDomain::forPlatform(*basePlatform);
+  }
+
+  if (restriction.getDomain().isSupersetOf(targetDomain))
+    return targetDomain;
+
+  return std::nullopt;
+}
+
 static bool
 shouldIgnoreRestrictionInContext(const Decl *decl,
                                  const AvailabilityRestriction &restriction,
@@ -284,16 +312,10 @@ shouldIgnoreRestrictionInContext(const Decl *decl,
   if (!canIgnoreRestrictionInUnavailableContexts(decl, restriction, flags))
     return false;
 
-  // If the restriction's domain is a superset of the compilation's target
-  // availability domain, use the more specific target availability domain
-  // instead. This allows declarations that are @available(macOS, unavailable)
-  // to be used in contexts that are @available(macOSApplicationExtension,
-  // unavailable), for example.
-  auto &ctx = decl->getASTContext();
   auto domain = restriction.getDomain();
-  auto targetDomain = ctx.getTargetAvailabilityDomain();
-  if (domain.isSupersetOf(targetDomain))
-    domain = targetDomain;
+  if (auto substituteDomain =
+          getSubstituteDomainForRestriction(restriction, decl->getASTContext()))
+    domain = *substituteDomain;
 
   return context.isUnavailableForDomain(domain);
 }
