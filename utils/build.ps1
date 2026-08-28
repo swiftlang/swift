@@ -23,9 +23,10 @@ Default: 'S:\SourceCache'
 The path to a directory where to write build system files and outputs.
 Default: 'S:\b'
 
-.PARAMETER ImageRoot
-The path to a directory that mimics a file system image root, under which the
-"Program Files" subdirectories will be created with the files installed by CMake.
+.PARAMETER BuildRoot
+The path to the merged file system image populated by the build. The
+"Program Files" subdirectories will be created beneath this directory.
+ImageRoot is retained as a compatibility alias.
 Default: 'S:\'
 
 .PARAMETER Stage
@@ -134,7 +135,8 @@ param
   # Build Paths
   [System.IO.FileInfo] $SourceCache = "S:\SourceCache",
   [System.IO.FileInfo] $BinaryCache = "S:\BinaryCache",
-  [System.IO.FileInfo] $ImageRoot = "S:",
+  [Alias("ImageRoot")]
+  [System.IO.FileInfo] $BuildRoot = "S:",
   [System.IO.FileInfo] $Cache = "S:\CAS",
   [string] $Stage = "",
 
@@ -766,7 +768,7 @@ function Get-PythonExecutable {
 }
 
 function Get-EmbeddedPythonInstallDir() {
-  return [IO.Path]::Combine("$ImageRoot\", "Program Files", "Swift", "Python-$PythonVersion")
+  return [IO.Path]::Combine("$BuildRoot\", "Program Files", "Swift", "Python-$PythonVersion")
 }
 
 function Get-Syft {
@@ -779,16 +781,16 @@ function Get-CMake {
 
 function Get-InstallDir([Hashtable] $Platform) {
   if ($Platform -eq $HostPlatform) {
-    return [IO.Path]::Combine("$ImageRoot\", "Program Files", "Swift")
+    return [IO.Path]::Combine("$BuildRoot\", "Program Files", "Swift")
   }
   if ($Platform -eq $KnownPlatforms["WindowsARM64"]) {
-    return [IO.Path]::Combine("$ImageRoot\", "Program Files (Arm64)", "Swift")
+    return [IO.Path]::Combine("$BuildRoot\", "Program Files (Arm64)", "Swift")
   }
   if ($Platform -eq $KnownPlatforms["WindowsX64"]) {
-    return [IO.Path]::Combine("$ImageRoot\", "Program Files (Amd64)", "Swift")
+    return [IO.Path]::Combine("$BuildRoot\", "Program Files (Amd64)", "Swift")
   }
   if ($Platform -eq $KnownPlatforms["WindowsX86"]) {
-    return [IO.Path]::Combine("$ImageRoot\", "Program Files (x86)", "Swift")
+    return [IO.Path]::Combine("$BuildRoot\", "Program Files (x86)", "Swift")
   }
   throw "Unknown Platform"
 }

@@ -107,7 +107,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %HostArchNameArg% ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
-  -ImageRoot %BuildRoot% ^
+  -BuildRoot %BuildRoot% ^
   %WindowsSDKArgs% ^
   %PackagingArg% ^
   %TestArg% ^
