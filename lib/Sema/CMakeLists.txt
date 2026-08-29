@@ -5,6 +5,7 @@ add_swift_host_library(swiftSema STATIC
   BindingProducer.cpp
   BuilderTransform.cpp
   Comment.cpp
+  ConformanceCache.cpp
   CSApply.cpp
   CSBindings.cpp
   CSDisjunction.cpp
