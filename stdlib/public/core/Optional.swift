@@ -421,6 +421,14 @@ extension Optional where Wrapped: ~Copyable & Escapable {
   @_lifetime(borrow self)
   public func _span() -> Span<Wrapped> { span }
 
+  /// A span over the wrapped value of this instance.
+  ///
+  /// The span contains a single element when this instance has a wrapped
+  /// value, and is empty when this instance is `nil`.
+  ///
+  /// - Returns: A `Span` over the wrapped value of this instance.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   public var span: Span<Wrapped> {
     @_addressableSelf
@@ -435,6 +443,14 @@ extension Optional where Wrapped: ~Copyable & Escapable {
     }
   }
 
+  /// A mutable span over the wrapped value of this instance.
+  ///
+  /// The span contains a single element when this instance has a wrapped
+  /// value, and is empty when this instance is `nil`.
+  ///
+  /// - Returns: A `MutableSpan` over the wrapped value of this instance.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   public var mutableSpan: MutableSpan<Wrapped> {
     @_lifetime(&self)
@@ -448,6 +464,41 @@ extension Optional where Wrapped: ~Copyable & Escapable {
     }
   }
 
+  /// Edit this instance through a closure with an output span over its storage.
+  ///
+  /// This method calls its function argument exactly once, allowing it to
+  /// change or remove the wrapped value, or to supply one if this instance
+  /// is `nil`. The span it is given has a capacity of one, and initially holds
+  /// one element if this instance has a wrapped value, or none if it is `nil`.
+  /// The argument is free to remove or add an item; however, it is not
+  /// allowed to replace the span or change its capacity. Appending more than
+  /// one item is a runtime error.
+  ///
+  /// When the function argument finishes (whether by returning or throwing an
+  /// error) this instance is updated to match the final contents of the output
+  /// span: it becomes `nil` if the span was left empty, and it wraps the item
+  /// the span holds otherwise.
+  ///
+  ///     var number: Int? = nil
+  ///
+  ///     number.edit { n in
+  ///       if n.isEmpty { n.append(6) }
+  ///     }
+  ///     print(number)
+  ///     // Prints "Optional(6)"
+  ///
+  ///     number.edit { n in
+  ///       n.removeAll()
+  ///     }
+  ///     print(number)
+  ///     // Prints "nil"
+  ///
+  /// - Parameter body: A function that edits the wrapped value of this
+  ///   instance through an `OutputSpan` argument. This method invokes this
+  ///   function at most once.
+  /// - Returns: This method returns the result of its function argument.
+  /// - Complexity: Adds O(1) overhead to the complexity of the function
+  ///   argument.
   @export(implementation)
   mutating public func edit<E: Error, R: ~Copyable>(
     _ body: (inout OutputSpan<Wrapped>) throws(E) -> R
