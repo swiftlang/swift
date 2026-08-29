@@ -710,6 +710,31 @@ static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {
   return nullptr;
 }
 
+static void unwrapTollFreeBridging(Type &lhs, Type &rhs) {
+  auto *lhsDecl = lhs->getClassOrBoundGenericClass();
+  auto *rhsDecl = rhs->getClassOrBoundGenericClass();
+
+  if (lhsDecl == nullptr || rhsDecl == nullptr)
+    return;
+
+  // Toll-free bridging CF -> ObjC.
+  if (lhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+      rhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
+    if (auto *lhsBridged = getBridgedObjCClass(lhsDecl)) {
+      lhs = lhsBridged->getDeclaredInterfaceType();
+      ASSERT(!lhs->hasTypeParameter());
+    }
+
+  // Toll-free bridging ObjC -> CF.
+  } else if (lhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
+             rhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+    if (auto *rhsBridged = getBridgedObjCClass(rhsDecl)) {
+      rhs = rhsBridged->getDeclaredInterfaceType();
+      ASSERT(!rhs->hasTypeParameter());
+    }
+  }
+}
+
 static bool isCovariantInstanceType(Type t) {
   return t->getClassOrBoundGenericClass() ||
          t->is<ArchetypeType>();
@@ -743,48 +768,24 @@ ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
     }
 
     case ConversionBehavior::Class: {
+      unwrapTollFreeBridging(lhs, rhs);
+
       // Unwrap DynamicSelfType.
-      bool lhsWasSelf = false;
-      if (auto *lhsSelf = lhs->getAs<DynamicSelfType>()) {
-        lhsWasSelf = true;
-        lhs = lhsSelf->getSelfType();
+      Type lhsSelf;
+      if (auto *dynamicSelf = lhs->getAs<DynamicSelfType>()) {
+        lhsSelf = dynamicSelf->getSelfType();
       }
 
-      bool rhsWasSelf = false;
-      if (auto *rhsSelf = rhs->getAs<DynamicSelfType>()) {
-        rhsWasSelf = true;
-        rhs = rhsSelf->getSelfType();
+      Type rhsSelf;
+      if (auto *dynamicSelf = rhs->getAs<DynamicSelfType>()) {
+        rhsSelf = dynamicSelf->getSelfType();
       }
 
       // DynamicSelfType-to-DynamicSelfType conversions are exact.
-      if (lhsWasSelf && rhsWasSelf) {
-        auto result = isLikelyExactMatch(lhs, rhs);
+      if (lhsSelf && rhsSelf) {
+        auto result = isLikelyExactMatch(lhsSelf, rhsSelf);
         if (result.has_value() && !*result)
           return ConflictFlag::Class;
-      }
-
-      // No conversions to DynamicSelfType.
-      if (rhsWasSelf)
-        return ConflictFlag::Class;
-
-      auto *lhsDecl = lhs->getClassOrBoundGenericClass();
-      auto *rhsDecl = rhs->getClassOrBoundGenericClass();
-
-      // Toll-free bridging CF -> ObjC.
-      if (lhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
-          rhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
-        if (auto *lhsBridged = getBridgedObjCClass(lhsDecl)) {
-          lhs = lhsBridged->getDeclaredInterfaceType();
-          ASSERT(!lhs->hasTypeParameter());
-        }
-
-      // Toll-free bridging ObjC -> CF.
-      } else if (lhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
-                 rhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-        if (auto *rhsBridged = getBridgedObjCClass(rhsDecl)) {
-          rhs = rhsBridged->getDeclaredInterfaceType();
-          ASSERT(!rhs->hasTypeParameter());
-        }
       }
 
       // Check for a subclassing relationship.
@@ -1404,7 +1405,7 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
     }
 
     case ConversionBehavior::Class: {
-      // FIXME: CF toll-free bridging
+      unwrapTollFreeBridging(lhs, rhs);
 
       auto result = superclassJoinMeetImpl(op, lhs, rhs);
       if (result)
