@@ -329,6 +329,12 @@ extension LifetimeDependence.Scope {
         // intermediate reference in a chain like `a.b.c` is destroyed as soon as the next one has been loaded, which
         // would give a scope too narrow to contain the dependent value.
         self.init(base: parentStorage, context)
+      } else if refElementAddr.instance.referenceRoot.ownership == .guaranteed {
+        // The reference was forwarded from a guaranteed value rather than
+        // loaded out of memory. Nothing may overwrite the storage that value
+        // was borrowed from while the borrow is live, so the referent stays
+        // alive for the whole borrow scope.
+        self.init(base: refElementAddr.instance.referenceRoot, context)
       } else {
         self.init(base: refElementAddr.instance, context)
       }
