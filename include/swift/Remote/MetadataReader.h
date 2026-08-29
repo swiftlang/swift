@@ -2447,6 +2447,7 @@ private:
       importInfo.emplace();
       nameAddress += name.size() + 1;
 
+      uint64_t importInfoSize = 0;
       while (true) {
         // Read the next string.
         std::string temp;
@@ -2456,6 +2457,12 @@ private:
         // If we read an empty string, we're done.
         if (temp.empty())
           break;
+
+        // The remote process may never provide the empty string that ends
+        // the list, so stop once it grows implausibly large.
+        importInfoSize += temp.size() + 1;
+        if (importInfoSize > MaxMetadataSize)
+          return std::nullopt;
 
         // Advance past the string.
         nameAddress += temp.size() + 1;
@@ -2512,6 +2519,11 @@ private:
       // Move the address forward and add the next chunk.
       currentAddress = currentAddress + chunk.size() + 1;
       mangledName += std::move(chunk);
+
+      // The remote process may never terminate the name outside of a symbolic
+      // reference, so stop once it grows implausibly large.
+      if (mangledName.size() > MaxMetadataSize)
+        return nullptr;
 
       // Scan through the mangled name to skip over symbolic references.
       unsigned end = mangledName.size();
