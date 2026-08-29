@@ -58,10 +58,10 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
 let closureSpecialization = FunctionPass(name: "closure-specialization") {
   (function: Function, context: FunctionPassContext) in
 
-  runClosureSpecialization(function: function, context: context)
+  runClosureSpecialization(function: function, isRootInvocation: true, context: context)
 }
 
-func runClosureSpecialization(function: Function, context: FunctionPassContext) {
+func runClosureSpecialization(function: Function, isRootInvocation: Bool, context: FunctionPassContext) {
   guard function.hasOwnership else {
     return
   }
@@ -73,7 +73,7 @@ func runClosureSpecialization(function: Function, context: FunctionPassContext) 
 
     for inst in function.instructions {
       if let apply = inst as? FullApplySite {
-        if trySpecialize(apply: apply, context) {
+        if trySpecialize(apply: apply, isRootInvocation: isRootInvocation, context) {
           changed = true
         }
       }
@@ -200,7 +200,7 @@ let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-special
       break
     }
 
-    if trySpecialize(apply: partialApplyInst, context) {
+    if trySpecialize(apply: partialApplyInst, isRootInvocation: true, context) {
       changed = true
     }
 
@@ -217,7 +217,7 @@ let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-special
 
 // ===================== Utility functions and extensions ===================== //
 
-private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> Bool {
+private func trySpecialize(apply: ApplySite, isRootInvocation: Bool, _ context: FunctionPassContext) -> Bool {
   guard isCalleeSpecializable(of: apply),
         let specialization = analyzeArguments(of: apply, context)
   else {
@@ -255,7 +255,7 @@ private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> 
 
   specialization.deleteDeadClosures(context)
 
-  if isNewFunction {
+  if isNewFunction && isRootInvocation {
     /// Further specialization rounds can leave the cloned callee holding a specializable closure and an `apply` which
     /// takes this closure as an argument. Consider the case when this specializable closure captures an argument from
     /// the cloned callee, and this argument by itself is a specializable closure constructed in caller and passed to
@@ -272,8 +272,8 @@ private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> 
     /// Running `runClosureSpecialization` synchronously on the cloned callee we've just produced fully specializes it
     /// before the caller's next specialization round, so the caller re-inspects the same apply, now sees `closure0` as
     /// transitively applied, and specializes it - leaving no `partial_apply` of a specializable closure in the caller.
-    /// This recursion terminates: `runClosureSpecialization` performs at most 5 rounds per function, and
-    /// `findSpecializableClosure` only specializes closures whose callee has `specializationLevel <= 2`.
+    /// This recursion terminates: recursive specialization run on the just-specialized callee is only triggered from the
+    /// actual pass invocation (`isRootInvocation`), so we won't trigger specialization of callees nested deeper.
     ///
     /// Round 2 for caller: specialize apply of specialized_callee_r1.
     ///
@@ -321,7 +321,7 @@ private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> 
 
     context.buildSpecializedFunction(specializedFunction: specializedFunction) {
       (specializedFunction, specializedContext) in
-      runClosureSpecialization(function: specializedFunction, context: specializedContext)
+      runClosureSpecialization(function: specializedFunction, isRootInvocation: false, context: specializedContext)
     }
   }
 
