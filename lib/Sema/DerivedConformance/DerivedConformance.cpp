@@ -1002,9 +1002,6 @@ static SourceLoc getValidParentLocForDerivation(DerivedConformance &derived,
   if (braces.Start.isValid())
     return braces.Start;
 
-  if (braces.End.isValid())
-    return braces.End;
-
   auto atLoc = derived.Conformance->getLoc();
   if (atLoc.isValid())
     return atLoc;
