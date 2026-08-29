@@ -43,9 +43,27 @@ public:
     ResolveSymbols[address] = std::move(symbol);
   }
 
+  /// The total number of string bytes, including terminators, handed out by
+  /// readString.
+  uint64_t getStringBytesRead() const { return StringBytesRead; }
+
 private:
   std::map<uint64_t, std::vector<uint8_t>> Memory;
   std::map<uint64_t, std::string> ResolveSymbols;
+  uint64_t StringBytesRead = 0;
+
+  /// Find the registered block containing the address, returning a pointer to
+  /// that address and the number of bytes remaining in the block.
+  std::pair<const uint8_t *, size_t> lookup(uint64_t address) const {
+    auto it = Memory.upper_bound(address);
+    if (it == Memory.begin())
+      return {nullptr, 0};
+    --it;
+    uint64_t offset = address - it->first;
+    if (offset >= it->second.size())
+      return {nullptr, 0};
+    return {it->second.data() + offset, it->second.size() - offset};
+  }
 
   bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                        void *outBuffer) override {
@@ -81,24 +99,24 @@ private:
   }
 
   bool readString(RemoteAddress address, std::string &dest) override {
-    auto it = Memory.find(address.getRawAddress());
-    if (it == Memory.end())
+    auto found = lookup(address.getRawAddress());
+    if (!found.first)
       return false;
-    const char *data = reinterpret_cast<const char *>(it->second.data());
-    size_t maxLen = it->second.size();
-    size_t len = strnlen(data, maxLen);
+    const char *data = reinterpret_cast<const char *>(found.first);
+    size_t len = strnlen(data, found.second);
     dest.assign(data, len);
+    StringBytesRead += len + 1;
     return true;
   }
 
   ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
-    auto it = Memory.find(address.getRawAddress());
-    if (it == Memory.end())
+    auto found = lookup(address.getRawAddress());
+    if (!found.first)
       return ReadBytesResult();
-    if (size > it->second.size())
+    if (size > found.second)
       return ReadBytesResult();
     void *buf = malloc(size);
-    memcpy(buf, it->second.data(), size);
+    memcpy(buf, found.first, size);
     return ReadBytesResult(buf,
                            [](const void *p) { free(const_cast<void *>(p)); });
   }
@@ -285,4 +303,55 @@ TEST(MetadataReader, ResilientSuperclassCycleTerminates) {
   ASSERT_TRUE(descriptorRef);
 
   EXPECT_FALSE(metadataReader.getClassMetadataBounds(descriptorRef).has_value());
+}
+
+// Test that reading a mangled name fails when the accumulated name grows past
+// the reader's size limit. A mangled name is read in NUL-terminated chunks,
+// because a symbolic reference can contain a NUL byte. Memory tiled with the
+// five-byte pattern 01 41 41 41 00 puts every terminator inside a symbolic
+// reference payload, so the reader always wants one more chunk.
+TEST(MetadataReader, MangledNameAccumulationIsBounded) {
+  auto reader = std::make_shared<MockMemoryReader>();
+
+  const uint64_t moduleAddr = 0x1000;
+  const uint64_t moduleNameAddr = 0x1100;
+  const uint64_t extensionAddr = 0x2000;
+  const uint64_t mangledNameAddr = 0x3000;
+
+  uint32_t moduleDescriptor[] = {
+      ContextDescriptorFlags(ContextDescriptorKind::Module, /*isGeneric*/ false,
+                             /*isUnique*/ true,
+                             /*hasInvertibleProtocols*/ false,
+                             /*kindSpecificFlags*/ 0)
+          .getIntValue(),
+      0, uint32_t(int32_t(moduleNameAddr - (moduleAddr + 8)))};
+  reader->addMemory(moduleAddr, moduleDescriptor, sizeof(moduleDescriptor));
+  reader->addMemory(moduleNameAddr, "M", 2);
+
+  uint32_t extensionDescriptor[] = {
+      ContextDescriptorFlags(ContextDescriptorKind::Extension,
+                             /*isGeneric*/ false, /*isUnique*/ true,
+                             /*hasInvertibleProtocols*/ false,
+                             /*kindSpecificFlags*/ 0)
+          .getIntValue(),
+      uint32_t(int32_t(moduleAddr - (extensionAddr + 4))),
+      uint32_t(int32_t(mangledNameAddr - (extensionAddr + 8)))};
+  reader->addMemory(extensionAddr, extensionDescriptor,
+                    sizeof(extensionDescriptor));
+
+  const uint8_t pattern[] = {0x01, 'A', 'A', 'A', 0x00};
+  std::vector<uint8_t> mangledName(8 * 1024 * 1024);
+  for (size_t i = 0; i + sizeof(pattern) <= mangledName.size();
+       i += sizeof(pattern))
+    memcpy(mangledName.data() + i, pattern, sizeof(pattern));
+  reader->addMemory(mangledNameAddr, mangledName.data(), mangledName.size());
+
+  TestMetadataReader metadataReader(reader);
+  Demangler dem;
+  auto result = metadataReader.readDemanglingForContextDescriptor(
+      RemoteAddress(extensionAddr, 0), dem);
+
+  EXPECT_EQ(result, nullptr);
+  EXPECT_GT(reader->getStringBytesRead(), uint64_t(512 * 1024));
+  EXPECT_LT(reader->getStringBytesRead(), uint64_t(2 * 1024 * 1024));
 }
