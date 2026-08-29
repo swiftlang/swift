@@ -3163,6 +3163,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isNoEscape() const;
   BRIDGED_INLINE bool isInteger() const;
   BRIDGED_INLINE bool isUnownedStorageType() const;
+  BRIDGED_INLINE bool isReferenceStorageType() const;
   BRIDGED_INLINE bool isMetatypeType() const;
   BRIDGED_INLINE bool isExistentialMetatypeType() const;
   BRIDGED_INLINE bool isTuple() const;
