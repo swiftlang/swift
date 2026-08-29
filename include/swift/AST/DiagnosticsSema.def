@@ -6273,6 +6273,18 @@ ERROR(distributed_actor_target_result_not_codable,none,
 ERROR(distributed_actor_system_serialization_req_must_be_protocol,none,
       "'SerializationRequirement' type witness %0 must be a protocol type",
       (Type))
+ERROR(distributed_actor_target_serialization_req_not_concrete,none,
+      "%kind0 cannot be checked because actor system %1 does not specify a "
+      "concrete 'SerializationRequirement'",
+      (const ValueDecl *, Type))
+NOTE(distributed_actor_target_serialization_req_not_concrete_note,none,
+     "constrain %0 with concrete actor system or 'SerializationRequirement', "
+     "e.g. 'DistributedActorSystem<any Codable>'",
+     (Type))
+NOTE(distributed_actor_target_serialization_req_not_concrete_extension_note,none,
+     "constrain this extension with concrete actor system or "
+     "'SerializationRequirement', e.g. 'DistributedActorSystem<any Codable>'",
+     ())
 ERROR(nonisolated_distributed_actor_storage,none,
       "'nonisolated' can not be applied to distributed actor stored properties",
       ())
