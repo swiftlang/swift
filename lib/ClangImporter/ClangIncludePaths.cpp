@@ -634,11 +634,30 @@ void GetWindowsFileMappings(
     // with empty files to allow a single module definition to work across
     // different MSVC STL releases.
     //
-    // __msvc_bit_utils.hpp was introduced in VS 2022 STL release 17.8.
-    // __msvc_string_view.hpp was introduced in VS 2022 STL release 17.11.
+    // Each entry is annotated with the STL release that introduced the header.
+    // Once we no longer support Visual Studio releases older than a given
+    // release, the corresponding entries can be removed from this list.
     static const char * const kInjectedHeaders[] = {
-      "__msvc_bit_utils.hpp",
-      "__msvc_string_view.hpp",
+      "__msvc_bit_utils.hpp",                    // VS 2022 17.8
+      "__msvc_chrono.hpp",                       // VS 2022 17.3
+      "__msvc_cxx_stdatomic.hpp",                // VS 2022 17.5
+      "__msvc_filebuf.hpp",                      // VS 2022 17.7
+      "__msvc_format_ucd_tables.hpp",            // VS 2022 17.3
+      "__msvc_formatter.hpp",                    // VS 2022 17.10
+      "__msvc_heap_algorithms.hpp",              // VS 2022 17.12
+      "__msvc_int128.hpp",                       // VS 2022 17.2
+      "__msvc_iter_core.hpp",                    // VS 2022 17.4
+      "__msvc_minmax.hpp",                       // VS 2022 17.10
+      "__msvc_ostream.hpp",                      // VS 2022 17.13
+      "__msvc_print.hpp",                        // VS 2022 17.7
+      "__msvc_ranges_to.hpp",                    // VS 2022 17.12
+      "__msvc_ranges_tuple_formatter.hpp",       // VS 2022 17.13
+      "__msvc_sanitizer_annotate_container.hpp", // VS 2022 17.6
+      "__msvc_string_view.hpp",                  // VS 2022 17.11
+      "__msvc_system_error_abi.hpp",             // VS 2019 16.6
+      "__msvc_threads_core.hpp",                 // VS 2022 17.11
+      "__msvc_tzdb.hpp",                         // VS 2019 16.10
+      "__msvc_xlocinfo_types.hpp",               // VS 2022 17.0
     };
 
     for (const char * const header : kInjectedHeaders) {
