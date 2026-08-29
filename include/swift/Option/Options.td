@@ -2467,6 +2467,13 @@ def cas_backend: Flag<["-"], "cas-backend">,
   Flags<[FrontendOption, NoDriverOption]>,
   HelpText<"Enable using CASBackend for object file output">;
 
+def print_llvm_backend_diagnostics
+    : Flag<["-"], "print-llvm-backend-diagnostics">,
+      Flags<[FrontendOption, NoDriverOption]>,
+      HelpText<
+          "Print error-severity LLVM backend diagnostics (e.g. object-file "
+          "emission errors) instead of swallowing them">;
+
 def debug_callsite_info: Flag<["-"], "debug-callsite-info">,
   Flags<[FrontendOption, NoDriverOption]>,
   HelpText<"Generate callsite information in debug info">;

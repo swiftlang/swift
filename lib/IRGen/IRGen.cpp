@@ -736,6 +736,15 @@ namespace {
     SwiftDiagnosticHandler(const IRGenOptions &Opts) : IRGenOpts(Opts) {}
 
     bool handleDiagnostics(const llvm::DiagnosticInfo &DI) override {
+      // By default all backend diagnostics are swallowed here. When
+      // -print-llvm-backend-diagnostics is set, let LLVM's default handler
+      // print error-severity diagnostics (e.g. an unsupported relocation
+      // reported by MC object emission) so the underlying message is visible;
+      // performLLVM separately turns a recorded backend error into a frontend
+      // failure.
+      if (IRGenOpts.PrintLLVMBackendDiagnostics &&
+          DI.getSeverity() == llvm::DS_Error)
+        return false;
       return true;
     }
 
@@ -874,6 +883,18 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
   auto res = compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
                                  *OutputFile, DiagMutex,
                                  CASIDFile ? CASIDFile.get() : nullptr);
+
+  // The LLVM backend reports MC/codegen errors (e.g. an unsupported relocation)
+  // through the LLVMContext diagnostic handler, which records them but does not
+  // by itself fail this function. Without this check IRGen would keep the
+  // empty/partial object file and return success, turning a real compiler error
+  // into a confusing downstream link failure ("file is empty in '...'.o").
+  if (const auto *DiagHandler = Ctxt.getDiagHandlerPtr();
+      DiagHandler && DiagHandler->HasErrors) {
+    diagnoseSync(Diags, DiagMutex, SourceLoc(),
+                 diag::error_generating_object_file, OutputFilename);
+    res = true;
+  }
 
   Ctxt.setDiagnosticHandler(std::move(OldDiagnosticHandler));
 

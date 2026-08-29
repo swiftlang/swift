@@ -641,6 +641,10 @@ public:
   /// Emit a .casid file next to the object file if CAS Backend is used.
   bool EmitCASIDFile = false;
 
+  /// Print error-severity LLVM backend diagnostics (e.g. object-file emission
+  /// errors) instead of swallowing them in IRGen's diagnostic handler.
+  bool PrintLLVMBackendDiagnostics = false;
+
   /// Paths to the pass plugins registered via -load-pass-plugin.
   std::vector<std::string> LLVMPassPlugins;
 
