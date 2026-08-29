@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/PlatformKindUtils.h"
 
 using namespace swift;
 
@@ -203,6 +204,32 @@ static bool canIgnoreConstraintInUnavailableContexts(
   }
 }
 
+/// Returns the domain for the target platform if \p constraint may be narrowed
+/// to apply to that domain when determining whether the constraint may be
+/// ignored in an unavailable context. Returns `std::nullopt` otherwise.
+static std::optional<AvailabilityDomain>
+getSubstituteDomainForConstraint(const AvailabilityConstraint &constraint,
+                                 const ASTContext &ctx) {
+  // Only narrow anyAppleOS availability constraints.
+  if (!constraint.getDomain().contains(
+          AvailabilityDomain::forPlatform(PlatformKind::anyAppleOS)))
+    return std::nullopt;
+
+  auto targetDomain = ctx.getTargetAvailabilityDomain();
+
+  // Don't narrow to an app extension domain. A module compiled with
+  // -application-extension cannot safely use declarations that are unavailable
+  // in the base platform domain.
+  if (auto basePlatform =
+          basePlatformForExtensionPlatform(targetDomain.getPlatformKind()))
+    targetDomain = AvailabilityDomain::forPlatform(*basePlatform);
+
+  if (constraint.getDomain().isSupersetOf(targetDomain))
+    return targetDomain;
+
+  return std::nullopt;
+}
+
 static bool
 shouldIgnoreConstraintInContext(const Decl *decl,
                                 const AvailabilityConstraint &constraint,
@@ -214,16 +241,10 @@ shouldIgnoreConstraintInContext(const Decl *decl,
   if (!canIgnoreConstraintInUnavailableContexts(decl, constraint, flags))
     return false;
 
-  // If the constraint's domain is a superset of the compilation's target
-  // availability domain, use the more specific target availability domain
-  // instead. This allows declarations that are @available(macOS, unavailable)
-  // to be used in contexts that are @available(macOSApplicationExtension,
-  // unavailable), for example.
-  auto &ctx = decl->getASTContext();
   auto domain = constraint.getDomain();
-  auto targetDomain = ctx.getTargetAvailabilityDomain();
-  if (domain.isSupersetOf(targetDomain))
-    domain = targetDomain;
+  if (auto substituteDomain =
+          getSubstituteDomainForConstraint(constraint, decl->getASTContext()))
+    domain = *substituteDomain;
 
   return context.isUnavailableForDomain(domain);
 }
