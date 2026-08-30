@@ -805,7 +805,16 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
 
   auto &C = nominal->getASTContext();
   auto loc = nominal->getLoc();
-  recordRequiredImportAccessLevelForDecl(C.getDistributedActorDecl(), nominal,
+
+  // Fail gracefully if theDistributed module is imported, but 'DistributedActor'
+  // protocol fails to resolve for some reason.
+  auto *distributedActorProto = C.getDistributedActorDecl();
+  if (!distributedActorProto) {
+    C.Diags.diagnose(loc, diag::broken_stdlib_type, "DistributedActor");
+    return;
+  }
+
+  recordRequiredImportAccessLevelForDecl(distributedActorProto, nominal,
                                          nominal->getEffectiveAccess(), loc);
 
   // ==== Constructors
