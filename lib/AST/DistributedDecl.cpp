@@ -543,6 +543,9 @@ bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
   if (type->hasError())
     return false;
 
+  if (!type->isExistentialType())
+    return false;
+
   auto encodable = C.getProtocol(KnownProtocolKind::Encodable);
   auto decodable = C.getProtocol(KnownProtocolKind::Decodable);
 
