@@ -20,7 +20,11 @@ actor LocalActor_1 {
   var mutable: String = ""
 
   distributed func nope() {
-    // expected-error@-1{{'distributed' method can only be declared within 'distributed actor'}}
+    // expected-error@-1{{distributed method can only be declared in 'DistributedActor' type}}
+  }
+
+  distributed var nein: Int {
+    12 // expected-error@-1{{distributed computed property can only be declared in 'DistributedActor' type}}
   }
 }
 
@@ -266,12 +270,20 @@ func isolated_existential_ok(_ t: isolated any DistributedActor) {}
 // ==== -----------------------------------------------------------------------
 // MARK: 'distributed' declarations outside of any type context
 
-// A 'distributed func' at file scope has no enclosing type at all, so there is
-// no 'Self' to check against; make sure we diagnose rather than crash
+// A 'distributed func' or 'distributed var' at file scope has no enclosing
+// type at all, so there is no 'Self' to check against; make sure we diagnose
+// rather than crash
 distributed func topLevelDistributedFunc() {}
-// expected-error@-1{{'distributed' method can only be declared within 'distributed actor'}}
+// expected-error@-1{{distributed method can only be declared in 'DistributedActor' type}}
+
+distributed var topLevelDistributedVar: Int { 0 }
+// expected-error@-1{{distributed computed property can only be declared in 'DistributedActor' type}}
 
 func enclosingFunc() {
   distributed func nestedDistributedFunc() {}
-  // expected-error@-1{{'distributed' method can only be declared within 'distributed actor'}}
+  // expected-error@-1{{distributed method can only be declared in 'DistributedActor' type}}
+
+  distributed var nestedDistributedVar: Int { 0 }
+  // expected-error@-1{{distributed computed property can only be declared in 'DistributedActor' type}}
+  _ = nestedDistributedVar
 }

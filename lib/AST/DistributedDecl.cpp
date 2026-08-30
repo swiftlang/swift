@@ -465,6 +465,9 @@ Type swift::getAssociatedTypeOfDistributedSystemOfActor(
   auto sig = actorOrExtension->getGenericSignatureOfContext();
 
   auto *actorType = actorOrExtension->getSelfNominalTypeDecl();
+  if (!actorType)
+    return ErrorType::get(ctx);
+
   if (isa<ProtocolDecl>(actorType))
     return memberTy->getReducedType(sig);
 
