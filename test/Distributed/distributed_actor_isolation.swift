@@ -262,3 +262,16 @@ extension Greeting where SerializationRequirement == Codable {
 func isolated_generic_ok<T: DistributedActor>(_ t: isolated T) {}
 
 func isolated_existential_ok(_ t: isolated any DistributedActor) {}
+
+// ==== -----------------------------------------------------------------------
+// MARK: 'distributed' declarations outside of any type context
+
+// A 'distributed func' at file scope has no enclosing type at all, so there is
+// no 'Self' to check against; make sure we diagnose rather than crash
+distributed func topLevelDistributedFunc() {}
+// expected-error@-1{{'distributed' method can only be declared within 'distributed actor'}}
+
+func enclosingFunc() {
+  distributed func nestedDistributedFunc() {}
+  // expected-error@-1{{'distributed' method can only be declared within 'distributed actor'}}
+}
