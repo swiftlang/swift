@@ -716,6 +716,12 @@ bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
   if (!swift::ensureDistributedModuleLoaded(nominal))
     return true;
 
+  // A 'distributed actor' cannot double as an actor system.
+  if (nominal->isDistributedActor()) {
+    nominal->diagnose(diag::distributed_actor_cannot_be_actor_system);
+    return true;
+  }
+
   // === AssociatedTypes
   // --- SerializationRequirement MUST be a protocol TODO(distributed): rdar://91663941
   // we may lift this in the future and allow classes but this requires more
