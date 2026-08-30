@@ -54,3 +54,23 @@ func testTollFree7(x: CFBoolean, y: CFBoolean) -> Exactly<CFBoolean> {
   let result = test(x, y)
   return result
 }
+
+// This used to produce a bogus diagnostic.
+func testArrayLiteral(x: CFString, y: NSString) -> [NSString] {
+  let a = [y, x]
+  return a
+}
+
+// More silly test cases for toll-free bridging, since we don't have enough
+// of them in the test suite.
+
+extension NSString {
+  func noTollFreeBridgeDynamicSelf() -> Self {
+    let x: CFString = self  // expected-error {{cannot convert value of type 'Self' to specified type 'CFString'}}
+    return self
+  }
+}
+
+func noTollFreeBridgeArchetype<T: NSString>(_ t: T) -> CFString {
+  return t  // expected-error {{cannot convert return expression of type 'T' to return type 'CFString'}}
+}
