@@ -998,15 +998,11 @@ bool swift::memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal) {
 /// with its parent context for name lookup.
 static SourceLoc getValidParentLocForDerivation(DerivedConformance &derived,
                                                 ValueDecl *requirement) {
+  auto braces = cast<IterableDeclContext>(derived.ConformanceDecl)->getBraces();
+  if (braces.Start.isValid())
+    return braces.Start;
+
   auto atLoc = derived.Conformance->getLoc();
-  if (atLoc.isValid())
-    return atLoc;
-
-  atLoc = derived.Nominal->getBraces().Start;
-  if (atLoc.isValid())
-    return atLoc;
-
-  atLoc = derived.Nominal->getBraces().End;
   if (atLoc.isValid())
     return atLoc;
 
