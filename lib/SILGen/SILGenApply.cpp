@@ -3549,6 +3549,43 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow(SILModule &M) && {
   return lvExpr;
 }
 
+/// Whether every reference `expr` goes through is strong, so that a dependence
+/// on storage interior to the referent can be rooted in something that outlives
+/// it.
+///
+/// Weak and unowned references don't keep an instance alive, so they break
+/// the strong chain.
+static bool hasStrongReferenceChain(Expr *expr) {
+  auto isStrong = [](ConcreteDeclRef declRef) -> VarDecl * {
+    auto *vd = dyn_cast_or_null<VarDecl>(declRef.getDecl());
+    if (!vd)
+      return nullptr;
+    if (auto *attr = vd->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+      if (attr->get() != ReferenceOwnership::Strong)
+        return nullptr;
+    }
+    return vd;
+  };
+
+  expr = expr->getSemanticsProvidingExpr();
+  if (auto *load = dyn_cast<LoadExpr>(expr))
+    return hasStrongReferenceChain(load->getSubExpr());
+  if (auto *force = dyn_cast<ForceValueExpr>(expr))
+    return hasStrongReferenceChain(force->getSubExpr());
+  if (auto *bind = dyn_cast<BindOptionalExpr>(expr))
+    return hasStrongReferenceChain(bind->getSubExpr());
+  if (auto *optEval = dyn_cast<OptionalEvaluationExpr>(expr))
+    return hasStrongReferenceChain(optEval->getSubExpr());
+  if (auto *dre = dyn_cast<DeclRefExpr>(expr))
+    return isStrong(dre->getDeclRef()) != nullptr;
+  if (auto *mre = dyn_cast<MemberRefExpr>(expr)) {
+    if (!isStrong(mre->getMember()))
+      return false;
+    return hasStrongReferenceChain(mre->getBase());
+  }
+  return false;
+}
+
 ManagedValue
 SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
                                                      ValueOwnership ownership) {
@@ -3655,13 +3692,14 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
   switch (strategy.getKind()) {
   case AccessStrategy::Storage: {
     auto vd = cast<VarDecl>(memberStorage);
-    // TODO: Is it possible and/or useful for class storage to be
-    // addressable?
-    if (!vd->isInstanceMember()
-        || !isa<StructDecl>(vd->getDeclContext())) {
+    if (!vd->isInstanceMember()) {
       return notAddressable();
     }
-  
+    auto *declContext = vd->getDeclContext();
+    if (!isa<StructDecl>(declContext) && !isa<ClassDecl>(declContext)) {
+      return notAddressable();
+    }
+
     // If the storage holds the fully-abstracted representation of the
     // type, then we can use its address.
     auto absBaseTy = getLoweredType(AbstractionPattern::getOpaque(),
@@ -3669,23 +3707,42 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     auto memberTy = absBaseTy.getFieldType(vd, &F);
     auto absMemberTy = getLoweredType(AbstractionPattern::getOpaque(),
                             lookupExpr->getType()->getWithoutSpecifierType());
-    
+
     if (memberTy.getAddressType() != absMemberTy.getAddressType()) {
       // The storage is not fully abstracted, so it can't serve as a
       // stable address.
       return notAddressable();
     }
-    
+
+    if (isa<ClassDecl>(declContext)) {
+      // A class instance holds its stored properties at a stable address for as
+      // long as the instance is alive, so unlike a struct the base does not
+      // itself have to be addressable. We only need to make sure that the
+      // instance stays alive.
+      //
+      // This only makes sense for a 'let' field, because it cannot be modified.
+      if (!vd->isLet() || accessKind != AccessKind::Read
+          || !hasStrongReferenceChain(lookupExpr->getBase())) {
+        return notAddressable();
+      }
+      // Project the field as an l-value: RefElementComponent borrows the
+      // instance using formal access, so that borrow outlives the call this
+      // address is passed to.
+      LValue lv = emitLValue(lookupExpr, SGFAccessKind::BorrowedAddressRead);
+      auto fieldAddr = emitAddressOfLValue(lookupExpr, std::move(lv));
+      return ManagedValue::forBorrowedAddressRValue(fieldAddr.getValue());
+    }
+
     // Otherwise, we can project the field address from the stable address
     // of the base, if it has one. Try to get the stable address for the
     // base.
     auto baseAddr = tryEmitAddressableParameterAsAddress(
       ArgumentSource(lookupExpr->getBase()), ownership);
-      
+
     if (!baseAddr) {
       return notAddressable();
     }
-    
+
     // Project the field's address.
     auto fieldAddr = B.createStructElementAddr(lookupExpr,
                                                baseAddr.getValue(), vd);
