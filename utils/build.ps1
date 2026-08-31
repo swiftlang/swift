@@ -1881,22 +1881,31 @@ function Add-FlagsDefine([hashtable]$Defines, [string]$Name, [string[]]$Value) {
 function ConvertTo-CMakeArgument([string] $Argument) {
   # Backslashes in CMakeCache.txt are escape characters, but the synthetic CAS
   # roots deliberately use a UNC spelling. Preserve the complete synthetic
-  # path while normalizing ordinary Windows path separators.
+  # path while normalizing ordinary Windows path separators. A synthetic path
+  # may be the complete argument or the value of an option using `=`.
   $SyntheticPath = $Argument.IndexOf('\\swift\')
-  if ($SyntheticPath -ge 0) {
+  if ($SyntheticPath -eq 0 -or
+      ($SyntheticPath -gt 0 -and $Argument[$SyntheticPath - 1] -eq '=')) {
     $Prefix = $Argument.Substring(0, $SyntheticPath).Replace("\", "/")
-    return $Prefix + $Argument.Substring($SyntheticPath)
+    $Path = $Argument.Substring($SyntheticPath).Replace('$', '$$')
+    return $Prefix + $Path
   }
 
   # Preserve a leading double backslash for ordinary UNC paths, while using
-  # forward slashes for the remaining components as before.
-  $DoubleBackslash = $Argument.IndexOf("\\")
-  if ($DoubleBackslash -lt 0) {
+  # forward slashes for the remaining components as before. As above, the UNC
+  # path may be the value of an option using `=`.
+  $UNCPath = if ($Argument.StartsWith("\\")) {
+    0
+  } else {
+    $OptionValue = $Argument.IndexOf("=\\")
+    if ($OptionValue -ge 0) { $OptionValue + 1 } else { -1 }
+  }
+  if ($UNCPath -lt 0) {
     return $Argument.Replace("\", "/")
   }
 
-  $Prefix = $Argument.Substring(0, $DoubleBackslash).Replace("\", "/")
-  $Suffix = $Argument.Substring($DoubleBackslash + 2).Replace("\", "/")
+  $Prefix = $Argument.Substring(0, $UNCPath).Replace("\", "/")
+  $Suffix = $Argument.Substring($UNCPath + 2).Replace("\", "/")
   return "$Prefix\\$Suffix"
 }
 
