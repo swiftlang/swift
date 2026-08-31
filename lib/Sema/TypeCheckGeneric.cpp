@@ -28,6 +28,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -1203,9 +1204,7 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     auto substReq = item.SubstReq;
 
     SmallVector<Requirement, 2> subReqs;
-    SmallVector<ProtocolConformanceRef, 2> isolatedConformances;
-    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true,
-                                      &isolatedConformances)) {
+    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true)) {
     case CheckRequirementResult::Success:
       break;
 
@@ -1236,22 +1235,6 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     case CheckRequirementResult::SubstitutionFailure:
       hadSubstFailure = true;
       break;
-    }
-
-    if (!isolatedConformances.empty() && signature) {
-      // Dig out the original type parameter for the requirement.
-      // FIXME: req might not be the right pre-substituted requirement,
-      // if this came from a conditional requirement.
-      for (const auto &isolatedConformance : isolatedConformances) {
-        (void)isolatedConformance;
-        if (auto failed =
-                signature->prohibitsIsolatedConformance(req.getFirstType())) {
-            return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
-              req, substReq,
-              TinyPtrVector<ProtocolConformanceRef>(isolatedConformances),
-              failed->second);
-        }
-      }
     }
   }
 

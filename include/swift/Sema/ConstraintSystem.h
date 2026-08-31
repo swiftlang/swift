@@ -31,6 +31,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/CSTrail.h"
+#include "swift/Sema/ConformanceCache.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintLocator.h"
@@ -1031,10 +1032,6 @@ private:
   llvm::SmallDenseMap<ConstraintLocator *, ArrayRef<OpenedType>, 4>
       OpenedTypes;
 
-  /// A dictionary of all conformances that have been looked up by the solver.
-  llvm::DenseMap<std::pair<TypeBase *, ProtocolDecl *>, ProtocolConformanceRef>
-      Conformances;
-
   /// A cache for unavailability checks peformed by the solver.
   llvm::DenseMap<std::pair<const Decl *, ConstraintLocator *>, bool>
       UnavailableDecls;
@@ -1113,6 +1110,10 @@ public:
   /// ad-hoc distributed `SerializationRequirement` conformances).
   llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
+
+  /// This is not trail-protected state; it's just a cache for some
+  /// information about Decls.
+  ConformanceCache CC;
 
 private:
   /// Describes the current solver state.
@@ -2800,37 +2801,9 @@ public:
 
   /// Check whether the given type conforms to the given protocol and if
   /// so return a valid conformance reference.
-  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *P);
-
-  /// We memoize the computation in the below.
-  llvm::DenseMap<std::pair<ConversionBehavior, ProtocolDecl *>, bool>
-      ConformanceTransitiveForSupertypeCache;
-
-  /// Suppose we are given a type T with the given conversion behavior,
-  /// and a protocol P, with the following setup:
-  /// - T conv $T0
-  /// - $T0 conforms P
-  /// The question is, does this imply that T must conform to P? This
-  /// returns true if so, false otherwise.
-  ///
-  /// Also see Subtyping.h, checkTranstiveSupertypeConformance().
-  bool isConformanceTransitiveForSupertype(ConversionBehavior behavior,
-                                           ProtocolDecl *proto);
-
-  /// We memoize the computation in the below.
-  llvm::DenseMap<std::pair<ConversionBehavior, ProtocolDecl *>, bool>
-      ConformanceTransitiveForSubtypeCache;
-
-  /// Suppose we are given a type T with the given conversion behavior,
-  /// and a protocol P, with the following setup:
-  /// - $T0 conv T
-  /// - $T0 conforms P
-  /// The question is, does this imply that T must conform to P? This
-  /// returns true if so, false otherwise.
-  ///
-  /// Also see Subtyping.h, checkTranstiveSubtypeConformance().
-  bool isConformanceTransitiveForSubtype(ConversionBehavior behavior,
-                                         ProtocolDecl *proto);
+  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *P) {
+    return CC.lookupConformance(type, P);
+  }
 
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
   /// the appropriate closure-type and opening extraction functions.

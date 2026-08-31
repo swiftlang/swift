@@ -93,7 +93,8 @@ private func optimizeClosureWithDeadCaptures(of partialApply: PartialApplyInst, 
 private func constantPropagateCaptures(of partialApply: PartialApplyInst, _ context: FunctionPassContext) {
   guard let callee = partialApply.referencedFunction,
         callee.isDefinition,
-        let (constArgs, nonConstArgs) = partialApply.classifyArgumentsForConstness()
+        let (constArgs, nonConstArgs) = partialApply.classifyArgumentsForConstness(),
+        !hasConcreteClosureArgForGenericParam(constArgs, callee: callee, partialApply: partialApply)
   else {
     return
   }
@@ -118,6 +119,17 @@ private func constantPropagateCaptures(of partialApply: PartialApplyInst, _ cont
   }
   let newArguments = Array(nonConstArgs.values)
   rewritePartialApply(partialApply, withSpecialized: specializedCallee, arguments: newArguments, context)
+}
+
+// Propagating a concrete-typed closure into an argument slot whose declared type still has
+// a type parameter would cause a type mismatch and SIL verification failure.
+private func hasConcreteClosureArgForGenericParam(_ constArgs: [Operand], callee: Function,
+                                                  partialApply: PartialApplyInst) -> Bool {
+  constArgs.contains(where: {
+    let calleeArgIdx = partialApply.calleeArgumentIndex(of: $0)!
+    let paramType = callee.argumentConventions[parameter: calleeArgIdx]!.type
+    return paramType.isLoweredFunction && paramType.hasTypeParameter
+  })
 }
 
 private func getSpecializedCalleeWithDeadParams(of partialApply: PartialApplyInst,

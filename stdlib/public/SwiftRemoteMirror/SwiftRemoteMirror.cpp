@@ -572,7 +572,10 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   }
 
   case TypeInfoKind::Borrow: {
-    swift_unreachable("not implemented");
+    // Either a bitwise copy of the referent or a pointer to it. Not
+    // SWIFT_RAW_POINTER even in the latter case: that promises the address of a
+    // heap allocation, and a borrow can point into the interior of one.
+    return SWIFT_BUILTIN;
   }
   }
 
@@ -988,9 +991,11 @@ const char *swift_reflection_iterateMetadataAllocationBacktraces(
           // systems, while StoredPointer is always the pointer size of the
           // target system.) Convert the array to an array of
           // swift_reflection_ptr_t.
-          std::vector<swift_reflection_ptr_t> ConvertedPtrs{&Ptrs[0],
-                                                            &Ptrs[Count]};
-          Call(AllocationPtr, Count, ConvertedPtrs.data(), ContextPtr);
+          std::vector<swift_reflection_ptr_t> ConvertedPtrs;
+          if (Ptrs)
+            ConvertedPtrs.assign(Ptrs, Ptrs + Count);
+          Call(AllocationPtr, ConvertedPtrs.size(), ConvertedPtrs.data(),
+               ContextPtr);
         });
     return returnableCString(ContextRef, Error);
   });

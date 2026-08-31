@@ -1991,6 +1991,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::objc_with_embedded);
       HadError = true;
     }
+
+    if (Opts.hasFeature(Feature::TypedAllocation) && !Target.isArch64Bit()) {
+      Diags.diagnose(SourceLoc(), diag::typed_allocation_requires_64_bit);
+      HadError = true;
+    }
   }
 
   if (auto A = Args.getLastArg(OPT_checked_async_objc_bridging)) {
@@ -2224,6 +2229,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_enumerate_supertypes,
                    Opts.SolverEnableEnumerateSupertypes);
 
+  Opts.SolverEnableTypeVariableJoins =
+      Args.hasFlag(OPT_solver_enable_type_var_joins,
+                   OPT_solver_disable_type_var_joins,
+                   Opts.SolverEnableTypeVariableJoins);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 
@@ -2369,6 +2379,20 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_clang_spi)) {
     Opts.EnableClangSPI = false;
   }
+
+  if (auto *A = Args.getLastArg(OPT_enable_objc_msgsend_selector_stubs,
+                                OPT_disable_objc_msgsend_selector_stubs))
+    Opts.ForceObjCMsgSendSelectorStubs =
+        A->getOption().matches(OPT_enable_objc_msgsend_selector_stubs);
+  else
+    Opts.ForceObjCMsgSendSelectorStubs = std::nullopt;
+
+  if (auto *A = Args.getLastArg(OPT_enable_objc_msgsend_class_selector_stubs,
+                                OPT_disable_objc_msgsend_class_selector_stubs))
+    Opts.ForceObjCMsgSendClassSelectorStubs =
+        A->getOption().matches(OPT_enable_objc_msgsend_class_selector_stubs);
+  else
+    Opts.ForceObjCMsgSendClassSelectorStubs = std::nullopt;
 
   Opts.DirectClangCC1ModuleBuild |= Args.hasArg(OPT_direct_clang_cc1_module_build);
 
@@ -4071,6 +4095,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_emit_singleton_metadata_pointer)) {
     Opts.EmitSingletonMetadataPointers = true;
+  }
+
+  if (Args.hasArg(OPT_disable_emit_singleton_metadata_pointer)) {
+    Opts.EmitSingletonMetadataPointers = false;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_read_legacy_type_info_path_EQ)) {

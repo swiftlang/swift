@@ -254,6 +254,21 @@ __attribute__((deprecated("use SomethingElse instead")))
 
 @end
 
+@interface SwiftAvailabilityMembersClass : NSObject
+
+- (void)swiftObsoletedMethod1;
+- (void)swiftObsoletedMethod2;
+- (void)swift99Method1;
+
+@end
+
+@interface SwiftObsoletedExtensionClass : NSObject
+@end
+
+@interface SwiftObsoletedExtensionClass (Category)
+- (void)swiftObsoletedCategoryMethod1;
+@end
+
 #endif
 
 void CImplFunc1(int param);

@@ -29,6 +29,8 @@
 //    is rejected, meaning we'll get a second set of notes about the prebuilt module.
 // RUN: %target-swift-frontend -typecheck -verify %s -I %t/Build -Rmodule-interface-rebuild -sdk %t -prebuilt-module-cache-path %t/PrebuiltCache -module-cache-path %t/ModuleCache
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import TestModule // expected-remark {{rebuilding module 'TestModule' from interface}}
 // expected-note @-1 {{forwarding module is out of date}}
 // expected-note @-2 {{dependency is out of date}}

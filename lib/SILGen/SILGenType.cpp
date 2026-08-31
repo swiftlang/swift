@@ -1429,6 +1429,29 @@ void SILGenModule::emitNonCopyableTypeDeinitTable(NominalTypeDecl *nom) {
   SILMoveOnlyDeinit::create(f->getModule(), nom, serialized, f);
 }
 
+void SILGenModule::recordNonCopyableTypeWithEmittedMetadata(
+    NominalTypeDecl *nom) {
+  // Only in Embedded Swift, where the deinits reachable from a type's value
+  // witnesses have to be specialized before IRGen runs.
+  if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return;
+
+  // A generic type's metadata is emitted per-specialization, so there is
+  // nothing to record for the generic declaration itself.
+  if (nom->isGenericContext())
+    return;
+
+  // Only `@export(interface)` types get their metadata emitted eagerly; the
+  // metadata of any other type is emitted lazily, and only if something
+  // actually needs it.
+  if (nom->getEffectiveCodeGenerationModel() != CodeGenerationModel::Interface)
+    return;
+
+  auto type = nom->getDeclaredInterfaceType()->getCanonicalType();
+  M.addNonCopyableTypeWithEmittedMetadata(
+      SILType::getPrimitiveObjectType(type));
+}
+
 namespace {
 
 /// An ASTVisitor for generating SIL from method declarations
@@ -1468,6 +1491,7 @@ public:
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
       if (!nom->canBeCopyable()) {
         SGM.emitNonCopyableTypeDeinitTable(nom);
+        SGM.recordNonCopyableTypeWithEmittedMetadata(nom);
       }
     }
 

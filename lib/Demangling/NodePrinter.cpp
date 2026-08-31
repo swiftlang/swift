@@ -313,6 +313,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::AssociatedTypeDescriptor:
   case Node::Kind::AssociatedTypeMetadataAccessor:
   case Node::Kind::AssociatedTypeWitnessTableAccessor:
+  case Node::Kind::AsyncMainEntryPoint:
   case Node::Kind::AsyncRemoved:
   case Node::Kind::AutoClosureType:
   case Node::Kind::BaseConformanceDescriptor:
@@ -2304,6 +2305,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   }
   case Node::Kind::AutoDiffSubsetParametersThunk: {
+    // The four trailing children are the kind and three index subsets, and at
+    // least one child ahead of them names the thing being thunked.
+    if (Node->getNumChildren() < 5) {
+      setInvalid();
+      return nullptr;
+    }
     Printer << "autodiff subset parameters thunk for ";
     auto currentIndex = Node->getNumChildren() - 1;
     auto toParamIndices = Node->getChild(currentIndex--);
@@ -3460,6 +3467,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::AsyncFunctionPointer:
     Printer << "async function pointer to ";
+    return nullptr;
+  case Node::Kind::AsyncMainEntryPoint:
+    Printer << "async main entry point";
     return nullptr;
   case Node::Kind::AsyncAwaitResumePartialFunction:
     if (Options.ShowAsyncResumePartial) {

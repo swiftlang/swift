@@ -515,12 +515,18 @@ isShortFormAvailabilityImpliedByOther(SemanticAvailableAttr Attr,
   assert(isShortAvailable(Attr));
 
   auto platform = Attr.getDomain().getPlatformKind();
+  if (!platform)
+    return false;
+
   for (auto other : Others) {
     auto otherPlatform = other.getDomain().getPlatformKind();
     if (platform == otherPlatform)
       continue;
 
-    if (!inheritsAvailabilityFromPlatform(platform, otherPlatform))
+    if (!otherPlatform)
+      continue;
+
+    if (!inheritsAvailabilityFromPlatform(*platform, *otherPlatform))
       continue;
 
     if (Attr.getIntroduced() == other.getIntroduced())
@@ -1320,6 +1326,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::CxxDecl: {
+    auto Attr = cast<CxxDeclAttr>(this);
+    Printer << "@cxx";
+    if (!Attr->Name.empty())
+      Printer << "(" << identifierEscapingIfNeeded(Attr->Name) << ")";
+    break;
+  }
+
   case DeclAttrKind::Expose: {
     Printer.printAttrName("@_expose");
     auto Attr = cast<ExposeAttr>(this);
@@ -1983,6 +1997,8 @@ StringRef DeclAttribute::getAttrName() const {
     if (cast<CDeclAttr>(this)->Underscored)
       return "_cdecl";
     return "c";
+  case DeclAttrKind::CxxDecl:
+    return "cxx";
   case DeclAttrKind::SwiftNativeObjCRuntimeBase:
     return "_swift_native_objc_runtime_base";
   case DeclAttrKind::Semantics:

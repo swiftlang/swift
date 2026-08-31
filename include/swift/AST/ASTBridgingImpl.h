@@ -715,6 +715,10 @@ bool BridgedASTType::isUnownedStorageType() const {
   return unbridged()->is<swift::UnownedStorageType>();
 }
 
+bool BridgedASTType::isReferenceStorageType() const {
+  return unbridged()->is<swift::ReferenceStorageType>();
+}
+
 bool BridgedASTType::isBuiltinType() const {
   return unbridged()->isBuiltinType();
 }

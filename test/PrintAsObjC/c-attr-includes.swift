@@ -48,6 +48,7 @@ typedef enum TKTimeSetting {
 #include "Dependency.h"
 
 //--- Lib.swift
+// expected-warning@<unknown> * {{libc not found for }}
 
 import CModule
 

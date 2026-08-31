@@ -138,7 +138,7 @@ public:
     ConcreteType,
   };
 
-  static const unsigned NumKinds = 9;
+  static const unsigned NumKinds = 10;
 
   static const llvm::StringRef Kinds[];
 

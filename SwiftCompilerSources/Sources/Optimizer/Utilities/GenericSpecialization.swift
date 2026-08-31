@@ -121,6 +121,107 @@ private struct VTableSpecializer {
   }
 }
 
+/// Specializes the deinit of a non-copyable generic type for the concrete `type`.
+///
+/// This is required in Embedded Swift: IRGen emits a call to the deinit from the
+/// destroy value witness of `type`'s metadata, and an unspecialized deinit takes
+/// type metadata for its generic parameters, which doesn't exist in Embedded Swift.
+///
+/// Recurses into stored properties and enum payloads, because emitting a type's
+/// value witnesses also destroys those.
+///
+/// `handled` carries the types already dealt with, so that a caller can share it
+/// across many calls and avoid re-walking the same aggregates.
+func specializeDeinits(forType type: Type,
+                       in function: Function,
+                       handled: inout Set<Type>,
+                       _ context: ModulePassContext,
+                       notifyNewFunction: (Function) -> ())
+{
+  guard type.isMoveOnly, handled.insert(type).inserted else {
+    return
+  }
+
+  // A `Builtin.FixedArray` (`InlineArray`) is destroyed element by element, and
+  // a tuple has no deinit of its own but its elements may. Neither is nominal,
+  // so handle them before looking for a deinit. This mirrors the aggregates
+  // `devirtualize(destroy:)` decomposes.
+  if type.isBuiltinFixedArray {
+    specializeDeinits(forType: type.builtinFixedArrayElementType(in: function),
+                      in: function, handled: &handled, context,
+                      notifyNewFunction: notifyNewFunction)
+    return
+  }
+
+  if type.isTuple {
+    for element in type.tupleElements {
+      specializeDeinits(forType: element, in: function, handled: &handled, context,
+                        notifyNewFunction: notifyNewFunction)
+    }
+    return
+  }
+
+  if let nominal = type.nominal, nominal.valueTypeDestructor != nil {
+    specializeDeinit(forType: type, nominal: nominal, context, notifyNewFunction)
+  }
+
+  // The value witnesses of an aggregate destroy its members, so their deinits
+  // need to be specialized, too.
+  if type.isStruct {
+    if let fields = type.getNominalFields(in: function) {
+      for field in fields {
+        specializeDeinits(forType: field, in: function, handled: &handled, context,
+                          notifyNewFunction: notifyNewFunction)
+      }
+    }
+  } else if type.isEnum {
+    if let cases = type.getEnumCases(in: function) {
+      for enumCase in cases {
+        if let payload = enumCase.payload {
+          specializeDeinits(forType: payload, in: function, handled: &handled, context,
+                            notifyNewFunction: notifyNewFunction)
+        }
+      }
+    }
+  }
+}
+
+private func specializeDeinit(forType type: Type,
+                              nominal: NominalTypeDecl,
+                              _ context: ModulePassContext,
+                              _ notifyNewFunction: (Function) -> ())
+{
+  guard let origDeinit = context.lookupDeinit(ofNominal: nominal),
+        // A non-generic deinit needs no specialization.
+        origDeinit.isGeneric,
+        // Don't specialize twice.
+        context.lookupSpecializedDeinit(ofType: type) == nil
+  else {
+    return
+  }
+
+  let deinitSubs = type.canonicalType.contextSubstitutionMap.getMethodSubstitutions(for: origDeinit)
+
+  guard !deinitSubs.conformances.contains(where: { !$0.isValid }),
+        context.loadFunction(function: origDeinit, loadCalleesRecursively: true),
+        let specializedDeinit = context.specialize(function: origDeinit, for: deinitSubs,
+                                                   convertIndirectToDirect: false, isMandatory: true)
+  else {
+    return
+  }
+  notifyNewFunction(specializedDeinit)
+
+  context.deserializeAllCallees(of: specializedDeinit, mode: .allFunctions)
+  // Use `shared` rather than `public` linkage: the specialization is only ever
+  // referenced from the value witnesses of types in this module, and importing
+  // modules create their own. Shared linkage lets the linker merge duplicates
+  // and dead-strip the deinit when the metadata that referenced it is stripped.
+  specializedDeinit.set(linkage: .shared, context)
+  specializedDeinit.set(isSerialized: false, context)
+
+  context.addSpecializedDeinit(ofType: type, specializedDeinit)
+}
+
 /// Specializes a witness table of `conformance` for the concrete type of the conformance.
 func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassContext) {
   if let existingSpecialization = context.lookupWitnessTable(for: conformance),

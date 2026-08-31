@@ -634,8 +634,13 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityRange &info,
   if (info.isAlwaysAvailable())
     return;
 
+  // A platform-versioned attribute needs a platform to attach the version to.
+  auto platform = targetPlatform(C.LangOpts);
+  if (!platform)
+    return;
+
   auto AvAttr = AvailableAttr::createPlatformVersioned(
-      C, targetPlatform(C.LangOpts), /*Message=*/"", /*Rename=*/"",
+      C, *platform, /*Message=*/"", /*Rename=*/"",
       info.getRawMinimumVersion(), /*Deprecated=*/{}, /*Obsoleted=*/{});
 
   decl->addAttribute(AvAttr);
@@ -2988,10 +2993,11 @@ namespace {
         importer::checkRetainReleaseFunctions(classDecl, Impl);
 
         auto availability = Impl.SwiftContext.getSwift58Availability();
-        if (!availability.isAlwaysAvailable()) {
+        auto platform = targetPlatform(Impl.SwiftContext.LangOpts);
+        if (!availability.isAlwaysAvailable() && platform) {
           assert(availability.hasMinimumVersion());
           auto AvAttr = AvailableAttr::createPlatformVersioned(
-              Impl.SwiftContext, targetPlatform(Impl.SwiftContext.LangOpts),
+              Impl.SwiftContext, *platform,
               /*Message=*/"", /*Rename=*/"",
               availability.getRawMinimumVersion(), /*Deprecated=*/{},
               /*Obsoleted=*/{});
@@ -4548,6 +4554,19 @@ namespace {
           "'returns_twice' attribute) are unavailable in Swift");
       }
 
+      bool hasConsumedAttr =
+          llvm::any_of(decl->parameters(), [](const clang::ParmVarDecl *param) {
+            return param->hasAttr<clang::OSConsumedAttr>();
+          });
+
+      if (hasConsumedAttr)
+        Impl.markUnavailable(result,
+                             "LIBKERN_CONSUMED annotation is not supported");
+
+      if (decl->hasAttr<clang::OSConsumesThisAttr>())
+        Impl.markUnavailable(
+            result, "LIBKERN_CONSUMES_THIS annotation is not supported");
+
       recordObjCOverride(result);
       Impl.swiftify(result);
     }
@@ -4774,6 +4793,13 @@ namespace {
                            Impl.SwiftContext.getIdentifier(staticCallName),
                            funcDecl->getName().getArgumentNames()));
               Impl.virtualThunkToOriginal[result] = funcDecl;
+
+              // Propagate availability attributes from the original Swift
+              // funcDecl.
+              if (auto unavailable = funcDecl->getUnavailableAttr())
+                result->addAttribute(unavailable->getParsedAttr()->clone(
+                    Impl.SwiftContext, /*implicit=*/true));
+
               // swiftify is called on import, but the virtualThunkToOriginal
               // mapping is not yet ready at that time, so call it again.
               Impl.swiftify(result);

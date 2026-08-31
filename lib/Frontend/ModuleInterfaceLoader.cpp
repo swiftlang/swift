@@ -22,6 +22,7 @@
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheResult.h"
@@ -1110,7 +1111,7 @@ class ModuleInterfaceLoaderImpl {
     }
     InterfaceSubContextDelegateImpl astDelegate(
         ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
-        ctx.ClangImporterOpts, ctx.CASOpts, Opts,
+        ctx.ClangImporterOpts, ctx.CASOpts, ctx.SILOpts, Opts,
         /*buildModuleCacheDirIfAbsent*/ true, cacheDir, prebuiltCacheDir,
         backupInterfaceDir, /*replayPrefixMap=*/{},
         /*serializeDependencyHashes*/ false, trackSystemDependencies);
@@ -1481,6 +1482,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &ClangOpts, const CASOptions &CASOpts,
+    const SILOptions &SILOpts,
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef BackupInterfaceDir, StringRef ModuleName, StringRef InPath,
     StringRef OutPath, StringRef ABIOutputPath,
@@ -1489,7 +1491,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     ModuleInterfaceLoaderOptions LoaderOpts,
     bool silenceInterfaceDiagnostics) {
   InterfaceSubContextDelegateImpl astDelegate(
-      SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, CASOpts,
+      SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, CASOpts, SILOpts,
       LoaderOpts,
       /*CreateCacheDirIfAbsent*/ true, CacheDir, PrebuiltCacheDir,
       BackupInterfaceDir, replayPrefixMap, SerializeDependencyHashes,
@@ -1646,6 +1648,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     FrontendOptions::ActionType requestedAction,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
+    const SILOptions &silOpts,
     bool suppressNotes, bool suppressRemarks,
     PrintDiagnosticNamesMode printDiagnosticNames) {
   GenericArgs.push_back("-frontend");
@@ -1699,6 +1702,17 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   GenericArgs.push_back("-swift-version");
   GenericArgs.push_back(ArgSaver.save(genericSubInvocation.getLangOptions()
     .EffectiveLanguageVersion.asAPINotesVersionString()));
+
+  // Forward the parent's sanitizer selection so the child's ClangImporter
+  // propagates the same flags into its Clang cc1 args. This is important because
+  // -sanitize options can add target-features (e.g. MTE). These are checked when
+  // loading a PCM (and mismatches are fatal).
+  genericSubInvocation.getSILOptions().Sanitizers = silOpts.Sanitizers;
+#define SANITIZER(_, kind, name, __)                                           \
+  if (silOpts.Sanitizers & SanitizerKind::kind) {                              \
+    GenericArgs.push_back("-sanitize=" #name);                                 \
+  }
+#include "swift/Basic/Sanitizers.def"
 
   genericSubInvocation.setImportSearchPaths(
       SearchPathOpts.getImportSearchPaths());
@@ -1852,6 +1866,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     SourceManager &SM, DiagnosticEngine *Diags,
     const SearchPathOptions &searchPathOpts, const LangOptions &langOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
+    const SILOptions &silOpts,
     ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
     StringRef moduleCachePath, StringRef prebuiltCachePath,
     StringRef backupModuleInterfaceDir,
@@ -1864,6 +1879,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
   inheritOptionsForBuildingInterface(LoaderOpts.requestedAction, searchPathOpts,
                                      langOpts, clangImporterOpts, casOpts,
+                                     silOpts,
                                      Diags->getSuppressNotes(),
                                      Diags->getSuppressRemarks(),
                                      Diags->getPrintDiagnosticNamesMode());

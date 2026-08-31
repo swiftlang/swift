@@ -4421,6 +4421,23 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
     }
   }
 
+  // C++ constructors are not generally inherited by derived classes, unless a
+  // using-decl is used within a derived type. Therefore, a constructor of a C++
+  // foreign reference type cannot satisfy an initializer requirement.
+  if (auto ctor = dyn_cast<ConstructorDecl>(witness)) {
+    if (isa_and_nonnull<clang::CXXMethodDecl>(ctor->getClangDecl())) {
+      getASTContext().addDelayedConformanceDiag(
+          Conformance, false,
+          [ctor, requirement](NormalProtocolConformance *conformance) {
+            auto &diags = ctor->getASTContext().Diags;
+            SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, ctor);
+            diags.diagnose(diagLoc, diag::witness_initializer_cxx_not_inherited,
+                           requirement, conformance->getType());
+            emitDeclaredHereIfNeeded(diags, diagLoc, ctor);
+          });
+    }
+  }
+
   // Check whether this requirement uses Self in a way that might
   // prevent conformance from succeeding.
   const auto selfRefInfo = findExistentialSelfReferences(requirement);
@@ -5598,9 +5615,43 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
       proto->getGenericSignature(),
       reqSig, QuerySubstitutionMap{substitutions});
   switch (result.getKind()) {
-  case CheckRequirementsResult::Success:
+  case CheckRequirementsResult::Success: {
+    // Ordinary requirement checking above does not catch isolated
+    // conformances that conflict with a `Sendable`/`SendableMetatype`
+    // requirement on the protocol's own 'Self' type (as opposed to a
+    // generic parameter substituted somewhere in a declaration's interface
+    // type, which is handled separately by
+    // TypeChecker::checkIsolatedConformancesInType). Check for that here,
+    // now that every witness has already been fully checked, so this can't
+    // reintroduce the circularity that isolated-conformance checking must
+    // avoid during ordinary interface type resolution.
+    const auto isolatedResult =
+        TypeChecker::checkIsolatedConformancesForDiagnostics(
+            proto->getGenericSignature(), reqSig,
+            QuerySubstitutionMap{substitutions});
+    if (isolatedResult.getKind() ==
+        CheckRequirementsResult::RequirementFailure) {
+      if (!conformance->isInvalid()) {
+        ctx.addDelayedConformanceDiag(
+            conformance, /*isError=*/true,
+            [isolatedResult, proto,
+             substitutions](NormalProtocolConformance *conformance) {
+              TypeChecker::diagnoseRequirementFailure(
+                  isolatedResult.getRequirementFailureInfo(),
+                  conformance->getLoc(), conformance->getLoc(),
+                  proto->getDeclaredInterfaceType(),
+                  {proto->getSelfInterfaceType()
+                       ->castTo<GenericTypeParamType>()},
+                  QuerySubstitutionMap{substitutions});
+            });
+        conformance->setInvalid();
+      }
+      return;
+    }
+
     // Go on to check exportability.
     break;
+  }
 
   case CheckRequirementsResult::RequirementFailure:
   case CheckRequirementsResult::SubstitutionFailure:

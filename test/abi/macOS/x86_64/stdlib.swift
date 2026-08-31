@@ -1356,3 +1356,6 @@ Added: _$ss11InlineArrayVsSHR_Ri__rlE9hashValueSivg
 Added: _$ss11InlineArrayVsSHR_Ri__rlE9hashValueSivpMV
 Added: _$ss11InlineArrayVyxq_GSHsSHR_Ri__rlMc
 Added: _$ss11InlineArrayVyxq_GSQsSQR_Ri__rlMc
+
+// Privilege gating for environment variables
+Added: __swift_isRestrictedProcess

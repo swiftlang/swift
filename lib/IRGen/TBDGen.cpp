@@ -243,8 +243,6 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
   bool isSimulator = target ? target->isSimulatorEnvironment() : false;
 
   switch(Ver.Platform) {
-  case swift::PlatformKind::none:
-    llvm_unreachable("cannot find platform kind");
   case swift::PlatformKind::DriverKit:
     llvm_unreachable("not used for this platform");
   case swift::PlatformKind::Swift:

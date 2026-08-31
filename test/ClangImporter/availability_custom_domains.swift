@@ -16,6 +16,8 @@
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   %s %S/Inputs/availability_custom_domains_other.swift
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // REQUIRES: swift_feature_CustomAvailability
 
 // https://github.com/swiftlang/swift/issues/80058

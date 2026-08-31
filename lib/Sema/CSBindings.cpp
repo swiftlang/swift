@@ -78,6 +78,13 @@ static Type applyElementTypeToBinding(Type containerTy, Type elementTy) {
   if (!boundTy)
     return containerTy;
 
+  // We should never form a type like Array<@noescape () -> ()>, because
+  // the non-escaping-ness is not a recursive property, and such types
+  // can silently leak into SILGen because there's no good way to detect
+  // them. Catch one spot where we might do this on accident, but it is
+  // not perfect.
+  ASSERT(elementTy->mayEscape());
+
   auto &ctx = boundTy->getASTContext();
   auto *decl = boundTy->getDecl();
   if (decl == ctx.getArrayDecl())
@@ -265,15 +272,19 @@ void BindingSet::computeJoinsAndMeets() {
   MergedBinding supertypes;
   MergedBinding subtypes;
 
+  // FIXME: Remove this.
+  bool allowTypeVariableJoins =
+      CS.getASTContext().TypeCheckerOpts.SolverEnableTypeVariableJoins;
+
   for (const auto &binding : Bindings) {
     if (binding.Kind == AllowedBindingKind::Supertypes &&
-        binding.isViableForJoinOrMeet()) {
+        binding.isViableForJoinOrMeet(allowTypeVariableJoins)) {
       if (!isAcceptableJoin(binding.BindingType))
         allowUpperBound = true;
 
       supertypes.add(binding);
     } else if (binding.Kind == AllowedBindingKind::Subtypes &&
-               binding.isViableForJoinOrMeet()) {
+               binding.isViableForJoinOrMeet(allowTypeVariableJoins)) {
       subtypes.add(binding);
     }
   }
@@ -307,6 +318,20 @@ void BindingSet::computeJoinsAndMeets() {
       // instead.
       bool existentialUpperBound = false;
       commonSupertype = subtypeJoin(commonSupertype, ty, &existentialUpperBound);
+    }
+
+    if (commonSupertype->is<JoinType>()) {
+      // This indicates we had parameter packs or something else the join
+      // code doesn't understand yet.
+      return;
+    }
+
+    // Don't allow this for now, because it leads to infinite recursion
+    // in constraint simplification. Once optional conversions are no
+    // longer presented as a disjunction, this case be removed.
+    if (auto objectType = commonSupertype->getOptionalObjectType()) {
+      if (objectType->is<JoinType>())
+        return;
     }
 
     // If the result was 'Any' or 'Any?' but none of the inputs were, don't
@@ -345,6 +370,20 @@ void BindingSet::computeJoinsAndMeets() {
       commonSubtype = subtypeMeet(commonSubtype, ty, &uninhabited);
     }
 
+    if (commonSubtype->is<MeetType>()) {
+      // This indicates we had parameter packs or something else the meet
+      // code doesn't understand yet.
+      return;
+    }
+
+    // Don't allow this for now, because it leads to infinite recursion
+    // in constraint simplification. Once optional conversions are no
+    // longer presented as a disjunction, this case be removed.
+    if (auto objectType = commonSubtype->getOptionalObjectType()) {
+      if (objectType->is<MeetType>())
+        return;
+    }
+
     auto newKind = uninhabited ? AllowedBindingKind::Exact
                                : AllowedBindingKind::Subtypes;
     PotentialBinding subtypeBinding(commonSubtype, newKind,
@@ -380,7 +419,7 @@ void BindingSet::computeJoinsAndMeets() {
     if (foundCommonSupertype) {
       // Filter out supertype bindings that participated in the join.
       if (binding.Kind == AllowedBindingKind::Supertypes &&
-          binding.isViableForJoinOrMeet()) {
+          binding.isViableForJoinOrMeet(allowTypeVariableJoins)) {
         continue;
       }
     }
@@ -388,7 +427,7 @@ void BindingSet::computeJoinsAndMeets() {
     if (foundCommonSubtype) {
       // Filter out supertype bindings that participated in the join.
       if (binding.Kind == AllowedBindingKind::Subtypes &&
-          binding.isViableForJoinOrMeet()) {
+          binding.isViableForJoinOrMeet(allowTypeVariableJoins)) {
         continue;
       }
     }
@@ -435,12 +474,12 @@ static bool isGenericParameter(TypeVariableType *TypeVar) {
   return locator && locator->isLastElement<LocatorPathElt::GenericParameter>();
 }
 
-bool PotentialBinding::isViableForJoinOrMeet() const {
-  return !BindingType->hasLValueType() &&
-         !BindingType->hasTypeVariable() &&
-         !BindingType->hasPlaceholder() &&
-         !BindingType->hasUnboundGenericType() &&
-         !BindingType->is<PackExpansionType>() &&
+bool PotentialBinding::isViableForJoinOrMeet(bool allowTypeVariableJoins) const {
+  // Temporary staging hack.
+  if (!allowTypeVariableJoins && BindingType->hasTypeVariable())
+    return false;
+
+  return !BindingType->is<PackExpansionType>() &&
          /// FIXME: The old join code didn't understand existentials, so it
          /// did not join 'Any' with 'any Sendable'. The compatibility hack
          /// where 'any Sendable' can bind to 'Any' relies on this behavior.
@@ -1500,7 +1539,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Existing exact binding must be a supertype of the new lower bound.
-      if (!canConvertTo(CS, binding.BindingType, existing.BindingType,
+      if (!canConvertTo(CS.CC, binding.BindingType, existing.BindingType,
                         GenericSignature())) {
         SUBSUME_DEBUG("Exact vs supertype conflict");
         return SubsumeBindingResult::Conflict;
@@ -1521,7 +1560,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Existing exact binding must be a subtype of the new upper bound.
-      if (!canConvertTo(CS, existing.BindingType, binding.BindingType,
+      if (!canConvertTo(CS.CC, existing.BindingType, binding.BindingType,
                         GenericSignature())) {
         SUBSUME_DEBUG("Exact vs subtype conflict");
         return SubsumeBindingResult::Conflict;
@@ -1549,7 +1588,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Exact binding must be a supertype of the existing lower bound.
-      if (!canConvertTo(CS, existing.BindingType, binding.BindingType,
+      if (!canConvertTo(CS.CC, existing.BindingType, binding.BindingType,
                         GenericSignature())) {
         SUBSUME_DEBUG("Supertype vs exact conflict");
         return SubsumeBindingResult::Conflict;
@@ -1582,13 +1621,17 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // Joins are handled in computeJoinsAndMeets().
 
     // FIXME: Remove this.
-    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
-    if (result.has_value() && *result) {
-      if (binding.BindingType->hasTypeVariable())
-        return SubsumeBindingResult::ExistingIsBetter;
+    bool allowTypeVariableJoins =
+        CS.getASTContext().TypeCheckerOpts.SolverEnableTypeVariableJoins;
+    if (!allowTypeVariableJoins) {
+      auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+      if (result.has_value() && *result) {
+        if (binding.BindingType->hasTypeVariable())
+          return SubsumeBindingResult::ExistingIsBetter;
 
-      ASSERT(existing.BindingType->hasTypeVariable());
-      return SubsumeBindingResult::NewIsBetter;
+        ASSERT(existing.BindingType->hasTypeVariable());
+        return SubsumeBindingResult::NewIsBetter;
+      }
     }
   }
 
@@ -1598,7 +1641,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The existing lower bound should be a subtype of the new upper bound.
-      if (!canConvertTo(CS, existing.BindingType, binding.BindingType,
+      if (!canConvertTo(CS.CC, existing.BindingType, binding.BindingType,
                         GenericSignature())) {
         SUBSUME_DEBUG("Supertype vs subtype conflict");
         return SubsumeBindingResult::Conflict;
@@ -1645,7 +1688,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The new exact binding should be a subtype of the existing upper bound.
-      if (!canConvertTo(CS, binding.BindingType, existing.BindingType,
+      if (!canConvertTo(CS.CC, binding.BindingType, existing.BindingType,
                         GenericSignature())) {
         SUBSUME_DEBUG("Subtype vs exact conflict");
         return SubsumeBindingResult::Conflict;
@@ -1673,7 +1716,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The new lower bound should be a subtype of the existing upper bound.
-      if (!canConvertTo(CS, binding.BindingType, existing.BindingType,
+      if (!canConvertTo(CS.CC, binding.BindingType, existing.BindingType,
                         GenericSignature())) {
         SUBSUME_DEBUG("Subtype vs supertype conflict");
         return SubsumeBindingResult::Conflict;
@@ -1849,8 +1892,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
     if (checkConformanceConstraints) {
       bool conforms = llvm::all_of(Protocols,
           [&](ProtocolDecl *proto) -> bool {
-            return checkTransitiveSubtypeConformance(
-                  CS, binding.BindingType, proto);
+            return CS.CC.checkTransitiveSubtypeConformance(
+                  binding.BindingType, proto);
           });
 
       if (!conforms) {
@@ -1909,8 +1952,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
     if (checkConformanceConstraints) {
       bool conforms = llvm::all_of(Protocols,
           [&](ProtocolDecl *proto) -> bool {
-            return checkTransitiveSupertypeConformance(
-                  CS, binding.BindingType, proto);
+            return CS.CC.checkTransitiveSupertypeConformance(
+                  binding.BindingType, proto);
           });
 
       if (!conforms) {
@@ -1931,7 +1974,7 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
       bool condition = llvm::any_of(Protocols,
           [&](ProtocolDecl *proto) {
         return (!proto->existentialConformsToSelf() &&
-                CS.isConformanceTransitiveForSupertype(
+                CS.CC.isConformanceTransitiveForSupertype(
                   ConversionBehavior::None, proto));
       });
 
@@ -2096,16 +2139,20 @@ void BindingSet::possiblyDropDefaults() {
   if (!Literals.empty())
     return;
 
+  // FIXME: Remove this.
+  bool allowTypeVariableJoins =
+      CS.getASTContext().TypeCheckerOpts.SolverEnableTypeVariableJoins;
+
   bool anySupertypeBindings = false;
   bool anyNonJoinableSupertypeBindings = false;
   for (const auto &binding : Bindings) {
     if (binding.Kind == AllowedBindingKind::Supertypes) {
       anySupertypeBindings = true;
-      if (!binding.isViableForJoinOrMeet())
+      if (!binding.isViableForJoinOrMeet(allowTypeVariableJoins))
         anyNonJoinableSupertypeBindings = true;
     }
   }
-  
+
   if (!anySupertypeBindings || anyNonJoinableSupertypeBindings)
     return;
 
@@ -2474,12 +2521,12 @@ bool LiteralRequirement::isCoveredBy(AllowedBindingKind kind, Type type,
     case AllowedBindingKind::Supertypes:
       if (!type->getAnyNominal() && !type->isExistentialType())
         return false;
-      return canConvertTo(CS, defaultType, type, GenericSignature());
+      return canConvertTo(CS.CC, defaultType, type, GenericSignature());
 
     case AllowedBindingKind::Subtypes:
       if (!type->getAnyNominal() && !type->isExistentialType())
         return false;
-      return canConvertTo(CS, type, defaultType, GenericSignature());
+      return canConvertTo(CS.CC, type, defaultType, GenericSignature());
     }
   }
 }
@@ -2761,7 +2808,11 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
 /// Check whether this is a dependent member type T.[P]Element where P is some
 /// protocol inheriting from Sequence, or T.[P]ArrayLiteralElement where P is
 /// some protocol inheriting from ExpressibleByArrayLiteral.
-static bool isInterestingElementType(Type type, TypeVariableType *forBase) {
+static bool isInterestingElementType(ConstraintKind forKind, Type type,
+                                     TypeVariableType *forBase) {
+  if (forKind != ConstraintKind::Bind && forKind != ConstraintKind::Equal)
+    return false;
+
   auto *memberTy = type->getAs<DependentMemberType>();
   if (!memberTy)
     return false;
@@ -2922,14 +2973,14 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     //
     // $T0.Element bind X
     if (firstTypeVar == TypeVar &&
-        isInterestingElementType(first, TypeVar)) {
+        isInterestingElementType(constraint->getKind(), first, TypeVar)) {
       recordElementType(second, constraint);
 
     // And the other direction:
     //
     // X bind $T0.Element
     } else if (secondTypeVar == TypeVar &&
-               isInterestingElementType(second, TypeVar)) {
+               isInterestingElementType(constraint->getKind(), second, TypeVar)) {
       recordElementType(first, constraint);
     }
 

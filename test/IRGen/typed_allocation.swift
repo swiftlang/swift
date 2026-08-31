@@ -1,4 +1,7 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=UNSAFEMUTABLEPOINTERALLOC
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=ERRORBOX
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=COROFRAME
 
 // REQUIRES: OS=macosx
 // REQUIRES: SWIFT_STDLIB_ARCH=arm64
@@ -123,17 +126,17 @@ public func deallocateMyClasses(_ ptr: UnsafeMutablePointer<MyClass>) {
   ptr.deallocate()
 }
 
-// CHECK-LABEL: define {{.*}}swiftcc ptr @"$eSp8allocate8capacitySpyxGSi_tFZ16typed_allocation7MyClassC_Tt0g5"
-// CHECK:   call noalias ptr @swift_allocRawTyped(i64 {{.*}}, i64 {{.*}}, i64 [[MYCLASS_ARRAY_TYPEID:.*]])
+// UNSAFEMUTABLEPOINTERALLOC-DAG: define {{.*}}swiftcc ptr @"$eSp8allocate8capacitySpyxGSi_tFZ16typed_allocation7MyClassC_Tt0g5"
+// UNSAFEMUTABLEPOINTERALLOC-DAG:   call noalias ptr @swift_allocRawTyped(i64 {{.*}}, i64 {{.*}}, i64 [[MYCLASS_ARRAY_TYPEID:.*]])
 
-// CHECK-LABEL: define {{.*}}swiftcc ptr @"$eSp8allocate8capacitySpyxGSi_tFZSi_Tt0g5"
-// CHECK:   call noalias ptr @swift_allocRawTyped(i64 {{.*}}, i64 {{.*}}, i64 [[INT_ARRAY_TYPEID:.*]])
+// UNSAFEMUTABLEPOINTERALLOC-DAG: define {{.*}}swiftcc ptr @"$eSp8allocate8capacitySpyxGSi_tFZSi_Tt0g5"
+// UNSAFEMUTABLEPOINTERALLOC-DAG:   call noalias ptr @swift_allocRawTyped(i64 {{.*}}, i64 {{.*}}, i64 [[INT_ARRAY_TYPEID:.*]])
 
-// CHECK-LABEL: define {{.*}}swiftcc void @"$eSp10deallocateyyF16typed_allocation7MyClassC_Tg5"
-// CHECK:   call void @swift_deallocRawTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[MYCLASS_ARRAY_TYPEID]])
+// UNSAFEMUTABLEPOINTERALLOC-DAG: define {{.*}}swiftcc void @"$eSp10deallocateyyF16typed_allocation7MyClassC_Tg5"
+// UNSAFEMUTABLEPOINTERALLOC-DAG:   call void @swift_deallocRawTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[MYCLASS_ARRAY_TYPEID]])
 
-// CHECK-LABEL: define {{.*}}swiftcc void @"$eSp10deallocateyyFSi_Tg5"
-// CHECK:   call void @swift_deallocRawTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[INT_ARRAY_TYPEID]])
+// UNSAFEMUTABLEPOINTERALLOC-DAG: define {{.*}}swiftcc void @"$eSp10deallocateyyFSi_Tg5"
+// UNSAFEMUTABLEPOINTERALLOC-DAG:   call void @swift_deallocRawTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[INT_ARRAY_TYPEID]])
 
 
 // --- Boxed opaque existential cases (typed alloc_box) ---
@@ -309,3 +312,64 @@ public func reassignDifferentType() -> any Existential {
 // CHECK:   store i64 [[NEW_DESCRIPTOR2]], ptr [[NEW_DESCRIPTOR_SLOT2]]
 // CHECK: dest-outline-cont:
 // CHECK:   call void @swift_releaseBoxTyped(ptr [[OLD_DEST_REF2]], i64 [[OLD_DESCRIPTOR2]])
+
+
+// --- Boxed Error existential cases (typed allocErrorBoxTyped / deallocErrorBoxTyped) ---
+
+public struct SimpleError: Error {}
+
+// emitBoxedExistentialContainerAllocation (swift_allocError).
+@inline(never)
+public func makeError() -> any Error {
+  return SimpleError()
+}
+
+// ARC release path (_errorBoxDestroyImpl).
+@inline(never)
+public func dropError() {
+  _ = makeError()
+}
+
+// ERRORBOX-DAG: define {{.*}} @swift_allocError(ptr %0, ptr %1, ptr %2, i1 %3)
+// ERRORBOX-DAG:   call noalias ptr @swift_allocObjectTyped(ptr @_swift_embedded_error_metadata_storage, i64 {{.*}}, i64 {{.*}}, i64 [[ERRORBOX_HEADER_TYPEID:[0-9]+]])
+
+// ERRORBOX-DAG: define {{.*}} @_swift_embedded_error_destroy_impl(ptr %0)
+// ERRORBOX-DAG:   call void @swift_deallocObjectTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[ERRORBOX_HEADER_TYPEID]])
+
+// emitBoxedExistentialContainerDeallocation (swift_deallocError).
+// ERRORBOX-DAG: define {{.*}} @swift_deallocError(ptr %0, ptr %1)
+// ERRORBOX-DAG:   call void @swift_deallocObjectTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[ERRORBOX_HEADER_TYPEID]])
+
+
+// --- Yield-once coroutine frames (typed alloc for swift_coroFrameAllocTyped/DeallocTyped) ---
+
+public struct CoroFrameLarge {
+  var a: Int
+  var b: Int
+  var c: Int
+  var d: Int
+  var e: Int
+  var f: Int
+  var g: Int
+  var h: Int
+}
+
+public final class CoroFrameHolder {
+  var large: CoroFrameLarge
+
+  init(_ l: CoroFrameLarge) { large = l }
+
+  public var value: CoroFrameLarge {
+    _read {
+      yield large
+    }
+    _modify {
+      yield &large
+    }
+  }
+}
+// COROFRAME-DAG: define {{.*}} @"[[CORO_READ:\$e[0-9]+typed_allocation15CoroFrameHolderC5valueAA0.*5LargeVvr]]"(ptr {{.*}}, ptr swiftself {{.*}})
+// COROFRAME-DAG:   call ptr @swift_coroFrameAllocTyped(i64 {{.*}}, i64 [[CORO_TYPEID:[0-9]+]])
+//
+// COROFRAME-DAG: define {{.*}} @"[[CORO_READ]].resume.0"
+// COROFRAME-DAG:   call void @swift_coroFrameDeallocTyped(ptr {{.*}}, i64 [[CORO_TYPEID]])

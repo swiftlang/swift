@@ -57,6 +57,12 @@ private func devirtualize(destroy: some DevirtualizableDestroy,
     return devirtualizeFixedSizeArray(destroy: destroy, isMandatory: isMandatory, context)
   }
 
+  // A tuple has no deinit of its own, but its elements may. Tuples aren't
+  // nominal, so this has to be handled before the `nominal` check below.
+  if type.isTuple {
+    return destroy.devirtualizeTupleElements(isMandatory: isMandatory, context)
+  }
+
   guard let nominal = type.nominal else {
     // E.g. a non-copyable generic function parameter
     return true
@@ -69,7 +75,7 @@ private func devirtualize(destroy: some DevirtualizableDestroy,
   }
 
   if nominal.valueTypeDestructor != nil && !destroy.shouldDropDeinit {
-    guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
+    guard var deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
       return false
     }
     // In mandatory mode, de-virtualization might create function references to functions with wrong linkage.
@@ -79,6 +85,15 @@ private func devirtualize(destroy: some DevirtualizableDestroy,
       let serialized = destroy.parentFunction.serializedKind
       guard serialized == .notSerialized || deinitFunc.hasValidLinkageForFragileRef(serialized) else {
         return false
+      }
+
+      // In Embedded Swift, go looking for an already-specialized deinit for a generic type.
+      // If there isn't one, we have to bail out.
+      if deinitFunc.isGeneric && context.options.enableEmbeddedSwift {
+        guard let specialized = context.lookupSpecializedDeinit(ofType: type) else {
+          return false
+        }
+        deinitFunc = specialized
       }
     }
 
@@ -134,6 +149,7 @@ private protocol DevirtualizableDestroy : UnaryInstruction {
   var shouldDropDeinit: Bool { get }
   func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext)
   func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool
+  func devirtualizeTupleElements(isMandatory: Bool, _ context: some MutatingContext) -> Bool
   func devirtualizeEnumPayload(enumCase: EnumCase,
                                in block: BasicBlock,
                                isMandatory: Bool,
@@ -238,6 +254,30 @@ extension DestroyValueInst : DevirtualizableDestroy {
     return true
   }
 
+  fileprivate func devirtualizeTupleElements(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+    let elements = type.tupleElements
+
+    defer {
+      context.erase(instruction: self)
+    }
+
+    let builder = Builder(before: self, context)
+    if elements.allSatisfy({ $0.isTrivial(in: parentFunction) }) {
+      builder.createEndLifetime(of: operand.value)
+      return true
+    }
+    let destructure = builder.createDestructureTuple(tuple: destroyedValue)
+    var result = true
+
+    for elementValue in destructure.results where !elementValue.type.isTrivial(in: parentFunction) {
+      let destroyElement = builder.createDestroyValue(operand: elementValue)
+      if !devirtualizeDeinits(of: destroyElement, isMandatory: isMandatory, context) {
+        result = false
+      }
+    }
+    return result
+  }
+
   fileprivate func createSwitchEnum(
     atEndOf block: BasicBlock,
     cases: [(Int, BasicBlock)],
@@ -266,7 +306,9 @@ extension DestroyAddrInst : DevirtualizableDestroy {
 
   fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
     let builder = Builder(before: self, context)
-    let subs = context.getContextSubstitutionMap(for: destroyedAddress.type)
+    let subs = deinitializer.isGeneric
+        ? context.getContextSubstitutionMap(for: destroyedAddress.type)
+        : SubstitutionMap()
     let deinitRef = builder.createFunctionRef(deinitializer)
     if !deinitializer.argumentConventions[deinitializer.selfArgumentIndex!].isIndirect {
       let value = builder.createLoad(fromAddress: destroyedAddress, ownership: .take)
@@ -317,6 +359,31 @@ extension DestroyAddrInst : DevirtualizableDestroy {
       return devirtualizeDeinits(of: destroyPayload, isMandatory: isMandatory, context)
     }
     return true
+  }
+
+  fileprivate func devirtualizeTupleElements(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+    let builder = Builder(before: self, context)
+    let elements = type.tupleElements
+
+    defer {
+      context.erase(instruction: self)
+    }
+    if elements.allSatisfy({ $0.isTrivial(in: parentFunction) }) {
+      builder.createEndLifetime(of: operand.value)
+      return true
+    }
+    var result = true
+    for (elementIdx, elementTy) in elements.enumerated()
+      where !elementTy.isTrivial(in: parentFunction)
+    {
+      let elementAddr = builder.createTupleElementAddr(tupleAddress: destroyedAddress,
+                                                       elementIndex: elementIdx)
+      let destroyElement = builder.createDestroyAddr(address: elementAddr)
+      if !devirtualizeDeinits(of: destroyElement, isMandatory: isMandatory, context) {
+        result = false
+      }
+    }
+    return result
   }
 
   fileprivate func createSwitchEnum(

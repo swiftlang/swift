@@ -611,6 +611,30 @@ SILMoveOnlyDeinit *SILModule::lookUpMoveOnlyDeinit(const NominalTypeDecl *C,
   return tbl;
 }
 
+SILMoveOnlyDeinit *
+SILModule::lookUpSpecializedMoveOnlyDeinit(SILType nominalType) {
+  // Specialized deinits are keyed by the object type, so that a lookup for the
+  // corresponding address type finds them too.
+  auto iter = SpecializedMoveOnlyDeinitMap.find(nominalType.getObjectType());
+  if (iter != SpecializedMoveOnlyDeinitMap.end())
+    return iter->second;
+
+  return nullptr;
+}
+
+SILMoveOnlyDeinit *
+SILModule::lookUpMoveOnlyDeinitForType(SILType nominalType,
+                                       bool deserializeLazily) {
+  // Prefer a specialized deinit, which is what must be used in Embedded Swift
+  // when the type is generic: the unspecialized deinit takes type metadata,
+  // which isn't available there.
+  if (auto *specialized = lookUpSpecializedMoveOnlyDeinit(nominalType))
+    return specialized;
+
+  return lookUpMoveOnlyDeinit(nominalType.getNominalOrBoundGenericNominal(),
+                              deserializeLazily);
+}
+
 SILVTable *SILModule::lookUpSpecializedVTable(SILType classTy) {
   // First try to look up R from the lookup table.
   auto R = SpecializedVTableMap.find(classTy);

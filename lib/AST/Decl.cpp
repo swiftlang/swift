@@ -1057,6 +1057,10 @@ bool Decl::isInMacroExpansionInContext() const {
   return swift::isMacroExpansionInContext(getStartLoc(), parentSF);
 }
 
+bool Decl::isFromSyntheticMacroExpansion() const {
+  return ::isFromSyntheticMacroExpansion(getModuleContext(), getStartLoc());
+}
+
 Decl *Decl::getMacroExpansionOriginatingDecl() const {
   SourceLoc loc = getLoc();
   auto *sf = getModuleContext()->getSourceFileContainingLocation(loc);
@@ -3064,10 +3068,35 @@ VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
   return getPatternList()[i].getAnchoringVarDecl();
 }
 
+/// Whether the downstream compile-time-values evaluator owns validation and
+/// static initialization of every '@const'/'@section' initializer.
+static bool constValuesSILEvaluatorFoldsInitializers(const ASTContext &ctx) {
+  return ctx.LangOpts.hasFeature(Feature::CompileTimeValues) ||
+         ctx.LangOpts.hasFeature(Feature::CompileTimeValuesPreview);
+}
+
 bool PatternBindingDecl::hasSingleVarConstantFoldedInit() const {
+  auto &ctx = getASTContext();
   auto *singleVar = getSingleVar();
-  return singleVar && singleVar->isConstValue() &&
-         getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
+  if (!singleVar || !singleVar->isConstValue() ||
+      !ctx.LangOpts.hasFeature(Feature::LiteralExpressions))
+    return false;
+  // When the downstream compile-time evaluator is in play, the
+  // literal-expression folder must be disabled. The two accept overlapping but
+  // different grammars: the evaluator takes 'Int(17.0 / 3.5)', which the folder
+  // rejects, and the folder takes a Clang-imported constant, which the
+  // evaluator rejects. So folding here can reject a valid compile-time value,
+  // and that error sets 'ASTContext::hadError()', which makes
+  // 'DiagnoseUnknownConstValues' bail before emitting its own diagnostic,
+  // hiding the real error behind a spurious one.
+  if (constValuesSILEvaluatorFoldsInitializers(ctx))
+    return false;
+
+  // Only stdlib integer constants participate in literal-expression folding.
+  // Other constant initializers (tuples, arrays, strings, etc) are left as
+  // written.
+  Type type = singleVar->getInterfaceType();
+  return type && type->isStdlibInteger();
 }
 
 Expr *PatternBindingDecl::getExecutableInit(unsigned i) const {
@@ -3660,6 +3689,11 @@ getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) 
     return AccessStrategy::getAccessor(AccessorKind::Init, dispatch);
   if (storage->requiresOpaqueMutateAccessor())
     return AccessStrategy::getAccessor(AccessorKind::Mutate, dispatch);
+  // A 'yielding mutate' requirement with no plain setter of its own (e.g. a
+  // protocol requirement spelled without 'set') has no setter to fall back to.
+  if (storage->requiresOpaqueYieldingMutateCoroutine() &&
+      !storage->requiresOpaqueSetter())
+    return AccessStrategy::getAccessor(AccessorKind::YieldingMutate, dispatch);
   return AccessStrategy::getAccessor(AccessorKind::Set, dispatch);
 }
 
@@ -3830,6 +3864,14 @@ bool AbstractStorageDecl::requiresOpaqueSetter() const {
     return false;
   }
   if (getParsedAccessor(AccessorKind::Mutate)) {
+    return false;
+  }
+  if (getParsedAccessor(AccessorKind::YieldingMutate) &&
+      !getParsedAccessor(AccessorKind::Set) &&
+      isa<ProtocolDecl>(getDeclContext())) {
+    // In a protocol, `yielding mutate` by itself suffices
+    // to provide write support and we don't need `set` unless
+    // the protocol explicitly specifies it.
     return false;
   }
   return true;
@@ -5047,9 +5089,10 @@ void ValueDecl::setInterfaceType(Type type) {
 }
 
 StringRef ValueDecl::getCDeclName() const {
-  // Treat imported C functions as implicitly @_cdecl.
+  // Treat imported C and C++ functions as implicitly @_cdecl / @cxx.
   if (auto clangDecl = dyn_cast_or_null<clang::FunctionDecl>(getClangDecl())) {
-    if (clangDecl->getLanguageLinkage() == clang::CLanguageLinkage
+    if ((clangDecl->getLanguageLinkage() == clang::CLanguageLinkage ||
+         clangDecl->getLanguageLinkage() == clang::CXXLanguageLinkage)
           && clangDecl->getIdentifier())
       return clangDecl->getName();
   }
@@ -5058,13 +5101,15 @@ StringRef ValueDecl::getCDeclName() const {
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
     return abiRole.getCounterpart()->getCDeclName();
 
-  // Handle explicit cdecl attributes.
-  if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
-    if (!cdeclAttr->Name.empty())
-      return cdeclAttr->Name;
-    else
-      return getBaseIdentifier().str();
-  }
+  // Handle explicit @c/@_cdecl and @cxx attributes. Both store an optional
+  // explicit name and fall back to the base identifier when it is empty.
+  auto nameOrBaseIdentifier = [&](StringRef name) -> StringRef {
+    return name.empty() ? getBaseIdentifier().str() : name;
+  };
+  if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>())
+    return nameOrBaseIdentifier(cdeclAttr->Name);
+  if (auto cxxAttr = getAttrs().getAttribute<CxxDeclAttr>())
+    return nameOrBaseIdentifier(cxxAttr->Name);
 
   return "";
 }

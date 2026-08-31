@@ -4,32 +4,37 @@
 template <class T> T addSameTypeParams(T a, T b) { return a + b; }
 
 template <class A, class B> A addMixedTypeParams(A a, B b) { return a + b; }
+// expected-error@-1 {{could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'addMixedTypeParams' could not be converted: any A & B, any A & C}}
 
 template <class T> T passThrough(T value) { return value; }
+// expected-error@-1 {{could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'passThrough' could not be converted: any A & B}}
 
 template <class T> const T passThroughConst(const T value) { return value; }
 
-void takesString(const char *) {}
+void takesString(const char * _Null_unspecified) {}
+// expected-note@-1 {{candidate function not viable: no known conversion from 'int' to 'const char * _Null_unspecified' for 1st argument}}
+
 template <class T> void expectsConstCharPtr(T str) { takesString(str); }
+// expected-error@-1 {{no matching function for call to 'takesString'}}
 
 template <long x> void hasNonTypeTemplateParameter() {}
 template <long x = 0> void hasDefaultedNonTypeTemplateParameter() {}
 
 // NOTE: these will cause multi-def linker errors if used in more than one compilation unit
-int *intPtr;
+int * _Null_unspecified intPtr;
 
 int get42(void) { return 42; }
-int (*functionPtrGet42)(void) = &get42;
+int (*_Null_unspecified functionPtrGet42)(void) = &get42;
 int (*_Nonnull nonNullFunctionPtrGet42)(void) = &get42;
 
 int tripleInt(int x) { return x * 3; }
-int (*functionPtrTripleInt)(int) = &tripleInt;
+int (*_Null_unspecified functionPtrTripleInt)(int) = &tripleInt;
 int (*_Nonnull nonNullFunctionPtrTripleInt)(int) = &tripleInt;
 
-int (^blockReturns111)(void) = ^{ return 111; };
+int (^_Null_unspecified blockReturns111)(void) = ^{ return 111; };
 int (^_Nonnull nonNullBlockReturns222)(void) = ^{ return 222; };
 
-int (^blockTripleInt)(int) = ^(int x) { return x * 3; };
+int (^_Null_unspecified blockTripleInt)(int) = ^(int x) { return x * 3; };
 int (^_Nonnull nonNullBlockTripleInt)(int) = ^(int x) { return x * 3; };
 
 // These functions construct block literals that capture a local variable, and
@@ -88,7 +93,7 @@ __attribute__((swift_attr("release:immortal"))) FRT {
 };
 
 template <typename T>
-void takesPointerToDependent(ClassTemplate<T> *ct) {
+void takesPointerToDependent(ClassTemplate<T> * _Null_unspecified ct) {
   ct->t++;
 }
 
@@ -96,7 +101,7 @@ template <typename T>
 T usedInDeclType(T) {}
 
 template <typename T>
-void takesDeclTypePointer(decltype(usedInDeclType<T>()) *) {}
+void takesDeclTypePointer(decltype(usedInDeclType<T>()) * _Null_unspecified) {}
 
 // TODO: Add tests for Decltype, UnaryTransform, and TemplateSpecialization with
 // a dependent type once those are supported.
@@ -120,7 +125,7 @@ template <class T> bool constLvalueReferenceToBool(const T &t) { return t; }
 
 template <class T> void forwardingReference(T &&) {}
 
-template <class T> bool pointerTemplateParameter(T *t) { return t; }
+template <class T> bool pointerTemplateParameter(T *_Null_unspecified t) { return t; }
 template <class T> bool pointerTemplateParameterNonnull(T *_Nonnull t) { return t; }
 template <class T> bool pointerTemplateParameterNullable(T *_Nullable t) { return t; }
 

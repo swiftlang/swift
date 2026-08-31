@@ -5196,8 +5196,13 @@ void irgen::emitYieldOnceCoroutineEntry(
   if (IGF.getOptions().EmitTypeMallocForCoroFrame) {
     auto mallocTypeId = IGF.getMallocTypeId();
     finalArgs.push_back(mallocTypeId);
-    // Use swift_coroFrameAllocStub to emit our allocator.
-    allocFn = IGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(IGF.IGM));
+    if (IGF.IGM.isTypedAllocationAvailable()) {
+      allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getCoroFrameAllocTypedFn());
+      deallocFn = IGF.IGM.getOpaquePtr(getCoroFrameDeallocTypedStubFn(IGF));
+    } else {
+      // Use swift_coroFrameAllocStub to emit our allocator.
+      allocFn = IGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(IGF.IGM));
+    }
   } else {
     // Use malloc as our allocator.
     allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
@@ -6417,7 +6422,7 @@ Signature irgen::emitCastOfFunctionPointer(IRGenFunction &IGF,
                             : IGF.IGM.getSignature(fnType);
 
   // Emit the cast.
-  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.PtrTy);
+  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.FunctionPtrTy);
 
   // Return the information.
   return sig;
@@ -6616,7 +6621,7 @@ FunctionPointer FunctionPointer::forExplosionValue(IRGenFunction &IGF,
                                                    llvm::Value *fnPtr,
                                                    CanSILFunctionType fnType) {
   // Bitcast out of an opaque pointer type.
-  assert(fnPtr->getType() == IGF.IGM.Int8PtrTy);
+  assert(fnPtr->getType() == IGF.IGM.Int8ProgramSpacePtrTy);
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, fnType);
   auto authInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, fnType);
 
@@ -6635,7 +6640,7 @@ FunctionPointer::getExplosionValue(IRGenFunction &IGF,
   }
 
   // Bitcast to an opaque pointer type.
-  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
+  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8ProgramSpacePtrTy);
 
   return fnPtr;
 }

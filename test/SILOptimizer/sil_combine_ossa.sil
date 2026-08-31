@@ -1,8 +1,8 @@
-// RUN: %target-sil-opt -sil-print-types -enable-copy-propagation=requested-passes-only -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -wmo | %FileCheck %s
-// RUN: %target-sil-opt -sil-print-types -enable-copy-propagation=requested-passes-only -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -generic-specializer | %FileCheck %s  --check-prefix=CHECK_FORWARDING_OWNERSHIP_KIND
+// RUN: %target-sil-opt -sil-print-types -sil-print-transform-blocks=false -enable-copy-propagation=requested-passes-only -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -wmo | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-print-transform-blocks=false -enable-copy-propagation=requested-passes-only -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -generic-specializer | %FileCheck %s  --check-prefix=CHECK_FORWARDING_OWNERSHIP_KIND
 //
 // FIXME: check copy-propagation output instead once it is the default mode
-// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -enable-copy-propagation -enable-lexical-lifetimes=false | %FileCheck %s --check-prefix=CHECK_COPYPROP
+// RUN: %target-sil-opt -sil-print-types -sil-print-transform-blocks=false -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -enable-copy-propagation -enable-lexical-lifetimes=false | %FileCheck %s --check-prefix=CHECK_COPYPROP
 
 // REQUIRES: objc_codegen
 
@@ -5765,4 +5765,73 @@ bb0(%2 : @guaranteed $Klass):
   destroy_value %63
   %r = tuple ()
   return %r
+}
+
+// When SILCombine folds away the cast, the destroy_value which it creates to
+// end the lifetime of the cast's operand must keep the [dead_end] flag.
+// Otherwise it turns into a "real" destroy_value which runs the deinitializer,
+// even though earlier optimizations may have left the object only partially
+// initialized (relying on the deinit not being executed).
+//
+// CHECK-LABEL: sil [ossa] @fold_cast_of_dead_end_destroy :
+// CHECK:         destroy_value [dead_end] %0
+// CHECK:       } // end sil function 'fold_cast_of_dead_end_destroy'
+sil [ossa] @fold_cast_of_dead_end_destroy : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $E
+  %1 = upcast %0 to $B
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = struct $UInt64 (%2)
+  destroy_value [dead_end] %1
+  unreachable
+}
+
+// Same, but with a chain of forwarding casts.
+//
+// CHECK-LABEL: sil [ossa] @fold_cast_chain_of_dead_end_destroy :
+// CHECK:         destroy_value [dead_end] %0
+// CHECK:       } // end sil function 'fold_cast_chain_of_dead_end_destroy'
+sil [ossa] @fold_cast_chain_of_dead_end_destroy : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $E
+  %1 = upcast %0 to $B
+  %2 = unchecked_ref_cast %1 to $Builtin.NativeObject
+  %3 = integer_literal $Builtin.Int64, 2
+  %4 = struct $UInt64 (%3)
+  destroy_value [dead_end] %2
+  unreachable
+}
+
+// A meaningful destroy_value must not become a [dead_end] destroy_value.
+//
+// CHECK-LABEL: sil [ossa] @fold_cast_of_real_destroy :
+// CHECK:         destroy_value %0
+// CHECK-NOT:     [dead_end]
+// CHECK:       } // end sil function 'fold_cast_of_real_destroy'
+sil [ossa] @fold_cast_of_real_destroy : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $E
+  %1 = upcast %0 to $B
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = struct $UInt64 (%2)
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// A meaningful destroy_value in a dead-end block must not become a [dead_end]
+// destroy_value either.
+//
+// CHECK-LABEL: sil [ossa] @fold_cast_of_real_destroy_in_dead_end_block :
+// CHECK:         destroy_value %0
+// CHECK-NOT:     [dead_end]
+// CHECK:       } // end sil function 'fold_cast_of_real_destroy_in_dead_end_block'
+sil [ossa] @fold_cast_of_real_destroy_in_dead_end_block : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $E
+  %1 = upcast %0 to $B
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = struct $UInt64 (%2)
+  destroy_value %1
+  unreachable
 }

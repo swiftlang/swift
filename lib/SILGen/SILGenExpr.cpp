@@ -3136,6 +3136,44 @@ static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
   return SGF.B.createValueMetatype(loc, metaTy, selfValue.getValue());
 }
 
+/// Emit the operand of a `value_metatype` or `existential_metatype`
+/// instruction.
+///
+/// Neither instruction consumes its operand; they only inspect the type of the
+/// value it designates. So when the operand names existing storage, borrow that
+/// storage in place instead of loading a copy out of it. That avoids a needless
+/// retain/release, and it's what lets `type(of:)` apply to a noncopyable value,
+/// where the copy would otherwise be diagnosed as a consume.
+///
+/// Only an address-only operand may be left in memory. `existential_metatype`
+/// accepts an address only for an address-only (opaque) existential; for a
+/// class, boxed, or metatype existential it reads the container as a value, and
+/// IRGen has no way to interpret an address there. So a loadable operand is
+/// loaded -- with `load_borrow`, which still doesn't consume it.
+///
+/// The caller must have established a `FormalEvaluationScope` covering the use
+/// of the returned value.
+static ManagedValue emitMetatypeOperand(SILGenFunction &SGF, Expr *baseExpr) {
+  if (auto *load = dyn_cast<LoadExpr>(baseExpr)) {
+    auto accessKind = SGF.getTypeLowering(load->getType()).isAddressOnly()
+                          ? SGFAccessKind::BorrowedAddressRead
+                          : SGFAccessKind::BorrowedObjectRead;
+    LValue lv = SGF.emitLValue(load->getSubExpr(), accessKind);
+    auto base = SGF.emitBorrowedLValue(load, std::move(lv));
+
+    // A borrowed read of physical storage comes back as the address of that
+    // storage, whether or not the type is loadable, so the load happens here.
+    if (base.getType().isAddress() && base.getType().isLoadable(SGF.F))
+      base = SGF.B.createFormalAccessLoadBorrow(load, base);
+    return base;
+  }
+
+  // Otherwise the operand produces a temporary of its own, which we can just
+  // read from.
+  return SGF.emitRValueAsSingleValue(baseExpr,
+                                     SGFContext::AllowImmediatePlusZero);
+}
+
 SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
   Type formalBaseType = baseExpr->getType()->getWithoutSpecifierType();
   CanType baseTy = formalBaseType->getCanonicalType();
@@ -3144,8 +3182,8 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
   if (baseTy.isAnyExistentialType()) {
     SILType metaTy = getLoweredLoadableType(
                                       CanExistentialMetatypeType::get(baseTy));
-    auto base = emitRValueAsSingleValue(baseExpr,
-                                  SGFContext::AllowImmediatePlusZero).getValue();
+    FormalEvaluationScope scope(*this);
+    auto base = emitMetatypeOperand(*this, baseExpr).getValue();
     return B.createExistentialMetatype(loc, metaTy, base);
   }
   SILType metaTy = getLoweredLoadableType(CanMetatypeType::get(baseTy));
@@ -3165,9 +3203,11 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
     }
 
     Scope S(*this, loc);
-    auto base = emitRValueAsSingleValue(baseExpr, SGFContext::AllowImmediatePlusZero);
-    return S.popPreservingValue(B.createValueMetatype(loc, metaTy, base))
-        .getValue();
+    FormalEvaluationScope scope(*this);
+    auto base = emitMetatypeOperand(*this, baseExpr);
+    auto result = B.createValueMetatype(loc, metaTy, base);
+    scope.pop();
+    return S.popPreservingValue(result).getValue();
   }
   // Otherwise, ignore the base and return the static thin metatype.
   emitIgnoredExpr(baseExpr);

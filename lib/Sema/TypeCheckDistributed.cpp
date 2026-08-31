@@ -404,6 +404,195 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
   return false;
 }
 
+/// Whether \p repr refers to \p decl, either because it has already been
+/// resolved to it or because it is spelled with that name.
+static bool declRefTypeReprRefersTo(TypeRepr *repr, const TypeDecl *decl) {
+  auto *declRefRepr = dyn_cast_or_null<DeclRefTypeRepr>(repr);
+  if (!declRefRepr || !decl)
+    return false;
+
+  if (declRefRepr->isBound())
+    return declRefRepr->getBoundDecl() == decl;
+
+  return declRefRepr->getNameRef().isSimpleName(decl->getName());
+}
+
+/// Find the location after which `<any Codable>` can be inserted in order to
+/// parameterize a bare `DistributedActorSystem` constraint on \p paramDecl,
+/// covering both spellings:
+///
+///     <ActorSystem: DistributedActorSystem>
+///     <ActorSystem> where ActorSystem: DistributedActorSystem
+///
+/// Returns an invalid location when no such constraint is spelled out, e.g.
+/// when it is already parameterized, in which case the requirement is abstract
+/// for some other reason and inserting arguments would not be valid.
+static SourceLoc
+findBareDistributedActorSystemConstraintLoc(GenericTypeParamDecl *paramDecl,
+                                           ProtocolDecl *systemProto) {
+  // --- `<ActorSystem: DistributedActorSystem>`
+  auto inherited = paramDecl->getInherited();
+  for (auto i : inherited.getIndices()) {
+    auto inheritedTy = inherited.getResolvedType(i);
+    if (!inheritedTy)
+      continue;
+
+    if (auto *existential = inheritedTy->getAs<ExistentialType>())
+      inheritedTy = existential->getConstraintType();
+
+    auto *protoTy = inheritedTy->getAs<ProtocolType>();
+    if (protoTy && protoTy->getDecl() == systemProto)
+      return inherited.getEntry(i).getSourceRange().End;
+  }
+
+  // --- `<ActorSystem> where ActorSystem: DistributedActorSystem`
+  auto *ownerDecl = paramDecl->getDeclContext()->getAsDecl();
+  auto *genericCtx = ownerDecl ? ownerDecl->getAsGenericContext() : nullptr;
+  auto *whereClause =
+      genericCtx ? genericCtx->getTrailingWhereClause() : nullptr;
+  if (!whereClause)
+    return SourceLoc();
+
+  for (const auto &req : whereClause->getRequirements()) {
+    if (req.getKind() != RequirementReprKind::TypeConstraint || req.isInvalid())
+      continue;
+
+    if (!declRefTypeReprRefersTo(req.getSubjectRepr(), paramDecl))
+      continue;
+
+    auto *constraintRepr =
+        dyn_cast_or_null<DeclRefTypeRepr>(req.getConstraintRepr());
+    if (constraintRepr && !constraintRepr->hasGenericArgList() &&
+        declRefTypeReprRefersTo(constraintRepr, systemProto))
+      return constraintRepr->getEndLoc();
+  }
+
+  return SourceLoc();
+}
+
+/// Emit a note on \p ext suggesting a `where` clause that gives the actor's
+/// `ActorSystem` a concrete `SerializationRequirement`.
+static bool emitConstrainExtensionSerializationRequirementNote(
+    ExtensionDecl *ext, GenericTypeParamDecl *paramDecl,
+    ProtocolDecl *systemProto) {
+  if (!systemProto)
+    return false;
+
+  // `AS: DistributedActorSystem<any Codable>`
+  llvm::SmallString<64> constraint;
+  constraint += paramDecl->getName().str();
+  constraint += ": ";
+  constraint += systemProto->getName().str();
+  constraint += "<any Codable>";
+
+  auto diagnoseWith = [&](SourceLoc loc, StringRef fixIt, bool insertAfter) {
+    auto diag = ext->diagnose(
+        diag::
+            distributed_actor_target_serialization_req_not_concrete_extension_note);
+    if (insertAfter)
+      diag.fixItInsertAfter(loc, fixIt);
+    else
+      diag.fixItInsert(loc, fixIt);
+  };
+
+  // Append to an existing `where` clause, if there is one
+  if (auto *whereClause = ext->getTrailingWhereClause()) {
+    auto reqs = whereClause->getRequirements();
+    if (reqs.empty())
+      return false;
+
+    auto lastReqLoc = reqs.back().getSourceRange().End;
+    if (!lastReqLoc.isValid())
+      return false;
+
+    llvm::SmallString<72> fixIt;
+    fixIt += ", ";
+    fixIt += constraint;
+    diagnoseWith(lastReqLoc, fixIt, /*insertAfter=*/true);
+    return true;
+  }
+
+  // Otherwise introduce one just before the extension's braces
+  auto braceLoc = ext->getBraces().Start;
+  if (!braceLoc.isValid())
+    return false;
+
+  llvm::SmallString<72> fixIt;
+  fixIt += " where ";
+  fixIt += constraint;
+  fixIt += " ";
+  diagnoseWith(braceLoc, fixIt, /*insertAfter=*/false);
+  return true;
+}
+
+/// Emit a note on the `ActorSystem` generic parameter of the enclosing actor,
+/// suggesting to constrain it to a system with a concrete
+/// `SerializationRequirement`.
+static void emitAbstractSerializationRequirementNote(ASTContext &C,
+                                                     ValueDecl *valueDecl,
+                                                     Type actorSystemTy) {
+  auto genericParamTy = actorSystemTy->getAs<GenericTypeParamType>();
+  if (!genericParamTy)
+    return;
+
+  auto *paramDecl = genericParamTy->getDecl();
+  if (!paramDecl)
+    return;
+
+  auto *systemProto = C.getDistributedActorSystemDecl();
+
+  // When the target is declared in an extension, constrain the extension
+  // rather than the actor: the actor declaration may live in another file or
+  // module, and may legitimately want to stay generic over its actor system.
+  if (auto *ext = dyn_cast<ExtensionDecl>(valueDecl->getDeclContext())) {
+    if (emitConstrainExtensionSerializationRequirementNote(ext, paramDecl,
+                                                           systemProto))
+      return;
+  }
+
+  auto fixItLoc =
+      findBareDistributedActorSystemConstraintLoc(paramDecl, systemProto);
+
+  auto diag = paramDecl->diagnose(
+      diag::distributed_actor_target_serialization_req_not_concrete_note,
+      paramDecl->getDeclaredInterfaceType());
+  if (fixItLoc.isValid())
+    diag.fixItInsertAfter(fixItLoc, "<any Codable>");
+}
+
+static bool diagnoseAbstractDistributedSerializationRequirement(
+    ValueDecl *valueDecl, Type serializationRequirement, bool diagnose) {
+  if (serializationRequirement->isExistentialType())
+    return false;
+
+  if (!diagnose)
+    return true;
+
+  auto &C = valueDecl->getASTContext();
+
+  // Name the 'ActorSystem' rather than the requirement itself in the
+  // diagnostic; that is the type the user has to constrain
+  auto *nominal = valueDecl->getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return true;
+
+  Type actorSystemTy;
+  if (isa<ProtocolDecl>(nominal)) {
+    actorSystemTy = getConcreteReplacementForProtocolActorSystemType(valueDecl);
+  } else if (nominal->isDistributedActor()) {
+    actorSystemTy = getDistributedActorSystemType(nominal);
+  }
+
+  if (!actorSystemTy || actorSystemTy->hasError())
+    return true; // whatever went wrong there is diagnosed elsewhere
+
+  valueDecl->diagnose(
+      diag::distributed_actor_target_serialization_req_not_concrete, valueDecl,
+      actorSystemTy);
+  emitAbstractSerializationRequirementNote(C, valueDecl, actorSystemTy);
+  return true;
+}
+
 static bool checkDistributedTargetResultType(
     ValueDecl *valueDecl,
     Type serializationRequirement,
@@ -427,15 +616,6 @@ static bool checkDistributedTargetResultType(
 
   if (resultType->isVoid())
     return false;
-
-  SmallVector<ProtocolDecl *, 4> serializationRequirements;
-  // Collect extra "SerializationRequirement: SomeProtocol" requirements
-  auto srl = serializationRequirement->getExistentialLayout();
-  llvm::copy(srl.getProtocols(), std::back_inserter(serializationRequirements));
-
-  auto isCodableRequirement =
-      checkDistributedSerializationRequirementIsExactlyCodable(
-          C, serializationRequirement);
 
   // --- Special case: `-> some/any P` where P is a `@Resolvable protocol`
   // Wire format encodes the actor's `id` as a Codable ActorID,
@@ -486,7 +666,19 @@ static bool checkDistributedTargetResultType(
   }
 
   if (!skipCodableCheck) {
-    for (auto serializationReq: serializationRequirements) {
+    // We can only check the result type if we actually know what the
+    // serialization requirement is
+    if (diagnoseAbstractDistributedSerializationRequirement(
+            valueDecl, serializationRequirement, diagnose))
+      return true;
+
+    auto isCodableRequirement =
+        checkDistributedSerializationRequirementIsExactlyCodable(
+            C, serializationRequirement);
+
+    // Collect extra "SerializationRequirement: SomeProtocol" requirements
+    auto srl = serializationRequirement->getExistentialLayout();
+    for (auto serializationReq: srl.getProtocols()) {
       auto conformance = checkConformance(resultType, serializationReq);
       if (conformance.isInvalid()) {
         if (diagnose) {
@@ -621,11 +813,6 @@ bool CheckDistributedFunctionRequest::evaluate(
   for (auto param: *func->getParameters()) {
     // --- Check the parameter conforming to serialization requirements
     if (!serializationReqType->hasError()) {
-      // If the requirement is exactly `Codable` we diagnose it ia bit nicer.
-      auto serializationRequirementIsCodable =
-          checkDistributedSerializationRequirementIsExactlyCodable(
-              C, serializationReqType);
-
       // --- Check parameters for 'SerializationRequirement' conformance
       auto paramTy = func->mapTypeIntoEnvironment(param->getInterfaceType());
 
@@ -679,6 +866,17 @@ bool CheckDistributedFunctionRequest::evaluate(
       }
 
       if (!skipSerializationRequirementCheck) {
+        // We can only check the parameter type if we actually know what the
+        // serialization requirement is
+        if (diagnoseAbstractDistributedSerializationRequirement(
+                func, serializationReqType, /*diagnose=*/true))
+          return true;
+
+        // If the requirement is exactly `Codable` we diagnose it a bit nicer
+        auto serializationRequirementIsCodable =
+            checkDistributedSerializationRequirementIsExactlyCodable(
+                C, serializationReqType);
+
         auto srl = serializationReqType->getExistentialLayout();
         for (auto req: srl.getProtocols()) {
           if (!checkConformance(paramTy, req)) {

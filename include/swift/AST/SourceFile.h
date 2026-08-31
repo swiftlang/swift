@@ -927,6 +927,10 @@ inline void simple_display(llvm::raw_ostream &out, const SourceFile *SF) {
 
   out << "source_file " << '\"' << SF->getFilename() << '\"';
 }
+
+/// Returns whether \p loc is inside a synthetic macro in \p module.
+bool isFromSyntheticMacroExpansion(ModuleDecl *module, SourceLoc loc);
+
 } // end namespace swift
 
 namespace llvm {

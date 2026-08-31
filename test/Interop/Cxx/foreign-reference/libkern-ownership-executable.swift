@@ -1,9 +1,11 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -I %swift_src_root/lib/ClangImporter/SwiftBridging -cxx-interoperability-mode=default -Xfrontend -disable-availability-checking)
+// RUN: %target-run-simple-swift(-I %S/Inputs -I %swift_src_root/lib/ClangImporter/SwiftBridging -cxx-interoperability-mode=default -enable-experimental-feature LibkernOwnershipConventions -Xfrontend -disable-availability-checking )
+
+// REQUIRES: swift_feature_LibkernOwnershipConventions
 
 // REQUIRES: executable_test
 
-// This test asserts that LIBKERN_RETURNS_RETAINED and LIBKERN_RETURNS_NOT_RETAINED are honored. 
-// The retain/release counts chcked below are only correct at -Onone.
+// This test asserts that LIBKERN_RETURNS_RETAINED and LIBKERN_RETURNS_NOT_RETAINED are honored.
+// The retain/release counts checked below are only correct at -Onone.
 //
 // UNSUPPORTED: swift_test_mode_optimize
 // UNSUPPORTED: swift_test_mode_optimize_size
@@ -49,6 +51,15 @@ Tests.test("Attach service") {
 
       do {
         let serviceProvider = service.getProvider()
+
+        expectTrue(checkEqual(provider, serviceProvider))
+        expectEqual(manager.getTotalRetains(), manager.getTotalReleases() + 3)
+      }
+
+      expectEqual(manager.getTotalRetains(), manager.getTotalReleases() + 2)
+
+      do {
+        let serviceProvider = service.__getProvider()
 
         expectTrue(checkEqual(provider, serviceProvider))
         expectEqual(manager.getTotalRetains(), manager.getTotalReleases() + 3)
@@ -122,6 +133,86 @@ Tests.test("Copy service") {
   }
 
   expectEqual(manager.getTotalRetains() + 2, manager.getTotalReleases())
+}
+
+Tests.test("Unannotated methods returning an OSObject subclass return +1 unless the name starts with 'get'") {
+  manager.reset()
+
+  do {
+    let service = Service.noAnnotationWithID(37)
+    expectEqual(37, service.getID())
+    expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+
+    do {
+      let same = service.virtualNoAnnotationCopyService()
+      expectEqual(service.getID(), same.getID())
+      expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+    }
+
+    expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
+  }
+
+  expectEqual(manager.getTotalRetains() + 2, manager.getTotalReleases())
+}
+
+Tests.test("Missing annotation on non-OSObject subclass") {
+  manager.reset()
+
+  do {
+    let service = NonOSService.noAnnotationWithID(37)
+    expectEqual(manager.getTotalRetains(), manager.getTotalReleases() + 1)
+  }
+
+  expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+}
+
+Tests.test("OSIterator is a special case") {
+  manager.reset()
+
+  do {
+    let iterator = OSIterator.getIterator()
+    expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+  }
+
+  expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
+
+  manager.reset()
+
+  do {
+    let iterator = OSCollectionIterator.getCollectionIterator()
+    expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+  }
+
+  expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
+}
+
+Tests.test("DerivedService") {
+  manager.reset()
+
+  do {
+    let service = DerivedService.derivedWithID(41)
+    expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+
+    do {
+      let provider = service.getProvider()
+      expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+    }
+
+    expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+  }
+
+  expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
+}
+
+Tests.test("Out parameters are always assumed to return retained") {
+  manager.reset()
+
+  do {
+    var service: Service!
+    Service.initializeService(47, &service)
+  }
+
+  expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
 }
 
 runAllTests()

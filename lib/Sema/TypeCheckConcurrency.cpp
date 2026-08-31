@@ -43,6 +43,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -3139,6 +3140,8 @@ namespace {
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
+      checkIsolatedConformancesInPattern(pattern);
+
       // Walking into patterns leads to nothing good because then we
       // end up visiting the AccessorDecls of a top-level
       // PatternBindingDecl twice.
@@ -3189,6 +3192,18 @@ namespace {
       if (!expr->getType() || expr->getType()->hasError())
         return Action::SkipNode(expr);
 
+      if (auto *T = dyn_cast<TypeExpr>(expr)) {
+        if (!T->isImplicit()) {
+          checkIsolatedConformancesInType(T->getType(), T->getTypeRepr(),
+                                          expr->getLoc());
+        }
+      }
+
+      if (auto *cast = dyn_cast<ExplicitCastExpr>(expr)) {
+        checkIsolatedConformancesInType(
+            cast->getCastType(), cast->getCastTypeRepr(), expr->getLoc());
+      }
+
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
         opaqueValues.push_back({
             openExistential->getOpaqueValue(),
@@ -3222,6 +3237,33 @@ namespace {
 
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         determineClosureIsolationInContext(closure, Parent.getAsExpr());
+
+        if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+          if (auto globalActor = getExplicitGlobalActor(explicitClosure)) {
+            checkIsolatedConformancesInType(globalActor,
+                                            /*TR=*/nullptr, expr->getLoc());
+          }
+
+          for (auto *param : *explicitClosure->getParameters()) {
+            checkIsolatedConformancesInType(param->getInterfaceType(),
+                                            param->getTypeRepr(),
+                                            expr->getLoc());
+          }
+
+          if (auto *thrownTypeRepr =
+                  explicitClosure->getExplicitThrownTypeRepr()) {
+            checkIsolatedConformancesInType(
+                explicitClosure->getExplicitThrownType(), thrownTypeRepr,
+                thrownTypeRepr->getLoc());
+          }
+
+          checkIsolatedConformancesInType(
+              explicitClosure->getResultType(),
+              explicitClosure->hasExplicitResultType()
+                  ? explicitClosure->getExplicitResultTypeRepr()
+                  : nullptr,
+              expr->getLoc());
+        }
 
         checkLocalCaptures(closure);
         contextStack.push_back(closure);
@@ -4775,6 +4817,35 @@ namespace {
           return globalActor;
       }
       return Type();
+    }
+
+    void checkIsolatedConformancesInPattern(Pattern *P) {
+      class Walker : public ASTWalker {
+      public:
+        PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+          if (P->isImplicit())
+            return Action::Continue(P);
+
+          if (auto *I = dyn_cast<IsPattern>(P)) {
+            checkIsolatedConformancesInType(I->getCastType(),
+                                            I->getCastTypeRepr(), I->getLoc());
+          }
+
+          if (auto *E = dyn_cast<EnumElementPattern>(P)) {
+            checkIsolatedConformancesInType(
+                E->getParentType(), E->getParentTypeRepr(), E->getLoc());
+          }
+
+          return Action::Continue(P);
+        }
+      };
+
+      Walker W;
+      P->walk(W);
+    }
+
+    static void checkIsolatedConformancesInType(Type T, TypeRepr *TR, SourceLoc loc) {
+      TypeChecker::checkIsolatedConformancesInType(T, TR ? TR->getLoc() : loc);
     }
 
   public:
@@ -7822,12 +7893,13 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
     bool anyPlatformSpecificAttrs = false;
     for (auto available : enclosing->getSemanticAvailableAttrs()) {
       // FIXME: [availability] Generalize to AvailabilityDomain.
-      if (available.getPlatform() == PlatformKind::none)
+      auto platform = available.getPlatform();
+      if (!platform)
         continue;
 
       auto attr = new (ctx) AvailableAttr(
           SourceLoc(), SourceRange(),
-          AvailabilityDomain::forPlatform(available.getPlatform()), SourceLoc(),
+          AvailabilityDomain::forPlatform(*platform), SourceLoc(),
           AvailableAttr::Kind::Unavailable, available.getMessage(),
           /*Rename=*/"", available.getIntroduced().value_or(noVersion),
           SourceRange(), available.getDeprecated().value_or(noVersion),

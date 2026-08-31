@@ -614,6 +614,11 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     return true;
   }
 
+  if (setupDiagnosticVerifierIfNeeded()) {
+    Error = "Setting up diagnostics verifier failed";
+    return true;
+  }
+
   if (setUpASTContextIfNeeded()) {
     Error = "Setting up ASTContext failed";
     return true;
@@ -621,11 +626,6 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 
   if (hasASTContext()) {
     setupStatsReporter();
-  }
-
-  if (setupDiagnosticVerifierIfNeeded()) {
-    Error = "Setting up diagnostics verifier failed";
-    return true;
   }
 
   // Setup caching diagnostics processor. It should be setup after all other
@@ -950,6 +950,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     InterfaceSubContextDelegateImpl ASTDelegate(
         Context->SourceMgr, &Context->Diags, Context->SearchPathOpts,
         Context->LangOpts, Context->ClangImporterOpts, Context->CASOpts,
+        Context->SILOpts,
         LoaderOpts,
         /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,

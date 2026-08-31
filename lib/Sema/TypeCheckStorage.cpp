@@ -4023,8 +4023,8 @@ static void finishPropertyWrapperImplInfo(VarDecl *var,
   if (var->hasObservers() || var->getDeclContext()->isLocalContext()) {
     info = StorageImplInfo::getMutableComputed();
   } else {
-    info = StorageImplInfo(ReadImplKind::Get, WriteImplKind::Set,
-                           ReadWriteImplKind::Modify);
+    info = StorageImplInfo::getMutableOpaque(OpaqueReadOwnership::Owned,
+                                             var->getASTContext());
   }
 }
 
@@ -4336,6 +4336,18 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       readImpl = ReadImplKind::Get;
       writeImpl = WriteImplKind::Set;
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
+    }
+    if (storage->getParsedAccessor(AccessorKind::YieldingMutate)) {
+      // `yielding mutate` implies `yielding borrow`
+      // (unless it's overridden later in this function).
+      readImpl = ReadImplKind::YieldingBorrow;
+      // If there's a written `set`, use `yielding mutate` only
+      // for read/write access and use the `set` for simple write.
+      // If there isn't a written `set`, use `yielding mutate` for
+      // both.
+      if (!storage->getParsedAccessor(AccessorKind::Set))
+        writeImpl = WriteImplKind::YieldingMutate;
+      readWriteImpl = ReadWriteImplKind::YieldingMutate;
     }
     if (storage->getParsedAccessor(AccessorKind::Get)) {
       readImpl = ReadImplKind::Get;

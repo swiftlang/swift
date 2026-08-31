@@ -353,3 +353,248 @@ class ComputedGetSetWitness: HasMutableVar {
     set { }
   }
 }
+
+// Check cases where generic parameter prohibits use of isolated conformances by conforming to Sendable/SendableMetatype
+
+// expected-note@+1 32 {{requirement specified as 'T' : 'P' [with T = C]}}
+struct SendableWrapper<T: P & Sendable> { }
+
+typealias GlobalTypeAliasTest = SendableWrapper<C> // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+struct GlobalVarTest {
+  var prop: SendableWrapper<C>? = nil // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  init() { }
+}
+
+struct GlobalFuncParamTest {
+  func method(_: SendableWrapper<C>) { } // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+struct GlobalFuncResultTest {
+  func method() -> SendableWrapper<C> { fatalError() } // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+struct GlobalSubscriptTest {
+  subscript(_: SendableWrapper<C>) -> Int { 0 } // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+struct GlobalInitTest {
+  init(_: SendableWrapper<C>) { } // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+enum GlobalEnumCaseTest {
+  case payload(SendableWrapper<C>) // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+struct SubscriptReturnTest {
+  subscript(i: Int) -> SendableWrapper<C> { fatalError() }
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+protocol BaseProto {}
+protocol ProtoWithInherited: BaseProto where Self.Assoc == SendableWrapper<C> {
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  associatedtype Assoc
+}
+
+protocol HasConstrainedAssoc {
+  associatedtype A: Sequence where A.Element == SendableWrapper<C>
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+protocol HasDefaultAssoc {
+  associatedtype B = SendableWrapper<C>
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+struct NominalWhereTest<U> where U == SendableWrapper<C> {
+  // expected-warning@-1 {{same-type requirement makes generic parameter 'U' non-generic; this is an error in the Swift 6 language mode}}
+  // expected-error@-2 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+@freestanding(expression)
+macro paramMacro(_ x: SendableWrapper<C>) = #externalMacro(module: "M", type: "T")
+// expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+// expected-warning@-2 {{external macro implementation type 'M.T' could not be found for macro 'paramMacro'; plugin for module 'M' not found}}
+
+@freestanding(expression)
+macro resultMacro() -> SendableWrapper<C> = #externalMacro(module: "M", type: "T")
+// expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+// expected-warning@-2 {{external macro implementation type 'M.T' could not be found for macro 'resultMacro()'; plugin for module 'M' not found}}
+
+actor GlobalActorBackingActor {
+  static let shared = GlobalActorBackingActor()
+}
+
+@globalActor
+struct GenGlobalActor<T: P & Sendable> { // expected-note 2 {{requirement specified as 'T' : 'P' [with T = C]}}
+  static var shared: GlobalActorBackingActor { GlobalActorBackingActor.shared }
+  // expected-warning@-1 {{GlobalActor witness static property 'shared' may return different actor instances, which would lead to global actor isolation violations}}
+  // expected-note@-2 {{declare it as 'static let' to guarantee a stable instance}}
+  // expected-note@-3 {{if this property always returns the same instance, silence the warning with '@diagnose(UnstableGlobalActorShared, as: ignored)'}}
+}
+
+@GenGlobalActor<C>
+// expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+struct UsesGenGlobalActor {}
+
+func testLocalDeclTests() {
+  typealias LocalTypeAliasTest = SendableWrapper<C> // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  let localVar: SendableWrapper<C>? = nil // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  _ = localVar
+
+  func local(_: SendableWrapper<C>) { } // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  struct LocalNestedTypeTest {
+    var prop: SendableWrapper<C>? = nil // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+    init() { }
+  }
+
+  var computed: SendableWrapper<C> {
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+    get { fatalError() }
+  }
+  
+  class A<T: P & Sendable> {}
+  // expected-note@-1 {{requirement specified as 'T' : 'P' [with T = C]}}
+
+  class B: A<C> {}
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  @resultBuilder
+  struct Builder<T: P & Sendable> { // expected-note {{requirement specified as 'T' : 'P' [with T = C]}}
+    static func buildBlock(_: T) {}
+  }
+
+  func usesBuilder(@Builder<C> _: () -> C) {}
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  @propertyWrapper
+  struct WrapperValue<Value: P & Sendable> { // expected-note {{requirement specified as 'Value' : 'P' [with Value = C]}}
+    var wrappedValue: Value
+
+    init(wrappedValue: Value) { // expected-note {{'init(wrappedValue:)' declared here}}
+      self.wrappedValue = wrappedValue
+    }
+  }
+
+  struct WrapperTest {
+    @WrapperValue<C> var value = .init()
+    // expected-error@-1 2 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  }
+}
+
+struct TestExt<T> {
+}
+
+extension TestExt where T == SendableWrapper<C> {
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+struct ClosureThrownTypeError<E: P & Sendable>: Error { }
+// expected-note@-1 {{requirement specified as 'E' : 'P' [with E = C]}}
+
+func testExpressionContext<T>(v: T) {
+  _ = SendableWrapper<C>.self
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  _ = (v as? SendableWrapper<C>)
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  _ = v as! SendableWrapper<C>
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  func test<U>() -> SendableWrapper<U> { // expected-note 2 {{'test()' declared here}}
+  }
+
+  guard let _: SendableWrapper<C> = test() else {
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+    return
+  }
+
+  let _ = {
+    guard let _: SendableWrapper<C> = test() else {
+      // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+      return
+    }
+  }
+
+  if case is SendableWrapper<C> = v {
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  }
+
+  let _ = {
+    switch v {
+    case is SendableWrapper<C>:
+      // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+      break
+    default:
+      break
+    }
+
+    guard case is SendableWrapper<C> = v else {
+      // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+      return
+    }
+  }
+
+  let _ = { (a: SendableWrapper<C>) in
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  }
+
+  let _ = { () -> SendableWrapper<C> in
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  }
+
+  let _ = { () throws(ClosureThrownTypeError<C>) -> Void in
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  }
+
+  let _ = { @GenGlobalActor<C> () -> Void in
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  }
+
+  func makeWrapper() -> SendableWrapper<C> { fatalError() }
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  let inferredGlobal = makeWrapper()
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  typealias X<U: P> = SendableWrapper<U>
+  _ = X<C>.self
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+
+  typealias Y<U: P & SendableMetatype> = SendableWrapper<U> // expected-note {{requirement specified as 'U' : 'P' [with U = C]}}
+  _ = Y<C>.self
+  // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'SendableMetatype' type parameter 'U'}}
+  // expected-error@-2 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+}
+
+struct SendableWrapperError<T: P & Sendable>: Error { }
+// expected-note@-1 {{'init()' declared here}}
+// expected-note@-2 {{requirement specified as 'T' : 'P' [with T = C]}}
+
+func testCatchAsPattern() {
+  do {
+    throw SendableWrapperError<C>()
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  } catch let e as SendableWrapperError<C> {
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+    _ = e
+  } catch {
+  }
+}
+
+enum GenericPatternEnum<T: P & Sendable> { // expected-note {{requirement specified as 'T' : 'P' [with T = C]}}
+  case foo(T)
+  case bar
+}
+
+func testEnumElementPatternParentType(_ x: Any) {
+  switch x {
+  case GenericPatternEnum<C>.bar:
+    // expected-error@-1 {{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+    break
+  default:
+    break
+  }
+}

@@ -42,33 +42,6 @@ using namespace swift;
 
 namespace {
 
-/// Calls \p callback for each type in each requirement provided by
-/// \p source.
-static void forAllRequirementTypes(
-    WhereClauseOwner &&source,
-    llvm::function_ref<void(Type, TypeRepr *)> callback) {
-  std::move(source).visitRequirements(TypeResolutionStage::Interface,
-      [&](const Requirement &req, RequirementRepr *reqRepr) {
-    switch (req.getKind()) {
-    case RequirementKind::SameShape:
-    case RequirementKind::Conformance:
-    case RequirementKind::SameType:
-    case RequirementKind::Superclass:
-      callback(req.getFirstType(),
-               RequirementRepr::getFirstTypeRepr(reqRepr));
-      callback(req.getSecondType(),
-               RequirementRepr::getSecondTypeRepr(reqRepr));
-      break;
-
-    case RequirementKind::Layout:
-      callback(req.getFirstType(),
-               RequirementRepr::getFirstTypeRepr(reqRepr));
-      break;
-    }
-    return false;
-  });
-}
-
 /// \see checkTypeAccess
 using CheckTypeAccessCallback =
     void(AccessScope, const TypeRepr *, DowngradeToWarning, ImportAccessLevel);
@@ -112,10 +85,11 @@ protected:
       AccessScope accessScope,
       const DeclContext *useDC,
       llvm::function_ref<CheckTypeAccessCallback> diagnose) {
-    forAllRequirementTypes(std::move(source), [&](Type type, TypeRepr *typeRepr) {
-      checkTypeAccessImpl(type, typeRepr, accessScope, useDC,
-                          /*mayBeInferred*/false, diagnose);
-    });
+    std::move(source).forAllRequirementTypes(
+        [&](Type type, TypeRepr *typeRepr) {
+          checkTypeAccessImpl(type, typeRepr, accessScope, useDC,
+                              /*mayBeInferred*/ false, diagnose);
+        });
   }
 
   void checkAvailabilityDomains(const Decl *D);
@@ -1133,7 +1107,8 @@ public:
       });
     }
 
-    forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
+    WhereClauseOwner(proto).forAllRequirementTypes([&](Type type,
+                                                       TypeRepr *typeRepr) {
       checkTypeAccess(
           type, typeRepr, proto,
           /*mayBeInferred*/ false,
@@ -2262,13 +2237,11 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
       if (isAsyncSequenceFlatMap(ownerCtx))
         return;
 
-      forAllRequirementTypes(WhereClauseOwner(
-                               const_cast<GenericContext *>(ownerCtx)),
-                             [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, ownerDecl,
-                  ExportabilityReason::General,
-                  DeclAvailabilityFlag::DisableUnsafeChecking);
-      });
+      WhereClauseOwner(const_cast<GenericContext *>(ownerCtx))
+          .forAllRequirementTypes([&](Type type, TypeRepr *typeRepr) {
+            checkType(type, typeRepr, ownerDecl, ExportabilityReason::General,
+                      DeclAvailabilityFlag::DisableUnsafeChecking);
+          });
     }
   }
 
@@ -2515,12 +2488,11 @@ public:
               assocType->getDefaultDefinitionTypeRepr(), assocType);
 
     if (assocType->getTrailingWhereClause()) {
-      forAllRequirementTypes(assocType,
-                             [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, assocType,
-                  ExportabilityReason::General,
-                  DeclAvailabilityFlag::DisableUnsafeChecking);
-      });
+      WhereClauseOwner(assocType).forAllRequirementTypes(
+          [&](Type type, TypeRepr *typeRepr) {
+            checkType(type, typeRepr, assocType, ExportabilityReason::General,
+                      DeclAvailabilityFlag::DisableUnsafeChecking);
+          });
     }
   }
 
@@ -2579,10 +2551,11 @@ public:
     }
 
     if (proto->getTrailingWhereClause()) {
-      forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, proto, ExportabilityReason::General,
-                  DeclAvailabilityFlag::DisableUnsafeChecking);
-      });
+      WhereClauseOwner(proto).forAllRequirementTypes(
+          [&](Type type, TypeRepr *typeRepr) {
+            checkType(type, typeRepr, proto, ExportabilityReason::General,
+                      DeclAvailabilityFlag::DisableUnsafeChecking);
+          });
     }
   }
 
@@ -2654,10 +2627,11 @@ public:
     if (!ED->getTrailingWhereClause())
       return;
 
-    forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, ED, reason,
-                DeclAvailabilityFlag::DisableUnsafeChecking);
-    });
+    WhereClauseOwner(ED).forAllRequirementTypes(
+        [&](Type type, TypeRepr *typeRepr) {
+          checkType(type, typeRepr, ED, reason,
+                    DeclAvailabilityFlag::DisableUnsafeChecking);
+        });
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -2972,7 +2946,8 @@ void registerPackageAccessForPackageExtendedType(ExtensionDecl *ED) {
           typeRepr ? typeRepr->getLoc() : ED->getLoc());
     };
 
-    forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
+    WhereClauseOwner(ED).forAllRequirementTypes([&](Type type,
+                                                    TypeRepr *typeRepr) {
       if (typeRepr) {
         typeRepr->walk(DeclRefTypeReprFinder([&](const DeclRefTypeRepr *TR) {
           record(TR->getBoundDecl(), TR);

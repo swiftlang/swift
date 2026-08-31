@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1017; // Multi-operand debug_value serialization
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1019; // @cxx attribute
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2332,6 +2332,12 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCFixed<1>, // underscored flag
     BCBlob      // cname
+  >;
+
+  using CxxDeclDeclAttrLayout = BCRecordLayout<
+    CxxDecl_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCBlob      // cxx name
   >;
 
   using ImplementsDeclAttrLayout = BCRecordLayout<

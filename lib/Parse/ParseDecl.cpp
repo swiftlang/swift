@@ -1913,16 +1913,12 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   return makeParserSuccess();
 }
 
-static PlatformKind getPlatformFromDomainOrIdentifier(
+static std::optional<PlatformKind> getPlatformFromDomainOrIdentifier(
     const AvailabilityDomainOrIdentifier &domainOrIdentifier) {
   if (auto domain = domainOrIdentifier.getAsDomain())
     return domain->getPlatformKind();
 
-  if (auto platform =
-          platformFromString(domainOrIdentifier.getAsIdentifier()->str()))
-    return *platform;
-
-  return PlatformKind::none;
+  return platformFromString(domainOrIdentifier.getAsIdentifier()->str());
 }
 
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
@@ -1943,7 +1939,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
     for (auto *Spec : Specs) {
       auto Platform =
           getPlatformFromDomainOrIdentifier(Spec->getDomainOrIdentifier());
-      if (Platform == PlatformKind::none)
+      if (!Platform)
         continue;
 
       auto Version = Spec->getRawVersion();
@@ -1952,7 +1948,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
                  diag::attr_availability_platform_version_major_minor_only,
                  AttrName);
       }
-      PlatformAndVersions.emplace_back(Platform, Version);
+      PlatformAndVersions.emplace_back(*Platform, Version);
     }
 
     return makeParserSuccess();
@@ -1966,12 +1962,21 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
 
   // Parse the platform name.
   StringRef platformText = Tok.getText();
+  bool IsWildcard = platformText == "*";
   auto MaybePlatform = platformFromString(platformText);
-  WasEmpty = WasEmpty || !MaybePlatform.has_value();
+  WasEmpty = WasEmpty || (!IsWildcard && !MaybePlatform.has_value());
   SourceLoc PlatformLoc = Tok.getLoc();
   consumeToken();
 
-  if (!MaybePlatform.has_value()) {
+  if (IsWildcard) {
+    // Wildcards ('*') aren't supported in this kind of list.
+    diagnose(PlatformLoc, diag::attr_availability_wildcard_ignored,
+             AttrName);
+
+    // If this list entry is just a wildcard, skip it.
+    if (Tok.isAny(tok::comma, tok::r_paren))
+      return makeParserSuccess();
+  } else if (!MaybePlatform.has_value()) {
     if (auto correctedPlatform = closestCorrectedPlatformString(platformText)) {
       diagnose(PlatformLoc, diag::attr_availability_suggest_platform,
                platformText, AttrName, *correctedPlatform)
@@ -1980,14 +1985,6 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
       diagnose(PlatformLoc, diag::attr_availability_unknown_platform,
                platformText, AttrName);
     }
-  } else if (*MaybePlatform == PlatformKind::none) {
-    // Wildcards ('*') aren't supported in this kind of list.
-    diagnose(PlatformLoc, diag::attr_availability_wildcard_ignored,
-             AttrName);
-
-    // If this list entry is just a wildcard, skip it.
-    if (Tok.isAny(tok::comma, tok::r_paren))
-      return makeParserSuccess();
   }
 
   // Parse version number.
@@ -2006,12 +2003,8 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
              AttrName);
   }
 
-  if (MaybePlatform.has_value()) {
-    auto Platform = *MaybePlatform;
-    if (Platform != PlatformKind::none) {
-      PlatformAndVersions.emplace_back(Platform, VerTuple);
-    }
-  }
+  if (MaybePlatform.has_value())
+    PlatformAndVersions.emplace_back(*MaybePlatform, VerTuple);
 
   return makeParserSuccess();
 }
@@ -3122,6 +3115,49 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     Attributes.add(SPIAccessControlAttr::create(Context, AtLoc, AttrRange,
                                                 spiGroups));
+    break;
+  }
+
+  case DeclAttrKind::CxxDecl: {
+    StringRef CxxName;
+    if (consumeIfAttributeLParen()) {
+      // The optional identifier argument is the C++ function name the
+      // importer matches against.
+      auto skipToEnd = [&]() {
+        skipUntil(tok::r_paren);
+        consumeIf(tok::r_paren);
+      };
+
+      // A C++ operator name spelled without backticks lexes as Swift's
+      // 'operator' keyword followed by further tokens. Give it a targeted
+      // error.
+      if (Tok.is(tok::kw_operator) &&
+          peekToken().isNot(tok::r_paren, tok::colon)) {
+        diagnose(Loc, diag::attr_cxx_operator_name_backticks, AttrName);
+        skipToEnd();
+        return makeParserSuccess();
+      }
+
+      if (Tok.isNot(tok::identifier) || peekToken().is(tok::colon)) {
+        diagnose(Loc, diag::attr_expected_cxx_name, AttrName);
+        skipToEnd();
+        return makeParserSuccess();
+      }
+      CxxName = Tok.getText();
+      consumeToken(tok::identifier);
+
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+      if (!consumeIf(tok::r_paren)) {
+        diagnose(Loc, diag::attr_expected_rparen, AttrName,
+                 DeclAttribute::isDeclModifier(DK));
+        return makeParserSuccess();
+      }
+    } else {
+      AttrRange = SourceRange(Loc);
+    }
+
+    Attributes.add(new (Context) CxxDeclAttr(CxxName, AtLoc, AttrRange,
+                                             /*Implicit=*/false));
     break;
   }
 
@@ -8227,6 +8263,7 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::YieldingBorrow:
   case AccessorKind::Borrow:
   case AccessorKind::Mutate:
+  case AccessorKind::YieldingMutate:
     return true;
 
   case AccessorKind::Address:
@@ -8235,7 +8272,6 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::DidSet:
   case AccessorKind::Read:
   case AccessorKind::Modify:
-  case AccessorKind::YieldingMutate:
     return false;
 
   case AccessorKind::Init:

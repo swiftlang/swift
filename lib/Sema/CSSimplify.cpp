@@ -11655,6 +11655,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       recordTypeVariablesAsHoles(memberTy);
       return SolutionKind::Solved;
     }
+    // If we have a dynamic member lookup and the member type has already been
+    // bound to a hole, bail without attempting to solve the member constraint.
+    // Keypath dynamic member subscripts expect the applicable function
+    // constraint to be present, which is may not be for a hole since we don't
+    // attempt to solve them when all arguments are bound to holes.
+    if (locator->isSubscriptMemberRef() &&
+        getFixedTypeRecursive(memberTy, /*rvalue*/ true)->isPlaceholder()) {
+      auto hasDynamicMemberLookup = baseObjTy->getMetatypeInstanceType()
+                                        ->eraseDynamicSelfType()
+                                        ->hasDynamicMemberLookupAttribute();
+      if (hasDynamicMemberLookup)
+        return SolutionKind::Solved;
+    }
   }
 
   MemberLookupResult result =

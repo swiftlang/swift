@@ -1833,7 +1833,20 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
         NewInst->getFunction()->createEmptyDebugReconstructionBlock();
     NewInst->setDebugReconstructionBlock(NewDebugBB);
     asImpl().cloneDebugReconstructionBlock(SrcDebugBB, NewDebugBB);
-    
+
+    // Type substitutions may rewrite a generic type into an opened archetype.
+    // The cloned instruction then carries type dependent operands on
+    // instructions outside of the reconstruction block, which is not supported.
+    // Keeping an undef of that type does not work either, as debug_value
+    // doesn't support type dependent operands itself.
+    if (llvm::any_of(*NewDebugBB, [](const SILInstruction &I) {
+          return I.getNumTypeDependentOperands() != 0;
+        })) {
+      // Drop the debug_value.
+      NewInst->eraseFromParent();
+      return;
+    }
+
     // Type substitutions may map an address-only (generic) type to something
     // else, in which case, the op_deref must be converted to a load.
     if (NewInst->hasDeref()) {

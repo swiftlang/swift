@@ -185,13 +185,6 @@ SILFunctionType::getDirectFormalResultsType(SILModule &M,
                                             TypeExpansionContext context,
                                             bool loweredAddresses) {
   CanType type;
-
-  if (hasAddressResult(loweredAddresses)) {
-    assert(getNumDirectFormalResults() == 1);
-    return SILType::getPrimitiveAddressType(
-        getSingleDirectFormalResult().getReturnValueType(M, this, context));
-  }
-
   if (getNumDirectFormalResults() == 0) {
     type = getASTContext().TheEmptyTupleType;
   } else if (getNumDirectFormalResults() == 1) {
@@ -209,6 +202,12 @@ SILFunctionType::getDirectFormalResultsType(SILModule &M,
       cache = type;
     }
   }
+
+  if (hasAddressResult()) {
+    assert(getNumDirectFormalResults() == 1);
+    return SILType::getPrimitiveAddressType(type);
+  }
+
   return SILType::getPrimitiveObjectType(type);
 }
 
@@ -3994,12 +3993,13 @@ namespace {
 
 class ObjCMethodConventions : public Conventions {
   const clang::ObjCMethodDecl *Method;
+  ASTContext &Ctx;
 
 public:
   const clang::ObjCMethodDecl *getMethod() const { return Method; }
 
-  ObjCMethodConventions(const clang::ObjCMethodDecl *method)
-    : Conventions(ConventionsKind::ObjCMethod), Method(method) {}
+  ObjCMethodConventions(const clang::ObjCMethodDecl *method, ASTContext &ctx)
+      : Conventions(ConventionsKind::ObjCMethod), Method(method), Ctx(ctx) {}
 
   ParameterConvention getIndirectParameter(unsigned index,
                            const AbstractionPattern &type,
@@ -4122,8 +4122,8 @@ public:
       return ResultConvention::Owned;
 
     if (tl.getLoweredType().isForeignReferenceType())
-      return importer::getOwnershipOfReturnedFRT(Method).value_or(
-          ResultConvention::Unowned);
+      return importer::getOwnershipOfReturnedFRT(Method, Ctx)
+          .value_or(ResultConvention::Unowned);
 
     return ResultConvention::Autoreleased;
   }
@@ -4249,11 +4249,14 @@ public:
 class CFunctionConventions : public CFunctionTypeConventions {
   using super = CFunctionTypeConventions;
   const clang::FunctionDecl *TheDecl;
+  ASTContext &Ctx;
+
 public:
-  CFunctionConventions(const clang::FunctionDecl *decl)
-    : CFunctionTypeConventions(ConventionsKind::CFunction,
-                               decl->getType()->castAs<clang::FunctionType>()),
-      TheDecl(decl) {}
+  CFunctionConventions(const clang::FunctionDecl *decl, ASTContext &ctx)
+      : CFunctionTypeConventions(
+            ConventionsKind::CFunction,
+            decl->getType()->castAs<clang::FunctionType>()),
+        TheDecl(decl), Ctx(ctx) {}
 
   ParameterConvention getDirectParameter(unsigned index,
                             const AbstractionPattern &type,
@@ -4277,7 +4280,7 @@ public:
     }
 
     if (tl.getLoweredType().isForeignReferenceType()) {
-      if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl))
+      if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl, Ctx))
         return convention.value();
     }
 
@@ -4317,13 +4320,15 @@ class CXXMethodConventions : public CFunctionTypeConventions {
   using super = CFunctionTypeConventions;
   const clang::CXXMethodDecl *TheDecl;
   bool isMutating;
+  ASTContext &Ctx;
 
 public:
-  CXXMethodConventions(const clang::CXXMethodDecl *decl, bool isMutating)
+  CXXMethodConventions(const clang::CXXMethodDecl *decl, bool isMutating,
+                       ASTContext &ctx)
       : CFunctionTypeConventions(
             ConventionsKind::CXXMethod,
             decl->getType()->castAs<clang::FunctionType>()),
-        TheDecl(decl), isMutating(isMutating) {}
+        TheDecl(decl), isMutating(isMutating), Ctx(ctx) {}
   ParameterConvention
   getIndirectSelfParameter(const AbstractionPattern &type) const override {
     if (isMutating)
@@ -4361,7 +4366,7 @@ public:
     }
 
     if (resultTL.getLoweredType().isForeignReferenceType()) {
-      if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl))
+      if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl, Ctx))
         return convention.value();
 
       if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>())
@@ -4389,8 +4394,8 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
         origType, method, foreignInfo.error, foreignInfo.async);
     return getSILFunctionType(
         TC, TypeExpansionContext::minimal(), origPattern, substInterfaceType,
-        extInfoBuilder, ObjCMethodConventions(method), foreignInfo, constant,
-        constant, std::nullopt, ProtocolConformanceRef());
+        extInfoBuilder, ObjCMethodConventions(method, TC.Context), foreignInfo,
+        constant, constant, std::nullopt, ProtocolConformanceRef());
   }
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
@@ -4401,7 +4406,7 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
                                                                         foreignInfo.self);
       bool isMutating =
           TC.Context.getClangModuleLoader()->isCXXMethodMutating(method);
-      auto conventions = CXXMethodConventions(method, isMutating);
+      auto conventions = CXXMethodConventions(method, isMutating, TC.Context);
       return getSILFunctionType(TC, TypeExpansionContext::minimal(),
                                 origPattern, substInterfaceType, extInfoBuilder,
                                 conventions, foreignInfo, constant, constant,
@@ -4416,10 +4421,10 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
             ? AbstractionPattern::getCFunctionAsMethod(origType, clangType,
                                                        foreignInfo.self)
             : AbstractionPattern(origType, clangType);
-    return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
-                              substInterfaceType, extInfoBuilder,
-                              CFunctionConventions(func), foreignInfo, constant,
-                              constant, std::nullopt, ProtocolConformanceRef());
+    return getSILFunctionType(
+        TC, TypeExpansionContext::minimal(), origPattern, substInterfaceType,
+        extInfoBuilder, CFunctionConventions(func, TC.Context), foreignInfo,
+        constant, constant, std::nullopt, ProtocolConformanceRef());
   }
 
   llvm_unreachable("call to unknown kind of C function");

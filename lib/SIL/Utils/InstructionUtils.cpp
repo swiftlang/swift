@@ -909,6 +909,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     SILType opType = cast<ExistentialMetatypeInst>(inst)->getOperand()->getType();
     impactType = opType;
     switch (opType.getPreferredExistentialRepresentation()) {
+    case ExistentialRepresentation::COM:
+      return RuntimeEffect::MetaData | RuntimeEffect::Existential;
     case ExistentialRepresentation::Metatype:
     case ExistentialRepresentation::Boxed:
     case ExistentialRepresentation::Opaque:
@@ -1102,9 +1104,11 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::Casting;
     case BuiltinValueKind::AllocRaw:
     case BuiltinValueKind::AllocRawTyped:
+    case BuiltinValueKind::AllocErrorBoxTyped:
       return RuntimeEffect::Allocating;
     case BuiltinValueKind::DeallocRaw:
     case BuiltinValueKind::DeallocRawTyped:
+    case BuiltinValueKind::DeallocErrorBoxTyped:
       return RuntimeEffect::Deallocating;
     case BuiltinValueKind::Fence:
     case BuiltinValueKind::CmpXChg:

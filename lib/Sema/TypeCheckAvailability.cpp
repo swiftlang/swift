@@ -29,6 +29,7 @@
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -889,7 +890,11 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     // macOS 10.x.y).
     auto RunningVers = ExplicitAvailability->getRawMinimumVersion();
     auto RequiredVers = RequiredAvailability.getRawMinimumVersion();
-    auto Platform = targetPlatform(Context.LangOpts);
+    auto MaybePlatform = targetPlatform(Context.LangOpts);
+    if (!MaybePlatform)
+      return false;
+
+    auto Platform = *MaybePlatform;
     if (RunningVers.getMajor() != RequiredVers.getMajor())
       return false;
     if ((Platform == PlatformKind::macOS ||
@@ -966,9 +971,11 @@ static void fixAvailabilityByAddingVersionCheck(
 
     // Runtime availability checks that specify app extension platforms don't
     // work, so only suggest checks against the base platform.
-    if (auto CanonicalPlatform =
-            basePlatformForExtensionPlatform(QueryDomain.getPlatformKind())) {
-      QueryDomain = AvailabilityDomain::forPlatform(*CanonicalPlatform);
+    if (auto QueryPlatform = QueryDomain.getPlatformKind()) {
+      if (auto CanonicalPlatform =
+              basePlatformForExtensionPlatform(*QueryPlatform)) {
+        QueryDomain = AvailabilityDomain::forPlatform(*CanonicalPlatform);
+      }
     }
 
     Out << "if #available(" << QueryDomain.getNameForAttributePrinting();
@@ -3099,10 +3106,17 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 /// Diagnose uses of unavailable declarations.
 void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
   auto where = ExportContext::forFunctionBody(DC, E->getStartLoc());
-  if (where.isImplicit())
+  // FIXME: We skip availability checking for expressions in synthesized
+  // derivation macros to match the behavior of the old built-in conformance
+  // synthesis, whose implicit members are skipped. This is unsound: it lets a
+  // derived conformance reference a member conformance that is unavailable,
+  // which crashes at runtime under -unavailable-decl-optimization=stub. We
+  // ought to diagnose this (likely staged in as a warning first). See
+  // https://github.com/swiftlang/swift/issues/77589.
+  if (where.isImplicit() || E->isFromSyntheticMacroExpansion(DC))
     return;
   ExprAvailabilityWalker walker(where);
-  const_cast<Expr*>(E)->walk(walker);
+  const_cast<Expr *>(E)->walk(walker);
 }
 
 namespace {

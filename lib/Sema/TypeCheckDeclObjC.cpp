@@ -32,6 +32,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 
 #include "clang/AST/DeclObjC.h"
@@ -3558,6 +3559,26 @@ private:
     diag.fixItInsert(insertionLoc, attrText);
   }
 
+  /// Returns true if an availability mismatch in \p domain between an
+  /// `@objc @implementation` declaration and the Objective-C declaration it
+  /// implements should be a warning until a future language mode.
+  ///
+  /// \p implIsLessAvailable indicates which of the two declarations the
+  /// restriction applies to.
+  static bool
+  shouldDowngradeAvailabilityMismatchDiag(AvailabilityDomain domain,
+                                          bool implIsLessAvailable) {
+    // Platform availability mismatches were not diagnosed before this check
+    // was introduced, so existing code depends on them being allowed.
+    if (domain.isPlatform())
+      return true;
+
+    // A restriction in the Swift language mode domain only prevents references
+    // from Swift source, so an implementation that is restricted this way is
+    // still reachable through the declaration in the header.
+    return implIsLessAvailable && domain.isSwiftLanguageMode();
+  }
+
   /// If \p ext is less available than the Objective-C declarations in
   /// \p interfaceDecls that it implements, diagnoses the availability
   /// restriction that makes it so.
@@ -3595,7 +3616,9 @@ private:
           domain, domain.isVersioned(), domainAndRange.getRange());
     };
 
-    emit().warnUntilLanguageModeIf(domain.isPlatform(), LanguageMode::future);
+    emit().warnUntilLanguageModeIf(shouldDowngradeAvailabilityMismatchDiag(
+                                       domain, /*implIsLessAvailable=*/true),
+                                   LanguageMode::future);
 
     restriction->emitNoteForDecl(ext);
   }
@@ -3690,6 +3713,12 @@ private:
     if (auto cdeclAttr = VD->getAttrs().getAttribute<CDeclAttr>()) {
       auto ident = VD->getASTContext().getIdentifier(cdeclAttr->Name);
       return ObjCSelector(VD->getASTContext(), 0, { ident });
+    }
+    if (auto cxxAttr = VD->getAttrs().getAttribute<CxxDeclAttr>()) {
+      if (!cxxAttr->Name.empty()) {
+        auto ident = VD->getASTContext().getIdentifier(cxxAttr->Name);
+        return ObjCSelector(VD->getASTContext(), 0, {ident});
+      }
     }
     if (auto objcAttr = VD->getAttrs().getAttribute<ObjCAttr>())
       if (!objcAttr->isNameImplicit())
@@ -4089,8 +4118,15 @@ private:
     if (explicitObjCName && getObjCName(req) != explicitObjCName)
       return MatchOutcome::WrongExplicitObjCName;
 
-    if (!hasSwiftNameMatch)
-      return MatchOutcome::WrongSwiftName;
+    if (!hasSwiftNameMatch) {
+      // A `@cxx(...)` implementation may be named differently from the C++
+      // function it implements. The explicit C++ name is the authoritative
+      // match key, so a Swift-name difference is expected and fine.
+      bool cxxExplicitNameMatch =
+          explicitObjCName && cand->getAttrs().hasAttribute<CxxDeclAttr>();
+      if (!cxxExplicitNameMatch)
+        return MatchOutcome::WrongSwiftName;
+    }
 
     if (!hasObjCNameMatch)
       return MatchOutcome::WrongImplicitObjCName;
@@ -4167,6 +4203,63 @@ private:
     return matchesImpl(req, cand, explicitObjCName);
   }
 
+  /// Extra validity checks for a successfully matched `@cxx @implementation`
+  /// pair. Returns true if an error was diagnosed (the match is invalid).
+  bool diagnoseInvalidCxxMatch(ValueDecl *req, ValueDecl *cand) {
+    if (!cand->getAttrs().hasAttribute<CxxDeclAttr>())
+      return false;
+
+    const auto *clangFD =
+        dyn_cast_or_null<clang::FunctionDecl>(req->getClangDecl());
+    if (!clangFD)
+      return false;
+
+    // A @cxx implementation must be the C++ function's one and only
+    // definition. Reject a match to a function that is already defined in the
+    // imported module (e.g. an inline definition in the header): the Swift
+    // body would be a second definition of the same symbol, violating the ODR.
+    //
+    // A function merely declared inline is rejected too: C++ requires an
+    // inline function to be defined in every TU that uses it, which a single
+    // external definition can never satisfy.
+    //
+    // constexpr implies inline and is called out by name.
+    if (clangFD->isDefined() || clangFD->isInlined()) {
+      unsigned reason = clangFD->isDefined()     ? 0
+                        : clangFD->isConstexpr() ? 2
+                                                 : 1;
+      diagnose(cand, diag::cxx_func_defined, cand, clangFD->getName(), reason);
+      return true;
+    }
+
+    // TODO: Not supported yet, ban C++ references for now.
+    bool usesReferences = clangFD->getReturnType()->isReferenceType();
+    for (const auto *param : clangFD->parameters())
+      usesReferences |= param->getType()->isReferenceType();
+    if (usesReferences) {
+      diagnose(cand, diag::cxx_references_unsupported, cand,
+               clangFD->getName());
+      return true;
+    }
+
+    // The symbol this implementation will be emitted under must not be one the
+    // Swift runtime reserves (swift_retain etc.). Compute it the same way
+    // SILDeclRef's lowering will: ClangImporter::getMangledName yields asm
+    // labels (with a \01 literal symbol prefix), plain extern "C" names, and
+    // mangled symbols.
+    // Emit a warning only.
+    llvm::SmallString<64> symbolBuf;
+    llvm::raw_svector_ostream os(symbolBuf);
+    const auto *importer = static_cast<const ClangImporter *>(
+        cand->getASTContext().getClangModuleLoader());
+    importer->getMangledName(os, clangFD);
+    StringRef symbol = os.str().ltrim('\01');
+    if (!canDeclareSymbolName(symbol, cand->getModuleContext()))
+      diagnose(cand, diag::reserved_runtime_symbol_name, symbol);
+
+    return false;
+  }
+
   void diagnoseOutcome(MatchOutcome outcome, ValueDecl *req, ValueDecl *cand,
                        ObjCSelector explicitObjCName) {
     // If the candidate was invalid, we've already diagnosed the likely cause of
@@ -4186,6 +4279,8 @@ private:
     case MatchOutcome::Match:
     case MatchOutcome::MatchWithExplicitObjCName:
       // Successful outcomes!
+      if (diagnoseInvalidCxxMatch(req, cand))
+        return;
       // If this member will require a vtable entry, diagnose that now.
       diagnoseVTableUse(cand);
       // The storage matched, but its accessors may not have.
@@ -4369,7 +4464,10 @@ private:
 
     {
       auto diag = emit();
-      diag.warnUntilLanguageModeIf(domain.isPlatform(), LanguageMode::future);
+      diag.warnUntilLanguageModeIf(
+          shouldDowngradeAvailabilityMismatchDiag(
+              domain, mismatch.candidateIsLessAvailable),
+          LanguageMode::future);
 
       if (mustBe)
         addAvailabilityFixIt(diag, cand, restriction);

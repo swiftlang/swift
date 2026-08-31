@@ -47,6 +47,10 @@ using FunctionParam = swift::Demangle::FunctionParam<BuiltType>;
 template <typename BuilderType>
 using TypeDecoder = swift::Demangle::TypeDecoder<BuilderType>;
 
+/// The depth limit for recursive walks over metadata in the inspected process,
+/// which can be malformed or cyclic.
+constexpr int defaultTypeRecursionLimit = 50;
+
 /// The kind of mangled name to read.
 enum class MangledNameKind {
   Type,
@@ -189,8 +193,6 @@ public:
   using StoredSignedPointer = typename Runtime::StoredSignedPointer;
   using StoredSize = typename Runtime::StoredSize;
   using TargetClassMetadata = TargetClassMetadataType<Runtime>;
-
-  static const int defaultTypeRecursionLimit = 50;
 
 private:
   /// The maximum number of bytes to read when reading metadata. Anything larger
@@ -1278,6 +1280,18 @@ public:
       TypeCache[TypeCacheKey] = BuiltFixedArray;
       return BuiltFixedArray;
     }
+    case MetadataKind::Borrow: {
+      auto borrow = cast<TargetBorrowTypeMetadata<Runtime>>(Meta);
+      auto referentAddress =
+          RemoteAddress(borrow->Referent, MetadataAddress.getAddressSpace());
+      auto Referent =
+          readTypeFromMetadata(referentAddress, false, recursion_limit);
+      if (!Referent) return BuiltType();
+
+      auto BuiltBorrow = Builder.createBuiltinBorrowType(Referent);
+      TypeCache[TypeCacheKey] = BuiltBorrow;
+      return BuiltBorrow;
+    }
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
@@ -1649,7 +1663,8 @@ public:
   Demangle::NodePointer
   buildContextMangling(ContextDescriptorRef descriptor,
                        Demangler &dem) {
-    auto demangling = buildContextDescriptorMangling(descriptor, dem, 50);
+    auto demangling = buildContextDescriptorMangling(
+        descriptor, dem, defaultTypeRecursionLimit);
     if (!demangling)
       return nullptr;
 
@@ -1857,7 +1872,8 @@ public:
 
   // This follows getMetadataBounds in ABI/Metadata.h.
   std::optional<ClassMetadataBounds>
-  getClassMetadataBounds(ContextDescriptorRef classRef) {
+  getClassMetadataBounds(ContextDescriptorRef classRef,
+                         int recursion_limit = defaultTypeRecursionLimit) {
     auto classDescriptor = cast<TargetClassDescriptor<Runtime>>(classRef);
 
     if (!classDescriptor->hasResilientSuperclass()) {
@@ -1875,12 +1891,17 @@ public:
       return bounds;
     }
 
-    return computeMetadataBoundsFromSuperclass(classRef);
+    return computeMetadataBoundsFromSuperclass(classRef, recursion_limit);
   }
 
   // This follows computeMetadataBoundsFromSuperclass in Metadata.cpp.
-  std::optional<ClassMetadataBounds>
-  computeMetadataBoundsFromSuperclass(ContextDescriptorRef subclassRef) {
+  std::optional<ClassMetadataBounds> computeMetadataBoundsFromSuperclass(
+      ContextDescriptorRef subclassRef,
+      int recursion_limit = defaultTypeRecursionLimit) {
+    if (recursion_limit <= 0) {
+      return std::nullopt;
+    }
+
     auto subclass = cast<TargetClassDescriptor<Runtime>>(subclassRef);
     std::optional<ClassMetadataBounds> bounds;
 
@@ -1899,7 +1920,7 @@ public:
               -> std::optional<ClassMetadataBounds> {
             if (!isa<TargetClassDescriptor<Runtime>>(superclass))
               return std::nullopt;
-            return getClassMetadataBounds(superclass);
+            return getClassMetadataBounds(superclass, recursion_limit - 1);
           },
           [&](MetadataRef metadata) -> std::optional<ClassMetadataBounds> {
             auto cls = dyn_cast<TargetClassMetadata>(metadata);
@@ -2426,6 +2447,7 @@ private:
       importInfo.emplace();
       nameAddress += name.size() + 1;
 
+      uint64_t importInfoSize = 0;
       while (true) {
         // Read the next string.
         std::string temp;
@@ -2435,6 +2457,12 @@ private:
         // If we read an empty string, we're done.
         if (temp.empty())
           break;
+
+        // The remote process may never provide the empty string that ends
+        // the list, so stop once it grows implausibly large.
+        importInfoSize += temp.size() + 1;
+        if (importInfoSize > MaxMetadataSize)
+          return std::nullopt;
 
         // Advance past the string.
         nameAddress += temp.size() + 1;
@@ -2491,6 +2519,11 @@ private:
       // Move the address forward and add the next chunk.
       currentAddress = currentAddress + chunk.size() + 1;
       mangledName += std::move(chunk);
+
+      // The remote process may never terminate the name outside of a symbolic
+      // reference, so stop once it grows implausibly large.
+      if (mangledName.size() > MaxMetadataSize)
+        return nullptr;
 
       // Scan through the mangled name to skip over symbolic references.
       unsigned end = mangledName.size();
@@ -3106,12 +3139,16 @@ private:
       return BuiltTypeDecl();
     std::vector<size_t> paramsPerLevel;
     size_t runningCount = 0;
-    std::function<void(ContextDescriptorRef current, size_t &)> countLevels =
-        [&](ContextDescriptorRef current, size_t &runningCount) {
+    std::function<void(ContextDescriptorRef current, size_t &, int)>
+        countLevels = [&](ContextDescriptorRef current, size_t &runningCount,
+                          int recursion_limit) {
+          if (recursion_limit <= 0)
+            return;
+
           if (auto parentContextRef = readParentContextDescriptor(current))
             if (parentContextRef->isResolved())
               if (auto parentContext = parentContextRef->getResolved())
-                countLevels(parentContext, runningCount);
+                countLevels(parentContext, runningCount, recursion_limit - 1);
 
           auto genericContext = current->getGenericContext();
           // Only consider generic contexts of type class, enum or struct.
@@ -3126,7 +3163,7 @@ private:
             runningCount += paramsPerLevel.back();
           }
         };
-    countLevels(descriptor, runningCount);
+    countLevels(descriptor, runningCount, defaultTypeRecursionLimit);
     BuiltTypeDecl decl = Builder.createTypeDecl(node, paramsPerLevel);
     return decl;
   }

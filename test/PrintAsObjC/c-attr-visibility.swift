@@ -17,6 +17,7 @@
 // RUN: %check-in-clang-c %t/cdecl.h
 
 //--- Lib.swift
+// expected-warning@<unknown> * {{libc not found for }}
 
 @c private enum PrivateEnum: CInt { case A, B }
 // PUBLIC-AND-INTERNAL-NOT: PrivateEnum

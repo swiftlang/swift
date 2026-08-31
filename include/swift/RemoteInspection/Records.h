@@ -131,7 +131,7 @@ struct TargetFieldRecordIterator {
 
   const TargetFieldRecord<Runtime> *operator->() const { return Cur; }
 
-  static const TargetFieldRecord<Runtime> *advanceRecordPointer(const TargetFieldRecord<Runtime> *Ptr, size_t bytes) {
+  static const TargetFieldRecord<Runtime> *advanceRecordPointer(const TargetFieldRecord<Runtime> *Ptr, uint64_t bytes) {
     return reinterpret_cast<const TargetFieldRecord<Runtime> *>(reinterpret_cast<const char *>(Ptr) + bytes);
   }
 
@@ -190,6 +190,16 @@ template <typename Runtime>
 class TargetFieldDescriptor {
   const TargetFieldRecord<Runtime> *getFieldRecordBuffer() const {
     return reinterpret_cast<const TargetFieldRecord<Runtime> *>(this + 1);
+  }
+
+  const TargetFieldRecord<Runtime> *getFieldRecordBufferEnd() const {
+    // We only ever emit FieldRecordSize equal to sizeof(FieldRecord). If it's
+    // anything else, consider it to be bad data and walk no records.
+    if (FieldRecordSize != sizeof(TargetFieldRecord<Runtime>))
+      return getFieldRecordBuffer();
+    return FieldRecordIterator::advanceRecordPointer(
+        getFieldRecordBuffer(),
+        (uint64_t)NumFields * (uint64_t)FieldRecordSize);
   }
 
 public:
@@ -252,14 +262,12 @@ public:
   }
 
   const_iterator begin() const {
-    auto Begin = getFieldRecordBuffer();
-    auto End = FieldRecordIterator::advanceRecordPointer(Begin, NumFields * FieldRecordSize);
-    return const_iterator { FieldRecordSize, Begin, End };
+    return const_iterator { FieldRecordSize, getFieldRecordBuffer(),
+                            getFieldRecordBufferEnd() };
   }
 
   const_iterator end() const {
-    auto Begin = getFieldRecordBuffer();
-    auto End = FieldRecordIterator::advanceRecordPointer(Begin, NumFields * FieldRecordSize);
+    auto End = getFieldRecordBufferEnd();
     return const_iterator { FieldRecordSize, End, End };
   }
 

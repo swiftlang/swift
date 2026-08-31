@@ -26,6 +26,7 @@
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILType.h"
 
 namespace swift {
 
@@ -39,6 +40,13 @@ class SILMoveOnlyDeinit final : public SILAllocated<SILMoveOnlyDeinit> {
   /// The nominal decl that is mapped to this move only deinit table.
   NominalTypeDecl *nominalDecl;
 
+  /// The nominal type if this is a specialized deinit, otherwise null.
+  ///
+  /// Specialized deinits are used in Embedded Swift, where the deinit of a
+  /// generic type must be fully specialized for the concrete type before it
+  /// can be referenced (e.g. from the destroy value witness).
+  SILType nominalType;
+
   /// The SILFunction that implements this deinit.
   SILFunction *funcImpl;
 
@@ -50,16 +58,27 @@ class SILMoveOnlyDeinit final : public SILAllocated<SILMoveOnlyDeinit> {
   SILMoveOnlyDeinit()
       : nominalDecl(nullptr), funcImpl(nullptr), serialized(unsigned(IsNotSerialized)) {}
 
-  SILMoveOnlyDeinit(NominalTypeDecl *nominaldecl, SILFunction *implementation,
-                    unsigned serialized);
+  SILMoveOnlyDeinit(NominalTypeDecl *nominaldecl, SILType nominalType,
+                    SILFunction *implementation, unsigned serialized);
   ~SILMoveOnlyDeinit();
 
 public:
   static SILMoveOnlyDeinit *create(SILModule &mod, NominalTypeDecl *nominalDecl,
+                                   SILType nominalType,
                                    SerializedKind_t serialized,
                                    SILFunction *funcImpl);
 
+  static SILMoveOnlyDeinit *create(SILModule &mod, NominalTypeDecl *nominalDecl,
+                                   SerializedKind_t serialized,
+                                   SILFunction *funcImpl) {
+    return create(mod, nominalDecl, SILType(), serialized, funcImpl);
+  }
+
   NominalTypeDecl *getNominalDecl() const { return nominalDecl; }
+
+  bool isSpecialized() const { return !nominalType.isNull(); }
+
+  SILType getNominalType() const { return nominalType; }
 
   SILFunction *getImplementation() const {
     assert(funcImpl);

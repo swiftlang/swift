@@ -217,6 +217,9 @@ param
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version 3.0
 $WindowsSxSAssemblyPublicKeyToken = $WindowsSxSAssemblyPublicKeyToken.ToLowerInvariant()
+# Share Clang modules across build phases without using the per-user cache.
+$ModuleCache = "$BinaryCache\ModuleCache"
+$env:CLANG_MODULE_CACHE_PATH = $ModuleCache
 
 # Avoid being run in a "Developer" shell since this script launches its own sub-shells targeting
 # different architectures, and these variables cause confusion.
@@ -1804,6 +1807,28 @@ function Add-FlagsDefine([hashtable]$Defines, [string]$Name, [string[]]$Value) {
   }
 }
 
+function ConvertTo-CMakeArgument([string] $Argument) {
+  # Backslashes in CMakeCache.txt are escape characters, but the synthetic CAS
+  # roots deliberately use a UNC spelling. Preserve the complete synthetic
+  # path while normalizing ordinary Windows path separators.
+  $SyntheticPath = $Argument.IndexOf('\\swift\')
+  if ($SyntheticPath -ge 0) {
+    $Prefix = $Argument.Substring(0, $SyntheticPath).Replace("\", "/")
+    return $Prefix + $Argument.Substring($SyntheticPath)
+  }
+
+  # Preserve a leading double backslash for ordinary UNC paths, while using
+  # forward slashes for the remaining components as before.
+  $DoubleBackslash = $Argument.IndexOf("\\")
+  if ($DoubleBackslash -lt 0) {
+    return $Argument.Replace("\", "/")
+  }
+
+  $Prefix = $Argument.Substring(0, $DoubleBackslash).Replace("\", "/")
+  $Suffix = $Argument.Substring($DoubleBackslash + 2).Replace("\", "/")
+  return "$Prefix\\$Suffix"
+}
+
 function Get-PlatformRoot([OS] $OS) {
   return ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms", "$($OS.ToString()).platform"))
 }
@@ -2280,8 +2305,23 @@ function Build-CMakeProject {
       }
     }
 
+    if ($UseSwift) {
+      Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @(
+        "-module-cache-path", $ModuleCache
+      )
+    }
+
     if ($EnableCaching) {
       $env:LLVM_CACHE_CAS_PATH = "$Cache"
+      $SyntheticSourceCache = '\\swift\SourceCache$'
+      $SyntheticBinaryCache = '\\swift\BinaryCache$'
+      $CASPrefixMappings = [ordered]@{
+        [IO.Path]::GetFullPath($SourceCache.FullName) = $SyntheticSourceCache;
+        [IO.Path]::GetFullPath($BinaryCache.FullName) = $SyntheticBinaryCache;
+      }
+      $env:LLVM_CACHE_PREFIX_MAPS = ($CASPrefixMappings.GetEnumerator() | ForEach-Object {
+        "$($_.Key)=$($_.Value)"
+      }) -join ";"
 
       # Skip the clang-cache launcher when targeting Android: cmake auto-detects
       # the NDK's clang (e.g. 19.x) as the actual compiler, but the launcher
@@ -2293,23 +2333,46 @@ function Build-CMakeProject {
       # the launcher.
       $LauncherSafe = ($Platform.OS -ne [OS]::Android)
 
+      # The dependency scanner presents source inputs to Clang using the
+      # synthetic paths from LLVM_CACHE_PREFIX_MAPS. This covers source paths
+      # in debug info, coverage, and macros without putting a host-specific
+      # `-ffile-prefix-map=<physical>=<synthetic>` in the cached command. Set
+      # the remaining compilation directory explicitly, and omit the CodeView
+      # command line because it contains the physical scanner replay mappings.
+      $ClangCachingFlags = @("-ffile-compilation-dir=$SyntheticBinaryCache")
+      if ($DebugInfo) {
+        $ClangCachingFlags += "-gno-codeview-command-line"
+      }
+
       if ($LauncherSafe -and $UseC -and $CCompiler.DriverStyle -ne [DriverStyle]::CL) {
+        Add-FlagsDefine $Defines CMAKE_C_FLAGS $ClangCachingFlags
         Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_LAUNCHER `
             (Join-Path -Path (Split-Path $CCompiler.Executable) -ChildPath "clang-cache.exe")
       }
 
       if ($LauncherSafe -and $UseCXX -and $CXXCompiler.DriverStyle -ne [DriverStyle]::CL) {
+        Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $ClangCachingFlags
         Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_LAUNCHER `
             (Join-Path -Path (Split-Path $CXXCompiler.Executable) -ChildPath "clang-cache.exe")
       }
 
       if ($UseSwift) {
-        Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @(
+        $SwiftCachingFlags = @(
           "-explicit-module-build",
           "-cache-compile-job",
           "-cas-path", $Cache,
-          "-incremental-dependency-scan"
+          "-incremental-dependency-scan",
+          "-file-compilation-dir", $SyntheticBinaryCache,
+          "-Xfrontend", "-prefix-map-sourceinfo"
         )
+
+        foreach ($Mapping in $CASPrefixMappings.GetEnumerator()) {
+          $SwiftCachingFlags += @(
+            "-scanner-prefix-map-paths", $Mapping.Key, $Mapping.Value
+          )
+        }
+
+        Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftCachingFlags
       }
     }
 
@@ -2331,7 +2394,7 @@ function Build-CMakeProject {
       # where they are interpreted as escapes.
       if ($Define.Value -is [string]) {
         # Single token value, no need to quote spaces, the splat operator does the right thing.
-        $Value = $Define.Value.Replace("\", "/")
+        $Value = ConvertTo-CMakeArgument $Define.Value
       } else {
         # Flags array, multiple tokens, quoting needed for tokens containing spaces
         $Value = ""
@@ -2340,7 +2403,7 @@ function Build-CMakeProject {
             $Value += " "
           }
 
-          $ArgWithForwardSlashes = $Arg.Replace("\", "/")
+          $ArgWithForwardSlashes = ConvertTo-CMakeArgument $Arg
           if ($ArgWithForwardSlashes.Contains(" ")) {
             # Escape the quote so it makes it through. PowerShell 5 and Core
             # handle quotes differently, so we need to check the version.
@@ -3401,19 +3464,35 @@ function Patch-mimalloc() {
     $NoAssertBinaries = $Tools | ForEach-Object {[IO.Path]::Combine($Platform.NoAssertsToolchainInstallRoot, "usr", "bin", $_)}
     $Binaries = $Binaries + $NoAssertBinaries
   }
-  foreach ($Binary in $Binaries) {
-    $Name = [IO.Path]::GetFileName($Binary)
-    # Binary-patch in place
-    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-f" "-i" "$Binary"
-    # Log the import table
-    $LogFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name.txt"
-    $ErrorFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name-error.txt"
-    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-l" "$Binary" -OutFile $LogFile -ErrorFile $ErrorFile
-    # Verify patching
-    $Found = Select-String -Path $LogFile -Pattern "mimalloc"
-    if (-not $Found) {
-      Get-Content $ErrorFile
-      throw "Failed to patch mimalloc for $Name"
+
+  $minject = "$SourceCache\mimalloc\bin\minject$BuildSuffix"
+  # minject creates an intermediate path by extending the input filename.
+  # Stage the input under a short name to avoid its pathname-length bug.
+  $PatchBinary = [IO.Path]::Combine([IO.Path]::GetDirectoryName($minject), "binary.exe")
+
+  try {
+    foreach ($Binary in $Binaries) {
+      $Name = [IO.Path]::GetFileName($Binary)
+
+      Copy-Item -Force -LiteralPath $Binary -Destination $PatchBinary
+      Invoke-Program $minject "-f" "-i" "$PatchBinary"
+      Copy-Item -Force -LiteralPath $PatchBinary -Destination $Binary
+
+      # Log the import table
+      $LogFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name.txt"
+      $ErrorFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name-error.txt"
+      Invoke-Program "$minject" "-l" "$Binary" -OutFile $LogFile -ErrorFile $ErrorFile
+
+      # Verify patching
+      $Found = Select-String -Path $LogFile -Pattern "mimalloc"
+      if (-not $Found) {
+        Get-Content $ErrorFile
+        throw "Failed to patch mimalloc for $Name"
+      }
+    }
+  } finally {
+    if (Test-Path -LiteralPath $PatchBinary) {
+      Remove-Item -Force -LiteralPath $PatchBinary
     }
   }
 }

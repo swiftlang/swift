@@ -420,6 +420,7 @@ public:
   void visitAvailableAttr(AvailableAttr *attr);
 
   void visitCDeclAttr(CDeclAttr *attr);
+  void visitCxxDeclAttr(CxxDeclAttr *attr);
   void visitCOMAttr(COMAttr *attr);
   void visitExposeAttr(ExposeAttr *attr);
   void visitExternAttr(ExternAttr *attr);
@@ -1771,6 +1772,8 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     D->getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
   if (!langAttr)
     langAttr = D->getAttrs().getAttribute<CDeclAttr>(/*AllowInvalid=*/true);
+  if (!langAttr)
+    langAttr = D->getAttrs().getAttribute<CxxDeclAttr>(/*AllowInvalid=*/true);
 
   if (!langAttr) {
     diagnose(attr->getLocation(), diag::attr_implementation_requires_language);
@@ -1893,12 +1896,12 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
       attr->setCategoryNameInvalid();
     }
 
-    // FIXME: if (AFD->getCDeclName().empty())
-
     if (!AFD->getImplementedObjCDecl()) {
+      StringRef name = AFD->getCDeclName();
+      if (name.empty())
+        name = AFD->getNameStr();
       diagnose(attr->getLocation(),
-               diag::attr_objc_implementation_func_not_found,
-               AFD->getCDeclName(), AFD);
+               diag::attr_objc_implementation_func_not_found, name, AFD);
     }
   }
 }
@@ -2410,7 +2413,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
   }
 }
 
-static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
+bool swift::canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // The Swift standard library needs to be able to define reserved symbols.
   if (fromModule->isStdlibModule()
       || fromModule->getName() == fromModule->getASTContext().Id_Concurrency
@@ -2482,6 +2485,32 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   if (D->getAttrs().getAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
   }
+}
+
+void AttributeChecker::visitCxxDeclAttr(CxxDeclAttr *attr) {
+  // @cxx requires C++ interop.
+  if (!Ctx.LangOpts.EnableCXXInterop)
+    diagnose(attr->getLocation(), diag::cxx_attr_requires_cxx_interop,
+             attr->getAttrName());
+
+  // Only top-level func decls are currently supported.
+  if (D->getDeclContext()->isTypeContext())
+    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level, attr);
+
+  // Reject using both @cxx and @objc on the same decl.
+  if (D->getAttrs().getAttribute<ObjCAttr>())
+    diagnose(attr->getLocation(), diag::cxx_incompatible_with_objc, D);
+
+  // Reject using both @cxx and @c/@_cdecl on the same decl.
+  if (auto *cAttr = D->getAttrs().getAttribute<CDeclAttr>())
+    diagnose(attr->getLocation(), diag::cxx_incompatible_with_cdecl, cAttr, D);
+
+  // @cxx currently requires @implementation.
+  // AllowInvalid=true so that if @implementation is present but malformed, its
+  // own diagnostics cover the problem.
+  if (!D->getAttrs().getAttribute<ObjCImplementationAttr>(
+          /*AllowInvalid=*/true))
+    diagnose(attr->getLocation(), diag::cxx_attr_requires_implementation);
 }
 
 void AttributeChecker::visitCOMAttr(COMAttr *attr) {
@@ -5392,7 +5421,7 @@ void suggestAnyAppleOSAvailability(const Decl *D,
     if (!semAttr || !semAttr->isPlatformSpecific())
       continue;
 
-    auto platform = semAttr->getPlatform();
+    auto platform = *semAttr->getPlatform();
 
     // Don't diagnose any declaration that already has an anyAppleOS attribute.
     if (platform == PlatformKind::anyAppleOS)
@@ -5480,7 +5509,7 @@ void suggestAnyAppleOSAvailability(const Decl *D,
       if (remainingAttrsToReplace.erase(member))
         continue;
       if (auto semAttr = D->getSemanticAvailableAttr(member)) {
-        os << ", " << platformString(semAttr->getPlatform());
+        os << ", " << semAttr->getDomain().getNameForAttributePrinting();
         if (auto v = member->getRawIntroduced())
           os << " " << *v;
       }
@@ -8260,13 +8289,27 @@ void AttributeChecker::visitActorAttr(ActorAttr *attr) {
 void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
   auto dc = D->getDeclContext();
 
-  // distributed can be applied to actor definitions and their methods
+  // distributed can be applied to actor definitions and their funcs or vars
   if (auto varDecl = dyn_cast<VarDecl>(D)) {
     if (varDecl->isDistributed()) {
+      // distributed var must be declared inside a distributed actor
+      auto selfTy = dc->isTypeContext() ? dc->getSelfTypeInContext() : Type();
+      if (!selfTy || !selfTy->isDistributedActor()) {
+        auto diagnostic = diagnoseAndRemoveAttr(
+            attr, diag::distributed_actor_func_not_in_distributed_actor,
+            /*isComputedProperty=*/true);
+
+        if (auto *protoDecl = dc->getSelfProtocolDecl()) {
+          diagnoseDistributedFunctionInNonDistributedActorProtocol(protoDecl,
+                                                                   diagnostic);
+        }
+        return;
+      }
+
       if (checkDistributedActorProperty(varDecl, /*diagnose=*/true))
         return;
     } else {
-      // distributed can not be applied to stored properties
+      // distributed can not be applied to local properties
       diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
       return;
     }
@@ -8281,9 +8324,10 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       // good: `distributed actor`
       return;
     }
-  } else if (dyn_cast<StructDecl>(D) || dyn_cast<EnumDecl>(D)) {
+  } else if (isa<StructDecl>(D) || isa<EnumDecl>(D)) {
     diagnoseAndRemoveAttr(
-        attr, diag::distributed_actor_func_not_in_distributed_actor);
+        attr, diag::distributed_actor_func_not_in_distributed_actor,
+        /*isComputedProperty=*/false);
     return;
   }
 
@@ -8304,10 +8348,20 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
     }
 
     // distributed func must be declared inside an distributed actor
+    // A 'distributed func' at file scope, or in any other non-type context,
+    // has no 'Self' type to inspect, so reject it before asking for one
+    if (!dc->isTypeContext()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::distributed_actor_func_not_in_distributed_actor,
+          /*isComputedProperty=*/false);
+      return;
+    }
+
     auto selfTy = dc->getSelfTypeInContext();
-    if (!selfTy->isDistributedActor()) {
+    if (!selfTy || !selfTy->isDistributedActor()) {
       auto diagnostic = diagnoseAndRemoveAttr(
-        attr, diag::distributed_actor_func_not_in_distributed_actor);
+        attr, diag::distributed_actor_func_not_in_distributed_actor,
+        /*isComputedProperty=*/false);
 
       if (auto *protoDecl = dc->getSelfProtocolDecl()) {
         diagnoseDistributedFunctionInNonDistributedActorProtocol(protoDecl,

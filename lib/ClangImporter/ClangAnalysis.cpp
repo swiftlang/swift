@@ -18,6 +18,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include <algorithm>
 
 using namespace swift;
 
@@ -612,6 +613,11 @@ static void diagnoseMissingReturnsRetained(ClangImporter::Implementation &Impl,
           info.getDecl(), {{"returned_as_unretained_by_default", true}}))
     return;
 
+  // If this returns OSObject or one of its subclasses, rely on libkern's
+  // ownership rules.
+  if (importer::getLibkernOwnershipOfReturnedFRT(clangFunc, ctx))
+    return;
+
   // If we reached here, then we have a call to an unannotated, Clang-imported
   // function that returns a pointer to a shared reference type that doesn't
   // have a default return ownership convention. Emit diagnostics.
@@ -628,8 +634,51 @@ void ClangImporter::checkCalledClangFunction(const ValueDecl *func,
   diagnoseMissingReturnsRetained(Impl, func, callSiteLoc);
 }
 
+static bool isOSObject(const clang::CXXRecordDecl *record) {
+  return record && record->getIdentifier() && record->getName() == "OSObject" &&
+         record->getDeclContext()->getRedeclContext()->isTranslationUnit();
+}
+
+static bool isOSIterator(const clang::CXXRecordDecl *record) {
+  return record && record->getIdentifier() &&
+         record->getName() == "OSIterator" &&
+         record->getDeclContext()->getRedeclContext()->isTranslationUnit();
+}
+
+LibkernSubclass ClangImporter::Implementation::getLibkernSubclass(
+    const clang::CXXRecordDecl *record) {
+  if (!record || !record->hasDefinition())
+    return LibkernSubclass::None;
+
+  record = record->getDefinition();
+  auto it = libkernSubclasses.find(record);
+  if (it != libkernSubclasses.end())
+    return it->second;
+
+  // OSIterator is the strongest answer there is, so no base can change it.
+  if (isOSIterator(record)) {
+    libkernSubclasses[record] = LibkernSubclass::OSIterator;
+    return LibkernSubclass::OSIterator;
+  }
+
+  auto result =
+      isOSObject(record) ? LibkernSubclass::OSObject : LibkernSubclass::None;
+
+  for (const auto &base : record->bases()) {
+    auto baseSubclass =
+        getLibkernSubclass(base.getType()->getAsCXXRecordDecl());
+    result = std::max(result, baseSubclass);
+    if (result == LibkernSubclass::OSIterator)
+      break;
+  }
+
+  libkernSubclasses[record] = result;
+  return result;
+}
+
 std::optional<ResultConvention>
-swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl) {
+swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
+                                           ASTContext &ctx) {
 
   auto attrInfo = importer::ReturnOwnershipInfo(decl);
   if (attrInfo.hasReturnsUnretained)
@@ -642,6 +691,9 @@ swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl) {
     if (auto convention = importer::matchSwiftAttr<ResultConvention>(
             recordDecl,
             {{"returned_as_unretained_by_default", ResultConvention::Unowned}}))
+      return convention.value();
+
+    if (auto convention = getLibkernOwnershipOfReturnedFRT(decl, ctx))
       return convention.value();
 
     // FIXME: this is only here to preserve legacy behavior; we really shouldn't
@@ -663,6 +715,62 @@ swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl) {
   }
 
   return std::nullopt;
+}
+
+std::optional<ResultConvention>
+swift::importer::getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
+                                                  ASTContext &ctx) {
+  if (!ctx.LangOpts.hasFeature(Feature::LibkernOwnershipConventions))
+    return std::nullopt;
+
+  auto *func = dyn_cast<clang::FunctionDecl>(decl);
+  if (!func)
+    return std::nullopt;
+
+  auto *recordDecl = getReturnTypeAsRecordDeclPtr(func);
+  if (!recordDecl)
+    return std::nullopt;
+
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  auto libkernSubclass = importer->getLibkernSubclass(recordDecl);
+  if (libkernSubclass == LibkernSubclass::None)
+    return std::nullopt;
+
+  if (!func->getIdentifier())
+    return std::nullopt;
+
+  auto consumeSynthesizedPrefixes = [](StringRef &funcName) -> bool {
+    bool consumed = false;
+    while (funcName.consume_front("__synthesizedVirtualCall_") ||
+           funcName.consume_front("__synthesizedBaseCall_"))
+      consumed = true;
+    return consumed;
+  };
+
+  StringRef funcName = func->getName();
+  // If this is a synthesized thunk, consume the prefix we added.
+  if (func->isImplicit()) {
+    if (!consumeSynthesizedPrefixes(funcName))
+      return std::nullopt;
+    if (funcName.starts_with("operator"))
+      return std::nullopt;
+  }
+
+  // Strip leading underscores.
+  funcName = funcName.substr(funcName.find_first_not_of('_'));
+
+  if (funcName == "safeMetaCast" || funcName == "requiredMetaCast" ||
+      funcName == "metaCast")
+    return ResultConvention::Unowned;
+
+  if (funcName.ends_with("Matching"))
+    return std::nullopt;
+
+  if ((!funcName.starts_with("get") && !funcName.starts_with("Get")) ||
+      libkernSubclass == LibkernSubclass::OSIterator)
+    return ResultConvention::Owned;
+
+  return ResultConvention::Unowned;
 }
 
 //===----------------------------------------------------------------------===//

@@ -2218,6 +2218,29 @@ ERROR(cdecl_incompatible_with_objc,none,
       "cannot apply both '@c' and '@objc' to %kindonly0",
       (const Decl *))
 
+// @cxx
+ERROR(cxx_attr_requires_cxx_interop,none,
+      "'%0' requires C++ interoperability; enable it with "
+      "'-cxx-interoperability-mode=default' or "
+      "'-enable-experimental-cxx-interop'", (StringRef))
+ERROR(cxx_incompatible_with_objc,none,
+      "cannot apply both '@cxx' and '@objc' to %kindonly0",
+      (const Decl *))
+ERROR(cxx_incompatible_with_cdecl,none,
+      "cannot apply both '@cxx' and '%0' to %kindonly1",
+      (DeclAttribute, const Decl *))
+ERROR(cxx_attr_requires_implementation,none,
+      "'@cxx' must be combined with '@implementation'",
+      ())
+ERROR(cxx_func_defined,none,
+      "%kind0 cannot implement C++ function '%1' because it "
+      "%select{already has a definition|is declared 'inline'|is 'constexpr' (implicitly 'inline')}2",
+      (ValueDecl *, StringRef, unsigned))
+ERROR(cxx_references_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because reference "
+      "parameters and return types are not yet supported",
+      (ValueDecl *, StringRef))
+
 // @used and @section
 ERROR(section_empty_name,none,
       "'@section' section name cannot be empty", ())
@@ -3155,6 +3178,9 @@ ERROR(type_does_not_conform_anyobject_in_decl_ref,none,
 ERROR(type_does_not_conform_decl_owner,none,
       "%kind0 requires that %1 conform to %2",
       (const ValueDecl *, Type, Type))
+NOTE(missing_conformance_unloaded_module,none,
+     "the conformance of %0 to %1 could not be loaded because module %2 was not "
+     "imported; add import of module %2", (Type, Type, Identifier))
 ERROR(type_does_not_conform_anyobject_decl_owner,none,
       "%kind0 requires that %1 be a class type",
       (const ValueDecl *, Type, Type))
@@ -3275,6 +3301,10 @@ ERROR(witness_initializer_not_required,none,
       "initializer requirement %0 can only be satisfied by a 'required' "
       "initializer in%select{| the definition of}1 non-final class %2",
       (const ValueDecl *, bool, Type))
+ERROR(witness_initializer_cxx_not_inherited,none,
+      "initializer requirement %0 cannot be satisfied by a C++ constructor of "
+      "non-final foreign reference type %1",
+      (const ValueDecl *, Type))
 ERROR(witness_initializer_failability,none,
       "non-failable initializer requirement %0"
       "%select{| in Objective-C protocol}1 cannot be satisfied by a "
@@ -6243,6 +6273,18 @@ ERROR(distributed_actor_target_result_not_codable,none,
 ERROR(distributed_actor_system_serialization_req_must_be_protocol,none,
       "'SerializationRequirement' type witness %0 must be a protocol type",
       (Type))
+ERROR(distributed_actor_target_serialization_req_not_concrete,none,
+      "%kind0 cannot be checked because actor system %1 does not specify a "
+      "concrete 'SerializationRequirement'",
+      (const ValueDecl *, Type))
+NOTE(distributed_actor_target_serialization_req_not_concrete_note,none,
+     "constrain %0 with concrete actor system or 'SerializationRequirement', "
+     "e.g. 'DistributedActorSystem<any Codable>'",
+     (Type))
+NOTE(distributed_actor_target_serialization_req_not_concrete_extension_note,none,
+     "constrain this extension with concrete actor system or "
+     "'SerializationRequirement', e.g. 'DistributedActorSystem<any Codable>'",
+     ())
 ERROR(nonisolated_distributed_actor_storage,none,
       "'nonisolated' can not be applied to distributed actor stored properties",
       ())
@@ -6526,8 +6568,9 @@ ERROR(distributed_actor_func_static,none,
       "'distributed' method cannot be 'static'",
       ())
 ERROR(distributed_actor_func_not_in_distributed_actor,none,
-      "'distributed' method can only be declared within 'distributed actor'",
-      ())
+      "distributed %select{method|computed property}0 can only be declared "
+      "in 'DistributedActor' type",
+      (bool))
 ERROR(distributed_actor_user_defined_special_property,none,
       "property %0 cannot be defined explicitly, as it conflicts with "
       "distributed actor synthesized stored property",
@@ -9171,10 +9214,10 @@ GROUPED_WARNING(use_generic_member_of_existential_in_embedded_swift,
                 EmbeddedRestrictions, none,
                 "cannot use generic %kind0 on a value of type %1 in Embedded Swift",
                 (const Decl *, Type))
-GROUPED_WARNING(dynamic_cast_involving_protocol_in_embedded_swift,
-                EmbeddedRestrictions, none,
-                "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
-                (const Decl *))
+GROUPED_ERROR(dynamic_cast_involving_protocol_in_embedded_swift,
+              EmbeddedRestrictions, none,
+              "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
+              (const Decl *))
 
 GROUPED_WARNING(open_existential_in_embedded_swift,
                 EmbeddedRestrictions, none,

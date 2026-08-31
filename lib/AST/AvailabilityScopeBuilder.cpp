@@ -990,14 +990,7 @@ private:
     auto primaryRange = runtimeRangeForSpec(spec);
     auto variantRange = runtimeRangeForSpec(variantSpec);
 
-    switch (domain.getKind()) {
-    case AvailabilityDomain::Kind::Embedded:
-    case AvailabilityDomain::Kind::SwiftLanguageMode:
-    case AvailabilityDomain::Kind::PackageDescription:
-      // These domains don't support queries.
-      llvm::report_fatal_error("unsupported domain");
-
-    case AvailabilityDomain::Kind::Universal:
+    if (domain.isUniversal()) {
       DEBUG_ASSERT(spec.isWildcard());
 
       // If all of the specs that matched are '*', then the query trivially
@@ -1013,30 +1006,9 @@ private:
       //
       return AvailabilityQuery::dynamic(variantSpec->getDomain(), primaryRange,
                                         variantRange);
-
-    case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
-      return AvailabilityQuery::dynamic(domain, primaryRange, std::nullopt);
-
-    case AvailabilityDomain::Kind::Platform:
-      // Platform and Swift runtime checks are always dynamic. The SIL optimizer
-      // is responsible eliminating these checks when it can prove that they can
-      // never fail (due to the deployment target). We can't perform that
-      // analysis here because it may depend on inlining.
-      return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
-    case AvailabilityDomain::Kind::Custom:
-      auto customDomain = domain.getCustomDomain();
-      ASSERT(customDomain);
-
-      switch (customDomain->getKind()) {
-      case CustomAvailabilityDomain::Kind::Enabled:
-      case CustomAvailabilityDomain::Kind::AlwaysEnabled:
-        return AvailabilityQuery::constant(domain, true);
-      case CustomAvailabilityDomain::Kind::Disabled:
-        return AvailabilityQuery::constant(domain, false);
-      case CustomAvailabilityDomain::Kind::Dynamic:
-        return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
-      }
     }
+
+    return AvailabilityQuery::forDomain(domain, primaryRange, variantRange);
   }
 
   /// Build the availability scopes for a StmtCondition and return a pair of
@@ -1190,7 +1162,7 @@ private:
         // diagnostic and just use the current scope.
         Context.Diags.diagnose(
             query->getLoc(), diag::availability_query_required_for_platform,
-            platformString(targetPlatform(Context.LangOpts)));
+            Context.getTargetAvailabilityDomain().getNameForAttributePrinting());
         falseFlowBuilder.setUndefined();
         continue;
       }
@@ -1322,13 +1294,13 @@ private:
       // properly. For example, on the OSXApplicationExtension platform
       // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
-      auto platform = domain.getPlatformKind();
+      auto platform = *domain.getPlatformKind();
       if (isPlatformActive(platform, Context.LangOpts, forTargetVariant,
                            /* ForRuntimeQuery */ true)) {
 
         if (!bestSpec ||
             inheritsAvailabilityFromPlatform(
-                platform, bestSpec->getDomain().getPlatformKind())) {
+                platform, *bestSpec->getDomain().getPlatformKind())) {
           bestSpec = spec;
         }
       }

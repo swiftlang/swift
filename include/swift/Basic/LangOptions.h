@@ -1103,8 +1103,12 @@ namespace swift {
     bool SolverPruneDisjunctions = true;
 
     /// Enable an inefficient form of inference, which will sometimes prevent
-    /// exact binding promotion from taking place.
+    /// exact binding promotion from taking place. This will be off by default
+    /// eventually.
     bool SolverEnableEnumerateSupertypes = true;
+
+    /// Enable type variable joins. This will be on by default eventually.
+    bool SolverEnableTypeVariableJoins = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
@@ -1234,6 +1238,14 @@ namespace swift {
     /// in versioned attributes, where the importer must select the appropriate
     /// ones to apply.
     bool LoadVersionIndependentAPINotes = false;
+
+    /// Whether ClangImporter should force \c -fobjc-msgsend-selector-stubs to
+    /// be either on or off. If \c nullopt , the decision will be left to the clang driver.
+    std::optional<bool> ForceObjCMsgSendSelectorStubs = std::nullopt;
+
+    /// Whether ClangImporter should force \c -fobjc-msgsend-class-selector-stubs to
+    /// be either on or off. If \c nullopt , the decision will be left to the clang driver.
+    std::optional<bool> ForceObjCMsgSendClassSelectorStubs = std::nullopt;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

@@ -1049,6 +1049,8 @@ namespace {
 
       auto rep = base.getType().getPreferredExistentialRepresentation();
       switch (rep) {
+      case ExistentialRepresentation::COM:
+        llvm_unreachable("opening a COM existential is not implemented");
       case ExistentialRepresentation::Opaque:
         if (!base.getValue()->getType().isAddress()) {
           assert(!SGF.useLoweredAddresses());
@@ -6043,6 +6045,8 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
   auto rep = lv.getTypeOfRValue()
     .getPreferredExistentialRepresentation();
   switch (rep) {
+  case ExistentialRepresentation::COM:
+    llvm_unreachable("opening a COM existential is not implemented");
   case ExistentialRepresentation::Opaque:
   case ExistentialRepresentation::Boxed: {
     lv.add<OpenOpaqueExistentialComponent>(openedArchetype, typeData);

@@ -152,7 +152,7 @@ struct PotentialBinding {
   /// Determine whether this binding could be a viable candidate
   /// to be "joined" with some other binding. It has to be at least
   /// a non-default r-value supertype binding with no type variables.
-  bool isViableForJoinOrMeet() const;
+  bool isViableForJoinOrMeet(bool allowTypeVariableJoins) const;
 
   static PotentialBinding forHole(TypeVariableType *typeVar,
                                   ConstraintLocator *locator) {
@@ -400,6 +400,7 @@ struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
   }
 
   static bool isEqual(const Binding &LHS, const Binding &RHS) {
+#if LLVM_VERSION_MAJOR <= 21
     // If either side is empty or tombstone, let's use pointer equality.
     {
       auto lhsTy = LHS.BindingType.getPointer();
@@ -415,6 +416,7 @@ struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
       if (rhsTy == emptyTy || rhsTy == tombstoneTy)
         return lhsTy == rhsTy;
     }
+#endif
 
     return LHS == RHS;
   }

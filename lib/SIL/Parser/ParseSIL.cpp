@@ -8233,27 +8233,37 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
                            nullptr, moveOnlyDeinitTableState, M))
     return true;
 
-  // Parse the class name.
-  Identifier name;
-  SourceLoc loc;
-  if (moveOnlyDeinitTableState.parseSILIdentifier(
-          name, loc, diag::expected_sil_value_name))
-    return true;
+  // Parse the nominal type name, or the type of a specialized deinit.
+  NominalTypeDecl *theNominalDecl = nullptr;
+  SILType specializedNominalTy;
+  if (parser.Tok.is(tok::sil_dollar)) {
+    if (SILParser(parser).parseSILType(specializedNominalTy))
+      return true;
+    theNominalDecl = specializedNominalTy.getNominalOrBoundGenericNominal();
+    if (!theNominalDecl)
+      return true;
+  } else {
+    Identifier name;
+    SourceLoc loc;
+    if (moveOnlyDeinitTableState.parseSILIdentifier(
+            name, loc, diag::expected_sil_value_name))
+      return true;
 
-  // Find the nominal decl.
-  llvm::PointerUnion<ValueDecl *, ModuleDecl *> res =
-      lookupTopDecl(parser, name, /*typeLookup=*/true);
-  assert(isa<ValueDecl *>(res) && "Class Nominal-up should return a Decl");
-  ValueDecl *varDecl = cast<ValueDecl *>(res);
-  if (!varDecl) {
-    parser.diagnose(loc, diag::sil_moveonlydeinit_nominal_not_found, name);
-    return true;
-  }
+    // Find the nominal decl.
+    llvm::PointerUnion<ValueDecl *, ModuleDecl *> res =
+        lookupTopDecl(parser, name, /*typeLookup=*/true);
+    assert(isa<ValueDecl *>(res) && "Class Nominal-up should return a Decl");
+    ValueDecl *varDecl = cast<ValueDecl *>(res);
+    if (!varDecl) {
+      parser.diagnose(loc, diag::sil_moveonlydeinit_nominal_not_found, name);
+      return true;
+    }
 
-  auto *theNominalDecl = dyn_cast<NominalTypeDecl>(varDecl);
-  if (!theNominalDecl) {
-    parser.diagnose(loc, diag::sil_moveonlydeinit_nominal_not_found, name);
-    return true;
+    theNominalDecl = dyn_cast<NominalTypeDecl>(varDecl);
+    if (!theNominalDecl) {
+      parser.diagnose(loc, diag::sil_moveonlydeinit_nominal_not_found, name);
+      return true;
+    }
   }
 
   SourceLoc lBraceLoc = parser.Tok.getLoc();
@@ -8286,7 +8296,8 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
   parser.parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                             lBraceLoc);
 
-  SILMoveOnlyDeinit::create(M, theNominalDecl, Serialized, func);
+  SILMoveOnlyDeinit::create(M, theNominalDecl, specializedNominalTy, Serialized,
+                            func);
   return false;
 }
 

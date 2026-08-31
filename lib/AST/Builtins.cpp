@@ -49,12 +49,11 @@ bool BuiltinInfo::isReadNone() const {
 
 const llvm::AttributeSet &
 IntrinsicInfo::getOrCreateFnAttributes(ASTContext &Ctx) const {
-  using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeSet>;
-  if (DenseMapInfo::isEqual(FnAttrs, DenseMapInfo::getEmptyKey())) {
+  if (!FnAttrs) {
     FnAttrs =
         llvm::Intrinsic::getFnAttributes(Ctx.getIntrinsicScratchContext(), ID);
   }
-  return FnAttrs;
+  return FnAttrs.value();
 }
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
@@ -1192,6 +1191,18 @@ static ValueDecl *getDeallocRawTypedOperation(ASTContext &ctx, Identifier id) {
                             _generics(_unrestricted),
                             _parameters(_rawPointer, _word, _word,
                                         _metatype(_typeparam(0))),
+                            _void);
+}
+
+static ValueDecl *getAllocErrorBoxTypedOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer, _word, _word),
+                            _rawPointer);
+}
+
+static ValueDecl *getDeallocErrorBoxTypedOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer, _word, _word),
                             _void);
 }
 
@@ -2725,8 +2736,6 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::MMX:
   case IITDescriptor::AMX:
   case IITDescriptor::Metadata:
-  case IITDescriptor::ExtendArgument:
-  case IITDescriptor::TruncArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
   case IITDescriptor::VecOfAnyPtrsToElt:
@@ -2767,6 +2776,22 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
     auto vecType = argType->getAs<BuiltinVectorType>();
     if (!vecType) return Type();
     return vecType->getElementType();
+  }
+
+  case IITDescriptor::ExtendArgument: {
+    Type argType = getTypeArgument(D.getArgumentNumber());
+    if (!argType) return Type();
+    if (auto vecType = argType->getAs<BuiltinVectorType>())
+      return vecType->getExtended(Context);
+    return Type();
+  }
+
+  case IITDescriptor::TruncArgument: {
+    Type argType = getTypeArgument(D.getArgumentNumber());
+    if (!argType) return Type();
+    if (auto vecType = argType->getAs<BuiltinVectorType>())
+      return vecType->getTruncated(Context);
+    return Type();
   }
 
   // A pointer to an immediate type.
@@ -3329,6 +3354,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::DeallocRawTyped:
     return getDeallocRawTypedOperation(Context, Id);
+
+  case BuiltinValueKind::AllocErrorBoxTyped:
+    return getAllocErrorBoxTypedOperation(Context, Id);
+
+  case BuiltinValueKind::DeallocErrorBoxTyped:
+    return getDeallocErrorBoxTypedOperation(Context, Id);
 
   case BuiltinValueKind::StackAlloc:
   case BuiltinValueKind::UnprotectedStackAlloc:

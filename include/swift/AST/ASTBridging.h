@@ -963,6 +963,12 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedStringRef cName,
                                                bool underscored);
 
+SWIFT_NAME("BridgedCxxDeclAttr.createParsed(_:atLoc:range:name:)")
+BridgedCxxDeclAttr BridgedCxxDeclAttr_createParsed(BridgedASTContext cContext,
+                                                   swift::SourceLoc atLoc,
+                                                   swift::SourceRange range,
+                                                   BridgedStringRef cName);
+
 SWIFT_NAME("BridgedCustomAttr.createParsed(atLoc:type:declContext:initContext:"
            "argumentList:)")
 BridgedCustomAttr BridgedCustomAttr_createParsed(
@@ -3157,6 +3163,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isNoEscape() const;
   BRIDGED_INLINE bool isInteger() const;
   BRIDGED_INLINE bool isUnownedStorageType() const;
+  BRIDGED_INLINE bool isReferenceStorageType() const;
   BRIDGED_INLINE bool isMetatypeType() const;
   BRIDGED_INLINE bool isExistentialMetatypeType() const;
   BRIDGED_INLINE bool isTuple() const;

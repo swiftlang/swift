@@ -530,7 +530,10 @@ struct BridgedFunction {
     IsNotThunk,
     IsThunk,
     IsReabstractionThunk,
-    IsSignatureOptimizedThunk
+    IsSignatureOptimizedThunk,
+    IsBackDeployedThunk,
+    IsDistributedThunk,
+    IsDistributedProxyAdapterThunk
   };
 
   enum class SerializedKind {
@@ -869,6 +872,7 @@ struct BridgedInstruction {
 
   BRIDGED_INLINE SwiftInt ProjectBoxInst_fieldIndex() const;
   BRIDGED_INLINE bool EndCOWMutationInst_doKeepUnique() const;
+  BRIDGED_INLINE void EndCOWMutationInst_setKeepUnique(bool keepUnique) const;
   BRIDGED_INLINE bool DestroyValueInst_isDeadEnd() const;
   BRIDGED_INLINE SwiftInt EnumInst_caseIndex() const;
   BRIDGED_INLINE SwiftInt UncheckedEnumDataInst_caseIndex() const;
@@ -1616,6 +1620,8 @@ struct BridgedContext {
                                                                           bool loadCalleesRecursively) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction lookupStdlibFunction(BridgedStringRef name) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedDeclObj nominal) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpSpecializedDeinitFunction(BridgedType nominalType) const;
+  void addSpecializedDeinit(BridgedType nominalType, BridgedFunction deinitFunc) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinIntegerType(SwiftInt bitWidth) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinWordType() const;

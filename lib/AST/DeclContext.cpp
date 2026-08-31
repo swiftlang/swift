@@ -1131,6 +1131,11 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
       if (d->hasClangNode())
         return true;
 
+      // If \p member comes from expanding a synthetic macro, we should skip
+      // checking the source order as it will most certainly be wrong.
+      if (d->isFromSyntheticMacroExpansion())
+        return true;
+      
       return false;
     };
 

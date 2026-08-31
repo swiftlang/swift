@@ -434,15 +434,15 @@ extension DistributedActor {
 
 // ==== isRemote / isLocal -----------------------------------------------------
 
-/// Verifies if the passed ``DistributedActor`` conforming type is a remote reference.
-/// Passing a type not conforming to ``DistributedActor`` may result in undefined behavior.
+/// Checks if the passed ``DistributedActor`` instance is a remote reference.
+/// Passing an object that is not a distributed actor will always return `false`.
 ///
 /// Official API to perform this task is `whenLocal`.
 @_silgen_name("swift_distributed_actor_is_remote")
 public func __isRemoteActor(_ actor: AnyObject) -> Bool
 
-/// Verifies if the passed ``DistributedActor`` conforming type is a local reference.
-/// Passing a type not conforming to ``DistributedActor`` may result in undefined behavior.
+/// Checks if the passed ``DistributedActor`` conforming type is a local instance.
+/// Passing an object that is not a distributed actor will always return `false`.
 ///
 /// Official API to perform this task is `whenLocal`.
 public func __isLocalActor(_ actor: AnyObject) -> Bool {

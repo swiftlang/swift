@@ -132,6 +132,7 @@ namespace swift {
   struct RequirementMatch;
   class TupleTypeElt;
   class EnumElementDecl;
+  class MacroDecl;
   class ProtocolDecl;
   class SubstitutableType;
   class SourceManager;
@@ -261,6 +262,20 @@ struct OpenedExistentialSignature {
 
   /// The `Self` parameter in the opened existential signature.
   CanType SelfType;
+};
+
+/// Identifies one of the builtin macros used to derive conformances \c
+/// MacroDecl is synthesized by the compiler.
+enum class BuiltinDerivedConformanceMacroKind : uint8_t {
+  DeriveEquatable,
+  DeriveHashable,
+  DeriveError,
+  DeriveComparable,
+  DeriveCaseIterable,
+  DeriveEncodable,
+  DeriveDecodable,
+
+  NumKinds,
 };
 
 /// ASTContext - This object creates and owns the AST objects.
@@ -849,7 +864,12 @@ public:
   /// Does *not* perform any name lookup to check whether, the module already
   /// contains a decl with the same name, only does synthesis.
   ProtocolDecl *synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const;
-  
+
+  /// Retrieve the builtin \c MacroDecl used to derive conformances via \c
+  /// SwiftMacros, synthesizing it into the stdlib on first use.
+  MacroDecl *getBuiltinDerivedConformanceMacroDecl(
+      BuiltinDerivedConformanceMacroKind kind) const;
+
   /// Determine whether the given nominal type is one of the standard
   /// library or Cocoa framework types that is known to be bridged by another
   /// module's overlay, for layering or implementation detail reasons.
@@ -1451,6 +1471,18 @@ public:
   /// conformance.
   std::vector<MissingWitness>
   takeDelayedMissingWitnesses(NormalProtocolConformance *conformance);
+
+  /// Record that a witness of a conformance of \p nominal could not be fully
+  /// deserialized because \p moduleName was never loaded. Used to add an
+  /// actionable note ("add 'import <module>'") to the later requirement-failure
+  /// diagnostic at the use site.
+  void recordUnloadedModuleForConformingType(const NominalTypeDecl *nominal,
+                                              Identifier moduleName);
+
+  /// Retrieve the modules that were not loaded while deserializing conformances
+  /// of \p nominal, or an empty list if there were none.
+  ArrayRef<Identifier>
+  getUnloadedModulesForConformingType(const NominalTypeDecl *nominal) const;
 
   /// Produce a specialized conformance, which takes a generic
   /// conformance and substitutions written in terms of the generic

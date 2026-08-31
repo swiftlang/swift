@@ -40,6 +40,33 @@ void SourceManager::verifyAllBuffers() const {
   (void)arbitraryTotal;
 }
 
+void SourceManager::dump() const {
+  llvm::errs() << "(source_manager";
+
+  if (OpenSourcesAsVolatile)
+    llvm::errs() << " open_sources_as_volatile";
+
+  if (IDEInspectionTargetBufferID)
+    llvm::errs() << " ide_inspection_target=buffer #"
+                 << IDEInspectionTargetBufferID << " @ offset "
+                 << IDEInspectionTargetOffset;
+
+  llvm::errs() << "\n  (buf_ident_id_map";
+  for (auto &pair : BufIdentIDMap)
+    llvm::errs() << "\n    ('" << pair.first << "' buffer #" << pair.second
+                 << ")";
+
+  llvm::errs() << ")";
+
+  // FIXME: Add GeneratedSourceInfo
+  // FIXME: Add ReplacedRanges
+  // FIXME: Add RegexLiteralStartLocs
+  // FIXME: Add BufferIDTOSourceFiles
+  // FIXME: Add VirtualFiles
+
+  llvm::errs() << ")";
+}
+
 SourceLoc SourceManager::getIDEInspectionTargetLoc() const {
   if (IDEInspectionTargetBufferID == 0U)
     return SourceLoc();

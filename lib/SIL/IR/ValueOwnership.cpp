@@ -402,6 +402,15 @@ static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
   if (isTrivial)
     return OwnershipKind::None;
 
+  // If the result type is an address, avoid consulting SILFunctionConventions
+  // to determine its ownership; we know it's None.
+  //
+  // This short-cut is needed _during_ AddressLowering for a @guaranteed_address
+  // result, as a new ApplyInst it creates with an address result happens before
+  // the global lowered-addresses flag is changed to influence getOwnershipKind.
+  if (ResultType.isAddress())
+    return OwnershipKind::None;
+
   // Per-function conventions (via getSubstCalleeConv): an already-lowered
   // function's apply has its formally-indirect results as address arguments
   // with no direct result, even while the module stage is still Raw.
@@ -598,6 +607,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, IsSameMetatype)
 CONSTANT_OWNERSHIP_BUILTIN(None, Alignof)
 CONSTANT_OWNERSHIP_BUILTIN(None, AllocRaw)
 CONSTANT_OWNERSHIP_BUILTIN(None, AllocRawTyped)
+CONSTANT_OWNERSHIP_BUILTIN(None, AllocErrorBoxTyped)
 CONSTANT_OWNERSHIP_BUILTIN(None, AssertConf)
 CONSTANT_OWNERSHIP_BUILTIN(None, InfiniteLoopTrueCondition)
 CONSTANT_OWNERSHIP_BUILTIN(None, UToSCheckedTrunc)
@@ -640,6 +650,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, UnexpectedError)
 CONSTANT_OWNERSHIP_BUILTIN(None, ErrorInMain)
 CONSTANT_OWNERSHIP_BUILTIN(None, DeallocRaw)
 CONSTANT_OWNERSHIP_BUILTIN(None, DeallocRawTyped)
+CONSTANT_OWNERSHIP_BUILTIN(None, DeallocErrorBoxTyped)
 CONSTANT_OWNERSHIP_BUILTIN(None, Fence)
 CONSTANT_OWNERSHIP_BUILTIN(None, Ifdef)
 CONSTANT_OWNERSHIP_BUILTIN(None, AtomicStore)
