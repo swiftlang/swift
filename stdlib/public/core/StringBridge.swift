@@ -36,10 +36,11 @@ internal typealias _CocoaString = AnyObject
    _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
   )
 
-  @objc(_fastCStringContents:)
-  func _fastCStringContents(
-    _ requiresNulTermination: Int8
-  ) -> UnsafePointer<CChar>?
+  @objc(_fastUTF8StringContents:utf8Length:)
+  func _fastUTF8StringContents(
+    _ requiresNulTermination: Int8,
+    _ outUTF8Length: UnsafeMutablePointer<UInt>
+  ) -> UnsafePointer<UInt8>?
 
   @objc(_fastCharacterContents)
   func _fastCharacterContents() -> UnsafePointer<UInt16>?
@@ -465,16 +466,16 @@ internal func _bridgeTaggedASCII(
 #endif
 
 @_effects(readonly)
-private func _NSStringASCIIPointer(_ str: _StringSelectorHolder) -> UnsafePointer<UInt8>? {
+private func _NSStringUTF8Pointer(
+  _ str: _StringSelectorHolder,
+) -> (contents: UnsafePointer<UInt8>?, utf8Length: UInt) {
   //TODO(String bridging): Unconditionally asking for nul-terminated contents is
   // overly conservative and hurts perf with some NSStrings
-  return unsafe str._fastCStringContents(1)?._asUInt8
-}
-
-@_effects(readonly)
-private func _NSStringUTF8Pointer(_ str: _StringSelectorHolder) -> UnsafePointer<UInt8>? {
-  //We don't have a way to ask for UTF8 here currently
-  return unsafe _NSStringASCIIPointer(str)
+  var utf8Length:UInt = 0
+  let result = withUnsafeMutablePointer(to: &utf8Length) {
+    unsafe str._fastUTF8StringContents(1, $0)
+  }
+  return unsafe (contents: result, utf8Length: utf8Length)
 }
 
 @_effects(readonly)
@@ -487,99 +488,67 @@ internal func _getNSCFConstantStringContentsPointer(
   ).pointee.str
 }
 
-@_effects(readonly) // @opaque
-private func _withCocoaASCIIPointer<R>(
-  _ str: _CocoaString,
-  requireStableAddress: Bool,
-  work: (UnsafePointer<UInt8>) -> R?
-) -> R? {
-  #if _pointerBitWidth(_64)
-  if _isObjCTaggedPointer(str) {
-    if requireStableAddress {
-      return nil // tagged pointer strings don't support _fastCStringContents
-    }
-    if let smol = _SmallString(taggedASCIICocoa: str) {
-      return _StringGuts(smol).withFastUTF8 {
-        unsafe work($0.baseAddress._unsafelyUnwrappedUnchecked)
-      }
-    }
-  }
-  #endif
-  defer { _fixLifetime(str) }
-  if let ptr = unsafe _NSStringASCIIPointer(_objc(str)) {
-    return unsafe work(ptr)
-  }
-  return nil
-}
-
 // Inline to make sure the optimizer can see through the closure
 @_effects(readonly) @inline(__always)
 private func _withCocoaUTF8Pointer<R>(
   _ str: _CocoaString,
   requireStableAddress: Bool,
-  work: (UnsafePointer<UInt8>) -> R?
+  work: (UnsafePointer<UInt8>, Int) -> R?
 ) -> R? {
   #if _pointerBitWidth(_64)
   if _isObjCTaggedPointer(str) {
     if requireStableAddress {
-      return nil // tagged pointer strings don't support _fastCStringContents
+      return nil // tagged pointer strings don't support _fastUTF8StringContents
     }
     if let smol = _SmallString(taggedCocoa: str) {
       return _StringGuts(smol).withFastUTF8 {
-        unsafe work($0.baseAddress._unsafelyUnwrappedUnchecked)
+        unsafe work($0.baseAddress._unsafelyUnwrappedUnchecked, $0.count)
       }
     }
   }
   #endif
   defer { _fixLifetime(str) }
-  if let ptr = unsafe _NSStringUTF8Pointer(_objc(str)) {
-    return unsafe work(ptr)
-  }
-  return nil
-}
-
-@_effects(readonly)
-internal func withCocoaASCIIPointer<R>(
-  _ str: _CocoaString,
-  work: (UnsafePointer<UInt8>) -> R?
-) -> R? {
-  return unsafe _withCocoaASCIIPointer(str, requireStableAddress: false, work: work)
+  let (ptr, utf8Length) = unsafe _NSStringUTF8Pointer(_objc(str))
+  guard let ptr = unsafe ptr else { return nil }
+  return unsafe work(ptr, Int(utf8Length))
 }
 
 @_effects(readonly)
 internal func withCocoaUTF8Pointer<R>(
   _ str: _CocoaString,
-  work: (UnsafePointer<UInt8>) -> R?
+  work: (UnsafePointer<UInt8>, Int) -> R?
 ) -> R? {
   return unsafe _withCocoaUTF8Pointer(str, requireStableAddress: false, work: work)
 }
 
 @_effects(readonly)
-internal func stableCocoaASCIIPointer(_ str: _CocoaString)
-  -> UnsafePointer<UInt8>? {
-  return unsafe _withCocoaASCIIPointer(str, requireStableAddress: true, work: { unsafe $0 })
-}
-
-@_effects(readonly)
 internal func stableCocoaUTF8Pointer(_ str: _CocoaString)
-  -> UnsafePointer<UInt8>? {
-  return unsafe _withCocoaUTF8Pointer(str, requireStableAddress: true, work: { unsafe $0 })
+  -> (UnsafePointer<UInt8>, Int)? {
+  return unsafe _withCocoaUTF8Pointer(
+    str,
+    requireStableAddress: true,
+    work: { (unsafe $0, $1) }
+  )
 }
 
 @unsafe
 private enum CocoaStringPointer {
-  case ascii(UnsafePointer<UInt8>)
-  case utf8(UnsafePointer<UInt8>)
+  case ascii(UnsafePointer<UInt8>, Int)
+  case utf8(UnsafePointer<UInt8>, Int)
   case utf16(UnsafePointer<UInt16>)
   case none
 }
 
 @_effects(readonly)
 private func _getCocoaStringPointer(
-  _ cfImmutableValue: _CocoaString
+  _ cfImmutableValue: _CocoaString,
+  utf16Length: Int
 ) -> CocoaStringPointer {
-  if let ascii = unsafe stableCocoaASCIIPointer(cfImmutableValue) {
-    return unsafe .ascii(ascii)
+  if let (ptr, utf8Count) = unsafe stableCocoaUTF8Pointer(cfImmutableValue) {
+    if utf8Count == utf16Length { //this only holds for ASCII contents
+      return unsafe .ascii(ptr, utf8Count)
+    }
+    return unsafe .utf8(ptr, utf8Count)
   }
   // We could ask for UTF16 here via _stdlib_binary_CFStringGetCharactersPtr,
   // but we currently have no use for it
@@ -628,19 +597,22 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     }
 #endif
 
-    let (fastUTF8, isASCII): (Bool, Bool)
-    switch unsafe _getCocoaStringPointer(immutableCopy) {
-    case .ascii(_): (fastUTF8, isASCII) = (true, true)
-    case .utf8(_): (fastUTF8, isASCII) = (true, false)
-    default:  (fastUTF8, isASCII) = (false, false)
+    let utf16Len = _stdlib_binary_CFStringGetLength(immutableCopy)
+
+    // `count` is the UTF-8 byte count when we have fast UTF-8 contents, and the
+    // UTF-16 length otherwise, see _StringObject's `sharedCount`
+    let (fastUTF8, isASCII, count): (Bool, Bool, Int)
+    switch unsafe _getCocoaStringPointer(immutableCopy, utf16Length: utf16Len) {
+    case .ascii(_, let utf8Count): (fastUTF8, isASCII, count) = (true, true, utf8Count)
+    case .utf8(_, let utf8Count): (fastUTF8, isASCII, count) = (true, false, utf8Count)
+    default:  (fastUTF8, isASCII, count) = (false, false, utf16Len)
     }
-    let length = _stdlib_binary_CFStringGetLength(immutableCopy)
 
     return _StringGuts(
       cocoa: immutableCopy,
       providesFastUTF8: fastUTF8,
       isASCII: isASCII,
-      length: length)
+      length: count)
   }
 }
 
