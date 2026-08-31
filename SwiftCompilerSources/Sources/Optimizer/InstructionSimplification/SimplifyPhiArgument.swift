@@ -70,15 +70,7 @@ extension Phi {
 
     // Remove the phi operand from all predecessor branches and erase the now-dead incoming
     // `begin_borrow`s.
-    for incomingOp in incomingOperands {
-      let beginBorrow = incomingOp.value as! BeginBorrowInst
-      let existingBranch = incomingOp.instruction as! BranchInst
-      let argsWithRemovedPhiOp = existingBranch.operands.filter{ $0 != incomingOp }.map{ $0.value }
-      Builder(before: existingBranch, context).createBranch(to: block, arguments: argsWithRemovedPhiOp)
-      context.erase(instruction: existingBranch)
-      context.erase(instruction: beginBorrow)
-    }
-    block.eraseArgument(at: value.index, context)
+    erasePhiArgument(phi: self, erasingIncomingInstructions: true, context)
     return true
   }
 
