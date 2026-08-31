@@ -4452,11 +4452,22 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
 
   auto roles = cast<MacroDecl>(macro.getDecl())->getMacroRoles();
   // If it's not a declaration macro or a code item macro, it must have been
-  // parsed as an expression macro, and this decl is just its substitute decl.
-  // So there's no thing to be done here.
+  // parsed as an expression macro, and this decl is usually just its substitute
+  // decl. However, a modifier before a freestanding macro forces it to be
+  // parsed as a declaration. Diagnose `async` in that position when the macro
+  // actually resolves to an expression macro.
   if (!roles.contains(MacroRole::Declaration) &&
-      !roles.contains(MacroRole::CodeItem))
+      !roles.contains(MacroRole::CodeItem)) {
+    if (roles.contains(MacroRole::Expression)) {
+      if (auto *asyncAttr =
+              MED->getAttrs().getAttribute<AsyncAttr>(/*AllowInvalid=*/true)) {
+        MED->getASTContext().Diags
+            .diagnose(asyncAttr->getLocation(), diag::expected_await_not_async)
+            .fixItReplace(asyncAttr->getRange(), "await");
+      }
+    }
     return std::nullopt;
+  }
 
   return expandFreestandingMacro(MED);
 }
