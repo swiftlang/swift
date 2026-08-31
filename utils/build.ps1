@@ -1985,6 +1985,7 @@ $Compilers = @{
         @("-g", "-debug-info-format=${Format}")
       }
       AssumeFunctional  = $false
+      SourceInfoMapping = $false
     }
   }
 
@@ -2037,6 +2038,7 @@ $Compilers = @{
         @("-g", "-debug-info-format=${Format}")
       }
       AssumeFunctional  = $true
+      SourceInfoMapping = $true
     }
   }
 }
@@ -2433,9 +2435,12 @@ function Build-CMakeProject {
           "-cache-compile-job",
           "-cas-path", $ObjectStore,
           "-incremental-dependency-scan",
-          "-file-compilation-dir", $SyntheticBinaryCache,
-          "-Xfrontend", "-prefix-map-sourceinfo"
+          "-file-compilation-dir", $SyntheticBinaryCache
         )
+
+        if ($SwiftCompiler.SourceInfoMapping) {
+          $SwiftCachingFlags += @("-Xfrontend", "-prefix-map-sourceinfo")
+        }
 
         foreach ($Mapping in $CASPrefixMappings.GetEnumerator()) {
           $SwiftCachingFlags += @(
