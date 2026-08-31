@@ -313,6 +313,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::AssociatedTypeDescriptor:
   case Node::Kind::AssociatedTypeMetadataAccessor:
   case Node::Kind::AssociatedTypeWitnessTableAccessor:
+  case Node::Kind::AsyncMainEntryPoint:
   case Node::Kind::AsyncRemoved:
   case Node::Kind::AutoClosureType:
   case Node::Kind::BaseConformanceDescriptor:
@@ -3466,6 +3467,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::AsyncFunctionPointer:
     Printer << "async function pointer to ";
+    return nullptr;
+  case Node::Kind::AsyncMainEntryPoint:
+    Printer << "async main entry point";
     return nullptr;
   case Node::Kind::AsyncAwaitResumePartialFunction:
     if (Options.ShowAsyncResumePartial) {
