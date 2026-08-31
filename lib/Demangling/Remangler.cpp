@@ -1834,6 +1834,21 @@ ManglingError Remangler::mangleGetter(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
+  // An unmangled base name must not pick up a mangling prefix.
+  bool isAsyncMainEntryPoint = false;
+  for (Node *Child : *node)
+    isAsyncMainEntryPoint |=
+        Child->getKind() == Node::Kind::AsyncMainEntryPoint;
+
+  if (isAsyncMainEntryPoint) {
+    Buffer << ASYNC_MAIN_ENTRY_POINT_NAME;
+    for (Node *Child : *node) {
+      if (Child->getKind() != Node::Kind::AsyncMainEntryPoint)
+        RETURN_IF_ERROR(mangle(Child, depth + 1));
+    }
+    return ManglingError::Success;
+  }
+
   switch (Flavor) {
   case ManglingFlavor::Default:
     Buffer << MANGLING_PREFIX_STR;
@@ -2736,6 +2751,11 @@ ManglingError
 Remangler::mangleAsyncSuspendResumePartialFunction(Node *node, unsigned depth) {
   Buffer << "TY";
   return mangleChildNode(node, 0, depth + 1);
+}
+
+ManglingError Remangler::mangleAsyncMainEntryPoint(Node *node, unsigned depth) {
+  Buffer << ASYNC_MAIN_ENTRY_POINT_NAME;
+  return ManglingError::Success;
 }
 
 ManglingError Remangler::manglePostfixOperator(Node *node, unsigned depth) {

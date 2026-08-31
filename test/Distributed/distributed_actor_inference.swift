@@ -26,19 +26,19 @@ distributed enum SomeDistributedActor_3 { } // expected-error{{'distributed' mod
 // NOTE: not distributed actor, so cannot have any distributed functions
 
 struct SomeNotActorStruct_2 {
-  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
+  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{distributed method can only be declared in 'DistributedActor' type}}
 }
 
 class SomeNotActorClass_3 {
-  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
+  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{distributed method can only be declared in 'DistributedActor' type}}
 }
 
 actor SomeNotDistributedActor_4 {
-  distributed func notInDistActorAsyncThrowing() async throws -> Int { 42 } // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
+  distributed func notInDistActorAsyncThrowing() async throws -> Int { 42 } // expected-error{{distributed method can only be declared in 'DistributedActor' type}}
 }
 
 protocol DP {
-  distributed func hello()  // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
+  distributed func hello()  // expected-error{{distributed method can only be declared in 'DistributedActor' type}}
 }
 
 protocol DPOK: DistributedActor {
@@ -50,7 +50,7 @@ protocol DPOK2: DPOK {
 }
 
 enum SomeNotActorEnum_5 {
-  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
+  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{distributed method can only be declared in 'DistributedActor' type}}
 }
 
 distributed actor SomeDistributedActor_6 {
