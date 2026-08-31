@@ -424,6 +424,13 @@ struct ASTContext::Implementation {
   ///    -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastDecl = nullptr;
 
+  /// func _stdlib_isOSVersionAtLeast_AEIC(
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.word)
+  ///  -> Builtin.Int1
+  FuncDecl *IsOSVersionAtLeastAEICDecl = nullptr;
+
   /// func _stdlib_isVariantOSVersionAtLeast(
   ///   Builtin.Word,
   ///   Builtin.Word,
@@ -2119,37 +2126,58 @@ ConstructorDecl *ASTContext::getMakeUTF8StringDecl() const {
   return nullptr;
 }
 
-FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
-  if (getImpl().IsOSVersionAtLeastDecl)
-    return getImpl().IsOSVersionAtLeastDecl;
-
-  // Look for the function.
-  auto decl =
-      findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast");
-  if (!decl)
-    return nullptr;
-
+/// Returns true if `decl` has the signature that the OS version query
+/// functions which take a single version share:
+/// `(Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1`.
+static bool hasOSVersionQuerySignature(FuncDecl *decl) {
   auto *fnType = getIntrinsicCandidateType(decl, /*allowTypeMembers=*/false);
   if (!fnType)
-    return nullptr;
+    return false;
 
   // Input must be (Builtin.Word, Builtin.Word, Builtin.Word)
   auto intrinsicsParams = fnType->getParams();
   if (intrinsicsParams.size() != 3)
-    return nullptr;
+    return false;
 
   if (llvm::any_of(intrinsicsParams, [](AnyFunctionType::Param param) {
     return (param.isVariadic() || param.isInOut() ||
             !isBuiltinWordType(param.getPlainType()));
   })) {
-    return nullptr;
+    return false;
   }
 
   // Output must be Builtin.Int1
-  if (!isBuiltinInt1Type(fnType->getResult()))
+  return isBuiltinInt1Type(fnType->getResult());
+}
+
+FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
+  if (getImpl().IsOSVersionAtLeastDecl)
+    return getImpl().IsOSVersionAtLeastDecl;
+
+  // Look for the function.
+  auto decl = findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast");
+  if (!decl)
+    return nullptr;
+
+  if (!hasOSVersionQuerySignature(decl))
     return nullptr;
 
   getImpl().IsOSVersionAtLeastDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getIsOSVersionAtLeastAEICDecl() const {
+  if (getImpl().IsOSVersionAtLeastAEICDecl)
+    return getImpl().IsOSVersionAtLeastAEICDecl;
+
+  auto decl = findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast_AEIC");
+  if (!decl)
+    return nullptr;
+
+  if (!hasOSVersionQuerySignature(decl))
+    return nullptr;
+
+  getImpl().IsOSVersionAtLeastAEICDecl = decl;
   return decl;
 }
 
