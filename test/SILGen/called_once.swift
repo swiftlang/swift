@@ -161,3 +161,39 @@ func testMixedCaptureKinds(_ f: @called(once) () -> Void) {
   g()
   _ = count
 }
+
+struct Resource: ~Copyable {
+  deinit {}
+  consuming func use() {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s11called_once25testDeferConsumesResourceyyF : $@convention(thin) () -> () {
+// CHECK:  [[R_PROJ:%.*]] = project_box {{.*}} : ${ let Resource }, 0
+// CHECK:  [[R_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[R_PROJ]] : $*Resource
+// CHECK:  [[R_VALUE:%.*]] = load [take] [[R_TAKE_ADDR]] : $*Resource
+// CHECK:  // function_ref $defer #1 () in testDeferConsumesResource()
+// CHECK:  [[DEFER_REF:%.*]] = function_ref @$s11called_once25testDeferConsumesResourceyyF6$deferL_yyF : $@convention(thin) (@owned Resource) -> ()
+// CHECK:  apply [[DEFER_REF]]([[R_VALUE]]) : $@convention(thin) (@owned Resource) -> ()
+// CHECK: } // end sil function '$s11called_once25testDeferConsumesResourceyyF'
+
+// CHECK-LABEL: sil private [ossa] @$s11called_once25testDeferConsumesResourceyyF6$deferL_yyF : $@convention(thin) (@owned Resource) -> () {
+// CHECK: bb0([[R_CAPTURE:%.*]] : @closureCapture @owned $Resource):
+// CHECK:  [[R_STACK:%.*]] = alloc_stack $Resource, let, name "r"
+// CHECK:  [[R_INIT_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[R_STACK]] : $*Resource
+// CHECK:  store [[R_CAPTURE]] to [init] [[R_INIT_ADDR]] : $*Resource
+// CHECK:  [[R_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[R_INIT_ADDR]] : $*Resource
+// CHECK:  [[R_FAKE_COPY:%.*]] = load [copy] [[R_ADDR]] : $*Resource
+// CHECK:  // function_ref Resource.use()
+// CHECK:  [[USE_REF:%.*]] = function_ref @$s11called_once8ResourceV3useyyF : $@convention(method) (@owned Resource) -> ()
+// CHECK:  apply [[USE_REF]]([[R_FAKE_COPY]]) : $@convention(method) (@owned Resource) -> ()
+// CHECK:  destroy_addr [[R_ADDR]] : $*Resource
+// CHECK: } // end sil function '$s11called_once25testDeferConsumesResourceyyF6$deferL_yyF'
+func testDeferConsumesResource() {
+  let r = Resource()
+
+  defer {
+    r.use()
+  }
+
+  _ = 42
+}
