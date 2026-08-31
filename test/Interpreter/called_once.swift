@@ -315,3 +315,48 @@ func testNeverCalledThroughThunkReleasesCapture() {
 
 // CHECK-NEXT: Tracker(unused) deinit
 testNeverCalledThroughThunkReleasesCapture()
+
+func testDeferConsumesResource() {
+  let r = Resource("deferred")
+  defer {
+    r.use()
+  }
+  print("before defer")
+}
+
+// CHECK-NEXT: before defer
+// CHECK-NEXT: Resource(deferred) used
+// CHECK-NEXT: Resource(deferred) deinit
+testDeferConsumesResource()
+
+func testDeferMultipleCaptures() {
+  let a = Resource("a")
+  let b = Resource("b")
+  defer {
+    a.use()
+    b.use()
+  }
+  print("multi before")
+}
+
+// CHECK-NEXT: multi before
+// CHECK-NEXT: Resource(a) used
+// CHECK-NEXT: Resource(a) deinit
+// CHECK-NEXT: Resource(b) used
+// CHECK-NEXT: Resource(b) deinit
+testDeferMultipleCaptures()
+
+func testTwoDefersLIFO() {
+  let first = Resource("first-declared")
+  let second = Resource("second-declared")
+  defer { first.use() }
+  defer { second.use() }
+  print("two defers before")
+}
+
+// CHECK-NEXT: two defers before
+// CHECK-NEXT: Resource(second-declared) used
+// CHECK-NEXT: Resource(second-declared) deinit
+// CHECK-NEXT: Resource(first-declared) used
+// CHECK-NEXT: Resource(first-declared) deinit
+testTwoDefersLIFO()

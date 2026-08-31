@@ -2611,9 +2611,18 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       infoBuilder = infoBuilder.withSendable(AFD->isSendable());
       // 'throws' only applies to the innermost function.
       infoBuilder = infoBuilder.withThrows(AFD->hasThrows(), thrownTy);
-      // Defer bodies must not escape.
       if (auto fd = dyn_cast<FuncDecl>(D)) {
-        infoBuilder = infoBuilder.withNoEscape(fd->isDeferBody());
+        if (fd->isDeferBody()) {
+          // Defer bodies must not escape.
+          infoBuilder = infoBuilder.withNoEscape(fd->isDeferBody());
+
+          // Defer is expected to be called only once, making it `@called(once)`
+          // allows it to consume non-Copyable values.
+          if (Context.LangOpts.hasFeature(Feature::CalledAttribute)) {
+            infoBuilder = infoBuilder.withCalledOnce();
+          }
+        }
+
         if (fd->hasSendingResult())
           infoBuilder = infoBuilder.withSendingResult();
       }
