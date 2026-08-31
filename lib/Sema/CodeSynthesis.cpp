@@ -1553,12 +1553,10 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
         if (auto *initAccessor = var->getAccessor(AccessorKind::Init)) {
           // Check whether the property has stronger availability restrictions
           // than the initializer.
-          if (!var->hasStorage()) {
-            if (auto restriction =
-                    structAvailability.unsatisfiedRestrictionForDecl(var)) {
-              availabilityRestrictions.push_back({var, *restriction});
-              return true;
-            }
+          if (auto restriction =
+              structAvailability.unsatisfiedRestrictionForDecl(var)) {
+            availabilityRestrictions.push_back({var, *restriction});
+            return true;
           }
 
           // Make sure that all properties accessed by init accessor
