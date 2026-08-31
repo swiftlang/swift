@@ -779,6 +779,12 @@ public struct Builder {
     return notifyNew(store.getAs(StoreInst.self))
   }
 
+  @discardableResult
+  public func createAssign(source: Value, destination: Value, ownership: AssignInst.AssignOwnership) -> AssignInst {
+    let assign = bridged.createAssign(source.bridged, destination.bridged, ownership.rawValue)
+    return notifyNew(assign.getAs(AssignInst.self))
+  }
+
   public func createStoreBorrow(source: Value, destination: Value) -> StoreBorrowInst {
     let storeBorrow = bridged.createStoreBorrow(source.bridged, destination.bridged)
     return notifyNew(storeBorrow.getAs(StoreBorrowInst.self))

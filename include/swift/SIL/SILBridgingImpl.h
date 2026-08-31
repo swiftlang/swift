@@ -3303,6 +3303,13 @@ BridgedInstruction BridgedBuilder::createStore(BridgedValue src, BridgedValue ds
                                   (swift::StoreOwnershipQualifier)ownership)};
 }
 
+BridgedInstruction BridgedBuilder::createAssign(BridgedValue src, BridgedValue dst,
+                               SwiftInt ownership) const {
+  return {unbridged().createAssign(regularLoc(), src.getSILValue(),
+                                   dst.getSILValue(),
+                                   (swift::AssignOwnershipQualifier)ownership)};
+}
+
 BridgedInstruction BridgedBuilder::createStoreBorrow(BridgedValue src, BridgedValue dst) const {
   return {unbridged().createStoreBorrow(regularLoc(), src.getSILValue(),
                                         dst.getSILValue())};

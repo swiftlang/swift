@@ -1523,6 +1523,8 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createProjectBox(BridgedValue box, SwiftInt fieldIdx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createStore(BridgedValue src, BridgedValue dst,
                                           SwiftInt ownership) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAssign(BridgedValue src, BridgedValue dst,
+                                          SwiftInt ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createStoreBorrow(BridgedValue src, BridgedValue dst) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createInitExistentialRef(BridgedValue instance,
                                           BridgedType type,
