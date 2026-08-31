@@ -68,7 +68,7 @@ class PostfixCompletionCallback : public TypeCheckCompletionCallback {
 
     /// Merge this result with \p Other, returning \c true if
     /// successful, else \c false.
-    bool tryMerge(const Result &Other, DeclContext *DC);
+    bool tryMerge(const Result &Other);
   };
 
   CodeCompletionExpr *CompletionExpr;
