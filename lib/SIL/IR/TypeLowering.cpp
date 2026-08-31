@@ -2312,6 +2312,12 @@ namespace {
     }
   };
 
+  static bool isImmortalForeignReferenceType(CanType type) {
+    if (type.isForeignReferenceType() || isa<ArchetypeType>(type))
+      return type->getReferenceCounting() == ReferenceCounting::None;
+    return false;
+  }
+
   /// Build the appropriate TypeLowering subclass for the given type,
   /// which is assumed to already have been lowered.
   class LowerType
@@ -2336,8 +2342,7 @@ namespace {
                                   SILTypeProperties properties) {
       properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       auto silType = SILType::getPrimitiveObjectType(type);
-      if (type.isForeignReferenceType() &&
-          type->getReferenceCounting() == ReferenceCounting::None)
+      if (isImmortalForeignReferenceType(type))
         return new (TC) TrivialTypeLowering(
             silType, SILTypeProperties::forTrivial(), Expansion);
 
@@ -3577,6 +3582,13 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             if (constraint && constraint->isTrivial()) {
               return false;
             }
+          }
+
+          // Case (11): an archetype bounded by an immortal foreign reference
+          // superclass. Trivially lowered like the concrete immortal foreign
+          // reference type but doesn't conform to BitwiseCopyable.
+          if (isImmortalForeignReferenceType(ty)) {
+            return false;
           }
 
           auto *nominal = ty.getAnyNominal();
