@@ -176,15 +176,55 @@ public func replacePhiWithIncomingValue(phi: Phi, _ context: some MutatingContex
     phi.value.uses.replaceAll(with: uniqueIncomingValue, context)
   }
 
+  erasePhiArgument(phi: phi, context)
+  return true
+}
+
+/// Removes the `phi` argument from its block and from the branches of all predecessors:
+///
+/// ```
+///   bb1:
+///     br bb3(%1, %2)
+///   bb2:
+///     br bb3(%3, %4)
+///   bb3(%5 : $T, %6 : $T):   // Predecessors: bb1, bb2
+/// ```
+/// ->
+/// ```
+///   bb1:
+///     br bb3(%1)
+///   bb2:
+///     br bb3(%3)
+///   bb3(%5 : $T):
+/// ```
+///
+/// The phi must not have any uses.
+/// If `erasingIncomingInstructions` is true, the instructions which define the incoming values
+/// are erased, too. Those instructions must not have any uses beside the branch operands.
+///
+public func erasePhiArgument(phi: Phi, erasingIncomingInstructions: Bool = false,
+                             _ context: some MutatingContext) {
   let block = phi.value.parentBlock
   for incomingOp in phi.incomingOperands {
+    let incomingInst = erasingIncomingInstructions ? incomingOp.value.definingInstruction : nil
     let existingBranch = incomingOp.instruction as! BranchInst
-    let argsWithRemovedPhiOp = existingBranch.operands.filter{ $0 != incomingOp }.map{ $0.value }
-    Builder(before: existingBranch, context).createBranch(to: block, arguments: argsWithRemovedPhiOp)
+    Builder(before: existingBranch, context).createBranch(to: block,
+                                                          arguments: existingBranch.arguments(excluding: incomingOp))
     context.erase(instruction: existingBranch)
+    if let incomingInst {
+      context.erase(instruction: incomingInst)
+    }
   }
   block.eraseArgument(at: phi.value.index, context)
-  return true
+}
+
+private extension BranchInst {
+  /// Returns the branch arguments without the argument for `excludedOperand`.
+  ///
+  /// Used to re-create the branch when a phi argument of the target block is removed.
+  func arguments(excluding excludedOperand: Operand) -> [Value] {
+    return Array(operands.filter{ $0 != excludedOperand }.values)
+  }
 }
 
 private func getUniqueIncomingValue(of phi: Phi, _ context: some MutatingContext) -> Value? {
