@@ -24,6 +24,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
@@ -1517,6 +1518,17 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
   llvm::SmallPtrSet<VarDecl *, 4> initializedProperties;
   llvm::SmallVector<std::pair<VarDecl *, Identifier>> invalidOrderings;
 
+  llvm::SmallVector<std::pair<VarDecl *, AvailabilityConstraint>>
+      availabilityConstraints;
+
+  // Synthesized memberwise intializers are available at the intersection of the
+  // availability of the struct containing the initializer and the deployment
+  // target (since they have at most 'internal' accessibility and therefore
+  // cannot be invoked by module clients).
+  auto structAvailability = AvailabilityContext::forDeclSignature(decl);
+  structAvailability.constrainWithContext(
+      AvailabilityContext::forDeploymentTarget(ctx), ctx);
+
   if (enumerateCurrentPropertiesAndAuxiliaryVars(decl, [&](VarDecl *var) {
         if (var->isStatic())
           return true;
@@ -1527,9 +1539,18 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
         if (!var->isMemberwiseInitialized(initKind, /*preferDeclared=*/true))
           return true;
 
-        // Check whether use of init accessors results in access to
-        // uninitialized properties.
         if (auto *initAccessor = var->getAccessor(AccessorKind::Init)) {
+          // Check whether the property has stronger availability restrictions
+          // than the initializer.
+          if (!var->hasStorage()) {
+            if (auto constraint =
+                    getAvailabilityConstraintsForDecl(var, structAvailability)
+                        .getPrimaryConstraint()) {
+              availabilityConstraints.push_back({var, *constraint});
+              return true;
+            }
+          }
+
           // Make sure that all properties accessed by init accessor
           // are previously initialized.
           for (auto *property : initAccessor->getAccessedProperties()) {
@@ -1564,12 +1585,8 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
       }))
     return false;
 
-  if (invalidOrderings.empty())
-    return !initializedProperties.empty();
-
-  {
-    ctx.Diags.diagnose(
-        decl, diag::cannot_synthesize_memberwise_due_to_property_init_order);
+  if (!invalidOrderings.empty()) {
+    ctx.Diags.diagnose(decl, diag::cannot_synthesize_memberwise_init, decl);
 
     for (const auto &invalid : invalidOrderings) {
       auto *accessor = invalid.first->getAccessor(AccessorKind::Init);
@@ -1577,9 +1594,24 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
                          diag::out_of_order_access_in_init_accessor,
                          invalid.first->getName(), invalid.second);
     }
+
+    return false;
   }
 
-  return false;
+  if (!availabilityConstraints.empty()) {
+    ctx.Diags.diagnose(decl, diag::cannot_synthesize_memberwise_init, decl);
+
+    for (const auto &[var, constraint] : availabilityConstraints) {
+      ctx.Diags.diagnose(
+          var->getLoc(),
+          diag::unavailable_init_accessor_prevent_memberwise_init_synthesis,
+          constraint.isUnavailable(), var);
+    }
+
+    return false;
+  }
+
+  return !initializedProperties.empty();
 }
 
 ConstructorDecl *
