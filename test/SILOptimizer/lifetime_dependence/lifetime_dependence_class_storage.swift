@@ -154,6 +154,26 @@ func localUse() -> Int {
   return span.count
 }
 
+// A class reference reached by `struct_extract` from a borrowed struct rather
+// than loaded out of memory. Nothing may overwrite the struct's storage while
+// it is borrowed, so the referent stays alive for the whole borrow. The
+// dependence roots at the borrowed struct, not at the copy of the reference
+// that SILGen makes, which is destroyed as soon as the next link is loaded.
+struct StructThenClass {
+  let mid: Mid
+
+  // CHECK-LABEL: sil hidden [ossa] @$s4test15StructThenClassV7getDatas4SpanVySiGyF : $@convention(method) (@guaranteed StructThenClass) -> @lifetime(borrow 0) @owned Span<Int> {
+  // CHECK: bb0(%0 : @guaranteed $StructThenClass):
+  // CHECK: struct_extract %0, #StructThenClass.mid
+  // CHECK: [[SPAN:%.*]] = apply %{{.*}} : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @lifetime(borrow 0) @owned Span<τ_0_0>
+  // CHECK: mark_dependence [unresolved] [[SPAN]] on %0
+  // CHECK-LABEL: } // end sil function '$s4test15StructThenClassV7getDatas4SpanVySiGyF'
+  @_lifetime(borrow self)
+  func getData() -> Span<Int> {
+    return mid.c.d.span
+  }
+}
+
 // MARK: - Rejected
 
 final class MutableField {
