@@ -1030,7 +1030,7 @@ swift_reflection_asyncTaskSlabAllocations(SwiftReflectionContextRef ContextRef,
     auto [Error, Info] = Context->asyncTaskSlabAllocations(SlabPtr);
 
     swift_async_task_slab_allocations_return_t Result = {};
-    if (Result.Error) {
+    if (Error) {
       Result.Error = returnableCString(ContextRef, Error);
       return Result;
     }
