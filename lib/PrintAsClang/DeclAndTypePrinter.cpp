@@ -1541,7 +1541,8 @@ private:
           os, resultTy);
   }
 
-  // Print out the function signature for a @_cdecl function.
+  // Print out the function signature for a C-exported function: @c, @_cdecl,
+  // or @objc on a top-level function (SE-0495).
   void printAbstractFunctionAsCFunction(FuncDecl *FD) {
     printDocumentationComment(FD);
     std::optional<ForeignAsyncConvention> asyncConvention =
@@ -1554,7 +1555,7 @@ private:
     auto resultTy = getForeignResultType(
         FD, funcTy, asyncConvention, errorConvention);
 
-    assert(FD->getAttrs().hasAttribute<CDeclAttr>() && "not a cdecl function");
+    assert(FD->getCDeclKind() && "not a C-exported function");
     os << "SWIFT_EXTERN ";
     printFunctionDeclAsCFunctionDecl(FD, FD->getCDeclName(), resultTy);
     os << " SWIFT_NOEXCEPT";

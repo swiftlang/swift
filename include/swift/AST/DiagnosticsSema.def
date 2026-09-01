@@ -2217,6 +2217,9 @@ ERROR(cdecl_throws,none,
 ERROR(cdecl_incompatible_with_objc,none,
       "cannot apply both '@c' and '@objc' to %kindonly0",
       (const Decl *))
+NOTE(cdecl_suggest_objc,none,
+     "use '@objc' to expose this function to Objective-C",
+     ())
 
 // @cxx
 ERROR(cxx_attr_requires_cxx_interop,none,
