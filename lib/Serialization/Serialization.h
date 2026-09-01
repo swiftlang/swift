@@ -24,9 +24,11 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include <array>
+#include <memory>
 #include <queue>
 #include <tuple>
 
@@ -36,6 +38,11 @@ namespace clang {
 
 namespace swift {
   struct HiddenTypeLayoutRequirement;
+  class SerializableFixedTypeInfoRepresentation;
+  struct SerializableLLVMTypeRepresentation;
+  class SerializableLoadableClangRecordTypeInfoRepresentation;
+  class SerializableLoadableRecordTypeInfoRepresentation;
+  class SerializableLoadableTypeInfoRepresentation;
   class SILModule;
 
   namespace fine_grained_dependencies {
@@ -55,7 +62,7 @@ protected:
   SmallVector<uint64_t, 64> ScratchRecord;
 
   /// The module currently being serialized.
-  const ModuleDecl *M = nullptr;
+  ModuleDecl *M = nullptr;
 
   /// The SourceFile currently being serialized, if any.
   ///
@@ -87,6 +94,8 @@ class Serializer : public SerializerBase {
   friend class TypeSerializer;
 
   const SerializationOptions &Options;
+
+  std::unique_ptr<IRABIDetailsProvider> LayoutProvider;
 
   /// A map from non-identifier uniqued strings to their serialized IDs.
   ///
@@ -219,7 +228,9 @@ class Serializer : public SerializerBase {
 
   /// Declarations whose layout must be serialized because they contribute to
   /// the ABI of a client-visible type but may not be available to clients.
-  llvm::SmallSetVector<const Decl *, 16> HiddenTypeLayoutsToSerialize;
+  ASTBlockRecordKeeper<const Decl *, DeclID,
+                       index_block::HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS>
+      HiddenTypeLayoutsToSerialize;
 
   ASTBlockRecordKeeper<Type, TypeID,
                        index_block::TYPE_OFFSETS>
@@ -425,6 +436,25 @@ private:
   /// \returns true if any entities were written
   template <typename SpecificASTBlockRecordKeeper>
   bool writeASTBlockEntitiesIfNeeded(SpecificASTBlockRecordKeeper &entities);
+
+  bool scheduleHiddenTypeLayoutSerialization(const Decl *decl);
+  IRABIDetailsProvider &getLayoutProvider();
+  void writeSerializableLLVMType(
+      const SerializableLLVMTypeRepresentation &type);
+  void writeSerializableTypeInfoBase(
+      const SerializableHiddenTypeInfoRepresentation &representation);
+  void writeSerializableFixedTypeInfo(
+      const SerializableFixedTypeInfoRepresentation &representation);
+  void writeSerializableLoadableTypeInfo(
+      const SerializableLoadableTypeInfoRepresentation &representation);
+  void writeSerializableRecordTypeInfo(
+      const SerializableLoadableRecordTypeInfoRepresentation &representation);
+  void writeSerializableClangRecordTypeInfo(
+      const SerializableLoadableClangRecordTypeInfoRepresentation
+          &representation);
+  void writeSerializableTypeInfo(
+      const SerializableHiddenTypeInfoRepresentation &representation);
+  void writeHiddenTypeLayout(const Decl *decl);
 
   /// Writes all decls and types in the DeclsToWrite queue.
   ///

@@ -19,6 +19,7 @@
 #define SWIFT_AST_ABSTRACTLAYOUT_H
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -27,6 +28,25 @@
 namespace swift {
 
 class NominalTypeDecl;
+class SerializableHiddenTypeInfoRepresentation;
+
+struct AbstractSILTypeProperties {
+  bool isTrivial = true;
+  bool isFixedABI = true;
+  bool isAddressOnly = false;
+  bool isResilient = false;
+  bool isTypeExpansionSensitive = false;
+  bool hasRawPointer = false;
+  bool isLexical = false;
+  bool hasPack = false;
+  bool isAddressableForDependencies = false;
+  bool hasRawLayout = false;
+  bool mayHaveCustomDeinit = false;
+  bool isVeryLargeType = false;
+  bool definitelyIsAddressableForDependencies = false;
+  bool definitelyHasRawLayout = false;
+  bool isEscapable = true;
+};
 
 struct AbstractTypeLayout {
   std::string mangledName;
@@ -35,7 +55,10 @@ struct AbstractTypeLayout {
   uint64_t stride;
   bool bitwiseCopyable;
   bool isOpaque;
+  AbstractSILTypeProperties typeProperties;
   std::optional<ReferenceCounting> referenceCountingSystem;
+  std::shared_ptr<SerializableHiddenTypeInfoRepresentation>
+      typeInfoRepresentation;
 };
 
 std::optional<AbstractTypeLayout>
