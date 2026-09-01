@@ -710,6 +710,18 @@ void swift::ide::SourceEditConsumer::acceptMacroExpansionBuffer(
   SourceFile *originalFile =
       containingSF->getParentModule()->getSourceFileContainingLocation(
           originalSourceRange.getStart());
+
+  if (originalFile && originalFile->Kind == SourceFileKind::SyntheticMacro) {
+    auto derivationInfo =
+        SM.getGeneratedSourceInfo(originalFile->getBufferID());
+    // The derivation buffer is anchored at the conformance context's opening
+    // brace.
+    auto memberListStart = Lexer::getLocForEndOfToken(
+        SM, derivationInfo->originalSourceRange.getStart());
+    originalSourceRange = CharSourceRange(memberListStart, 0);
+    originalFile = originalFile->getEnclosingSourceFile();
+  }
+
   StringRef originalPath;
   if (containingSF->getBufferID() != originalFile->getBufferID()) {
     originalPath = SM.getIdentifierForBuffer(originalFile->getBufferID());

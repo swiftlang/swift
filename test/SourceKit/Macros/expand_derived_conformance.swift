@@ -34,26 +34,26 @@ struct Suppressed: ~Copyable {
 //##-- Conformance stated in the inheritance clause.
 // RUN: %sourcekitd-test -req=refactoring.expand.derived_conformance -pos=1:16 %s -- -enable-experimental-feature DeriveConformancesViaMacros -module-name DerivedConformanceUser %s | %FileCheck -check-prefix=DIRECT %s
 // DIRECT: source.edit.kind.active:
-// DIRECT-NEXT: __derivation_macro__Direct@==__buffer 1:1-1:{{[0-9]+}} ({{.*}}_deriveEquatablefMf_.swift) "@_implements(Swift::Equatable, ==(_:_:))
+// DIRECT-NEXT: {{^}}{{ +}}1:27-1:27 ({{.*}}_deriveEquatablefMf_.swift) "@_implements(Swift::Equatable, ==(_:_:))
 // DIRECT-NEXT: static func __derived_struct_equals(_ lhs: Self, _ rhs: Self) -> Swift::Bool {
 
 //##-- Conformance stated in an extension.
 // RUN: %sourcekitd-test -req=refactoring.expand.derived_conformance -pos=9:24 %s -- -enable-experimental-feature DeriveConformancesViaMacros -module-name DerivedConformanceUser %s | %FileCheck -check-prefix=IN_EXTENSION %s
 // IN_EXTENSION: source.edit.kind.active:
-// IN_EXTENSION-NEXT: __derivation_macro__InExtension@==__buffer 1:1-1:{{[0-9]+}} ({{.*}}_deriveEquatablefMf_.swift) "@_implements(Swift::Equatable, ==(_:_:))
+// IN_EXTENSION-NEXT: {{^}}{{ +}}9:35-9:35 ({{.*}}_deriveEquatablefMf_.swift) "@_implements(Swift::Equatable, ==(_:_:))
 // IN_EXTENSION-NEXT: static func __derived_struct_equals(_ lhs: Self, _ rhs: Self) -> Swift::Bool {
 
 //##-- A typealias naming a protocol composition resolves to the same buffer for both protocols, so only one edit is expected.
 // RUN: %sourcekitd-test -req=refactoring.expand.derived_conformance -pos=13:22 %s -- -enable-experimental-feature DeriveConformancesViaMacros -module-name DerivedConformanceUser %s | %FileCheck -check-prefix=VIA_TYPEALIAS %s
 // VIA_TYPEALIAS: source.edit.kind.active:
-// VIA_TYPEALIAS-NEXT: __derivation_macro__ViaTypealias@==__buffer 1:1-1:{{[0-9]+}} ({{.*}}_deriveEquatablefMf_.swift) "@_implements(Swift::Equatable, ==(_:_:))
+// VIA_TYPEALIAS-NEXT: {{^}}{{ +}}13:44-13:44 ({{.*}}_deriveEquatablefMf_.swift) "@_implements(Swift::Equatable, ==(_:_:))
 // VIA_TYPEALIAS-NEXT: static func __derived_struct_equals(_ lhs: Self, _ rhs: Self) -> Swift::Bool {
-// VIA_TYPEALIAS-NOT: __derivation_macro__
+// VIA_TYPEALIAS-NOT: 13:44-13:44
 
 //##-- Hashable has no macro-derived witnesses of its own, so this walks its inherited protocols down to Equatable.
 // RUN: %sourcekitd-test -req=refactoring.expand.derived_conformance -pos=17:12 %s -- -enable-experimental-feature DeriveConformancesViaMacros -module-name DerivedConformanceUser %s | %FileCheck -check-prefix=ENUM %s
 // ENUM: source.edit.kind.active:
-// ENUM-NEXT: __derivation_macro__Enum@==__buffer 1:1-1:{{[0-9]+}} ({{.*}}_deriveEquatablefMf_.swift) "@_semantics("derived_enum_equals")
+// ENUM-NEXT: {{^}}{{ +}}17:22-17:22 ({{.*}}_deriveEquatablefMf_.swift) "@_semantics("derived_enum_equals")
 // ENUM-NEXT: @_implements(Swift::Equatable, ==(_:_:))
 // ENUM-NEXT: static func __derived_enum_equals(_ lhs: Self, _ rhs: Self) -> Swift::Bool {
 
