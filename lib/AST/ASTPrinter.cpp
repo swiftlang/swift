@@ -334,6 +334,19 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       if (options.printPublicInterface() && shouldSkipDeclInPublicInterface(D))
         return false;
 
+      // Skip the backing storage property of a wrapped property when the
+      // wrapped property itself is printed. The attached wrapper attribute is
+      // printed too, so the backing storage property is synthesized again when
+      // the interface is compiled. Printing it here as well would be an
+      // invalid redeclaration.
+      if (auto *VD = dyn_cast<VarDecl>(D)) {
+        if (auto *wrappedVar = VD->getOriginalWrappedProperty(
+                PropertyWrapperSynthesizedPropertyKind::Backing)) {
+          if (shouldPrint(wrappedVar, options))
+            return false;
+        }
+      }
+
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         // Skip anything that isn't 'public' or '@usableFromInline' or has a
         // _specialize attribute with a targetFunction parameter.
