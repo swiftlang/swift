@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1028; // serialize hidden abstract type layouts
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1029; // hidden type XREF fallback
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2924,7 +2924,8 @@ namespace index_block {
     CLANG_TYPE_OFFSETS,
     EXPORTED_PRESPECIALIZATION_DECLS,
     HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS,
-    LastRecordKind = HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS,
+    HIDDEN_TYPE_FALLBACK_TABLE,
+    LastRecordKind = HIDDEN_TYPE_FALLBACK_TABLE,
   };
 
   constexpr const unsigned RecordIDFieldWidth = 5;
