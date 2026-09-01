@@ -484,6 +484,13 @@ function (swift_benchmark_compile_archopts)
         set(extra_options "-Xfrontend"
                           "-disable-swift-bridge-attr")
       endif()
+      # UncheckedString is still pre-release (@available(SwiftStdlib 9999, *)),
+      # so these benchmarks need availability checking disabled to compile.
+      if("${module_name}" STREQUAL "UncheckedStringUInt8" OR
+         "${module_name}" STREQUAL "UncheckedStringUInt16")
+        set(extra_options "-Xfrontend"
+                          "-disable-availability-checking")
+      endif()
       set(objfile "${objdir}/${module_name}.o")
       set(swiftmodule "${objdir}/${module_name}.swiftmodule")
       set(source "${srcdir}/${module_name_path}.swift")

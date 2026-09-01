@@ -162,6 +162,17 @@ targets += singleSourceLibraries.map { name in
       swiftSettings: [.unsafeFlags(["-Xfrontend",
                                     "-disable-swift-bridge-attr"])])
   }
+  if name == "UncheckedStringUInt8" || name == "UncheckedStringUInt16" {
+    // UncheckedString is still pre-release (@available(SwiftStdlib 9999, *)),
+    // so these benchmarks need availability checking disabled to compile.
+    return .target(
+      name: name,
+      dependencies: singleSourceDeps,
+      path: path,
+      sources: ["\(name).swift"],
+      swiftSettings: [.unsafeFlags(["-Xfrontend",
+                                    "-disable-availability-checking"])])
+  }
   return .target(name: name,
       dependencies: singleSourceDeps,
       path: path,
