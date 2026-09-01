@@ -616,12 +616,21 @@ static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
 
   // If we have a closure capture...
   if (arg->isClosureCapture()) {
-    // And that closure capture is from an async let, treat it as sending. This
-    // is because we allow for disconnected values to be sent into async let
-    // closures.
-    if (auto declRef = arg->getFunction()->getDeclRef();
-        declRef && declRef.isAsyncLetClosure) {
-      return true;
+    if (auto declRef = arg->getFunction()->getDeclRef()) {
+      // And that closure capture is from an async let, treat it as sending.
+      // This is because we allow for disconnected values to be sent into async
+      // let closures.
+      if (declRef.isAsyncLetClosure)
+        return true;
+
+      // All of the non-Sendable captures of non-escaping @called(once) closures
+      // that aren't explicitly `sending` can be sent.
+      if (auto *closure = declRef.getClosureExpr();
+          closure && closure->isCalledOnce()) {
+        auto *closureTy = closure->getType()->castTo<FunctionType>();
+        if (closureTy->getExtInfo().isNoEscape())
+          return true;
+      }
     }
   }
 

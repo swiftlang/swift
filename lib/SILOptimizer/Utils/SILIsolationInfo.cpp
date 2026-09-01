@@ -1011,10 +1011,21 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // sync with that code.
   if (!fArg->isIndirectResult() && !fArg->isIndirectErrorResult() &&
       fArg->isClosureCapture()) {
-    if (auto declRef = func->getDeclRef();
-        declRef && declRef.isAsyncLetClosure) {
-      return SILIsolationInfo::getDisconnected(
-          isClosureCapturedNonisolatedUnsafe);
+    if (auto declRef = func->getDeclRef()) {
+      if (declRef.isAsyncLetClosure) {
+        return SILIsolationInfo::getDisconnected(
+            isClosureCapturedNonisolatedUnsafe);
+      }
+
+      // All of the non-Sendable captures of non-escaping @called(once) closures
+      // that aren't explicitly `sending` are disconnected.
+      if (auto *closure = declRef.getClosureExpr();
+          closure && closure->isCalledOnce()) {
+        auto *closureTy = closure->getType()->castTo<FunctionType>();
+        if (closureTy->getExtInfo().isNoEscape())
+          return SILIsolationInfo::getDisconnected(
+              isClosureCapturedNonisolatedUnsafe);
+      }
     }
   }
 
