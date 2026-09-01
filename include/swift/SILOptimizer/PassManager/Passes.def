@@ -154,6 +154,8 @@ PASS(MandatoryTempRValueElimination, "mandatory-temp-rvalue-elimination",
      "Mandatory remove short-lived immutable temporary copies")
 PASS(TempRValueElimination, "temp-rvalue-elimination",
      "Remove short-lived immutable temporary copies")
+PASS(MandatoryTempLValueElimination, "mandatory-temp-lvalue-elimination",
+     "Mandatory remove short-lived immutable temporary l-values")
 PASS(TempLValueElimination, "temp-lvalue-elimination",
      "Remove short-lived immutable temporary l-values")
 PASS(LoopInvariantCodeMotion, "loop-invariant-code-motion",
