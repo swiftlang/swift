@@ -1022,10 +1022,18 @@ public:
     return StageFloor >= SILStage::Canonical;
   }
 
-  /// True once the module has committed to Lowered. LoadableByAddress has
-  /// rewritten function types module-wide, so canonical bodies can no longer be
-  /// deserialized or linked in.
+  /// True once the module has committed the module-wide SIL stage floor to
+  /// Lowered. Read this only for a question about the Lowered stage itself,
+  /// such as whether an instruction is legal here.
   bool hasCommittedLowered() const { return StageFloor >= SILStage::Lowered; }
+
+  /// True once LoadableByAddress may have rewritten function types, so a
+  /// verifier type-equality check must be skipped. It changes large loadable
+  /// parameters and results to indirect, rewriting a nested function type
+  /// wherever it appears, an aggregate field included.
+  bool haveFunctionTypesBeenRewritten() const {
+    return StageFloor >= SILStage::Lowered;
+  }
 
   /// Advance the module to s and sweep every function behind it up to it.
   /// The stage only ever moves forward.
