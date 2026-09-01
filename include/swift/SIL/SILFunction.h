@@ -1504,6 +1504,18 @@ public:
   /// Whether this declaration is never emitted into the client.
   bool isNeverEmitIntoClient() const;
 
+  /// True if this function is the exported entry point of an @objcDirect
+  /// method. Delegates to the AbstractFunctionDecl predicate so the AST
+  /// attribute stays the single source of truth.
+  bool isObjCDirect() const {
+    if (!hasLocation())
+      return false;
+
+    auto *V = getLocation().getAsASTNode<ValueDecl>();
+    auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(V);
+    return AFD && AFD->isObjCDirect();
+  }
+
   /// Return whether this function has attribute @used on it
   bool markedAsUsed() const { return MarkedAsUsed; }
   void setMarkedAsUsed(bool value) { MarkedAsUsed = value; }

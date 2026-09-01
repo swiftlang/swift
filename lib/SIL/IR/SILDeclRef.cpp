@@ -18,6 +18,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -32,6 +33,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/Mangle.h"
+#include "clang/Basic/CodeGenOptions.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -543,6 +545,12 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     // Native-to-foreign thunks for methods are always just private, since
     // they're anchored by Objective-C metadata.
     auto &attrs = fn->getAttrs();
+    // An @objcDirect method is deliberately *not* anchored by ObjC metadata --
+    // its thunk is the exported implementation symbol -- so it keeps the
+    // linkage implied by its Swift access level instead.
+    if (constant.isNativeToForeignThunk() &&
+        attrs.hasAttribute<ObjCDirectAttr>())
+      return Limit::None;
     if (constant.isNativeToForeignThunk() &&
         !(attrs.hasAttribute<CDeclAttr>() && !fn->hasOnlyCEntryPoint())) {
       auto isTopLevel = fn->getDeclContext()->isModuleScopeContext();
@@ -1277,6 +1285,13 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   return decl->hasNonUniqueDefinition();
 }
 
+bool SILDeclRef::isObjCDirect() const {
+  if (!isForeign)
+    return false;
+  auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(getDecl());
+  return AFD && AFD->isObjCDirect();
+}
+
 bool SILDeclRef::isForeignToNativeThunk() const {
   // If this isn't a native entry-point, it's not a foreign-to-native thunk.
   if (isForeign)
@@ -1439,6 +1454,52 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     auto genericSig = funcDecl->getGenericSignature();
     return GenericSpecializationMangler::manglePrespecialization(
         getASTContext(), mangledNonSpecializedString, genericSig, getSpecializedSignature());
+  }
+
+  // @objcDirect methods use Clang's ObjC method mangling with the direct ABI
+  // suffix instead of Swift's mangling. This covers every entry point kind
+  // (Func and Initializer alike) because it precedes the switch below; only the
+  // foreign entry point is direct, which `isObjCDirect()` already checks.
+  if (isObjCDirect()) {
+    auto *AFD = cast<AbstractFunctionDecl>(getDecl());
+    auto &ctx = AFD->getASTContext();
+
+    // Mirror Clang's own gate rather than hardcoding the direct ABI: Clang
+    // appends the trailing 'D' (and drops the '\01' prefix) only when the
+    // precondition-thunk ABI is on, so reading the same CodeGenOpt keeps the
+    // callee symbol byte-identical to Clang's caller-side reference. Sema
+    // rejects @objcDirect outright when the flag is off, so in practice this is
+    // true wherever we get here; reading it anyway keeps the two in lockstep.
+    auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+    bool useDirectABI =
+        importer && importer->getCodeGenOpts().ObjCDirectPreconditionThunk;
+
+    // The class-name segment must be the identifier printed for the ObjC
+    // @interface, which is what Clang uses to build the caller's reference: the
+    // @objc(Name) custom name when present, else the plain Swift class name.
+    // Note this is *not* getObjCRuntimeName(), which yields the mangled
+    // _TtC... form and would leave the callee symbol unresolvable by Clang.
+    auto *classDecl = AFD->getDeclContext()->getSelfClassDecl();
+    assert(classDecl && classDecl->hasName() &&
+           "ObjC direct method must be in a class");
+    StringRef className = objc_translation::getNameForObjC(
+        classDecl, objc_translation::CustomNamesOnly);
+    if (className.empty())
+      className = classDecl->getNameStr();
+
+    llvm::SmallString<64> selectorBuf;
+    StringRef selectorStr = AFD->getObjCSelector().getString(selectorBuf);
+
+    // Constructors are not instance members per ValueDecl::isInstanceMember(),
+    // but their ObjC selector (-initWithX:) is an instance method, so use
+    // isObjCInstanceMethod() to pick '-' vs '+' the way Clang does.
+    std::string result;
+    llvm::raw_string_ostream OS(result);
+    clang::mangleObjCMethodName(OS, /*includePrefixByte=*/false,
+                                AFD->isObjCInstanceMethod(), className,
+                                /*CategoryName=*/std::nullopt, selectorStr,
+                                useDirectABI);
+    return result;
   }
 
   ASTMangler::SymbolKind SKind = ASTMangler::SymbolKind::Default;
