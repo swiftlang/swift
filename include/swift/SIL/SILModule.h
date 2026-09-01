@@ -1029,10 +1029,30 @@ public:
     return StageFloor >= SILStage::Canonical;
   }
 
-  /// True once the module has committed to Lowered. LoadableByAddress has
-  /// rewritten function types module-wide, so canonical bodies can no longer be
-  /// deserialized or linked in.
+  /// True once the module has committed the module-wide SIL stage floor to
+  /// Lowered. Read this only for a question about the Lowered stage itself,
+  /// such as whether an instruction is legal here.
   bool hasCommittedLowered() const { return StageFloor >= SILStage::Lowered; }
+
+  /// True once every function's types have been rewritten by a lowering pass,
+  /// so a type-equality check in the verifier must be skipped.
+  ///
+  /// Two passes rewrite types: AddressLowering is a
+  /// SILFunctionTransform: it rewrites one function at a time under
+  /// `-enable-sil-opaque-values` and records that in SILFunction's
+  /// HasLoweredAddresses bit. LoadableByAddress is a SILModuleTransform: it
+  /// rewrites large loadable types for the ABI across the module, and it runs
+  /// later, during IRGen preparation.
+  ///
+  /// This is module-wide for a scheduling reason. The SIL stage
+  /// floor commits to Lowered at the end of runSILLoweringPasses, by which
+  /// point AddressLowering has visited every function. The verifier sites
+  /// whose compared types all belong to the enclosing function could key on
+  /// HasLoweredAddresses instead. The sites comparing a callee or witness
+  /// type, and the deserialization cutoffs, cannot.
+  bool haveFunctionTypesBeenRewritten() const {
+    return StageFloor >= SILStage::Lowered;
+  }
 
   /// Advance the module to s and sweep every function behind it up to it.
   /// The stage only ever moves forward.

@@ -1549,7 +1549,7 @@ public:
     if (fArg->getType().isAddress())
       checkAddressWalkerCanVisitAllTransitiveUses(fArg);
 
-    if (fArg->getModule().hasCommittedLowered() ||
+    if (fArg->getModule().haveFunctionTypesBeenRewritten() ||
         !fArg->getType().isAddress() ||
         !fArg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
       return;
@@ -3934,7 +3934,7 @@ public:
 
       SILType loweredType =
           structTy.getFieldType(field, F.getModule(), F.getTypeExpansionContext());
-      if (!SI->getModule().hasCommittedLowered()) {
+      if (!SI->getModule().haveFunctionTypesBeenRewritten()) {
         requireSameType((*opi)->getType(), loweredType,
                         "struct operand type does not match field type");
       }
@@ -3957,7 +3957,7 @@ public:
               "EnumInst operand must be an object");
       SILType caseTy = UI->getType().getEnumElementType(
           UI->getElement(), F.getModule(), F.getTypeExpansionContext());
-      if (!UI->getModule().hasCommittedLowered()) {
+      if (!UI->getModule().haveFunctionTypesBeenRewritten()) {
         requireSameType(caseTy, UI->getOperand()->getType(),
                         "EnumInst operand type does not match type of case");
       }
@@ -3979,7 +3979,7 @@ public:
     SILType caseTy = UI->getOperand()->getType().getEnumElementType(
         UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
-    if (!UI->getModule().hasCommittedLowered()) {
+    if (!UI->getModule().haveFunctionTypesBeenRewritten()) {
       requireSameType(
           caseTy, UI->getType(),
           "InitEnumDataAddrInst result does not match type of enum case");
@@ -4001,7 +4001,7 @@ public:
     SILType caseTy = UI->getOperand()->getType().getEnumElementType(
         UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
-    if (!UI->getModule().hasCommittedLowered()) {
+    if (!UI->getModule().haveFunctionTypesBeenRewritten()) {
       requireSameType(
           caseTy, UI->getType(),
           "UncheckedEnumData result does not match type of enum case");
@@ -4023,7 +4023,7 @@ public:
     SILType caseTy = UI->getEnum()->getType().getEnumElementType(
         UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
-    if (!UI->getModule().hasCommittedLowered()) {
+    if (!UI->getModule().haveFunctionTypesBeenRewritten()) {
       requireSameType(caseTy, UI->getType(),
                       "instruction result "
                       "does not match type of enum case");
@@ -4068,7 +4068,7 @@ public:
     require(TI->getElements().size() == ResTy->getNumElements(),
             "Tuple field count mismatch!");
 
-    if (!TI->getModule().hasCommittedLowered()) {
+    if (!TI->getModule().haveFunctionTypesBeenRewritten()) {
       for (size_t i = 0, size = TI->getElements().size(); i < size; ++i) {
         requireSameType(TI->getElement(i)->getType().getASTType(),
                         ResTy.getElementType(i),
@@ -4313,7 +4313,7 @@ public:
     require(EI->getForwardingOwnershipKind() == OwnershipKind::None ||
                 EI->getForwardingOwnershipKind() == OwnershipKind::Guaranteed,
             "invalid forwarding ownership kind on tuple_extract instruction");
-    if (!EI->getModule().hasCommittedLowered()) {
+    if (!EI->getModule().haveFunctionTypesBeenRewritten()) {
       requireSameType(EI->getType().getASTType(),
                       operandTy.getElementType(EI->getFieldIndex()),
                       "type of tuple_extract does not match type of element");
@@ -4349,7 +4349,7 @@ public:
             "Imported structs with ptrauth qualified fields should not be "
             "promoted to a value");
 
-    if (!EI->getModule().hasCommittedLowered()) {
+    if (!EI->getModule().haveFunctionTypesBeenRewritten()) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
       requireSameType(loweredFieldTy, EI->getType(),
@@ -4369,7 +4369,7 @@ public:
 
     require(EI->getFieldIndex() < tupleType->getNumElements(),
             "invalid field index for tuple_element_addr instruction");
-    if (!EI->getModule().hasCommittedLowered()) {
+    if (!EI->getModule().haveFunctionTypesBeenRewritten()) {
       requireSameType(
           EI->getType().getASTType(),
           tupleType.getElementType(EI->getFieldIndex()),
@@ -4404,7 +4404,7 @@ public:
                 "begin_access [signed]/end_access");
       }
     }
-    if (!EI->getModule().hasCommittedLowered()) {
+    if (!EI->getModule().haveFunctionTypesBeenRewritten()) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
       requireSameType(
@@ -4431,7 +4431,7 @@ public:
                 cd->getImplementationContext()->getAsGenericContext(),
             "ref_element_addr field must be a member of the class");
 
-    if (!EI->getModule().hasCommittedLowered()) {
+    if (!EI->getModule().haveFunctionTypesBeenRewritten()) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
       requireSameType(
@@ -4695,7 +4695,7 @@ public:
     SILModule &mod = CMI->getModule();
     bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
-    if (!mod.hasCommittedLowered() && !embedded) {
+    if (!mod.haveFunctionTypesBeenRewritten() && !embedded) {
       requireSameType(
           CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
           "result type of class_method must match abstracted type of method");
@@ -4727,7 +4727,7 @@ public:
     auto member = CMI->getMember();
     auto overrideTy =
         TC.getConstantOverrideType(F.getTypeExpansionContext(), member);
-    if (!CMI->getModule().hasCommittedLowered()) {
+    if (!CMI->getModule().haveFunctionTypesBeenRewritten()) {
       requireSameType(
           CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
           "result type of super_method must match abstracted type of method");
@@ -4805,7 +4805,7 @@ public:
     auto member = OMI->getMember();
     auto overrideTy =
         TC.getConstantOverrideType(F.getTypeExpansionContext(), member);
-    if (!OMI->getModule().hasCommittedLowered()) {
+    if (!OMI->getModule().haveFunctionTypesBeenRewritten()) {
       requireSameType(
           OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
           "result type of super_method must match abstracted type of method");
@@ -5898,7 +5898,7 @@ public:
         SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule(),
                                                   F.getTypeExpansionContext());
         SILType bbArgTy = dest->getArguments()[0]->getType();
-        if (!F.getModule().hasCommittedLowered()) {
+        if (!F.getModule().haveFunctionTypesBeenRewritten()) {
           // During the lowered stage, a function type might have different
           // signature
           //
@@ -6355,7 +6355,7 @@ public:
     // parameter/result conventions.
     // TODO: Check that derivative function types match excluding
     // parameter/result conventions in lowered SIL.
-    if (F.getModule().hasCommittedLowered())
+    if (F.getModule().haveFunctionTypesBeenRewritten())
       return;
     if (dfi->hasDerivativeFunctions()) {
       auto jvp = dfi->getJVPFunction();
@@ -6395,7 +6395,7 @@ public:
     // Skip lowered SIL: LoadableByAddress changes parameter/result conventions.
     // TODO: Check that transpose function type matches excluding
     // parameter/result conventions in lowered SIL.
-    if (F.getModule().hasCommittedLowered())
+    if (F.getModule().haveFunctionTypesBeenRewritten())
       return;
     if (lfi->hasTransposeFunction()) {
       auto transpose = lfi->getTransposeFunction();
@@ -7797,7 +7797,7 @@ void SILVTable::verify(const SILModule &M) const {
       entry.getMethod().print(os);
     }
 
-    if (!M.hasCommittedLowered() &&
+    if (!M.haveFunctionTypesBeenRewritten() &&
         !M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
       // Note the direction of the compatibility check: the witness
       // function must be compatible with being used as the requirement
@@ -7901,7 +7901,7 @@ void SILWitnessTable::verify(const SILModule &mod) const {
                SILFunctionTypeRepresentation::WitnessMethod &&
            "Witnesses must have witness_method representation.");
 
-    if (!mod.hasCommittedLowered() &&
+    if (!mod.haveFunctionTypesBeenRewritten() &&
         !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
       // Note the direction of the compatibility check: the witness
       // function must be compatible with being used as the requirement
@@ -7954,7 +7954,7 @@ void SILDefaultWitnessTable::verify(const SILModule &mod) const {
                SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
 
-    if (!mod.hasCommittedLowered() &&
+    if (!mod.haveFunctionTypesBeenRewritten() &&
         !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
       // Note the direction of the compatibility check: the witness
       // function must be compatible with being used as the requirement
