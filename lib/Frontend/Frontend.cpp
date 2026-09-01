@@ -746,6 +746,30 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
     llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
         new llvm::vfs::OverlayFileSystem(MemFS);
     OverlayVFS->pushOverlay(SourceMgr.getFileSystem());
+
+    if (CASOpts.CASFSInputOverlay) {
+      // Overlay the input files that exist on disk on top of the CAS file
+      // system, so that editing them takes effect while every other file the
+      // compilation sees still comes from the CAS.
+      llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> InputFS =
+          new llvm::vfs::InMemoryFileSystem();
+      for (const auto &Input :
+           Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
+        StringRef InputPath = Input.getFileName();
+        // An input that is not on disk is provided by the CAS file system.
+        if (InputPath == "-" || !llvm::sys::fs::exists(InputPath))
+          continue;
+        auto Buffer = llvm::MemoryBuffer::getFile(InputPath);
+        if (!Buffer) {
+          Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
+                               InputPath, Buffer.getError().message());
+          return true;
+        }
+        InputFS->addFile(InputPath, 0, std::move(*Buffer));
+      }
+      OverlayVFS->pushOverlay(std::move(InputFS));
+    }
+
     SourceMgr.setFileSystem(std::move(OverlayVFS));
   }
 
