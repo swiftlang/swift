@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_GENSTRUCT_H
 #define SWIFT_IRGEN_GENSTRUCT_H
 
+#include <memory>
 #include <optional>
 
 namespace llvm {
@@ -25,6 +26,7 @@ namespace llvm {
 
 namespace swift {
   class CanType;
+  class SerializableHiddenTypeInfoRepresentation;
   class SILType;
   class VarDecl;
 
@@ -35,6 +37,10 @@ namespace irgen {
   class IRGenModule;
   class MemberAccessStrategy;
   class TypeInfo;
+
+  std::unique_ptr<TypeInfo> createTypeInfoFromSerializableRepresentation(
+      IRGenModule &IGM,
+      const SerializableHiddenTypeInfoRepresentation &representation);
 
   Address projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                              Address base,

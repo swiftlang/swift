@@ -133,6 +133,13 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(GenericEnvironments, core->GenericEnvironments);
   allocateBuffer(SubstitutionMaps, core->SubstitutionMaps);
   allocateBuffer(Identifiers, core->Identifiers);
+  allocateBuffer(HiddenTypeLayoutInfoDecls, core->HiddenTypeLayoutInfoDecls);
+
+  auto fallbackData = core->HiddenTypeFallbackTableData;
+  for (unsigned index = 0; index + 1 < fallbackData.size(); index += 2) {
+    HiddenTypeFallbackMap[static_cast<uint32_t>(fallbackData[index])] =
+        static_cast<uint32_t>(fallbackData[index + 1]);
+  }
 }
 
 bool ModuleFile::allowCompilerErrors() const {

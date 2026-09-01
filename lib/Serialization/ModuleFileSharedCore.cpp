@@ -1113,6 +1113,14 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(SILLayouts, scratch);
         break;
+      case index_block::HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(HiddenTypeLayoutInfoDecls, scratch);
+        break;
+      case index_block::HIDDEN_TYPE_FALLBACK_TABLE:
+        assert(blobData.empty());
+        allocateBuffer(HiddenTypeFallbackTableData, scratch);
+        break;
 
       default:
         // Unknown index kind, which this version of the compiler won't use.

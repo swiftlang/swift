@@ -273,6 +273,12 @@ getHiddenTypeReferenceCounting(CanHiddenType type) {
 
   assert(layoutInfoDecl->Layout &&
          "HiddenTypeLayoutInfoDecl should have abstract layout");
+
+  // The only TypeInfo representation currently supported here is a Clang
+  // record, which is a value type.
+  if (layoutInfoDecl->Layout->typeInfoRepresentation)
+    return std::nullopt;
+
   return layoutInfoDecl->Layout->referenceCountingSystem;
 }
 

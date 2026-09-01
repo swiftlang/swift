@@ -593,6 +593,8 @@ public:
 
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {
+    this->assertNotDeserialized(
+        "RecordTypeInfo::collectMetadataForOutlining");
     for (auto &field : getFields()) {
       auto fType = field.getType(collector.IGF.IGM, T);
       field.getTypeInfo().collectMetadataForOutlining(collector, fType);

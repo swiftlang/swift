@@ -27,15 +27,17 @@
 namespace swift {
 
 class NominalTypeDecl;
+class SerializableHiddenTypeInfoRepresentation;
 
 struct AbstractTypeLayout {
   std::string mangledName;
-  uint64_t size;
-  uint64_t alignment;
-  uint64_t stride;
-  bool bitwiseCopyable;
-  bool isOpaque;
+  uint64_t size = 0;
+  uint64_t alignment = 0;
+  uint64_t stride = 0;
+  bool bitwiseCopyable = false;
+  bool isOpaque = false;
   std::optional<ReferenceCounting> referenceCountingSystem;
+  SerializableHiddenTypeInfoRepresentation *typeInfoRepresentation = nullptr;
 };
 
 std::optional<AbstractTypeLayout>

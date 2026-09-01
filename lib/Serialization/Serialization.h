@@ -227,6 +227,8 @@ class Serializer : public SerializerBase {
                        index_block::HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS>
       HiddenTypeLayoutsToSerialize;
 
+  SmallVector<std::pair<DeclID, DeclID>, 16> HiddenTypeFallbackTable;
+
   ASTBlockRecordKeeper<Type, TypeID,
                        index_block::TYPE_OFFSETS>
   TypesToSerialize;
@@ -366,6 +368,8 @@ private:
 
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
+
+  void writeHiddenTypeXRef(const HiddenTypeLayoutInfoDecl *hidden);
 
   /// Handle a hidden layout requirement discovered by AST analysis.
   void handleHiddenTypeLayoutRequirement(
