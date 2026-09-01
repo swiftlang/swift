@@ -108,6 +108,10 @@ namespace {
       return T.getFieldType(Field, IGM.getSILModule(),
                             IGM.getMaximalTypeExpansionContext());
     }
+
+    Type getInterfaceTypeForSerialization() const {
+      return Field ? Field->getInterfaceType() : Type();
+    }
   };
 
   /// A field-info implementation for fields of Clang types.
@@ -139,6 +143,10 @@ namespace {
       // The Swift-field-less cases use opaque storage, which is
       // guaranteed to ignore the type passed to it.
       return {};
+    }
+
+    Type getInterfaceTypeForSerialization() const {
+      return Field ? Field->getInterfaceType() : Type();
     }
   };
 
@@ -1043,8 +1051,11 @@ namespace {
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
-        IRGenModule &) const override {
-      unsupportedSerializableHiddenTypeInfoRepresentation();
+        IRGenModule &IGM) const override {
+      auto representation =
+          std::make_unique<SerializableLoadableStructTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
     }
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
