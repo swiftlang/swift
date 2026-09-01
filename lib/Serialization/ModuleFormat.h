@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1021; // Hidden type layout placeholder
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1022; // serialize hidden LoadableClangRecordTypeInfo
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2735,6 +2735,13 @@ namespace decls_block {
     DeclIDField // declaration whose hidden layout will be represented
   >;
 
+  using HiddenLoadableClangRecordLayout = BCRecordLayout<
+    HIDDEN_LOADABLE_CLANG_RECORD,
+    IdentifierIDField, // mangled type name
+    DeclIDField,       // parent type declaration, if any
+    BCArray<BCVBR<16>> // serialized TypeInfo representation
+  >;
+
   // clang-format on
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT
@@ -2837,7 +2844,8 @@ namespace index_block {
     SUBSTITUTION_MAP_OFFSETS,
     CLANG_TYPE_OFFSETS,
     EXPORTED_PRESPECIALIZATION_DECLS,
-    LastRecordKind = EXPORTED_PRESPECIALIZATION_DECLS,
+    HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS,
+    LastRecordKind = HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS,
   };
 
   constexpr const unsigned RecordIDFieldWidth = 5;

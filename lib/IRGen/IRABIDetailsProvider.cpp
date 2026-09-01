@@ -29,6 +29,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SerializableHiddenTypeInfoRepresentation.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
@@ -102,6 +103,13 @@ public:
     return IRABIDetailsProvider::SizeAndAlignment{
         fixedTI->getFixedSize().getValue(),
         fixedTI->getFixedAlignment().getValue()};
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  getSerializableHiddenTypeInfoRepresentation(const NominalTypeDecl *TD) {
+    auto &typeInfo =
+        IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
+    return typeInfo.createSerializableHiddenTypeInfoRepresentation(IGM);
   }
 
   IRABIDetailsProvider::FunctionABISignature
@@ -473,6 +481,12 @@ IRABIDetailsProvider::~IRABIDetailsProvider() {}
 std::optional<IRABIDetailsProvider::SizeAndAlignment>
 IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
   return impl->getTypeSizeAlignment(TD);
+}
+
+std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+IRABIDetailsProvider::getSerializableHiddenTypeInfoRepresentation(
+    const NominalTypeDecl *TD) {
+  return impl->getSerializableHiddenTypeInfoRepresentation(TD);
 }
 
 std::optional<LoweredFunctionSignature>

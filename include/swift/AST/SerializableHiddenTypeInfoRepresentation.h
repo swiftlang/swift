@@ -26,6 +26,17 @@
 
 namespace swift {
 
+enum class SerializableHiddenTypeInfoKind : uint8_t {
+  TypeInfo,
+  Fixed,
+  Loadable,
+  Primitive,
+  OpaqueStorage,
+  LoadableRecord,
+  LoadableStruct,
+  LoadableClangRecord,
+};
+
 // This is used to provide a serializable representation of
 // the llvm::Type used to represent type layout in TypeInfo objects.
 // In producing this structure from an llvm::Type, we also transform
@@ -53,6 +64,9 @@ public:
   irgen::TypeInfoBitfields bits = {0};
 
   virtual ~SerializableHiddenTypeInfoRepresentation() = default;
+  virtual SerializableHiddenTypeInfoKind getKind() const {
+    return SerializableHiddenTypeInfoKind::TypeInfo;
+  }
 };
 
 class SerializableFixedTypeInfoRepresentation
@@ -60,10 +74,42 @@ class SerializableFixedTypeInfoRepresentation
 public:
   uint32_t size = 0;
   irgen::SpareBitVector spareBits;
+
+  SerializableHiddenTypeInfoKind getKind() const override {
+    return SerializableHiddenTypeInfoKind::Fixed;
+  }
+};
+
+struct SerializableExplosionSchemaElement {
+  std::unique_ptr<SerializableLLVMTypeRepresentation> type;
+  uint64_t aggregateAlignment = 0;
 };
 
 class SerializableLoadableTypeInfoRepresentation
-    : public SerializableFixedTypeInfoRepresentation {};
+    : public SerializableFixedTypeInfoRepresentation {
+public:
+  std::vector<SerializableExplosionSchemaElement> schema;
+
+  SerializableHiddenTypeInfoKind getKind() const override {
+    return SerializableHiddenTypeInfoKind::Loadable;
+  }
+};
+
+class SerializablePrimitiveTypeInfoRepresentation final
+    : public SerializableLoadableTypeInfoRepresentation {
+public:
+  SerializableHiddenTypeInfoKind getKind() const override {
+    return SerializableHiddenTypeInfoKind::Primitive;
+  }
+};
+
+class SerializableOpaqueStorageTypeInfoRepresentation final
+    : public SerializableLoadableTypeInfoRepresentation {
+public:
+  SerializableHiddenTypeInfoKind getKind() const override {
+    return SerializableHiddenTypeInfoKind::OpaqueStorage;
+  }
+};
 
 struct SerializableRecordFieldRepresentation {
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation> typeInfo;
@@ -77,10 +123,19 @@ public:
   std::vector<SerializableRecordFieldRepresentation> fields;
   bool fieldsAreABIAccessible = false;
   uint32_t explosionSize = 0;
+
+  SerializableHiddenTypeInfoKind getKind() const override {
+    return SerializableHiddenTypeInfoKind::LoadableRecord;
+  }
 };
 
 class SerializableLoadableStructTypeInfoRepresentation
-    : public SerializableLoadableRecordTypeInfoRepresentation {};
+    : public SerializableLoadableRecordTypeInfoRepresentation {
+public:
+  SerializableHiddenTypeInfoKind getKind() const override {
+    return SerializableHiddenTypeInfoKind::LoadableStruct;
+  }
+};
 
 struct SerializableAggLoweringInputRepresentation {
   uint64_t begin = 0;
@@ -93,6 +148,10 @@ class SerializableLoadableClangRecordTypeInfoRepresentation final
 public:
   bool hasReferenceField = false;
   std::vector<SerializableAggLoweringInputRepresentation> aggLoweringInputs;
+
+  SerializableHiddenTypeInfoKind getKind() const override {
+    return SerializableHiddenTypeInfoKind::LoadableClangRecord;
+  }
 };
 
 } // namespace swift

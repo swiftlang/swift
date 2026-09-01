@@ -417,6 +417,19 @@ namespace {
     bool HasReferenceField;
     std::vector<SwiftAggLowering::StorageEntry> AggLoweringInputs;
 
+    void requireFaithfulSerializedRepresentation(IRGenModule &IGM) const {
+      if (HasReferenceField ||
+          !isTriviallyDestroyable(ResilienceExpansion::Maximal) ||
+          !isCopyable(ResilienceExpansion::Maximal))
+        llvm::report_fatal_error(
+            "hidden Clang record TypeInfo serialization does not support "
+            "nontrivial records");
+      if (getFixedExtraInhabitantCount(IGM) != 0)
+        llvm::report_fatal_error(
+            "hidden Clang record TypeInfo serialization does not support "
+            "extra inhabitants");
+    }
+
     static std::vector<SwiftAggLowering::StorageEntry>
     computeAggLoweringInputs(IRGenModule &IGM,
                              const clang::RecordDecl *clangDecl) {
@@ -491,6 +504,8 @@ namespace {
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &IGM) const override {
+      requireFaithfulSerializedRepresentation(IGM);
+
       auto representation = std::make_unique<
           SerializableLoadableClangRecordTypeInfoRepresentation>();
       populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
@@ -1026,6 +1041,15 @@ namespace {
       : public StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo> {
     using super = StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo>;
 
+    void requireFaithfulSerializedRepresentation(IRGenModule &IGM) const {
+      if (!areFieldsABIAccessible() ||
+          !isTriviallyDestroyable(ResilienceExpansion::Maximal) ||
+          !isCopyable(ResilienceExpansion::Maximal) ||
+          getFixedExtraInhabitantCount(IGM) != 0)
+        llvm::report_fatal_error(
+            "cannot faithfully serialize this LoadableStructTypeInfo");
+    }
+
   public:
     LoadableStructTypeInfo(ArrayRef<StructFieldInfo> fields,
                            FieldsAreABIAccessible_t areFieldsABIAccessible,
@@ -1047,8 +1071,13 @@ namespace {
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
-        IRGenModule &) const override {
-      unsupportedSerializableHiddenTypeInfoRepresentation();
+        IRGenModule &IGM) const override {
+      requireFaithfulSerializedRepresentation(IGM);
+
+      auto representation =
+          std::make_unique<SerializableLoadableStructTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
     }
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,

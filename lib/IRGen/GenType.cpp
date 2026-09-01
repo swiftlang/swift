@@ -340,6 +340,20 @@ void LoadableTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
     SerializableLoadableTypeInfoRepresentation &representation) const {
   FixedTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
       IGM, representation);
+  ExplosionSchema schema;
+  getSchema(schema);
+  representation.schema.clear();
+  for (const auto &element : schema) {
+    SerializableExplosionSchemaElement serializedElement;
+    if (element.isScalar()) {
+      serializedElement.type = serializeLLVMType(element.getScalarType());
+    } else {
+      serializedElement.type = serializeLLVMType(element.getAggregateType());
+      serializedElement.aggregateAlignment =
+          element.getAggregateAlignment().getValue();
+    }
+    representation.schema.push_back(std::move(serializedElement));
+  }
 }
 
 std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -1271,6 +1285,27 @@ namespace {
                       SpareBitVector &&spareBits,
                       Alignment align)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align) {}
+
+    PrimitiveTypeInfo(
+        IRGenModule &IGM,
+        const SerializablePrimitiveTypeInfoRepresentation &representation)
+        : PODSingleScalarTypeInfo(IGM, representation) {
+      if (representation.schema.size() != 1 ||
+          representation.schema.front().aggregateAlignment != 0 ||
+          deserializeLLVMType(IGM, representation.schema.front().type) !=
+              getStorageType())
+        llvm::report_fatal_error(
+            "serialized PrimitiveTypeInfo has an invalid explosion schema");
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override {
+      auto representation =
+          std::make_unique<SerializablePrimitiveTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
+    }
   };
 
   /// A TypeInfo implementation for pointers that are:
@@ -1410,6 +1445,14 @@ namespace {
                        IsABIAccessible),
         ScalarTypes(std::move(scalarTypes))
     {}
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override {
+      auto representation =
+          std::make_unique<SerializableOpaqueStorageTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
+    }
     
     llvm::ArrayType *getStorageType() const {
       return cast<llvm::ArrayType>(ScalarTypeInfo::getStorageType());
