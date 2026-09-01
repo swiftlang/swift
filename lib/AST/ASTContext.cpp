@@ -4965,6 +4965,7 @@ MetatypeType *MetatypeType::get(Type T,
                                 std::optional<MetatypeRepresentation> Repr,
                                 const ASTContext &Ctx) {
   auto properties = T->getRecursiveProperties();
+  properties.removeIsUnsafe();
   auto arena = getArena(properties);
 
   unsigned reprKey;
@@ -4997,6 +4998,7 @@ ExistentialMetatypeType::get(Type T, std::optional<MetatypeRepresentation> repr,
     T = existential->getConstraintType();
 
   auto properties = T->getRecursiveProperties();
+  properties.removeIsUnsafe();
   auto arena = getArena(properties);
 
   unsigned reprKey;
