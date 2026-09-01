@@ -894,8 +894,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
 
 bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
                                          bool openArchetypes,
-                                         ConstraintKind kind, DeclContext *dc,
-                                         bool *unwrappedIUO) {
+                                         ConstraintKind kind, DeclContext *dc) {
   // Don't allow any type variables to leak into the nested ConstraintSystem
   // (including as originator types for placeholders). This also ensure that we
   // avoid lifetime issues for e.g cases where we lazily populate the
@@ -914,15 +913,11 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
   cs.addConstraint(kind, type1, type2, cs.getConstraintLocator({}));
 
   if (openArchetypes) {
-    assert(!unwrappedIUO && "FIXME");
     SmallVector<Solution, 4> solutions;
     return !cs.solve(solutions, FreeTypeVariableBinding::Allow);
   }
 
   if (auto solution = cs.solveSingle()) {
-    if (unwrappedIUO)
-      *unwrappedIUO = solution->getFixedScore().Data[SK_ForceUnchecked] > 0;
-
     return true;
   }
 
@@ -935,12 +930,10 @@ bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
                                 ConstraintKind::Subtype, dc);
 }
 
-bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc,
-                                  bool *unwrappedIUO) {
+bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
   return typesSatisfyConstraint(type1, type2,
                                 /*openArchetypes=*/false,
-                                ConstraintKind::Conversion, dc,
-                                unwrappedIUO);
+                                ConstraintKind::Conversion, dc);
 }
 
 bool TypeChecker::isExplicitlyConvertibleTo(Type type1, Type type2,
@@ -951,12 +944,11 @@ bool TypeChecker::isExplicitlyConvertibleTo(Type type1, Type type2,
           isObjCBridgedTo(type1, type2, dc));
 }
 
-bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc,
-                                  bool *unwrappedIUO) {
+bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc) {
   return (typesSatisfyConstraint(type1, type2,
                                  /*openArchetypes=*/false,
                                  ConstraintKind::BridgingConversion,
-                                 dc, unwrappedIUO));
+                                 dc));
 }
 
 bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
@@ -1617,10 +1609,8 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
                                   CheckedCastContextKind contextKind,
                                   DeclContext *dc) {
   // If the from/to types are equivalent or convertible, this is a coercion.
-  bool unwrappedIUO = false;
   if (fromType->isEqual(toType) ||
-      (isConvertibleTo(fromType, toType, dc, &unwrappedIUO) &&
-       !unwrappedIUO)) {
+      isConvertibleTo(fromType, toType, dc)) {
     return CheckedCastKind::Coercion;
   }
 
@@ -1664,7 +1654,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   if (toType->isAnyObject())
     return CheckedCastKind::BridgingCoercion;
 
-  if (isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO){
+  if (isObjCBridgedTo(fromType, toType, dc)){
     return CheckedCastKind::BridgingCoercion;
   }
 
