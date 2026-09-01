@@ -2741,7 +2741,7 @@ namespace {
       // Regardless of their member types, Nonescapable values have ownership
       // for lifetime diagnostics.
       if (!origType.isEscapable(structType)) {
-        properties.setNonTrivial();
+        properties.setNonEscapable();
       }
       // Merge the CustomDeinit properties of the type parameters.
       if (hasConditionalDefaultDeinit(structType, D)) {
@@ -2854,7 +2854,7 @@ namespace {
       // Regardless of their member types, Nonescapable values have ownership
       // for lifetime diagnostics.
       if (!origType.isEscapable(enumType)) {
-        properties.setNonTrivial();
+        properties.setNonEscapable();
       }
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);
