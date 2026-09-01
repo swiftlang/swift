@@ -1534,6 +1534,10 @@ private:
       }
     }
 
+    if (AFD->isObjCDirect()) {
+      os << " SWIFT_OBJC_DIRECT";
+    }
+
     if (!skipAvailability) {
       printAvailability(AFD);
     }
