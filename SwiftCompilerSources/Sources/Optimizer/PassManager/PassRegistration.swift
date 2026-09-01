@@ -120,6 +120,7 @@ private func registerSwiftPasses() {
   registerPass(tempRValueElimination, { tempRValueElimination.run($0) })
   registerPass(mandatoryTempRValueElimination, { mandatoryTempRValueElimination.run($0) })
   registerPass(tempLValueElimination, { tempLValueElimination.run($0) })
+  registerPass(mandatoryTempLValueElimination, { mandatoryTempLValueElimination.run($0) })
   registerPass(closureSpecialization, { closureSpecialization.run($0) })
   registerPass(autodiffClosureSpecialization, { autodiffClosureSpecialization.run($0) })
   registerPass(loopInvariantCodeMotionPass, { loopInvariantCodeMotionPass.run($0) })
