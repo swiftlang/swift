@@ -114,6 +114,10 @@ CLANG_MACRO_CONDITIONAL("SWIFT_NOESCAPE", , \
                         "__has_attribute(noescape)", \
                         "__attribute__((noescape))")
 
+CLANG_MACRO_CONDITIONAL("SWIFT_OBJC_DIRECT", , \
+                        "__has_attribute(objc_direct)", \
+                        "__attribute__((objc_direct))")
+
 CLANG_MACRO_CONDITIONAL("SWIFT_RELEASES_ARGUMENT", , \
                         "__has_attribute(ns_consumed)", \
                         "__attribute__((ns_consumed))")
