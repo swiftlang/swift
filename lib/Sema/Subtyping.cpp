@@ -1003,7 +1003,7 @@ static std::optional<AnyFunctionType::ExtInfo>
 extInfoJoinMeetImpl(Operation op,
                     AnyFunctionType::ExtInfo lhsInfo,
                     AnyFunctionType::ExtInfo rhsInfo) {
-  bool noEscape, sendable, throwing;
+  bool noEscape, sendable, throwing, async;
   Type sendableDep;
   Type thrownError;
 
@@ -1016,6 +1016,7 @@ extInfoJoinMeetImpl(Operation op,
 
   if (op == Operation::Join) {
     noEscape = lhsInfo.isNoEscape() || rhsInfo.isNoEscape();
+    async = lhsInfo.isAsync() || rhsInfo.isAsync();
 
     if (lhsSendableDep && rhsSendableDep) {
       // Form a tuple; its Sendable iff both components are Sendable.
@@ -1050,6 +1051,7 @@ extInfoJoinMeetImpl(Operation op,
     }
   } else {
     noEscape = lhsInfo.isNoEscape() && rhsInfo.isNoEscape();
+    async = lhsInfo.isAsync() && rhsInfo.isAsync();
 
     if (lhsSendableDep && rhsSendableDep) {
       // We cannot represent the meet of two sendable-dependent types.
@@ -1093,6 +1095,7 @@ extInfoJoinMeetImpl(Operation op,
   return lhsInfo.intoBuilder()
       .withNoEscape(noEscape)
       .withThrows(throwing, thrownError)
+      .withAsync(async)
       .withSendable(sendable)
       .withSendableDependentType(sendableDep)
       .build();
@@ -1216,15 +1219,15 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
       auto *lhsFunc = lhs->castTo<FunctionType>();
       auto *rhsFunc = rhs->castTo<FunctionType>();
 
-      auto result = rec(lhsFunc->getResult(), rhsFunc->getResult());
-
-      SmallVector<AnyFunctionType::Param, 4> params;
-
       // Note: getConversionBehavior() guarantees the function types don't
       // contain any parameter packs, so we may assume their lengths are
       // known.
       if (lhsFunc->getNumParams() != rhsFunc->getNumParams())
         return fail();
+
+      auto result = rec(lhsFunc->getResult(), rhsFunc->getResult());
+
+      SmallVector<AnyFunctionType::Param, 4> params;
 
       for (unsigned i : indices(lhsFunc->getParams())) {
         auto lhsParam = lhsFunc->getParams()[i];
@@ -1235,7 +1238,6 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
 
         Type paramType;
         if (lhsParam.isInOut() || lhsParam.isVariadic()) {
-          ASSERT(rhsParam.isInOut());
           auto result = isLikelyExactMatch(lhsParam.getPlainType(),
                                            rhsParam.getPlainType());
           if (!result)
