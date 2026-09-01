@@ -45,7 +45,7 @@
 // Diagnose any use of the attribute CLASS without FEATURE_NAME enabled,
 // and also enable other special behavior. If you use this for an experimental
 // feature, please add test cases to:
-// 
+//
 // * test/attr/feature_requirement.swift
 // * test/IDE/complete_decl_attribute_feature_requirement.swift
 #ifndef DECL_ATTR_FEATURE_REQUIREMENT
@@ -60,7 +60,7 @@
 // Declaration Attributes and Modifers
 //
 // Please keep entries in serialization code order. If you remove an entry,
-// leave an "Unused 'NNN'" comment so the unused code is obvious. 
+// leave an "Unused 'NNN'" comment so the unused code is obvious.
 DECL_ATTR(_silgen_name, SILGenName,
   OnAbstractFunction | OnVar,
   LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
@@ -945,7 +945,12 @@ DECL_ATTR(cxx, CxxDecl,
   178)
 DECL_ATTR_FEATURE_REQUIREMENT(CxxDecl, CxxImplementation)
 
-LAST_DECL_ATTR(CxxDecl)
+SIMPLE_DECL_ATTR(objcDirect, ObjCDirect,
+  OnAbstractFunction,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  179)
+
+LAST_DECL_ATTR(ObjCDirect)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

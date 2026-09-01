@@ -5157,6 +5157,7 @@ public:
   TRIVIAL_ATTR_PRINTER(NonMutating, non_mutating)
   TRIVIAL_ATTR_PRINTER(NonObjC, non_objc)
   TRIVIAL_ATTR_PRINTER(NonOverride, non_override)
+  TRIVIAL_ATTR_PRINTER(ObjCDirect, objc_direct)
   TRIVIAL_ATTR_PRINTER(ObjCMembers, objc_members)
   TRIVIAL_ATTR_PRINTER(ObjCNonLazyRealization, objc_non_lazy_realization)
   TRIVIAL_ATTR_PRINTER(Optional, optional)
