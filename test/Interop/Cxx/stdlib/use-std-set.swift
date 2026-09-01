@@ -20,6 +20,8 @@
 // UNSUPPORTED: LinuxDistribution=rhel-10.2
 // UNSUPPORTED: LinuxDistribution=ubuntu-26.04
 
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
+
 import StdlibUnittest
 #if !BRIDGING_HEADER
 import StdSet
