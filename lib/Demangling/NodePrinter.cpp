@@ -3803,10 +3803,17 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
           if (node->getKind() == Node::Kind::Identifier) {
             return std::string(node->getText());
           }
-          if (node->getKind() == Node::Kind::LocalDeclName) {
-            auto text = node->getChild(1)->getText();
-            auto index = node->getChild(0)->getIndex() + 1;
-            return std::string(text) + " #" + std::to_string(index);
+          if (node->getKind() == Node::Kind::LocalDeclName &&
+              node->getNumChildren() >= 2) {
+            // Only attempt to generate a string if the child nodes are an index
+            // (discriminator) followed by text (name).
+            NodePointer discriminator = node->getChild(0);
+            NodePointer name = node->getChild(1);
+            if (name->hasText() && discriminator->hasIndex()) {
+              auto index = discriminator->getIndex() + 1;
+              return std::string(name->getText()) + " #" +
+                     std::to_string(index);
+            }
           }
           return std::string("<unknown>");
         };
