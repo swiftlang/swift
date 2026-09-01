@@ -2609,6 +2609,10 @@ namespace {
           if (auto *underlyingDecl = friendDecl->getFriendDecl()) {
             m = underlyingDecl;
             isFriend = true;
+          } else {
+            // A friend declaration that names a type instead of a declaration
+            // has nothing to import.
+            continue;
           }
         }
 
