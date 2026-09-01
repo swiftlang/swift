@@ -906,6 +906,7 @@ mangled in to disambiguate.
   FUNC-REPRESENTATION ::= 'M'                // Swift method
   FUNC-REPRESENTATION ::= 'J'                // ObjC method
   FUNC-REPRESENTATION ::= 'K'                // closure
+  FUNC-REPRESENTATION ::= 'V'                // COM method
   FUNC-REPRESENTATION ::= 'W'                // protocol witness
 
   COROUTINE-KIND ::= 'A'                     // yield-once coroutine
