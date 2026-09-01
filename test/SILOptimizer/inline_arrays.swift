@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -primary-file %s -O -disable-availability-checking -module-name=test -emit-sil | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
+// RUN: %target-swift-frontend  -primary-file %s -O -disable-availability-checking -module-name=test -emit-sil -parse-as-library | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
 
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
@@ -196,3 +196,52 @@ public func equal(_ lhs: borrowing [32 of Int], _ rhs: borrowing [32 of Int]) ->
     }
     return true
 }
+
+// MARK: rdar://183793878 (Reading an InlineArray field of struct in an Array causes a full copy of the struct)
+// Verify that we can use Array.span to avoid copying elements when subscripting.
+
+public struct E {
+    var tag: UInt8 = 0
+    var v: [16 of UInt8] = .init(repeating: 0)
+    var pad: [128 of UInt8] = .init(repeating: 0)
+}
+
+// CHECK-LABEL: sil @$s4test9s_dynamicys5UInt8VSayAA1EVG_S2itF
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test9s_dynamicys5UInt8VSayAA1EVG_S2itF'
+public func s_dynamic(_ a: [E], _ i: Int, _ j: Int) -> UInt8 { a.span[i].v[j] }
+
+
+let gLet = [E](repeating: E(), count: 64)
+var gVar = [E](repeating: E(), count: 64)
+public final class Holder { var p = [E](repeating: E(), count: 64) }
+
+// CHECK-LABEL: sil @$s4test16a_borrowingParamys5UInt8VSayAA1EVG_S2itF
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test16a_borrowingParamys5UInt8VSayAA1EVG_S2itF'
+public func a_borrowingParam(_ a: borrowing [E], _ i: Int, _ j: Int) -> UInt8 { a[i].v[j] }
+
+// CHECK-LABEL: sil {{.*}} @$s4test16a_consumingParamys5UInt8VSayAA1EVGn_S2itF
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test16a_consumingParamys5UInt8VSayAA1EVGn_S2itF'
+public func a_consumingParam(_ a: consuming [E], _ i: Int, _ j: Int) -> UInt8 { a.span[i].v[j] }
+
+// CHECK-LABEL: sil @$s4test11a_globalLetys5UInt8VSi_SitF
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test11a_globalLetys5UInt8VSi_SitF'
+public func a_globalLet(_ i: Int, _ j: Int) -> UInt8 { gLet.span[i].v[j] }
+
+// CHECK-LABEL: sil @$s4test11a_globalVarys5UInt8VSi_SitF
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test11a_globalVarys5UInt8VSi_SitF'
+public func a_globalVar(_ i: Int, _ j: Int) -> UInt8 { gVar.span[i].v[j] }
+
+// CHECK-LABEL: sil @$s4test15a_classPropertyys5UInt8VAA6HolderC_S2itF
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test15a_classPropertyys5UInt8VAA6HolderC_S2itF'
+public func a_classProperty(_ h: borrowing Holder, _ i: Int, _ j: Int) -> UInt8 { h.p.span[i].v[j] }
+
+// specialized a_consumingParam that does not consume the array, called from original a_consumingParam.
+// CHECK-LABEL: sil shared @$s4test16a_consumingParamys5UInt8VSayAA1EVGn_S2itFTf4gnn_n
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test16a_consumingParamys5UInt8VSayAA1EVGn_S2itFTf4gnn_n'
