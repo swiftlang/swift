@@ -1245,16 +1245,6 @@ How `unchecked_ownership` can be used depends on the forwarding ownership:
 
 * With `@none` forwarding, the result is a value without ownership, which has
   no lifetime or scope which OSSA utilities and optimizations have to respect.
-  Therefore it can be used throughout the OSSA pipeline. For example, it can be
-  used to create the `value_hint` of a `load_borrow` from a value which is not
-  alive anymore in terms of OSSA at the `load_borrow` (see
-  [load_borrow](#load_borrow)):
-  ```
-  store %1 to [init] %0 : $*T      // consumes %1
-  ...
-  %2 = unchecked_ownership %1 : $T, forwarding: @none
-  %3 = load_borrow %0 : $*T, value_hint %2 : $T
-  ```
 
 * With `@guaranteed` or `@owned` forwarding, the result has a lifetime or
   borrow scope which is not connected with the operand. OSSA optimizations
