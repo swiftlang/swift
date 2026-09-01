@@ -1329,3 +1329,6 @@ Added: _$ss11UniqueArrayVyxGSHsSHRzRi_zrlMc
 Added: _$ss11UniqueArrayVyxGSQsSQRzRi_zrlMc
 Added: _$ss11UniqueArrayVsRi_zrlE11descriptionSSvg
 Added: _$ss11UniqueArrayVsRi_zrlE16debugDescriptionSSvg
+
+// Setter for typed willThrow hook.
+Added: __swift_setWillThrowTypedHandler
