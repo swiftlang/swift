@@ -46,6 +46,7 @@
 #include "GenMeta.h"
 #include "GenPoly.h"
 #include "GenProto.h"
+#include "GenStruct.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -1284,6 +1285,18 @@ namespace {
                       Alignment align)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align) {}
 
+    PrimitiveTypeInfo(
+        IRGenModule &IGM,
+        const SerializablePrimitiveTypeInfoRepresentation &representation)
+        : PODSingleScalarTypeInfo(IGM, representation) {
+      if (representation.schema.size() != 1 ||
+          representation.schema.front().aggregateAlignment != 0 ||
+          deserializeLLVMType(IGM, representation.schema.front().type) !=
+              getStorageType())
+        llvm::report_fatal_error(
+            "serialized PrimitiveTypeInfo has an invalid explosion schema");
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &IGM) const override {
@@ -1431,6 +1444,25 @@ namespace {
                        IsABIAccessible),
         ScalarTypes(std::move(scalarTypes))
     {}
+
+    OpaqueStorageTypeInfo(
+        IRGenModule &IGM,
+        const SerializableOpaqueStorageTypeInfoRepresentation &representation)
+        : ScalarTypeInfo(IGM, representation) {
+      ScalarTypes.reserve(representation.schema.size());
+      for (const auto &element : representation.schema) {
+        if (element.aggregateAlignment != 0)
+          llvm::report_fatal_error(
+              "cannot reconstruct an aggregate explosion element");
+        auto *scalarType = dyn_cast<llvm::IntegerType>(
+            deserializeLLVMType(IGM, element.type));
+        if (!scalarType)
+          llvm::report_fatal_error(
+              "opaque storage explosion element is not an integer");
+        ScalarTypes.push_back(scalarType);
+      }
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &IGM) const override {
@@ -1783,6 +1815,60 @@ namespace {
   };
 } // end anonymous namespace
 
+static std::unique_ptr<TypeInfo>
+createPrimitiveTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializablePrimitiveTypeInfoRepresentation &representation) {
+  return std::make_unique<PrimitiveTypeInfo>(IGM, representation);
+}
+
+static std::unique_ptr<TypeInfo>
+createOpaqueStorageTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializableOpaqueStorageTypeInfoRepresentation &representation) {
+  return std::make_unique<OpaqueStorageTypeInfo>(IGM, representation);
+}
+
+std::unique_ptr<TypeInfo>
+swift::irgen::createTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializableHiddenTypeInfoRepresentation &representation) {
+  switch (representation.getKind()) {
+  case SerializableHiddenTypeInfoKind::Primitive:
+    return createPrimitiveTypeInfoFromSerializableRepresentation(
+        IGM,
+        static_cast<const SerializablePrimitiveTypeInfoRepresentation &>(
+            representation));
+
+  case SerializableHiddenTypeInfoKind::OpaqueStorage:
+    return createOpaqueStorageTypeInfoFromSerializableRepresentation(
+        IGM,
+        static_cast<const SerializableOpaqueStorageTypeInfoRepresentation &>(
+            representation));
+
+  case SerializableHiddenTypeInfoKind::LoadableStruct:
+    return createLoadableStructTypeInfoFromSerializableRepresentation(
+        IGM,
+        static_cast<const SerializableLoadableStructTypeInfoRepresentation &>(
+            representation));
+
+  case SerializableHiddenTypeInfoKind::LoadableClangRecord:
+    return createLoadableClangRecordTypeInfoFromSerializableRepresentation(
+        IGM,
+        static_cast<
+            const SerializableLoadableClangRecordTypeInfoRepresentation &>(
+            representation));
+
+  case SerializableHiddenTypeInfoKind::TypeInfo:
+  case SerializableHiddenTypeInfoKind::Fixed:
+  case SerializableHiddenTypeInfoKind::Loadable:
+  case SerializableHiddenTypeInfoKind::LoadableRecord:
+    llvm::report_fatal_error(
+        "unsupported serialized hidden TypeInfo representation");
+  }
+  llvm_unreachable("invalid serialized hidden TypeInfo kind");
+}
+
 /// Constructs a type info which performs simple loads and stores of
 /// the given IR type.
 const LoadableTypeInfo *
@@ -1969,6 +2055,21 @@ TypeConverter::~TypeConverter() {
     I = Cur->NextConverted;
     delete Cur;
   }
+}
+
+const TypeInfo &
+TypeConverter::adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo) {
+  assert(typeInfo && "cannot adopt a null TypeInfo");
+  assert(!typeInfo->NextConverted && "TypeInfo is already owned");
+  auto *result = typeInfo.release();
+  result->NextConverted = FirstType;
+  FirstType = result;
+  return *result;
+}
+
+const TypeInfo &
+IRGenModule::adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo) {
+  return Types.adoptTypeInfo(std::move(typeInfo));
 }
 
 void TypeConverter::setGenericContext(CanGenericSignature signature) {
@@ -2755,6 +2856,15 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for the type info an IntegerType");
   case TypeKind::Hidden: {
     auto hidden = cast<HiddenType>(ty);
+    if (auto *layoutInfo = hidden->getLayoutInfoDecl()) {
+      assert(layoutInfo->Layout &&
+             layoutInfo->Layout->typeInfoRepresentation &&
+             "hidden layout declaration has no TypeInfo representation");
+      return createTypeInfoFromSerializableRepresentation(
+                 IGM, *layoutInfo->Layout->typeInfoRepresentation)
+          .release();
+    }
+
     auto *defining = hidden->getDefiningModule();
     assert(defining &&
            "HiddenType must carry a defining module after deserialization");
