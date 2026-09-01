@@ -943,6 +943,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, PACK_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
   BLOCK_RECORD(index_block, HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS);
+  BLOCK_RECORD(index_block, HIDDEN_TYPE_FALLBACK_TABLE);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
   BLOCK_RECORD(index_block, NESTED_TYPE_DECLS);
   BLOCK_RECORD(index_block, DECL_MEMBER_NAMES);
@@ -2650,6 +2651,25 @@ void Serializer::writeCrossReference(const Decl *D) {
   XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        addTypeRef(ty), iid, isProtocolExt,
                                        D->hasClangNode(), val->isStatic());
+}
+
+void Serializer::writeHiddenTypeXRef(
+    const HiddenTypeLayoutInfoDecl *hidden) {
+  using namespace decls_block;
+  unsigned abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
+  ModuleID moduleID = hidden->OriginalModuleIsObjCHeader
+                          ? ModuleID(OBJC_HEADER_MODULE_ID)
+                          : addDeclBaseNameRef(hidden->OriginalModuleName);
+  XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                         moduleID, hidden->OriginalXRefPath.size());
+
+  abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
+  for (const auto &piece : hidden->OriginalXRefPath) {
+    XRefTypePathPieceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addDeclBaseNameRef(piece.Name),
+        /*privateDiscriminator=*/0, piece.InProtocolExtension,
+        piece.ImportedFromClang);
+  }
 }
 
 /// Translate from the AST associativity enum to the Serialization enum
@@ -5640,6 +5660,14 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
     }
   };
 
+  if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(D)) {
+    assert((hidden->OriginalModuleIsObjCHeader ||
+            !hidden->OriginalModuleName.empty()) &&
+           "cannot reserialize a hidden type without its original XREF");
+    writeHiddenTypeXRef(hidden);
+    return;
+  }
+
   if (isDeclXRef(D)) {
     writeCrossReference(D);
     return;
@@ -6494,6 +6522,13 @@ public:
 
   void visitHiddenType(const HiddenType *hidden) {
     using namespace decls_block;
+    if (auto *layoutDecl = hidden->getLayoutInfoDecl()) {
+      unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
+      NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                    S.addDeclRef(layoutDecl),
+                                    S.addTypeRef(hidden->getParent()));
+      return;
+    }
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[HiddenTypeLayout::Code];
     HiddenTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -6857,29 +6892,40 @@ IRABIDetailsProvider &Serializer::getLayoutProvider() {
 void Serializer::writeHiddenTypeLayout(const Decl *decl) {
   using namespace decls_block;
 
-  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
-  if (!nominal)
+  AbstractTypeLayout computedLayout;
+  const AbstractTypeLayout *layout;
+  std::string mangledName;
+  if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(decl)) {
+    if (!hidden->Layout)
+      llvm::report_fatal_error(
+          "hidden type declaration has no abstract layout");
+    layout = hidden->Layout;
+    mangledName = hidden->MangledName.str();
+  } else if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    computedLayout = getLayoutProvider().getAbstractTypeLayout(nominal);
+    layout = &computedLayout;
+    mangledName =
+        Mangle::ASTMangler(nominal->getASTContext()).mangleNominalType(nominal);
+  } else {
     llvm::report_fatal_error(
-        "cannot serialize a hidden layout for a non-nominal declaration");
+        "cannot serialize a hidden layout for a non-type declaration");
+  }
 
-  auto layout = getLayoutProvider().getAbstractTypeLayout(nominal);
-  if (!layout.typeInfoRepresentation)
+  if (!layout->typeInfoRepresentation)
     llvm::report_fatal_error(
         "abstract type layout has no serializable TypeInfo representation");
 
-  auto mangledName =
-      Mangle::ASTMangler(nominal->getASTContext()).mangleNominalType(nominal);
   auto mangledNameID = addUniquedString(mangledName).second;
-  auto *parentDecl = getHiddenTypeLayoutDeclParentDecl(nominal);
+  auto *parentDecl = getHiddenTypeLayoutDeclParentDecl(decl);
   auto parentDeclID = parentDecl ? addDeclRef(parentDecl) : DeclID();
 
   unsigned abbrCode = DeclTypeAbbrCodes[HiddenTypeLayoutInfoLayout::Code];
   HiddenTypeLayoutInfoLayout::emitRecord(
       Out, ScratchRecord, abbrCode, mangledNameID, parentDeclID,
       static_cast<unsigned>(getStableSerializableReferenceCountingKind(
-          layout.referenceCountingSystem)));
+          layout->referenceCountingSystem)));
 
-  const auto &properties = layout.typeProperties;
+  const auto &properties = layout->typeProperties;
   abbrCode = DeclTypeAbbrCodes[SerializableSILTypePropertiesLayout::Code];
   SerializableSILTypePropertiesLayout::emitRecord(
       Out, ScratchRecord, abbrCode, properties.isTrivial,
@@ -6891,7 +6937,7 @@ void Serializer::writeHiddenTypeLayout(const Decl *decl) {
       properties.definitelyIsAddressableForDependencies,
       properties.definitelyHasRawLayout, properties.isEscapable);
 
-  writeSerializableTypeInfo(*layout.typeInfoRepresentation);
+  writeSerializableTypeInfo(*layout->typeInfoRepresentation);
 }
 
 void Serializer::writeAllDeclsAndTypes() {
@@ -7559,7 +7605,9 @@ bool Serializer::scheduleHiddenTypeLayoutSerialization(const Decl *D) {
 
   if (HiddenTypeLayoutsToSerialize.hasRef(D))
     return false;
-  HiddenTypeLayoutsToSerialize.addRef(D);
+  auto hiddenLayoutID = HiddenTypeLayoutsToSerialize.addRef(D);
+  HiddenTypeFallbackTable.push_back(
+      {DeclsToSerialize.addRef(D), hiddenLayoutID});
   return true;
 }
 
@@ -7779,6 +7827,14 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, PackConformancesToSerialize);
     writeOffsets(Offsets, SILLayoutsToSerialize);
     writeOffsets(Offsets, HiddenTypeLayoutsToSerialize);
+
+    SmallVector<uint32_t, 32> fallbackPairs;
+    for (auto [xrefID, layoutID] : HiddenTypeFallbackTable) {
+      fallbackPairs.push_back(xrefID);
+      fallbackPairs.push_back(layoutID);
+    }
+    Offsets.emit(ScratchRecord, index_block::HIDDEN_TYPE_FALLBACK_TABLE,
+                 fallbackPairs);
 
     Offsets.emit(ScratchRecord, index_block::IDENTIFIER_OFFSETS,
                  identifierOffsets);

@@ -50,11 +50,11 @@ struct AbstractSILTypeProperties {
 
 struct AbstractTypeLayout {
   std::string mangledName;
-  uint64_t size;
-  uint64_t alignment;
-  uint64_t stride;
-  bool bitwiseCopyable;
-  bool isOpaque;
+  uint64_t size = 0;
+  uint64_t alignment = 0;
+  uint64_t stride = 0;
+  bool bitwiseCopyable = false;
+  bool isOpaque = false;
   AbstractSILTypeProperties typeProperties;
   std::optional<ReferenceCounting> referenceCountingSystem;
   std::shared_ptr<SerializableHiddenTypeInfoRepresentation>

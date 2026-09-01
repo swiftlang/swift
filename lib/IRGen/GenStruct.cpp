@@ -101,6 +101,10 @@ namespace {
     StructFieldInfo(VarDecl *field, const TypeInfo &type)
       : RecordField(type), Field(field) {}
 
+    StructFieldInfo(VarDecl *field, const ElementLayout &layout,
+                    unsigned explosionBegin, unsigned explosionEnd)
+        : RecordField(layout, explosionBegin, explosionEnd), Field(field) {}
+
     /// The field.
     VarDecl * const Field;
 
@@ -1053,6 +1057,12 @@ namespace {
                            alwaysFixedSize, isABIAccessible)
     {}
 
+    LoadableStructTypeInfo(
+        ArrayRef<StructFieldInfo> fields, IRGenModule &IGM,
+        const SerializableLoadableStructTypeInfoRepresentation &representation)
+        : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo, fields,
+                             IGM, representation) {}
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &IGM) const override {
@@ -1936,7 +1946,62 @@ namespace {
       return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
     }
   };
+
+  static const TypeInfo &
+  createRecordFieldTypeInfoFromSerializableRepresentation(
+      IRGenModule &IGM,
+      const SerializableRecordFieldRepresentation &field) {
+    if (field.type) {
+      auto loweredType = IGM.getLoweredType(field.type->getCanonicalType());
+      return IGM.getTypeInfo(loweredType);
+    }
+    if (!field.typeInfo)
+      llvm::report_fatal_error(
+          "serialized record field has no TypeInfo representation");
+    return IGM.adoptTypeInfo(
+        createTypeInfoFromSerializableRepresentation(IGM, *field.typeInfo));
+  }
+
+  template <typename FieldInfo>
+  static void createRecordFieldsFromSerializableRepresentation(
+      IRGenModule &IGM,
+      const SerializableLoadableRecordTypeInfoRepresentation &representation,
+      SmallVectorImpl<FieldInfo> &fields) {
+    fields.reserve(representation.fields.size());
+    for (const auto &field : representation.fields) {
+      const auto &fieldTypeInfo =
+          createRecordFieldTypeInfoFromSerializableRepresentation(IGM, field);
+      auto layout = ElementLayout::getFromSerializedStorage(
+          fieldTypeInfo, field.layout);
+      fields.emplace_back(nullptr, layout, field.storage.Begin,
+                          field.storage.End);
+    }
+  }
+
 } // end anonymous namespace
+
+std::unique_ptr<TypeInfo>
+swift::irgen::createLoadableStructTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializableLoadableStructTypeInfoRepresentation &representation) {
+  SmallVector<StructFieldInfo, 8> fields;
+  createRecordFieldsFromSerializableRepresentation(IGM, representation,
+                                                   fields);
+  return std::unique_ptr<TypeInfo>(
+      LoadableStructTypeInfo::create(fields, IGM, representation));
+}
+
+std::unique_ptr<TypeInfo>
+swift::irgen::createLoadableClangRecordTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializableLoadableClangRecordTypeInfoRepresentation
+        &representation) {
+  SmallVector<ClangFieldInfo, 8> fields;
+  createRecordFieldsFromSerializableRepresentation(IGM, representation,
+                                                   fields);
+  return std::unique_ptr<TypeInfo>(
+      LoadableClangRecordTypeInfo::create(fields, IGM, representation));
+}
 
 const TypeInfo *
 TypeConverter::convertResilientStruct(IsCopyable_t copyable,
