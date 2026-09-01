@@ -4,6 +4,34 @@
 
 // CHECK-LABEL: internal enum HasElementsWithAvailability : Hashable
 enum HasElementsWithAvailability: Hashable {
+  // CHECK:       internal func hash(into hasher: inout Hasher) {
+  // CHECK-NEXT:    var discriminator: Int
+  // CHECK-EMPTY:
+  // CHECK-NEXT:    switch self {
+  // CHECK-NEXT:    case .alwaysAvailable:
+  // CHECK-NEXT:      discriminator = 0
+  // CHECK-NEXT:    case .neverAvailable:
+  // CHECK-NEXT:      Swift::fatalError("Unavailable code reached")
+  // CHECK-NEXT:    case .unavailableMacOS:
+  // CHECK-NEXT:      discriminator = 1
+  // CHECK-NEXT:    case .unavailableiOS:
+  // CHECK-NEXT:      discriminator = 2
+  // CHECK-NEXT:    case .unavailableMacCatalyst:
+  // CHECK-NEXT:      discriminator = 3
+  // CHECK-NEXT:    case .unavailableMacOSAndiOS:
+  // CHECK-NEXT:      Swift::fatalError("Unavailable code reached")
+  // CHECK-NEXT:    case .unavailableMacOSAndMacCatalyst:
+  // CHECK-NEXT:      discriminator = 4
+  // CHECK-NEXT:    }
+  // CHECK-NEXT:    hasher.combine(discriminator)
+  // CHECK-NEXT:  }
+
+  // CHECK:       internal var hashValue: Int {
+  // CHECK-NEXT:    get {
+  // CHECK-NEXT:      return Swift::_hashValue(for: self)
+  // CHECK-NEXT:    }
+  // CHECK-NEXT:  }
+  
   // CHECK:       @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
   // CHECK-NEXT:    var index_lhs: Int
   // CHECK-EMPTY:
@@ -11,7 +39,7 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:    case .alwaysAvailable:
   // CHECK-NEXT:      index_lhs = 0
   // CHECK-NEXT:    case .neverAvailable:
-  // CHECK-NEXT:    fatalError("Unavailable code reached")
+  // CHECK-NEXT:      Swift::fatalError("Unavailable code reached")
   // CHECK-NEXT:    case .unavailableMacOS:
   // CHECK-NEXT:      index_lhs = 1
   // CHECK-NEXT:    case .unavailableiOS:
@@ -19,7 +47,7 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:    case .unavailableMacCatalyst:
   // CHECK-NEXT:      index_lhs = 3
   // CHECK-NEXT:    case .unavailableMacOSAndiOS:
-  // CHECK-NEXT:    fatalError("Unavailable code reached")
+  // CHECK-NEXT:      Swift::fatalError("Unavailable code reached")
   // CHECK-NEXT:    case .unavailableMacOSAndMacCatalyst:
   // CHECK-NEXT:      index_lhs = 4
   // CHECK-NEXT:    }
@@ -29,7 +57,7 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:    case .alwaysAvailable:
   // CHECK-NEXT:      index_rhs = 0
   // CHECK-NEXT:    case .neverAvailable:
-  // CHECK-NEXT:    fatalError("Unavailable code reached")
+  // CHECK-NEXT:      Swift::fatalError("Unavailable code reached")
   // CHECK-NEXT:    case .unavailableMacOS:
   // CHECK-NEXT:      index_rhs = 1
   // CHECK-NEXT:    case .unavailableiOS:
@@ -37,7 +65,7 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:    case .unavailableMacCatalyst:
   // CHECK-NEXT:      index_rhs = 3
   // CHECK-NEXT:    case .unavailableMacOSAndiOS:
-  // CHECK-NEXT:    fatalError("Unavailable code reached")
+  // CHECK-NEXT:      Swift::fatalError("Unavailable code reached")
   // CHECK-NEXT:    case .unavailableMacOSAndMacCatalyst:
   // CHECK-NEXT:      index_rhs = 4
   // CHECK-NEXT:    }
@@ -74,31 +102,4 @@ enum HasElementsWithAvailability: Hashable {
   @available(macOS, unavailable)
   @available(macCatalyst, unavailable)
   case unavailableMacOSAndMacCatalyst
-
-  // CHECK:       internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:    var discriminator: Int
-  // CHECK-NEXT:    switch self {
-  // CHECK-NEXT:    case .alwaysAvailable:
-  // CHECK-NEXT:      discriminator = 0
-  // CHECK-NEXT:    case .neverAvailable:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}
-  // CHECK-NEXT:    case .unavailableMacOS:
-  // CHECK-NEXT:      discriminator = 1
-  // CHECK-NEXT:    case .unavailableiOS:
-  // CHECK-NEXT:      discriminator = 2
-  // CHECK-NEXT:    case .unavailableMacCatalyst:
-  // CHECK-NEXT:      discriminator = 3
-  // CHECK-NEXT:    case .unavailableMacOSAndiOS:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}
-  // CHECK-NEXT:    case .unavailableMacOSAndMacCatalyst:
-  // CHECK-NEXT:      discriminator = 4
-  // CHECK-NEXT:    }
-  // CHECK-NEXT:    hasher.combine(discriminator)
-  // CHECK-NEXT:  }
-
-  // CHECK:       internal var hashValue: Int {
-  // CHECK-NEXT:    get {
-  // CHECK-NEXT:      return _hashValue(for: self)
-  // CHECK-NEXT:    }
-  // CHECK-NEXT:  }
 }
