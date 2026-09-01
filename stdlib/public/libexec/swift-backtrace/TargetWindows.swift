@@ -230,11 +230,9 @@ class Target {
     self.pid = pid
 
     guard let hProcess = OpenProcess(
-            DWORD(
-              PROCESS_VM_READ
+            PROCESS_VM_READ
               | PROCESS_QUERY_LIMITED_INFORMATION
-              | PROCESS_SUSPEND_RESUME
-            ),
+              | PROCESS_SUSPEND_RESUME,
             false,
             pid
           ) else {
@@ -524,4 +522,3 @@ class Target {
 }
 
 #endif // os(Windows)
-
