@@ -2225,7 +2225,7 @@ public:
   /// _Concurrency module. This is an egregious hack to allow us to
   /// use overloading tricks to retain the behavior previously
   /// afforded by rethrowing conformances.
-  bool shouldSkipGenericRequirements(const GenericContext *ownerCtx) {
+  bool shouldSkipGenericWhereClause(const GenericContext *ownerCtx) {
     return isAsyncSequenceFlatMap(ownerCtx);
   }
 

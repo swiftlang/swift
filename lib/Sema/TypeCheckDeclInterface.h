@@ -40,7 +40,7 @@ class DeclInterfaceTypeChecker : public DeclVisitor<Derived> {
 protected:
   /// Whether the trailing where clause of a generic context should be
   /// skipped entirely.
-  bool shouldSkipGenericRequirements(const GenericContext *ownerCtx) {
+  bool shouldSkipGenericWhereClause(const GenericContext *ownerCtx) {
     return false;
   }
 
@@ -62,7 +62,7 @@ protected:
     }
 
     if (ownerCtx->getTrailingWhereClause()) {
-      if (asDerived().shouldSkipGenericRequirements(ownerCtx))
+      if (asDerived().shouldSkipGenericWhereClause(ownerCtx))
         return;
 
       WhereClauseOwner(const_cast<GenericContext *>(ownerCtx))
