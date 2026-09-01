@@ -71,6 +71,44 @@ SWIFT_RUNTIME_STDLIB_API void
 swift_willThrow(SWIFT_CONTEXT void *unused,
                 SWIFT_ERROR_RESULT SwiftError **object);
 
+/// A handler called by swift_willThrow when an untyped error is thrown.
+using WillThrowHandler = void (*)(SwiftError *error);
+
+/// A handler called by swift_willThrowTypedImpl when a typed error is thrown.
+using WillThrowTypedHandler = void (*)(OpaqueValue *value,
+                                       const Metadata *type,
+                                       const WitnessTable *errorConformance);
+
+/// Receives the handler that was installed for untyped throws before the
+/// handler being installed by _swift_setWillThrowHandler.
+using WillThrowOldHandlerCallback = void (*)(WillThrowHandler oldHandler);
+
+/// Receives the handler that was installed for typed throws before the handler
+/// being installed by _swift_setWillThrowTypedHandler.
+using WillThrowTypedOldHandlerCallback =
+    void (*)(WillThrowTypedHandler oldHandler);
+
+/// Install \p handler as the handler for untyped throws, passing the handler it
+/// replaces to \p saveOldHandler first.  Pass null for \p saveOldHandler when
+/// the old handler is not wanted.
+///
+/// \p saveOldHandler runs before \p handler becomes reachable, so a handler that
+/// chains to its predecessor can record it before a throw on another thread
+/// reaches the chain.  It may be called more than once; the handler passed to the
+/// last call is the one that was replaced.
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+void _swift_setWillThrowHandler(WillThrowHandler handler,
+                                WillThrowOldHandlerCallback saveOldHandler);
+
+/// Install \p handler as the handler for typed throws, passing the handler it
+/// replaces to \p saveOldHandler first.  See _swift_setWillThrowHandler.
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+void _swift_setWillThrowTypedHandler(
+    WillThrowTypedHandler handler,
+    WillThrowTypedOldHandlerCallback saveOldHandler);
+
 /// Called when throwing a typed error.  Serves as a breakpoint hook
 /// for debuggers.
 SWIFT_CC(swift)
