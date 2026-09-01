@@ -94,11 +94,13 @@ public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
   @inlinable
   public var count: Int { return storage.count }
 
+  @usableFromInline
   internal init(_ storage: Storage) {
     self.storage = storage
   }
 
   /// Constructs an empty string
+  @inlinable
   public init() {
     self.init(UncheckedStringStorage.empty)
   }
@@ -168,7 +170,8 @@ public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
 @_specialize(where Element == UInt8)
 @_specialize(where Element == CChar)
 @_specialize(where Element == UInt16)
-fileprivate func _unpackSmallUncheckedString<Element: FixedWidthInteger>(
+@usableFromInline
+internal func _unpackSmallUncheckedString<Element: FixedWidthInteger>(
   _ data: SmallUncheckedStringStorage<Element>,
   into buffer: UnsafeMutableBufferPointer<Element>
 ) {
@@ -185,6 +188,7 @@ fileprivate func _unpackSmallUncheckedString<Element: FixedWidthInteger>(
 extension UncheckedString {
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a NUL-terminated sequence of `Element`s.
+  @inlinable
   public func withCString<R, Failure>(
     _ body: (UnsafePointer<Element>) throws(Failure) -> R
   ) throws(Failure) -> R {
@@ -274,6 +278,7 @@ func _convertConstUncheckedStringToPointerArgument<
 extension UncheckedString where Element == UInt8 {
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a NUL-terminated sequence of `Element`s.
+  @inlinable
   public func withCString<R, Failure>(
     _ body: (UnsafePointer<CChar>) throws(Failure) -> R
   ) throws(Failure) -> R {
@@ -292,19 +297,21 @@ extension UncheckedString {
   @_specialize(where Element == UInt8)
   @_specialize(where Element == CChar)
   @_specialize(where Element == UInt16)
+  @inlinable
   public init(cString: UnsafePointer<Element>) {
     let len = unsafe fast_strlen(cString)
+    let newStorage: Storage
 
     if len == 0 {
-      storage = .empty
+      newStorage = .empty
     } else if len <= SmallUncheckedStringStorage<Element>.capacity {
-      storage = .small(
+      newStorage = .small(
         unsafe SmallUncheckedStringStorage(
           unsafe UnsafeBufferPointer(start: cString, count: len)
         )
       )
     } else {
-      storage = .dynamic(
+      newStorage = .dynamic(
         DynamicUncheckedStringStorage(
           characters: unsafe Array<Element>(
             unsafe UnsafeBufferPointer(start: cString,
@@ -314,6 +321,7 @@ extension UncheckedString {
         )
       )
     }
+    self.init(newStorage)
   }
 }
 
@@ -321,6 +329,7 @@ extension UncheckedString {
 @available(SwiftStdlib 9999, *)
 extension UncheckedString where Element == UInt8 {
   /// Creates a string from a NUL-terminated sequence of characters.
+  @inlinable
   public init(cString nullTerminatedCharacters: UnsafePointer<CChar>) {
     unsafe self.init(
       cString: unsafe UnsafeRawPointer(nullTerminatedCharacters).assumingMemoryBound(
@@ -338,19 +347,21 @@ extension UncheckedString {
   @_specialize(where Element == UInt8)
   @_specialize(where Element == CChar)
   @_specialize(where Element == UInt16)
+  @inlinable
   public init(immortalString: UnsafePointer<Element>) {
     let len = unsafe fast_strlen(immortalString)
+    let newStorage: Storage
 
     if len == 0 {
-      storage = .empty
+      newStorage = .empty
     } else if len <= SmallUncheckedStringStorage<Element>.capacity {
-      storage = .small(
+      newStorage = .small(
         unsafe SmallUncheckedStringStorage(
           unsafe UnsafeBufferPointer(start: immortalString, count: len)
         )
       )
     } else {
-      storage = .immortal(
+      newStorage = .immortal(
         unsafe ImmortalUncheckedStringStorage(
           characters: immortalString,
           count: UInt32(len),
@@ -358,19 +369,23 @@ extension UncheckedString {
         )
       )
     }
+    self.init(newStorage)
   }
 
   // Creates a string from an immortal string that isn't NUL terminated.
   @_specialize(where Element == UInt8)
   @_specialize(where Element == CChar)
   @_specialize(where Element == UInt16)
+  @inlinable
   public init(immortalString: UnsafeBufferPointer<Element>) {
+    let newStorage: Storage
+
     if immortalString.count == 0 {
-      storage = .empty
+      newStorage = .empty
     } else if immortalString.count <= SmallUncheckedStringStorage<Element>.capacity {
-      storage = .small(unsafe SmallUncheckedStringStorage(immortalString))
+      newStorage = .small(unsafe SmallUncheckedStringStorage(immortalString))
     } else {
-      storage = .immortal(
+      newStorage = .immortal(
         unsafe ImmortalUncheckedStringStorage(
           characters: immortalString.baseAddress!,
           count: UInt32(immortalString.count),
@@ -378,6 +393,73 @@ extension UncheckedString {
         )
       )
     }
+    self.init(newStorage)
+  }
+}
+
+// For UInt16, provide dedicated overloads that call `fast_strlen` with a
+// literally-typed `UnsafePointer<UInt16>` argument. The `Element`-generic
+// initializers above can only ever bind their `fast_strlen(cString)` call to
+// the generic `fast_strlen<T>` overload, since overload resolution runs at
+// type-checking time, before `Element` is known to be concretely `UInt16` --
+// `@_specialize`ing the generic initializer only clones that same generic
+// loop, it can't retarget the call to a different overload. Duplicating the
+// two bodies here is what actually lets `UncheckedString<UInt16>(cString:)`
+// reach the faster, word-at-a-time `fast_strlen(_: UnsafePointer<UInt16>)`.
+@available(SwiftStdlib 9999, *)
+extension UncheckedString where Element == UInt16 {
+  /// Creates a string from a NUL-terminated sequence of characters.
+  @inlinable
+  public init(cString: UnsafePointer<UInt16>) {
+    let len = unsafe fast_strlen(cString)
+    let newStorage: Storage
+
+    if len == 0 {
+      newStorage = .empty
+    } else if len <= SmallUncheckedStringStorage<UInt16>.capacity {
+      newStorage = .small(
+        unsafe SmallUncheckedStringStorage(
+          unsafe UnsafeBufferPointer(start: cString, count: len)
+        )
+      )
+    } else {
+      newStorage = .dynamic(
+        DynamicUncheckedStringStorage(
+          characters: unsafe Array<UInt16>(
+            unsafe UnsafeBufferPointer(start: cString,
+                                       count: len + 1)
+          ),
+          flags: [.nulTerminated]
+        )
+      )
+    }
+    self.init(newStorage)
+  }
+
+  /// Creates a string from a NUL-terminated immortal string.
+  @inlinable
+  public init(immortalString: UnsafePointer<UInt16>) {
+    let len = unsafe fast_strlen(immortalString)
+    let newStorage: Storage
+
+    if len == 0 {
+      newStorage = .empty
+    } else if len <= SmallUncheckedStringStorage<UInt16>.capacity {
+      newStorage = .small(
+        unsafe SmallUncheckedStringStorage(
+          unsafe UnsafeBufferPointer(start: immortalString, count: len)
+        )
+      )
+    } else {
+      newStorage = .immortal(
+        unsafe ImmortalUncheckedStringStorage(
+          characters: immortalString,
+          count: UInt32(len),
+          flags: [.nulTerminated]
+        )
+      )
+    }
+    self.init(newStorage)
   }
 }
 
@@ -385,6 +467,7 @@ extension UncheckedString {
 extension UncheckedString {
   /// Calls the given closure with a buffer of `Element`s,
   /// which are *not* necessarily NUL-terminated.
+  @inlinable
   public func withCharacterData<R, Failure>(
     _ body: (Span<Element>) throws(Failure) -> R
   ) throws(Failure) -> R {
@@ -525,6 +608,7 @@ public struct UncheckedSubString<E: FixedWidthInteger>
     return UncheckedSubString<Element>(base: base, bounds: bounds)
   }
 
+  @inlinable
   public func withCharacterData<R, Failure>(
     _ body: (Span<Element>) throws(Failure) -> R
   ) throws(Failure) -> R {
@@ -546,9 +630,9 @@ public struct UncheckedSubString<E: FixedWidthInteger>
 
 @_specialize(where T == UInt8)
 @_specialize(where T == CChar)
-@_specialize(where T == UInt16)
-@inline(always)
-fileprivate func fast_strlen<T: FixedWidthInteger>(_ str: UnsafePointer<T>) -> Int {
+@usableFromInline
+@inline(__always)
+internal func fast_strlen<T: FixedWidthInteger>(_ str: UnsafePointer<T>) -> Int {
   // The compiler will optimize this to a call to C strlen() for UInt8
   var ptr = unsafe str
   while unsafe ptr.pointee != 0 {
@@ -563,7 +647,8 @@ fileprivate func containsNul16(_ word: UInt64) -> Bool {
 }
 
 // For UInt16, this is faster than the above
-fileprivate func fast_strlen(_ str: UnsafePointer<UInt16>) -> Int {
+@usableFromInline
+internal func fast_strlen(_ str: UnsafePointer<UInt16>) -> Int {
   var ptr = unsafe str
 
   // Align

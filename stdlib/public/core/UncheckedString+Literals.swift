@@ -22,6 +22,7 @@ extension UncheckedString: _ExpressibleByBuiltinUncheckedStringLiteral {
   @_specialize(where Element == CChar)
   @_specialize(where Element == UInt16)
   @_effects(readonly)
+  @inlinable
   public init(
     _builtinUncheckedStringLiteral start: Builtin.RawPointer,
     unitCount: Builtin.Word
