@@ -77,3 +77,33 @@ bb2:
 bb3(%r : $@convention(thin) (@owned X, UInt8) -> ()):
   return %r : $@convention(thin) (@owned X, UInt8) -> ()
 }
+
+struct LargeExpr {
+  var a: Int, b: Int, c: Int, d: Int, e: Int, f: Int, g: Int, h: Int
+}
+
+enum Cond {
+  case expression((Int, Int) -> Optional<LargeExpr>)
+}
+
+sil private @thunk : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (Int, Int) -> Optional<LargeExpr>) -> Optional<LargeExpr> {
+bb0(%0 : $Int, %1 : $Int, %2 : $@callee_guaranteed (Int, Int) -> Optional<LargeExpr>):
+  %3 = apply %2(%1, %0) : $@callee_guaranteed (Int, Int) -> Optional<LargeExpr>
+  return %3 : $Optional<LargeExpr>
+}
+
+// CHECK-LABEL: sil @reversed
+// The closure is extracted directly with the rewritten @out return convention
+// and fed to the partial_apply with no intervening convert_function.
+// CHECK: [[CLOSURE:%.*]] = unchecked_enum_data %0, #Cond.expression!enumelt
+// CHECK-NOT: convert_function
+// CHECK: partial_apply [callee_guaranteed] {{%.*}}([[CLOSURE]]) : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (Int, Int) -> @out Optional<LargeExpr>) -> @out Optional<LargeExpr>
+sil @reversed : $@convention(method) (@guaranteed Cond) -> @owned Cond {
+bb0(%0 : $Cond):
+  %2 = unchecked_enum_data %0 : $Cond, #Cond.expression!enumelt
+  %4 = function_ref @thunk : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (Int, Int) -> Optional<LargeExpr>) -> Optional<LargeExpr>
+  %5 = partial_apply [callee_guaranteed] %4(%2) : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (Int, Int) -> Optional<LargeExpr>) -> Optional<LargeExpr>
+  %6 = enum $Cond, #Cond.expression!enumelt, %5 : $@callee_guaranteed (Int, Int) -> Optional<LargeExpr>
+  retain_value %0 : $Cond
+  return %6 : $Cond
+}

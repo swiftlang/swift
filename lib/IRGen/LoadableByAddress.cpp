@@ -3022,11 +3022,19 @@ bool LoadableByAddress::recreateUncheckedEnumDataInstr(
     newType = newType.getObjectType();
   }
   if (caseTy != newType) {
-    auto *takeEnum = enumBuilder.createUncheckedEnumData(
-        enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
-        caseTy);
-    newInstr = enumBuilder.createUncheckedReinterpretCast(enumInstr->getLoc(),
-                                                          takeEnum, newType);
+    // If the payload is a rewritten function type, extract the payload directly
+    // with the rewritten type instead of casting.
+    if (isFuncOrOptionalFuncType(newType)) {
+      newInstr = enumBuilder.createUncheckedEnumData(
+          enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
+          newType);
+    } else {
+      auto *takeEnum = enumBuilder.createUncheckedEnumData(
+          enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
+          caseTy);
+      newInstr = enumBuilder.createUncheckedReinterpretCast(enumInstr->getLoc(),
+                                                            takeEnum, newType);
+    }
   } else {
     newInstr = enumBuilder.createUncheckedEnumData(
         enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
