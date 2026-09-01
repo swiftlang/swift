@@ -925,6 +925,7 @@ namespace {
       NumRequirementsInSignature = B.addPlaceholderWithSize(IGM.Int32Ty);
       NumRequirements = B.addPlaceholderWithSize(IGM.Int32Ty);
       asImpl().addAssociatedTypeNames();
+      asImpl().addCOMInterfaceID();
       asImpl().addRequirementSignature();
       asImpl().addRequirements();
       auto addr = IGM.getAddrOfProtocolDescriptor(Proto,
@@ -939,6 +940,16 @@ namespace {
       auto nameStr = IGM.getAddrOfGlobalIdentifierString(Proto->getName().str(),
                                            /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(nameStr);
+    }
+
+    void addCOMInterfaceID() {
+      if (!Proto->isCOMInterface())
+        return;
+
+      const COMDeclInfo *info = Proto->getCOMDeclInfo();
+      ASSERT(info && info->isInterface());
+
+      B.add(IGM.getCOMIdentityConstant(info->getInterfaceID()));
     }
 
     void addRequirementSignature() {
