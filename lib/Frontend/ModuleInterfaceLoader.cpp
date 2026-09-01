@@ -1815,8 +1815,10 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(clangImporterOpts.BuildSessionFilePath);
   }
 
-  if (casOpts.EnableCaching) {
+  if (casOpts.EnableCaching || casOpts.ImportModuleFromCAS) {
     genericSubInvocation.getCASOptions().EnableCaching = casOpts.EnableCaching;
+    genericSubInvocation.getCASOptions().ImportModuleFromCAS =
+        casOpts.ImportModuleFromCAS;
     genericSubInvocation.getCASOptions().Config = casOpts.Config;
     genericSubInvocation.getCASOptions().HasImmutableFileSystem =
         casOpts.HasImmutableFileSystem;
