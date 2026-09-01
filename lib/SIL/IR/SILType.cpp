@@ -147,6 +147,12 @@ bool SILType::isTrivial(const SILFunction &F) const {
   return F.getTypeProperties(contextType).isTrivial();
 }
 
+bool SILType::isNonTrivialOnlyBecauseNonEscapable(const SILFunction &F) const {
+  auto contextType =
+      hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
+  return F.getTypeProperties(contextType).isNonTrivialOnlyBecauseNonEscapable();
+}
+
 bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
   return F.getTypeProperties(contextType).isOrContainsRawPointer();

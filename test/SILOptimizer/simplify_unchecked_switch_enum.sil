@@ -11,6 +11,23 @@ enum E {
   case C(Int)
 }
 
+enum F {
+  case X(String)
+  case Y(String)
+}
+
+class C {
+  var i: Int
+  init()
+}
+
+enum EC {
+  case K(C)
+  case L
+}
+
+sil @use_string : $@convention(thin) (@guaranteed String) -> ()
+
 // CHECK-LABEL: sil @test_simple :
 // CHECK:       bb0(%0 : $String):
 // CHECK-NEXT:    br bb1(%0 : $String)
@@ -154,5 +171,497 @@ bb1(%2 : @owned $String):
 bb2(%4 : @owned $E):
   destroy_value [dead_end] %4
   unreachable
+}
+
+//===----------------------------------------------------------------------===//
+// Forwarding a borrowed `switch_enum` operand to the owned enum value.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: sil [ossa] @forward_borrow_to_owned :
+// CHECK:       bb0(%0 : @owned $E):
+// CHECK-NEXT:    switch_enum %0 : $E, case #E.B!enumelt: bb1, case #E.C!enumelt: bb2, case #E.A!enumelt: bb3
+// CHECK:       bb1([[PAYLOAD:%.*]] : @owned $String):
+// CHECK-NEXT:    destroy_value [[PAYLOAD]]
+// CHECK-NEXT:    br bb4
+// CHECK:       bb2({{%[0-9]+}} : $Int):
+// CHECK-NEXT:    br bb4
+// CHECK:       bb3:
+// CHECK-NEXT:    br bb4
+// CHECK:       } // end sil function 'forward_borrow_to_owned'
+sil [ossa] @forward_borrow_to_owned : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow %0 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, case #E.C!enumelt: bb2, case #E.A!enumelt: bb3
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  %5 = unchecked_enum_data %0 : $E, #E.B!enumelt
+  destroy_value %5 : $String
+  br bb4
+
+bb2(%7 : $Int):
+  end_borrow %1 : $E
+  destroy_value %0 : $E
+  br bb4
+
+bb3:
+  end_borrow %1 : $E
+  destroy_value %0 : $E
+  br bb4
+
+bb4:
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// The `destroy_value` of the enum is re-targeted to the non-trivial payload argument.
+//
+// CHECK-LABEL: sil [ossa] @forward_borrow_destroy_payload :
+// CHECK:       bb0(%0 : @owned $F):
+// CHECK-NEXT:    switch_enum %0 : $F, case #F.X!enumelt: bb1, case #F.Y!enumelt: bb2
+// CHECK:       bb1([[X:%.*]] : @owned $String):
+// CHECK-NEXT:    destroy_value [[X]]
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2([[Y:%.*]] : @owned $String):
+// CHECK-NEXT:    destroy_value [[Y]]
+// CHECK-NEXT:    br bb3
+// CHECK:       } // end sil function 'forward_borrow_destroy_payload'
+sil [ossa] @forward_borrow_destroy_payload : $@convention(thin) (@owned F) -> () {
+bb0(%0 : @owned $F):
+  %1 = begin_borrow %0 : $F
+  switch_enum %1 : $F, case #F.X!enumelt: bb1, case #F.Y!enumelt: bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $F
+  %5 = unchecked_enum_data %0 : $F, #F.X!enumelt
+  destroy_value %5 : $String
+  br bb3
+
+bb2(%8 : @guaranteed $String):
+  end_borrow %1 : $F
+  destroy_value %0 : $F
+  br bb3
+
+bb3:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// The `default` block takes the enum itself as payload argument.
+//
+// CHECK-LABEL: sil [ossa] @forward_borrow_default_block :
+// CHECK:       bb0(%0 : @owned $E):
+// CHECK-NEXT:    switch_enum %0 : $E, case #E.B!enumelt: bb1, default bb2
+// CHECK:       bb1([[PAYLOAD:%.*]] : @owned $String):
+// CHECK-NEXT:    destroy_value [[PAYLOAD]]
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2([[ENUM:%.*]] : @owned $E):
+// CHECK-NEXT:    destroy_value [[ENUM]]
+// CHECK-NEXT:    br bb3
+// CHECK:       } // end sil function 'forward_borrow_default_block'
+sil [ossa] @forward_borrow_default_block : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow %0 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  %5 = unchecked_enum_data %0 : $E, #E.B!enumelt
+  destroy_value %5 : $String
+  br bb3
+
+bb2(%8 : @guaranteed $E):
+  end_borrow %1 : $E
+  destroy_value %0 : $E
+  br bb3
+
+bb3:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// The payload is not destroyed but returned to the caller.
+//
+// CHECK-LABEL: sil [ossa] @forward_borrow_dead_end :
+// CHECK:       bb0(%0 : @owned $E):
+// CHECK-NEXT:    switch_enum %0 : $E, case #E.B!enumelt: bb1, default bb2
+// CHECK:       bb1([[PAYLOAD:%.*]] : @owned $String):
+// CHECK-NEXT:    return [[PAYLOAD]]
+// CHECK:       bb2([[ENUM:%.*]] : @owned $E):
+// CHECK-NEXT:    destroy_value [dead_end] [[ENUM]]
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'forward_borrow_dead_end'
+sil [ossa] @forward_borrow_dead_end : $@convention(thin) (@owned E) -> @owned String {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow %0 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  %5 = unchecked_enum_data %0 : $E, #E.B!enumelt
+  return %5 : $String
+
+bb2(%7 : @guaranteed $E):
+  end_borrow %1 : $E
+  destroy_value [dead_end] %0 : $E
+  unreachable
+}
+
+// A `begin_borrow [lexical]` must be preserved in -Onone mode, because it is important for
+// diagnostic passes.
+//
+// CHECK-LABEL: sil [ossa] @forward_lexical_borrow :
+// CHECK:       bb0(%0 : @owned $E):
+// CHECK-O-NEXT:    switch_enum %0 : $E, case #E.B!enumelt: bb1, default bb2
+// CHECK-ONONE-NEXT: [[B:%.*]] = begin_borrow [lexical] %0
+// CHECK-ONONE-NEXT: switch_enum [[B]] : $E, case #E.B!enumelt: bb1, default bb2
+// CHECK:       } // end sil function 'forward_lexical_borrow'
+sil [ossa] @forward_lexical_borrow : $@convention(thin) (@owned E) -> @owned String {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow [lexical] %0 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  %5 = unchecked_enum_data %0 : $E, #E.B!enumelt
+  return %5 : $String
+
+bb2(%7 : @guaranteed $E):
+  end_borrow %1 : $E
+  destroy_value [dead_end] %0 : $E
+  unreachable
+}
+
+// The same for a `begin_borrow [var_decl]`.
+//
+// CHECK-LABEL: sil [ossa] @forward_var_decl_borrow :
+// CHECK:       bb0(%0 : @owned $E):
+// CHECK-O-NEXT:    switch_enum %0 : $E, case #E.B!enumelt: bb1, default bb2
+// CHECK-ONONE-NEXT: [[B:%.*]] = begin_borrow [var_decl] %0
+// CHECK-ONONE-NEXT: switch_enum [[B]] : $E, case #E.B!enumelt: bb1, default bb2
+// CHECK:       } // end sil function 'forward_var_decl_borrow'
+sil [ossa] @forward_var_decl_borrow : $@convention(thin) (@owned E) -> @owned String {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow [var_decl] %0 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  %5 = unchecked_enum_data %0 : $E, #E.B!enumelt
+  return %5 : $String
+
+bb2(%7 : @guaranteed $E):
+  end_borrow %1 : $E
+  destroy_value [dead_end] %0 : $E
+  unreachable
+}
+//
+// CHECK-LABEL: sil [ossa] @forward_borrow_with_debug_value :
+// CHECK:       bb0(%0 : @owned $E):
+// CHECK-NEXT:    debug_value %0 : $E, let, name "e"
+// CHECK-NEXT:    switch_enum %0 : $E, case #E.B!enumelt: bb1, default bb2
+// CHECK-NOT:     begin_borrow
+// CHECK:       } // end sil function 'forward_borrow_with_debug_value'
+sil [ossa] @forward_borrow_with_debug_value : $@convention(thin) (@owned E) -> @owned String {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow %0 : $E
+  debug_value %1 : $E, let, name "e"
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  %5 = unchecked_enum_data %0 : $E, #E.B!enumelt
+  return %5 : $String
+
+bb2(%7 : @guaranteed $E):
+  end_borrow %1 : $E
+  destroy_value [dead_end] %0 : $E
+  unreachable
+}
+
+// After forwarding the borrow, the `enum` - `switch_enum` pair can be folded, too.
+//
+// CHECK-LABEL: sil [ossa] @forward_borrow_then_fold_enum :
+// CHECK:       bb0(%0 : @owned $String):
+// CHECK-NEXT:    br bb1(%0 : $String)
+// CHECK:       bb1([[PAYLOAD:%.*]] : @owned $String):
+// CHECK-NEXT:    return [[PAYLOAD]]
+// CHECK-NOT:   bb2
+// CHECK:       } // end sil function 'forward_borrow_then_fold_enum'
+sil [ossa] @forward_borrow_then_fold_enum : $@convention(thin) (@owned String) -> @owned String {
+bb0(%0 : @owned $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  %2 = begin_borrow %1 : $E
+  switch_enum %2 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%4 : @guaranteed $String):
+  end_borrow %2 : $E
+  %6 = unchecked_enum_data %1 : $E, #E.B!enumelt
+  return %6 : $String
+
+bb2(%8 : @guaranteed $E):
+  end_borrow %2 : $E
+  destroy_value [dead_end] %1 : $E
+  unreachable
+}
+
+//===----------------------------------------------------------------------===//
+// Negative tests: the borrow must not be forwarded.
+//===----------------------------------------------------------------------===//
+
+// The borrow has a use other than the `switch_enum` and its `end_borrow`s.
+//
+// CHECK-LABEL: sil [ossa] @dont_forward_borrow_with_extra_use :
+// CHECK:         begin_borrow
+// CHECK:         switch_enum %1 : $E
+// CHECK:       } // end sil function 'dont_forward_borrow_with_extra_use'
+sil [ossa] @dont_forward_borrow_with_extra_use : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow %0 : $E
+  %2 = copy_value %1 : $E
+  destroy_value %2 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%5 : @guaranteed $String):
+  end_borrow %1 : $E
+  %7 = unchecked_enum_data %0 : $E, #E.B!enumelt
+  destroy_value %7 : $String
+  br bb3
+
+bb2(%10 : @guaranteed $E):
+  end_borrow %1 : $E
+  destroy_value %0 : $E
+  br bb3
+
+bb3:
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// The borrowed value is not owned, so there is nothing to gain.
+//
+// CHECK-LABEL: sil [ossa] @dont_forward_guaranteed_borrow :
+// CHECK:         begin_borrow
+// CHECK:         switch_enum %1 : $E
+// CHECK:       } // end sil function 'dont_forward_guaranteed_borrow'
+sil [ossa] @dont_forward_guaranteed_borrow : $@convention(thin) (@guaranteed E) -> () {
+bb0(%0 : @guaranteed $E):
+  %1 = begin_borrow %0 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  br bb3
+
+bb2(%5 : @guaranteed $E):
+  end_borrow %1 : $E
+  br bb3
+
+bb3:
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// The enum's lifetime does not end in the case blocks, but in a common successor block.
+//
+// CHECK-LABEL: sil [ossa] @dont_forward_borrow_without_lifetime_ends :
+// CHECK:         begin_borrow
+// CHECK:         switch_enum %1 : $E
+// CHECK:       } // end sil function 'dont_forward_borrow_without_lifetime_ends'
+sil [ossa] @dont_forward_borrow_without_lifetime_ends : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow %0 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  br bb3
+
+bb2(%5 : @guaranteed $E):
+  end_borrow %1 : $E
+  br bb3
+
+bb3:
+  destroy_value %0 : $E
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// The enum's lifetime ends only in _some_ of the case blocks.
+//
+// CHECK-LABEL: sil [ossa] @dont_forward_borrow_with_partial_lifetime_ends :
+// CHECK:         begin_borrow
+// CHECK:         switch_enum %1 : $E
+// CHECK:       } // end sil function 'dont_forward_borrow_with_partial_lifetime_ends'
+sil [ossa] @dont_forward_borrow_with_partial_lifetime_ends : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow %0 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  %5 = unchecked_enum_data %0 : $E, #E.B!enumelt
+  destroy_value %5 : $String
+  br bb3
+
+bb2(%8 : @guaranteed $E):
+  end_borrow %1 : $E
+  br bb4
+
+bb4:
+  destroy_value %0 : $E
+  br bb3
+
+bb3:
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// A case block contains a use of the enum which is neither a `destroy_value` nor an
+// `unchecked_enum_data`.
+//
+// CHECK-LABEL: sil [ossa] @dont_forward_borrow_with_other_use_in_case_block :
+// CHECK:         begin_borrow
+// CHECK:         switch_enum %1 : $E
+// CHECK:       } // end sil function 'dont_forward_borrow_with_other_use_in_case_block'
+sil [ossa] @dont_forward_borrow_with_other_use_in_case_block : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow %0 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  %5 = copy_value %0 : $E
+  destroy_value %5 : $E
+  destroy_value %0 : $E
+  br bb3
+
+bb2(%9 : @guaranteed $E):
+  end_borrow %1 : $E
+  destroy_value %0 : $E
+  br bb3
+
+bb3:
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// The `unchecked_enum_data` in the default block does not correspond to the block argument.
+//
+// CHECK-LABEL: sil [ossa] @dont_forward_borrow_with_mismatching_payload_type :
+// CHECK:         begin_borrow
+// CHECK:         switch_enum %1 : $E
+// CHECK:       } // end sil function 'dont_forward_borrow_with_mismatching_payload_type'
+sil [ossa] @dont_forward_borrow_with_mismatching_payload_type : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow %0 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  %5 = unchecked_enum_data %0 : $E, #E.B!enumelt
+  destroy_value %5 : $String
+  br bb3
+
+bb2(%8 : @guaranteed $E):
+  end_borrow %1 : $E
+  %10 = unchecked_enum_data %0 : $E, #E.C!enumelt
+  br bb3
+
+bb3:
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// A `debug_value` of the enum in a case block prevents the transformation.
+// TODO: this could be handled by ignoring debug uses in -O mode.
+//
+// CHECK-LABEL: sil [ossa] @dont_forward_borrow_with_debug_use_in_case_block :
+// CHECK:         begin_borrow
+// CHECK:         switch_enum %1 : $E
+// CHECK:       } // end sil function 'dont_forward_borrow_with_debug_use_in_case_block'
+sil [ossa] @dont_forward_borrow_with_debug_use_in_case_block : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow %0 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %1 : $E
+  debug_value %0 : $E, let, name "e"
+  %6 = unchecked_enum_data %0 : $E, #E.B!enumelt
+  destroy_value %6 : $String
+  br bb3
+
+bb2(%9 : @guaranteed $E):
+  end_borrow %1 : $E
+  destroy_value %0 : $E
+  br bb3
+
+bb3:
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// The payload argument of a case block cannot be turned into an owned value if it has uses
+// which require a guaranteed value - like `ref_element_addr` here.
+// TODO: this could be handled by inserting a `begin_borrow` of the payload argument.
+//
+// CHECK-LABEL: sil [ossa] @dont_forward_borrow_with_borrowing_use_of_payload :
+// CHECK:         begin_borrow
+// CHECK:         switch_enum %1 : $EC
+// CHECK:       } // end sil function 'dont_forward_borrow_with_borrowing_use_of_payload'
+sil [ossa] @dont_forward_borrow_with_borrowing_use_of_payload : $@convention(thin) (@owned EC) -> () {
+bb0(%0 : @owned $EC):
+  %1 = begin_borrow %0 : $EC
+  switch_enum %1 : $EC, case #EC.K!enumelt: bb1, case #EC.L!enumelt: bb2
+
+bb1(%3 : @guaranteed $C):
+  %4 = ref_element_addr %3 : $C, #C.i
+  %5 = load [trivial] %4 : $*Int
+  end_borrow %1 : $EC
+  %7 = unchecked_enum_data %0 : $EC, #EC.K!enumelt
+  destroy_value %7 : $C
+  br bb3
+
+bb2:
+  end_borrow %1 : $EC
+  destroy_value %0 : $EC
+  br bb3
+
+bb3:
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// If the payload argument is unused, the transformation is possible.
+//
+// CHECK-LABEL: sil [ossa] @forward_borrow_with_unused_payload_argument :
+// CHECK:       bb0(%0 : @owned $EC):
+// CHECK-NEXT:    switch_enum %0 : $EC, case #EC.K!enumelt: bb1, case #EC.L!enumelt: bb2
+// CHECK:       bb1([[PAYLOAD:%.*]] : @owned $C):
+// CHECK-NEXT:    destroy_value [[PAYLOAD]]
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       } // end sil function 'forward_borrow_with_unused_payload_argument'
+sil [ossa] @forward_borrow_with_unused_payload_argument : $@convention(thin) (@owned EC) -> () {
+bb0(%0 : @owned $EC):
+  %1 = begin_borrow %0 : $EC
+  switch_enum %1 : $EC, case #EC.K!enumelt: bb1, case #EC.L!enumelt: bb2
+
+bb1(%3 : @guaranteed $C):
+  end_borrow %1 : $EC
+  %5 = unchecked_enum_data %0 : $EC, #EC.K!enumelt
+  destroy_value %5 : $C
+  br bb3
+
+bb2:
+  end_borrow %1 : $EC
+  destroy_value %0 : $EC
+  br bb3
+
+bb3:
+  %11 = tuple ()
+  return %11 : $()
 }
 
