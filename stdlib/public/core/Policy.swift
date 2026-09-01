@@ -164,6 +164,11 @@ public typealias ExtendedGraphemeClusterType = String
 /// The default type for an otherwise-unconstrained string literal.
 @_unavailableInEmbedded
 public typealias StringLiteralType = String
+/// The default type for an otherwise-unconstrained string literal when only
+/// the `ExpressibleByPossiblyUncheckedStringLiteral` umbrella protocol (and
+/// not `ExpressibleByUncheckedStringLiteral` specifically) is required.
+@_unavailableInEmbedded
+public typealias PossiblyUncheckedStringLiteralType = String
 
 #if !$Embedded
 /// The default type for an otherwise-unconstrained string literal

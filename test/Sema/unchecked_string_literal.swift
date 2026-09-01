@@ -48,12 +48,11 @@ let ordinaryString: String = "no escapes here"
 
 // MARK: `as`-coercion and call-syntax routing
 //
-// A `let`/`var` binding's declared type registers a contextual type before
-// its initializer expression is visited, but `as`-coercion (`CoerceExpr`)
-// and call-syntax literal-init sugar (`T(literal)`) are different code
-// paths that don't automatically get the same treatment -- both need to
-// route a literal through `ExpressibleByUncheckedStringLiteral` just like
-// ordinary contextual typing does.
+// A splice-free string literal conforms to the `ExpressibleByPossiblyUncheckedStringLiteral`
+// umbrella (not directly to `ExpressibleByStringLiteral`), so ordinary
+// constraint solving can resolve it to `UncheckedString<Element>` under
+// *any* kind of context -- a declared type, an `as`-coercion, or call-syntax
+// literal-init sugar -- without needing special-case handling for each.
 
 // `as`-coercion, no escapes at all.
 let asCoercionPlain = "no escapes here" as UncheckedString<UInt16>
@@ -124,4 +123,45 @@ func defaultParameterClosure(_ body: () -> Void = {
 }) {
   body()
 }
+
+// MARK: Umbrella-protocol redesign: operators, single-character literals,
+// and interpolation
+
+// A concrete, non-generic `+` overload lets literal operands (including
+// single-character ones, and splice-containing ones) resolve under context,
+// unlike `RangeReplaceableCollection`'s fully generic `+`, whose `Other`
+// parameter names no concrete type for the solver to try.
+let plusMultiChar: UncheckedString<UInt8> = "ab" + "cd"
+let plusSingleChar: UncheckedString<UInt8> = "ab" + "c"
+let plusWithSplice: UncheckedString<UInt8> = "ab" + "\x{41}"
+
+// A single-character literal now conforms to the "possibly unchecked"
+// unicode-scalar/grapheme-cluster umbrellas (mirroring plain literals'
+// `ExpressibleByPossiblyUncheckedStringLiteral`), so it can resolve to
+// `UncheckedString<Element>` under context instead of being locked
+// unconditionally to `Character`/`Unicode.Scalar`/`String`.
+let singleCharDirect: UncheckedString<UInt8> = "c"
+let singleCharCoercion = "c" as UncheckedString<UInt8>
+let singleCharCallSyntax = UncheckedString<UInt8>("c")
+
+// Ordinary `Character`/`Unicode.Scalar`/`String` single-character literals
+// must be completely unaffected by the above.
+let ordinaryCharacter: Character = "x"
+let ordinaryScalar: Unicode.Scalar = "y"
+let ordinaryStringSingleChar: String = "z"
+
+// Multi-segment interpolation, including segments that are themselves
+// single characters, resolves correctly -- this used to fail because each
+// single-character segment was unconditionally locked to
+// `ExpressibleByUnicodeScalarLiteral`/`ExpressibleByExtendedGraphemeClusterLiteral`
+// regardless of context, long before the umbrella-protocol redesign for
+// plain multi-character literals even applied.
+func interpolationLocalName() -> UncheckedString<UInt8> { "world" }
+let interpolationGreeting: UncheckedString<UInt8> =
+  "hello, \(interpolationLocalName())!"
+
+// `\x{hh}` inside an interpolated literal's segment -- the original
+// motivating limitation for this whole redesign.
+let interpolationWithEscape: UncheckedString<UInt8> =
+  "Ren\x{e9} says: \(interpolationLocalName())"
 

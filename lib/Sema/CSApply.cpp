@@ -3219,6 +3219,24 @@ namespace {
       auto *interpolationProto = TypeChecker::getProtocol(
           ctx, expr->getLoc(),
           KnownProtocolKind::ExpressibleByStringInterpolation);
+
+      // The resolved type might conform to `ExpressibleByUncheckedStringInterpolation`
+      // instead of `ExpressibleByStringInterpolation` -- mirroring
+      // `handleStringLiteralExpr`'s analogous checked/unchecked dispatch for
+      // plain (non-interpolated) literals.
+      auto interpolationProtoKind = KnownProtocolKind::ExpressibleByStringInterpolation;
+      if (!interpolationProto || !checkConformance(type, interpolationProto)) {
+        auto *uncheckedInterpolationProto = TypeChecker::getProtocol(
+            ctx, expr->getLoc(),
+            KnownProtocolKind::ExpressibleByUncheckedStringInterpolation);
+        if (uncheckedInterpolationProto &&
+            checkConformance(type, uncheckedInterpolationProto)) {
+          interpolationProto = uncheckedInterpolationProto;
+          interpolationProtoKind =
+              KnownProtocolKind::ExpressibleByUncheckedStringInterpolation;
+        }
+      }
+
       auto associatedTypeDecl =
           interpolationProto->getAssociatedType(ctx.Id_StringInterpolation);
       if (associatedTypeDecl == nullptr) {
@@ -3237,7 +3255,7 @@ namespace {
       expr->setBuilderInit(builderInit);
 
       ConcreteDeclRef resultInit = fetchProtocolInitWitness(
-          KnownProtocolKind::ExpressibleByStringInterpolation, type,
+          interpolationProtoKind, type,
           {ctx.Id_stringInterpolation});
       if (!resultInit) return nullptr;
       expr->setInitializer(resultInit);

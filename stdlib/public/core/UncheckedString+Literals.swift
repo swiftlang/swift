@@ -43,3 +43,55 @@ extension UncheckedString: ExpressibleByUncheckedStringLiteral {
     self = value
   }
 }
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedString {
+  /// The type used to build an `UncheckedString` from a string literal
+  /// containing interpolations.
+  ///
+  /// Literal segments materialize as `UncheckedString<Element>` values
+  /// directly (rather than `String`), so a `\x{hh}` raw code unit escape in
+  /// a literal segment is fully supported, exactly as in a non-interpolated
+  /// `UncheckedString` literal. Interpolated values must conform to
+  /// `CustomUncheckedStringConvertible` with a matching `Element` -- there
+  /// is no generic/reflective fallback, since describing an arbitrary value
+  /// as text would require an encoding `UncheckedString` deliberately
+  /// doesn't have.
+  public struct StringInterpolation: StringInterpolationProtocol {
+    @usableFromInline
+    internal var chars: [Element]
+
+    public init(literalCapacity: Int, interpolationCount: Int) {
+      chars = []
+      chars.reserveCapacity(literalCapacity + interpolationCount)
+    }
+
+    public mutating func appendLiteral(_ literal: UncheckedString<Element>) {
+      literal.withCharacterData { data in
+        data.withUnsafeBufferPointer { buffer in
+          unsafe chars.append(contentsOf: buffer)
+        }
+      }
+    }
+
+    /// Appends the raw representation of `value`, which must produce
+    /// `Element`s directly -- no encoding, transcoding, or textual
+    /// description is involved.
+    public mutating func appendInterpolation<T: CustomUncheckedStringConvertible>(
+      _ value: T
+    ) where T.UncheckedStringElement == Element {
+      value.withUncheckedStringRepresentation { data in
+        data.withUnsafeBufferPointer { buffer in
+          unsafe chars.append(contentsOf: buffer)
+        }
+      }
+    }
+  }
+}
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedString: ExpressibleByUncheckedStringInterpolation {
+  public init(stringInterpolation: StringInterpolation) {
+    self.init(taking: stringInterpolation.chars)
+  }
+}

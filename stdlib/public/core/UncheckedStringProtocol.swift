@@ -10,6 +10,34 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A type that can provide a raw, native-width representation of itself for
+/// interpolation into an `UncheckedString`.
+///
+/// Unlike `String`'s `CustomStringConvertible`, which produces Unicode text,
+/// a `CustomUncheckedStringConvertible` type produces raw `Element` data
+/// directly -- no implicit encoding, transcoding, or textual description is
+/// involved. `UncheckedString` interpolation only accepts values that
+/// conform to this protocol (rather than any `CustomStringConvertible`
+/// value, the way `String` interpolation does), since nothing about
+/// `UncheckedString` implies a text encoding that an arbitrary describable
+/// value could be rendered through.
+///
+/// `UncheckedStringProtocol` (and therefore `UncheckedString` and
+/// `UncheckedSubString`) conforms to this protocol automatically, producing
+/// its own character data. Any other type can opt in by declaring the
+/// conformance and implementing `withUncheckedStringRepresentation`.
+@available(SwiftStdlib 9999, *)
+public protocol CustomUncheckedStringConvertible {
+  /// The element type of the raw representation this type provides.
+  associatedtype UncheckedStringElement: FixedWidthInteger
+
+  /// Calls the given closure with a buffer containing this value's raw
+  /// `UncheckedStringElement` representation.
+  func withUncheckedStringRepresentation<R, Failure>(
+    _ body: (Span<UncheckedStringElement>) throws(Failure) -> R
+  ) throws(Failure) -> R
+}
+
 /// A type that can represent a string as a collection of characters.
 ///
 /// Unlike `StringProtocol`, no assumptions are made about the encoding or
@@ -17,10 +45,11 @@
 @available(SwiftStdlib 9999, *)
 public protocol UncheckedStringProtocol
   : BidirectionalCollection, Equatable, Hashable, Comparable,
-    CustomDebugStringConvertible
+    CustomDebugStringConvertible, CustomUncheckedStringConvertible
   where Iterator.Element: FixedWidthInteger,
     Index == Int,
-    SubSequence: UncheckedStringProtocol
+    SubSequence: UncheckedStringProtocol,
+    UncheckedStringElement == Element
 {
   typealias SubSequence = UncheckedSubString<Element>
 
@@ -29,6 +58,15 @@ public protocol UncheckedStringProtocol
   func withCharacterData<R, E>(
     _ body: (Span<Element>) throws(E) -> R
   ) throws(E) -> R
+}
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedStringProtocol {
+  public func withUncheckedStringRepresentation<R, Failure>(
+    _ body: (Span<Element>) throws(Failure) -> R
+  ) throws(Failure) -> R {
+    try withCharacterData(body)
+  }
 }
 
 @available(SwiftStdlib 9999, *)

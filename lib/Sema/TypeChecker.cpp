@@ -27,7 +27,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Identifier.h"
@@ -108,23 +107,39 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
         KnownProtocolKind::ExpressibleByBooleanLiteral);
 
   if (const auto *SLE = dyn_cast<StringLiteralExpr>(expr)) {
-    if (SLE->hasRawSplices())
-      return TypeChecker::getProtocol(
-          Context, expr->getLoc(),
-          KnownProtocolKind::ExpressibleByUncheckedStringLiteral);
+    if (!SLE->hasRawSplices()) {
+      // These route through their own "possibly unchecked" umbrellas, not
+      // the checked protocols directly, for the same reason plain literals
+      // do below: `UncheckedString` conforms transitively (via
+      // `ExpressibleByUncheckedStringLiteral` refining
+      // `ExpressibleByPossiblyUncheckedExtendedGraphemeClusterLiteral`
+      // refining this one), so a single-character literal like `"c"` can
+      // resolve to `UncheckedString<Element>` under context instead of
+      // being locked to `Character`/`Unicode.Scalar`/`String` unconditionally.
+      if (SLE->isSingleUnicodeScalar())
+        return TypeChecker::getProtocol(
+            Context, expr->getLoc(),
+            KnownProtocolKind::ExpressibleByPossiblyUncheckedUnicodeScalarLiteral);
 
-    if (SLE->isSingleUnicodeScalar())
-      return TypeChecker::getProtocol(
-          Context, expr->getLoc(),
-          KnownProtocolKind::ExpressibleByUnicodeScalarLiteral);
+      if (SLE->isSingleExtendedGraphemeCluster())
+        return getProtocol(
+            Context, expr->getLoc(),
+            KnownProtocolKind::ExpressibleByPossiblyUncheckedExtendedGraphemeClusterLiteral);
+    }
 
-    if (SLE->isSingleExtendedGraphemeCluster())
-      return getProtocol(
-          Context, expr->getLoc(),
-          KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral);
-
+    // Every other string literal -- whether or not it contains a `\x{hh}`
+    // raw code unit escape -- conforms to the "possibly unchecked" umbrella
+    // protocol here; which of `ExpressibleByStringLiteral`/
+    // `ExpressibleByUncheckedStringLiteral` it actually ends up needing is
+    // resolved later by ordinary constraint solving against whatever
+    // contextual type is available, not decided eagerly here. See
+    // `CSGen.cpp`'s `visitStringLiteralExpr`, which adds an *additional*,
+    // more specific `LiteralConformsTo` constraint on top of this one when
+    // the literal has raw splices, so that a type unable to represent them
+    // (like `String`) is ruled out via ordinary constraint contradiction.
     return TypeChecker::getProtocol(
-        Context, expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByPossiblyUncheckedStringLiteral);
   }
 
   if (isa<InterpolatedStringLiteralExpr>(expr))
@@ -165,38 +180,6 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
   }
 
   return nullptr;
-}
-
-ProtocolDecl *TypeChecker::getLiteralProtocolForContextualType(
-    ASTContext &Context, Expr *expr, Type contextualType) {
-  auto *SLE = dyn_cast<StringLiteralExpr>(expr);
-  if (!SLE)
-    return TypeChecker::getLiteralProtocol(Context, expr);
-
-  // A literal with a `\x{hh}` raw code unit escape must always be typed via
-  // `ExpressibleByUncheckedStringLiteral` -- there is no other protocol it
-  // could conform to.
-  if (SLE->hasRawSplices())
-    return TypeChecker::getLiteralProtocol(Context, expr);
-
-  // Otherwise, if the contextual type is concrete and conforms to
-  // `ExpressibleByUncheckedStringLiteral`, prefer that over the default
-  // `ExpressibleByStringLiteral` -- this lets SILGen materialize a
-  // native-width constant directly instead of a UTF-8 constant that would
-  // need transcoding at runtime. See `CSGen.cpp`'s `visitStringLiteralExpr`
-  // for the analogous check used for ordinary (non-`as`/call-syntax)
-  // contextual typing, e.g. `let x: UncheckedString<UInt16> = "..."`.
-  if (contextualType && !contextualType->hasTypeVariable() &&
-      !contextualType->hasUnboundGenericType()) {
-    auto *uncheckedProto = TypeChecker::getProtocol(
-        Context, expr->getLoc(),
-        KnownProtocolKind::ExpressibleByUncheckedStringLiteral);
-    auto lookupType = contextualType->lookThroughAllOptionalTypes();
-    if (uncheckedProto && lookupConformance(lookupType, uncheckedProto))
-      return uncheckedProto;
-  }
-
-  return TypeChecker::getLiteralProtocol(Context, expr);
 }
 
 DeclName TypeChecker::getObjectLiteralConstructorName(ASTContext &Context,

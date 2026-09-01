@@ -2825,14 +2825,12 @@ Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
       return nullptr;
   }
 
-  // Passing `castTy` here (rather than calling plain `getLiteralProtocol`)
-  // lets a splice-free string literal route to
-  // `ExpressibleByUncheckedStringLiteral` when `castTy` conforms to it, so
-  // e.g. `UncheckedString<UInt16>("...")` gets a native-width constant from
-  // SILGen instead of failing to find a matching initializer (`UncheckedString`
-  // doesn't conform to the default `ExpressibleByStringLiteral`).
-  auto *protocol = TypeChecker::getLiteralProtocolForContextualType(
-      getASTContext(), literal, castTy);
+  // `getLiteralProtocol` returns the `ExpressibleByPossiblyUncheckedStringLiteral`
+  // umbrella for an ordinary string literal, so this conformance check
+  // already recognizes `UncheckedString<UInt16>("...")` as valid
+  // literal-init sugar (via `ExpressibleByUncheckedStringLiteral` refining
+  // the umbrella) without needing to special-case the contextual type here.
+  auto *protocol = TypeChecker::getLiteralProtocol(getASTContext(), literal);
   if (!protocol)
     return nullptr;
 

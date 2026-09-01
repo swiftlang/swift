@@ -166,4 +166,86 @@ UncheckedStringTests.test("pointerConversion") {
   expectEqual(3, rawLength(small))
 }
 
+// A type that opts into `CustomUncheckedStringConvertible` itself, rather
+// than getting it for free via `UncheckedStringProtocol`.
+struct Point: CustomUncheckedStringConvertible {
+  var x: Int
+  var y: Int
+
+  func withUncheckedStringRepresentation<R, Failure>(
+    _ body: (Span<UInt8>) throws(Failure) -> R
+  ) throws(Failure) -> R {
+    let xDigits = UncheckedString<UInt8>(String(x).utf8)
+    let yDigits = UncheckedString<UInt8>(String(y).utf8)
+    let description: UncheckedString<UInt8> = "(\(xDigits), \(yDigits))"
+    return try description.withCharacterData(body)
+  }
+}
+
+UncheckedStringTests.test("interpolation") {
+  // Interpolating an `UncheckedString` value works via
+  // `UncheckedStringProtocol`'s default `CustomUncheckedStringConvertible`
+  // conformance, with no transcoding (same width in, same width out).
+  let name: UncheckedString<UInt8> = "world"
+  let greeting: UncheckedString<UInt8> = "hello, \(name)!"
+  expectTrue(greeting == "hello, world!" as UncheckedString<UInt8>)
+
+  // Multiple segments and interpolations, including single-character
+  // segments -- these used to be unconditionally locked to
+  // `Character`/`Unicode.Scalar` regardless of context.
+  let multi: UncheckedString<UInt8> = "a\(name)b\(name)c"
+  expectTrue(multi == "aworldbworldc" as UncheckedString<UInt8>)
+
+  // `\x{hh}` inside an interpolated literal's segment materializes as a
+  // native-width constant, exactly like a non-interpolated literal.
+  let withEscape: UncheckedString<UInt8> = "Ren\x{e9} says: \(name)"
+  expectTrue(withEscape == "Ren\x{e9} says: world" as UncheckedString<UInt8>)
+
+  // A custom `CustomUncheckedStringConvertible` conformer.
+  let point = Point(x: 1, y: 2)
+  let described: UncheckedString<UInt8> = "point: \(point)"
+  expectTrue(described == "point: (1, 2)" as UncheckedString<UInt8>)
+
+  // Widths other than UInt8 work too.
+  let name16: UncheckedString<UInt16> = "world"
+  let greeting16: UncheckedString<UInt16> = "hello, \(name16)!"
+  expectTrue(greeting16 == "hello, world!" as UncheckedString<UInt16>)
+}
+
+UncheckedStringTests.test("operators") {
+  // A concrete `+` overload resolves literal operands under context,
+  // including single-character operands and ones containing `\x{hh}`.
+  let ab_cd: UncheckedString<UInt8> = "ab" + "cd"
+  expectTrue(ab_cd == "abcd" as UncheckedString<UInt8>)
+
+  let ab_c: UncheckedString<UInt8> = "ab" + "c"
+  expectTrue(ab_c == "abc" as UncheckedString<UInt8>)
+
+  let ab_escape: UncheckedString<UInt8> = "ab" + "\x{41}"
+  expectTrue(ab_escape == "abA" as UncheckedString<UInt8>)
+}
+
+UncheckedStringTests.test("singleCharacterLiterals") {
+  // A single-character literal now conforms to the "possibly unchecked"
+  // unicode-scalar/grapheme-cluster umbrellas, resolving to
+  // `UncheckedString<Element>` under context via a compile-time-materialized
+  // constant (verified separately in test/SILGen), not runtime transcoding.
+  let direct: UncheckedString<UInt8> = "c"
+  expectTrue(direct == UncheckedString<UInt8>(["c".utf8.first!]))
+
+  let coerced = "c" as UncheckedString<UInt8>
+  expectTrue(coerced == direct)
+
+  let called = UncheckedString<UInt8>("c")
+  expectTrue(called == direct)
+
+  // Ordinary `Character`/`Unicode.Scalar`/`String` are unaffected.
+  let ch: Character = "x"
+  let sc: Unicode.Scalar = "y"
+  let str: String = "z"
+  expectEqual("x", String(ch))
+  expectEqual("y", String(sc))
+  expectEqual("z", str)
+}
+
 runAllTests()

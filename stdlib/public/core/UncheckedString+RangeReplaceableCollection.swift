@@ -64,6 +64,33 @@ extension UncheckedString: RangeReplaceableCollection {
 }
 
 @available(SwiftStdlib 9999, *)
+extension UncheckedString {
+  /// Concatenates two `UncheckedString` values.
+  ///
+  /// `RangeReplaceableCollection` already provides a fully generic `+`
+  /// (`Self, Other: RangeReplaceableCollection where Other.Element == Self.Element`),
+  /// but its `Other` parameter is a bare generic parameter that doesn't name
+  /// any concrete type. When an operand is a string literal, the constraint
+  /// solver has nothing there to offer as a candidate binding beyond the
+  /// literal's own default (`String`) -- which doesn't satisfy
+  /// `Element == Element`, so the whole expression fails to type-check
+  /// whenever both operands are literals, regardless of context.
+  ///
+  /// This concrete, non-generic overload gives the solver a directly
+  /// nameable target type (`UncheckedString<Element>`) to try instead, which
+  /// resolves the problem for the common case of concatenating two
+  /// `UncheckedString` values (including literals).
+  public static func + (
+    lhs: UncheckedString<Element>,
+    rhs: UncheckedString<Element>
+  ) -> UncheckedString<Element> {
+    var result = lhs
+    result.append(contentsOf: rhs)
+    return result
+  }
+}
+
+@available(SwiftStdlib 9999, *)
 extension UncheckedSubString: RangeReplaceableCollection {
 
   public mutating func replaceSubrange<C>(

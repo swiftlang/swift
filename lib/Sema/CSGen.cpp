@@ -773,39 +773,39 @@ namespace {
       if (expr->getType())
         return expr->getType();
 
-      // A literal already known to contain a `\x{hh}` raw code unit escape
-      // is always typed via `ExpressibleByUncheckedStringLiteral`
-      // (`TypeChecker::getLiteralProtocol` handles this below); only
-      // literals that could go either way need a contextual-type check
-      // here. Only consider a contextual type that's already concrete --
-      // e.g. one of several branches of a switch expression being jointly
-      // inferred is represented by an unresolved type variable at this
-      // point, and running a conformance lookup against it here would
-      // corrupt that joint inference.
-      if (!expr->hasRawSplices()) {
-        auto contextualType = CS.getContextualType(expr,
-                                                    /*forConstraint=*/false);
+      // `visitLiteralExpr` adds a `LiteralConformsTo` constraint against
+      // whatever `TypeChecker::getLiteralProtocol` returns for this literal
+      // -- for any ordinary string literal, that's the
+      // `ExpressibleByPossiblyUncheckedStringLiteral` umbrella, letting
+      // ordinary constraint solving pick between `ExpressibleByStringLiteral`
+      // and `ExpressibleByUncheckedStringLiteral` based on whatever context
+      // eventually pins the type variable down.
+      auto tv = visitLiteralExpr(expr);
+      if (!tv)
+        return tv;
+
+      // A literal with a `\x{hh}` raw code unit escape must resolve to
+      // something that can actually represent one. Add an *additional*,
+      // more specific constraint on top of the umbrella one above, so that
+      // a type unable to represent raw splices (like `String`) gets ruled
+      // out via ordinary constraint contradiction once context pins the
+      // type variable down, rather than by guessing the literal's protocol
+      // eagerly here (which is what prevented this literal from ever
+      // routing through `UncheckedString` as an operator operand or as an
+      // interpolation's literal segment).
+      if (expr->hasRawSplices()) {
         auto &ctx = CS.getASTContext();
-        auto *protocol = TypeChecker::getLiteralProtocolForContextualType(
-            ctx, expr, contextualType);
-        if (protocol &&
-            protocol->isSpecificProtocol(
-                KnownProtocolKind::ExpressibleByUncheckedStringLiteral)) {
-          // Prefer routing through `ExpressibleByUncheckedStringLiteral`
-          // so SILGen can materialize a native-width constant directly,
-          // rather than through `ExpressibleByStringLiteral`, which would
-          // force a UTF-8 constant to be transcoded at runtime.
-          contextualType = CS.getContextualType(expr,
-                                                /*forConstraint=*/true);
-          CS.addConstraint(ConstraintKind::LiteralConformsTo,
-                           contextualType,
-                           protocol->getDeclaredInterfaceType(),
+        auto *uncheckedProto = TypeChecker::getProtocol(
+            ctx, expr->getLoc(),
+            KnownProtocolKind::ExpressibleByUncheckedStringLiteral);
+        if (uncheckedProto) {
+          CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
+                           uncheckedProto->getDeclaredInterfaceType(),
                            CS.getConstraintLocator(expr));
-          return contextualType;
         }
       }
 
-      return visitLiteralExpr(expr);
+      return tv;
     }
 
     Type visitLiteralExpr(LiteralExpr *expr) {
@@ -828,11 +828,16 @@ namespace {
 
     Type
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
-      // Dig out the ExpressibleByStringInterpolation protocol.
+      // Dig out the ExpressibleByPossiblyUncheckedStringInterpolation
+      // umbrella protocol -- letting the constraint system defer the choice
+      // between `ExpressibleByStringInterpolation` and
+      // `ExpressibleByUncheckedStringInterpolation` until enough context is
+      // available, the same way `visitStringLiteralExpr` does for plain
+      // literals via `ExpressibleByPossiblyUncheckedStringLiteral`.
       auto &ctx = CS.getASTContext();
       auto interpolationProto = TypeChecker::getProtocol(
           ctx, expr->getLoc(),
-          KnownProtocolKind::ExpressibleByStringInterpolation);
+          KnownProtocolKind::ExpressibleByPossiblyUncheckedStringInterpolation);
       if (!interpolationProto) {
         ctx.Diags.diagnose(expr->getStartLoc(),
                            diag::interpolation_missing_proto);
@@ -3830,28 +3835,6 @@ namespace {
         if (!coerceExpr->getSubExpr()) {
           return Action::SkipNode(expr);
         }
-
-        // If the coercion's operand is a splice-free string literal, resolve
-        // the coercion's target type now and register it as contextual info
-        // for the literal before descending into it. `visitStringLiteralExpr`
-        // needs to see this to route the literal through
-        // `ExpressibleByUncheckedStringLiteral` when appropriate (e.g.
-        // `"..." as UncheckedString<UInt16>`), but by the time
-        // `visitCoerceExpr` itself runs, the literal has already been
-        // visited (and its protocol locked in) as a child of this node --
-        // unlike `let x: T = literal`, where the contextual type is
-        // registered before the initializer is walked at all.
-        if (auto *literal = dyn_cast<StringLiteralExpr>(
-                coerceExpr->getSubExpr()->getSemanticsProvidingExpr())) {
-          if (!literal->hasRawSplices() && !literal->getType() &&
-              !CS.getContextualTypeInfo(literal)) {
-            auto toType = CG.getTypeForCast(coerceExpr);
-            if (toType && !toType->hasError()) {
-              CS.setContextualInfo(
-                  literal, ContextualTypeInfo(toType, CTP_CoerceOperand));
-            }
-          }
-        }
       }
 
       // Don't visit TernaryExpr with empty sub expressions. They may occur
@@ -4166,30 +4149,6 @@ bool ConstraintSystem::generateConstraints(
     expr = buildTypeErasedExpr(expr, target.getDeclContext(),
                                target.getExprContextualType(),
                                target.getExprContextualTypePurpose());
-
-    // A *local* pattern binding's initializer (checked as part of a
-    // closure's or function's joint constraint system, via
-    // `CSSyntacticElement.cpp`'s `visitPatternBindingElement`, which calls
-    // this same function without pre-registering contextual info -- unlike
-    // top-level expression type-checking, which does so once up front via
-    // `setContextualInfo` in `TypeCheckConstraints.cpp`) has no contextual
-    // type visible yet when its initializer expression is visited below --
-    // only after, when the conversion constraint is added from the
-    // fully-generated expression type. That's too late for a literal
-    // expression whose protocol choice depends on the contextual type (see
-    // `visitStringLiteralExpr`), since the literal's protocol is locked in
-    // at generation time, not at conversion time. Register it early here,
-    // scoped specifically to `CTP_Initialization` -- other contextual-type
-    // purposes (return statements, default-argument closures, etc.) have
-    // their own independent registration paths elsewhere that this would
-    // otherwise collide with (double-registering asserts).
-    if (target.getExprContextualTypePurpose() == CTP_Initialization &&
-        !getContextualTypeInfo(expr).has_value()) {
-      if (Type contextualTy = target.getExprContextualType()) {
-        setContextualInfo(
-            expr, ContextualTypeInfo(contextualTy, CTP_Initialization));
-      }
-    }
 
     // Generate constraints for the main system.
     expr = generateConstraints(expr, target.getDeclContext());

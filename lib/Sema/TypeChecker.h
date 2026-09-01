@@ -1019,16 +1019,6 @@ ProtocolDecl *getProtocol(ASTContext &ctx, SourceLoc loc,
 /// expression does not have an associated literal protocol.
 ProtocolDecl *getLiteralProtocol(ASTContext &ctx, Expr *expr);
 
-/// Retrieve the literal protocol for the given expression, given a
-/// contextual type it's being converted to (e.g. via `as`-coercion or
-/// call-syntax literal-init sugar, neither of which register the target
-/// type as an ordinary contextual type the way a `let`/`var` binding's
-/// declared type does). If \p contextualType is concrete and conforms to
-/// `ExpressibleByUncheckedStringLiteral`, that's preferred over the default
-/// `ExpressibleByStringLiteral` for a splice-free string literal; otherwise
-/// this falls back to `getLiteralProtocol(ctx, expr)`.
-ProtocolDecl *getLiteralProtocolForContextualType(ASTContext &ctx, Expr *expr,
-                                                  Type contextualType);
 
 DeclName getObjectLiteralConstructorName(ASTContext &ctx,
                                          ObjectLiteralExpr *expr);

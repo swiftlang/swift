@@ -7629,13 +7629,18 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ExpressibleByBooleanLiteral:
   case KnownProtocolKind::ExpressibleByDictionaryLiteral:
   case KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral:
+  case KnownProtocolKind::ExpressibleByPossiblyUncheckedExtendedGraphemeClusterLiteral:
   case KnownProtocolKind::ExpressibleByFloatLiteral:
   case KnownProtocolKind::ExpressibleByIntegerLiteral:
   case KnownProtocolKind::ExpressibleByStringInterpolation:
+  case KnownProtocolKind::ExpressibleByUncheckedStringInterpolation:
+  case KnownProtocolKind::ExpressibleByPossiblyUncheckedStringInterpolation:
   case KnownProtocolKind::ExpressibleByStringLiteral:
   case KnownProtocolKind::ExpressibleByUncheckedStringLiteral:
+  case KnownProtocolKind::ExpressibleByPossiblyUncheckedStringLiteral:
   case KnownProtocolKind::ExpressibleByNilLiteral:
   case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral:
+  case KnownProtocolKind::ExpressibleByPossiblyUncheckedUnicodeScalarLiteral:
   case KnownProtocolKind::ExpressibleByColorLiteral:
   case KnownProtocolKind::ExpressibleByImageLiteral:
   case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
@@ -7645,6 +7650,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinStringLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinUncheckedStringLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinPossiblyUncheckedStringLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral:
   case KnownProtocolKind::OptionSet:
   case KnownProtocolKind::BridgedNSError:
