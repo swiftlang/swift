@@ -133,6 +133,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
 // KEYWORD2-NEXT:             Keyword/None:                       specialized[#Func Attribute#]; name=specialized
 // KEYWORD2-NEXT:             Keyword/None:                       diagnose[#Func Attribute#]; name=diagnose
+// KEYWORD2-NEXT:             Keyword/None:                       objcDirect[#Func Attribute#]; name=objcDirect
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -268,6 +269,7 @@ struct _S {
 
   @#^ON_METHOD^# private
   func foo()
+// ON_METHOD-DAG: Keyword/None:                       objcDirect[#Func Attribute#]; name=objcDirect
 // ON_METHOD-DAG: Keyword/None:                       abi[#Func Attribute#]; name=abi
 // ON_METHOD-DAG: Keyword/None:                       available[#Func Attribute#]; name=available
 // ON_METHOD-DAG: Keyword/None:                       objc[#Func Attribute#]; name=objc
@@ -327,6 +329,7 @@ struct _S {
 
 
   @#^ON_MEMBER_LAST^#
+// ON_MEMBER_LAST-DAG: Keyword/None:                       objcDirect[#Declaration Attribute#]; name=objcDirect
 // ON_MEMBER_LAST-DAG: Keyword/None:                       abi[#Declaration Attribute#]; name=abi
 // ON_MEMBER_LAST-DAG: Keyword/None:                       available[#Declaration Attribute#]; name=available
 // ON_MEMBER_LAST-DAG: Keyword/None:                       objc[#Declaration Attribute#]; name=objc
@@ -404,6 +407,7 @@ func dummy2() {}
 
 @#^KEYWORD_LAST^#
 
+// KEYWORD_LAST-DAG: Keyword/None:                       objcDirect[#Declaration Attribute#]; name=objcDirect
 // KEYWORD_LAST-DAG: Keyword/None:                       abi[#Declaration Attribute#]; name=abi
 // KEYWORD_LAST-DAG: Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-DAG: Keyword/None:                       freestanding[#Declaration Attribute#]; name=freestanding{{$}}

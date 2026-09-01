@@ -307,6 +307,7 @@ extension ASTGenVisitor {
         .NSApplicationMain,
         .NSCopying,
         .NSManaged,
+        .ObjCDirect,
         .ObjCMembers,
         .ObjCNonLazyRealization,
         .Owned,
