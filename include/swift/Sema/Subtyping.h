@@ -194,7 +194,7 @@ ConflictReason checkConversion(ConformanceCache &cache,
 /// More meaningful overload for when you want a boolean result.
 bool canConvertTo(ConformanceCache &cache,
                   Type lhs, Type rhs,
-                  GenericSignature sig);
+                  GenericSignature sig = GenericSignature());
 
 /// Computes the join between two types.
 ///
