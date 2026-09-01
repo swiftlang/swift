@@ -4855,6 +4855,93 @@ bool RegionAnalysisFunctionInfo::isClosureCaptured(SILValue value,
   return translator->isClosureCaptured(value, op->getUser());
 }
 
+namespace {
+
+/// A minimal evaluator used only to answer whole-function summary queries
+/// like RegionAnalysisFunctionInfo::wasValueEverSent. It mirrors the real
+/// isolation/closure-capture callbacks used by SendNonSendable's
+/// DiagnosticEvaluator (so "sent" here matches what diagnostics would
+/// report, including elision), but never emits errors.
+struct SendQueryEvaluator final
+    : PartitionOpEvaluatorBaseImpl<SendQueryEvaluator> {
+  RegionAnalysisFunctionInfo *info;
+
+  SendQueryEvaluator(Partition &workingPartition,
+                     RegionAnalysisFunctionInfo *info,
+                     SendingOperandToStateMap &operandToStateMap)
+      : PartitionOpEvaluatorBaseImpl(
+            workingPartition, info->getOperandSetFactory(), operandToStateMap),
+        info(info) {}
+
+  void handleError(PartitionOpError &&error) const {}
+
+  bool isActorDerived(Element element) const {
+    return info->getValueMap().getIsolationRegion(element).isActorIsolated();
+  }
+
+  bool isTaskIsolatedDerived(Element element) const {
+    return info->getValueMap().getIsolationRegion(element).isTaskIsolated();
+  }
+
+  SILIsolationInfo getIsolationRegionInfo(Element element) const {
+    return info->getValueMap().getIsolationRegion(element);
+  }
+
+  std::optional<Element> getElement(SILValue value) const {
+    auto trackableValue = info->getValueMap().getTrackableValue(value);
+    if (trackableValue.value.isSendable())
+      return {};
+    return trackableValue.value.getID();
+  }
+
+  SILValue getRepresentative(SILValue value) const {
+    return info->getValueMap()
+        .getTrackableValue(value)
+        .value.getRepresentative()
+        .maybeGetValue();
+  }
+
+  RepresentativeValue getRepresentativeValue(Element element) const {
+    return info->getValueMap().getRepresentativeValue(element);
+  }
+
+  bool isClosureCaptured(Element element, Operand *op) const {
+    auto value = info->getValueMap().maybeGetRepresentative(element);
+    if (!value)
+      return false;
+    return info->isClosureCaptured(value, op);
+  }
+};
+
+} // end anonymous namespace
+
+bool RegionAnalysisFunctionInfo::wasValueEverSent(SILValue value) {
+  assert(supportedFunction && "Unsupported Function?!");
+
+  auto trackableValue = getValueMap().getTrackableValue(value);
+  if (trackableValue.value.isSendable())
+    return false;
+
+  Element elt = trackableValue.value.getID();
+
+  for (auto [block, blockState] : getRange()) {
+    if (!blockState.getLiveness())
+      continue;
+
+    Partition workingPartition = blockState.getEntryPartition();
+    SendQueryEvaluator eval(workingPartition, this,
+                            getSendingOperandToStateMap());
+
+    for (auto &partitionOp : blockState.getPartitionOps()) {
+      eval.apply(partitionOp);
+      if (workingPartition.isSent(elt))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 void RegionAnalysisFunctionInfo::runDataflow() {
   assert(!solved && "solve should only be called once");
   solved = true;
