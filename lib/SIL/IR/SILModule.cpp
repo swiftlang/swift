@@ -684,7 +684,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   if (!C.isConcrete())
     return {nullptr, nullptr};
 
-  if (!hasCommittedLowered()) {
+  if (!haveFunctionTypesBeenRewritten()) {
     SILLinkerVisitor linker(*this, linkingMode);
     linker.processConformance(C);
   }
