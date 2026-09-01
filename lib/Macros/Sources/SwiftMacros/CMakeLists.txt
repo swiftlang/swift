@@ -18,6 +18,7 @@ add_swift_macro_library(SwiftMacros
   TaskLocalMacro.swift
   SwiftifyImportMacro.swift
   TypeInfoParser.swift
+  DerivedConformances/DeriveCaseIterable.swift
   DerivedConformances/DeriveEquatable.swift
   SWIFT_DEPENDENCIES
     SwiftDiagnostics
