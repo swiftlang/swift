@@ -150,6 +150,11 @@ static llvm::cl::list<std::string> LoadPluginLibrary(
     "load-plugin-library",
     llvm::cl::desc("Path to a compiler plugin library"));
 
+static llvm::cl::list<std::string> EnableExperimentalFeature(
+    "enable-experimental-feature",
+    llvm::cl::desc("Enable an experimental feature"));
+
+
 enum class DumpType {
   REWRITTEN,
   JSON,
@@ -373,6 +378,12 @@ int main(int argc, char *argv[]) {
         PluginSearchOption::LoadPluginLibrary{path});
   Invocation.setDefaultInProcessPluginServerPathIfNecessary();
 
+  for (const auto &featureName : options::EnableExperimentalFeature) {
+    auto feature = Feature::getExperimentalFeature(featureName);
+    if (feature)
+      Invocation.getLangOptions().enableFeature(*feature);
+  }
+
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);
   Invocation.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
@@ -382,11 +393,6 @@ int main(int argc, char *argv[]) {
 
   if (options::EnableExperimentalConcurrency)
     Invocation.getLangOptions().EnableExperimentalConcurrency = true;
-
-  // Make sure the `DeriveConformancesViaMacros` experimental feature is enabled
-  // if we want to expand derived conformances.
-  if (options::Action == RefactoringKind::ExpandDerivedConformance)
-    Invocation.getLangOptions().enableFeature(Feature::DeriveConformancesViaMacros);
 
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);

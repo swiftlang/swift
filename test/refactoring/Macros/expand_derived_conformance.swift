@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %refactor-check-compiles -expand-derived-conformance -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) --dump-text -source-filename %s -pos=%(line+1):21 | %FileCheck -check-prefix=DIRECT %s
+// RUN: %refactor-check-compiles -expand-derived-conformance -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) --dump-text -source-filename %s -pos=%(line+1):21 | %FileCheck -check-prefix=DIRECT %s
 struct Direct: Equatable {
   var x: Int = 0
 }
@@ -11,7 +11,7 @@ struct Direct: Equatable {
 // DIRECT-NEXT: @_implements(Swift::Equatable, ==(_:_:))
 // DIRECT-NEXT: static func __derived_struct_equals(_ lhs: Self, _ rhs: Self) -> Swift::Bool {
 
-// RUN: %refactor-check-compiles -expand-derived-conformance -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) -source-filename %s -pos=%(line+5):28 | %FileCheck -check-prefix=IN_EXTENSION %s
+// RUN: %refactor-check-compiles -expand-derived-conformance -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) -source-filename %s -pos=%(line+5):28 | %FileCheck -check-prefix=IN_EXTENSION %s
 struct InExtension {
   var x: Int = 0
 }
@@ -24,7 +24,7 @@ extension InExtension: Equatable {}
 
 typealias EquatableAndHashable = Equatable & Hashable
 
-// RUN: %refactor-check-compiles -expand-derived-conformance -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) -source-filename %s -pos=%(line+1):31 | %FileCheck -check-prefix=VIA_TYPEALIAS %s
+// RUN: %refactor-check-compiles -expand-derived-conformance -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) -source-filename %s -pos=%(line+1):31 | %FileCheck -check-prefix=VIA_TYPEALIAS %s
 struct ViaTypealias: EquatableAndHashable {
   var x: Int = 0
 }
@@ -34,7 +34,7 @@ struct ViaTypealias: EquatableAndHashable {
 // VIA_TYPEALIAS-NEXT: static func __derived_struct_equals(_ lhs: Self, _ rhs: Self) -> Swift::Bool {
 // VIA_TYPEALIAS-NOT: {{.*}}.swift [[@LINE-7]]:44 -> [[@LINE-7]]:44
 
-// RUN: %refactor-check-compiles -expand-derived-conformance -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) -source-filename %s -pos=%(line+1):17 | %FileCheck -check-prefix=ENUM %s
+// RUN: %refactor-check-compiles -expand-derived-conformance -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) -source-filename %s -pos=%(line+1):17 | %FileCheck -check-prefix=ENUM %s
 enum Enum: Hashable {
   case a
   case b(Int)
