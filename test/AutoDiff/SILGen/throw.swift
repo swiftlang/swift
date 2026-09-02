@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
+// REQUIRES: optimized_stdlib
+
 import _Differentiation
 
 // Nothing special for throwing functions
