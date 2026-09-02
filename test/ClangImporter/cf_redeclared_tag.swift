@@ -2,6 +2,8 @@
 
 // REQUIRES: objc_interop
 
+// REQUIRES: rdar186401993
+
 import CFRedeclaredTag
 
 // Equivalent, since CFRedeclaredTagRef should be imported as OpaquePointer
