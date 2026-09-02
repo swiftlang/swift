@@ -93,3 +93,26 @@ bb0(%0 : $Int64, %1 : $Int64):
   dealloc_stack %4 : $*MyStruct, loc "sroa.swift":21:9, scope 3
   return %10 : $Int64, loc "sroa.swift":26:5, scope 3
 }
+
+sil_scope 4 { loc "sroa.swift":30:6 parent @sroa_keeps_alloc_stack_scope : $@convention(thin) (Int64, Int64) -> Int64 }
+sil_scope 5 { loc "sroa.swift":32:3 parent 4 }
+
+// CHECK-SROA-LABEL: sil {{.+}} @sroa_keeps_alloc_stack_scope
+// The new allocations must keep the scope of the original alloc_stack, not the
+// scope of the next instruction.
+// CHECK-SROA: alloc_stack $Int64
+// CHECK-SROA-SAME: scope 4
+// CHECK-SROA: alloc_stack $Int64
+// CHECK-SROA-SAME: scope 4
+sil hidden @sroa_keeps_alloc_stack_scope : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %2 = alloc_stack $MyStruct, var, name "my_struct", loc "sroa.swift":31:9, scope 4
+  %3 = struct_element_addr %2 : $*MyStruct, #MyStruct.x, loc "sroa.swift":32:17, scope 5
+  store %0 to %3 : $*Int64, loc "sroa.swift":32:17, scope 5
+  %5 = struct_element_addr %2 : $*MyStruct, #MyStruct.y, loc "sroa.swift":33:17, scope 5
+  store %1 to %5 : $*Int64, loc "sroa.swift":33:17, scope 5
+  %7 = struct_element_addr %2 : $*MyStruct, #MyStruct.x, loc "sroa.swift":34:10, scope 5
+  %8 = load %7 : $*Int64, loc "sroa.swift":34:10, scope 5
+  dealloc_stack %2 : $*MyStruct, loc "sroa.swift":31:9, scope 4
+  return %8 : $Int64, loc "sroa.swift":35:5, scope 4
+}
