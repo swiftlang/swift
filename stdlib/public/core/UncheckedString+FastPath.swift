@@ -1,0 +1,199 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import SwiftShims
+
+//
+// `==`, `<`, and `hash(into:)` are defined only in the generic
+// `UncheckedStringProtocol` extension (see UncheckedStringProtocol.swift),
+// are not `@inlinable`, and have no concrete override on `UncheckedString`/
+// `UncheckedSubString`. That means a call like `a == b`, even with `a`/`b`
+// concretely typed at the call site, still pays witness-table dispatch for
+// the inner `withCharacterData` call. This file adds a single concrete,
+// `@inlinable` override of each directly on `UncheckedString`/
+// `UncheckedSubString`, generic over any `Element: FixedWidthInteger`:
+//
+//  - `==`/`hash(into:)` get a genuine algorithmic speedup for *every*
+//    width: a bulk raw-byte comparison/hash is correct for any fixed-width
+//    element, since two values are equal iff their raw byte representations
+//    are equal (both written by the same process/platform), and `Hashable`
+//    only requires "equal values hash equal," which holds trivially for a
+//    hash of the raw bytes.
+//  - `<` cannot use a raw byte compare unconditionally -- for multi-byte
+//    elements, byte-order comparison isn't equivalent to numeric
+//    element-order comparison, and even for single-byte elements it's only
+//    valid for an *unsigned* one (`Int8`/`CChar`'s byte ordering and signed
+//    numeric ordering disagree on negative values) -- so it keeps a
+//    per-element loop as the general case, but special-cases
+//    `Element.self == UInt8.self` specifically (a compile-time-foldable
+//    check once `Element` is concretely known at a specialized call site)
+//    to reuse the same memcmp-based fast path as `==`.
+//
+// Getting actual *data* out of `.small` storage fast for single-byte
+// elements (as opposed to just picking a fast comparison algorithm once the
+// data is already in hand) is handled inside `withCharacterData` itself
+// (UncheckedString.swift), not here -- see the comment there for why that
+// has to be the one and only implementation of that method, rather than a
+// second `Element == UInt8`-constrained sibling.
+//
+// Important: earlier revisions of this file tried a *two-tier* design for
+// `==`/`<`/`hash(into:)` themselves -- this same generic implementation,
+// plus an *additional*, more specific `extension UncheckedString where
+// Element == UInt8` overload of each operator. Unlike `withCharacterData`
+// (a single protocol-required method with, correctly, a single
+// implementation), `==`/`<`/`hash(into:)`'s witnesses would have been two
+// competing extensions *on the same concrete generic type*
+// (`UncheckedString`), and empirically (verified by instrumenting both
+// candidates and observing which one actually ran), Swift's witness
+// selection for `Equatable`/`Comparable`'s operator requirements does not
+// reliably prefer the more constrained sibling in that situation -- it kept
+// choosing the generic one regardless. Hence a single implementation per
+// operator, with the `Element.self == UInt8.self` runtime branch doing the
+// specialization *inside* one function instead of via a second competing
+// extension.
+//
+// `UncheckedSubString` gets the identical trio below, for the identical
+// reason (its own conformances also come only from `UncheckedStringProtocol`'s
+// generic default otherwise). Unlike `withCharacterData`,
+// `UncheckedSubString.withCharacterData` doesn't need its own duplicate here:
+// it just forwards to `base.withCharacterData` (UncheckedString.swift), and
+// since *that* is fast for single-byte elements regardless of the calling
+// context (see the comment there), so is everything built on top of it --
+// including these three, and including callers other than these three.
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedString {
+  @inlinable
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    if lhs.count != rhs.count { return false }
+    return lhs.withCharacterData { l in
+      rhs.withCharacterData { r in
+        l.withUnsafeBufferPointer { lb in
+          r.withUnsafeBufferPointer { rb in
+            let lRaw = unsafe UnsafeRawBufferPointer(lb)
+            let rRaw = unsafe UnsafeRawBufferPointer(rb)
+            if unsafe lRaw.isEmpty { return true }
+            return unsafe 0 == _swift_stdlib_memcmp(
+              lRaw.baseAddress.unsafelyUnwrapped,
+              rRaw.baseAddress.unsafelyUnwrapped,
+              lRaw.count)
+          }
+        }
+      }
+    }
+  }
+
+  @inlinable
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    return lhs.withCharacterData { l in
+      rhs.withCharacterData { r in
+        l.withUnsafeBufferPointer { lb in
+          r.withUnsafeBufferPointer { rb in
+            if Element.self == UInt8.self {
+              let lRaw = unsafe UnsafeRawBufferPointer(lb)
+              let rRaw = unsafe UnsafeRawBufferPointer(rb)
+              let n = Swift.min(lRaw.count, rRaw.count)
+              let cmp = n == 0 ? 0 : unsafe _swift_stdlib_memcmp(
+                lRaw.baseAddress.unsafelyUnwrapped,
+                rRaw.baseAddress.unsafelyUnwrapped,
+                n)
+              return cmp != 0 ? cmp < 0 : lb.count < rb.count
+            }
+            let minCount = Swift.min(lb.count, rb.count)
+            var i = 0
+            while i < minCount {
+              let lv = unsafe lb[i]
+              let rv = unsafe rb[i]
+              if lv != rv { return lv < rv }
+              i += 1
+            }
+            return lb.count < rb.count
+          }
+        }
+      }
+    }
+  }
+
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(count)
+    withCharacterData { data in
+      data.withUnsafeBufferPointer { buffer in
+        unsafe hasher.combine(bytes: UnsafeRawBufferPointer(buffer))
+      }
+    }
+  }
+}
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedSubString {
+  @inlinable
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    if lhs.count != rhs.count { return false }
+    return lhs.withCharacterData { l in
+      rhs.withCharacterData { r in
+        l.withUnsafeBufferPointer { lb in
+          r.withUnsafeBufferPointer { rb in
+            let lRaw = unsafe UnsafeRawBufferPointer(lb)
+            let rRaw = unsafe UnsafeRawBufferPointer(rb)
+            if unsafe lRaw.isEmpty { return true }
+            return unsafe 0 == _swift_stdlib_memcmp(
+              lRaw.baseAddress.unsafelyUnwrapped,
+              rRaw.baseAddress.unsafelyUnwrapped,
+              lRaw.count)
+          }
+        }
+      }
+    }
+  }
+
+  @inlinable
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    return lhs.withCharacterData { l in
+      rhs.withCharacterData { r in
+        l.withUnsafeBufferPointer { lb in
+          r.withUnsafeBufferPointer { rb in
+            if Element.self == UInt8.self {
+              let lRaw = unsafe UnsafeRawBufferPointer(lb)
+              let rRaw = unsafe UnsafeRawBufferPointer(rb)
+              let n = Swift.min(lRaw.count, rRaw.count)
+              let cmp = n == 0 ? 0 : unsafe _swift_stdlib_memcmp(
+                lRaw.baseAddress.unsafelyUnwrapped,
+                rRaw.baseAddress.unsafelyUnwrapped,
+                n)
+              return cmp != 0 ? cmp < 0 : lb.count < rb.count
+            }
+            let minCount = Swift.min(lb.count, rb.count)
+            var i = 0
+            while i < minCount {
+              let lv = unsafe lb[i]
+              let rv = unsafe rb[i]
+              if lv != rv { return lv < rv }
+              i += 1
+            }
+            return lb.count < rb.count
+          }
+        }
+      }
+    }
+  }
+
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(count)
+    withCharacterData { data in
+      data.withUnsafeBufferPointer { buffer in
+        unsafe hasher.combine(bytes: UnsafeRawBufferPointer(buffer))
+      }
+    }
+  }
+}

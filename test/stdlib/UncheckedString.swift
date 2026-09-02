@@ -102,11 +102,15 @@ UncheckedStringTests.test("isTriviallyIdentical/dynamic") {
 UncheckedStringTests.test("isTriviallyIdentical/differentStorageKinds") {
   // Same content, but one is small and the other has been forced into
   // dynamic storage -- these must not be considered identical even
-  // though they compare equal. `SmallUncheckedStringStorage<UInt16>`'s
-  // capacity is 7 elements on 64-bit platforms, so appending enough
-  // extra content to push well past that (then trimming back down)
-  // guarantees `dynamic` actually left small storage, rather than never
-  // having exceeded capacity in the first place.
+  // though they compare equal. `.dynamic` storage never demotes back to
+  // `.small` on shrink (see "noStorageDemotionOnShrink" below): once a
+  // string has paid for a heap allocation, further mutations are likely,
+  // so the storage kind -- and the underlying buffer's reserved capacity
+  // -- is kept rather than given up. `SmallUncheckedStringStorage<UInt16>`'s
+  // capacity is 7 elements on 64-bit platforms, so appending enough extra
+  // content to push well past that (then trimming back down) guarantees
+  // `dynamic` actually left small storage, rather than never having
+  // exceeded capacity in the first place.
   let small: UncheckedString<UInt16> = "abc"
   var dynamic: UncheckedString<UInt16> = "abc"
   dynamic.append(contentsOf: "defghijklmnop" as UncheckedString<UInt16>)
@@ -114,7 +118,22 @@ UncheckedStringTests.test("isTriviallyIdentical/differentStorageKinds") {
 
   expectTrue(small == dynamic)
   expectFalse(small.isTriviallyIdentical(to: dynamic))
+
+  // Storage kinds that differ for reasons *other* than a size threshold --
+  // e.g. immortal (a long literal, backed by static memory) vs. dynamic (the
+  // same long content, but built up via mutation into a heap-allocated
+  // array) -- are never candidates for demotion into each other (both are
+  // well above small-storage capacity), so they should still never be
+  // considered trivially identical even with equal content.
+  let immortalLong: UncheckedString<UInt16> = "this literal is long enough to not be small"
+  var dynamicLong: UncheckedString<UInt16> = "this literal is long eno"
+  dynamicLong.append(contentsOf: "ugh to not be small" as UncheckedString<UInt16>)
+
+  expectTrue(immortalLong == dynamicLong)
+  expectFalse(immortalLong.isTriviallyIdentical(to: dynamicLong))
 }
+
+
 
 UncheckedStringTests.test("isTriviallyIdentical/substring") {
   let s: UncheckedString<UInt16> = "Ren\u{e9} Descartes"
@@ -246,6 +265,146 @@ UncheckedStringTests.test("singleCharacterLiterals") {
   expectEqual("x", String(ch))
   expectEqual("y", String(sc))
   expectEqual("z", str)
+}
+
+// MARK: - Performance-fix regression coverage
+//
+// Exhaustively exercises the allocation-free small-storage mutation paths
+// (append/insert/remove/replaceSubrange) added for `Element ==
+// FixedWidthInteger` in general (not just `UInt8`), checked against a plain
+// `Array` oracle, and independently cross-checks the cached `.dynamic`
+// `count` field (Storage.count) against the real underlying element count
+// (`withCharacterData { $0.count }`) after every mutation, to catch a
+// stale-cache bug that a same-source-of-truth comparison (e.g. `Array(s)`,
+// whose length is itself derived from the cached count) would not.
+func checkSmallStorageMutations<Element: FixedWidthInteger>(
+  capacity: Int, of type: Element.Type
+) {
+  func checkConsistent(_ s: UncheckedString<Element>, _ oracle: [Element]) {
+    expectEqual(Array(s), oracle)
+    expectEqual(s.count, oracle.count)
+    expectEqual(s.count, s.withCharacterData { $0.count })
+  }
+
+  for count in 0...capacity {
+    let base: [Element] = (0..<count).map { Element(truncatingIfNeeded: $0 + 1) }
+
+    if count < capacity {
+      var s = UncheckedString<Element>(base)
+      var oracle = base
+      let e = Element(99)
+      s.append(e)
+      oracle.append(e)
+      checkConsistent(s, oracle)
+
+      for i in 0...count {
+        var s = UncheckedString<Element>(base)
+        var oracle = base
+        s.insert(e, at: i)
+        oracle.insert(e, at: i)
+        checkConsistent(s, oracle)
+      }
+    }
+
+    if count > 0 {
+      for i in 0..<count {
+        var s = UncheckedString<Element>(base)
+        var oracle = base
+        let removed = s.remove(at: i)
+        let removedOracle = oracle.remove(at: i)
+        expectEqual(removed, removedOracle)
+        checkConsistent(s, oracle)
+      }
+    }
+
+    for lo in 0...count {
+      for hi in lo...count {
+        for replacementLength in 0...2 {
+          let finalCount = count - (hi - lo) + replacementLength
+          guard finalCount <= capacity else { continue }
+          var s = UncheckedString<Element>(base)
+          var oracle = base
+          let replacement: [Element] =
+            (0..<replacementLength).map { Element(210 + $0) }
+          s.replaceSubrange(lo..<hi, with: replacement)
+          oracle.replaceSubrange(lo..<hi, with: replacement)
+          checkConsistent(s, oracle)
+        }
+      }
+    }
+  }
+}
+
+UncheckedStringTests.test("smallStorageMutations/UInt8") {
+  // `SmallUncheckedStringStorage<UInt8>`'s capacity is 14 elements on
+  // 64-bit platforms (matching the convention of hardcoding this already
+  // used elsewhere in this file, since the type itself isn't visible
+  // outside the defining module).
+  checkSmallStorageMutations(capacity: 14, of: UInt8.self)
+}
+
+UncheckedStringTests.test("smallStorageMutations/UInt16") {
+  // `SmallUncheckedStringStorage<UInt16>`'s capacity is 7 elements on
+  // 64-bit platforms.
+  checkSmallStorageMutations(capacity: 7, of: UInt16.self)
+}
+
+// Shrinking `.dynamic` storage back down across (and below) the
+// small-storage capacity boundary, whether via `replaceSubrange`-based
+// APIs (`removeLast`) or `removeAll`, must *not* demote it to `.small`/
+// `.empty`, for any `FixedWidthInteger` element type: a string already
+// being mutated is likely to be mutated further, so the storage kind (and,
+// for `removeAll(keepingCapacity: true)`, the underlying buffer) is kept
+// rather than given up. Checked via `isTriviallyIdentical` against a
+// freshly-constructed `.small`/`.empty` string with the same content,
+// which is the sharpest check that no demotion happened (rather than
+// merely comparing equal).
+func checkNoStorageDemotionOnShrink<Element: FixedWidthInteger>(
+  capacity: Int, of type: Element.Type
+) {
+  let content: [Element] = (0..<capacity).map { Element(truncatingIfNeeded: $0 + 1) }
+  let small = UncheckedString<Element>(content)
+
+  var dynamic = UncheckedString<Element>(content)
+  dynamic.append(contentsOf: (0..<20).map { Element(truncatingIfNeeded: $0 + 100) })
+  expectEqual(dynamic.count, capacity + 20)
+
+  dynamic.removeLast(20)
+  expectEqual(dynamic.count, capacity)
+  expectTrue(small == dynamic)
+  expectFalse(small.isTriviallyIdentical(to: dynamic))
+
+  // `removeAll(keepingCapacity: true)` on a `.dynamic` source: stays
+  // `.dynamic`, zero-length, not `.empty`.
+  var removedKeepingCapacity = dynamic
+  removedKeepingCapacity.removeAll(keepingCapacity: true)
+  expectEqual(removedKeepingCapacity.count, 0)
+  expectFalse(UncheckedString<Element>().isTriviallyIdentical(to: removedKeepingCapacity))
+
+  // `removeAll(keepingCapacity: false)` on a `.dynamic` source: the caller
+  // is explicitly saying it doesn't need the capacity kept, so this drops
+  // straight to `.empty` -- both this type's own `removeAll` override (in
+  // UncheckedString+RangeReplaceableCollection.swift) and
+  // `RangeReplaceableCollection`'s default agree on this.
+  var removedDiscardingCapacity = dynamic
+  removedDiscardingCapacity.removeAll(keepingCapacity: false)
+  expectEqual(removedDiscardingCapacity.count, 0)
+  expectTrue(UncheckedString<Element>().isTriviallyIdentical(to: removedDiscardingCapacity))
+
+  // A source that was never `.dynamic` to begin with has no buffer to
+  // preserve, so `removeAll` on it still produces `.empty`.
+  var neverDynamic = small
+  neverDynamic.removeAll(keepingCapacity: true)
+  expectEqual(neverDynamic.count, 0)
+  expectTrue(UncheckedString<Element>().isTriviallyIdentical(to: neverDynamic))
+}
+
+UncheckedStringTests.test("noStorageDemotionOnShrink/UInt8") {
+  checkNoStorageDemotionOnShrink(capacity: 14, of: UInt8.self)
+}
+
+UncheckedStringTests.test("noStorageDemotionOnShrink/UInt16") {
+  checkNoStorageDemotionOnShrink(capacity: 7, of: UInt16.self)
 }
 
 runAllTests()

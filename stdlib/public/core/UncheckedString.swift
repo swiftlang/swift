@@ -94,6 +94,15 @@ public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
   @inlinable
   public var count: Int { return storage.count }
 
+  /// `Collection`'s own default implementation of `isEmpty` (`startIndex ==
+  /// endIndex`) has no concrete override on `UncheckedString`, so a call to
+  /// it goes through full protocol-witness dispatch for both `startIndex`
+  /// and `endIndex` -- and `endIndex` itself calls through to `count` --
+  /// confirmed by sampling profiler to dominate this path's cost, for what
+  /// should just be a single field read. This overrides it directly.
+  @inlinable
+  public var isEmpty: Bool { return storage.count == 0 }
+
   @usableFromInline
   internal init(_ storage: Storage) {
     self.storage = storage
@@ -124,6 +133,7 @@ public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
       storage = .dynamic(
         DynamicUncheckedStringStorage(
           characters: chars,
+          count: UInt32(chars.count - 1),
           flags: [.nulTerminated]
         )
       )
@@ -149,6 +159,7 @@ public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
       storage = .dynamic(
         DynamicUncheckedStringStorage(
           characters: a,
+          count: UInt32(a.count - 1),
           flags: [.nulTerminated]
         )
       )
@@ -317,6 +328,7 @@ extension UncheckedString {
             unsafe UnsafeBufferPointer(start: cString,
                                        count: len + 1)
           ),
+          count: UInt32(len),
           flags: [.nulTerminated]
         )
       )
@@ -372,12 +384,21 @@ extension UncheckedString {
     self.init(newStorage)
   }
 
-  // Creates a string from an immortal string that isn't NUL terminated.
+  /// Creates a string from an immortal string whose contents are given by
+  /// `immortalString`.
+  ///
+  /// Pass `nulTerminated: true` only if a `0`-valued `Element` is known to
+  /// immediately follow `immortalString`'s contents in memory (e.g. because
+  /// it is itself a slice of a NUL-terminated buffer); this lets later
+  /// C-interop calls skip re-copying the contents to add one.
   @_specialize(where Element == UInt8)
   @_specialize(where Element == CChar)
   @_specialize(where Element == UInt16)
   @inlinable
-  public init(immortalString: UnsafeBufferPointer<Element>) {
+  public init(
+    immortalString: UnsafeBufferPointer<Element>,
+    nulTerminated: Bool = false
+  ) {
     let newStorage: Storage
 
     if immortalString.count == 0 {
@@ -389,7 +410,7 @@ extension UncheckedString {
         unsafe ImmortalUncheckedStringStorage(
           characters: immortalString.baseAddress!,
           count: UInt32(immortalString.count),
-          flags: []
+          flags: nulTerminated ? [.nulTerminated] : []
         )
       )
     }
@@ -429,6 +450,7 @@ extension UncheckedString where Element == UInt16 {
             unsafe UnsafeBufferPointer(start: cString,
                                        count: len + 1)
           ),
+          count: UInt32(len),
           flags: [.nulTerminated]
         )
       )
@@ -467,10 +489,60 @@ extension UncheckedString where Element == UInt16 {
 extension UncheckedString {
   /// Calls the given closure with a buffer of `Element`s,
   /// which are *not* necessarily NUL-terminated.
+  ///
+  /// For a single-byte `Element` (`UInt8`, `CChar`/`Int8`, ...), `.small`
+  /// storage's packed byte tuple needs no unpacking at all: a single-byte
+  /// integer has no alignment requirement beyond 1 byte, so the tuple's
+  /// bytes already *are* a valid `Span<Element>` in place, reinterpreted
+  /// via `bindMemory` rather than copied element-by-element through
+  /// `_unpackSmallUncheckedString` into a temporary buffer (needed only for
+  /// wider `Element`s, whose alignment the packed tuple does *not*
+  /// guarantee). `MemoryLayout<Element>.size == 1` is a runtime check, but
+  /// one that folds away to a compile-time constant once this function is
+  /// specialized for a concrete `Element` (same as the `Element.self ==
+  /// UInt8.self` checks elsewhere in this file) -- and checking the size
+  /// rather than a specific type's identity means every single-byte
+  /// `FixedWidthInteger` gets the fast path for free, with nothing to
+  /// update if another one is added later.
+  ///
+  /// This check belongs here, inside the one and only implementation of
+  /// this (protocol-required) method, rather than split across a second,
+  /// `Element == UInt8`-constrained sibling extension providing an
+  /// alternate witness for the same requirement (as an earlier revision of
+  /// this function did): that split is only reached by callers whose *own*
+  /// static context already knows `Element == UInt8` concretely --
+  /// `==`/`<`/`hash(into:)` (UncheckedString+FastPath.swift), which are
+  /// themselves generic over `Element`, call `self.withCharacterData` from
+  /// a still-generic context and so could never resolve to that sibling,
+  /// no matter what `Element` turned out to be at their own concrete call
+  /// sites (confirmed by sampling profiler, which caught `<` still paying
+  /// for the temporary-buffer unpack on `UInt8` data despite that sibling
+  /// existing). Doing the check inside this single implementation instead
+  /// means every caller -- generic or concrete, present or future -- reaches
+  /// the fast path automatically, with no caller-side awareness needed.
   @inlinable
   public func withCharacterData<R, Failure>(
     _ body: (Span<Element>) throws(Failure) -> R
   ) throws(Failure) -> R {
+    if MemoryLayout<Element>.size == 1 {
+      switch storage {
+        case .empty:
+          return try body(Span<Element>())
+        case .small(let data):
+          return try withUnsafeBytes(of: data.bytes) { (rawBuffer) throws(Failure) -> R in
+            let buffer = unsafe rawBuffer.bindMemory(to: Element.self)
+            return try body(unsafe UnsafeBufferPointer(
+              start: buffer.baseAddress, count: Int(data.count)
+            ).span)
+          }
+        case .immortal(let data):
+          return try body(unsafe UnsafeBufferPointer(start: data.characters,
+                                              count: Int(data.count)).span)
+        case .dynamic(let data):
+          // Ignore the trailing NUL
+          return try body(data.characters.span.extracting(droppingLast: 1))
+      }
+    }
     switch storage {
       case .empty:
         return try body(Span<Element>())
@@ -481,40 +553,6 @@ extension UncheckedString {
         ) { (buffer) throws(Failure) -> R in
           unsafe _unpackSmallUncheckedString(data, into: buffer)
           return try body(unsafe UnsafeBufferPointer(buffer).span)
-        }
-      case .immortal(let data):
-        return try body(unsafe UnsafeBufferPointer(start: data.characters,
-                                            count: Int(data.count)).span)
-      case .dynamic(let data):
-        // Ignore the trailing NUL
-        return try body(data.characters.span.extracting(droppingLast: 1))
-    }
-  }
-}
-
-// For UInt8, `.small` storage's packed byte tuple needs no unpacking: a
-// `UInt8` has no alignment requirement beyond 1 byte, so the tuple's bytes
-// already *are* a valid `Span<UInt8>` in place. This overrides the generic
-// `withCharacterData` above (which must unpack `.small` storage into a
-// temporary buffer for wider `Element`s, to satisfy their alignment) for
-// this specific, and most common, instantiation.
-@available(SwiftStdlib 9999, *)
-extension UncheckedString where Element == UInt8 {
-  /// Calls the given closure with a buffer of `Element`s,
-  /// which are *not* necessarily NUL-terminated.
-  @inlinable
-  public func withCharacterData<R, Failure>(
-    _ body: (Span<Element>) throws(Failure) -> R
-  ) throws(Failure) -> R {
-    switch storage {
-      case .empty:
-        return try body(Span<Element>())
-      case .small(let data):
-        return try withUnsafeBytes(of: data.bytes) { (rawBuffer) throws(Failure) -> R in
-          let buffer = unsafe rawBuffer.bindMemory(to: UInt8.self)
-          return try body(unsafe UnsafeBufferPointer(
-            start: buffer.baseAddress, count: Int(data.count)
-          ).span)
         }
       case .immortal(let data):
         return try body(unsafe UnsafeBufferPointer(start: data.characters,

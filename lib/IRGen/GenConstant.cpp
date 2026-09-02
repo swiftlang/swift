@@ -48,11 +48,16 @@ namespace {
 /// care of serializing them correctly for the target's actual endianness
 /// when the module is emitted -- this code never needs to know or assume
 /// what that target endianness is.
+///
+/// A trailing zero-valued \p T is always appended past \p data's elements,
+/// matching `getAddrOfGlobalString`'s guarantee for 8-bit string literals;
+/// the stdlib's literal initializer relies on this to mark the resulting
+/// `UncheckedString` as NUL-terminated without a separate copy.
 template <typename T>
 llvm::Constant *emitAddrOfConstantIntArray(IRGenModule &IGM, StringRef data) {
   assert(data.size() % sizeof(T) == 0);
   size_t count = data.size() / sizeof(T);
-  SmallVector<T, 64> values(count);
+  SmallVector<T, 64> values(count + 1, T(0));
   memcpy(values.data(), data.data(), data.size());
 
   auto *init = llvm::ConstantDataArray::get(IGM.getLLVMContext(),

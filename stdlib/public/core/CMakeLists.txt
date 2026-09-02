@@ -231,6 +231,7 @@ split_embedded_sources(
   EMBEDDED UIntBuffer.swift
   NORMAL UncheckedString.swift
   NORMAL UncheckedString+Encoding.swift
+  NORMAL UncheckedString+FastPath.swift
   NORMAL UncheckedString+Literals.swift
   NORMAL UncheckedString+RangeReplaceableCollection.swift
   NORMAL UncheckedStringProtocol.swift

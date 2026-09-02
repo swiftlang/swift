@@ -17,7 +17,9 @@ extension UncheckedString: _ExpressibleByBuiltinUncheckedStringLiteral {
   /// spliced (for `\x{hh}` raw code unit escapes) to `Element`'s width.
   ///
   /// The pointee is permanently alive, backed by the executable's constant
-  /// data, matching `init(immortalString:)`'s requirements.
+  /// data, matching `init(immortalString:)`'s requirements. IRGen also
+  /// guarantees a `0`-valued `Element` immediately follows the literal's
+  /// data, so the result is marked NUL-terminated.
   @_specialize(where Element == UInt8)
   @_specialize(where Element == CChar)
   @_specialize(where Element == UInt16)
@@ -31,7 +33,7 @@ extension UncheckedString: _ExpressibleByBuiltinUncheckedStringLiteral {
       start: UnsafeRawPointer(start).assumingMemoryBound(to: Element.self),
       count: Int(unitCount)
     )
-    unsafe self.init(immortalString: buffer)
+    unsafe self.init(immortalString: buffer, nulTerminated: true)
   }
 }
 
