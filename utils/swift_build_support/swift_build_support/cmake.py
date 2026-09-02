@@ -222,6 +222,7 @@ class CMake(object):
                                 echo=True, optional=True)
         (c_major, c_minor, c_patch) = (0, 0, 0)
         if version is not None:
+            print(version)
             x = re.findall(r'cmake version (\d+)\.(\d+)\.(\d+)',
                            version.rstrip())
             if len(x) == 1:
