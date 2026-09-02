@@ -10,9 +10,11 @@ struct SimpleTest {
 // CHECK:         [[T0:%.*]] = struct_extract %0 : $SimpleTest, #SimpleTest.stored
 // CHECK-NEXT:    yield [[T0]] : $String, resume bb1, unwind bb2
 // CHECK:       bb1:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 // CHECK:       bb2:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    unwind
     _read {
       yield stored
@@ -31,6 +33,7 @@ struct SimpleTest {
 // CHECK-NEXT:    end_apply [[TOKEN]]
 // CHECK-NEXT:    end_borrow [[SELF_BORROW]]
 // CHECK-NEXT:    destroy_value [[SELF]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[RET]] : $String
   mutating func get() -> String {
     return readable
@@ -45,6 +48,7 @@ class GetterSynthesis {
 // CHECK-NEXT:    ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[READFN]](%0)
 // CHECK-NEXT:    [[RET:%.*]] = copy_value [[VALUE]] : $String
 // CHECK-NEXT:    end_apply [[TOKEN]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[RET]] : $String
     _read {
       yield stored
@@ -83,12 +87,14 @@ struct TupleReader {
 // CHECK:       bb1:
 // CHECK-NEXT:    end_apply [[SUBTOKEN]]
 // CHECK-NEXT:    destroy_value [[COMPUTE]] : $String
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[T0:%.*]] = tuple ()
 // CHECK-NEXT:    return [[T0]] : $()
 // CHECK:       bb2:
 //   Should this be an abort_apply?
 // CHECK-NEXT:    end_apply [[SUBTOKEN]]
 // CHECK-NEXT:    destroy_value [[COMPUTE]] : $String
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    unwind
 // CHECK-LABEL: } // end sil function '$s13read_accessor11TupleReaderV8readableSS_ytt_SSyttvr'
     _read {

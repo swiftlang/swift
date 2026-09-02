@@ -542,6 +542,7 @@ struct ReferenceStorageTypeRValues {
 // CHECK-NEXT:   debug_value [[ARG]] : $ReferenceStorageTypeRValues
 // CHECK-NEXT:   [[UNOWNED_ARG_FIELD:%.*]] = struct_extract [[ARG]] : $ReferenceStorageTypeRValues, #ReferenceStorageTypeRValues.p1
 // CHECK-NEXT:   [[COPIED_VALUE:%.*]] = strong_copy_unowned_value [[UNOWNED_ARG_FIELD]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   return [[COPIED_VALUE]] : $Ref
 
   init() {
@@ -647,6 +648,7 @@ class ClassWithLetProperty {
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr [[ARG]] : $ClassWithLetProperty, #ClassWithLetProperty.p
 // CHECK-NEXT:    [[VAL:%[0-9]+]] = load [trivial] [[PTR]] : $*Int
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   return [[VAL]] : $Int
 
 
@@ -837,6 +839,7 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened({{.*}}, any NonmutatingProtocol) Self
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*any NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_BOX]] : $*any NonmutatingProtocol
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
 

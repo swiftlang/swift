@@ -997,8 +997,10 @@ struct S_58201 {
 // CHECK-NEXT:  [[DEFAULTVALUE_FN:%.*]] = function_ref @$s17property_wrappers23BasicComputedIntWrapperVACycfC : $@convention(method) (@thin BasicComputedIntWrapper.Type) -> BasicComputedIntWrapper
 // CHECK-NEXT:  [[DEFAULTRESULT:%.*]] = apply [[DEFAULTVALUE_FN]]([[METATYPE]]) : $@convention(method) (@thin BasicComputedIntWrapper.Type) -> BasicComputedIntWrapper
 // CHECK-NEXT:  store [[DEFAULTRESULT]] to [trivial] [[BOXADDR]] : $*BasicComputedIntWrapper
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  end_borrow [[BOX_LIFETIME]] : ${ var BasicComputedIntWrapper }
 // CHECK-NEXT:  destroy_value [[BOX]] : ${ var BasicComputedIntWrapper }
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()
 // CHECK-NEXT:  } // end sil function '$s17property_wrappers7S_58201V1ayyF'

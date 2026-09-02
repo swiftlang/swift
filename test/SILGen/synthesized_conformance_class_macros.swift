@@ -58,6 +58,7 @@ class Nonfinal<T> {
 // CHECK: bb0(%0 : @guaranteed $FinalHashableClass):
 // CHECK:   [[FN:%.*]] = function_ref @$s36synthesized_conformance_class_macros18FinalHashableClassC9hashValueSivg : $@convention(method) (@guaranteed FinalHashableClass) -> Int
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]](%0) : $@convention(method) (@guaranteed FinalHashableClass) -> Int
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RESULT]] : $Int
 
 

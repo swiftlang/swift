@@ -50,5 +50,6 @@ let foo = Foo(value: "Hello")
 
 // CHECK: bb2:
 // CHECK-NEXT: end_access [[BEGIN_ACCESS]] : $*T
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: unwind
 foo.value = "World"

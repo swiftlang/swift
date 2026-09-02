@@ -5653,6 +5653,22 @@ consumed at most once. If the marker is `no_consume_or_assign`, then the
 move checker will validate that the result of this instruction is never
 consumed or assigned over.
 
+### end_formal_scope
+
+```
+sil-instruction ::= 'end_formal_scope' sil-operand
+
+end_formal_scope %0 : $T
+```
+
+`end_formal_scope` is a marker that corresponds to the end of the formal
+scope of a local variable as written in source code. This does not necessarily
+indicate the end of the bound value's lifetime, since it could be consumed prior
+to the end of the variable binding, or it could be moved somewhere else, but
+the marker serves to provide barriers for the diagnostic passes that establish
+value lifetimes so that, for instance, dependent values do not extend a variable
+value outside of its original scope.
+
 ## No Implicit Copy and No Escape Value Instructions
 
 ### copyable_to_moveonlywrapper

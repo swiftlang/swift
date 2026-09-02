@@ -219,9 +219,12 @@ OPERAND_OWNERSHIP(TrivialUse, DereferenceBorrow)
 OPERAND_OWNERSHIP(TrivialUse, DereferenceAddrBorrow)
 OPERAND_OWNERSHIP(TrivialUse, DereferenceBorrowAddr)
 
-// The dealloc_stack_ref operand needs to have NonUse ownership because
-// this use comes after the last consuming use (which is usually a dealloc_ref).
+// A dealloc_stack_ref or end_formal_scope operand needs to have NonUse
+// ownership because this use comes after the last consuming use (which is
+// usually a dealloc_ref).
 OPERAND_OWNERSHIP(NonUse, DeallocStackRef)
+OPERAND_OWNERSHIP(NonUse, EndFormalScope)
+
 OPERAND_OWNERSHIP(InstantaneousUse, IgnoredUse)
 
 // Use an owned or guaranteed value only for the duration of the operation.
@@ -648,13 +651,13 @@ OperandOwnershipClassifier::visitPartialApplyInst(PartialApplyInst *i) {
     if (operandTy.isTrivial(*i->getFunction())) {
       return OperandOwnership::TrivialUse;
     }
-    
+
     // Borrowing of address operands is ultimately handled by the move-only
     // address checker and/or exclusivity checker rather than by value ownership.
     if (operandTy.isAddress()) {
       return OperandOwnership::TrivialUse;
     }
-  
+
     return OperandOwnership::Borrow;
   }
   // All non-trivial types should be captured.
@@ -802,7 +805,7 @@ namespace {
 struct OperandOwnershipBuiltinClassifier
     : SILBuiltinVisitor<OperandOwnershipBuiltinClassifier, OperandOwnership> {
   using Map = OperandOwnership;
-      
+
   const Operand &op;
   OperandOwnershipBuiltinClassifier(const Operand &op) : op(op) {}
 
@@ -1041,7 +1044,7 @@ OperandOwnershipBuiltinClassifier
     // The result buffer pointer is a trivial use.
     return OperandOwnership::TrivialUse;
   }
-  
+
   // The closure is borrowed while the async let task is executing.
   return OperandOwnership::Borrow;
 }
