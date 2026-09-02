@@ -1539,8 +1539,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Existing exact binding must be a supertype of the new lower bound.
-      if (!canConvertTo(CS.CC, binding.BindingType, existing.BindingType,
-                        GenericSignature())) {
+      if (!canConvertTo(CS.CC, binding.BindingType, existing.BindingType)) {
         SUBSUME_DEBUG("Exact vs supertype conflict");
         return SubsumeBindingResult::Conflict;
       }
@@ -1560,8 +1559,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Existing exact binding must be a subtype of the new upper bound.
-      if (!canConvertTo(CS.CC, existing.BindingType, binding.BindingType,
-                        GenericSignature())) {
+      if (!canConvertTo(CS.CC, existing.BindingType, binding.BindingType)) {
         SUBSUME_DEBUG("Exact vs subtype conflict");
         return SubsumeBindingResult::Conflict;
       }
@@ -1588,8 +1586,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Exact binding must be a supertype of the existing lower bound.
-      if (!canConvertTo(CS.CC, existing.BindingType, binding.BindingType,
-                        GenericSignature())) {
+      if (!canConvertTo(CS.CC, existing.BindingType, binding.BindingType)) {
         SUBSUME_DEBUG("Supertype vs exact conflict");
         return SubsumeBindingResult::Conflict;
       }
@@ -1641,8 +1638,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The existing lower bound should be a subtype of the new upper bound.
-      if (!canConvertTo(CS.CC, existing.BindingType, binding.BindingType,
-                        GenericSignature())) {
+      if (!canConvertTo(CS.CC, existing.BindingType, binding.BindingType)) {
         SUBSUME_DEBUG("Supertype vs subtype conflict");
         return SubsumeBindingResult::Conflict;
       }
@@ -1688,8 +1684,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The new exact binding should be a subtype of the existing upper bound.
-      if (!canConvertTo(CS.CC, binding.BindingType, existing.BindingType,
-                        GenericSignature())) {
+      if (!canConvertTo(CS.CC, binding.BindingType, existing.BindingType)) {
         SUBSUME_DEBUG("Subtype vs exact conflict");
         return SubsumeBindingResult::Conflict;
       }
@@ -1716,8 +1711,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The new lower bound should be a subtype of the existing upper bound.
-      if (!canConvertTo(CS.CC, binding.BindingType, existing.BindingType,
-                        GenericSignature())) {
+      if (!canConvertTo(CS.CC, binding.BindingType, existing.BindingType)) {
         SUBSUME_DEBUG("Subtype vs supertype conflict");
         return SubsumeBindingResult::Conflict;
       }
@@ -2521,12 +2515,12 @@ bool LiteralRequirement::isCoveredBy(AllowedBindingKind kind, Type type,
     case AllowedBindingKind::Supertypes:
       if (!type->getAnyNominal() && !type->isExistentialType())
         return false;
-      return canConvertTo(CS.CC, defaultType, type, GenericSignature());
+      return canConvertTo(CS.CC, defaultType, type);
 
     case AllowedBindingKind::Subtypes:
       if (!type->getAnyNominal() && !type->isExistentialType())
         return false;
-      return canConvertTo(CS.CC, type, defaultType, GenericSignature());
+      return canConvertTo(CS.CC, type, defaultType);
     }
   }
 }
