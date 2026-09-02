@@ -966,7 +966,7 @@ private extension Type {
     }
     // Only support the most important builtin types to be on the safe side.
     // Historically we assumed that Builtin.RawPointer can alias everything (but why?).
-    if isBuiltinInteger || isBuiltinFloat {
+    if isBuiltinInteger || isBuiltinFloat || isBuiltinBridgeObject {
       return true
     }
     return false
