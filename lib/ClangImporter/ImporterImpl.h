@@ -36,6 +36,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "clang/APINotes/Types.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
@@ -73,6 +74,9 @@ class ParmVarDecl;
 class Parser;
 class QualType;
 class TypedefNameDecl;
+namespace api_notes {
+class APINotesManager;
+}
 namespace serialization {
 class ModuleFile;
 } // namespace serialization
@@ -557,6 +561,13 @@ private:
   /// modules.
   std::unique_ptr<clang::CompilerInstance> Instance;
 
+  /// Per-module API Notes loaded from an imported PCM's CAS include tree.
+  /// Presence in this map makes the include tree authoritative, including when
+  /// it contains no API Notes.
+  llvm::DenseMap<const clang::Module *,
+                 std::unique_ptr<clang::api_notes::APINotesManager>>
+      CASModuleAPINotes;
+
   /// Clang compiler action, which is used to actually run the
   /// parser.
   std::unique_ptr<clang::FrontendAction> Action;
@@ -662,6 +673,8 @@ public:
   /// mangling, such as Windows) of \p clangDecl to \p os.
   static void getItaniumMangledName(const clang::NamedDecl *clangDecl,
                                     raw_ostream &os);
+
+  llvm::Error loadAPINotes(const clang::Module *module);
 
 private:
   /// The Importer may be configured to load modules of a different OS Version
@@ -1082,6 +1095,10 @@ public:
   clang::Sema &getClangSema() const {
     return Instance->getSema();
   }
+
+  std::optional<clang::api_notes::GlobalVariableInfo>
+  lookupAPINotes(clang::Sema &S, const clang::Module *M,
+                 const clang::IdentifierInfo *II, clang::SourceLocation Loc);
 
   /// Retrieve the Clang AST context.
   clang::Preprocessor &getClangPreprocessor() const {

@@ -2625,7 +2625,9 @@ NameImporter::importMacroName(const clang::IdentifierInfo *II,
   // Honor an APINotes 'SwiftName:' override, if one applies. A macro constant
   // can only be renamed to a simple identifier, so reject function, operator,
   // and member names, which are meaningless here.
-  if (auto notes = getClangSema().ProcessAPINotes(M, II, MI->getDefinitionLoc())) {
+  clang::Sema &S = getClangSema();
+  if (auto notes =
+          importerImpl->lookupAPINotes(S, M, II, MI->getDefinitionLoc())) {
     if (!notes->SwiftName.empty()) {
       ParsedDeclName ident = parseDeclName(notes->SwiftName);
       if (ident && !ident.isOperator() && !ident.IsFunctionName &&

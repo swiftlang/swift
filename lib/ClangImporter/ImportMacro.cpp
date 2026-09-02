@@ -50,8 +50,8 @@ static Type importMacroTypeOverride(ClangImporter::Implementation &Impl,
     return Type();
 
   clang::Sema &S = Impl.getClangSema();
-  auto Info = S.ProcessAPINotes(ClangN.getOwningClangModule(), II,
-                                macro->getDefinitionLoc());
+  auto Info = Impl.lookupAPINotes(S, ClangN.getOwningClangModule(), II,
+                                  macro->getDefinitionLoc());
   if (!Info || Info->getType().empty())
     return Type();
 

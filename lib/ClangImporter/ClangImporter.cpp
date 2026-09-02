@@ -53,6 +53,8 @@
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
+#include "clang/APINotes/APINotesManager.h"
+#include "clang/APINotes/APINotesReader.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclBase.h"
@@ -2652,6 +2654,79 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
   return MD;
 }
 
+llvm::Error
+ClangImporter::Implementation::loadAPINotes(const clang::Module *M) {
+  auto *TopLevelModule = M->getTopLevelModule();
+  auto ASTFile = TopLevelModule->getASTFile();
+  if (!ASTFile)
+    return llvm::Error::success();
+
+  auto *MF = Instance->getASTReader()->getModuleManager().lookup(*ASTFile);
+  if (!MF || MF->IncludeTreeID.empty())
+    return llvm::Error::success();
+
+  auto ID = CAS->parseID(MF->IncludeTreeID);
+  if (!ID)
+    return ID.takeError();
+
+  auto Ref = CAS->getReference(*ID);
+  if (!Ref)
+    return CAS->createUnknownObjectError(*ID);
+
+  auto Root = clang::cas::IncludeTreeRoot::get(*CAS, *Ref);
+  if (!Root)
+    return Root.takeError();
+
+  auto Notes = Root->getAPINotes();
+  if (!Notes)
+    return Notes.takeError();
+
+  llvm::SmallVector<llvm::StringRef, 2> Buffers;
+  if (*Notes)
+    if (auto Err = (*Notes)->forEachAPINotes([&](llvm::StringRef Buffer) {
+      Buffers.push_back(Buffer);
+      return llvm::Error::success();
+    }))
+      return Err;
+
+  auto &SM = Instance->getSourceManager();
+  auto &LangOpts = Instance->getLangOpts();
+  auto Manager =
+      std::make_unique<clang::api_notes::APINotesManager>(SM, LangOpts);
+  Manager->setSwiftVersion(Instance->getAPINotesOpts().SwiftVersion);
+  if (!Buffers.empty() &&
+      !Manager->loadCurrentModuleAPINotesFromBuffer(Buffers))
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "failed to load attach APINotes for %s",
+                                   TopLevelModule->Name.c_str());
+
+  CASModuleAPINotes.try_emplace(TopLevelModule, std::move(Manager));
+  return llvm::Error::success();
+}
+
+std::optional<clang::api_notes::GlobalVariableInfo>
+ClangImporter::Implementation::lookupAPINotes(clang::Sema &S,
+                                              const clang::Module *M,
+                                              const clang::IdentifierInfo *II,
+                                              clang::SourceLocation Loc) {
+  if (!II || Loc.isInvalid())
+    return std::nullopt;
+
+  if (M) {
+    M = M->getTopLevelModule();
+    if (auto it = CASModuleAPINotes.find(M); it != CASModuleAPINotes.end()) {
+      for (auto *Reader : it->second->getCurrentModuleReaders()) {
+        auto Info = Reader->lookupGlobalVariable(II->getName());
+        if (auto Selected = Info.getSelected())
+          return Info[*Selected].second;
+      }
+      return std::nullopt;
+    }
+  }
+
+  return S.ProcessAPINotes(M, II, Loc);
+}
+
 ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     const clang::Module *clangModule, SourceLoc importLoc) {
   assert(clangModule);
@@ -2666,6 +2741,10 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   ModuleDecl *result = wrapperUnit->getParentModule();
   auto &moduleWrapper = ModuleWrappers[clangModule];
   if (!moduleWrapper.getInt()) {
+    if (CAS)
+      if (auto Err = loadAPINotes(clangModule))
+        llvm::report_fatal_error(std::move(Err));
+
     moduleWrapper.setInt(true);
     (void) namelookup::getAllImports(result);
   }
