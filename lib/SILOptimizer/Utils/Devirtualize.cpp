@@ -777,7 +777,10 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
   // Mandatory inlining does class method devirtualization. I'm not sure if this
   // is really needed, but some test rely on this.
   // So even for Onone functions we have to do it if the SILStage is raw.
-  if (f->getModule().getStage() != SILStage::Raw && !f->shouldOptimize()) {
+  // This asks whether the raw mandatory pipeline is still running, not what
+  // stage the callee is at. Mandatory inlining must devirtualize even Onone
+  // callees while the module is Raw, so read the floor.
+  if (f->getModule().getStageFloor() != SILStage::Raw && !f->shouldOptimize()) {
     // Do not consider functions that should not be optimized.
     LLVM_DEBUG(llvm::dbgs()
                << "        FAIL: Could not optimize function "

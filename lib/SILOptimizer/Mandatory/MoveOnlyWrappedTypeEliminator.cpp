@@ -438,7 +438,7 @@ struct SILMoveOnlyWrappedTypeEliminatorPass : SILFunctionTransform {
     if (getFunction()->wasDeserializedCanonical())
       return;
 
-    assert(fn->getModule().getStage() == SILStage::Raw &&
+    assert(fn->getModule().getStageFloor() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
     if (SILMoveOnlyWrappedTypeEliminator(getFunction())

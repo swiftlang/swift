@@ -858,6 +858,10 @@ bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(
 
 bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->hasLoweredAddresses(); }
 
+SwiftInt BridgedFunction::getStage() const {
+  return (SwiftInt)getFunction()->getFunctionStage();
+}
+
 BridgedCanType BridgedFunction::getLoweredFunctionType() const {
   return getFunction()->getLoweredFunctionType();
 }
@@ -3454,6 +3458,13 @@ static_assert((int)BridgedContext::SILStage::Raw == (int)swift::SILStage::Raw);
 static_assert((int)BridgedContext::SILStage::Canonical == (int)swift::SILStage::Canonical);
 static_assert((int)BridgedContext::SILStage::Lowered == (int)swift::SILStage::Lowered);
 
+// BridgedFunction::getStage returns a SwiftInt, which Function.silStage rebuilds
+// with SILStage(rawValue:). The Swift enum's raw values are positional, so pin
+// the numbering here as well.
+static_assert((int)swift::SILStage::Raw == 0);
+static_assert((int)swift::SILStage::Canonical == 1);
+static_assert((int)swift::SILStage::Lowered == 2);
+
 bool BridgedContext::isTransforming(BridgedFunction function) const {
   return context->getFunction() == function.getFunction();
 }
@@ -3466,8 +3477,8 @@ bool BridgedContext::hasChangeNotification(NotificationKind changeKind) const {
   return (context->getChangeNotifications() & (swift::SILContext::NotificationKind)changeKind) != 0;
 }
 
-BridgedContext::SILStage BridgedContext::getSILStage() const {
-  return (SILStage)context->getModule()->getStage();
+BridgedContext::SILStage BridgedContext::getStageFloor() const {
+  return (SILStage)context->getModule()->getStageFloor();
 }
 
 bool BridgedContext::moduleIsSerialized() const {

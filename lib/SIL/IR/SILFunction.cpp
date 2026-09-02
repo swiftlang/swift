@@ -290,8 +290,11 @@ void SILFunction::init(
   // Set by AddressLowering when it lowers this function in the Raw-stage
   // mandatory pipeline, and copied from a clone's source by SILCloner. Functions
   // born after the module advances past Raw are reported lowered by the
-  // module-stage term in hasLoweredAddresses(), so no creation-time seed is needed.
+  // stage term in hasLoweredAddresses(), so no creation-time seed is needed.
   this->HasLoweredAddresses = false;
+  // A function is born at the stage floor. Content created after the module
+  // commits to a stage is built to that stage's rules.
+  this->FunctionStage = unsigned(Module.getStageFloor());
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -312,10 +315,21 @@ bool SILFunction::hasLoweredAddresses() const {
   // - This function was individually lowered by AddressLowering
   // - This function arrived already canonical via deserialization
   // - This is a non-opaque-values build
-  // - Module has committed past Raw SIL stage 
+  // - This function has committed past Raw SIL
   return HasLoweredAddresses || WasDeserializedCanonical ||
          !getModule().usesOpaqueValues() ||
-         getModule().getStage() != SILStage::Raw;
+         getFunctionStage() != SILStage::Raw;
+}
+
+SILStage SILFunction::getFunctionStage() const {
+  return SILStage(FunctionStage);
+}
+
+void SILFunction::setFunctionStage(SILStage stage) {
+  assert(stage >= getFunctionStage() && "regressing per-function stage?!");
+  assert(stage >= getModule().getStageFloor() &&
+         "per-function stage below the module stage floor?!");
+  FunctionStage = unsigned(stage);
 }
 
 SILAddressConventions SILAddressConventions::forRawSIL(SILModule &M) {
