@@ -81,14 +81,27 @@ extension HashableRequirement: TypeInfoProtocol {
       """
     }
   }
+
+  var isUnsafe: Bool {
+    switch self {
+    case .hashValue(let isUnsafe):
+      isUnsafe
+    case .compatHash(let isUnsafe):
+      isUnsafe
+    case .hashRawValue(let isUnsafe):
+      isUnsafe
+    case .hash(let info):
+      info.isUnsafe
+    }
+  }
 }
 
 public struct DeriveHashableMacro: DeclarationMacro {
 
-  let isUnsafe: Bool
+  let requirement: HashableRequirement
 
   var unsafeMark: String {
-    isUnsafe ? "unsafe " : ""
+    requirement.isUnsafe ? "unsafe " : ""
   }
 
   public static func expansion(
@@ -98,45 +111,42 @@ public struct DeriveHashableMacro: DeclarationMacro {
     // Parse the requirement and then expand it.
     let req = try node.arguments.expect(
       .init(parser: HashableRequirement.fromStringLit))
-    return [Self.expand(req)]
+    return [Self(requirement: req).expand]
   }
 
   /// Returns the expansion for `hashValue` var using `_hashValue`. When the
   /// conformance is unsafe, the call is combined through an `unsafe` expression.
-  func expandHashValue() -> DeclSyntax {
-    return
-      """
-      var hashValue: Swift::Int {
-        return \(raw: unsafeMark)Swift::_hashValue(for: self)
-      }
-      """
+  var expandHashValue: DeclSyntax {
+    """
+    var hashValue: Swift::Int {
+      return \(raw: unsafeMark)Swift::_hashValue(for: self)
+    }
+    """
   }
 
   /// Returns the signature of the `hash(into:)` method.
-  static func getHashSignature() -> DeclSyntax {
+  static var getHashSignature: DeclSyntax {
     """
     func hash(into hasher: inout Swift::Hasher)
     """
   }
 
   /// Returns the expansion of the `hash(into:)` method using the `hashValue` var.
-  func expandCompatHash() -> DeclSyntax {
-    return
-      """
-      \(Self.getHashSignature()) {
-        \(raw: unsafeMark)hasher.combine(self.hashValue)
-      }
-      """
+  var expandCompatHash: DeclSyntax {
+    """
+    \(Self.getHashSignature) {
+      \(raw: unsafeMark)hasher.combine(self.hashValue)
+    }
+    """
   }
 
   /// Returns the expansion of the `hash(into:)` method using the enum's raw value.
-  func expandHashRawValue() -> DeclSyntax {
-    return
-      """
-      \(Self.getHashSignature()) {
-        \(raw: unsafeMark)hasher.combine(self.rawValue)
-      }
-      """
+  var expandHashRawValue: DeclSyntax {
+    """
+    \(Self.getHashSignature) {
+      \(raw: unsafeMark)hasher.combine(self.rawValue)
+    }
+    """
   }
 
   /// Derives the body of `hash(into:)` for an enum with no associated values
@@ -160,10 +170,7 @@ public struct DeriveHashableMacro: DeclarationMacro {
   /// Derives the body of `hash(into:)` for an enum with associated values. When
   /// the conformance is unsafe, each associated value is combined through an
   /// `unsafe` expression, since it relies on the value's Hashable conformance.
-  static func getHashBodyHasAssociatedValues(
-    _ infos: EnumTypeInfo, isUnsafe: Bool
-  ) -> CodeBlockItemListSyntax {
-    let unsafeMark = isUnsafe ? "unsafe " : ""
+  func getHashBodyHasAssociatedValues(_ infos: EnumTypeInfo) -> CodeBlockItemListSyntax {
     var idx = 0
     let cases: [SwitchCaseSyntax] =
       infos.cases.map { caseInfo in
@@ -207,19 +214,18 @@ public struct DeriveHashableMacro: DeclarationMacro {
   }
 
   /// Derives the body of `hash(into:)` for an enum
-  static func getHashBody(_ infos: EnumTypeInfo, isUnsafe: Bool) -> CodeBlockItemListSyntax {
+  func getHashBody(_ infos: EnumTypeInfo) -> CodeBlockItemListSyntax {
     if infos.hasNoAssociatedValues() {
-      getHashBodyNoAssociatedValues(infos)
+      Self.getHashBodyNoAssociatedValues(infos)
     } else {
-      getHashBodyHasAssociatedValues(infos, isUnsafe: isUnsafe)
+      getHashBodyHasAssociatedValues(infos)
     }
   }
 
   /// Derives the body of `hash(into:)` for a struct. When the conformance is
   /// unsafe, each property is combined through an `unsafe` expression, since it
   /// relies on the property's Hashable conformance.
-  static func getHashBody(_ infos: StructTypeInfo, isUnsafe: Bool) -> CodeBlockItemListSyntax {
-    let unsafeMark = isUnsafe ? "unsafe " : ""
+  func getHashBody(_ infos: StructTypeInfo) -> CodeBlockItemListSyntax {
     var items: [CodeBlockItemSyntax] = []
     for prop in infos.properties {
       if !prop.isUserAccessible {
@@ -235,35 +241,31 @@ public struct DeriveHashableMacro: DeclarationMacro {
   }
 
   /// Derives the body of `hash(into:)`
-  static func getHashBody(_ infos: NominalTypeInfo) -> CodeBlockItemListSyntax {
+  func getHashBody(_ infos: NominalTypeInfo) -> CodeBlockItemListSyntax {
     switch infos.kind {
     case .enumLike(let enum_infos):
-      return getHashBody(enum_infos, isUnsafe: infos.isUnsafe)
+      return getHashBody(enum_infos)
     case .structLike(let struct_infos):
-      return getHashBody(struct_infos, isUnsafe: infos.isUnsafe)
+      return getHashBody(struct_infos)
     }
   }
 
   /// Derives the `hash(into:)` method
-  static func expandHash(_ infos: NominalTypeInfo) -> DeclSyntax {
+  func expandHash(_ infos: NominalTypeInfo) -> DeclSyntax {
     """
-    \(getHashSignature()) {
+    \(Self.getHashSignature) {
       \(getHashBody(infos))
     }
     """
   }
 
   /// Derives a requirement for `Hashable`
-  static func expand(_ req: HashableRequirement) -> DeclSyntax {
-    switch req {
-    case .hashValue(let isUnsafe):
-      Self(isUnsafe: isUnsafe).expandHashValue()
-    case .compatHash(let isUnsafe):
-      Self(isUnsafe: isUnsafe).expandCompatHash()
-    case .hashRawValue(let isUnsafe):
-      Self(isUnsafe: isUnsafe).expandHashRawValue()
-    case .hash(let infos):
-      Self.expandHash(infos)
+  var expand: DeclSyntax {
+    switch requirement {
+    case .hashValue: expandHashValue
+    case .compatHash: expandCompatHash
+    case .hashRawValue: expandHashRawValue
+    case .hash(let infos): expandHash(infos)
     }
   }
 }
