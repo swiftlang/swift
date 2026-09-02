@@ -478,6 +478,22 @@ private func _NSStringUTF8Pointer(
   return unsafe (contents: result, utf8Length: utf8Length)
 }
 
+@_silgen_name("swift_stdlib_installNSStringCompatibilityMethods")
+internal func _installNSStringCompatibilityMethods() -> Bool
+
+private let _nsStringCompatibilityMethodsInstalled =
+  _installNSStringCompatibilityMethods()
+
+/*
+ Adds methods we need onto NSString, IFF it doesn't already have them.
+
+ Must run before any foreign `_CocoaString` reaches `_withCocoaUTF8Pointer`.
+ */
+internal func _installNSStringCompatibilityMethodsIfNeeded() -> Void {
+  let installed = _nsStringCompatibilityMethodsInstalled
+  _debugPrecondition(installed)
+}
+
 @_effects(readonly)
 internal func _getNSCFConstantStringContentsPointer(
   _ cocoa: AnyObject
@@ -575,6 +591,8 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     return _StringGuts(_SmallString(taggedCocoa: cocoaString)!)
 #endif
   case .cocoa:
+    _installNSStringCompatibilityMethodsIfNeeded()
+
     // "Copy" it into a value to be sure nobody will modify behind
     // our backs. In practice, when value is already immutable, this
     // just does a retain.
