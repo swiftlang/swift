@@ -31,8 +31,10 @@ enum NoValues {
 // CHECK: }
 
 // CHECK-LABEL: extension NoValues : CaseIterable {
+// CHECK:   static var allCases: [NoValues] { 
+// CHECK:     get 
+// CHECK:   }
 // CHECK:   typealias AllCases = [NoValues]
-// CHECK:   static var allCases: [NoValues] { get }
 // CHECK: }
 
 
