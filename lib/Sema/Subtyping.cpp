@@ -501,6 +501,39 @@ bool swift::constraints::canConvertTo(ConformanceCache &cache,
   return !checkConversion(cache, lhs, rhs, sig);
 }
 
+static ConflictReason
+checkExtInfoConversion(ConformanceCache &cache,
+                       FunctionType *lhsFunc,
+                       FunctionType *rhsFunc,
+                       AnyFunctionType::ExtInfo lhsInfo,
+                       AnyFunctionType::ExtInfo rhsInfo,
+                       GenericSignature sig) {
+  if (lhsInfo.isNoEscape() && !rhsInfo.isNoEscape())
+    return ConflictFlag::FunctionNoEscape;
+
+  if (lhsInfo.isAsync() && !rhsInfo.isAsync())
+    return ConflictFlag::FunctionAsync;
+
+  auto lhsThrows = lhsFunc->getEffectiveThrownErrorType();
+  auto rhsThrows = rhsFunc->getEffectiveThrownErrorType();
+  if (lhsThrows.has_value() && !rhsThrows.has_value()) {
+    auto result = isLikelyExactMatch(*lhsThrows,
+                                     lhsFunc->getASTContext().getNeverType());
+    if (result.has_value() && *result)
+      return ConflictFlag::FunctionThrows;
+  }
+
+  if (lhsThrows.has_value() && rhsThrows.has_value()) {
+    auto reason = checkConversion(cache, *lhsThrows, *rhsThrows, sig);
+    if (reason)
+      return reason | ConflictFlag::FunctionThrows;
+  }
+
+  // FIXME: We can't usefully handle isolation (too complex) or Sendable
+  // (depends on preconcurrency context) here.
+  return std::nullopt;
+}
+
 ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
                                                    Type lhs, Type rhs,
                                                    GenericSignature sig) {
@@ -632,9 +665,60 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
         return result | ConflictFlag::Metatype;
       break;
     }
-    case ConversionBehavior::Function:
-      // FIXME: Implement.
+    case ConversionBehavior::Function: {
+      auto *lhsFunc = lhs->castTo<FunctionType>();
+      auto *rhsFunc = rhs->castTo<FunctionType>();
+
+      // Note: getConversionBehavior() guarantees the function types don't
+      // contain any parameter packs, so we may assume their lengths are
+      // known.
+      if (lhsFunc->getNumParams() != rhsFunc->getNumParams())
+        return ConflictReason(ConflictFlag::FunctionParamCount);
+
+      auto result = checkConversion(cache,
+                                    lhsFunc->getResult(),
+                                    rhsFunc->getResult(),
+                                    sig);
+      if (result)
+        return result | ConflictFlag::FunctionResult;
+
+      for (unsigned i : indices(lhsFunc->getParams())) {
+        auto lhsParam = lhsFunc->getParams()[i];
+        auto rhsParam = rhsFunc->getParams()[i];
+
+        if (lhsParam.isInOut() != rhsParam.isInOut())
+          return ConflictReason(ConflictFlag::FunctionParamFlags);
+
+        if (lhsParam.isVariadic() != rhsParam.isVariadic())
+          return ConflictReason(ConflictFlag::FunctionParamFlags);
+
+        Type paramType;
+        if (lhsParam.isInOut() || lhsParam.isVariadic()) {
+          auto result = isLikelyExactMatch(lhsParam.getPlainType(),
+                                           rhsParam.getPlainType());
+          if (result.has_value() && !*result)
+            return ConflictReason(ConflictFlag::FunctionParamType);
+        } else {
+          auto result = checkConversion(cache,
+                                        rhsParam.getPlainType(),
+                                        lhsParam.getPlainType(),
+                                        sig);
+          if (result)
+            return result | ConflictFlag::FunctionParamType;
+        }
+      }
+
+      auto lhsInfo = lhsFunc->getExtInfo();
+      auto rhsInfo = rhsFunc->getExtInfo();
+      auto reason = checkExtInfoConversion(cache,
+                                           lhsFunc, rhsFunc,
+                                           lhsInfo, rhsInfo, sig);
+      if (reason)
+        return reason;
+
       break;
+    }
+
     case ConversionBehavior::InOut:
     case ConversionBehavior::LValue: {
       // InOut-to-InOut and LValue-to-LValue conversions are invariant.
@@ -1003,7 +1087,7 @@ static std::optional<AnyFunctionType::ExtInfo>
 extInfoJoinMeetImpl(Operation op,
                     AnyFunctionType::ExtInfo lhsInfo,
                     AnyFunctionType::ExtInfo rhsInfo) {
-  bool noEscape, sendable, throwing;
+  bool noEscape, sendable, throwing, async;
   Type sendableDep;
   Type thrownError;
 
@@ -1016,6 +1100,7 @@ extInfoJoinMeetImpl(Operation op,
 
   if (op == Operation::Join) {
     noEscape = lhsInfo.isNoEscape() || rhsInfo.isNoEscape();
+    async = lhsInfo.isAsync() || rhsInfo.isAsync();
 
     if (lhsSendableDep && rhsSendableDep) {
       // Form a tuple; its Sendable iff both components are Sendable.
@@ -1050,6 +1135,7 @@ extInfoJoinMeetImpl(Operation op,
     }
   } else {
     noEscape = lhsInfo.isNoEscape() && rhsInfo.isNoEscape();
+    async = lhsInfo.isAsync() && rhsInfo.isAsync();
 
     if (lhsSendableDep && rhsSendableDep) {
       // We cannot represent the meet of two sendable-dependent types.
@@ -1093,6 +1179,7 @@ extInfoJoinMeetImpl(Operation op,
   return lhsInfo.intoBuilder()
       .withNoEscape(noEscape)
       .withThrows(throwing, thrownError)
+      .withAsync(async)
       .withSendable(sendable)
       .withSendableDependentType(sendableDep)
       .build();
@@ -1216,15 +1303,15 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
       auto *lhsFunc = lhs->castTo<FunctionType>();
       auto *rhsFunc = rhs->castTo<FunctionType>();
 
-      auto result = rec(lhsFunc->getResult(), rhsFunc->getResult());
-
-      SmallVector<AnyFunctionType::Param, 4> params;
-
       // Note: getConversionBehavior() guarantees the function types don't
       // contain any parameter packs, so we may assume their lengths are
       // known.
       if (lhsFunc->getNumParams() != rhsFunc->getNumParams())
         return fail();
+
+      auto result = rec(lhsFunc->getResult(), rhsFunc->getResult());
+
+      SmallVector<AnyFunctionType::Param, 4> params;
 
       for (unsigned i : indices(lhsFunc->getParams())) {
         auto lhsParam = lhsFunc->getParams()[i];
@@ -1235,7 +1322,6 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
 
         Type paramType;
         if (lhsParam.isInOut() || lhsParam.isVariadic()) {
-          ASSERT(rhsParam.isInOut());
           auto result = isLikelyExactMatch(lhsParam.getPlainType(),
                                            rhsParam.getPlainType());
           if (!result)
@@ -1637,4 +1723,20 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " tuple_element";
   if (reason.contains(ConflictFlag::Existential))
     out << " existential";
+  if (reason.contains(ConflictFlag::FunctionResult))
+    out << " function_result";
+  if (reason.contains(ConflictFlag::FunctionParamCount))
+    out << " function_param_count";
+  if (reason.contains(ConflictFlag::FunctionParamFlags))
+    out << " function_param_flags";
+  if (reason.contains(ConflictFlag::FunctionParamType))
+    out << " function_param_type";
+  if (reason.contains(ConflictFlag::FunctionNoEscape))
+    out << " function_no_escape";
+  if (reason.contains(ConflictFlag::FunctionAsync))
+    out << " function_async";
+  if (reason.contains(ConflictFlag::FunctionThrows))
+    out << " function_throws";
+  if (reason.contains(ConflictFlag::FunctionSendable))
+    out << " function_sendable";
 }
