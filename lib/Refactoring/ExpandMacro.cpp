@@ -315,7 +315,7 @@ expandDerivedConformanceWitnesses(SourceManager &SM,
   // Send all of the rewritten buffer snippets.
   for (auto bufferID : bufferIDs) {
     editConsumer.acceptMacroExpansionBuffer(SM, bufferID, containingSF,
-                                            /*adjustExpansion=*/false,
+                                            /*adjustExpansion=*/true,
                                             /*includeBufferName=*/true);
   }
   return false;
