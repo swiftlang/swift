@@ -28,9 +28,11 @@ func g<T : P>(_ x : T) -> Bool {
 // CHECK-LABEL: sil @$s10dead_alloc0A10AllocStackySbAA1XVF :
 // CHECK:         debug_value
 // CHECK-NEXT:    debug_value
-// CHECK:         %3 = integer_literal
-// CHECK-NEXT:    %4 = struct
-// CHECK-NEXT:    return %4
+// CHECK-NEXT:    debug_value
+// CHECK-NEXT:    debug_value
+// CHECK-NEXT:    %5 = integer_literal
+// CHECK-NEXT:    %6 = struct
+// CHECK-NEXT:    return %6
 // CHECK-NEXT:  } // end sil function '$s10dead_alloc0A10AllocStackySbAA1XVF'
 public func deadAllocStack(_ x: X) -> Bool {
   return g(x)
