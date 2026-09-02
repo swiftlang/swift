@@ -1,0 +1,292 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplification -simplify-instruction=br,struct_extract,tuple_extract,unchecked_enum_data,destructure_struct,destructure_tuple | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=br,struct_extract,tuple_extract,unchecked_enum_data,destructure_struct,destructure_tuple | %FileCheck %s
+
+// Simplifying a `br` "unwraps" a phi argument by hoisting the extract of a single struct field,
+// tuple element or enum payload into the predecessors - see SimplifyPhiArgument.swift.
+// The tests in this file need the `struct`/`tuple`/`enum` instructions to be simplified as well,
+// so that the hoisted extract folds with the aggregate construction in the predecessor.
+// Tests which only need the `br` simplification are in simplify_branch.sil.
+
+import Swift
+import Builtin
+
+class C {}
+
+struct S {
+  var c: C
+}
+
+enum E {
+  case a(C)
+  case b
+}
+
+enum E2 {
+  case a(C)
+  case b(C)
+}
+
+// A phi which is only used to extract a single struct field is replaced by that field.
+// The `struct_extract` is hoisted into the predecessors, where it folds with the `struct`.
+// This also works if the extract is nested in a borrow scope of the phi.
+// CHECK-LABEL: sil [ossa] @unwrap_owned_struct_phi
+// CHECK:       bb1:
+// CHECK-NEXT:    [[C1:%.*]] = copy_value %0
+// CHECK-NEXT:    br bb3([[C1]] : $C)
+// CHECK:       bb2:
+// CHECK-NEXT:    [[C2:%.*]] = copy_value %1
+// CHECK-NEXT:    br bb3([[C2]] : $C)
+// CHECK:       bb3([[A:%.*]] : @owned $C):
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[A]] : $C
+// CHECK-NEXT:    fix_lifetime [[B]] : $C
+// CHECK-NEXT:    end_borrow [[B]] : $C
+// CHECK-NEXT:    return [[A]] : $C
+// CHECK:       } // end sil function 'unwrap_owned_struct_phi'
+sil [ossa] @unwrap_owned_struct_phi : $@convention(thin) (@guaranteed C, @guaranteed C) -> @owned C {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %0 : $C
+  %3 = struct $S (%2 : $C)
+  br bb3(%3 : $S)
+
+bb2:
+  %4 = copy_value %1 : $C
+  %5 = struct $S (%4 : $C)
+  br bb3(%5 : $S)
+
+bb3(%6 : @owned $S):
+  %7 = begin_borrow %6 : $S
+  %8 = struct_extract %7 : $S, #S.c
+  fix_lifetime %8 : $C
+  end_borrow %7 : $S
+  %9 = destructure_struct %6 : $S
+  return %9 : $C
+}
+
+// The same for a tuple phi.
+// CHECK-LABEL: sil [ossa] @unwrap_tuple_phi
+// CHECK:       bb1:
+// CHECK-NEXT:    br bb3(%1 : $Builtin.Int64)
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3(%0 : $Builtin.Int64)
+// CHECK:       bb3([[A:%.*]] : $Builtin.Int64):
+// CHECK-NEXT:    return [[A]] : $Builtin.Int64
+// CHECK:       } // end sil function 'unwrap_tuple_phi'
+sil [ossa] @unwrap_tuple_phi : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+  br bb3(%2 : $(Builtin.Int64, Builtin.Int64))
+
+bb2:
+  %3 = tuple (%1 : $Builtin.Int64, %0 : $Builtin.Int64)
+  br bb3(%3 : $(Builtin.Int64, Builtin.Int64))
+
+bb3(%4 : $(Builtin.Int64, Builtin.Int64)):
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int64), 1
+  return %5 : $Builtin.Int64
+}
+
+// The same for an enum phi, which is unwrapped with `unchecked_enum_data`.
+// CHECK-LABEL: sil [ossa] @unwrap_owned_enum_phi
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value %1 : $C
+// CHECK-NEXT:    br bb3(%0 : $C)
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %0 : $C
+// CHECK-NEXT:    br bb3(%1 : $C)
+// CHECK:       bb3([[A:%.*]] : @owned $C):
+// CHECK-NEXT:    return [[A]] : $C
+// CHECK:       } // end sil function 'unwrap_owned_enum_phi'
+sil [ossa] @unwrap_owned_enum_phi : $@convention(thin) (@owned C, @owned C) -> @owned C {
+bb0(%0 : @owned $C, %1 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $C
+  %2 = enum $E, #E.a!enumelt, %0 : $C
+  br bb3(%2 : $E)
+
+bb2:
+  destroy_value %0 : $C
+  %3 = enum $E, #E.a!enumelt, %1 : $C
+  br bb3(%3 : $E)
+
+bb3(%4 : @owned $E):
+  %5 = unchecked_enum_data %4 : $E, #E.a!enumelt
+  return %5 : $C
+}
+
+// A guaranteed phi is unwrapped through its `borrowed_from` instruction.
+// CHECK-LABEL: sil [ossa] @unwrap_guaranteed_struct_phi
+// CHECK:       bb1:
+// CHECK-NEXT:    br bb3(%0 : $C)
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3(%1 : $C)
+// CHECK:       bb3([[A:%.*]] : @guaranteed $C):
+// CHECK-NEXT:    [[BF:%.*]] = borrowed [[A]] : $C from (
+// CHECK-NEXT:    fix_lifetime [[BF]] : $C
+// CHECK:       } // end sil function 'unwrap_guaranteed_struct_phi'
+sil [ossa] @unwrap_guaranteed_struct_phi : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = struct $S (%0 : $C)
+  br bb3(%2 : $S)
+
+bb2:
+  %3 = struct $S (%1 : $C)
+  br bb3(%3 : $S)
+
+bb3(%4 : @guaranteed $S):
+  %5 = borrowed %4 from (%0 : $C, %1 : $C)
+  %6 = struct_extract %5 : $S, #S.c
+  fix_lifetime %6 : $C
+  %t = tuple ()
+  return %t : $()
+}
+
+// The incoming aggregate can have other uses. It's just not removed in this case.
+// CHECK-LABEL: sil [ossa] @unwrap_aggregate_with_other_use
+// CHECK:       bb1:
+// CHECK-NEXT:    [[S:%.*]] = struct $S (%0 : $C)
+// CHECK-NEXT:    [[CP:%.*]] = copy_value [[S]] : $S
+// CHECK-NEXT:    destroy_value [[CP]] : $S
+// CHECK-NEXT:    br bb3(%0 : $C)
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3(%1 : $C)
+// CHECK:       bb3([[A:%.*]] : @guaranteed $C):
+// CHECK-NEXT:    [[BF:%.*]] = borrowed [[A]] : $C from (
+// CHECK-NEXT:    fix_lifetime [[BF]] : $C
+// CHECK:       } // end sil function 'unwrap_aggregate_with_other_use'
+sil [ossa] @unwrap_aggregate_with_other_use : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = struct $S (%0 : $C)
+  %3 = copy_value %2 : $S
+  destroy_value %3 : $S
+  br bb3(%2 : $S)
+
+bb2:
+  %4 = struct $S (%1 : $C)
+  br bb3(%4 : $S)
+
+bb3(%5 : @guaranteed $S):
+  %6 = borrowed %5 : $S from (%0 : $C, %1 : $C)
+  %7 = struct_extract %6 : $S, #S.c
+  fix_lifetime %7 : $C
+  %t = tuple ()
+  return %t : $()
+}
+
+// The hoisted `unchecked_enum_data` only folds in the predecessor which constructs the
+// matching enum case.
+// CHECK-LABEL: sil [ossa] @hoist_unwrap_of_different_enum_cases
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value %1 : $C
+// CHECK-NEXT:    br bb3(%0 : $C)
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %0 : $C
+// CHECK-NEXT:    [[EN:%.*]] = enum $E2, #E2.b!enumelt, %1 : $C
+// CHECK-NEXT:    [[UED:%.*]] = unchecked_enum_data [[EN]] : $E2, #E2.a!enumelt
+// CHECK-NEXT:    br bb3([[UED]] : $C)
+// CHECK:       bb3([[A:%.*]] : @owned $C):
+// CHECK-NEXT:    return [[A]] : $C
+// CHECK:       } // end sil function 'hoist_unwrap_of_different_enum_cases'
+sil [ossa] @hoist_unwrap_of_different_enum_cases : $@convention(thin) (@owned C, @owned C) -> @owned C {
+bb0(%0 : @owned $C, %1 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $C
+  %2 = enum $E2, #E2.a!enumelt, %0 : $C
+  br bb3(%2 : $E2)
+
+bb2:
+  destroy_value %0 : $C
+  %3 = enum $E2, #E2.b!enumelt, %1 : $C
+  br bb3(%3 : $E2)
+
+bb3(%4 : @owned $E2):
+  %5 = unchecked_enum_data %4 : $E2, #E2.a!enumelt
+  return %5 : $C
+}
+
+// A guaranteed enum phi is unwrapped through its `borrowed_from` instruction, even if the
+// incoming `enum` has other uses.
+// CHECK-LABEL: sil [ossa] @unwrap_guaranteed_enum_phi
+// CHECK:       bb1:
+// CHECK-NEXT:    [[E:%.*]] = enum $E, #E.a!enumelt, %0 : $C
+// CHECK-NEXT:    [[CP:%.*]] = copy_value [[E]] : $E
+// CHECK-NEXT:    destroy_value [[CP]] : $E
+// CHECK-NEXT:    br bb3(%0 : $C)
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3(%1 : $C)
+// CHECK:       bb3([[A:%.*]] : @guaranteed $C):
+// CHECK-NEXT:    [[BF:%.*]] = borrowed [[A]] : $C from (
+// CHECK-NEXT:    fix_lifetime [[BF]] : $C
+// CHECK:       } // end sil function 'unwrap_guaranteed_enum_phi'
+sil [ossa] @unwrap_guaranteed_enum_phi : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = enum $E, #E.a!enumelt, %0 : $C
+  %3 = copy_value %2 : $E
+  destroy_value %3 : $E
+  br bb3(%2 : $E)
+
+bb2:
+  %4 = enum $E, #E.a!enumelt, %1 : $C
+  br bb3(%4 : $E)
+
+bb3(%5 : @guaranteed $E):
+  %6 = borrowed %5 : $E from (%0 : $C, %1 : $C)
+  %7 = unchecked_enum_data %6 : $E, #E.a!enumelt
+  fix_lifetime %7 : $C
+  %t = tuple ()
+  return %t : $()
+}
+
+// An owned aggregate with other uses cannot be removed, but the "unwrap" is still hoisted.
+// CHECK-LABEL: sil [ossa] @hoist_unwrap_of_owned_aggregate_with_other_use
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value %1 : $C
+// CHECK-NEXT:    [[E:%.*]] = enum $E, #E.a!enumelt, %0 : $C
+// CHECK-NEXT:    [[CP:%.*]] = copy_value [[E]] : $E
+// CHECK-NEXT:    destroy_value [[CP]] : $E
+// CHECK-NEXT:    [[D:%.*]] = unchecked_enum_data [[E]] : $E, #E.a!enumelt
+// CHECK-NEXT:    br bb3([[D]] : $C)
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %0 : $C
+// CHECK-NEXT:    br bb3(%1 : $C)
+// CHECK:       bb3([[A:%.*]] : @owned $C):
+// CHECK-NEXT:    return [[A]] : $C
+// CHECK:       } // end sil function 'hoist_unwrap_of_owned_aggregate_with_other_use'
+sil [ossa] @hoist_unwrap_of_owned_aggregate_with_other_use : $@convention(thin) (@owned C, @owned C) -> @owned C {
+bb0(%0 : @owned $C, %1 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $C
+  %2 = enum $E, #E.a!enumelt, %0 : $C
+  %3 = copy_value %2 : $E
+  destroy_value %3 : $E
+  br bb3(%2 : $E)
+
+bb2:
+  destroy_value %0 : $C
+  %4 = enum $E, #E.a!enumelt, %1 : $C
+  br bb3(%4 : $E)
+
+bb3(%5 : @owned $E):
+  %6 = unchecked_enum_data %5 : $E, #E.a!enumelt
+  return %6 : $C
+}
