@@ -2855,7 +2855,7 @@ matchFunctionThrowing(ConstraintSystem &cs,
         locator.withPathElement(LocatorPathElt::ThrownErrorType()));
   }
 
-  switch (compareThrownErrorsForSubtyping(thrownError1, thrownError2, cs.DC)) {
+  switch (compareThrownErrorsForSubtyping(thrownError1, thrownError2)) {
   case ThrownErrorSubtyping::DropsThrows: {
     // We need to drop 'throws' to make this work.
     if (!cs.shouldAttemptFixes())
