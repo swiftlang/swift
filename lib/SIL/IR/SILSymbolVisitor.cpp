@@ -507,8 +507,8 @@ public:
       }
     }
 
-    if (auto distributedThunk = AFD->getDistributedThunk()) {
-      auto thunk = SILDeclRef(distributedThunk).asDistributed();
+    if (AFD->getDistributedThunk()) {
+      auto thunk = SILDeclRef(AFD).getDistributedThunkDeclRef();
       addFunction(thunk);
       addAsyncFunctionPointer(thunk);
     }

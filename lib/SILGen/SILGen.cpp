@@ -996,7 +996,8 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
   }
 
   switch (constant.kind) {
-  case SILDeclRef::Kind::Func: {
+  case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::DistributedThunk: {
     if (auto *ce = constant.getAbstractClosureExpr()) {
       preEmitFunction(constant, f, ce);
       PrettyStackTraceSILFunction X("silgen closureexpr", f);
