@@ -528,6 +528,39 @@ extension UncheckedString: BidirectionalCollection {
 
 @available(SwiftStdlib 9999, *)
 extension UncheckedString {
+  /// Provides bulk access to this string's contents as contiguous storage.
+  ///
+  /// Without this override, `Sequence`'s default implementation (which
+  /// returns `nil` unconditionally) would force every generic algorithm
+  /// that tries this fast path first (e.g. `Array(_:)`, `elementsEqual`)
+  /// back onto element-by-element iteration via `subscript(_:)` -- for
+  /// `.small` storage, each such access re-unpacks the *entire* packed byte
+  /// tuple just to extract one element.
+  @inlinable
+  @safe
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try unsafe _uncheckedStringWithContiguousStorage(self, body)
+  }
+
+  /// Bulk-copies this string's elements into `buffer`.
+  ///
+  /// Without this override, `Sequence`'s default implementation copies one
+  /// element at a time via `makeIterator()`/`subscript(_:)`, hitting the
+  /// same per-element unpacking cost described on
+  /// `withContiguousStorageIfAvailable` above. This is the hook that
+  /// `Array(_:)`/`_copyCollectionToContiguousArray` actually calls.
+  @inlinable
+  public __consuming func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (IndexingIterator<Self>, UnsafeMutableBufferPointer<Element>.Index) {
+    return unsafe _uncheckedStringCopyContents(self, initializing: buffer)
+  }
+}
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedString {
   /// Returns a Boolean value indicating whether this string is trivially
   /// identical to `other`.
   ///
@@ -537,6 +570,7 @@ extension UncheckedString {
   /// with `==`, but not all equal strings are considered identical.
   ///
   /// - Complexity: O(1)
+  @inlinable
   public func isTriviallyIdentical(to other: Self) -> Bool {
     switch (storage, other.storage) {
     case (.empty, .empty):
@@ -609,6 +643,21 @@ public struct UncheckedSubString<E: FixedWidthInteger>
   }
 
   @inlinable
+  @safe
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try unsafe _uncheckedStringWithContiguousStorage(self, body)
+  }
+
+  @inlinable
+  public __consuming func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (IndexingIterator<Self>, UnsafeMutableBufferPointer<Element>.Index) {
+    return unsafe _uncheckedStringCopyContents(self, initializing: buffer)
+  }
+
+  @inlinable
   public func withCharacterData<R, Failure>(
     _ body: (Span<Element>) throws(Failure) -> R
   ) throws(Failure) -> R {
@@ -621,6 +670,7 @@ public struct UncheckedSubString<E: FixedWidthInteger>
   /// identical to `other`.
   ///
   /// - Complexity: O(1)
+  @inlinable
   public func isTriviallyIdentical(to other: Self) -> Bool {
     bounds == other.bounds && base.isTriviallyIdentical(to: other.base)
   }

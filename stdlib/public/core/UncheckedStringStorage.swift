@@ -47,6 +47,7 @@ struct SmallUncheckedStringStorage<CharType: FixedWidthInteger> {
 
   @usableFromInline
   var count: UInt8 = 0
+  @usableFromInline
   var bytes: Bytes = (0, 0, 0, 0,
                       0, 0, 0, 0,
                       0, 0, 0, 0,
@@ -120,6 +121,7 @@ struct SmallUncheckedStringStorage<CharType: FixedWidthInteger> {
 
   @usableFromInline
   var count: UInt8 = 0
+  @usableFromInline
   var bytes: Bytes = (0, 0, 0, 0, 0, 0)
 }
 

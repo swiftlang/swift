@@ -143,6 +143,73 @@ extension UncheckedStringProtocol {
 }
 
 @available(SwiftStdlib 9999, *)
+extension UncheckedStringProtocol where Iterator == IndexingIterator<Self> {
+  /// Bulk-copies this string's elements into `buffer`.
+  ///
+  /// Without this override, `Sequence`'s default implementation copies one
+  /// element at a time via `makeIterator()`/`subscript(_:)` -- for `.small`
+  /// storage, each such access re-unpacks the *entire* packed byte tuple
+  /// just to extract one element. This is the hook that
+  /// `Array(_:)`/`_copyCollectionToContiguousArray` actually calls.
+  ///
+  /// `UncheckedString`/`UncheckedSubString` additionally provide their own
+  /// concrete override of this and of `withContiguousStorageIfAvailable`
+  /// (in `UncheckedString.swift`) rather than relying solely on this
+  /// protocol-extension default -- verified by testing that both are
+  /// actually reached through `Array(_:)` for every storage case.
+  @inlinable
+  public __consuming func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (IndexingIterator<Self>, UnsafeMutableBufferPointer<Element>.Index) {
+    return unsafe _uncheckedStringCopyContents(self, initializing: buffer)
+  }
+}
+
+/// Provides bulk access to `str`'s contents as contiguous storage.
+///
+/// Shared implementation called from both `UncheckedString`'s and
+/// `UncheckedSubString`'s own concrete `withContiguousStorageIfAvailable`
+/// overrides, so the two types don't duplicate this body.
+@available(SwiftStdlib 9999, *)
+@usableFromInline
+@inline(__always)
+internal func _uncheckedStringWithContiguousStorage<S: UncheckedStringProtocol, R>(
+  _ str: S,
+  _ body: (UnsafeBufferPointer<S.Element>) throws -> R
+) rethrows -> R? {
+  return try str.withCharacterData { data in
+    try data.withUnsafeBufferPointer(body)
+  }
+}
+
+/// Bulk-copies `str`'s elements into `buffer`.
+///
+/// Shared implementation called from both `UncheckedString`'s and
+/// `UncheckedSubString`'s own concrete `_copyContents` overrides, so the
+/// two types don't duplicate this body.
+@available(SwiftStdlib 9999, *)
+@usableFromInline
+internal func _uncheckedStringCopyContents<S: UncheckedStringProtocol>(
+  _ str: S,
+  initializing buffer: UnsafeMutableBufferPointer<S.Element>
+) -> (IndexingIterator<S>, UnsafeMutableBufferPointer<S.Element>.Index) {
+  let copied = str.withCharacterData { data in
+    data.withUnsafeBufferPointer { source -> Int in
+      let n = Swift.min(buffer.count, source.count)
+      if n > 0 {
+        unsafe buffer.baseAddress!.initialize(from: source.baseAddress!, count: n)
+      }
+      return n
+    }
+  }
+  let newPosition = str.index(str.startIndex, offsetBy: copied)
+  return (
+    IndexingIterator(_elements: str, _position: newPosition),
+    unsafe buffer.index(buffer.startIndex, offsetBy: copied)
+  )
+}
+
+@available(SwiftStdlib 9999, *)
 extension UncheckedStringProtocol {
   /// Returns a Boolean value indicating whether this string begins with the
   /// specified prefix.
