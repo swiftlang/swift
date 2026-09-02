@@ -3162,6 +3162,12 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   std::optional<ForeignLanguage> cdeclKind = std::nullopt;
   if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD))
     cdeclKind = FD->getCDeclKind();
+
+  // A @cxx function implements a C++ declaration that already exists in an
+  // imported C++ header; never redeclare it in a generated header.
+  if (cdeclKind == ForeignLanguage::Cxx)
+    return false;
+
   if (cdeclKind &&
       (*cdeclKind == ForeignLanguage::C) !=
        (outputLang == OutputLanguageMode::C))

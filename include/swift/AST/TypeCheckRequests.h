@@ -5154,11 +5154,12 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @c functions for compatibility with the foreign language.
-class TypeCheckCDeclFunctionRequest
-    : public SimpleRequest<TypeCheckCDeclFunctionRequest,
+/// Check a function that is exported to a foreign language for compatibility
+/// with that language. This covers @c, @_cdecl, and @cxx.
+class TypeCheckForeignFunctionRequest
+    : public SimpleRequest<TypeCheckForeignFunctionRequest,
                            evaluator::SideEffect(FuncDecl *FD,
-                                                 CDeclAttr *attr),
+                                                 DeclAttribute *attr),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5167,7 +5168,7 @@ private:
   friend SimpleRequest;
 
   evaluator::SideEffect
-  evaluate(Evaluator &evaluator, FuncDecl *FD, CDeclAttr *attr) const;
+  evaluate(Evaluator &evaluator, FuncDecl *FD, DeclAttribute *attr) const;
 
 public:
   bool isCached() const { return true; }
