@@ -21,10 +21,10 @@
 #include "swift/Basic/Version.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializationOptions.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/TargetParser/Triple.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 

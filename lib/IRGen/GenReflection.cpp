@@ -15,13 +15,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
-#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/Platform.h"
 #include "swift/IRGen/Linking.h"

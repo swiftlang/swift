@@ -21,7 +21,6 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/IDE/Utils.h"
-#include "swift/IDE/IDETypeIDs.h"
 
 namespace swift {
 //----------------------------------------------------------------------------//

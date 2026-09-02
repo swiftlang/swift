@@ -27,7 +27,6 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/SynthesizedDeclBuilder.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/STLExtras.h"

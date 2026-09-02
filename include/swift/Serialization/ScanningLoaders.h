@@ -14,7 +14,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ModuleDependencies.h"
-#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 
 namespace swift {

@@ -22,15 +22,12 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/Sema/CSBindings.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/Compiler.h"
-#include <functional>
 #include <utility>
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
 

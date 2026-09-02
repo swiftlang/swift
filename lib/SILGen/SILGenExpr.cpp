@@ -36,7 +36,6 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ExtInfo.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/KnownProtocols.h"
@@ -48,7 +47,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/type_traits.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -59,7 +57,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 

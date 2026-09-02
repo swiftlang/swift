@@ -12,9 +12,7 @@
 
 #define DEBUG_TYPE "sil-analysis"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -26,8 +24,6 @@
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 

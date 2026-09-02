@@ -15,7 +15,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/TypeOrExtensionDecl.h"
-#include <memory>
 #include <string>
 
 namespace swift {

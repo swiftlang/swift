@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "closure-lifetime-fixup"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"

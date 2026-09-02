@@ -18,7 +18,6 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"

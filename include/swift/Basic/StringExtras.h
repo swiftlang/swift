@@ -21,14 +21,13 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Allocator.h"
 #include <iterator>
 #include <optional>
-#include <string>
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
   /// Determine whether the given string can be an argument label.

@@ -24,7 +24,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/PackConformance.h"
-#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/UnsafeUse.h"
 

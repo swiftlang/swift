@@ -17,13 +17,11 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/IRGen/GenericRequirement.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/raw_ostream.h"
 #include <optional>
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 

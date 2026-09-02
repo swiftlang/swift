@@ -13,7 +13,6 @@
 #include "ScanFixture.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "llvm/Support/FileSystem.h"
-#include "gtest/gtest.h"
 
 using namespace swift;
 using namespace swift::unittest;

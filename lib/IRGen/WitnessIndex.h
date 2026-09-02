@@ -19,7 +19,6 @@
 #define SWIFT_IRGEN_WITNESSINDEX_H
 
 #include "swift/ABI/MetadataValues.h"
-#include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
 namespace irgen {

@@ -10,9 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Config.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
 #include "llvm/ADT/DenseMap.h"

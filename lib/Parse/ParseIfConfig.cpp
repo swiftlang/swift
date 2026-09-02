@@ -20,14 +20,11 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsParse.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseVersion.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;

@@ -28,8 +28,10 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_OSSSALIFETIMECOMPLETION_H
 #define SWIFT_SILOPTIMIZER_UTILS_OSSSALIFETIMECOMPLETION_H
 
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipLiveness.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/SILFunction.h"
 
 namespace swift {

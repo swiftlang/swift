@@ -55,13 +55,11 @@
 
 #define DEBUG_TYPE "access-enforcement-wmo"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 using namespace swift;
 

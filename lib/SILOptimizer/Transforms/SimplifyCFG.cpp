@@ -32,7 +32,6 @@
 
 #include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -45,7 +44,6 @@
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"

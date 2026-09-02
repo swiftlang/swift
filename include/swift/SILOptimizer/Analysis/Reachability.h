@@ -23,9 +23,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILSuccessor.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Debug.h"
 
 namespace swift {
 

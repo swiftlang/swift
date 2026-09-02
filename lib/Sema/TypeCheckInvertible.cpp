@@ -21,7 +21,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 
 using namespace swift;

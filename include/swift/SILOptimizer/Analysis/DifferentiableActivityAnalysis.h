@@ -50,7 +50,6 @@
 
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "llvm/ADT/DenseMap.h"

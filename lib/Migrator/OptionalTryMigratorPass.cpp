@@ -10,12 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Migrator/ASTMigratorPass.h"

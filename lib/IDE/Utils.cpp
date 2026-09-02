@@ -12,7 +12,6 @@
 
 #include "swift/IDE/Utils.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
@@ -22,9 +21,7 @@
 #include "clang/AST/ASTContext.h"
 #include "llvm/ADT/RewriteBuffer.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 
 using namespace swift;
 using namespace ide;

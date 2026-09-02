@@ -22,8 +22,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/SemanticAttrs.h"
-#include "swift/Basic/Assertions.h"
 using namespace swift;
 using namespace LiteralExprFolding;
 

@@ -10,12 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 

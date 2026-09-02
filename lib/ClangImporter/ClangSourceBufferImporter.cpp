@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangSourceBufferImporter.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "clang/Basic/SourceManager.h"
 #include "llvm/Support/MemoryBuffer.h"

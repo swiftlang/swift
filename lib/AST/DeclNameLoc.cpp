@@ -16,7 +16,6 @@
 
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

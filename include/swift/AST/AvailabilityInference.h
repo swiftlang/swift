@@ -19,7 +19,6 @@
 
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Type.h"
-#include "llvm/Support/VersionTuple.h"
 #include <optional>
 
 namespace swift {

@@ -14,7 +14,6 @@
 #define SWIFT_FOREIGNREPRESENTATIONINFO_H
 
 #include "swift/AST/Type.h"
-#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerIntPair.h"
 

@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "gtest/gtest.h"
-#include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/BlockList.h"
 #include "swift/Basic/SourceManager.h"

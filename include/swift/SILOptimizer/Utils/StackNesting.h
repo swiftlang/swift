@@ -14,8 +14,6 @@
 #define SWIFT_SILOPTIMIZER_UTILS_STACKNESTING_H
 
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/BasicBlockData.h"
-#include "llvm/ADT/SmallBitVector.h"
 
 namespace swift {
 

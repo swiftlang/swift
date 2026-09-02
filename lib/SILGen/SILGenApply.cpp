@@ -45,7 +45,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -55,7 +54,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
-#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace Lowering;

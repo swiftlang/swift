@@ -21,7 +21,6 @@
 #define SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYOBJECTCHECKERUTILS_H
 
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
-#include "llvm/Support/Compiler.h"
 
 #include "MoveOnlyBorrowToDestructureUtils.h"
 

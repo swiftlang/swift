@@ -17,9 +17,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/Chrono.h"
 
 namespace llvm {
 namespace opt {

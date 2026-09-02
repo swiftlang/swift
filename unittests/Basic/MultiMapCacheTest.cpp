@@ -13,7 +13,6 @@
 #include "swift/Basic/MultiMapCache.h"
 #include "swift/Basic/Range.h"
 #include "gtest/gtest.h"
-#include <random>
 
 using namespace swift;
 

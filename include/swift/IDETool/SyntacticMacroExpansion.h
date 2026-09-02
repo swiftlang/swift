@@ -16,7 +16,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/PluginRegistry.h"
-#include "swift/Basic/Fingerprint.h"
 #include "swift/Frontend/Frontend.h"
 #include "llvm/Support/MemoryBuffer.h"
 

@@ -20,7 +20,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "gtest/gtest.h"
 #include <cmath>
-#include <memory>
 
 using namespace swift;
 using namespace llvm;

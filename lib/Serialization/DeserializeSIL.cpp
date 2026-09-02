@@ -26,7 +26,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"

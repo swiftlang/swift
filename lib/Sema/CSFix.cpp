@@ -23,8 +23,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"

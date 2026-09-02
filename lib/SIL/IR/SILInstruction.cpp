@@ -17,8 +17,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Basic/AssertImplements.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Unicode.h"
-#include "swift/Basic/type_traits.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstWrappers.h"
@@ -34,7 +32,6 @@
 #include "swift/SIL/StackAllocation.h"
 #include "swift/SIL/Test.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 using namespace Lowering;

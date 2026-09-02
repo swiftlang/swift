@@ -13,18 +13,12 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CASTOPTIMIZER_H
 #define SWIFT_SILOPTIMIZER_UTILS_CASTOPTIMIZER_H
 
-#include "swift/Basic/ArrayRefView.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
-#include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "llvm/Support/Allocator.h"
 #include <functional>
-#include <utility>
 
 namespace swift {
 

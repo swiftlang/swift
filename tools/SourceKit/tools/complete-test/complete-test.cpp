@@ -13,8 +13,6 @@
 #include "sourcekitd/sourcekitd.h"
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/raw_ostream.h"

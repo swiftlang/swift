@@ -21,9 +21,7 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 
-#include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILInstructionWorklist.h"

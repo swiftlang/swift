@@ -20,7 +20,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/NameLookup.h"
@@ -51,7 +50,6 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
-#include <functional>
 
 namespace swift {
 

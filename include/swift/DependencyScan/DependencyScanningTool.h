@@ -18,7 +18,6 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/DependencyScan/ScanDependencies.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "llvm/Support/Error.h"
 

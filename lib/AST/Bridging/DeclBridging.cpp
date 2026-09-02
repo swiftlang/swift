@@ -24,7 +24,6 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

@@ -20,7 +20,6 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Identifier.h"
-#include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/DenseMap.h"

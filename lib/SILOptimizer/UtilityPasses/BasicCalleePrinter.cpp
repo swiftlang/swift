@@ -19,9 +19,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;

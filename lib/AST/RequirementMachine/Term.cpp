@@ -16,7 +16,6 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
-#include <vector>
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"

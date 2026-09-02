@@ -13,26 +13,14 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
 #include "swift/Subsystems.h"
 
-#include "clang/AST/ASTContext.h"
-#include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
-#include "clang/Basic/SourceManager.h"
-#include "clang/Index/USRGeneration.h"
-#include "clang/Lex/Lexer.h"
-#include "clang/Basic/CharInfo.h"
 
-#include "llvm/Support/MemoryBuffer.h"
 
-#include <numeric>
 
 using namespace swift;
 using namespace swift::ide;

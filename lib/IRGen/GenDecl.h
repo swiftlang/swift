@@ -22,7 +22,6 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/SIL/SILLocation.h"
 #include "clang/AST/DeclCXX.h"
-#include "llvm/IR/CallingConv.h"
 #include "llvm/Support/CommandLine.h"
 
 namespace llvm {

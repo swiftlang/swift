@@ -28,7 +28,6 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IDE/IDERequests.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Lexer.h"
