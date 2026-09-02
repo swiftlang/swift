@@ -1372,3 +1372,9 @@ Added: _swift_dynamicCastTest
 
 // Setter for typed willThrow hook.
 Added: __swift_setWillThrowTypedHandler
+
+// Prespecialized tuple metadata witness tables
+Added: _swift_tupleWitnesses_nonpod_inline
+Added: _swift_tupleWitnesses_nonpod_noninline
+Added: _swift_tupleWitnesses_pod_inline
+Added: _swift_tupleWitnesses_pod_noninline
