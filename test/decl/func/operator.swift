@@ -297,13 +297,13 @@ struct Unrelated { }
 
 struct S2 {
   static func %%%(lhs: Unrelated, rhs: Unrelated) -> Unrelated { }
-  // expected-error@-1{{member operator '%%%' must have at least one argument of type 'S2'}}
+  // expected-error@-1{{member operator '%%%' must have at least one argument of type 'S2'}} {{none}}
 
   static func %%%(lhs: Unrelated, rhs: Unrelated) -> S2 { }
-  // expected-error@-1{{member operator '%%%' must have at least one argument of type 'S2'}}
+  // expected-error@-1{{member operator '%%%' must have at least one argument of type 'S2'}} {{none}}
 
   static func %%%(lhs: Unrelated, rhs: Unrelated) -> S2.Type { }
-  // expected-error@-1{{member operator '%%%' must have at least one argument of type 'S2'}}
+  // expected-error@-1{{member operator '%%%' must have at least one argument of type 'S2'}} {{none}}
 
   // Okay: refers to S2
   static func %%%(lhs: S2, rhs: Unrelated) -> Unrelated { }
@@ -318,13 +318,13 @@ struct S2 {
 
 extension S2 {
   static func %%%%(lhs: Unrelated, rhs: Unrelated) -> Unrelated { }
-  // expected-error@-1{{member operator '%%%%' must have at least one argument of type 'S2'}}
+  // expected-error@-1{{member operator '%%%%' must have at least one argument of type 'S2'}} {{none}}
 
   static func %%%%(lhs: Unrelated, rhs: Unrelated) -> S2 { }
-  // expected-error@-1{{member operator '%%%%' must have at least one argument of type 'S2'}}
+  // expected-error@-1{{member operator '%%%%' must have at least one argument of type 'S2'}} {{none}}
 
   static func %%%%(lhs: Unrelated, rhs: Unrelated) -> S2.Type { }
-  // expected-error@-1{{member operator '%%%%' must have at least one argument of type 'S2'}}
+  // expected-error@-1{{member operator '%%%%' must have at least one argument of type 'S2'}} {{none}}
 
   // Okay: refers to S2
   static func %%%%(lhs: S2, rhs: Unrelated) -> Unrelated { }
@@ -339,13 +339,13 @@ extension S2 {
 
 protocol P2 {
   static func %%%(lhs: Unrelated, rhs: Unrelated) -> Unrelated
-  // expected-error@-1{{member operator '%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+  // expected-error@-1{{member operator '%%%' of protocol 'P2' must have at least one argument of type 'Self'}} {{none}}
 
   static func %%%(lhs: Unrelated, rhs: Unrelated) -> Self
-  // expected-error@-1{{member operator '%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+  // expected-error@-1{{member operator '%%%' of protocol 'P2' must have at least one argument of type 'Self'}} {{none}}
 
   static func %%%(lhs: Unrelated, rhs: Unrelated) -> Self.Type
-  // expected-error@-1{{member operator '%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+  // expected-error@-1{{member operator '%%%' of protocol 'P2' must have at least one argument of type 'Self'}} {{none}}
 
   // Okay: refers to Self
   static func %%%(lhs: Self, rhs: Unrelated) -> Unrelated
@@ -360,13 +360,13 @@ protocol P2 {
 
 extension P2 {
   static func %%%%(lhs: Unrelated, rhs: Unrelated) -> Unrelated { }
-  // expected-error@-1{{member operator '%%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+  // expected-error@-1{{member operator '%%%%' of protocol 'P2' must have at least one argument of type 'Self'}} {{none}}
 
   static func %%%%(lhs: Unrelated, rhs: Unrelated) -> Self { }
-  // expected-error@-1{{member operator '%%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+  // expected-error@-1{{member operator '%%%%' of protocol 'P2' must have at least one argument of type 'Self'}} {{none}}
 
   static func %%%%(lhs: Unrelated, rhs: Unrelated) -> Self.Type { }
-  // expected-error@-1{{member operator '%%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+  // expected-error@-1{{member operator '%%%%' of protocol 'P2' must have at least one argument of type 'Self'}} {{none}}
 
   // Okay: refers to Self
   static func %%%%(lhs: Self, rhs: Unrelated) -> Unrelated { }
@@ -382,13 +382,24 @@ extension P2 {
 protocol P3 {
   // Not allowed: there's no way to infer 'Self' from this interface type
   static func %%%(lhs: P3, rhs: Unrelated) -> Unrelated
-  // expected-error@-1 {{member operator '%%%' of protocol 'P3' must have at least one argument of type 'Self'}}
+  // expected-error@-1 {{member operator '%%%' of protocol 'P3' must have at least one argument of type 'Self'}} {{none}}
 }
 
 extension P3 {
   // Not allowed: there's no way to infer 'Self' from this interface type
   static func %%%%(lhs: P3, rhs: Unrelated) -> Unrelated { }
-  // expected-error@-1 {{member operator '%%%%' of protocol 'P3' must have at least one argument of type 'Self'}}
+  // expected-error@-1 {{member operator '%%%%' of protocol 'P3' must have at least one argument of type 'Self'}} {{25-27=Self}}
+  static func %%%%(lhs: P3, rhs: P3) -> Unrelated { }
+  // expected-error@-1 {{member operator '%%%%' of protocol 'P3' must have at least one argument of type 'Self'}} {{25-27=Self}}
+  static func %%%%(lhs: Unrelated, rhs: P3) -> Unrelated { }
+  // expected-error@-1 {{member operator '%%%%' of protocol 'P3' must have at least one argument of type 'Self'}} {{41-43=Self}}
+}
+
+protocol P4 { }
+extension P4 {
+  // Not allowed: there's no way to infer 'Self' from this interface type
+  static func %%%%<T: P4>(lhs: T, rhs: Unrelated) -> Unrelated { }
+  // expected-error@-1 {{member operator '%%%%' of protocol 'P4' must have at least one argument of type 'Self'}} {{none}}
 }
 
 // rdar://problem/27940842 - recovery with a non-static '=='.
