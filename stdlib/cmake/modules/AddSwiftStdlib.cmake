@@ -2182,6 +2182,7 @@ function(add_swift_target_library name)
         C_COMPILE_FLAGS_WATCHOS
         C_COMPILE_FLAGS_LINUX
         C_COMPILE_FLAGS_WINDOWS
+        C_COMPILE_FLAGS_WASI
         DEPENDS
         FILE_DEPENDS
         FRAMEWORK_DEPENDS
@@ -2688,6 +2689,9 @@ function(add_swift_target_library name)
       elseif(sdk STREQUAL "WINDOWS")
         list(APPEND swiftlib_c_compile_flags_all
              ${SWIFTLIB_C_COMPILE_FLAGS_WINDOWS})
+      elseif(sdk STREQUAL "WASI")
+        list(APPEND swiftlib_c_compile_flags_all
+             ${SWIFTLIB_C_COMPILE_FLAGS_WASI})
       endif()
 
       # Add flags to prepend framework search paths for the parallel framework
