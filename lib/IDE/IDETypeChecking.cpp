@@ -705,16 +705,16 @@ public:
         BufferId(SF.getBufferID()), Results(Results), OS(OS),
         InterestedProtocols(InterestedProtocols),
         FullyQualified(FullyQualified), CanonicalType(CanonicalType) {}
-  bool walkToExprPre(Expr *E) override {
+  PreWalkAction walkToExprPre(Expr *E) override {
     if (E->getSourceRange().isInvalid())
-      return true;
+      return Action::Continue();
     CharSourceRange Range =
       Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     unsigned Offset = SM.getLocOffsetInBuffer(Range.getStart(), BufferId);
     unsigned Length = Range.getByteLength();
     std::vector<StringRef> Conformances;
     if (!shouldReport(Offset, Length, E, Conformances))
-      return true;
+      return Action::Continue();
     // Print the type to a temporary buffer.
     SmallString<64> Buffer;
     {
@@ -740,7 +740,7 @@ public:
 
     // Keep track of that we have a type reported for this range.
     AllPrintedTypes[Offset].insert(Length);
-    return true;
+    return Action::Continue();
   }
 };
 
@@ -820,13 +820,13 @@ public:
         TotalRange(Range), FullyQualified(FullyQualified), Results(Results),
         OS(OS) {}
 
-  bool walkToDeclPre(Decl *D, CharSourceRange DeclNameRange) override {
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange DeclNameRange) override {
     if (DeclNameRange.isInvalid()) {
-      return true;
+      return Action::Continue();
     }
     // Skip this declaration and its subtree if outside the range
     if (!overlapsTotalRange(D->getSourceRange())) {
-      return false;
+      return Action::SkipNode();
     }
     if (auto VD = dyn_cast<VarDecl>(D)) {
       unsigned VarOffset =
@@ -842,7 +842,7 @@ public:
         auto Ty = VD->getInterfaceType();
         // Skip this declaration and its children if the type is an error type.
         if (Ty->is<ErrorType>()) {
-          return false;
+          return Action::SkipNode();
         }
         Ty->print(OS, Options);
       }
@@ -854,22 +854,22 @@ public:
       // Add the type information to the result list.
       Results.emplace_back(VarOffset, VarLength, HasExplicitType, TyOffset);
     }
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToStmtPre(Stmt *S) override {
+  PreWalkAction walkToStmtPre(Stmt *S) override {
     // Skip this statement and its subtree if outside the range
-    return overlapsTotalRange(S->getSourceRange());
+    return Action::VisitNodeIf(overlapsTotalRange(S->getSourceRange()));
   }
 
-  bool walkToExprPre(Expr *E) override {
+  PreWalkAction walkToExprPre(Expr *E) override {
     // Skip this expression and its subtree if outside the range
-    return overlapsTotalRange(E->getSourceRange());
+    return Action::VisitNodeIf(overlapsTotalRange(E->getSourceRange()));
   }
 
-  bool walkToPatternPre(Pattern *P) override {
+  PreWalkAction walkToPatternPre(Pattern *P) override {
     // Skip this pattern and its subtree if outside the range
-    return overlapsTotalRange(P->getSourceRange());
+    return Action::VisitNodeIf(overlapsTotalRange(P->getSourceRange()));
   }
 };
 

@@ -52,12 +52,12 @@ findConcatenatedExpressions(const ResolvedRangeInfo &Info, ASTContext &Ctx) {
       return true;
     }
 
-    bool walkToExprPre(Expr *E) override {
+    PreWalkAction walkToExprPre(Expr *E) override {
       if (E->isImplicit())
-        return true;
+        return Action::Continue();
       // FIXME: we should have ErrorType instead of null.
       if (E->getType().isNull())
-        return true;
+        return Action::Continue();
 
       // Only binary concatenation operators should exist in expression
       if (E->getKind() == ExprKind::Binary) {
@@ -66,14 +66,14 @@ findConcatenatedExpressions(const ResolvedRangeInfo &Info, ASTContext &Ctx) {
         if (!(isConcatenationExpr(OperatorDeclRef) &&
               E->getType()->isString())) {
           IsValidInterpolation = false;
-          return false;
+          return Action::SkipNode();
         }
-        return true;
+        return Action::Continue();
       }
       // Everything that evaluates to string should be gathered.
       if (E->getType()->isString()) {
         Bucket->insert(E);
-        return false;
+        return Action::SkipNode();
       }
       if (auto *DR = dyn_cast<DeclRefExpr>(E)) {
         // Checks whether all function references in expression are
@@ -81,12 +81,12 @@ findConcatenatedExpressions(const ResolvedRangeInfo &Info, ASTContext &Ctx) {
         auto *FD = dyn_cast<FuncDecl>(DR->getDecl());
         auto IsConcatenation = isConcatenationExpr(DR);
         if (FD && IsConcatenation) {
-          return false;
+          return Action::SkipNode();
         }
       }
       // There was non-expected expression, it's not valid interpolation then.
       IsValidInterpolation = false;
-      return false;
+      return Action::SkipNode();
     }
   } Walker(Ctx);
   Walker.walk(E);

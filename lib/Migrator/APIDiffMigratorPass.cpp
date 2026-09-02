@@ -468,37 +468,39 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   }
 
-  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
-                          ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override {
+  PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                    TypeDecl *CtorTyRef,
+                                    ExtensionDecl *ExtTyRef, Type T,
+                                    ReferenceMetaData Data) override {
     CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
         D->getASTContext().SourceMgr, Range);
     if (Data.isImplicit)
-      return true;
+      return Action::Continue();
 
     for (auto *Item: getRelatedDiffItems(CtorTyRef ? CtorTyRef: D)) {
       std::string RepText;
       if (isSimpleReplacement(Item, isDotMember(CharRange), RepText)) {
         Editor.replace(CharRange, RepText);
-        return true;
+        return Action::Continue();
       }
     }
-    return true;
+    return Action::Continue();
   }
 
   struct ReferenceCollector : public SourceEntityWalker {
     ValueDecl *Target;
     CharSourceRange Result;
     ReferenceCollector(ValueDecl* Target) : Target(Target) {}
-    bool visitDeclReference(ValueDecl *D, SourceRange Range,
-                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
-                            Type T, ReferenceMetaData Data) override {
+    PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                      TypeDecl *CtorTyRef,
+                                      ExtensionDecl *ExtTyRef, Type T,
+                                      ReferenceMetaData Data) override {
       if (D == Target && !Data.isImplicit && Range.isValid()) {
         Result = Lexer::getCharSourceRangeFromSourceRange(
             D->getASTContext().SourceMgr, Range);
-        return false;
+        return Action::Stop();
       }
-      return true;
+      return Action::Continue();
     }
   };
 
@@ -1113,21 +1115,21 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return false;
   }
 
-  bool walkToExprPre(Expr *E) override {
+  PreWalkAction walkToExprPre(Expr *E) override {
     if (E->getSourceRange().isInvalid())
-      return false;
+      return Action::SkipNode();
     if (handleRevertRawRepresentable(E)) {
       // The name may also change, so we should keep visiting.
-      return true;
+      return Action::Continue();
     }
     if (handleQualifiedReplacement(E))
-      return false;
+      return Action::SkipNode();
     if (handleAssignDestMigration(E))
-      return false;
+      return Action::SkipNode();
     if (handleAttributeReference(E))
-      return false;
+      return Action::SkipNode();
     if (handlePropertyTypeChange(E))
-      return false;
+      return Action::SkipNode();
     if (auto *CE = dyn_cast<CallExpr>(E)) {
       auto Fn = CE->getFn();
       auto Args = CE->getArgs();
@@ -1156,7 +1158,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         }
       }
     }
-    return true;
+    return Action::Continue();
   }
 
   static void collectParameters(AbstractFunctionDecl *AFD,
@@ -1413,9 +1415,9 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   };
 
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (D->isImplicit())
-      return true;
+      return Action::Continue();
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       handleFuncDeclRename(AFD, Range);
       for (auto *Item: getRelatedDiffItems(AFD)) {
@@ -1450,7 +1452,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         }
       }
     }
-    return true;
+    return Action::Continue();
   }
 };
 
