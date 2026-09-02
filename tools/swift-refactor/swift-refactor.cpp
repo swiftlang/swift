@@ -85,7 +85,10 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::AddAsyncAlternative,
                       "add-async-alternative", "Add an async alternative of a function taking a callback"),
            clEnumValN(RefactoringKind::AddAsyncWrapper,
-                      "add-async-wrapper", "Add an async alternative that forwards onto the function taking a callback")));
+                      "add-async-wrapper", "Add an async alternative that forwards onto the function taking a callback"),
+           clEnumValN(RefactoringKind::ExpandDerivedConformance,
+                      "expand-derived-conformance", "Expands the conformance derived using macros")));
+
 
 
 static llvm::cl::opt<std::string>
@@ -142,6 +145,10 @@ Triple("target", llvm::cl::desc("target triple"));
 static llvm::cl::opt<std::string> ResourceDir(
     "resource-dir",
     llvm::cl::desc("The directory that holds the compiler resource files"));
+
+static llvm::cl::list<std::string> LoadPluginLibrary(
+    "load-plugin-library",
+    llvm::cl::desc("Path to a compiler plugin library"));
 
 enum class DumpType {
   REWRITTEN,
@@ -361,6 +368,11 @@ int main(int argc, char *argv[]) {
   if (!options::ResourceDir.empty())
     Invocation.setRuntimeResourcePath(options::ResourceDir);
 
+  for (const auto &path : options::LoadPluginLibrary)
+    Invocation.getSearchPathOptions().PluginSearchOpts.emplace_back(
+        PluginSearchOption::LoadPluginLibrary{path});
+  Invocation.setDefaultInProcessPluginServerPathIfNecessary();
+
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);
   Invocation.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
@@ -370,6 +382,11 @@ int main(int argc, char *argv[]) {
 
   if (options::EnableExperimentalConcurrency)
     Invocation.getLangOptions().EnableExperimentalConcurrency = true;
+
+  // Make sure the `DeriveConformancesViaMacros` experimental feature is enabled
+  // if we want to expand derived conformances.
+  if (options::Action == RefactoringKind::ExpandDerivedConformance)
+    Invocation.getLangOptions().enableFeature(Feature::DeriveConformancesViaMacros);
 
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
