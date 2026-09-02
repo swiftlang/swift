@@ -259,7 +259,7 @@ Build the toolchain with optimizations, debuginfo, and assertions, using Ninja:
 
 - macOS:
   ```sh
-  utils/build-script --skip-build-benchmarks \
+  utils/build-script \
     --swift-darwin-supported-archs "$(uname -m)" \
     --release-debuginfo --swift-disable-dead-stripping
   ```
