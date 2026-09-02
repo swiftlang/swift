@@ -261,8 +261,8 @@ func _convertConstUncheckedStringToPointerArgument<
     //
     // Bulk-copy via `withCharacterData`/`withUnsafeBufferPointer` rather
     // than `Array(str)`, which would iterate element-by-element through
-    // `subscript(_:)` -- for `.small` storage, each such access re-unpacks
-    // the *entire* packed byte tuple just to extract one element.
+    // `subscript(_:)`, paying repeated closure-dispatch and bounds-check
+    // overhead in place of a single bulk copy.
     var chars = str.withCharacterData { data in
       data.withUnsafeBufferPointer { buffer in
         unsafe Array(buffer)
@@ -516,6 +516,18 @@ extension UncheckedString: BidirectionalCollection {
   @inlinable
   public subscript(_ ndx: Self.Index) -> Self.Element {
     precondition(ndx >= 0 && ndx < endIndex)
+    // `.small` storage packs its elements into a `UInt8` tuple with no
+    // alignment guarantee wider than 1 byte, so the element can be read
+    // directly with an alignment-agnostic load instead of unpacking the
+    // whole tuple into a temporary buffer via `withCharacterData` just to
+    // extract one element.
+    if case .small(let data) = storage {
+      return withUnsafeBytes(of: data.bytes) { rawBuffer in
+        unsafe rawBuffer.loadUnaligned(
+          fromByteOffset: ndx * MemoryLayout<Element>.stride,
+          as: Element.self)
+      }
+    }
     return withCharacterData { data in
       return data[ndx]
     }
@@ -533,9 +545,9 @@ extension UncheckedString {
   /// Without this override, `Sequence`'s default implementation (which
   /// returns `nil` unconditionally) would force every generic algorithm
   /// that tries this fast path first (e.g. `Array(_:)`, `elementsEqual`)
-  /// back onto element-by-element iteration via `subscript(_:)` -- for
-  /// `.small` storage, each such access re-unpacks the *entire* packed byte
-  /// tuple just to extract one element.
+  /// back onto element-by-element iteration via `subscript(_:)`, paying
+  /// repeated closure-dispatch and bounds-check overhead in place of a
+  /// single bulk copy.
   @inlinable
   @safe
   public func withContiguousStorageIfAvailable<R>(
@@ -548,7 +560,7 @@ extension UncheckedString {
   ///
   /// Without this override, `Sequence`'s default implementation copies one
   /// element at a time via `makeIterator()`/`subscript(_:)`, hitting the
-  /// same per-element unpacking cost described on
+  /// same per-element dispatch cost described on
   /// `withContiguousStorageIfAvailable` above. This is the hook that
   /// `Array(_:)`/`_copyCollectionToContiguousArray` actually calls.
   @inlinable

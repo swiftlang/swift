@@ -147,9 +147,9 @@ extension UncheckedStringProtocol where Iterator == IndexingIterator<Self> {
   /// Bulk-copies this string's elements into `buffer`.
   ///
   /// Without this override, `Sequence`'s default implementation copies one
-  /// element at a time via `makeIterator()`/`subscript(_:)` -- for `.small`
-  /// storage, each such access re-unpacks the *entire* packed byte tuple
-  /// just to extract one element. This is the hook that
+  /// element at a time via `makeIterator()`/`subscript(_:)`, paying
+  /// repeated closure-dispatch and bounds-check overhead in place of a
+  /// single bulk copy. This is the hook that
   /// `Array(_:)`/`_copyCollectionToContiguousArray` actually calls.
   ///
   /// `UncheckedString`/`UncheckedSubString` additionally provide their own
