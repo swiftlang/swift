@@ -3353,24 +3353,6 @@ static bool hasMandatoryArgument(TermInst *term) {
 }
 
 
-// Get the element of Aggregate corresponding to the one extracted by
-// Extract.
-static SILValue getInsertedValue(SILInstruction *Aggregate,
-                                 SILInstruction *Extract) {
-  if (auto *Struct = dyn_cast<StructInst>(Aggregate)) {
-    auto *SEI = cast<StructExtractInst>(Extract);
-    return Struct->getFieldValue(SEI->getField());
-  }
-  if (auto *Enum = dyn_cast<EnumInst>(Aggregate)) {
-    assert(Enum->getElement() ==
-           cast<UncheckedEnumDataInst>(Extract)->getElement());
-    return Enum->getOperand();
-  }
-  auto *Tuple = cast<TupleInst>(Aggregate);
-  auto *TEI = cast<TupleExtractInst>(Extract);
-  return Tuple->getElement(TEI->getFieldIndex());
-}
-
 /// Find a parent SwitchEnumInst of the block \p BB. The block \p BB is a
 /// predecessor of the merge-block \p PostBB which should post-dominate the
 /// switch_enum. Any successors of the switch_enum which reach \p BB (and are
@@ -3652,10 +3634,10 @@ static FunctionTest SimplifyCFGSimplifyBlockArgs(
     });
 } // end namespace swift::test
 
-// Attempt to simplify the ith argument of BB.  We simplify cases
-// where there is a single use of the argument that is an extract from
-// a struct, tuple or enum and where the predecessors all build the struct,
-// tuple or enum and pass it directly.
+// Attempt to simplify the ith argument of BB.
+//
+// Note: "unwrapping" of a struct, tuple or enum argument is implemented in
+// Swift - see `Phi.unwrapAggregate` in SimplifyPhiArgument.swift.
 bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   auto *A = BB->getArgument(i);
 
@@ -3665,84 +3647,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   if (!DT && A->getType().is<BuiltinIntegerType>())
     return simplifySwitchEnumToSelectEnum(BB, i, A);
 
-  // For now, just focus on cases where there is a single use.
-  SILValue argVal = lookThroughBorrowedFromUser(A);
-  if (!argVal->hasOneUse())
-    return false;
-
-  auto *Use = *argVal->use_begin();
-  auto *User = Use->getUser();
-
-  auto disableInOSSA = [](SingleValueInstruction *inst) {
-    assert(isa<StructInst>(inst) || isa<TupleInst>(inst) ||
-           isa<EnumInst>(inst));
-    if (!inst->getFunction()->hasOwnership()) {
-      return false;
-    }
-    if (inst->getOwnershipKind() == OwnershipKind::Owned)
-      return !inst->getSingleUse();
-    return false;
-  };
-
-  // Handle projections.
-  if (!isa<StructExtractInst>(User) &&
-      !isa<TupleExtractInst>(User) &&
-      !isa<UncheckedEnumDataInst>(User))
-    return false;
-  auto proj = cast<SingleValueInstruction>(User);
-
-  // For now, just handle the case where all predecessors are
-  // unconditional branches.
-  for (auto *Pred : BB->getPredecessorBlocks()) {
-    if (!isa<BranchInst>(Pred->getTerminator()))
-      return false;
-    auto *Branch = cast<BranchInst>(Pred->getTerminator());
-    SILValue BranchArg = Branch->getArg(i);
-    if (!isa<StructInst>(BranchArg) && !isa<TupleInst>(BranchArg) &&
-        !isa<EnumInst>(BranchArg)) {
-      return false;
-    }
-    if (auto *EI = dyn_cast<EnumInst>(BranchArg)) {
-      if (EI->getElement() != cast<UncheckedEnumDataInst>(proj)->getElement())
-        return false;
-    }
-    if (disableInOSSA(cast<SingleValueInstruction>(BranchArg))) {
-      return false;
-    }
-  }
-
-  // Okay, we'll replace the BB arg with one with the right type, replace
-  // the uses in this block, and then rewrite the branch operands.
-  LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
-  if (auto *bfi = getBorrowedFromUser(A)) {
-    bfi->replaceAllUsesWith(A);
-    bfi->eraseFromParent();
-  }
-  A->replaceAllUsesWith(SILUndef::get(A));
-  auto *NewArg = BB->replacePhiArgument(i, proj->getType(),
-                                        BB->getArgument(i)->getOwnershipKind());
-  proj->replaceAllUsesWith(NewArg);
-
-  // Rewrite the branch operand for each incoming branch.
-  for (auto *Pred : BB->getPredecessorBlocks()) {
-    if (auto *Branch = cast<BranchInst>(Pred->getTerminator())) {
-      auto *BranchOpValue = cast<SingleValueInstruction>(Branch->getOperand(i));
-      auto V = getInsertedValue(cast<SingleValueInstruction>(Branch->getArg(i)),
-                                proj);
-      Branch->setOperand(i, V);
-      if (isInstructionTriviallyDead(BranchOpValue)) {
-        BranchOpValue->replaceAllUsesWithUndef();
-        BranchOpValue->eraseFromParent();
-      }
-      addToWorklist(Pred);
-    }
-  }
-
-  proj->eraseFromParent();
-
-  updateGuaranteedPhis(PM, { NewArg });
-
-  return true;
+  return false;
 }
 
 namespace swift::test {
