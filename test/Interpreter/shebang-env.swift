@@ -1,5 +1,4 @@
 // This file is also used by shebang-direct.swift.
-// REQUIRES: SR77996
 
 // RUN: echo '#!/usr/bin/env' 'swift ' > %t.shebang.swift
 // RUN: cat %s >> %t.shebang.swift
