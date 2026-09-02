@@ -835,6 +835,9 @@ public:
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
 
+  // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast_AEIC.
+  FuncDecl *getIsOSVersionAtLeastAEICDecl() const;
+
   // Retrieve the declaration of Swift._stdlib_isVariantOSVersionAtLeast.
   FuncDecl *getIsVariantOSVersionAtLeastDecl() const;
 
