@@ -6905,6 +6905,49 @@ static bool isImpliedByConformancePredatingConcurrency(
   return isImpliedByConformancePredatingConcurrency(implied);
 }
 
+/// Find the source range to remove the inheritance clause entry of \p idc
+/// that declared a redundant conformance to \p proto at \p loc, for use in
+/// a Fix-It.
+///
+/// Returns an invalid range when the redundant conformance cannot be removed
+/// by deleting an inheritance clause entry: it was not written directly in
+/// this declaration's inheritance clause, or the entry that declared it
+/// states more than just this conformance (e.g. a protocol composition or a
+/// typealias referring to one).
+static SourceRange getRedundantConformanceRemovalRange(IterableDeclContext *idc,
+                                                       ProtocolDecl *proto,
+                                                       SourceLoc loc) {
+  if (loc.isInvalid())
+    return SourceRange();
+
+  llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl;
+  if (auto *ext = dyn_cast<ExtensionDecl>(idc->getDecl()))
+    decl = ext;
+  else
+    decl = cast<NominalTypeDecl>(idc->getDecl());
+
+  auto inheritedTypes = InheritedTypes(decl);
+  for (auto i : inheritedTypes.getIndices()) {
+    auto *typeRepr = inheritedTypes.getTypeRepr(i);
+    if (!typeRepr || typeRepr->getLoc() != loc)
+      continue;
+
+    // Only offer to remove the entry when it declares nothing besides the
+    // redundant conformance itself.
+    SmallVector<InheritedNominalEntry, 2> entries;
+    InvertibleProtocolSet inverses;
+    bool anyObject = false;
+    getDirectlyInheritedNominalTypeDecls(decl, i, entries, inverses, anyObject);
+    if (anyObject || !inverses.empty() || entries.size() != 1 ||
+        entries.front().Item != proto || entries.front().isSuppressed)
+      return SourceRange();
+
+    return inheritedTypes.getRemovalRange(i);
+  }
+
+  return SourceRange();
+}
+
 void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   auto *const dc = idc->getAsGenericContext();
   auto *sf = dc->getParentSourceFile();
@@ -7134,6 +7177,15 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
                                   currentSig.getCanonicalSignature() !=
                                       existingSig.getCanonicalSignature();
 
+    // If the redundant conformance was explicitly written in this
+    // declaration's inheritance clause, offer to remove it. The range is
+    // invalid when no removal Fix-It applies, in which case attaching it
+    // below is a no-op.
+    SourceRange removalRange;
+    if (diag.Kind == ConformanceEntryKind::Explicit)
+      removalRange =
+          getRedundantConformanceRemovalRange(idc, diag.Protocol, diag.Loc);
+
     // If we've redundantly stated a conformance for which the original
     // conformance came from the module of the type or the module of the
     // protocol, just warn; we'll pick up the original conformance.
@@ -7186,16 +7238,22 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         Context.Diags.diagnose(diag.Loc, diag::redundant_conformance,
                                nominal->getDeclaredInterfaceType(),
                                diag.Protocol->getName())
-          .limitBehavior(DiagnosticBehavior::Warning);
+          .limitBehavior(DiagnosticBehavior::Warning)
+          .fixItRemoveChars(removalRange.Start, removalRange.End);
       } else {
         auto diagID = differentlyConditional
                           ? diag::redundant_conformance_adhoc_conditional
                           : diag::redundant_conformance_adhoc;
-        Context.Diags.diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
-                               diag.Protocol->getName(),
-                               existingModule->getName() ==
-                                   extendedNominal->getParentModule()->getName(),
-                               existingModule->getName());
+        auto inFlight = Context.Diags.diagnose(
+            diag.Loc, diagID, dc->getDeclaredInterfaceType(),
+            diag.Protocol->getName(),
+            existingModule->getName() ==
+                extendedNominal->getParentModule()->getName(),
+            existingModule->getName());
+        // Don't suggest removing a conditional conformance; the user needs
+        // to decide which of the two conformances to keep.
+        if (!differentlyConditional)
+          inFlight.fixItRemoveChars(removalRange.Start, removalRange.End);
       }
 
       // Complain about any declarations in this extension whose names match
@@ -7230,8 +7288,13 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       auto diagID = differentlyConditional
                         ? diag::redundant_conformance_conditional
                         : diag::redundant_conformance;
-      Context.Diags.diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
-                             diag.Protocol->getName());
+      auto inFlight = Context.Diags.diagnose(
+          diag.Loc, diagID, dc->getDeclaredInterfaceType(),
+          diag.Protocol->getName());
+      // Don't suggest removing a conditional conformance; the user needs to
+      // decide which of the two conformances to keep.
+      if (!differentlyConditional)
+        inFlight.fixItRemoveChars(removalRange.Start, removalRange.End);
     }
 
     // Special case: explain that 'RawRepresentable' conformance
