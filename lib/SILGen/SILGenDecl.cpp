@@ -2067,8 +2067,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
           }
 
           // Try directly accessing the initializer's storage instead of copying
-	  // into an rvalue, so that we can leave it unconsumed if the pattern
-	  // fails.
+          // into an rvalue, so that we can leave it unconsumed if the pattern
+          // fails.
           if (initialization->tryInitializeFromStorageReference(
                   *this, elt.getInitializer(), loc)) {
             // We are now on the match-succeeded path, with the binding in
