@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -disable-availability-checking -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -disable-availability-checking -module-name=test -emit-sil | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-BOTH
+// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -Onone -disable-availability-checking -module-name=test -emit-sil | %FileCheck %s --check-prefix=CHECK-ONONE --check-prefix=CHECK-BOTH
 
 // Also do an end-to-end test to check all components, including IRGen.
 // RUN: %empty-directory(%t) 
@@ -36,23 +37,23 @@ struct IntByteAndByte {
 }
 
 struct S {
-  // CHECK-LABEL: sil_global hidden [let] @$s4test1SV6simples11InlineArrayVy$2_SiGvpZ : $InlineArray<3, Int> = {
-  // CHECK:         [[V:%.*]] = vector
-  // CHECK:         %initval = struct $InlineArray<3, Int> ([[V]])
-  // CHECK:       }
+  // CHECK-BOTH-LABEL: sil_global hidden [let] @$s4test1SV6simples11InlineArrayVy$2_SiGvpZ : $InlineArray<3, Int> = {
+  // CHECK-BOTH:         [[V:%.*]] = vector
+  // CHECK-BOTH:         %initval = struct $InlineArray<3, Int> ([[V]])
+  // CHECK-BOTH:       }
   static let simple: InlineArray = [1, 2, 3]
 
-  // CHECK-LABEL: sil_global hidden [let] @$s4test1SV12optionalIntss11InlineArrayVy$2_SiSgGvpZ : $InlineArray<3, Optional<Int>> = {
-  // CHECK:         [[V:%.*]] = vector
-  // CHECK:         %initval = struct $InlineArray<3, Optional<Int>> ([[V]])
-  // CHECK:       }
+  // CHECK-BOTH-LABEL: sil_global hidden [let] @$s4test1SV12optionalIntss11InlineArrayVy$2_SiSgGvpZ : $InlineArray<3, Optional<Int>> = {
+  // CHECK-BOTH:         [[V:%.*]] = vector
+  // CHECK-BOTH:         %initval = struct $InlineArray<3, Optional<Int>> ([[V]])
+  // CHECK-BOTH:       }
   static let optionalInts: InlineArray<_, Int?> = [10, 20, 30]
 
-  // CHECK-LABEL: sil_global hidden [let] @$s4test1SV13optionalArrays06InlineC0Vy$2_SiGSgvpZ : $Optional<InlineArray<3, Int>> = {
-  // CHECK:         [[V:%.*]] = vector
-  // CHECK:         [[A:%.*]] = struct $InlineArray<3, Int> ([[V]])
-  // CHECK:         %initval = enum $Optional<InlineArray<3, Int>>, #Optional.some!enumelt, [[A]]
-  // CHECK:       }
+  // CHECK-BOTH-LABEL: sil_global hidden [let] @$s4test1SV13optionalArrays06InlineC0Vy$2_SiGSgvpZ : $Optional<InlineArray<3, Int>> = {
+  // CHECK-BOTH:         [[V:%.*]] = vector
+  // CHECK-BOTH:         [[A:%.*]] = struct $InlineArray<3, Int> ([[V]])
+  // CHECK-BOTH:         %initval = enum $Optional<InlineArray<3, Int>>, #Optional.some!enumelt, [[A]]
+  // CHECK-BOTH:       }
   static let optionalArray: InlineArray? = [1, 2, 3]
 
   // CHECK-LABEL: sil_global hidden [let] @$s4test1SV12intBytePairss11InlineArrayVy$2_AA03IntC0VGvpZ : $InlineArray<3, IntByte> = {
@@ -71,25 +72,25 @@ struct S {
   // CHECK:       }
   static let optionalInlineArrayOfPairs: InlineArray<_, IntByte>? = [IntByte(i: 11, b: 12), IntByte(i: 13, b: 14), IntByte(i: 15, b: 16)]
 
-  // CHECK-LABEL: sil_global hidden [let] @$s4test1SV6tupless11InlineArrayVy$2_Si_SitGvpZ : $InlineArray<3, (Int, Int)> = {
-  // CHECK:         [[T0:%.*]] = tuple
-  // CHECK:         [[T1:%.*]] = tuple
-  // CHECK:         [[T2:%.*]] = tuple
-  // CHECK:         [[V:%.*]] = vector ([[T0]], [[T1]], [[T2]])
-  // CHECK:         %initval = struct $InlineArray<3, (Int, Int)> ([[V]])
-  // CHECK:       }
+  // CHECK-BOTH-LABEL: sil_global hidden [let] @$s4test1SV6tupless11InlineArrayVy$2_Si_SitGvpZ : $InlineArray<3, (Int, Int)> = {
+  // CHECK-BOTH:         [[T0:%.*]] = tuple
+  // CHECK-BOTH:         [[T1:%.*]] = tuple
+  // CHECK-BOTH:         [[T2:%.*]] = tuple
+  // CHECK-BOTH:         [[V:%.*]] = vector ([[T0]], [[T1]], [[T2]])
+  // CHECK-BOTH:         %initval = struct $InlineArray<3, (Int, Int)> ([[V]])
+  // CHECK-BOTH:       }
   static let tuples: InlineArray = [(10, 20), (30, 40), (50, 60)]
 
-  // CHECK-LABEL: sil_global hidden [let] @$s4test1SV6nesteds11InlineArrayVy$2_AFy$1_SiGGvpZ : $InlineArray<3, InlineArray<2, Int>> = {
-  // CHECK:         [[V0:%.*]] = vector
-  // CHECK:         [[A0:%.*]] = struct $InlineArray<2, Int> ([[V0]])
-  // CHECK:         [[V1:%.*]] = vector
-  // CHECK:         [[A1:%.*]] = struct $InlineArray<2, Int> ([[V1]])
-  // CHECK:         [[V2:%.*]] = vector
-  // CHECK:         [[A2:%.*]] = struct $InlineArray<2, Int> ([[V2]])
-  // CHECK:         [[V:%.*]] = vector ([[A0]], [[A1]], [[A2]])
-  // CHECK:         %initval = struct $InlineArray<3, InlineArray<2, Int>> ([[V]])
-  // CHECK:       }
+  // CHECK-BOTH-LABEL: sil_global hidden [let] @$s4test1SV6nesteds11InlineArrayVy$2_AFy$1_SiGGvpZ : $InlineArray<3, InlineArray<2, Int>> = {
+  // CHECK-BOTH:         [[V0:%.*]] = vector
+  // CHECK-BOTH:         [[A0:%.*]] = struct $InlineArray<2, Int> ([[V0]])
+  // CHECK-BOTH:         [[V1:%.*]] = vector
+  // CHECK-BOTH:         [[A1:%.*]] = struct $InlineArray<2, Int> ([[V1]])
+  // CHECK-BOTH:         [[V2:%.*]] = vector
+  // CHECK-BOTH:         [[A2:%.*]] = struct $InlineArray<2, Int> ([[V2]])
+  // CHECK-BOTH:         [[V:%.*]] = vector ([[A0]], [[A1]], [[A2]])
+  // CHECK-BOTH:         %initval = struct $InlineArray<3, InlineArray<2, Int>> ([[V]])
+  // CHECK-BOTH:       }
   static let nested: InlineArray<3, InlineArray<2, Int>> = [[100, 200], [300, 400], [500, 600]]
 
   // CHECK-LABEL: sil_global hidden [let] @$s4test1SV010intByteAndC0AA03IntcdC0VvpZ : $IntByteAndByte = {
@@ -158,6 +159,15 @@ struct S {
   // CHECK:       }
   static let optionalRepeatingLarge: InlineArray<64, Int>? = .init(repeating: 37)
 }
+
+// rdar://181752317 (Large constant lookup tables cause stack overflows in debug)
+// CHECK-BOTH-LABEL: sil_global hidden [let] @$s4test14topLevelSimples11InlineArrayVy$15_s6UInt16VGvp : $InlineArray<16, UInt16> = {
+// CHECK-BOTH:         [[V:%.*]] = vector
+// CHECK-BOTH:         [[A:%.*]] = struct $InlineArray<16, UInt16> ([[V]])
+// CHECK-BOTH:       }
+let topLevelSimple: [_ of UInt16] = [
+    0x0000, 0x0000, 0x07B5, 0x07B5, 0x0840, 0x0842, 0x0841, 0x083C, 0x0843, 0x083E, 0x083D, 0x0838, 0x083F, 0x083A, 0x0839, 0x0834,
+]
 
 @main
 struct Main {
