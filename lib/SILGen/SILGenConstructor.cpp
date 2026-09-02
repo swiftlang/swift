@@ -1606,17 +1606,19 @@ void SILGenFunction::emitMemberInitializationViaInitAccessor(
     B.createEndAccess(loc, selfRef.getValue(), /*aborted=*/false);
 }
 
-void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
-                                           PatternBindingDecl *field,
-                                           SubstitutionMap substitutions) {
+void SILGenFunction::emitMemberInitializer(
+    DeclContext *dc, VarDecl *selfDecl, PatternBindingDecl *field,
+    SubstitutionMap substitutions,
+    const llvm::SmallPtrSetImpl<VarDecl *> &initAccessorSubsumedStorage) {
   assert(!field->isStatic());
 
   for (auto i : range(field->getNumPatternEntries())) {
-    if (auto *var = field->getAnchoringVarDecl(i))
+    auto *var = field->getAnchoringVarDecl(i);
+    if (var)
       (void)var->getImplInfo(); // trigger expansion of attached accessor macros
 
     auto init = field->getExecutableInit(i);
-    if (!init)
+    if (!init || (var && initAccessorSubsumedStorage.count(var)))
       continue;
 
     // Member initializer expressions are only used in a constructor with
@@ -1624,7 +1626,6 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     // initializer from being evaluated synchronously (or propagating required
     // isolation through closure bodies), then the default value cannot be used
     // and the member must be explicitly initialized in the constructor.
-    auto *var = field->getAnchoringVarDecl(i);
     auto requiredIsolation = var->getInitializerIsolation();
     auto contextIsolation = getActorIsolationOfContext(dc);
     switch (requiredIsolation) {
@@ -1717,10 +1718,38 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
   }
 }
 
+/// The stored properties of \p nominal whose own initializer is subsumed by an
+/// init accessor on another property. This is recomputing a fact that should
+/// be answered via some requestified bit of code that determine whether to call
+/// `setInitializerSubsumed`. That code in Sema is currently only run during
+/// primary-file type checking.
+static void collectInitAccessorSubsumedStorage(
+    NominalTypeDecl *nominal, llvm::SmallPtrSetImpl<VarDecl *> &subsumed) {
+  std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
+  nominal->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
+
+  for (auto &pair : initializedViaAccessor) {
+    VarDecl *backing = pair.first;
+    VarDecl *accessorProp = pair.second;
+    auto *pbd = accessorProp->getParentPatternBinding();
+    if (!pbd)
+      continue;
+    auto idx = pbd->getPatternEntryIndexForVarDecl(accessorProp);
+    // Subsumed only if the accessor has an initializer of its own; force its
+    // possibly synthesized default (e.g., an Optional's 'nil').
+    (void)pbd->getCheckedPatternBindingEntry(idx);
+    if (pbd->isInitialized(idx))
+      subsumed.insert(backing);
+  }
+}
+
 void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                             VarDecl *selfDecl,
                                             NominalTypeDecl *nominal) {
   auto subs = getSubstitutionsForPropertyInitializer(dc, nominal);
+
+  llvm::SmallPtrSet<VarDecl *, 4> initAccessorSubsumedStorage;
+  collectInitAccessorSubsumedStorage(nominal, initAccessorSubsumedStorage);
 
   llvm::SmallPtrSet<PatternBindingDecl *, 4> alreadyInitialized;
   for (auto member : nominal->getImplementationContext()->getAllMembers()) {
@@ -1741,7 +1770,8 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
           for (auto *property : initAccessor->getAccessedProperties()) {
             auto *PBD = property->getParentPatternBinding();
             if (alreadyInitialized.insert(PBD).second)
-              emitMemberInitializer(dc, selfDecl, PBD, subs);
+              emitMemberInitializer(dc, selfDecl, PBD, subs,
+                                    initAccessorSubsumedStorage);
           }
 
           emitMemberInitializationViaInitAccessor(dc, selfDecl, pbd, subs);
@@ -1749,7 +1779,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         }
       }
 
-      emitMemberInitializer(dc, selfDecl, pbd, subs);
+      emitMemberInitializer(dc, selfDecl, pbd, subs, initAccessorSubsumedStorage);
     }
   }
 }
