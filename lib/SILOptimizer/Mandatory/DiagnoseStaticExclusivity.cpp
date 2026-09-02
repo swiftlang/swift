@@ -35,6 +35,7 @@
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -1107,6 +1108,9 @@ private:
       // Don't rerun diagnostics on deserialized functions.
       if (function.wasDeserializedCanonical())
         continue;
+
+      PrettyStackTraceSILFunction stackTrace(
+          "running static exclusivity diagnostics on", &function);
 
       // This is a staging flag. Eventually the ability to turn off static
       // enforcement will be removed.

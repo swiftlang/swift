@@ -31,9 +31,8 @@
 
 #define DEBUG_TYPE "sil-partial-apply-simplification"
 
-#include "llvm/Support/Debug.h"
-#include "llvm/ADT/Statistic.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -41,6 +40,8 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Debug.h"
 
 STATISTIC(NumInvocationFunctionsChanged,
           "Number of invocation functions rewritten");
@@ -86,6 +87,8 @@ class PartialApplySimplificationPass : public SILModuleTransform {
     llvm::DenseMap<SILFunction *, KnownCallee> knownCallees;
     llvm::SetVector<swift::PartialApplyInst *> dynamicCallees;
     for (auto &f : *getModule()) {
+      PrettyStackTraceSILFunction stackTrace(
+          "running partial apply simplification on", &f);
       scanFunction(&f, knownCallees, dynamicCallees);
     }
 
