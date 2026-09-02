@@ -7,6 +7,8 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
       SwiftSyntax
       SwiftSyntaxBuilder
       SwiftSyntaxMacros
+      SwiftDiagnostics
+      SwiftOperators
     PACKAGE_NAME Toolchain
   )
 

@@ -6,6 +6,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     SWIFT_DEPENDENCIES
       SwiftCompilerPluginMessageHandling
       SwiftLibraryPluginProvider
+      SwiftSyntaxBuilder
     PACKAGE_NAME Toolchain
   )
   set_target_properties(swift-plugin-server PROPERTIES
@@ -19,6 +20,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     SWIFT_DEPENDENCIES
       SwiftCompilerPluginMessageHandling
       SwiftLibraryPluginProvider
+      SwiftSyntaxBuilder
     PACKAGE_NAME Toolchain
   )
 
