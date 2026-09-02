@@ -17,6 +17,7 @@ import SwiftIfConfig
 @_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftParserDiagnostics
 @_spi(Compiler) import SwiftSyntax
+@_spi(Experimental) import SwiftLexicalLookup
 
 /// Describes a source file that has been "exported" to the C++ part of the
 /// compiler, with enough information to interface with the C++ layer.
@@ -43,6 +44,12 @@ public struct ExportedSourceFile {
   ///
   /// This is a cached value; access via configuredRegions(astContext:).
   var _configuredRegions: ConfiguredRegions? = nil
+  
+  /// Cache used by unqualified lookup
+  ///
+  /// Cached so we don't need to re-evaluate common parts
+  /// of the scope tree during successive lookups.
+  var lookupCache: LookupCache? = nil
 
   /// Warning group control regions for this source file
   ///
