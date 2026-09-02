@@ -228,6 +228,36 @@ func testVarPeer() {
 func test(@declareVarValuePeer x: Int) {}
 #endif
 
+#if TEST_DIAGNOSTICS
+protocol MultiRoleMacroMarker {}
+
+@attached(member, names: named(generated))
+@attached(memberAttribute)
+@attached(extension, conformances: MultiRoleMacroMarker)
+@attached(peer)
+macro PeerOnlyUseSite() =
+  #externalMacro(module: "MacroDefinition", type: "EmptyPeerMacro")
+
+@PeerOnlyUseSite
+func multiRoleGlobalFunction() {}
+
+@PeerOnlyUseSite
+let multiRoleGlobalValue = 1
+
+struct MultiRoleContainer {
+  @PeerOnlyUseSite
+  let property = 2
+
+  @PeerOnlyUseSite
+  func method() {}
+}
+
+enum MultiRoleEnum {
+  @PeerOnlyUseSite
+  case value
+}
+#endif
+
 // Stored properties added via peer macros.
 @attached(peer, names: named(_foo))
 macro AddPeerStoredProperty() =
