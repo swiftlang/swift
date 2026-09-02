@@ -9,12 +9,6 @@
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 
-// The ObjC async completion handler thunk builds the continuation's resume
-// argument in an alloc_stack, which is not valid with opaque values, where an
-// @in parameter is lowered to a direct value. This is unrelated to what is
-// tested here and reproduces without the @in_cxx fix as well.
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
-
 // The argument of the completion handler block is passed with the Itanium C++
 // ABI convention: the caller destroys it.
 

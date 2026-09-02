@@ -388,6 +388,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
     SILGenFunction SGF(*this, *F, SwiftModule);
     {
       Scope scope(SGF, loc);
+      bool useLoweredAddresses = SGF.silConv.useLoweredAddresses();
       SmallVector<ManagedValue, 4> params;
       SGF.collectThunkParams(loc, params);
 
@@ -415,9 +416,16 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
 
         // If we are not using checked bridging, we load the continuation from
         // memory since we are going to pass it in registers, not in memory to
-        // the intrinsic.
-        if (!checkedBridging)
+        // the intrinsic. A checked continuation is passed indirectly, but only
+        // in lowered-address mode; with opaque values the intrinsic takes it as
+        // a value too.
+        if (!checkedBridging) {
           continuation = SGF.B.createLoadTrivial(loc, continuation);
+        } else if (!useLoweredAddresses) {
+          auto loaded = SGF.B.emitLoadValueOperation(
+              loc, continuation.getValue(), LoadOwnershipQualifier::Copy);
+          continuation = SGF.emitManagedRValueWithCleanup(loaded);
+        }
       }
 
       // Check for an error if the convention includes one.
@@ -525,25 +533,38 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       // arguments to the callback.
       {
         Scope resumeScope(SGF, loc);
-        auto resumeArgBuf = SGF.emitTemporaryAllocation(loc,
-                                              loweredResumeTy.getAddressType());
 
-        auto prepareArgument = [&](SILValue destBuf, CanType destFormalType,
-                                   ManagedValue arg, CanType argFormalType) {
+        // In lowered-address mode the intrinsic takes the resume value
+        // indirectly, so compose it in a temporary buffer. With opaque values
+        // it takes a value, so collect the bridged components and compose them
+        // into a tuple instead.
+        SILValue resumeArgBuf;
+        if (useLoweredAddresses) {
+          resumeArgBuf = SGF.emitTemporaryAllocation(
+              loc, loweredResumeTy.getAddressType());
+        }
+        SmallVector<ManagedValue, 4> resumeArgValues;
+
+        auto prepareArgument = [&](SILType destTy, SILValue destBuf,
+                                   CanType destFormalType, ManagedValue arg,
+                                   CanType argFormalType) {
           // Convert the ObjC argument to the bridged Swift representation we
           // want.
           ManagedValue bridgedArg = SGF.emitBridgedToNativeValue(
               loc, arg.copy(SGF, loc), argFormalType, destFormalType,
-              destBuf->getType().getObjectType());
+              destTy.getObjectType());
           // Force-unwrap an argument that comes to us as Optional if it's
           // formally non-optional in the return.
-          if (bridgedArg.getType().getOptionalObjectType()
-              && !destBuf->getType().getOptionalObjectType()) {
+          if (bridgedArg.getType().getOptionalObjectType() &&
+              !destTy.getOptionalObjectType()) {
             bridgedArg = SGF.emitPreconditionOptionalHasValue(loc,
                                                              bridgedArg,
                                                              /*implicit*/ true);
           }
-          bridgedArg.forwardInto(SGF, loc, destBuf);
+          if (destBuf)
+            bridgedArg.forwardInto(SGF, loc, destBuf);
+          else
+            resumeArgValues.push_back(bridgedArg);
         };
 
         // Collect the indices which correspond to the values to be returned.
@@ -567,14 +588,17 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
           // does not.
           return paramIndices[i] - 1;
         };
-        if (auto resumeTuple = dyn_cast<TupleType>(resumeType)) {
+        auto resumeTuple = dyn_cast<TupleType>(resumeType);
+        if (resumeTuple) {
           assert(paramIndices.size() == resumeTuple->getNumElements());
           assert(params.size() == resumeTuple->getNumElements()
                                    + 1 + (bool)errorIndex + (bool)flagIndex);
           for (unsigned i : indices(resumeTuple.getElementTypes())) {
-            auto resumeEltBuf = SGF.B.createTupleElementAddr(loc,
-                                                             resumeArgBuf, i);
+            SILValue resumeEltBuf;
+            if (resumeArgBuf)
+              resumeEltBuf = SGF.B.createTupleElementAddr(loc, resumeArgBuf, i);
             prepareArgument(
+                /*destTy*/ loweredResumeTy.getTupleElementType(i),
                 /*destBuf*/ resumeEltBuf,
                 /*destFormalType*/
                 F->mapTypeIntoEnvironment(resumeTuple.getElementTypes()[i])
@@ -586,16 +610,25 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         } else {
           assert(paramIndices.size() == 1);
           assert(params.size() == 2 + (bool)errorIndex + (bool)flagIndex);
-          prepareArgument(/*destBuf*/ resumeArgBuf,
-                          /*destFormalType*/
-                          F->mapTypeIntoEnvironment(resumeType)->getCanonicalType(),
-                          /*arg*/ params[paramIndices[0]],
-                          /*argFormalType*/
-                          blockParams[blockParamIndex(0)].getParameterType());
+          prepareArgument(
+              /*destTy*/ loweredResumeTy,
+              /*destBuf*/ resumeArgBuf,
+              /*destFormalType*/
+              F->mapTypeIntoEnvironment(resumeType)->getCanonicalType(),
+              /*arg*/ params[paramIndices[0]],
+              /*argFormalType*/
+              blockParams[blockParamIndex(0)].getParameterType());
         }
-        
+
         // Resume the continuation with the composed bridged result.
-        ManagedValue resumeArg = SGF.emitManagedBufferWithCleanup(resumeArgBuf);
+        ManagedValue resumeArg;
+        if (useLoweredAddresses) {
+          resumeArg = SGF.emitManagedBufferWithCleanup(resumeArgBuf);
+        } else if (resumeTuple) {
+          resumeArg = SGF.B.createTuple(loc, loweredResumeTy, resumeArgValues);
+        } else {
+          resumeArg = resumeArgValues[0];
+        }
         Type replacementTypes[]
           = {F->mapTypeIntoEnvironment(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(resumeIntrinsic->getGenericSignature(),

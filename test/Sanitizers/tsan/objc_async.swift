@@ -11,7 +11,6 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 @main struct Main {
   static func main() async {

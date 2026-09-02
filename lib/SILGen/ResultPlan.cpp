@@ -927,6 +927,10 @@ public:
             SGF.B.createProjectBlockStorage(loc, blockStorage);
 
         ManagedValue continuation;
+        // Set when the continuation had to be loaded as an owned value; this
+        // block is emitted out of line, so it cannot rely on a scope cleanup
+        // and destroys the value explicitly after the resume call below.
+        SILValue continuationToDestroy;
         {
           FormalEvaluationScope scope(SGF);
 
@@ -942,9 +946,17 @@ public:
               SILType::getPrimitiveAddressType(continuationTy));
 
           // If we are calling the unsafe variant, we always pass the value in
-          // registers.
-          if (!checkedBridging)
+          // registers. A checked continuation is passed indirectly, but only
+          // in lowered-address mode; with opaque values the intrinsic takes it
+          // as a value too.
+          if (!checkedBridging) {
             continuation = SGF.B.createLoadTrivial(loc, continuation);
+          } else if (!SGF.silConv.useLoweredAddresses()) {
+            continuationToDestroy = SGF.B.emitLoadValueOperation(
+                loc, continuation.getValue(), LoadOwnershipQualifier::Copy);
+            continuation = ManagedValue::forOwnedRValue(
+                continuationToDestroy, CleanupHandle::invalid());
+          }
         }
 
         auto mappedOutContinuationTy =
@@ -969,6 +981,9 @@ public:
              SGF.B.copyOwnedObjectRValue(loc, bridgedForeignError,
                                          ManagedValue::ScopeKind::Lexical)},
             SGFContext());
+
+        if (continuationToDestroy)
+          SGF.B.createDestroyValue(loc, continuationToDestroy);
 
         // Second, emit a branch from the end of the foreign error block to the
         // await block, to await the continuation which was just fulfilled.
