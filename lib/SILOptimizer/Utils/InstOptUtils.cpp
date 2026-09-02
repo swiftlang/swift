@@ -2048,7 +2048,7 @@ static void salvageCheckedTruncFromLiteral(BuiltinInst *builtin) {
   std::optional<bool> ResultsInError;
   SILValue folded = constantFoldBuiltin(builtin, ResultsInError);
   if (!folded)
-    return;
+    return killAllDebugUses(builtin);
 
   auto *tupleFolded = cast<SingleValueInstruction>(folded);
 
@@ -2229,15 +2229,13 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
 // TODO: whenever a debug_value is inserted at a new location, check that no
 // other debug_value instructions exist between the old and new location for
 // the same variable.
-//
-// TODO: Kill all debug uses when the salvage fails.
 void swift::salvageDebugInfo(SILInstruction *I) {
   if (!I)
     return;
 
   // Instructions with type dependent operands cannot be salvaged.
   if (I->getNumTypeDependentOperands() != 0)
-    return;
+    return killAllDebugUses(I);
 
   switch (I->getKind()) {
   case SILInstructionKind::StoreInst: {
@@ -2296,7 +2294,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     // Only salvage side-effects free SIL builtins.
     BuiltinInfo info = builtin->getBuiltinInfo();
     if (info.ID == BuiltinValueKind::None || !info.isReadNone())
-      return;
+      return killAllDebugUses(I);
 
     if ((info.ID == BuiltinValueKind::SToSCheckedTrunc ||
          info.ID == BuiltinValueKind::UToUCheckedTrunc ||
@@ -2313,9 +2311,16 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     // or, and, xor, cmp_*, ...
     return salvageMultiOperandInst(builtin);
   }
-  default:
-    // TODO: Kill all debug uses when the salvage fails.
+
+  case SILInstructionKind::AllocStackInst:
+    // Stores to an alloc_stack are salvaged: debug values are cloned at each
+    // store. The original debug values on the alloc_stack can be deleted
+    // rather than killed.
     return;
+
+  default:
+    // Any instruction that cannot be salvaged is replaced with undef.
+    return killAllDebugUses(I);
   }
 }
 
