@@ -94,10 +94,8 @@ func testGenericSubstitution() {
   generic(AlwaysUnsafeType())
   // expected-error@-1{{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}{{documentation-file=always-unsafe}}
   // expected-note@-2{{argument #0 in call to global function 'generic' has unsafe type 'AlwaysUnsafeType'}}
-  // expected-note@-3{{argument 'self' in call to initializer 'init' has unsafe type 'AlwaysUnsafeType.Type'}}
-  // expected-note@-4{{reference to unsafe type 'AlwaysUnsafeType'}}
-  // expected-note@-5{{reference to unsafe type 'AlwaysUnsafeType'}}
-  // expected-note@-6{{reference to initializer 'init()' involves unsafe type 'AlwaysUnsafeType'}}
+  // expected-note@-3{{reference to unsafe type 'AlwaysUnsafeType'}}
+  // expected-note@-4{{reference to initializer 'init()' involves unsafe type 'AlwaysUnsafeType'}}
 
   unsafe generic(AlwaysUnsafeType())
 }

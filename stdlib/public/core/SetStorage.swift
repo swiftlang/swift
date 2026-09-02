@@ -329,14 +329,14 @@ extension _SetStorage {
     capacity: Int,
     move: Bool
   ) -> _SetStorage {
-    let scale = unsafe _HashTable.scale(forCapacity: capacity)
+    let scale = _HashTable.scale(forCapacity: capacity)
     return unsafe allocate(scale: scale, age: nil, seed: nil)
   }
 
   @usableFromInline
   @_effects(releasenone)
   static internal func allocate(capacity: Int) -> _SetStorage {
-    let scale = unsafe _HashTable.scale(forCapacity: capacity)
+    let scale = _HashTable.scale(forCapacity: capacity)
     return unsafe allocate(scale: scale, age: nil, seed: nil)
   }
 
@@ -347,8 +347,8 @@ extension _SetStorage {
     _ cocoa: __CocoaSet,
     capacity: Int
   ) -> _SetStorage {
-    let scale = unsafe _HashTable.scale(forCapacity: capacity)
-    let age = unsafe _HashTable.age(for: cocoa.object)
+    let scale = _HashTable.scale(forCapacity: capacity)
+    let age = _HashTable.age(for: cocoa.object)
     return unsafe allocate(scale: scale, age: age, seed: nil)
   }
 #endif
@@ -363,7 +363,7 @@ extension _SetStorage {
     _internalInvariant(scale >= 0 && scale < Int.bitWidth - 1)
 
     let bucketCount = (1 as Int) &<< scale
-    let wordCount = unsafe _UnsafeBitset.wordCount(forCapacity: bucketCount)
+    let wordCount = _UnsafeBitset.wordCount(forCapacity: bucketCount)
     let storage = unsafe Builtin.allocWithTailElems_2(
       _SetStorage<Element>.self,
       wordCount._builtinWordValue, _HashTable.Word.self,
@@ -374,7 +374,7 @@ extension _SetStorage {
       metadataAddr, wordCount._builtinWordValue, _HashTable.Word.self,
       Element.self)
     unsafe storage._count = 0
-    unsafe storage._capacity = unsafe _HashTable.capacity(forScale: scale)
+    unsafe storage._capacity = _HashTable.capacity(forScale: scale)
     unsafe storage._scale = scale
     unsafe storage._reservedScale = 0
     unsafe storage._extra = 0

@@ -680,10 +680,10 @@ public:
                                       /*isImplicitlyAsync=*/false,
                                       /*isImplicitlyThrows=*/false);
     } else if (auto ECE = dyn_cast<ExplicitCastExpr>(E)) {
-      recurse = asImpl().checkType(E, ECE->getCastTypeRepr(), ECE->getCastType());
+      recurse = asImpl().checkType(E, ECE->getCastTypeRepr(), ECE->getCastType(), /*isMetatype=*/false);
     } else if (auto TE = dyn_cast<TypeExpr>(E)) {
       if (!TE->isImplicit()) {
-        recurse = asImpl().checkType(TE, TE->getTypeRepr(), TE->getInstanceType());
+        recurse = asImpl().checkType(TE, TE->getTypeRepr(), TE->getInstanceType(), /*isMetatype=*/true);
       }
     } else if (auto KPE = dyn_cast<KeyPathExpr>(E)) {
       for (auto &component : KPE->getComponents()) {
@@ -2275,7 +2275,8 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type,
+                              bool isMetatype) {
       return ShouldRecurse;
     }
 
@@ -2428,7 +2429,8 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type,
+                              bool isMetatype) {
       return ShouldRecurse;
     }
 
@@ -2542,8 +2544,9 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
-      if (!assumedSafeArguments.contains(E)) {
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type,
+                              bool isMetatype) {
+      if (!assumedSafeArguments.contains(E) && !isMetatype) {
         SourceLoc loc = typeRepr ? typeRepr->getLoc() : E->getLoc();
         classification.merge(
             Classification::forType(type, loc).onlyUnsafe());
@@ -4098,13 +4101,13 @@ private:
     return ShouldRecurse;
   }
 
-  ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+  ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type, bool isMetatype) {
     SourceLoc loc = typeRepr ? typeRepr->getLoc() : E->getLoc();
     auto classification = Classification::forType(type, loc);
 
-    // If this expression is covered as a safe argument, drop the unsafe
-    // classification.
-    if (assumedSafeArguments.contains(E))
+    // If this expression is covered as a safe argument or this is a metatype,
+    // drop the unsafe classification.
+    if (assumedSafeArguments.contains(E) || isMetatype)
       classification = classification.withoutUnsafe();
 
     checkEffectSite(E, /*requiresTry=*/false, classification);
