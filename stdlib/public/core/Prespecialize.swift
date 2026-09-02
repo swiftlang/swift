@@ -261,3 +261,1105 @@ extension _ContiguousArrayBuffer {
   @usableFromInline
   func __specialize_class__consumeAndCreateNew(bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool) -> _ContiguousArrayBuffer<Element> { Builtin.unreachable() }
 }
+
+@_specializeExtension
+extension Dictionary._Variant {
+  @_specialize(
+    exported: true,
+    target: setValue(_:forKey:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == Any)
+  @_specialize(
+    exported: true,
+    target: setValue(_:forKey:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == String)
+  @_specialize(
+    exported: true,
+    target: setValue(_:forKey:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == Any)
+  @_specialize(
+    exported: true,
+    target: setValue(_:forKey:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: setValue(_:forKey:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_setValue(_: __owned Value, forKey: Key) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: removeValue(forKey:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == String)
+  @_specialize(
+    exported: true,
+    target: removeValue(forKey:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == Any)
+  @_specialize(
+    exported: true,
+    target: removeValue(forKey:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == Any)
+  @_specialize(
+    exported: true,
+    target: removeValue(forKey:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: removeValue(forKey:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_removeValue(forKey: Key) -> Value? {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: isUniquelyReferenced(),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == String)
+  @_specialize(
+    exported: true,
+    target: isUniquelyReferenced(),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == Any)
+  @_specialize(
+    exported: true,
+    target: isUniquelyReferenced(),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == Any)
+  @_specialize(
+    exported: true,
+    target: isUniquelyReferenced(),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: isUniquelyReferenced(),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_isUniquelyReferenced() -> Bool {
+    Builtin.unreachable()
+  }
+}
+
+// FIXME: Crashes in TypeBase::removeArgumentLabels(unsigned int)
+// @_specializeExtension
+// extension Dictionary {
+//   subscript(__specialize_: Key) -> Value? {
+//     @available(SwiftStdlib x.y, *)
+//     @usebleFromInline
+//     get { Builtin.unreachable() }
+//     @_specialize(
+//       exported: true,
+//       target: subscript(_:),
+//       availability: SwiftStdlib x.y;
+//       where Key == AnyHashable, Value == String)
+//     @_specialize(
+//       exported: true,
+//       target: subscript(_:),
+//       availability: SwiftStdlib x.y;
+//       where Key == AnyHashable, Value == Any)
+//     @_specialize(
+//       exported: true,
+//       target: subscript(_:),
+//       availability: SwiftStdlib x.y;
+//       where Key == String, Value == Any)
+//     @_specialize(
+//       exported: true,
+//       target: subscript(_:),
+//       availability: SwiftStdlib x.y;
+//       where Key == String, Value == AnyHashable)
+//     @available(SwiftStdlib x.y, *)
+//     @@usebleFromInline
+//     set { Builtin.unreachable() }
+//   }
+// }
+
+@_specializeExtension
+extension _NativeDictionary {
+
+  @_specialize(
+    exported: true,
+    target: _copyOrMoveAndResize(capacity:moveElements:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == String)
+  @_specialize(
+    exported: true,
+    target: _copyOrMoveAndResize(capacity:moveElements:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == Any)
+  @_specialize(
+    exported: true,
+    target: _copyOrMoveAndResize(capacity:moveElements:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == Any)
+  @_specialize(
+    exported: true,
+    target: _copyOrMoveAndResize(capacity:moveElements:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: _copyOrMoveAndResize(capacity:moveElements:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize__copyOrMoveAndResize(
+    capacity: Swift.Int, moveElements: Swift.Bool
+  ) { Builtin.unreachable() }
+
+  @_specialize(
+    exported: true,
+    target: copy(),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == Any)
+  @_specialize(
+    exported: true,
+    target: copy(),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == String)
+  @_specialize(
+    exported: true,
+    target: copy(),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == Any)
+  @_specialize(
+    exported: true,
+    target: copy(),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: copy(),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_copy() { Builtin.unreachable() }
+
+  @_specialize(
+    exported: true,
+    target: mutatingFind(_:isUnique:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == Any)
+  @_specialize(
+    exported: true,
+    target: mutatingFind(_:isUnique:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == String)
+  @_specialize(
+    exported: true,
+    target: mutatingFind(_:isUnique:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == Any)
+  @_specialize(
+    exported: true,
+    target: mutatingFind(_:isUnique:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: mutatingFind(_:isUnique:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_mutatingFind(
+    _ key: Key, isUnique: Bool
+  ) -> (bucket: _HashTable.Bucket, found: Bool) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: _insert(at:key:value:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == Any)
+  @_specialize(
+    exported: true,
+    target: _insert(at:key:value:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == String)
+  @_specialize(
+    exported: true,
+    target: _insert(at:key:value:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == Any)
+  @_specialize(
+    exported: true,
+    target: _insert(at:key:value:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: _insert(at:key:value:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  func __specialize__insert(
+    at: Bucket, key: __owned Key, value: __owned Value
+  ) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: ensureUnique(isUnique:capacity:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == Any)
+  @_specialize(
+    exported: true,
+    target: ensureUnique(isUnique:capacity:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == String)
+  @_specialize(
+    exported: true,
+    target: ensureUnique(isUnique:capacity:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == Any)
+  @_specialize(
+    exported: true,
+    target: ensureUnique(isUnique:capacity:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: ensureUnique(isUnique:capacity:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_ensureUnique(
+    isUnique: Bool, capacity: Int
+  ) -> Bool {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: uncheckedRemove(at:isUnique:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == Any)
+  @_specialize(
+    exported: true,
+    target: uncheckedRemove(at:isUnique:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == AnyHashable, Value == String)
+  @_specialize(
+    exported: true,
+    target: uncheckedRemove(at:isUnique:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == Any)
+  @_specialize(
+    exported: true,
+    target: uncheckedRemove(at:isUnique:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: uncheckedRemove(at:isUnique:),
+    availability: SwiftStdlib 5.5, *;
+    where Key == String, Value == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_uncheckedRemove(
+    at: _HashTable.Bucket, isUnique: Bool
+  ) -> (key: Key, value: Value) {
+    Builtin.unreachable()
+  }
+}
+
+@_specializeExtension
+extension __RawDictionaryStorage {
+  @_specialize(
+    exported: true,
+    target: find(_:hashValue:),
+    availability: SwiftStdlib 5.5, *;
+    where T == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: find(_:hashValue:),
+    availability: SwiftStdlib 5.5, *;
+    where T == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  func __specialize_find<T: Hashable>(
+    _: T, hashValue: Int
+  ) -> (bucket: Swift._HashTable.Bucket, found: Swift.Bool) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: find(_:),
+    availability: SwiftStdlib 5.5, *;
+    where T == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: find(_:),
+    availability: SwiftStdlib 5.5, *;
+    where T == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  func __specialize_find<T: Hashable>(
+    _: T
+  ) -> (bucket: Swift._HashTable.Bucket, found: Swift.Bool) {
+    Builtin.unreachable()
+  }
+}
+
+@_specializeExtension
+extension Array {
+  @_specialize(
+    exported: true,
+    target: _checkSubscript(_:wasNativeTypeChecked:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _checkSubscript(_:wasNativeTypeChecked:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  func __specialize__checkSubscript(
+    _: Int, wasNativeTypeChecked: Bool
+  ) -> _DependenceToken {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: _endMutation(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _endMutation(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize__endMutation(){ Builtin.unreachable() }
+
+  @_specialize(
+    exported: true,
+    target: _createNewBuffer(bufferIsUnique:minimumCapacity:growForAppend:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _createNewBuffer(bufferIsUnique:minimumCapacity:growForAppend:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize__createNewBuffer(
+    bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
+  ) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: _makeUniqueAndReserveCapacityIfNotUnique(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _makeUniqueAndReserveCapacityIfNotUnique(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize__makeUniqueAndReserveCapacityIfNotUnique() {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: _appendElementAssumeUniqueAndCapacity(_:newElement:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _appendElementAssumeUniqueAndCapacity(_:newElement:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize__appendElementAssumeUniqueAndCapacity(
+    _: Int, newElement: __owned Element
+  ) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: append(_:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: append(_:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_append(_: __owned Element) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: _adoptStorage(_:count:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _adoptStorage(_:count:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  static func __specialize__adoptStorage(
+    _: __owned _ContiguousArrayStorage<Element>, count: Int
+  ) -> ([Element], UnsafeMutablePointer<Element>) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: append(contentsOf:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String, S == [String])
+  @_specialize(
+    exported: true,
+    target: append(contentsOf:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any, S == [Any])
+  @_specialize(
+    exported: true,
+    target: append(contentsOf:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String, S == Set<String>)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_append<S: Sequence>(contentsOf: __owned S)
+  where S.Element == Element
+  {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: _reserveCapacityImpl(minimumCapacity:growForAppend:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _reserveCapacityImpl(minimumCapacity:growForAppend:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize__reserveCapacityImpl(
+    minimumCapacity: Int, growForAppend: Bool
+  ) {
+    Builtin.unreachable()
+  }
+}
+
+#if _runtime(_ObjC)
+@_specializeExtension
+extension _ArrayBuffer {
+  @_specialize(
+    exported: true,
+    target: _consumeAndCreateNew(bufferIsUnique:minimumCapacity:growForAppend:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _consumeAndCreateNew(bufferIsUnique:minimumCapacity:growForAppend:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  func __specialize__consumeAndCreateNew(
+    bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
+  ) -> _ArrayBuffer<Element> {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: isMutableAndUniquelyReferenced(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: isMutableAndUniquelyReferenced(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_isMutableAndUniquelyReferenced() -> Bool {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: isUniquelyReferenced(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: isUniquelyReferenced(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_isUniquelyReferenced() -> Bool {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: beginCOWMutation(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: beginCOWMutation(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_beginCOWMutation() -> Bool {
+    Builtin.unreachable()
+  }
+
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  var __specialize_firstElementAddress: UnsafeMutablePointer<Element> {
+    @_specialize(
+      exported: true,
+      target: firstElementAddress,
+      availability: SwiftStdlib 5.5, *;
+      where Element == Any)
+    @_specialize(
+      exported: true,
+      target: firstElementAddress,
+      availability: SwiftStdlib 5.5, *;
+      where Element == String)
+    get { Builtin.unreachable() }
+  }
+
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  var __specialize__native: _ContiguousArrayBuffer<Element> {
+    @_specialize(
+      exported: true,
+      target: _native,
+      availability: SwiftStdlib 5.5, *;
+      where Element == Any)
+    @_specialize(
+      exported: true,
+      target: _native,
+      availability: SwiftStdlib 5.5, *;
+      where Element == String)
+    get { Builtin.unreachable() }
+  }
+
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  var __specialize_immutableCount: Int {
+    @_specialize(
+      exported: true,
+      target: immutableCount,
+      availability: SwiftStdlib 5.5, *;
+      where Element == Any)
+    @_specialize(
+      exported: true,
+      target: immutableCount,
+      availability: SwiftStdlib 5.5, *;
+      where Element == String)
+    get { Builtin.unreachable() }
+  }
+
+  // FIXME: Currently triggers a verification error in OwnershipModelEliminator
+  // @_specialize(
+  //   exported: true,
+  //   target: init(_buffer:shiftedToStartIndex:),
+  //   availability: SwiftStdlib x.y;
+  //   where Element == String)
+  // @_specialize(
+  //   exported: true,
+  //   target: init(_buffer:shiftedToStartIndex:),
+  //   availability: SwiftStdlib x.y;
+  //   where Element == Any)
+  // @available(SwiftStdlib x.y, *)
+  // @usableFromInline
+  // init(
+  //   specialized_buffer: _ContiguousArrayBuffer<Element>,
+  //   shiftedToStartIndex: Int
+  // ) {
+  //   Builtin.unreachable()
+  // }
+}
+#endif
+
+@_specializeExtension
+extension ContiguousArray {
+  @_specialize(
+    exported: true,
+    target: _endMutation(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _endMutation(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize__endMutation(){ Builtin.unreachable() }
+  @_specialize(
+    exported: true,
+    target: _createNewBuffer(bufferIsUnique:minimumCapacity:growForAppend:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _createNewBuffer(bufferIsUnique:minimumCapacity:growForAppend:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize__createNewBuffer(
+    bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
+  ) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: _makeUniqueAndReserveCapacityIfNotUnique(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _makeUniqueAndReserveCapacityIfNotUnique(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize__makeUniqueAndReserveCapacityIfNotUnique() {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: _appendElementAssumeUniqueAndCapacity(_:newElement:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _appendElementAssumeUniqueAndCapacity(_:newElement:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize__appendElementAssumeUniqueAndCapacity(
+    _: Int, newElement: __owned Element
+  ) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: append(_:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: append(_:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_append(_: __owned Element) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: append(contentsOf:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any, S == [Any])
+  @_specialize(
+    exported: true,
+    target: append(contentsOf:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String, S == [String])
+  @_specialize(
+    exported: true,
+    target: append(contentsOf:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String, S == Set<String>)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_append<S: Sequence>(contentsOf: __owned S)
+  where S.Element == Element
+  {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: _reserveCapacityImpl(minimumCapacity:growForAppend:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _reserveCapacityImpl(minimumCapacity:growForAppend:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize__reserveCapacityImpl(
+    minimumCapacity: Int, growForAppend: Bool
+  ) {
+    Builtin.unreachable()
+  }
+}
+
+@_specializeExtension
+extension _ContiguousArrayBuffer {
+  @_specialize(
+    exported: true,
+    target: _consumeAndCreateNew(bufferIsUnique:minimumCapacity:growForAppend:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: _consumeAndCreateNew(bufferIsUnique:minimumCapacity:growForAppend:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  func __specialize__consumeAndCreateNew(
+    bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
+  ) -> _ContiguousArrayBuffer<Element> {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: isMutableAndUniquelyReferenced(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == Any)
+  @_specialize(
+    exported: true,
+    target: isMutableAndUniquelyReferenced(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_isMutableAndUniquelyReferenced() -> Bool {
+    Builtin.unreachable()
+  }
+
+  // FIXME: Currently triggers a verification error in OwnershipModelEliminator
+  // @_specialize(
+  //   exported: true,
+  //   target: init(_buffer:shiftedToStartIndex:),
+  //   availability: SwiftStdlib x.y;
+  //   where Element == String)
+  // @_specialize(
+  //   exported: true,
+  //   target: init(_buffer:shiftedToStartIndex:),
+  //   availability: SwiftStdlib x.y;
+  //   where Element == Any)
+  // @available(SwiftStdlib x.y, *)
+  // @usableFromInline
+  // init(
+  //   specialized_buffer: _ContiguousArrayBuffer<Element>,
+  //   shiftedToStartIndex: Int
+  // ) {
+  //   Builtin.unreachable()
+  // }
+}
+
+@_specializeExtension
+extension Set {
+  @_specialize(
+    exported: true,
+    target: contains(_:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: contains(_:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  func __specialize_contains(_: Element) -> Bool { Builtin.unreachable() }
+}
+
+@_specializeExtension
+extension Set._Variant {
+  @_specialize(
+    exported: true,
+    target: insert(_:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: insert(_:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_insert(
+    _: __owned Element
+  ) -> (inserted: Bool, memberAfterInsert: Element) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: remove(_:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: remove(_:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_remove(_: Element) -> Element? {
+    Builtin.unreachable()
+  }
+}
+
+@_specializeExtension
+extension Sequence {
+  @_specialize(
+    exported: true,
+    target: _copyContents(initializing:),
+    availability: SwiftStdlib 5.5, *;
+    where Self == [String])
+  @_specialize(
+    exported: true,
+    target: _copyContents(initializing:),
+    availability: SwiftStdlib 5.5, *;
+    where Self == Set<String>)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  __consuming func __specialize__copyContents(
+    initializing: Swift.UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, Int) {
+    Builtin.unreachable()
+  }
+}
+
+@_specializeExtension
+extension _NativeSet {
+  @_specialize(
+    exported: true,
+    target: copyAndResize(capacity:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: copyAndResize(capacity:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_copyAndResize(capacity: Int) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: copy(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: copy(),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_copy() { Builtin.unreachable() }
+
+  @_specialize(
+    exported: true,
+    target: index(after:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: index(after:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  func __specialize_index(after: Set<Element>.Index) -> Set<Element>.Index {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: resize(capacity:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: resize(capacity:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_resize(capacity: Int) { Builtin.unreachable() }
+
+  @_specialize(
+    exported: true,
+    target: _delete(at:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: _delete(at:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize__delete(at: _HashTable.Bucket) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: insertNew(_:at:isUnique:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: insertNew(_:at:isUnique:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  mutating func __specialize_insertNew(
+    _: __owned Element, at: _HashTable.Bucket, isUnique: Bool
+  ) {
+    Builtin.unreachable()
+  }
+
+  @_specialize(
+    exported: true,
+    target: _unsafeInsertNew(_:at:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: _unsafeInsertNew(_:at:),
+    availability: SwiftStdlib 5.5, *;
+    where Element == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  func __specialize__unsafeInsertNew(
+    _: __owned Element, at: _HashTable.Bucket
+  ) {
+    Builtin.unreachable()
+  }
+}
+
+@_specializeExtension
+extension Optional {
+  @_specialize(
+    exported: true,
+    target: ==(_:_:),
+    availability: SwiftStdlib 5.5, *;
+    where Wrapped == AnyHashable)
+  @_specialize(
+    exported: true,
+    target: ==(_:_:),
+    availability: SwiftStdlib 5.5, *;
+    where Wrapped == String)
+  @available(SwiftStdlib 5.5, *)
+  @usableFromInline
+  static func __specialize_equals(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
+    Builtin.unreachable()
+  }
+}
+
+@_specialize(
+  exported: true,
+  target: _dictionaryUpCast(_:),
+  availability: SwiftStdlib 5.5, *;
+  where
+    DerivedKey == String,
+    DerivedValue == AnyHashable,
+    BaseKey == AnyHashable,
+    BaseValue == Any)
+@_specialize(
+  exported: true,
+  target: _dictionaryUpCast(_:),
+  availability: SwiftStdlib 5.5, *;
+  where
+    DerivedKey == String,
+    DerivedValue == AnyHashable,
+    BaseKey == String,
+    BaseValue == Any)
+@available(SwiftStdlib 5.5, *)
+@usableFromInline
+func __specialize_dictionaryUpCast<
+  DerivedKey, DerivedValue, BaseKey, BaseValue
+>(
+  _ source: Dictionary<DerivedKey, DerivedValue>
+) -> Dictionary<BaseKey, BaseValue> {
+  Builtin.unreachable()
+}
+
+@_specialize(
+  exported: true,
+  target: _copyCollectionToContiguousArray(_:),
+  availability: SwiftStdlib 5.5, *;
+  where C == [String])
+@_specialize(
+  exported: true,
+  target: _copyCollectionToContiguousArray(_:),
+  availability: SwiftStdlib 5.5, *;
+  where C == Set<String>)
+@available(SwiftStdlib 5.5, *)
+@usableFromInline
+func __specialize_copyCollectionToContiguousArray<C: Collection>(
+  _ source: C
+) -> ContiguousArray<C.Element> {
+  Builtin.unreachable()
+}
