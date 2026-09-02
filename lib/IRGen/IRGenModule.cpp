@@ -1658,6 +1658,8 @@ void IRGenModule::constructInitialFnAttributes(
   // Add/remove MinSize based on the appropriate setting.
   if (FuncOptMode == OptimizationMode::NotSet)
     FuncOptMode = IRGen.Opts.OptMode;
+  // Mirror Clang (getTrivialDefaultFunctionAttributes): only size-optimized
+  // functions get OptimizeForSize/MinSize; speed functions get neither.
   if (FuncOptMode == OptimizationMode::ForSize) {
     Attrs.addAttribute(llvm::Attribute::OptimizeForSize);
     Attrs.addAttribute(llvm::Attribute::MinSize);
