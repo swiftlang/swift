@@ -90,6 +90,12 @@ endif()
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
 
+# Sysroot libc++abi has no exception runtime; the -static target misses the
+# -fno-exceptions that llvm_update_compile_flags gives the shared one.
+if("WASI" IN_LIST SWIFT_SDKS)
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS "-fno-exceptions")
+endif()
+
 set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   ../CompatibilityOverride/CompatibilityOverride.cpp
   Actor.cpp
