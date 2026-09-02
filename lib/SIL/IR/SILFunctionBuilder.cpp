@@ -259,6 +259,9 @@ void SILFunctionBuilder::addFunctionAttributes(
       F->setSection(*sectionName);
   }
 
+  if (auto *TA = decl->getAttrs().getAttribute<TargetAttr>())
+    F->setTargetFeatures(TA->Value);
+
   // Only emit replacements for the objc entry point of objc methods.
   // There is one exception: @_dynamicReplacement(for:) of @objc methods in
   // generic classes. In this special case we use native replacement instead of

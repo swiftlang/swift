@@ -4502,6 +4502,22 @@ ERROR(attr_incompatible_with_attr,none,
       "'%0' cannot be used with '%1'",
       (DeclAttribute, DeclAttribute))
 
+ERROR(attr_target_empty_string,none,
+      "'@_target' requires a non-empty target string", ())
+
+ERROR(attr_target_unsupported_feature,none,
+      "unsupported target feature '%0' in '@_target'", (StringRef))
+
+ERROR(attr_target_unsupported_cpu,none,
+      "unsupported CPU '%0' in '@_target'", (StringRef))
+
+ERROR(attr_target_duplicate_option,none,
+      "duplicate '%0' option in '@_target'", (StringRef))
+
+ERROR(attr_target_invalid_branch_protection,none,
+      "invalid branch protection specification '%0' in '@_target'",
+      (StringRef))
+
 ERROR(attr_incompatible_with_non_final,none,
       "'%0' cannot be applied to a non-final %kindonly1",
       (DeclAttribute, const ValueDecl *))
