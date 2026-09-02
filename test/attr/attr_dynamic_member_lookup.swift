@@ -1078,7 +1078,7 @@ func keypath_with_subscripts(_ arr: SubscriptLens<[Int]>,
 
 func keypath_with_incorrect_return_type(_ arr: Lens<Array<Int>>) {
   for idx in 0..<arr.count {
-    // expected-error@-1 {{cannot convert value of type 'Lens<Int>' to expected argument type 'Int'}}
+    // expected-error@-1 {{cannot convert value of type 'Lens<Int>' to expected '..<' operand type 'Int'}}
     let _ = arr[idx]
   }
 }

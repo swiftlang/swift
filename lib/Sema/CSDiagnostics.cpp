@@ -1263,6 +1263,11 @@ bool AttributedFuncToTypeConversionFailure::diagnoseAsError() {
   return true;
 }
 
+/*bool AttributedFuncToTypeConversionFailure::diagnoseForAmbiguity(
+    MutableArrayRef<FailureDiagnostic> commonDiagnostics) {
+  return commonDiagnostics[0].diagnoseAsError();
+}*/
+
 static VarDecl *getDestinationVarDecl(AssignExpr *AE,
                                       const Solution &solution) {
   ConstraintLocator *locator = nullptr;
@@ -2978,6 +2983,11 @@ bool ContextualFailure::diagnoseAsNote() {
   return true;
 }
 
+bool ContextualFailure::diagnoseForAmbiguity(
+    MutableArrayRef<ContextualFailure> commonDiagnostics) {
+  return commonDiagnostics[0].diagnoseAsError();
+}
+
 static std::optional<Diag<Type>>
 getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   switch (CTP) {
@@ -3984,6 +3994,12 @@ bool FunctionTypeMismatch::diagnoseAsError() {
   emitDiagnostic(*diagnostic, getFromType(), getToType());
   return true;
 }
+
+/*bool FunctionTypeMismatch::diagnoseForAmbiguity(
+    MutableArrayRef<FailureDiagnostic> commonDiagnostics) {
+  return commonDiagnostics[0].diagnoseAsError();
+}*/
+
 
 bool AutoClosurePointerConversionFailure::diagnoseAsError() {
   auto diagnostic = diag::invalid_autoclosure_pointer_conversion;
@@ -5565,6 +5581,11 @@ bool MissingArgumentsFailure::diagnoseAsNote() {
 
   return false;
 }
+
+/*bool MissingArgumentsFailure::diagnoseForAmbiguity(
+    MutableArrayRef<FailureDiagnostic> commonDiagnostics) {
+  return commonDiagnostics[0].diagnoseAsError();
+}*/
 
 bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   auto &ctx = getASTContext();
@@ -7607,11 +7628,21 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   return true;
 }
 
+/*bool ThrowingFunctionConversionFailure::diagnoseForAmbiguity(
+    MutableArrayRef<FailureDiagnostic> commonDiagnostics) {
+  return commonDiagnostics[0].diagnoseAsError();
+}*/
+
 bool ThrownErrorTypeConversionFailure::diagnoseAsError() {
   emitDiagnostic(diag::thrown_error_type_mismatch, getFromType(),
                  getToType());
   return true;
 }
+
+/*bool ThrownErrorTypeConversionFailure::diagnoseForAmbiguity(
+    MutableArrayRef<FailureDiagnostic> commonDiagnostics) {
+  return commonDiagnostics[0].diagnoseAsError();
+}*/
 
 bool AsyncFunctionConversionFailure::diagnoseAsError() {
   auto *locator = getLocator();
@@ -7876,6 +7907,236 @@ bool ArgumentMismatchFailure::diagnoseAsNote() {
     return true;
   }
 
+  return false;
+}
+
+bool ArgumentMismatchFailure::diagnoseForAmbiguity(
+    MutableArrayRef<ArgumentMismatchFailure> commonDiagnostics) {
+  //This diagnostic and first diagnostic will be the same diagnostic if
+  //called from AllowArgumentMismatch diagnoseForAmbiguity. So the
+  //solution, loc, fromType, and toType are present within the set of diagnostics
+
+  Type resolvedFromType = resolveType(getFromType());
+
+  //We want to compare FunctionTypes that could be polymorphically interchanged. But that
+  //will be better using mergeable. This is a short term partial solution.
+  auto matchableFuncType = [&](Type currentFromType) {
+    if (auto funFromType = resolvedFromType->getAs<AnyFunctionType>()) {
+      if (auto funCurrentF = currentFromType->getAs<AnyFunctionType>()) {
+        return funFromType->getNumParams() == funCurrentF->getNumParams();
+      }
+    }
+    return false;
+  };
+
+  // Check if all From types pass isEqual checks
+  bool equalTypes = llvm::all_of(
+      commonDiagnostics,
+      [&](ArgumentMismatchFailure &entry) {
+        auto currentFromType = entry.resolveType(entry.getFromType());
+        return resolvedFromType->isEqual(currentFromType);
+      });
+  // Check if all From types are functions And similar
+  bool similarFunctionalTypes = llvm::all_of(
+      commonDiagnostics,
+      [&](ArgumentMismatchFailure &entry) {
+        auto currentFromType = entry.resolveType(entry.getFromType());
+        return matchableFuncType(currentFromType);
+      });
+
+  if (equalTypes || similarFunctionalTypes) {
+    auto &CS = getConstraintSystem();
+    auto &DE = CS.getASTContext().Diags;
+    auto loc = getLocator();
+    auto overload = getCalleeOverloadChoiceIfAvailable(loc);
+
+    if (!overload)
+      return false;
+
+    auto argumentExp = getFunctionArgApplyInfo(loc).value().getArgExpr();
+    bool closureAnchor = false;
+    if (isExpr<ClosureExpr>(argumentExp)) {
+      closureAnchor = true;
+    }
+    bool functionToType = false;
+
+    auto primaryDecl = overload->choice.getDecl();
+    DeclNameRef diagnosisName =
+        DeclNameRef(primaryDecl->getName().getBaseName());
+    llvm::StringSet<> overloadedToTypes;
+    llvm::StringSet<> overloadedFromTypes;
+
+    llvm::SmallSetVector<Decl *, 4> matchedDecls;
+
+    for (auto &entry : commonDiagnostics) {
+      auto currentDiag = entry.castTo<ArgumentMismatchFailure>();
+      matchedDecls.insert(
+          currentDiag->getOverloadChoice(currentDiag->getLocator())->choice.getDecl());
+      auto toType = currentDiag->resolveType(currentDiag->getToType());
+      overloadedToTypes.insert(toType.getString());
+      if (toType->is<AnyFunctionType>())
+        functionToType = true;
+
+      if (similarFunctionalTypes)
+        overloadedFromTypes.insert(
+            currentDiag->resolveType(currentDiag->getFromType()).getString());
+    }
+
+    auto srcLoc = ::getLoc(getAnchor());
+
+    SmallString<80> fromTypeStr;
+    {
+      llvm::raw_svector_ostream OS(fromTypeStr);
+      SmallVector<std::string> temp;
+      if (!overloadedFromTypes.empty()) {
+        for (auto &t : overloadedFromTypes)
+          temp.emplace_back(StringRef(t.getKey()).str());
+        llvm::sort(temp);
+        llvm::interleaveComma(temp, OS,
+                              [&OS](auto type) { OS << "'" << type << "'"; });
+      }
+    }
+
+    std::optional<std::string> fromTypeSummary;
+    /// This is an arbitrary cut off to avoid very long
+    /// diagnostic messages when there are many overloads
+    /// TODO: make a shape based message, and make a ranking
+    /// to select the most likely types for a partial message
+    if (fromTypeStr.size() > 80) {
+      fromTypeSummary =
+          std::to_string(overloadedFromTypes.size()) + " function types";
+    }
+
+    auto toType = resolveType(getToType());
+    if (similarFunctionalTypes && overloadedToTypes.size() == 1) {
+      auto useFromTypeSummary = fromTypeSummary.has_value();
+      auto fromTypeSummaryS = fromTypeSummary.value_or("");
+
+      if (closureAnchor && !functionToType)
+        DE.diagnose(srcLoc, diag::unsupported_closure_arg_options,
+                    diagnosisName, useFromTypeSummary, fromTypeSummaryS,
+                    fromTypeStr, toType);
+      else if (diagnosisName.isOperator())
+        DE.diagnose(srcLoc, diag::incorrect_function_operand_for_op,
+                    diagnosisName, useFromTypeSummary, fromTypeSummaryS,
+                    fromTypeStr, toType);
+      else if (isa<ConstructorDecl>(primaryDecl))
+        DE.diagnose(srcLoc, diag::incorrect_function_for_init,
+                    useFromTypeSummary, fromTypeSummaryS, fromTypeStr, toType);
+      else
+        DE.diagnose(srcLoc, diag::incorrect_function_for_call, diagnosisName,
+                    useFromTypeSummary, fromTypeSummaryS, fromTypeStr, toType);
+      return true;
+    }
+
+      // Lift to CSDiagnostic
+    if (overloadedToTypes.size() == 1) {
+      if (closureAnchor && !functionToType)
+       DE.diagnose(srcLoc, diag::unsupported_closure_argument, diagnosisName,
+                    resolvedFromType->hasPlaceholder(), resolvedFromType, toType);
+      else if (diagnoseConversionToBool()) {
+        return true;
+      } else if (diagnosisName.isOperator() &&
+                 diagnosisName.getBaseName().getIdentifier().str() == "~=") {
+        DE.diagnose(srcLoc, diag::cannot_match_expr_pattern_with_value,
+                    resolvedFromType, toType);
+      } else if (diagnosisName.isOperator()) {
+        auto diag = DE.diagnose(srcLoc, diag::incorrect_operand_for_op,
+                                diagnosisName, resolvedFromType, toType);
+        tryFixIts(diag);
+      } else if (isa<ConstructorDecl>(primaryDecl)) {
+        auto diag = DE.diagnose(srcLoc, diag::incorrect_argument_for_init,
+                                resolvedFromType, toType);
+        tryFixIts(diag);
+      } else {
+        auto diag = DE.diagnose(srcLoc, diag::incorrect_argument_for_call,
+                                diagnosisName, resolvedFromType, toType);
+        tryFixIts(diag);
+      }
+      return true;
+    }
+
+    auto sizeOverloadedToTypes = overloadedToTypes.size();
+
+    SmallString<80> toTypeStr;
+    {
+      llvm::raw_svector_ostream OS(toTypeStr);
+      SmallVector<std::string> temp;
+      if (!overloadedToTypes.empty()) {
+        for (auto &t : overloadedToTypes)
+          temp.emplace_back(StringRef(t.getKey()).str());
+        llvm::sort(temp);
+        llvm::interleaveComma(temp, OS,
+                              [&OS](auto type) { OS << "'" << type << "'"; });
+      }
+    }
+
+    std::optional<std::string> toTypesSummary = std::nullopt;
+    if (toTypeStr.size() > 80) {
+      toTypesSummary =
+          std::to_string(sizeOverloadedToTypes) + " different types";
+    }
+
+    auto useToTypeSummary = toTypesSummary.has_value();
+    auto toTypesSummaryS = toTypesSummary.value_or("");
+
+    if (similarFunctionalTypes) {
+      auto useFromTypeSummary = fromTypeSummary.has_value();
+      auto fromTypeSummaryS = fromTypeSummary.value_or("");
+
+      // no exact matches ... and should be in cs diagnostic but with all of the useSummary information
+      if (isa<ConstructorDecl>(primaryDecl))
+        DE.diagnose(srcLoc, diag::ambiguous_function_init, useFromTypeSummary,
+                    fromTypeSummaryS, fromTypeStr, useToTypeSummary,
+                    toTypesSummaryS, toTypeStr);
+      else
+        DE.diagnose(srcLoc, diag::ambiguous_decl_ref_function_types,
+                    diagnosisName, useFromTypeSummary, fromTypeSummaryS,
+                    fromTypeStr, useToTypeSummary, toTypesSummaryS, toTypeStr);
+
+    } else {
+      if (closureAnchor && !functionToType)
+        DE.diagnose(srcLoc, diag::unsupported_closure_arg_to_options,
+                    diagnosisName, resolvedFromType->hasPlaceholder(), resolvedFromType,
+                    useToTypeSummary, toTypesSummaryS, toTypeStr);
+      else if (diagnosisName.isOperator() &&
+               diagnosisName.getBaseName().getIdentifier().str() == "~=") {
+        DE.diagnose(srcLoc, diag::cannot_match_expr_pattern_with_options,
+                    resolvedFromType, useToTypeSummary, toTypesSummaryS, toTypeStr);
+      } else if (isa<ConstructorDecl>(primaryDecl))
+        DE.diagnose(srcLoc, diag::ambiguous_init, resolvedFromType, useToTypeSummary,
+                    toTypesSummaryS, toTypeStr);
+      else
+        DE.diagnose(srcLoc, diag::ambiguous_decl_ref_types, diagnosisName,
+                    resolvedFromType, useToTypeSummary, toTypesSummaryS, toTypeStr);
+    }
+    for (auto &entry : commonDiagnostics) {
+      auto overload =
+          entry.getOverloadChoice(entry.getLocator())->choice.getDecl();
+      if (!matchedDecls.contains(overload))
+        continue;
+
+      auto parameters = overload->getParameterList();
+      unsigned paramIdx =
+          getFunctionArgApplyInfo(entry.getLocator())
+              ->getParamPosition();
+      if (closureAnchor && !entry.getToType()->is<AnyFunctionType>()) {
+        // TODO: make this take the parameter position
+        DE.diagnose(overload, diag::candidate_has_invalid_closure_at_position,
+                    entry.resolveType(entry.getToType()));
+      } else
+        DE.diagnose(overload, diag::candidate_has_invalid_argument_at_position,
+                    entry.resolveType(entry.getToType()), paramIdx,
+                    !parameters
+                        ? false
+                        : (parameters->size() == 0
+                               ? false
+                               : parameters->get(paramIdx - 1)->isInOut()),
+                    entry.resolveType(entry.getFromType()));
+      matchedDecls.remove(overload);
+    }
+    return true;
+  }
   return false;
 }
 

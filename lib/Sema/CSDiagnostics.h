@@ -57,6 +57,11 @@ public:
 
   virtual ~FailureDiagnostic();
 
+  template <typename Diagnostic>
+  const Diagnostic *castTo() const {
+   return static_cast<const Diagnostic *>(this);
+  }
+
   virtual SourceLoc getLoc() const { return constraints::getLoc(getAnchor()); }
 
   virtual SourceRange getSourceRange() const {
@@ -689,6 +694,8 @@ public:
 
   bool diagnoseAsNote() override;
 
+  bool diagnoseForAmbiguity(MutableArrayRef<ContextualFailure> commonDiagnostics);
+
   /// If the type of a key path literal is read-only due to setter
   /// availability restrictions but the context requires a writable
   /// key path, let's produce a tailed availability diagnostic that
@@ -837,6 +844,8 @@ public:
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
 
+  //bool diagnoseForAmbiguity(MutableArrayRef<FailureDiagnostic> commonDiagnostics) override;
+
 private:
   /// Emit tailored diagnostics for no-escape/non-sendable parameter
   /// conversions e.g. passing such parameter as an @escaping or @Sendable
@@ -967,6 +976,9 @@ public:
   }
 
   bool diagnoseAsError() override;
+
+  //bool diagnoseForAmbiguity(
+  //    MutableArrayRef<FailureDiagnostic> commonDiagnostics) override;
 };
 
 /// Diagnose failures related to conversion between the thrown error type
@@ -985,6 +997,9 @@ public:
   }
 
   bool diagnoseAsError() override;
+
+ // bool diagnoseForAmbiguity(
+ //     MutableArrayRef<FailureDiagnostic> commonDiagnostics) override;
 };
 
 /// Diagnose failures related to conversion between 'async' function type
@@ -1118,6 +1133,9 @@ public:
   }
 
   bool diagnoseAsError() override;
+
+  //bool diagnoseForAmbiguity(
+  //    MutableArrayRef<FailureDiagnostic> commonDiagnostics) override;
 };
 
 /// Diagnose invalid pointer conversions for an autoclosure result type.
@@ -1454,6 +1472,7 @@ public:
   bool diagnoseAsError() override;
 };
 
+// This one should likely have a diagnoseForAmbiguity ... so perhaps not just ContextualFailures
 class InvalidInitRefFailure : public FailureDiagnostic {
 protected:
   Type BaseType;
@@ -1540,6 +1559,7 @@ public:
   bool diagnoseAsError() override;
 };
 
+//This really likely needs ambiguity
 class MissingArgumentsFailure final : public FailureDiagnostic {
   SmallVector<SynthesizedArg, 4> SynthesizedArgs;
 
@@ -1559,6 +1579,8 @@ public:
   bool diagnoseAsError() override;
 
   bool diagnoseAsNote() override;
+
+  //bool diagnoseForAmbiguity(MutableArrayRef<FailureDiagnostic> commonDiagnostics) override;
 
   bool diagnoseSingleMissingArgument() const;
 
@@ -2311,6 +2333,7 @@ public:
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
+  bool diagnoseForAmbiguity(MutableArrayRef<ArgumentMismatchFailure> commonDiagnostics);
 
   /// If both argument and parameter are represented by `ArchetypeType`
   /// produce a special diagnostic in case their names match.
@@ -2434,6 +2457,12 @@ protected:
   /// \returns The flags of a parameter at a given index.
   ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
     return Info.getParameterFlagsAtIndex(idx);
+  }
+
+  //poke through the protected blocks
+  std::optional<SelectedOverload>
+  getOverloadChoice(ConstraintLocator *locator) const {
+    return this->getCalleeOverloadChoiceIfAvailable(locator);
   }
 };
 
