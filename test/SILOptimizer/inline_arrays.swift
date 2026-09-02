@@ -46,6 +46,19 @@ public final class C {
   }
 }
 
+// rdar://172132851 (Getting a MutableSpan from an InlineArray causes a heap allocation that isn't really used)
+// CHECK-LABEL: sil @$s4test0A11MutableSpanySis11InlineArrayVy$511_SiGzF
+// CHECK-NOT:     alloc{{.*}}InlineArray
+// CHECK-LABEL: } // end sil function '$s4test0A11MutableSpanySis11InlineArrayVy$511_SiGzF'
+public func testMutableSpan(_ value: inout [512 of Int]) -> Int {
+    var sum = 0
+    let span = value.mutableSpan
+    for i in span.indices {
+        sum &+= span[i]
+    }
+    return sum
+}
+
 public struct S {
   let a: InlineArray<7000, UInt8>
 
