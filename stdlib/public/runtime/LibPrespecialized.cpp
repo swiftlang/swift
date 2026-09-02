@@ -373,6 +373,8 @@ struct LibPrespecializedState {
     LOG("  functionMetadataMap=%p", data->getFunctionMetadataMap());
     LOG("  tupleMetadataMap=%p", data->getTupleMetadataMap());
     LOG("  foreignMetadataMap=%p", data->getForeignMetadataMap());
+    LOG("  objcClassWrapperMetadataMap=%p",
+        data->getObjCClassWrapperMetadataMap());
 
     return data;
   }
@@ -767,6 +769,34 @@ ForeignTypeMetadata *swift::getLibPrespecializedForeignTypeMetadata(
   LOG("Found foreign metadata %p for '%.*s'.", result, (int)identity.size(),
       identity.data());
   return result;
+}
+
+const Metadata *swift::getLibPrespecializedObjCClassWrapperMetadata(
+    const ClassMetadata *theClass) {
+#if DYLD_FIND_POINTER_HASH_TABLE_ENTRY_DEFINED
+  auto &state = LibPrespecialized.get();
+
+  auto *data = state.data;
+  if (!data)
+    return nullptr;
+
+  if (!state.enabled())
+    return nullptr;
+
+  auto *map = data->getObjCClassWrapperMetadataMap();
+  if (!map)
+    return nullptr;
+
+  if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_find_pointer_hash_table_entry)) {
+    // The key is just the ObjC class, so we never pass anything for arguments.
+    auto value = SWIFT_RUNTIME_WEAK_USE(_dyld_find_pointer_hash_table_entry(
+        map, theClass, /*argumentCount=*/0, /*arguments=*/nullptr));
+    LOG("ObjC class wrapper lookup (class=%p) -> %p.", (const void *)theClass,
+        value);
+    return reinterpret_cast<const Metadata *>(value);
+  }
+#endif
+  return nullptr;
 }
 
 std::pair<LibPrespecializedLookupResult, const TypeContextDescriptor *>

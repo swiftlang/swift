@@ -63,11 +63,16 @@ struct LibPrespecializedData {
   /// single metadata per key.
   TargetPointer<Runtime, const void> foreignMetadataMap;
 
+  /// Objective-C class wrapper metadata map. Keys are the Objective-C class
+  /// object. Values are the wrapper metadata that stands in for it as a Swift
+  /// type. The class fully determines the wrapper, so a key has one value.
+  TargetPointer<Runtime, const void> objcClassWrapperMetadataMap;
+
   // Existing fields are above, add new fields below this point.
 
   // The major/minor version numbers for this version of the struct.
   static constexpr uint32_t currentMajorVersion = 1;
-  static constexpr uint32_t currentMinorVersion = 7;
+  static constexpr uint32_t currentMinorVersion = 9;
 
   // Version numbers where various fields were introduced.
   static constexpr uint32_t minorVersionWithDisabledProcessesTable = 2;
@@ -78,6 +83,7 @@ struct LibPrespecializedData {
   static constexpr uint32_t minorVersionWithFunctionMetadataMap = 6;
   static constexpr uint32_t minorVersionWithTupleMetadataMap = 7;
   static constexpr uint32_t minorVersionWithForeignMetadataMap = 8;
+  static constexpr uint32_t minorVersionWithObjCClassWrapperMetadataMap = 9;
 
   // Option flags values.
   enum : typename Runtime::StoredSize {
@@ -160,6 +166,12 @@ struct LibPrespecializedData {
       return nullptr;
     return reinterpret_cast<const ForeignMetadataMap *>(foreignMetadataMap);
   }
+
+  const void *getObjCClassWrapperMetadataMap() const {
+    if (minorVersion < minorVersionWithObjCClassWrapperMetadataMap)
+      return nullptr;
+    return objcClassWrapperMetadataMap;
+  }
 };
 
 /// The value of an entry in a prespecialized metadata table whose key does not
@@ -221,6 +233,11 @@ getLibPrespecializedTupleTypeMetadata(const Metadata *const *elements,
 /// type descriptor, or nullptr if the library has none.
 ForeignTypeMetadata *
 getLibPrespecializedForeignTypeMetadata(const TypeContextDescriptor *description);
+
+/// Look up the prespecialized wrapper metadata for a pure Objective-C class,
+/// or nullptr if the library has none.
+const Metadata *
+getLibPrespecializedObjCClassWrapperMetadata(const ClassMetadata *theClass);
 
 std::pair<LibPrespecializedLookupResult, const TypeContextDescriptor *>
 getLibPrespecializedTypeDescriptor(Demangle::NodePointer node);
