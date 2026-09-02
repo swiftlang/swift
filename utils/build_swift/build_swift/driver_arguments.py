@@ -1399,8 +1399,12 @@ def create_argument_parser():
     option('--skip-build-android', toggle_false('build_android'),
            help='skip building Swift stdlibs for Android')
 
-    option('--skip-build-benchmarks', toggle_false('build_benchmarks'),
-           help='skip building Swift Benchmark Suite')
+    option('--build-benchmarks', toggle_true('build_benchmarks'), default=False,
+           help='build Swift Benchmark Suite')
+
+    option('--skip-build-benchmarks', toggle_true('skip_build_benchmarks'),
+           help='[no-op] building the Swift Benchmark Suite is skipped by '
+                'default; pass --build-benchmarks to opt in')
 
     option('--build-external-benchmarks', toggle_true,
            help='skip building Swift Benchmark Suite')
