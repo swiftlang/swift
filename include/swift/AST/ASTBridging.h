@@ -3177,6 +3177,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinFloat() const;
   BRIDGED_INLINE bool isBuiltinVector() const;
   BRIDGED_INLINE bool isBuiltinFixedArray() const;
+  BRIDGED_INLINE bool isBuiltinBridgeObject() const;
   BRIDGED_INLINE bool isBox() const;
   BRIDGED_INLINE bool isPack() const;
   BRIDGED_INLINE bool isSILPack() const;

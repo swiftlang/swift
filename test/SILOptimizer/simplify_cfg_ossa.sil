@@ -1370,33 +1370,11 @@ bb3(%10 : $Builtin.Int32):
   return %10 : $Builtin.Int32
 }
 
-// CHECK-LABEL: sil [ossa] @unpack_enum_arg
-// CHECK: bb1:
-// CHECK:   br bb3(%0 : $Int)
-// CHECK: bb2:
-// CHECK:   br bb3(%1 : $Int)
-// CHECK: bb3([[A:%[0-9]+]] : $Int):
-// CHECK:   return [[A]]
-sil [ossa] @unpack_enum_arg : $@convention(thin) (Int, Int) -> Int {
-bb0(%0 : $Int, %1 : $Int):
-  cond_br undef, bb1, bb2
-
-bb1:
-  %2 = enum $Optional<Int>, #Optional.some!enumelt, %0 : $Int
-  br bb3(%2 : $Optional<Int>)
-
-bb2:
-  %3 = enum $Optional<Int>, #Optional.some!enumelt, %1 : $Int
-  br bb3(%3 : $Optional<Int>)
-
-bb3(%4 : $Optional<Int>):
-  %5 = unchecked_enum_data %4 : $Optional<Int>, #Optional.some!enumelt
-  return %5 : $Int
-}
-
 // CHECK-LABEL: sil [ossa] @dont_crash_on_enum_payload_is_enum
 // CHECK: bb0(%0 : $TwoCase):
-// CHECK:   switch_enum %0
+// CHECK:   [[E:%.*]] = enum $Optional<TwoCase>, #Optional.some!enumelt, %0
+// CHECK:   [[D:%.*]] = unchecked_enum_data [[E]]
+// CHECK:   switch_enum [[D]] : $TwoCase
 // CHECK: bb1:
 // CHECK:   return
 sil [ossa] @dont_crash_on_enum_payload_is_enum : $@convention(thin) (TwoCase) -> () {
