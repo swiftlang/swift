@@ -5,6 +5,8 @@
 
 // REQUIRES: OS=macosx
 
+// REQUIRES: rdar185826684
+
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
