@@ -174,6 +174,28 @@ struct StructThenClass {
   }
 }
 
+// An addressable-for-dependencies field, whose `span` takes `self` indirectly.
+// SILGen projects the field's address directly rather than materializing a
+// temporary copy, so the dependence is on storage the instance owns and roots
+// at `self`.
+final class AddressableLetField {
+  let inline: InlineArray<10, Int>
+
+  init(inline: InlineArray<10, Int>) { self.inline = inline }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s4test19AddressableLetFieldC7getDatas4SpanVySiGyF : $@convention(method) (@guaranteed AddressableLetField) -> @lifetime(borrow 0) @owned Span<Int> {
+  // CHECK: bb0(%0 : @guaranteed $AddressableLetField):
+  // CHECK-NOT: alloc_stack
+  // CHECK: [[ADDR:%.*]] = ref_element_addr %0, #AddressableLetField.inline
+  // CHECK: [[SPAN:%.*]] = apply %{{.*}}([[ADDR]]) : $@convention(method) <let τ_0_0 : Int, τ_0_1 where τ_0_1 : ~Copyable> (@in_guaranteed InlineArray<τ_0_0, τ_0_1>) -> @lifetime(borrow address_for_deps 0) @owned Span<τ_0_1>
+  // CHECK: mark_dependence [unresolved] [[SPAN]] on [[ADDR]]
+  // CHECK-LABEL: } // end sil function '$s4test19AddressableLetFieldC7getDatas4SpanVySiGyF'
+  @_lifetime(borrow self)
+  func getData() -> Span<Int> {
+    return inline.span
+  }
+}
+
 // MARK: - Rejected
 
 final class MutableField {
@@ -272,4 +294,56 @@ func returnFromLocal() -> Span<Int> {
   let t = Top() // expected-note {{it depends on the lifetime of variable 't'}}
   return t.b.c.d.span // expected-error {{lifetime-dependent value escapes its scope}}
   // expected-note @-1 {{this use causes the lifetime-dependent value to escape}}
+}
+
+// A `var` addressable-for-dependencies field does not get its address projected
+// directly: a `var` can be reassigned, so its address is only valid within an
+// access scope, which is narrower than the temporary copy SILGen materializes
+// instead. The dependence is therefore on that copy, and cannot be returned.
+final class AddressableVarField {
+  var inline: InlineArray<10, Int>
+
+  init(inline: InlineArray<10, Int>) { self.inline = inline }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s4test19AddressableVarFieldC7getDatas4SpanVySiGyF : $@convention(method) (@guaranteed AddressableVarField) -> @lifetime(borrow 0) @owned Span<Int> {
+  // CHECK: bb0(%0 : @guaranteed $AddressableVarField):
+  // CHECK: [[TMP:%.*]] = alloc_stack $InlineArray<10, Int>
+  // CHECK: [[SPAN:%.*]] = apply %{{.*}}([[TMP]])
+  // CHECK: mark_dependence [unresolved] [[SPAN]] on [[TMP]]
+  // CHECK-LABEL: } // end sil function '$s4test19AddressableVarFieldC7getDatas4SpanVySiGyF'
+  @_lifetime(borrow self)
+  func getData() -> Span<Int> {
+    return inline.span // expected-error {{lifetime-dependent value escapes its scope}}
+    // expected-note @-1 {{it depends on this scoped access to variable 'inline'}}
+    // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
+  }
+}
+
+// Uses within the function are accepted, but only because the span views the
+// copy rather than the field.
+// TODO: This is memory-safe, but silently makes a copy of the InlineArray,
+// which is annoying.
+func localSpanOfVarField(_ c: AddressableVarField) -> Int {
+  let span = c.inline.span
+  return span.count
+}
+
+// A `weak`, `unowned`, or `unowned(unsafe)` link is read through a temporary
+// copy, because the instance might go away.
+// TODO: Again, this is memory-safe because it introduces a copy.
+final class NonStrongLink {
+  unowned(unsafe) let inner: AddressableLetField
+
+  init(inner: AddressableLetField) { self.inner = inner }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test24spanThroughNonStrongLinkySiAA0deF0CF : $@convention(thin) (@guaranteed NonStrongLink) -> Int {
+// CHECK: bb0(%0 : @guaranteed $NonStrongLink):
+// CHECK: [[TMP:%.*]] = alloc_stack $InlineArray<10, Int>
+// CHECK: [[SPAN:%.*]] = apply %{{.*}}([[TMP]])
+// CHECK: mark_dependence [unresolved] [[SPAN]] on [[TMP]]
+// CHECK-LABEL: } // end sil function '$s4test24spanThroughNonStrongLinkySiAA0deF0CF'
+func spanThroughNonStrongLink(_ h: NonStrongLink) -> Int {
+  let span = h.inner.inline.span
+  return span.count
 }
