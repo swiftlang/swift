@@ -143,17 +143,20 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
   if (!I->mayHaveSideEffects())
     return ArrayBoundsEffect::kNone;
 
-  // A store to an alloc_stack can't possibly store to the array size which is
-  // stored in a runtime allocated object sub field of an alloca.
   if (auto *SI = dyn_cast<StoreInst>(I)) {
     if (SI->getOwnershipQualifier() == StoreOwnershipQualifier::Assign) {
       // store [assign] can call a destructor with unintended effects
       return ArrayBoundsEffect::kMayChangeAny;
     }
-    auto Ptr = SI->getDest();
-    return isa<AllocStackInst>(Ptr) || isAddressOfArrayElement(SI->getDest())
-               ? ArrayBoundsEffect::kNone
-               : ArrayBoundsEffect::kMayChangeAny;
+    auto dest = SI->getDest();
+    if (isa<AllocStackInst>(dest) &&
+        !dest->getType().isTrivial(*dest->getFunction())) {
+      // A store to a non-trivial alloc_stack holding an Array can replace it
+      // with a smaller array
+      return ArrayBoundsEffect::kMayChangeAny;
+    }
+    return isAddressOfArrayElement(dest) ? ArrayBoundsEffect::kNone
+                                         : ArrayBoundsEffect::kMayChangeAny;
   }
 
   if (isa<LoadInst>(I))

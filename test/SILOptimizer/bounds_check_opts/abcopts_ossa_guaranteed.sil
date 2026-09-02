@@ -1631,3 +1631,199 @@ bb6(%33 : $Builtin.Int32):
   %34 = struct $Int32 (%33)
   return %34
 }
+
+sil [ossa] [_semantics "array.props.isNativeTypeChecked"] @isNativeTypeChecked : $@convention(method) (@guaranteed Array<Int>) -> Bool
+
+sil [ossa] [_semantics "array.check_subscript"] @checkSubscript : $@convention(method) (Int, Bool, @guaranteed Array<Int>) -> _DependenceToken
+
+sil [ossa] [_semantics "array.get_element"] @getElement : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Int>) -> Int
+
+sil @escape : $@convention(thin) (@inout Array<Int>) -> ()
+
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_check_across_wholearray_store_to_alloc_stack :
+// CHECK: [[CHECK:%[0-9]+]] = function_ref @checkSubscript
+// The subscript check must not be hoisted into the preheader.
+// CHECK-NOT: apply [[CHECK]]
+// Loop header.
+// CHECK: bb3({{.*}}):
+// The check stays in the loop, applied to the array reloaded there.
+// CHECK: [[ARR:%[0-9]+]] = load_borrow %{{[0-9]+}} : $*Array<Int>
+// CHECK: apply [[CHECK]]({{.*}}, [[ARR]])
+// CHECK: store %{{[0-9]+}} to [init] %{{[0-9]+}} : $*Array<Int>
+// CHECK-LABEL: } // end sil function 'dont_hoist_check_across_wholearray_store_to_alloc_stack'
+sil [ossa] @dont_hoist_check_across_wholearray_store_to_alloc_stack : $@convention(thin) (@guaranteed Array<Int>, @guaranteed Array<Int>, Int, Int) -> Int {
+bb0(%0 : @guaranteed $Array<Int>, %1 : @guaranteed $Array<Int>, %2 : $Int, %3 : $Int):
+  %8 = alloc_stack [var_decl] $Array<Int>
+  %9 = copy_value %0 : $Array<Int>
+  store %9 to [init] %8 : $*Array<Int>
+  %11 = integer_literal $Builtin.Int64, 0
+  %13 = struct_extract %3 : $Int, #Int._value
+  %14 = builtin "cmp_slt_Int64"(%13 : $Builtin.Int64, %11 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %14 : $Builtin.Int1, "Range requires lowerBound <= upperBound"
+  %19 = struct $Int (%11 : $Builtin.Int64)
+  %20 = builtin "cmp_eq_Int64"(%13 : $Builtin.Int64, %11 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %20, bb2, bb1
+
+bb1:
+  %22 = integer_literal $Builtin.Int64, 1
+  %23 = integer_literal $Builtin.Int1, -1
+  %24 = function_ref @isNativeTypeChecked : $@convention(method) (@guaranteed Array<Int>) -> Bool
+  %25 = function_ref @checkSubscript : $@convention(method) (Int, Bool, @guaranteed Array<Int>) -> _DependenceToken
+  %26 = function_ref @getElement : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Int>) -> Int
+  %27 = integer_literal $Builtin.Int1, 0
+  %30 = function_ref @getCount2 : $@convention(method) (@guaranteed Array<Int>) -> Int32
+  br bb3(%11 : $Builtin.Int64, %11 : $Builtin.Int64)
+
+bb2:
+  br bb6(%19 : $Int)
+
+bb3(%33 : $Builtin.Int64, %34 : $Builtin.Int64):
+  %35 = builtin "cmp_slt_Int64"(%34 : $Builtin.Int64, %11 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %35 : $Builtin.Int1, "Index out of bounds"
+  %37 = builtin "cmp_sge_Int64"(%34 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %37 : $Builtin.Int1, "Index out of bounds"
+  %39 = builtin "sadd_with_overflow_Int64"(%34 : $Builtin.Int64, %22 : $Builtin.Int64, %23 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %40 = tuple_extract %39 : $(Builtin.Int64, Builtin.Int1), 0
+  %41 = tuple_extract %39 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %41 : $Builtin.Int1, "arithmetic overflow"
+  %44 = load_borrow %8 : $*Array<Int>
+  %45 = apply %24(%44) : $@convention(method) (@guaranteed Array<Int>) -> Bool
+  %46 = apply %25(%2, %45, %44) : $@convention(method) (Int, Bool, @guaranteed Array<Int>) -> _DependenceToken
+  %47 = apply %26(%2, %45, %46, %44) : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Int>) -> Int
+  %48 = struct_extract %47 : $Int, #Int._value
+  end_borrow %44 : $Array<Int>
+  %50 = builtin "sadd_with_overflow_Int64"(%33 : $Builtin.Int64, %48 : $Builtin.Int64, %27 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %51 = tuple_extract %50 : $(Builtin.Int64, Builtin.Int1), 0
+  %53 = load [take] %8 : $*Array<Int>
+  %55 = copy_value %1 : $Array<Int>
+  store %55 to [init] %8 : $*Array<Int>
+  %57 = apply %30(%53) : $@convention(method) (@guaranteed Array<Int>) -> Int32
+  destroy_value %53 : $Array<Int>
+  %58 = struct_extract %57 : $Int32, #Int32._value
+  %59 = builtin "zextOrBitCast_Int32_Int64"(%58 : $Builtin.Int32) : $Builtin.Int64
+  %60 = builtin "sadd_with_overflow_Int64"(%51 : $Builtin.Int64, %59 : $Builtin.Int64, %27 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %61 = tuple_extract %60 : $(Builtin.Int64, Builtin.Int1), 0
+  %63 = struct $Int (%61 : $Builtin.Int64)
+  %64 = builtin "cmp_eq_Int64"(%40 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %64, bb5, bb4
+
+bb4:
+  br bb3(%61 : $Builtin.Int64, %40 : $Builtin.Int64)
+
+bb5:
+  br bb6(%63 : $Int)
+
+bb6(%68 : $Int):
+  %69 = function_ref @escape : $@convention(thin) (@inout Array<Int>) -> ()
+  %70 = apply %69(%8) : $@convention(thin) (@inout Array<Int>) -> ()
+  %71 = load [take] %8 : $*Array<Int>
+  destroy_value %71 : $Array<Int>
+  dealloc_stack %8 : $*Array<Int>
+  return %68 : $Int
+}
+
+// 2-D variant of the reproducer above (see 2dbug.swift): the array being
+// bounds-checked is itself an *element* of an outer array, and the whole
+// inner array is reassigned inside the loop via a store to the element
+// address (`matrix[0] = small`).  The destination of that store is an array
+// element address, so `isAddressOfArrayElement(dest)` is true and
+// `mayChangeArraySize` returns kNone -- symmetric to the alloc_stack kNone
+// case above.  Replacing `matrix[0]` with a smaller array changes the size of
+// the array whose check_subscript we would otherwise hoist, so the check must
+// stay in the loop.
+
+struct UnsafeMutablePointerArrayInt {
+  var _rawValue : Builtin.RawPointer
+}
+
+sil [ossa] [_semantics "array.get_element_address"] @getElementAddrOuter : $@convention(method) (Int, @guaranteed Array<Array<Int>>) -> UnsafeMutablePointerArrayInt
+
+sil @escapeOuter : $@convention(thin) (@inout Array<Array<Int>>) -> ()
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_check_across_wholearray_store_to_array_element :
+// CHECK: [[CHECK:%[0-9]+]] = function_ref @checkSubscript
+// The subscript check must not be hoisted into the preheader.
+// CHECK-NOT: apply [[CHECK]]
+// Loop header.
+// CHECK: bb3({{.*}}):
+// The check stays in the loop, applied to the inner array reloaded there.
+// CHECK: [[ARR:%[0-9]+]] = load_borrow %{{[0-9]+}} : $*Array<Int>
+// CHECK: apply [[CHECK]]({{.*}}, [[ARR]])
+// The whole-array store to the outer array element.
+// CHECK: store %{{[0-9]+}} to [init] %{{[0-9]+}} : $*Array<Int>
+// CHECK-LABEL: } // end sil function 'dont_hoist_check_across_wholearray_store_to_array_element'
+sil [ossa] @dont_hoist_check_across_wholearray_store_to_array_element : $@convention(thin) (@guaranteed Array<Array<Int>>, @guaranteed Array<Int>, Int, Int) -> Int {
+bb0(%0 : @guaranteed $Array<Array<Int>>, %1 : @guaranteed $Array<Int>, %2 : $Int, %3 : $Int):
+  %8 = alloc_stack [var_decl] $Array<Array<Int>>
+  %9 = copy_value %0 : $Array<Array<Int>>
+  store %9 to [init] %8 : $*Array<Array<Int>>
+  %11 = integer_literal $Builtin.Int64, 0
+  %12 = struct $Int (%11 : $Builtin.Int64)
+  %13 = struct_extract %3 : $Int, #Int._value
+  %14 = builtin "cmp_slt_Int64"(%13 : $Builtin.Int64, %11 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %14 : $Builtin.Int1, "Range requires lowerBound <= upperBound"
+  %19 = struct $Int (%11 : $Builtin.Int64)
+  %20 = builtin "cmp_eq_Int64"(%13 : $Builtin.Int64, %11 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %20, bb2, bb1
+
+bb1:
+  %22 = integer_literal $Builtin.Int64, 1
+  %23 = integer_literal $Builtin.Int1, -1
+  %24 = function_ref @isNativeTypeChecked : $@convention(method) (@guaranteed Array<Int>) -> Bool
+  %25 = function_ref @checkSubscript : $@convention(method) (Int, Bool, @guaranteed Array<Int>) -> _DependenceToken
+  %26 = function_ref @getElement : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Int>) -> Int
+  %27 = integer_literal $Builtin.Int1, 0
+  %28 = function_ref @getElementAddrOuter : $@convention(method) (Int, @guaranteed Array<Array<Int>>) -> UnsafeMutablePointerArrayInt
+  br bb3(%11 : $Builtin.Int64, %11 : $Builtin.Int64)
+
+bb2:
+  br bb6(%19 : $Int)
+
+bb3(%33 : $Builtin.Int64, %34 : $Builtin.Int64):
+  %35 = builtin "cmp_slt_Int64"(%34 : $Builtin.Int64, %11 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %35 : $Builtin.Int1, "Index out of bounds"
+  %37 = builtin "cmp_sge_Int64"(%34 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %37 : $Builtin.Int1, "Index out of bounds"
+  %39 = builtin "sadd_with_overflow_Int64"(%34 : $Builtin.Int64, %22 : $Builtin.Int64, %23 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %40 = tuple_extract %39 : $(Builtin.Int64, Builtin.Int1), 0
+  %41 = tuple_extract %39 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %41 : $Builtin.Int1, "arithmetic overflow"
+  // Address of the inner array `matrix[0]` (element 0 of the outer array).
+  %43 = load_borrow %8 : $*Array<Array<Int>>
+  %44 = apply %28(%12, %43) : $@convention(method) (Int, @guaranteed Array<Array<Int>>) -> UnsafeMutablePointerArrayInt
+  %45 = struct_extract %44 : $UnsafeMutablePointerArrayInt, #UnsafeMutablePointerArrayInt._rawValue
+  %46 = pointer_to_address %45 : $Builtin.RawPointer to [strict] $*Array<Int>
+  // check_subscript on the inner array matrix[0] at index %2.
+  %47 = load_borrow %46 : $*Array<Int>
+  %48 = apply %24(%47) : $@convention(method) (@guaranteed Array<Int>) -> Bool
+  %49 = apply %25(%2, %48, %47) : $@convention(method) (Int, Bool, @guaranteed Array<Int>) -> _DependenceToken
+  %50 = apply %26(%2, %48, %49, %47) : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Int>) -> Int
+  %51 = struct_extract %50 : $Int, #Int._value
+  end_borrow %47 : $Array<Int>
+  // Whole-array store: matrix[0] = small.
+  %53 = load [take] %46 : $*Array<Int>
+  %54 = copy_value %1 : $Array<Int>
+  store %54 to [init] %46 : $*Array<Int>
+  destroy_value %53 : $Array<Int>
+  end_borrow %43 : $Array<Array<Int>>
+  %57 = builtin "sadd_with_overflow_Int64"(%33 : $Builtin.Int64, %51 : $Builtin.Int64, %27 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %58 = tuple_extract %57 : $(Builtin.Int64, Builtin.Int1), 0
+  %59 = struct $Int (%58 : $Builtin.Int64)
+  %60 = builtin "cmp_eq_Int64"(%40 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %60, bb5, bb4
+
+bb4:
+  br bb3(%58 : $Builtin.Int64, %40 : $Builtin.Int64)
+
+bb5:
+  br bb6(%59 : $Int)
+
+bb6(%64 : $Int):
+  %65 = function_ref @escapeOuter : $@convention(thin) (@inout Array<Array<Int>>) -> ()
+  %66 = apply %65(%8) : $@convention(thin) (@inout Array<Array<Int>>) -> ()
+  %67 = load [take] %8 : $*Array<Array<Int>>
+  destroy_value %67 : $Array<Array<Int>>
+  dealloc_stack %8 : $*Array<Array<Int>>
+  return %64 : $Int
+}
