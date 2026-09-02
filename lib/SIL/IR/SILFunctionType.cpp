@@ -1786,19 +1786,19 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
     return true;
   }
 
-  // Pass C++ const reference types indirectly. Right now there's no way to
-  // express immutable borrowed params, so we have to have this hack.
+  // Every C++ reference kind but a mutable lvalue reference is imported as the
+  // pointee and passed indirectly. Right now there's no way to express
+  // immutable borrowed params, so we have to have this hack.
   // Eventually, we should just express these correctly: rdar://89647503
-  // If this is a const reference to a foreign reference type (const FRT&), this
-  // is equivalent to a pointer to the foreign reference type, which are passed
-  // directly.
-  if (importer::isCxxConstReferenceType(clangTy) &&
-      !(clangTy->getPointeeType()->getAs<clang::RecordType>() &&
-        substTy->isForeignReferenceType()))
-    return true;
-
-  if (clangTy->isRValueReferenceType())
-    return true;
+  // A reference to a foreign reference type is equivalent to a pointer to it,
+  // which is passed directly.
+  if (auto ref = importer::classifyCxxReferenceParameter(
+          clang::QualType(clangTy, 0))) {
+    if (ref->kind == importer::CxxReferenceParameterKind::Mutating)
+      return false;
+    return !(clangTy->getPointeeType()->getAs<clang::RecordType>() &&
+             substTy->isForeignReferenceType());
+  }
 
   return false;
 }
@@ -3917,10 +3917,17 @@ static bool isCFTypedef(const TypeLowering &tl, clang::QualType type) {
 static ParameterConvention getIndirectCParameterConvention(clang::QualType type) {
   // Non-trivial C++ types would be Indirect_Inout (at least in Itanium).
   // A trivial const * parameter in C should be considered @in.
-  if (importer::isCxxConstReferenceType(type.getTypePtr()))
-    return ParameterConvention::Indirect_In_Guaranteed;
-  if (type->isRValueReferenceType())
-    return ParameterConvention::Indirect_In_CXX;
+  if (auto ref = importer::classifyCxxReferenceParameter(type)) {
+    switch (ref->kind) {
+    case importer::CxxReferenceParameterKind::Borrowed:
+      return ParameterConvention::Indirect_In_Guaranteed;
+    case importer::CxxReferenceParameterKind::Consuming:
+      return ParameterConvention::Indirect_In_CXX;
+    case importer::CxxReferenceParameterKind::Mutating:
+      // Imported as a pointer or as `inout`; fall through to the record cases.
+      break;
+    }
+  }
   if (auto *decl = type->getAsRecordDecl()) {
     if (!decl->isParamDestroyedInCallee())
       return ParameterConvention::Indirect_In_CXX;
