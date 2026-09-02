@@ -531,7 +531,7 @@ extension __CocoaSet.Index {
   internal var age: Int32 {
     @_effects(releasenone)
     get {
-      return unsafe _HashTable.age(for: storage.base.object)
+      return _HashTable.age(for: storage.base.object)
     }
   }
 }
