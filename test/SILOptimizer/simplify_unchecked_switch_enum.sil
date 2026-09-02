@@ -179,37 +179,49 @@ bb2(%4 : @owned $E):
 
 // CHECK-LABEL: sil [ossa] @forward_borrow_to_owned :
 // CHECK:       bb0(%0 : @owned $E):
-// CHECK-NEXT:    switch_enum %0 : $E, case #E.B!enumelt: bb1, case #E.C!enumelt: bb2, case #E.A!enumelt: bb3
-// CHECK:       bb1([[PAYLOAD:%.*]] : @owned $String):
+// CHECK-NEXT:    %1 = begin_borrow %0
+// CHECK:       bb1:
+// CHECK-NEXT:    %3 = begin_borrow %0
+// CHECK-NEXT:    end_borrow %3
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    switch_enum %0 : $E, case #E.B!enumelt: bb2, case #E.C!enumelt: bb3, case #E.A!enumelt: bb4
+// CHECK:       bb2([[PAYLOAD:%.*]] : @owned $String):
 // CHECK-NEXT:    destroy_value [[PAYLOAD]]
-// CHECK-NEXT:    br bb4
-// CHECK:       bb2({{%[0-9]+}} : $Int):
-// CHECK-NEXT:    br bb4
-// CHECK:       bb3:
-// CHECK-NEXT:    br bb4
+// CHECK-NEXT:    br bb5
+// CHECK:       bb3({{%[0-9]+}} : $Int):
+// CHECK-NEXT:    br bb5
+// CHECK:       bb4:
+// CHECK-NEXT:    br bb5
 // CHECK:       } // end sil function 'forward_borrow_to_owned'
 sil [ossa] @forward_borrow_to_owned : $@convention(thin) (@owned E) -> () {
 bb0(%0 : @owned $E):
-  %1 = begin_borrow %0 : $E
-  switch_enum %1 : $E, case #E.B!enumelt: bb1, case #E.C!enumelt: bb2, case #E.A!enumelt: bb3
+  %1 = begin_borrow %0  // unrelated, non-overlapping borrow scope, spanning over 2 blocks
+  br bb1
 
-bb1(%3 : @guaranteed $String):
-  end_borrow %1 : $E
-  %5 = unchecked_enum_data %0 : $E, #E.B!enumelt
-  destroy_value %5 : $String
-  br bb4
+bb1:
+  %3 = begin_borrow %0
+  %4 = begin_borrow %0  // unrelated, non-overlapping borrow scope in a single block
+  end_borrow %4
+  end_borrow %1
+  switch_enum %3 : $E, case #E.B!enumelt: bb2, case #E.C!enumelt: bb3, case #E.A!enumelt: bb4
 
-bb2(%7 : $Int):
-  end_borrow %1 : $E
+bb2(%5 : @guaranteed $String):
+  end_borrow %3 : $E
+  %6 = unchecked_enum_data %0 : $E, #E.B!enumelt
+  destroy_value %6 : $String
+  br bb5
+
+bb3(%7 : $Int):
+  end_borrow %3 : $E
   destroy_value %0 : $E
-  br bb4
-
-bb3:
-  end_borrow %1 : $E
-  destroy_value %0 : $E
-  br bb4
+  br bb5
 
 bb4:
+  end_borrow %3 : $E
+  destroy_value %0 : $E
+  br bb5
+
+bb5:
   %11 = tuple ()
   return %11 : $()
 }
@@ -631,6 +643,41 @@ bb2:
 bb3:
   %13 = tuple ()
   return %13 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_forward_with_overlapping_borrow_scope :
+// CHECK:         begin_borrow
+// CHECK:         begin_borrow
+// CHECK:         switch_enum %2 : $E
+// CHECK:       } // end sil function 'dont_forward_with_overlapping_borrow_scope'
+sil [ossa] @dont_forward_with_overlapping_borrow_scope : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = begin_borrow %0
+  %2 = begin_borrow %0
+  switch_enum %2, case #E.B!enumelt: bb1, case #E.C!enumelt: bb2, case #E.A!enumelt: bb3
+
+bb1(%3 : @guaranteed $String):
+  end_borrow %2
+  end_borrow %1
+  %5 = unchecked_enum_data %0, #E.B!enumelt
+  destroy_value %5
+  br bb4
+
+bb2(%7 : $Int):
+  end_borrow %2
+  end_borrow %1
+  destroy_value %0
+  br bb4
+
+bb3:
+  end_borrow %2
+  end_borrow %1
+  destroy_value %0
+  br bb4
+
+bb4:
+  %11 = tuple ()
+  return %11
 }
 
 // If the payload argument is unused, the transformation is possible.
