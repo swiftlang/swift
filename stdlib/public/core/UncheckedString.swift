@@ -492,6 +492,40 @@ extension UncheckedString {
   }
 }
 
+// For UInt8, `.small` storage's packed byte tuple needs no unpacking: a
+// `UInt8` has no alignment requirement beyond 1 byte, so the tuple's bytes
+// already *are* a valid `Span<UInt8>` in place. This overrides the generic
+// `withCharacterData` above (which must unpack `.small` storage into a
+// temporary buffer for wider `Element`s, to satisfy their alignment) for
+// this specific, and most common, instantiation.
+@available(SwiftStdlib 9999, *)
+extension UncheckedString where Element == UInt8 {
+  /// Calls the given closure with a buffer of `Element`s,
+  /// which are *not* necessarily NUL-terminated.
+  @inlinable
+  public func withCharacterData<R, Failure>(
+    _ body: (Span<Element>) throws(Failure) -> R
+  ) throws(Failure) -> R {
+    switch storage {
+      case .empty:
+        return try body(Span<Element>())
+      case .small(let data):
+        return try withUnsafeBytes(of: data.bytes) { (rawBuffer) throws(Failure) -> R in
+          let buffer = unsafe rawBuffer.bindMemory(to: UInt8.self)
+          return try body(unsafe UnsafeBufferPointer(
+            start: buffer.baseAddress, count: Int(data.count)
+          ).span)
+        }
+      case .immortal(let data):
+        return try body(unsafe UnsafeBufferPointer(start: data.characters,
+                                            count: Int(data.count)).span)
+      case .dynamic(let data):
+        // Ignore the trailing NUL
+        return try body(data.characters.span.extracting(droppingLast: 1))
+    }
+  }
+}
+
 // MARK: BidirectionalCollection
 
 @available(SwiftStdlib 9999, *)
