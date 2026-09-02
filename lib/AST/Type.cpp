@@ -3446,14 +3446,16 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   if (nominal->hasClangNode() || nominal->isObjC()) {
     switch (language) {
     case ForeignLanguage::C:
+    case ForeignLanguage::Cxx:
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
         switch (classDecl->getForeignClassKind()) {
         case ClassDecl::ForeignKind::Normal:
         case ClassDecl::ForeignKind::RuntimeOnly:
-          // Imported classes cannot be represented in C.
+          // Imported classes cannot be represented in C or C++.
           return failure();
         case ClassDecl::ForeignKind::CFType:
-          // Imported CF types can be represented as trivial pointer types in C.
+          // Imported CF types can be represented as trivial pointer types in C
+          // or C++.
           break;
         }
       }
@@ -3462,8 +3464,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       if (isa<ProtocolDecl>(nominal))
         return failure();
 
-      // @objc enums are not representable in C, @c ones and imported ones
-      // are ok.
+      // @objc enums are not representable in C or C++; @c ones and types
+      // imported from Clang are ok.
       if (!nominal->hasClangNode())
         return failure();
 

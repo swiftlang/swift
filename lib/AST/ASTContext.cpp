@@ -6916,13 +6916,14 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   // Language-specific filtering.
   switch (language) {
   case ForeignLanguage::C:
-    // Ignore _ObjectiveCBridgeable conformances in C.
+  case ForeignLanguage::Cxx:
+    // Ignore _ObjectiveCBridgeable conformances in C and C++.
     if (conformance &&
         conformance->getProtocol()->isSpecificProtocol(
           KnownProtocolKind::ObjectiveCBridgeable))
       return ForeignRepresentationInfo::forNone();
 
-    // Ignore error bridging in C.
+    // Ignore error bridging in C and C++.
     if (entry.getKind() == ForeignRepresentableKind::BridgedError)
       return ForeignRepresentationInfo::forNone();
 

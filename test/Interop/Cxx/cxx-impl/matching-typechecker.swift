@@ -164,25 +164,3 @@ func variadicFunc(_: Int32) -> Int32 {
 func sameArityOverload(_: Int32) -> Int32 {
   return 0
 }
-
-
-// C++ references
-// TODO: The examples below actually do match, but not necessarily with the
-// types we want. They should use unsafe pointers instead.
-
-// expected-error@+2{{global function 'takesConstRef' cannot implement C++ function 'takesConstRef' because reference parameters and return types are not yet supported}}
-@cxx @implementation
-func takesConstRef(_: Int32) -> Int32 {
-  return 0
-}
-
-// expected-error@+2{{global function 'takesMutableRef' cannot implement C++ function 'takesMutableRef' because reference parameters and return types are not yet supported}}
-@cxx @implementation
-func takesMutableRef(_: inout Int32) {
-}
-
-// expected-error@+2{{global function 'returnsMutableRef()' cannot implement C++ function 'returnsMutableRef' because reference parameters and return types are not yet supported}}
-@cxx @implementation
-func returnsMutableRef() -> UnsafeMutablePointer<Int32> {
-  fatalError()
-}

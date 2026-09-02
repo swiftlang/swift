@@ -52,6 +52,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
     LLVM_FALLTHROUGH;
 
   case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyCxxDecl:
   case ObjCReason::ExplicitlyUnderscoreCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
@@ -86,6 +87,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
 unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   switch (reason) {
   case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyCxxDecl:
   case ObjCReason::ExplicitlyUnderscoreCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
@@ -138,6 +140,7 @@ void ObjCReason::describe(const Decl *D) const {
 
   case ObjCReason::ExplicitlyObjCByAccessNote:
   case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyCxxDecl:
   case ObjCReason::ExplicitlyUnderscoreCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
@@ -3377,6 +3380,13 @@ class ObjCImplementationChecker {
                             .getAttribute<ObjCAttr>(/*AllowInvalid=*/true))
       return objc->isInvalid();
 
+    // A failed C++ representability check marks the candidate's CxxDeclAttr
+    // invalid.
+    if (auto cxx =
+            cand->getAttrs().getAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
+      if (cxx->isInvalid())
+        return true;
+
     return getAttr()->hasInvalidImplicitLangAttrs() || getAttr()->isInvalid();
   }
 
@@ -4674,16 +4684,20 @@ evaluate(Evaluator &evaluator, Decl *D) const {
 }
 
 evaluator::SideEffect
-TypeCheckCDeclFunctionRequest::evaluate(Evaluator &evaluator,
+TypeCheckForeignFunctionRequest::evaluate(Evaluator &evaluator,
                                         FuncDecl *FD,
-                                        CDeclAttr *attr) const {
+                                        DeclAttribute *attr) const {
   auto &ctx = FD->getASTContext();
 
   auto lang = FD->getCDeclKind();
-  assert(lang && "missing @c?");
-  auto kind = lang == ForeignLanguage::ObjectiveC
-                      ? ObjCReason::ExplicitlyUnderscoreCDecl
-                      : ObjCReason::ExplicitlyCDecl;
+  assert(lang && "missing @c/@cxx?");
+  ObjCReason::Kind kind;
+  if (*lang == ForeignLanguage::ObjectiveC)
+    kind = ObjCReason::ExplicitlyUnderscoreCDecl;
+  else if (*lang == ForeignLanguage::Cxx)
+    kind = ObjCReason::ExplicitlyCxxDecl;
+  else
+    kind = ObjCReason::ExplicitlyCDecl;
   ObjCReason reason(kind, attr);
 
   std::optional<ForeignAsyncConvention> asyncConvention;
@@ -4698,6 +4712,11 @@ TypeCheckCDeclFunctionRequest::evaluate(Evaluator &evaluator,
       ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_throws,
                          attr);
     }
+
+    // For @cxx, async/throws are hard errors that also invalidate the
+    // attribute so downstream matching diagnostics do not pile on.
+    if (*lang == ForeignLanguage::Cxx && (FD->hasAsync() || FD->hasThrows()))
+      reason.setAttrInvalid();
   } else {
     reason.setAttrInvalid();
   }
