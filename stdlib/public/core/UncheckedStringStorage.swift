@@ -17,13 +17,17 @@ struct UncheckedStringStorageFlags: OptionSet {
   @usableFromInline
   let rawValue: UInt8
 
-  @usableFromInline
+  @inlinable
   init(rawValue: UInt8) {
     self.rawValue = rawValue
   }
+}
 
-  @usableFromInline
-  static let nulTerminated = UncheckedStringStorageFlags(rawValue: 1 << 0)
+extension UncheckedStringStorageFlags {
+  @inlinable
+  static var nulTerminated: UncheckedStringStorageFlags {
+    UncheckedStringStorageFlags(rawValue: 1 << 0)
+  }
 }
 
 // MARK: Storage Types
@@ -67,9 +71,10 @@ struct ImmortalUncheckedStringStorage<CharType: FixedWidthInteger> {
   @usableFromInline
   var flags: UncheckedStringStorageFlags
   @safe
+  @usableFromInline
   var _reserved: (UInt8, UInt8) = (0, 0)
 
-  @usableFromInline
+  @inlinable
   init(
     characters: UnsafePointer<CharType>,
     count: UInt32,
@@ -102,9 +107,10 @@ struct DynamicUncheckedStringStorage<CharType: FixedWidthInteger> {
   var count: UInt32
   @usableFromInline
   var flags: UncheckedStringStorageFlags
+  @usableFromInline
   var _reserved2: (UInt8, UInt8) = (0, 0)
 
-  @usableFromInline
+  @inlinable
   init(
     characters: [CharType],
     count: UInt32,
@@ -149,7 +155,7 @@ struct ImmortalUncheckedStringStorage<CharType: FixedWidthInteger> {
   @usableFromInline
   var flags: UncheckedStringStorageFlags
 
-  @usableFromInline
+  @inlinable
   init(
     characters: UnsafePointer<CharType>,
     count: UInt16,
@@ -168,6 +174,7 @@ struct DynamicUncheckedStringStorage<CharType: FixedWidthInteger> {
   var characters: [CharType]
   @usableFromInline
   var flags: UncheckedStringStorageFlags
+  @usableFromInline
   var _reserved: (UInt8, UInt8) = (0, 0)
 
   /// 32-bit `DynamicUncheckedStringStorage` has no spare byte to cache
@@ -175,10 +182,10 @@ struct DynamicUncheckedStringStorage<CharType: FixedWidthInteger> {
   /// as before. `init(count:)` still accepts the count for call-site
   /// symmetry with the 64-bit initializer, but only uses it to sanity-check
   /// the caller's arithmetic in debug builds.
-  @usableFromInline
+  @inlinable
   var count: Int { characters.count - 1 }
 
-  @usableFromInline
+  @inlinable
   init(
     characters: [CharType],
     count: UInt32,
@@ -201,7 +208,7 @@ struct DynamicUncheckedStringStorage<CharType: FixedWidthInteger> {
 #endif
 
 extension SmallUncheckedStringStorage {
-  @usableFromInline
+  @inlinable
   init<C: Collection>(_ collection: C) where C.Element == CharType {
     precondition(collection.count <= Self.capacity)
     count = UInt8(collection.count)
@@ -219,7 +226,7 @@ extension SmallUncheckedStringStorage {
     }
   }
 
-  @usableFromInline
+  @inlinable
   static var capacity: Int {
     return MemoryLayout<Bytes>.size / MemoryLayout<CharType>.stride
   }
@@ -233,7 +240,7 @@ enum UncheckedStringStorage<CharType: FixedWidthInteger> {
   case immortal(ImmortalUncheckedStringStorage<CharType>)
   case `dynamic`(DynamicUncheckedStringStorage<CharType>)
 
-  @usableFromInline
+  @inlinable
   var count: Int {
     switch self {
       case .empty: return 0

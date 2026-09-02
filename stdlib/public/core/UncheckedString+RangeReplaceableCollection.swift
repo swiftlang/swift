@@ -28,6 +28,9 @@ extension SmallUncheckedStringStorage {
   /// `count < Self.capacity`.
   @inline(__always)
   @usableFromInline
+  @_specialize(exported: true, where CharType == UInt8)
+  @_specialize(exported: true, where CharType == UInt16)
+  @_specialize(exported: true, where CharType == CChar)
   mutating func fastAppend(_ newElement: CharType) {
     let stride = MemoryLayout<CharType>.stride
     withUnsafeMutableBytes(of: &bytes) { buf in
@@ -74,6 +77,9 @@ extension SmallUncheckedStringStorage {
   /// `count < Self.capacity` and `0 <= i && i <= count`.
   @inline(__always)
   @usableFromInline
+  @_specialize(exported: true, where CharType == UInt8)
+  @_specialize(exported: true, where CharType == UInt16)
+  @_specialize(exported: true, where CharType == CChar)
   mutating func fastInsert(_ newElement: CharType, at i: Int) {
     let stride = MemoryLayout<CharType>.stride
     withUnsafeMutableBytes(of: &bytes) { buf in
@@ -93,6 +99,9 @@ extension SmallUncheckedStringStorage {
   @inline(__always)
   @usableFromInline
   @discardableResult
+  @_specialize(exported: true, where CharType == UInt8)
+  @_specialize(exported: true, where CharType == UInt16)
+  @_specialize(exported: true, where CharType == CChar)
   mutating func fastRemove(at i: Int) -> CharType {
     let stride = MemoryLayout<CharType>.stride
     let removed: CharType = withUnsafeMutableBytes(of: &bytes) { buf in

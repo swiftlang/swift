@@ -171,7 +171,7 @@ extension UncheckedStringProtocol where Iterator == IndexingIterator<Self> {
 /// `UncheckedSubString`'s own concrete `withContiguousStorageIfAvailable`
 /// overrides, so the two types don't duplicate this body.
 @available(SwiftStdlib 9999, *)
-@usableFromInline
+@inlinable
 @inline(__always)
 internal func _uncheckedStringWithContiguousStorage<S: UncheckedStringProtocol, R>(
   _ str: S,
@@ -188,7 +188,7 @@ internal func _uncheckedStringWithContiguousStorage<S: UncheckedStringProtocol, 
 /// `UncheckedSubString`'s own concrete `_copyContents` overrides, so the
 /// two types don't duplicate this body.
 @available(SwiftStdlib 9999, *)
-@usableFromInline
+@inlinable
 internal func _uncheckedStringCopyContents<S: UncheckedStringProtocol>(
   _ str: S,
   initializing buffer: UnsafeMutableBufferPointer<S.Element>

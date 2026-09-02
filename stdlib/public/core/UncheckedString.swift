@@ -81,6 +81,7 @@
 ///                               onInvalidEncoding: .substitute)
 ///
 @available(SwiftStdlib 9999, *)
+@frozen
 public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
   public typealias Element = E
 
@@ -103,7 +104,7 @@ public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
   @inlinable
   public var isEmpty: Bool { return storage.count == 0 }
 
-  @usableFromInline
+  @inlinable
   internal init(_ storage: Storage) {
     self.storage = storage
   }
@@ -679,6 +680,7 @@ extension UncheckedString {
 // MARK: UncheckedSubString
 
 @available(SwiftStdlib 9999, *)
+@frozen
 public struct UncheckedSubString<E: FixedWidthInteger>
   : UncheckedStringProtocol
 {
@@ -762,9 +764,9 @@ public struct UncheckedSubString<E: FixedWidthInteger>
 
 // MARK: fast_strlen
 
-@_specialize(where T == UInt8)
-@_specialize(where T == CChar)
-@usableFromInline
+@_specialize(exported: true, where T == UInt8)
+@_specialize(exported: true, where T == CChar)
+@inlinable
 @inline(__always)
 internal func fast_strlen<T: FixedWidthInteger>(_ str: UnsafePointer<T>) -> Int {
   // The compiler will optimize this to a call to C strlen() for UInt8
@@ -775,13 +777,14 @@ internal func fast_strlen<T: FixedWidthInteger>(_ str: UnsafePointer<T>) -> Int 
   return unsafe ptr - str
 }
 
-@inline(always)
-fileprivate func containsNul16(_ word: UInt64) -> Bool {
+@inlinable
+@inline(__always)
+internal func containsNul16(_ word: UInt64) -> Bool {
   return ((word &- 0x0001000100010001) & ~word & 0x8000800080008000) != 0
 }
 
 // For UInt16, this is faster than the above
-@usableFromInline
+@inlinable
 internal func fast_strlen(_ str: UnsafePointer<UInt16>) -> Int {
   var ptr = unsafe str
 
