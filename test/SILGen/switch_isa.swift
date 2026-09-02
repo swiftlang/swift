@@ -74,14 +74,18 @@ func guardFn(_ l: D, _ r: D) -> Bool { return true }
 // CHECK:       [[GUARD_YES]]:
 // CHECK-NEXT:    debug_value [[MOVED_R2]]
 // CHECK-NEXT:    debug_value [[MOVED_L2]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    destroy_value [[MOVED_L2]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    destroy_value [[MOVED_R2]]
 // CHECK-NEXT:    end_borrow [[BORROWED_TUP]]
 // CHECK-NEXT:    destroy_value [[TUP]]
 // CHECK-NEXT:    br [[EXIT:bb[0-9]+]]
 //
 // CHECK:       [[GUARD_NO]]:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    destroy_value [[MOVED_L2]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    destroy_value [[MOVED_R2]]
 // CHECK-NEXT:    end_borrow [[BORROWED_TUP]]
 // CHECK-NEXT:    br [[CONT:bb[0-9]+]]

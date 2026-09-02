@@ -183,6 +183,7 @@ class HasDidSet : Base {
 // CHECK-NEXT:   yield [[VAL]] : $*Int, resume bb1, unwind bb2
 // CHECK:        [[DIDSET:%.*]] = function_ref @$s6modify9HasDidSetC6storedSivW
 // CHECK-NEXT:   apply [[DIDSET]]([[SELF]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:   return [[TUPLE]]
 // CHECK: }

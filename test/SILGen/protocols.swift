@@ -33,6 +33,7 @@ func use_subscript_rvalue_get(_ i : Int) -> Int {
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[ALLOCSTACK]])
 // CHECK-NEXT: destroy_addr [[ALLOCSTACK]]
 // CHECK-NEXT: dealloc_stack [[ALLOCSTACK]] : $*[[OPENED]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RESULT]]
 
 func use_subscript_lvalue_get(_ i : Int) -> Int {
@@ -47,6 +48,7 @@ func use_subscript_lvalue_get(_ i : Int) -> Int {
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGetSet.subscript!getter
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[PROJ]])
 // CHECK-NEXT: end_access [[READ]] : $*any SubscriptableGetSet
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RESULT]]
 
 func use_subscript_lvalue_set(_ i : Int) {
@@ -280,6 +282,7 @@ class ClassWithStoredProperty : PropertyWithGetter {
   // CHECK-NEXT: [[FUN:%.*]] = class_method [[ARG]] : $ClassWithStoredProperty, #ClassWithStoredProperty.a!getter : (ClassWithStoredProperty) -> () -> Int, $@convention(method) (@guaranteed ClassWithStoredProperty) -> Int
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[FUN]]([[ARG]])
   // CHECK-NOT: destroy_value
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: return [[RESULT]] : $Int
 }
 
@@ -294,6 +297,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
   // CHECK: bb0(%0 : $StructWithStoredProperty):
   // CHECK-NEXT: debug_value %0
   // CHECK-NEXT: %2 = struct_extract %0 : $StructWithStoredProperty, #StructWithStoredProperty.a
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: return %2 : $Int
 }
 
@@ -331,6 +335,7 @@ struct StructWithStoredClassProperty : PropertyWithGetter {
   // CHECK: bb0(%0 : @guaranteed $StructWithStoredClassProperty):
   // CHECK-NEXT: debug_value %0
   // CHECK-NEXT: %2 = struct_extract %0 : $StructWithStoredClassProperty, #StructWithStoredClassProperty.a
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: return %2 : $Int
 }
 
