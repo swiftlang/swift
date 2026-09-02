@@ -8063,6 +8063,32 @@ bool ClangImporter::isUnsafeCXXMethod(const FuncDecl *func) {
   return id.starts_with("__") && id.ends_with("Unsafe");
 }
 
+void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
+                                              SourceLoc useLoc) {
+  if (!decl || !decl->hasClangNode())
+    return;
+
+  auto *method =
+      dyn_cast_or_null<clang::CXXMethodDecl>(decl->getClangNode().getAsDecl());
+  if (!method)
+    return;
+
+  // An annotation written in the header speaks for itself. Do not paraphrase
+  // it, and never let a heuristic explain a decision the heuristic did not
+  // make.
+  if (importer::hasSwiftAttribute(method, {"unsafe", "unsafe(always)"}))
+    return;
+
+  auto reason =
+      importer::shouldRenameCXXMethodAsUnsafe(method, Impl.SwiftContext);
+  if (!reason)
+    return;
+
+  Impl.diagnose(HeaderLoc(method->getLocation(), useLoc),
+                diag::cxx_unsafe_decl_reason, decl,
+                importer::describe(*reason));
+}
+
 bool ClangImporter::isAnnotatedWith(const clang::CXXMethodDecl *method,
                                     StringRef attr) {
   return hasSwiftAttribute(method, {attr});

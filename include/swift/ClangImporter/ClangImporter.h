@@ -711,6 +711,9 @@ public:
 
   bool isUnsafeCXXMethod(const FuncDecl *func) override;
 
+  void diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
+                                 SourceLoc useLoc) override;
+
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
 
   bool needsClosureConstructor(
