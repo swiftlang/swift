@@ -15,8 +15,9 @@ module CxxHeader {
 
 // TODO: the following diagnostics should be moved to main.swift at the call site
 //       that triggers the instantiation (see static-cast-typecheck.swift)
-// expected-error@+2{{could not substitute parameters for C++ function template 'funcTempl' with Swift closure of '(inout Int32) -> ()' type that has an inout parameter}}
-// expected-error@+1{{could not substitute parameters for C++ function template 'funcTempl' with Swift closure of '(Int32, inout Int32) -> ()' type that has an inout parameter}}
+// expected-error@+3{{could not substitute parameters for C++ function template 'funcTempl' with Swift closure of '(inout Int32) -> ()' type that has an inout parameter}}
+// expected-error@+2{{could not substitute parameters for C++ function template 'funcTempl' with Swift closure of '(Int32, inout Int32) -> ()' type that has an inout parameter}}
+// expected-error@+1{{type(s) provided to 'funcTempl' could not be converted: (@convention(c) () -> Int32)?}}
 template <class T> void funcTempl(T value) { }
 
 // expected-error@+2 2{{could not substitute parameters for C++ function template 'funcTempl2' with Swift closure of '(inout Int32) -> ()' type that has an inout parameter}}
@@ -84,3 +85,9 @@ funcTemplAndIntRef({() in ()}, &x)
 
 // BAD: (inout Int32) -> () & inout Int32
 funcTemplAndIntRef(inoutFoo, &x)
+
+// FIXME: (@convention(c) () -> Int32)?
+// Optional @convention(c) function pointers cannot be converted back to
+// Clang template arguments. Should work but currently produces a diagnostic.
+let cFnPtr: (@convention(c) () -> Int32)? = nil
+funcTempl(cFnPtr)
