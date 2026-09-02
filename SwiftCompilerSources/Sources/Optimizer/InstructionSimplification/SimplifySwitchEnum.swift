@@ -109,6 +109,13 @@ extension SwitchEnumInst : OnoneSimplifiable, SILCombineSimplifiable {
     defer { caseBlocksWithLifetimeEnds.deinitialize() }
 
     for user in ownedEnum.users {
+      // This optimization breaks up the liverange of the owned enum value at the `switch_enum`.
+      // Therefore any borrow scope of the owned value (other than that we'll delete) must not
+      // overlap the `switch_enum`.
+      if user != beginBorrow, user.beginsBorrowScope(overlapping: self, context) {
+        return false
+      }
+
       let block = user.parentBlock
       guard block.singlePredecessor == switchBlock else {
         continue
@@ -179,4 +186,24 @@ private func ownedPayloadArgument(of caseBlock: BasicBlock) -> Argument? {
     return caseBlock.arguments[0]
   }
   return nil
+}
+
+private extension Instruction {
+  func beginsBorrowScope(overlapping switchEnum: SwitchEnumInst, _ context: SimplifyContext) -> Bool {
+    guard let borrowingInst = BorrowingInstruction(self) else {
+      return false
+    }
+    var scopeBlocks = BasicBlockRange(begin: parentBlock, context)
+    defer { scopeBlocks.deinitialize() }
+
+    if borrowingInst.visitScopeEndingOperands(context, visitor: {
+      scopeBlocks.insert($0.instruction.parentBlock)
+      return .continueWalk
+    }) == .abortWalk {
+      return true
+    }
+    // If the _exclusive_ block range of the borrow scope includes the switch-block,
+    // the `switch_enum` is in the range, because it's the last instruction of that block.
+    return scopeBlocks.contains(switchEnum.parentBlock)
+  }
 }
