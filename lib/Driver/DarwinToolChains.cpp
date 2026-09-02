@@ -646,6 +646,27 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
   }
 }
 
+// This function is copied from CompilerInvocation to ensure the same logic.
+static std::string
+getVersionedPrebuiltModulePath(std::optional<llvm::VersionTuple> sdkVer,
+                               StringRef defaultPrebuiltPath) {
+  if (!sdkVer.has_value())
+    return defaultPrebuiltPath.str();
+  std::string versionStr = sdkVer->getAsString();
+  StringRef vs = versionStr;
+  do {
+    SmallString<64> pathWithSDKVer = defaultPrebuiltPath;
+    llvm::sys::path::append(pathWithSDKVer, vs);
+    if (llvm::sys::fs::exists(pathWithSDKVer)) {
+      return pathWithSDKVer.str().str();
+    } else if (vs.ends_with(".0")) {
+      vs = vs.substr(0, vs.size() - 2);
+    } else {
+      return defaultPrebuiltPath.str();
+    }
+  } while(true);
+}
+
 static unsigned getDWARFVersionForTriple(const llvm::Triple &triple) {
   llvm::VersionTuple osVersion;
   const DarwinPlatformKind kind = getDarwinPlatformKind(triple);
@@ -705,6 +726,28 @@ void toolchains::Darwin::addCommonFrontendArgs(
           inputArgs.MakeArgString(variantSDKVersion->getAsString()));
     }
   }
+
+  // For Mac Catalyst only, add the versioned prebuilt modules directory.
+  //
+  // This must be done here because the frontend does not have information to
+  // recover this path.
+  if (tripleIsMacCatalystEnvironment(getTriple()) && SDKInfo) {
+    SmallString<128> BasePrebuiltModulesPath;
+    getResourceDirPath(BasePrebuiltModulesPath, inputArgs, /*Shared=*/true);
+    llvm::sys::path::remove_filename(BasePrebuiltModulesPath);
+    llvm::sys::path::append(BasePrebuiltModulesPath, "macosx", "prebuilt-modules");
+
+    auto SDKVersion = SDKInfo->getVersion();
+
+    auto VersionedPrebuiltModulesPath = getVersionedPrebuiltModulePath(
+        SDKVersion, BasePrebuiltModulesPath);
+
+    if (VersionedPrebuiltModulesPath != BasePrebuiltModulesPath) {
+      arguments.push_back("-prebuilt-module-cache-path");
+      arguments.push_back(inputArgs.MakeArgString(VersionedPrebuiltModulesPath));
+    }
+  }
+
   std::string dwarfVersion;
   {
     llvm::raw_string_ostream os(dwarfVersion);
