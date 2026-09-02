@@ -111,7 +111,7 @@ struct SWIFT_NONESCAPABLE CaptureView {
     CaptureView() : view(nullptr) {}
     CaptureView(View p [[clang::lifetimebound]]) : view(p) {}
 
-    void captureView(View v [[clang::lifetime_capture_by(this)]]) {
+    void captureView(View v [[clang::lifetime_capture_by_this]]) {
         view = v;
     }
 
