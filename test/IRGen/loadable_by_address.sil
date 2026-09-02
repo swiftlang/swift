@@ -107,3 +107,29 @@ bb0(%0 : $Cond):
   retain_value %0 : $Cond
   return %6 : $Cond
 }
+
+struct Region { var a: Int, b: Int, c: Int }
+
+struct Event { var a: Int, b: Int, c: Int, d: Int, e: Int }
+
+class Box {
+  var pending: (region: Region, handler: (Event) -> Bool)?
+  init()
+}
+
+sil_vtable Box {}
+
+// CHECK-LABEL: sil hidden [transparent] @box_pending_setter :
+// CHECK: bb0(%0 : $*Optional<(region: Region, handler: @callee_guaranteed (@in_guaranteed Event) -> Bool)>, %1 : $Box):
+// CHECK: [[REF:%.*]] = ref_element_addr %1, #Box.pending
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF]]
+// CHECK: copy_addr [take] %0 to [init] [[ACCESS]]
+sil hidden [transparent] @box_pending_setter : $@convention(method) (@owned Optional<(region: Region, handler: @callee_guaranteed (Event) -> Bool)>, @guaranteed Box) -> () {
+bb0(%0 : $Optional<(region: Region, handler: @callee_guaranteed (Event) -> Bool)>, %1 : $Box):
+  %2 = ref_element_addr %1 : $Box, #Box.pending
+  %3 = begin_access [modify] [dynamic] %2 : $*Optional<(region: Region, handler: @callee_guaranteed (Event) -> Bool)>
+  store %0 to %3 : $*Optional<(region: Region, handler: @callee_guaranteed (Event) -> Bool)>
+  end_access %3 : $*Optional<(region: Region, handler: @callee_guaranteed (Event) -> Bool)>
+  %5 = tuple ()
+  return %5 : $()
+}
