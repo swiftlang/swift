@@ -19,6 +19,7 @@
 
 #include "ClangAdapter.h"
 #include "ClangSourceBufferImporter.h"
+#include "CxxUnsafetyReason.h"
 #include "ImportEnumInfo.h"
 #include "ImportName.h"
 #include "SwiftLookupTable.h"
@@ -2400,8 +2401,12 @@ bool isSwiftClassType(const clang::CXXRecordDecl *decl);
 /// a projection that could yield a dangling pointer/reference/iterator. Methods
 /// that are not safe are imported under a \c __<name>Unsafe name and/or marked
 /// \c @unsafe. See also PrintOptions::SkipUnsafeCXXMethods.
-bool shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
-                                   ASTContext &ctx);
+///
+/// Returns which rule decided that, so a diagnostic can explain it, or nothing
+/// when the method needs no rename.
+std::optional<CxxUnsafetyReason>
+shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
+                              ASTContext &ctx);
 
 /// Whether \p method keeps its original Swift name, and is imported
 /// \c @unsafe(always) rather than renamed to \c __<name>Unsafe .

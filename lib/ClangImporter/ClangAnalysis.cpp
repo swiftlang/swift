@@ -1,4 +1,5 @@
 #include "ClangDerivedConformances.h"
+#include "CxxUnsafetyReason.h"
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ParameterList.h"
@@ -24,6 +25,26 @@ using namespace swift;
 
 bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, {"import_reference"});
+}
+
+StringRef importer::describe(CxxUnsafetyReason reason) {
+  switch (reason) {
+  case CxxUnsafetyReason::IteratorFromBeginEnd:
+    return "'begin' and 'end' are assumed to return iterators, which do not "
+           "keep the underlying storage alive";
+  case CxxUnsafetyReason::PointerProjection:
+    return "it returns a pointer or reference into a type that owns its "
+           "storage";
+  case CxxUnsafetyReason::KnownUnsafeStdMethod:
+    return "this standard library method is known to be hard to use correctly "
+           "from Swift";
+  case CxxUnsafetyReason::ReturnsIterator:
+    return "it returns an iterator, which does not keep the underlying storage "
+           "alive";
+  case CxxUnsafetyReason::ViewProjection:
+    return "it returns a view into a type that owns its storage";
+  }
+  llvm_unreachable("covered switch");
 }
 
 bool importer::hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
@@ -1246,26 +1267,33 @@ static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
   return false;
 }
 
-bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
-                                             ASTContext &ctx) {
+std::optional<importer::CxxUnsafetyReason>
+importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
+                                        ASTContext &ctx) {
+  // Returning the reason rather than reporting it through an out-parameter
+  // keeps the verdict and its explanation inseparable.
+  auto safe = []() -> std::optional<CxxUnsafetyReason> { return std::nullopt; };
+  auto unsafe = [](CxxUnsafetyReason reason)
+      -> std::optional<CxxUnsafetyReason> { return reason; };
+
   // The user explicitly explicitly acknowledged this method's unsafety
   // and asked us to import it as is anyway. No renaming needed.
   if (hasUnsafeAPIAttr(method))
-    return false;
+    return safe();
 
   // If it's a static method, it cannot project anything. It's fine.
   if (method->isOverloadedOperator() || method->isStatic() ||
       isa<clang::CXXConstructorDecl>(method))
-    return false;
+    return safe();
 
   // begin and end methods likely return an iterator, so they're unsafe.
   // This is required so that automatic the conformance to RAC works properly.
   if (method->getNameAsString() == "begin" ||
       method->getNameAsString() == "end")
-    return true;
+    return unsafe(CxxUnsafetyReason::IteratorFromBeginEnd);
 
   if (clangTypeIsForeignReference(method->getReturnType(), ctx))
-    return false;
+    return safe();
 
   auto parentQualType =
       method->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
@@ -1278,12 +1306,13 @@ bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
   // projection (unsafe).
   if (method->getReturnType()->isPointerType() ||
       method->getReturnType()->isReferenceType())
-    return parentIsSelfContained;
+    return parentIsSelfContained ? unsafe(CxxUnsafetyReason::PointerProjection)
+                                 : safe();
 
   // Check if it's one of the known unsafe methods we currently
   // mark as safe by default.
   if (isUnsafeStdMethod(method))
-    return true;
+    return unsafe(CxxUnsafetyReason::KnownUnsafeStdMethod);
 
   // Try to figure out the semantics of the return type. If it's a
   // pointer/iterator, it's unsafe.
@@ -1292,28 +1321,29 @@ bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
     if (auto cxxRecordReturnType =
             dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
       if (isSwiftClassType(cxxRecordReturnType))
-        return false;
+        return safe();
 
       if (hasIteratorAPIAttr(cxxRecordReturnType) ||
           hasIteratorCategory(cxxRecordReturnType))
-        return true;
+        return unsafe(CxxUnsafetyReason::ReturnsIterator);
 
       // Mark this as safe to help our diganostics down the road.
       if (!cxxRecordReturnType->getDefinition()) {
-        return false;
+        return safe();
       }
 
       // A projection of a view type (such as a string_view) from a self
       // contained parent is a proejction (unsafe).
       if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
           isViewType(cxxRecordReturnType)) {
-        return parentIsSelfContained;
+        return parentIsSelfContained ? unsafe(CxxUnsafetyReason::ViewProjection)
+                                     : safe();
       }
     }
   }
 
   // Otherwise, it's safe.
-  return false;
+  return safe();
 }
 
 /// Whether the C++ standard library overlay in stdlib/public/Cxx already
