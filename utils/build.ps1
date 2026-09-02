@@ -610,9 +610,6 @@ $PinnedToolchain = [IO.Path]::GetFileNameWithoutExtension($PinnedBuild)
 $ToolchainVersionIdentifier = $PinnedToolchain -replace 'swift-(.+?)-windows10.*', '$1'
 
 if ($EnableCaching) {
-  if ($PinnedVersion -ne "0.0.0") {
-    throw "CAS currently requires using a main-branch pinned toolchain."
-  }
   $UseHostToolchain = $false
 }
 
