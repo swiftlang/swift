@@ -1074,9 +1074,12 @@ public:
   /// \param selfDecl The 'self' declaration within the current function.
   /// \param field The stored property that has to be initialized.
   /// \param substitutions The substitutions to apply to initializer and setter.
-  void emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
-                             PatternBindingDecl *field,
-                             SubstitutionMap substitutions);
+  /// \param initAccessorSubsumedStorage Stored properties set up through an init
+  /// accessor on another property; their own initializer is skipped.
+  void emitMemberInitializer(
+      DeclContext *dc, VarDecl *selfDecl, PatternBindingDecl *field,
+      SubstitutionMap substitutions,
+      const llvm::SmallPtrSetImpl<VarDecl *> &initAccessorSubsumedStorage);
 
   void emitMemberInitializationViaInitAccessor(DeclContext *dc,
                                                VarDecl *selfDecl,
