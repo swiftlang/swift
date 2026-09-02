@@ -58,6 +58,7 @@ func test3<E: Error>(e: E) {
   // CHECK-NEXT:   dealloc_stack [[V4]]
   // CHECK-NEXT:   dealloc_stack [[V3]]
   // CHECK-NEXT:   dealloc_stack [[V2]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   throw [[V7]]
   // CHECK-NEXT: } // end sil function '$s{{.+}}5test31eyx_ts5ErrorRzlFyyxYKcfU_'
   let _: () throws -> Void = { () throws(E) -> Void in

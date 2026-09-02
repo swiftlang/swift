@@ -571,7 +571,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(PartialApplyInst, partial_apply,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
   SINGLE_VALUE_INST(EndApplyInst, end_apply,
-                    SILInstruction, MayHaveSideEffects, MayRelease)  
+                    SILInstruction, MayHaveSideEffects, MayRelease)
   SINGLE_VALUE_INST(FunctionExtractIsolationInst, function_extract_isolation,
                     SingleValueInstruction, None, DoesNotRelease)
 
@@ -697,7 +697,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(DifferentiabilityWitnessFunctionInst,
                     differentiability_witness_function,
                     SingleValueInstruction, None, DoesNotRelease)
-  
+
   // Async
   // TODO: The side effects declarations on this instruction could likely
   // be tightened, though we want to be careful that passes that try to do
@@ -938,12 +938,16 @@ NON_VALUE_INST(MarkDependenceAddrInst, mark_dependence_addr,
 
 NON_VALUE_INST(EndCOWMutationAddrInst, end_cow_mutation_addr,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
-NODE_RANGE(NonValueInstruction, UnreachableInst, EndCOWMutationAddrInst)
+
+NON_VALUE_INST(EndFormalScopeInst, end_formal_scope,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+
+NODE_RANGE(NonValueInstruction, UnreachableInst, EndFormalScopeInst)
 
 ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
 MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,
                     MultipleValueInstruction, MayHaveSideEffects, MayRelease)
-                                  
+
 // begin_cow_mutation is defined to have side effects, because it has
 // dependencies with instructions which retain the buffer operand. This prevents
 // optimizations from moving begin_cow_mutation instructions across such retain

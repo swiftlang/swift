@@ -189,6 +189,7 @@ class OptionalResult {
 // CHECK-NEXT: debug_value [[SELF]] : $OptionalResult
 // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK-NEXT: [[T0:%.*]] = enum $Optional<OptionalResult>, #Optional.some!enumelt, [[SELF_COPY]] : $OptionalResult
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[T0]] : $Optional<OptionalResult>
 // CHECK: } // end sil function '$s12dynamic_self14OptionalResultC3fooACXDSgyF'
 

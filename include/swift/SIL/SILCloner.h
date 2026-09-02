@@ -196,7 +196,7 @@ public:
   void setTrackingList(SmallVectorImpl<SILInstruction*> *II) {
     getBuilder().setTrackingList(II);
   }
-  
+
   SmallVectorImpl<SILInstruction*> *getTrackingList() {
     return getBuilder().getTrackingList();
   }
@@ -2376,7 +2376,7 @@ void SILCloner<ImplClass>::visitCopyValueInst(CopyValueInst *Inst) {
         return recordFoldedValue(Inst, getOpValue(Inst->getOperand()));
       }
     }
-  
+
     SILValue newValue = getBuilder().emitCopyValueOperation(
         getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()));
     return recordFoldedValue(Inst, newValue);
@@ -2576,7 +2576,7 @@ void SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
             getBuilder().createDeallocStack(getOpLocation(Inst->getLoc()),
                                             getOpValue(origPA)));
         }
-        
+
         return;
       }
     }
@@ -2737,7 +2737,7 @@ SILCloner<ImplClass>::visitEnumInst(EnumInst *Inst) {
               ? Inst->getForwardingOwnershipKind()
               : ValueOwnershipKind(OwnershipKind::None)));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitInitEnumDataAddrInst(InitEnumDataAddrInst *Inst) {
@@ -2747,7 +2747,7 @@ SILCloner<ImplClass>::visitInitEnumDataAddrInst(InitEnumDataAddrInst *Inst) {
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
                 Inst->getElement(), getOpType(Inst->getType())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitUncheckedEnumDataInst(UncheckedEnumDataInst *Inst) {
@@ -2760,7 +2760,7 @@ SILCloner<ImplClass>::visitUncheckedEnumDataInst(UncheckedEnumDataInst *Inst) {
                     ? Inst->getForwardingOwnershipKind()
                     : ValueOwnershipKind(OwnershipKind::None)));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *Inst) {
@@ -2770,7 +2770,7 @@ SILCloner<ImplClass>::visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAd
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
                 Inst->getElement(), getOpType(Inst->getType())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnumDataAddrInst *Inst) {
@@ -2780,7 +2780,7 @@ SILCloner<ImplClass>::visitUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnum
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
                 Inst->getElement(), getOpType(Inst->getType())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDataAddrInst *Inst) {
@@ -2792,7 +2792,7 @@ SILCloner<ImplClass>::visitUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDa
                 getOpValue(Inst->getScratch()),
                 Inst->getElement(), getOpType(Inst->getType())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitInjectEnumAddrInst(InjectEnumAddrInst *Inst) {
@@ -2802,7 +2802,7 @@ SILCloner<ImplClass>::visitInjectEnumAddrInst(InjectEnumAddrInst *Inst) {
                                               getOpValue(Inst->getOperand()),
                                               Inst->getElement()));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitMetatypeInst(MetatypeInst *Inst) {
@@ -3643,6 +3643,14 @@ void SILCloner<ImplClass>::visitEndCOWMutationAddrInst(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitEndFormalScopeInst(
+    EndFormalScopeInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createEndFormalScope(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitDestroyNotEscapedClosureInst(
     DestroyNotEscapedClosureInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -3949,7 +3957,7 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
                                     SrcType, DestValue, TargetType, OpSuccBB,
                                     OpFailBB, TrueCount, FalseCount));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitSwitchValueInst(SwitchValueInst *Inst) {
@@ -4015,7 +4023,7 @@ SILCloner<ImplClass>::visitSelectEnumInst(SelectEnumInst *Inst) {
   for (unsigned i = 0, e = Inst->getNumCases(); i != e; ++i)
     CaseResults.push_back(std::make_pair(Inst->getCase(i).first,
                                          getOpValue(Inst->getCase(i).second)));
-  
+
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createSelectEnum(
@@ -4034,7 +4042,7 @@ SILCloner<ImplClass>::visitSelectEnumAddrInst(SelectEnumAddrInst *Inst) {
   for (unsigned i = 0, e = Inst->getNumCases(); i != e; ++i)
     CaseResults.push_back(std::make_pair(Inst->getCase(i).first,
                                          getOpValue(Inst->getCase(i).second)));
-  
+
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createSelectEnumAddr(
                                     getOpLocation(Inst->getLoc()),
