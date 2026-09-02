@@ -7,6 +7,13 @@ protocol P {
   func foo()
 }
 
+public class C {}
+
+public struct T: P {
+  let c: C
+  func foo()
+}
+
 // CHECK-LABEL: sil [ossa] @expand_enum_with_debug_value :
 // CHECK:         [[A:%[0-9]+]] = alloc_stack $Int
 // CHECK:         debug_value [[A]], var, name "x", type $Optional<Int>, transform {
@@ -115,6 +122,34 @@ bb3:
   %5 = unchecked_take_enum_data_addr %1 : $*TwoCase, #TwoCase.a!enumelt
   destroy_addr %5 : $*Int
   dealloc_stack %1 : $*TwoCase
+  %r = tuple ()
+  return %r : $()
+}
+
+// When an existential alloc_stack is replaced by its concrete type, the
+// existential value cannot be recreated from a reconstruction block.
+// Plain debug_values are retyped to the concrete type. Debug values which
+// already have a reconstruction block are killed as unsalvageable.
+// CHECK-LABEL: sil [ossa] @kill_transform_operand_of_existential :
+// CHECK:         alloc_stack $T
+// CHECK:         debug_value (), var, name "x", type $Builtin.RawPointer, transform {
+// CHECK-NEXT:    bb0:
+// CHECK-NEXT:      = address_to_pointer undef
+// CHECK:         }
+// CHECK:       } // end sil function 'kill_transform_operand_of_existential'
+sil [ossa] @kill_transform_operand_of_existential : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %1 = alloc_stack $any P
+  %2 = init_existential_addr %1, $T
+  store %0 to [init] %2
+  debug_value %1, var, name "x", type $Builtin.RawPointer, transform {
+  bb0(%0 : $*any P):
+    %p = address_to_pointer %0 : $*any P to $Builtin.RawPointer
+    return %p : $Builtin.RawPointer
+  }
+  %4 = open_existential_addr mutable_access %1 to $*@opened(1, P) Self
+  destroy_addr %4
+  dealloc_stack %1
   %r = tuple ()
   return %r : $()
 }
