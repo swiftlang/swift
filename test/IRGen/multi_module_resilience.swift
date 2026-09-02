@@ -29,8 +29,10 @@ import OtherModule
 // CHECK: [[T0:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 2
 // CHECK: [[T1:%.*]] = load ptr, ptr [[T0]],
 // CHECK: call ptr [[T1]](ptr noalias [[ALLOCA]], ptr noalias %1, ptr [[METADATA]])
-//   Perform 'initializeWithCopy' via the VWT.
-// CHECK: call ptr [[T1]](ptr noalias %0, ptr noalias [[ALLOCA]], ptr [[METADATA]])
+//   Perform 'initializeWithTake' via the VWT.
+// CHECK: [[T2:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 4
+// CHECK: [[T3:%.*]] = load ptr, ptr [[T2]],
+// CHECK: call ptr [[T3]](ptr noalias %0, ptr noalias [[ALLOCA]], ptr [[METADATA]])
 public func copyFoo(foo: Foo) -> Foo {
   let copy = foo
   return copy
@@ -50,8 +52,10 @@ public func copyFoo(foo: Foo) -> Foo {
 // CHECK: [[T0:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 2
 // CHECK: [[T1:%.*]] = load ptr, ptr [[T0]],
 // CHECK: call ptr [[T1]](ptr noalias [[ALLOCA]], ptr noalias %1, ptr [[METADATA]])
-//   Perform 'initializeWithCopy' via the VWT.
-// CHECK: call ptr [[T1]](ptr noalias %0, ptr noalias [[ALLOCA]], ptr [[METADATA]])
+//   Perform 'initializeWithTake' via the VWT.
+// CHECK: [[T2:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 4
+// CHECK: [[T3:%.*]] = load ptr, ptr [[T2]],
+// CHECK: call ptr [[T3]](ptr noalias %0, ptr noalias [[ALLOCA]], ptr [[METADATA]])
 public func copyBar(bar: Bar) -> Bar {
   let copy = bar
   return copy
