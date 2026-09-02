@@ -221,6 +221,11 @@ Type TypeBase::findUnsafeType(
         return Action::SkipNode;
       }
 
+      // Do not recurse into metatypes. The metatype itself is safe independent
+      // of whether its underlying type is safe.
+      if (isa<AnyMetatypeType>(type.getPointer()))
+        return Action::SkipNode;
+
       return Action::Continue;
     }
 

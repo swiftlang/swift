@@ -702,7 +702,7 @@ func isValidPointerForNativeRetain(object: Builtin.RawPointer) -> Bool {
   if objectBits == 0 { return false }
 
   #if _pointerBitWidth(_64)
-  if unsafe (objectBits & HeapObject.immortalObjectPointerBit) != 0 { return false }
+  if (objectBits & HeapObject.immortalObjectPointerBit) != 0 { return false }
   #endif
 
   return true
@@ -778,7 +778,7 @@ public func swift_bridgeObjectRetain(object: Builtin.RawPointer) -> Builtin.RawP
 @c
 public func swift_bridgeObjectRetain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
   let objectBits = UInt(Builtin.ptrtoint_Word(object))
-  let untaggedObject = unsafe Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
+  let untaggedObject = Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
   _ = swift_retain_n(object: untaggedObject, n: n)
   return object
 }
@@ -828,7 +828,7 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32, isBo
 
   let refcount = unsafe refcountPointer(for: object)
   let loadedRefcount = unsafe loadRelaxed(refcount)
-  if unsafe loadedRefcount & HeapObject.refcountMask == HeapObject.immortalRefCount {
+  if loadedRefcount & HeapObject.refcountMask == HeapObject.immortalRefCount {
     return
   }
 
@@ -843,7 +843,7 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32, isBo
     // There can only be one thread with a reference at this point (because
     // we're releasing the last existing reference), so a relaxed store is
     // enough.
-    let doNotFree = unsafe (loadedRefcount & HeapObject.doNotFreeBit) != 0
+    let doNotFree = (loadedRefcount & HeapObject.doNotFreeBit) != 0
     unsafe storeRelaxed(refcount, newValue: HeapObject.immortalRefCount | (doNotFree ? HeapObject.doNotFreeBit : 0))
 
     if isBoxRelease {
@@ -899,7 +899,7 @@ public func swift_bridgeObjectRelease(object: Builtin.RawPointer) {
 @c
 public func swift_bridgeObjectRelease_n(object: Builtin.RawPointer, n: UInt32) {
   let objectBits = UInt(Builtin.ptrtoint_Word(object))
-  let untaggedObject = unsafe Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
+  let untaggedObject = Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
   swift_release_n(object: untaggedObject, n: n)
 }
 
