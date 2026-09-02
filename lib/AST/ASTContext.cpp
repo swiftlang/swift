@@ -1591,7 +1591,7 @@ MacroDecl *ASTContext::getBuiltinDerivedConformanceMacroDecl(
     break;
   case BuiltinDerivedConformanceMacroKind::DeriveCaseIterable:
     macro = makeMacro("_deriveCaseIterable", "DeriveCaseIterableMacro",
-                      {stringParam("", "infos"), stringParam("", "witness")},
+                      {stringParam("", "infos")},
                       MacroIntroducedDeclName::getArbitrary());
     break;
   case BuiltinDerivedConformanceMacroKind::DeriveEncodable:
