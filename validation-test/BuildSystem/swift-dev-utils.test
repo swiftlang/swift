@@ -21,6 +21,7 @@
 
 # Run the test suite
 # RUN: xcrun swift-test -c release --disable-dependency-cache --package-path "%t/src/swift/utils/swift-dev-utils"
+# RUN: false
 
 # Then check to see that xcodegen can generate a project successfully
 # RUN: xcrun swift-run -c release --disable-dependency-cache --skip-build --package-path "%t/src/swift/utils/swift-dev-utils" swift-xcodegen --project-root-dir "%swift_src_root/.." --output-dir "%t/out" "%swift_obj_root/.."
