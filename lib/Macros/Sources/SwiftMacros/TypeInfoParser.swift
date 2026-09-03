@@ -52,8 +52,32 @@ public struct EnumCaseInfo {
   /// appear in Swift source) and `nil` if there isn't one
   var associatedValueLabels: [String?]
 
-  /// Whether or not the enum case is marked as reachable
+  /// Whether a value of this case can exist at runtime. False only when the
+  /// case is unavailable in every execution context the code may run in, so a
+  /// switch over `self` may treat it as unreachable.
   var isReachable: Bool
+
+  /// Whether a reference constructing this case may be synthesized, guarded by
+  /// `runtimeAvailabilityQueries`. False when some restriction on the case
+  /// cannot be expressed as a runtime query, in which case the case must be
+  /// left out of any synthesized initializer entirely. This is stricter than
+  /// `isReachable`: a case unavailable on one of several targets is still
+  /// reachable, but cannot be constructed.
+  var isConstructible: Bool
+
+  /// The queries that must all succeed for this case to be available at
+  /// runtime. Only meaningful when `isConstructible` is true.
+  var runtimeAvailabilityQueries: [AvailabilityQuery]
+}
+
+public struct AvailabilityQuery {
+  var domain: String
+  var primaryRange: String?
+  var variantRange: String?
+
+  /// Whether this is an `#unavailable` query rather than an `#available` one.
+  var isUnavailability: Bool
+  var constantResult: Bool?
 }
 
 public struct StructTypeInfo {
@@ -505,25 +529,65 @@ extension EnumCaseInfo: TypeInfoProtocol {
     // Expecting:
     //   EnumCaseInfo(name: <String>,
     //                associatedValueLabels: <[String?]>,
-    //                isReachable: <Bool>)
+    //                isReachable: <Bool>,
+    //                isConstructible: <Bool>,
+    //                runtimeAvailabilityQueries: <[AvailabilityQuery]>)
 
-    let (name, associatedValueLabels, isReachable) = try getNamedFuncallArgs(
-      node: node,
-      name: "EnumCaseInfo"
-    ).expect(
-      .stringArg("name"),
-      .stringArg("associatedValueLabels").toOptional().toArray(),
-      .boolArg("isReachable")
-    )
+    let (name, associatedValueLabels, isReachable, isConstructible,
+         runtimeAvailabilityQueries) =
+      try getNamedFuncallArgs(
+        node: node,
+        name: "EnumCaseInfo"
+      ).expect(
+        .stringArg("name"),
+        .stringArg("associatedValueLabels").toOptional().toArray(),
+        .boolArg("isReachable"),
+        .boolArg("isConstructible"),
+        .arrayArg("runtimeAvailabilityQueries", parser: AvailabilityQuery.fromSyntax)
+      )
 
     return Self(
-      name: name, associatedValueLabels: associatedValueLabels, isReachable: isReachable)
+      name: name,
+      associatedValueLabels: associatedValueLabels,
+      isReachable: isReachable,
+      isConstructible: isConstructible,
+      runtimeAvailabilityQueries: runtimeAvailabilityQueries)
   }
 
   public var syntax: ExprSyntax {
     """
-    EnumCaseInfo(name: \(stringlit(name)), associatedValueLabels: \(arraySyntax(associatedValueLabels, {optionalSyntax($0, stringlit)})))
+    EnumCaseInfo(name: \(stringlit(name)), associatedValueLabels: \(arraySyntax(associatedValueLabels, {optionalSyntax($0, stringlit)})), isReachable: \(boollit(isReachable)), isConstructible: \(boollit(isConstructible)), runtimeAvailabilityQueries: \(arraySyntax(runtimeAvailabilityQueries, \.syntax)))
     """
+  }
+}
+
+extension AvailabilityQuery: TypeInfoProtocol {
+  public static func fromSyntax(node: ExprSyntax) throws -> Self {
+    let (domain, primaryRange, variantRange, isUnavailability, constantResult) =
+      try getNamedFuncallArgs(
+        node: node, name: "AvailabilityQuery"
+      ).expect(
+        .stringArg("domain"),
+        .stringArg("primaryRange").toOptional(),
+        .stringArg("variantRange").toOptional(),
+        .boolArg("isUnavailability"),
+        .boolArg("constantResult").toOptional(),
+      )
+    return Self(
+      domain: domain, primaryRange: primaryRange, variantRange: variantRange,
+      isUnavailability: isUnavailability, constantResult: constantResult)
+  }
+
+  public var syntax: ExprSyntax {
+    return
+      """
+      AvailabilityQuery(
+        domain: \(stringlit(domain)),
+        primaryRange: \(optionalSyntax(primaryRange, stringlit)),
+        variantRange: \(optionalSyntax(variantRange, stringlit)),
+        isUnavailability: \(boollit(isUnavailability)),
+        constantResult: \(optionalSyntax(constantResult, boollit)))
+      """
   }
 }
 
