@@ -3,7 +3,7 @@
 import StdOptional
 import CxxStdlib
 
-func takeCopyable<T: Copyable>(_ x: T) {} // expected-note {{'where T: Copyable' is implicit here}}
+func takeCopyable<T: Copyable>(_ x: T) {} // expected-note* {{'where T: Copyable' is implicit here}}
 
 func takeCxxOptional<T: CxxOptional>(_ x: T) {
   _ = x.hasValue
@@ -18,6 +18,11 @@ var _ = nonNilCopyable.pointee // expected-warning {{'pointee' is deprecated: us
 let nonNilOptNonCopyable = getNonNilOptionalHasDeletedCopyCtor()
 takeCopyable(nonNilOptNonCopyable) // expected-error {{conform to 'Copyable'}}
 var _ = nonNilOptNonCopyable.pointee
+
+let optVectorNonCopyable = getNonNilOptionalMoveOnlyVector()
+takeCopyable(optVectorNonCopyable) // expected-error {{conform to 'Copyable'}}
+var _ = optVectorNonCopyable.pointee
+var _ = optVectorNonCopyable.pointee[0].value
 
 let _ = returnsConvertsToTemplated() // shouldn't crash the compiler
 
