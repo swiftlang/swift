@@ -47,7 +47,7 @@ extension Task where Success == Never, Failure == Never {
 
   /// The type of continuation used in the implementation of
   /// sleep(nanoseconds:).
-  typealias SleepContinuation = UnsafeContinuation<(), Error>
+  typealias SleepContinuation = UnsafeContinuation<(), _Concurrency.CancellationError>
 
   /// Describes the state of a sleep() operation.
   @unsafe enum SleepState {
@@ -237,7 +237,26 @@ extension Task where Success == Never, Failure == Never {
   /// this function throws `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.
-  public static func sleep(nanoseconds duration: UInt64) async throws {
+  @available(SwiftStdlib 5.1, *)
+  @_alwaysEmitIntoClient
+  @abi(static func __typed_throws_sleep(nanoseconds duration: UInt64) async throws(_Concurrency.CancellationError))
+  public static func sleep(nanoseconds duration: UInt64) async throws(_Concurrency.CancellationError) {
+    do {
+      // Calling self.__untyped_throws_sleep(nanoseconds:) in this method
+      // instead of vice versa in order to avoid exposing the contained
+      // internal symbols as ABI.
+      try await Self.__untyped_throws_sleep(nanoseconds: duration)
+    } catch {
+      throw error as! _Concurrency.CancellationError
+    }
+  }
+
+  @available(SwiftStdlib 5.1, *)
+  @abi(
+    static func sleep(nanoseconds duration: UInt64) async throws
+  )
+  @usableFromInline
+  internal static func __untyped_throws_sleep(nanoseconds duration: UInt64) async throws {
     // Create a token which will initially have the value "not started", which
     // means the continuation has neither been created nor completed.
     let token = unsafe UnsafeSleepStateToken()
@@ -347,7 +366,7 @@ extension Task where Success == Never, Failure == Never {
   }
   @available(SwiftStdlib 5.1, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-  public static func sleep(nanoseconds duration: UInt64) async throws {
+  public static func sleep(nanoseconds duration: UInt64) async throws(_Concurrency.CancellationError) {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
 }

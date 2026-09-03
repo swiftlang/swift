@@ -110,8 +110,33 @@ extension ContinuousClock: Clock {
   /// `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.
-  @diagnose(UselessAvailabilityCheck, as: ignored)
+  @_alwaysEmitIntoClient
+  @abi(
+    func __typed_throws_sleep(
+      until deadline: Instant, tolerance: Swift.Duration?
+    ) async throws(_Concurrency.CancellationError)
+  )
   public func sleep(
+    until deadline: Instant, tolerance: Swift.Duration? = nil
+  ) async throws(_Concurrency.CancellationError) {
+    do {
+      // Calling self.__untyped_throws_sleep(until:tolerance:) in this method
+      // instead of vice versa in order to avoid exposing the contained
+      // internal symbols as ABI.
+      try await self.__untyped_throws_sleep(until: deadline, tolerance: tolerance)
+    } catch {
+      throw error as! _Concurrency.CancellationError
+    }
+  }
+
+  @diagnose(UselessAvailabilityCheck, as: ignored)
+  @abi(
+    func sleep(
+      until deadline: Instant, tolerance: Swift.Duration?
+    ) async throws
+  )
+  @usableFromInline
+  internal func __untyped_throws_sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
     if #available(StdlibDeploymentTarget 6.3, *) {
