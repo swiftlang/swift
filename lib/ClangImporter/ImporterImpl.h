@@ -41,6 +41,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/Type.h"
+#include "clang/AST/TypeOrdering.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -582,6 +583,13 @@ public:
 
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
+
+  /// Maps a canonical declaration and a type that only appears \em elsewhere
+  /// in its redeclaration chain to the declaration that should be used as part
+  /// of its \c ImportedDecls cache key. See \c getImportedDeclsKey()
+  /// for details.
+  llvm::DenseMap<std::pair<const clang::Decl *, clang::QualType>,
+                 const clang::NamedDecl *> AltCanonDecls;
 
   /// Per-module count of Clang decls actually deserialized (materialized) into
   /// the shared ASTContext, keyed by the owning serialized module. Populated by
@@ -1256,6 +1264,13 @@ public:
   /// \param decl The Clang record or function declaration to validate.
   void validateSwiftAttributes(const clang::NamedDecl *decl);
 
+  /// Determines the key that should be used to store or look up \p ClangDecl
+  /// in \c ImportedDecls . This will usually canonicalize the decl, although
+  /// there are rare exceptions.
+  std::pair<const clang::Decl *, Version>
+  getImportedDeclsKey(const clang::NamedDecl *ClangDecl, Version version,
+                      bool UseCanonicalDecl = true);
+
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
   std::optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl,
@@ -1284,8 +1299,7 @@ public:
   }
 
   Decl *lookupImportedDecl(const clang::NamedDecl *decl) {
-    auto Known = importDeclCached(
-        cast<clang::NamedDecl>(decl->getCanonicalDecl()), CurrentVersion, true);
+    auto Known = importDeclCached(decl, CurrentVersion, true);
     if (Known.has_value())
       return Known.value();
     return nullptr;
