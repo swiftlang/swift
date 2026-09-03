@@ -648,7 +648,7 @@ namespace {
       }
 
       if (auto *typeDecl = dyn_cast<TypeDecl>(decl)) {
-        if (!isa<ModuleDecl>(decl)) {
+        if (!isa<ModuleDecl, NamespaceDecl>(decl)) {
           TypeExpr *typeExpr = nullptr;
           if (implicit) {
             typeExpr = TypeExpr::createImplicitHack(
@@ -1857,9 +1857,9 @@ namespace {
       Type refTy = simplifyType(overload.openedFullType);
       Type adjustedRefTy = simplifyType(overload.adjustedOpenedFullType);
 
-      // If we're referring to the member of a module, it's just a simple
-      // reference.
-      if (baseTy->is<ModuleType>()) {
+      // If we're referring to a member through a module or namespace
+      // qualifier, it's just a simple reference with an ignored source base.
+      if (baseTy->is<ModuleType>() || baseTy->is<NamespaceType>()) {
         assert(semantics == AccessSemantics::Ordinary &&
                "Direct property access doesn't make sense for this");
         auto *dre = new (ctx) DeclRefExpr(memberRef, memberLoc, Implicit);

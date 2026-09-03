@@ -672,7 +672,7 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
                                           UDRE->getNameLoc().getStartLoc());
 
     // FIXME: This is odd.
-    if (isa<ModuleDecl>(D)) {
+    if (isa<ModuleDecl, NamespaceDecl>(D)) {
       return new (Context) DeclRefExpr(
           D, UDRE->getNameLoc(),
           /*Implicit=*/false, AccessSemantics::Ordinary, D->getInterfaceType());

@@ -125,6 +125,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         if (isa<TypeDecl>(DRE->getDecl())) {
           if (isa<ModuleDecl>(DRE->getDecl()))
             checkUseOfModule(DRE);
+          else if (isa<NamespaceDecl>(DRE->getDecl()))
+            checkUseOfNamespace(DRE);
           else
             checkUseOfMetaTypeName(Base);
         }
@@ -807,6 +809,18 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_module_type);
+    }
+
+    void checkUseOfNamespace(DeclRefExpr *E) {
+      // A namespace may only survive as the ignored source base of a
+      // qualified reference.
+      if (auto *parentExpr = Parent.getAsExpr()) {
+        if (isa<DotSyntaxBaseIgnoredExpr>(parentExpr) ||
+            isa<UnresolvedDotExpr>(parentExpr))
+          return;
+      }
+
+      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_namespace_type);
     }
 
     // Diagnose metatype values that don't appear as part of a property,

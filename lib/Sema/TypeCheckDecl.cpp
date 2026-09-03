@@ -930,6 +930,12 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(decl))
     return accessor->getStorage()->isStatic();
 
+  // `static` on a namespace member is an admission marker in source, not a
+  // request for a metatype receiver. Namespace declarations deliberately do
+  // not form type contexts or introduce `Self`.
+  if (isa<NamespaceDecl>(decl->getDeclContext()))
+    return false;
+
   bool result = (decl->getStaticLoc().isValid() ||
                  decl->getStaticSpelling() != StaticSpellingKind::None);
   auto *dc = decl->getDeclContext();

@@ -2862,7 +2862,9 @@ RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
 
 RValue RValueEmitter::
 visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
-  visit(E->getLHS());
+  // A namespace is only a compile-time lookup qualifier.
+  if (!E->getLHS()->getType()->is<NamespaceType>())
+    visit(E->getLHS());
   return visit(E->getRHS());
 }
 
@@ -7749,6 +7751,9 @@ static void emitIgnoredPackExpansion(SILGenFunction &SGF,
 
 // Evaluate the expression as an lvalue or rvalue, discarding the result.
 void SILGenFunction::emitIgnoredExpr(Expr *E) {
+  if (E->getType()->is<NamespaceType>())
+    return;
+
   // If this is a tuple expression, recursively ignore its elements.
   // This may let us recursively avoid work.
   if (auto *TE = dyn_cast<TupleExpr>(E)) {

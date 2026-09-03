@@ -784,7 +784,8 @@ private:
       return getOrCreateModule(
           {ImportPath::Access(), cast<ModuleDecl>(DC)});
     case DeclContextKind::NamespaceDecl:
-      llvm_unreachable("namespace debug context is not implemented");
+      // Namespaces have no runtime/debug metadata node in this slice.
+      return getOrCreateContext(DC->getParent());
     case DeclContextKind::FileUnit:
       // A module may contain multiple files.
       return getOrCreateContext(DC->getParent());

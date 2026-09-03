@@ -4805,7 +4805,11 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
                                                SourceRange(StartLoc, EndLoc));
     printSourceRange(Range, Ctx);
   } else {
-    if (decl->isStatic() && Options.PrintStaticKeyword)
+    bool hasNamespaceStaticSpelling =
+        isa<NamespaceDecl>(decl->getDeclContext()) &&
+        decl->getStaticSpelling() != StaticSpellingKind::None;
+    if ((decl->isStatic() || hasNamespaceStaticSpelling) &&
+        Options.PrintStaticKeyword)
       printStaticKeyword(decl->getCorrectStaticSpelling());
 
     printSelfAccessKindModifiersIfNeeded(decl);

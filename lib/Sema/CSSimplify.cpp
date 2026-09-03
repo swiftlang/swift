@@ -10713,7 +10713,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     bool hasInstanceMethods = false;
     bool hasStaticMembers = false;
     Type instanceTy = baseObjTy;
-    if (baseObjTy->is<ModuleType>()) {
+    if (baseObjTy->is<ModuleType>() || baseObjTy->is<NamespaceType>()) {
       hasStaticMembers = true;
     } else if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>()) {
       instanceTy = baseObjMeta->getInstanceType();

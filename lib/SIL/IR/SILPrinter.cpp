@@ -247,7 +247,9 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     return;
 
   case DeclContextKind::NamespaceDecl:
-    llvm_unreachable("namespace context made it to SIL printing");
+    printFullContext(Context->getParent(), Buffer);
+    Buffer << cast<NamespaceDecl>(Context)->getName() << ".";
+    return;
 
   case DeclContextKind::FileUnit:
     // Ignore the file; just print the module.

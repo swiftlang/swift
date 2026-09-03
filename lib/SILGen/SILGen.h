@@ -270,8 +270,9 @@ public:
   void visitConstructorDecl(ConstructorDecl *d) {}
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
-  void visitNamespaceDecl(NamespaceDecl *) {
-    llvm_unreachable("namespace SIL generation is not implemented");
+  void visitNamespaceDecl(NamespaceDecl *decl) {
+    for (auto *member : decl->getMembers())
+      visit(member);
   }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
   void visitUsingDecl(UsingDecl *) {}

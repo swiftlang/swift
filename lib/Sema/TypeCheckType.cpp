@@ -5591,6 +5591,15 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
+  if (auto namespaceTy = result->getAs<NamespaceType>()) {
+    if (!options.contains(TypeResolutionFlags::SilenceDiagnostics)) {
+      diagnose(repr->getNameLoc(), diag::namespace_cannot_be_used_as_type,
+               namespaceTy->getNamespace()->getName());
+    }
+    repr->setInvalid();
+    return ErrorType::get(getASTContext());
+  }
+
     auto *dc = getDeclContext();
     auto &ctx = getASTContext();
 

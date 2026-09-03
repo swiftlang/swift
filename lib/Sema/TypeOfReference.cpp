@@ -1182,8 +1182,8 @@ ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
     // Convert any placeholder types and open generics.
     type = replaceInferableTypesWithTypeVars(type, locator, preparedOverload);
 
-    // Module types are not wrapped in metatypes.
-    if (type->is<ModuleType>())
+    // Module and namespace qualifier types are not wrapped in metatypes.
+    if (type->is<ModuleType>() || type->is<NamespaceType>())
       return { type, Type() };
 
     // If it's a value reference, refer to the metatype.
@@ -1886,7 +1886,7 @@ ConstraintSystem::getTypeOfMemberReferencePre(
   Type baseRValueTy = baseTy->getRValueType();
   auto baseObjTy = baseRValueTy->getMetatypeInstanceType();
 
-  if (baseObjTy->is<ModuleType>()) {
+  if (baseObjTy->is<ModuleType>() || baseObjTy->is<NamespaceType>()) {
     return getTypeOfReferencePre(choice, useDC, locator, preparedOverload);
   }
 
@@ -2099,7 +2099,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReferencePost(
   Type baseRValueTy = baseTy->getRValueType();
   Type baseObjTy = baseRValueTy->getMetatypeInstanceType();
 
-  if (baseObjTy->is<ModuleType>()) {
+  if (baseObjTy->is<ModuleType>() || baseObjTy->is<NamespaceType>()) {
     return getTypeOfReferencePost(choice, useDC, locator,
                                   openedType, thrownErrorType);
   }

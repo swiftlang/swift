@@ -2705,9 +2705,27 @@ bool DeclContext::lookupQualified(Type type,
     return lookupQualified(moduleTy->getModule(), member,
                            loc, options, decls);
 
-  // Namespace member lookup is added with the qualified-lookup slice.
-  if (type->is<NamespaceType>())
-    return false;
+  // A namespace is a pure lookup qualifier. For the initial implementation,
+  // lookup is deliberately restricted to the members of this one declaration
+  // fragment; there is no extension, inheritance, or fragment merging.
+  if (auto namespaceTy = type->getAs<NamespaceType>()) {
+    auto *namespaceDecl = namespaceTy->getNamespace();
+    for (auto *memberDecl : namespaceDecl->getMembers()) {
+      auto *value = dyn_cast<FuncDecl>(memberDecl);
+      if (!value || !value->getName().matchesRef(member.getFullName()))
+        continue;
+      if (options.contains(NLFlags::OnlyTypes) ||
+          options.contains(NLFlags::OnlyMacros))
+        continue;
+      if (isAcceptableLookupResult(this, options, value,
+                                   /*onlyCompleteObjectInits=*/false,
+                                   /*requireImport=*/false))
+        decls.push_back(value);
+    }
+
+    pruneLookupResultSet(this, options, member.getModuleSelector(), decls);
+    return !decls.empty();
+  }
 
   // Figure out which nominal types we will look into.
   SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;

@@ -317,6 +317,9 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
      if (func->getDeclContext()->isModuleScopeContext())
        return DescriptiveDeclKind::GlobalFunction;
 
+     if (isa<NamespaceDecl>(func->getDeclContext()))
+       return DescriptiveDeclKind::GlobalFunction;
+
      // We have a method.
      switch (func->getCorrectStaticSpelling()) {
      case StaticSpellingKind::None:
@@ -4085,6 +4088,9 @@ static bool hasPrivateOrFilePrivateFormalAccess(const Decl *D) {
 static bool isInPrivateOrLocalContext(const Decl *D) {
   const DeclContext *DC = D->getDeclContext();
   if (!DC->isTypeContext()) {
+    if (auto *namespaceDecl = dyn_cast<NamespaceDecl>(DC))
+      return isInPrivateOrLocalContext(namespaceDecl);
+
     assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
            "unexpected context kind");
     return DC->isLocalContext();
@@ -5722,6 +5728,13 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   };
 
   while (!resultDC->isModuleScopeContext()) {
+    if (isa<NamespaceDecl>(resultDC)) {
+      // A namespace is a source-level qualification context, not an access
+      // boundary of its own, including for private declarations.
+      resultDC = resultDC->getParent();
+      continue;
+    }
+
     if (isa<TopLevelCodeDecl>(resultDC)) {
       return AccessScope(resultDC->getModuleScopeContext(),
                          access == AccessLevel::Private);
@@ -12237,6 +12250,9 @@ bool AccessorDecl::doesAccessorHaveBody() const {
 }
 
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
+  if (isa<NamespaceDecl>(getDeclContext()))
+    return getStaticSpelling();
+
   assert(getDeclContext()->isTypeContext());
   if (!isStatic())
     return StaticSpellingKind::None;

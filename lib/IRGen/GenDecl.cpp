@@ -2733,7 +2733,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::Namespace:
-    llvm_unreachable("NamespaceDecl made it to IRGen");
+    // Namespace members have already been emitted as ordinary SIL globals.
+    // The namespace itself has no runtime artifact or context descriptor.
+    return;
       
   case DeclKind::OpaqueType:
     // TODO: Eventually we'll need to emit descriptors to access the opaque

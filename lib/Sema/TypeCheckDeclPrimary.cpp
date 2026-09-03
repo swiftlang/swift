@@ -773,7 +773,19 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitions;
-  if (currentDC->isTypeContext()) {
+  if (auto *namespaceDecl = dyn_cast<NamespaceDecl>(currentDC)) {
+    // Namespace lookup is intentionally local to one declaration fragment in
+    // this initial implementation.
+    for (auto *member : namespaceDecl->getMembers()) {
+      auto *value = dyn_cast<ValueDecl>(member);
+      if (!value || !value->getName().matchesRef(current->getName()))
+        continue;
+      if (ABIRoleInfo(value).matches(currentIsABIOnly
+                                         ? ABIRole::ProvidesABI
+                                         : ABIRole::ProvidesAPI))
+        otherDefinitions.push_back(value);
+    }
+  } else if (currentDC->isTypeContext()) {
     // Look within a type context.
     if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
       OptionSet<NominalTypeDecl::LookupDirectFlags> flags;
@@ -3807,8 +3819,39 @@ public:
 
   void visitModuleDecl(ModuleDecl *) { }
 
-  void visitNamespaceDecl(NamespaceDecl *) {
-    llvm_unreachable("namespace type checking is not implemented");
+  void visitNamespaceDecl(NamespaceDecl *ND) {
+    TypeChecker::checkDeclAttributes(ND);
+
+    for (auto *member : ND->getMembers()) {
+      auto *func = dyn_cast<FuncDecl>(member);
+      if (!func) {
+        // VarDecls are auxiliary declarations of a PatternBindingDecl, which
+        // receives the one diagnostic for unsupported namespace storage.
+        if (!isa<VarDecl>(member))
+          member->diagnose(diag::namespace_member_not_supported);
+        member->setInvalid();
+        continue;
+      }
+
+      switch (func->getStaticSpelling()) {
+      case StaticSpellingKind::None:
+        func->diagnose(diag::namespace_function_requires_static,
+                       func->getName())
+            .fixItInsert(func->getAttributeInsertionLoc(/*forModifier=*/true),
+                         "static ");
+        func->setInvalid();
+        break;
+      case StaticSpellingKind::KeywordClass:
+        func->diagnose(diag::namespace_function_cannot_be_class)
+            .fixItReplace(func->getStaticLoc(), "static");
+        func->setInvalid();
+        break;
+      case StaticSpellingKind::KeywordStatic:
+        break;
+      }
+
+      visit(func);
+    }
   }
 
   void visitEnumCaseDecl(EnumCaseDecl *ECD) {

@@ -1365,7 +1365,10 @@ public:
   }
 
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
-    setSideEffect(e->getLHS());
+    // Namespace qualifiers have no runtime representation or side effect.
+    // Do not ask type lowering to materialize their qualifier-only type.
+    if (!e->getLHS()->getType()->is<NamespaceType>())
+      setSideEffect(e->getLHS());
     visit(e->getRHS());
   }
 

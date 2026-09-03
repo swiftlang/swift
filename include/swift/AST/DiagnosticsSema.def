@@ -1228,6 +1228,8 @@ NOTE(note_remapped_type,none,
      "did you mean to use '%0'?", (StringRef))
 NOTE(note_module_as_type,none,
      "cannot use module %0 as a type", (Identifier))
+ERROR(namespace_cannot_be_used_as_type,none,
+      "cannot use namespace %0 as a type", (Identifier))
 
 ERROR(use_unknown_object_literal_protocol,none,
      "cannot deduce protocol for %0 literal", (StringRef))
@@ -1890,6 +1892,13 @@ ERROR(functions_mutating_and_not,none,
 
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
+
+ERROR(namespace_function_requires_static,none,
+      "function %0 declared in a namespace must be marked 'static'", (DeclName))
+ERROR(namespace_function_cannot_be_class,none,
+      "'class' methods are not allowed in a namespace; use 'static' instead", ())
+ERROR(namespace_member_not_supported,none,
+      "only 'static func' declarations are supported in namespaces", ())
 
 ERROR(modifier_invalid_borrow_mutate_accessor, none,
       "%0 cannot be declared %1", (StringRef, StringRef))
@@ -5288,6 +5297,9 @@ WARNING(store_in_willset,none,
 
 ERROR(value_of_module_type,none,
       "expected module member name after module name", ())
+
+ERROR(value_of_namespace_type,none,
+      "expected namespace member name after namespace name", ())
 
 ERROR(value_of_metatype_type,none,
       "expected member name or initializer call after type name", ())

@@ -2731,12 +2731,16 @@ void ASTMangler::appendContext(const DeclContext *ctx,
   case DeclContextKind::Module:
     return appendModule(cast<ModuleDecl>(ctx), useModuleName);
 
-  case DeclContextKind::NamespaceDecl:
-    ABORT([&](llvm::raw_ostream &out) {
-      out << "Cannot mangle a declaration in a namespace context before "
-             "namespace mangling is implemented:\n";
-      cast<NamespaceDecl>(ctx)->dump(out);
-    });
+  case DeclContextKind::NamespaceDecl: {
+    // Provisional, intentionally private encoding for the first executable
+    // namespace slice. Model the namespace as a named anonymous context so it
+    // contributes identity without claiming nominal-type metadata semantics.
+    auto *namespaceDecl = cast<NamespaceDecl>(ctx);
+    appendContext(ctx->getParent(), base, useModuleName);
+    appendIdentifier(namespaceDecl->getName().str());
+    appendOperator("yXZ");
+    return;
+  }
 
   case DeclContextKind::FileUnit:
     assert(!isa<BuiltinUnit>(ctx) && "mangling member of builtin module!");
