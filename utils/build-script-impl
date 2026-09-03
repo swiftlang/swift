@@ -1295,6 +1295,7 @@ LLDB_SOURCE_DIR="${WORKSPACE}/llvm-project/lldb"
 LLBUILD_SOURCE_DIR="${WORKSPACE}/llbuild"
 STRESSTEST_PACKAGE_DIR="${WORKSPACE}/swift-stress-tester"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
+XCTEST_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 FOUNDATION_MACROS_SOURCE_DIR="${WORKSPACE}/swift-foundation/Sources/FoundationMacros"
@@ -1320,6 +1321,7 @@ SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 [[ "${SKIP_BUILD_STATIC_FOUNDATION}" ]] || PRODUCTS+=(foundation_static)
 [[ "${SKIP_BUILD_LLBUILD}" ]] || PRODUCTS+=(llbuild)
 [[ "${SKIP_BUILD_XCTEST}" ]] || PRODUCTS+=(xctest)
+[[ "${SKIP_BUILD_XCTEST}" ]] || PRODUCTS+=(xctest_static)
 
 # get_host_specific_variable(host, name)
 #
@@ -2347,9 +2349,21 @@ for host in "${ALL_HOSTS[@]}"; do
                   call rm -rf "$(build_directory ${host} llbuild)"
                 fi
                 ;;
-            xctest)
-                XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
-                FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
+            xctest|xctest_static)
+                if [[ "${product}" == "xctest_static" && "${host}" == macosx-* ]]; then
+                  continue
+                fi
+
+                if [[ "${product}" == "xctest_static" ]]; then
+                  XCTEST_DEPENDENCY_SUFFIX="_static"
+                  XCTEST_BUILD_SHARED_LIBS="NO"
+                else
+                  XCTEST_DEPENDENCY_SUFFIX=""
+                  XCTEST_BUILD_SHARED_LIBS="YES"
+                fi
+
+                XCTEST_BUILD_DIR=$(build_directory ${host} ${product})
+                FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation${XCTEST_DEPENDENCY_SUFFIX})
                 SWIFT_BUILD_DIR=$(build_directory ${host} swift)
 
                 if [[ "${SKIP_CLEAN_XCTEST}" == "0" ]]
@@ -2364,7 +2378,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 macosx-*)
                   # Staging: require opt-in for building with dispatch
                   if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
-                      LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
+                      LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch${XCTEST_DEPENDENCY_SUFFIX})"
                       LIBDISPATCH_BUILD_ARGS="--libdispatch-src-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
                   fi
 
@@ -2397,14 +2411,15 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_INSTALL_LIBDIR:PATH="lib"
 
-                    -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
-                    -DFoundation_DIR=$(build_directory ${host} foundation)/cmake/modules
-                    -DSwiftTesting_DIR=$(build_directory ${host} swifttesting)/cmake/modules
+                    -DBUILD_SHARED_LIBS=${XCTEST_BUILD_SHARED_LIBS}
+                    -Ddispatch_DIR=$(build_directory ${host} libdispatch${XCTEST_DEPENDENCY_SUFFIX})/cmake/modules
+                    -DFoundation_DIR=$(build_directory ${host} foundation${XCTEST_DEPENDENCY_SUFFIX})/cmake/modules
+                    -DSwiftTesting_DIR=$(build_directory ${host} swifttesting${XCTEST_DEPENDENCY_SUFFIX})/cmake/modules
                     -DSwiftTestingMacros_DIR=$(build_directory ${host} swifttestingmacros)/cmake/modules
                     -DLLVM_DIR=$(build_directory ${host} llvm)/lib/cmake/llvm
 
                     -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE:PATH=${LIBDISPATCH_SOURCE_DIR}
-                    -DXCTEST_PATH_TO_LIBDISPATCH_BUILD:PATH=$(build_directory ${host} libdispatch)
+                    -DXCTEST_PATH_TO_LIBDISPATCH_BUILD:PATH=$(build_directory ${host} libdispatch${XCTEST_DEPENDENCY_SUFFIX})
                     -DXCTEST_PATH_TO_FOUNDATION_BUILD:PATH=${FOUNDATION_BUILD_DIR}
                     -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                     -DCMAKE_PREFIX_PATH:PATH=$(build_directory ${host} llvm)
@@ -2797,9 +2812,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 results_targets=("test")
                 executable_target=""
                 ;;
-            xctest)
+            xctest|xctest_static)
                 if [[ "${SKIP_TEST_XCTEST}" ]]; then
                     continue
+                fi
+
+                if [[ "${product}" == "xctest_static" && "${host}" == macosx-* ]]; then
+                  continue
                 fi
 
                 case ${host} in
@@ -3005,7 +3024,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 INSTALL_TARGETS="install-distribution"
                 ;;
-            xctest)
+            xctest|xctest_static)
                 if [[ -z "${INSTALL_XCTEST}" ]] ; then
                     continue
                 fi
