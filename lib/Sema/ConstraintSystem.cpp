@@ -3714,7 +3714,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::GlobalActorType:
     case ConstraintLocator::ContextualType:
-    case ConstraintLocator::FunctionSendability: {
+    case ConstraintLocator::FunctionSendability:
+    case ConstraintLocator::FunctionExecutionSemantics: {
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
