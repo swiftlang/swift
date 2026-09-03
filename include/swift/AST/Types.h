@@ -443,7 +443,7 @@ protected:
     HasCachedType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
@@ -451,7 +451,8 @@ protected:
     HasClangTypeInfo : 1,
     HasThrownError : 1,
     HasLifetimeDependencies : 1,
-    HasSendableDependence : 1
+    HasSendableDependence : 1,
+    HasCalledOnceDependence : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -3745,6 +3746,8 @@ protected:
           !Info.value().getLifetimeDependencies().empty();
       Bits.AnyFunctionType.HasSendableDependence =
           !Info->getSendableDependentType().isNull();
+      Bits.AnyFunctionType.HasCalledOnceDependence =
+          !Info->getCalledOnceDependentType().isNull();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3758,6 +3761,7 @@ protected:
       Bits.AnyFunctionType.HasThrownError = false;
       Bits.AnyFunctionType.HasLifetimeDependencies = false;
       Bits.AnyFunctionType.HasSendableDependence = false;
+      Bits.AnyFunctionType.HasCalledOnceDependence = false;
     }
     this->NumParams = NumParams;
     assert(this->NumParams == NumParams && "Params dropped!");
@@ -3818,6 +3822,10 @@ public:
     return Bits.AnyFunctionType.HasSendableDependence;
   }
 
+  bool hasCalledOnceDependentType() const {
+    return Bits.AnyFunctionType.HasCalledOnceDependence;
+  }
+
   bool hasLifetimeDependencies() const {
     return Bits.AnyFunctionType.HasLifetimeDependencies;
   }
@@ -3836,6 +3844,11 @@ public:
   /// is only used within the constraint system, and will contain type
   /// variables if present.
   Type getSendableDependentType() const;
+
+  /// A dependent type that determines whether the function is @called(once).
+  /// This is only used within the constraint system, and will contain type
+  /// variables if present.
+  Type getCalledOnceDependentType() const;
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
 
@@ -3889,7 +3902,8 @@ public:
     assert(hasExtInfo());
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
                    getGlobalActor(), getThrownError(),
-                   getSendableDependentType(), getLifetimeDependencies());
+                   getSendableDependentType(), getCalledOnceDependentType(),
+                   getLifetimeDependencies());
   }
 
   /// Get the canonical ExtInfo for the function type.
@@ -4058,7 +4072,7 @@ public:
     return getExtInfo().getDifferentiabilityKind();
   }
 
-  bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
+  bool isCalledOnce() const;
 
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
@@ -4140,7 +4154,8 @@ class FunctionType final
   }
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return hasGlobalActor() + hasThrownError() + hasSendableDependentType();
+    return hasGlobalActor() + hasThrownError() + hasSendableDependentType() +
+           hasCalledOnceDependentType();
   }
 
   size_t numTrailingObjects(OverloadToken<size_t>) const {
@@ -4189,6 +4204,16 @@ public:
     if (!hasSendableDependentType())
       return Type();
     return getTrailingObjects<Type>()[hasGlobalActor() + hasThrownError()];
+  }
+
+  /// A dependent type that determines whether the function is @called(once).
+  /// This is only used within the constraint system, and will contain type
+  /// variables if present.
+  Type getCalledOnceDependentType() const {
+    if (!hasCalledOnceDependentType())
+      return Type();
+    return getTrailingObjects<Type>()[hasGlobalActor() + hasThrownError() +
+                                      hasSendableDependentType()];
   }
 
   inline size_t getNumLifetimeDependencies() const {

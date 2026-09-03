@@ -4523,6 +4523,17 @@ Type AnyFunctionType::getSendableDependentType() const {
   }
 }
 
+Type AnyFunctionType::getCalledOnceDependentType() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getCalledOnceDependentType();
+  case TypeKind::GenericFunction:
+    return Type();
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
+}
+
 bool AnyFunctionType::isSendable() const {
   ASSERT(!hasSendableDependentType() && "Query Sendable dependence first");
   return getExtInfo().isSendable();
@@ -4573,6 +4584,11 @@ AnyFunctionType::getLifetimeDependenceForResult(const ValueDecl *decl) const {
   return getLifetimeDependenceFor(resultIndex);
 }
 
+bool AnyFunctionType::isCalledOnce() const {
+  ASSERT(!hasCalledOnceDependentType() && "Query CalledOnce dependence first");
+  return getExtInfo().isCalledOnce();
+}
+
 ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
   return getClangTypeInfo().getCanonical();
 }
@@ -4613,11 +4629,15 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
   if (sendableDependentType)
     sendableDependentType = sendableDependentType->getCanonicalType();
 
+  Type calledOnceDependentType = getCalledOnceDependentType();
+  if (calledOnceDependentType)
+    calledOnceDependentType = calledOnceDependentType->getCanonicalType();
+
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
                  globalActor, thrownError, sendableDependentType,
-                 getLifetimeDependencies());
+                 calledOnceDependentType, getLifetimeDependencies());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
