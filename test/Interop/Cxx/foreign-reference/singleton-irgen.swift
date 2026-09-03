@@ -22,3 +22,10 @@ public func test() {
   _ = x.test()
   mutateIt(x)
 }
+
+// CHECK-LABEL: define {{.*}}swiftcc {{.*}}@"$s4main18testConstRvalueRefyySo21DeletedSpecialMembersVF"
+// CHECK: call i32 @{{.*}}readItConstRvalueRef{{.*}}(ptr %0)
+
+public func testConstRvalueRef(_ x: DeletedSpecialMembers) {
+  _ = readItConstRvalueRef(consuming: x)
+}
