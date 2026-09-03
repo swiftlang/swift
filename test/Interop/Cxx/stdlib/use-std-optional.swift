@@ -96,4 +96,11 @@ StdOptionalTestSuite.test("std::optional init(_:Wrapped)") {
   expectEqual(321, optConstexprCtor.pointee.value)
 }
 
+StdOptionalTestSuite.test("std::optional of move-only std::vector") {
+  let optVectorNonCopyable = getNonNilOptionalMoveOnlyVector()
+  expectEqual(2, optVectorNonCopyable.pointee.size())
+  expectEqual(789, optVectorNonCopyable.pointee[0].value)
+  expectEqual(987, optVectorNonCopyable.pointee[1].value)
+}
+
 runAllTests()
