@@ -51,9 +51,6 @@ enum class OverloadChoiceKind : int {
   /// was found by bridging the base value type to its Objective-C
   /// class type.
   DeclViaBridge,
-  /// The overload choice selects a particular declaration that
-  /// was found by unwrapping an optional context type.
-  DeclViaUnwrappedOptional,
   /// The overload choice materializes a pack from a tuple.
   MaterializePack,
   /// The overload choice extracts the isolation of a dynamically isolated
@@ -84,15 +81,26 @@ class OverloadChoice {
     /// Indicates that this declaration was bridged, turning a
     /// "Decl" kind into "DeclViaBridge" kind.
     IsDeclViaBridge = 0x01,
-    /// Indicates that this declaration was resolved by unwrapping an
-    /// optional context type, turning a "Decl" kind into
-    /// "DeclViaUnwrappedOptional".
+    /// Indicates that this declaration was resolved by unwrapping an optional
+    /// context type. Like \c IsDeclViaFunctionResult below, this is NOT a
+    /// distinct OverloadChoiceKind: it reads as a plain "Decl"
+    /// (\c getKind() returns \c Decl) and is distinguished via
+    /// \c isDeclViaUnwrappedOptional().
     IsDeclViaUnwrappedOptional = 0x02,
-    /// Indicates that there are viable members found on `Optional`
-    /// type and its underlying type. And current overload choice
-    /// is a backup one, which should be picked only if members
-    /// found directly on `Optional` do not match.
+    /// As \c IsDeclViaUnwrappedOptional, but there are also viable members on
+    /// `Optional` itself, so this one is a backup that should be picked only if
+    /// those don't match; \c isFallbackMemberOnUnwrappedBase() reads this to
+    /// score it below them.
     IsFallbackDeclViaUnwrappedOptional = 0x03,
+    /// Indicates that this declaration was resolved by looking through a
+    /// function-typed context '(P...) -> R' to a static member of the return
+    /// type 'R'. Like \c IsFallbackDeclViaUnwrappedOptional above, this is NOT
+    /// a distinct OverloadChoiceKind: it reads as a plain "Decl" everywhere
+    /// (\c getKind() returns \c Decl), and the one place that cares -- ranking,
+    /// where it must score strictly below a directly-found member -- reads it
+    /// via \c isDeclViaFunctionResult(). This keeps the leading-dot look-through
+    /// from spreading a bespoke kind across every overload-choice switch.
+    IsDeclViaFunctionResult = 0x04,
     /// Indicates that this declaration was dynamic, turning a
     /// "Decl" kind into "DeclViaDynamic" kind.
     IsDeclViaDynamic = 0x07,
@@ -146,7 +154,6 @@ public:
     assert(kind != OverloadChoiceKind::Decl &&
            kind != OverloadChoiceKind::DeclViaDynamic &&
            kind != OverloadChoiceKind::DeclViaBridge &&
-           kind != OverloadChoiceKind::DeclViaUnwrappedOptional &&
            "wrong constructor for decl");
   }
 
@@ -220,6 +227,21 @@ public:
     return result;
   }
 
+  /// Retrieve an overload choice for a declaration that was found by looking
+  /// through a function-typed context '(P...) -> R' to a static member of the
+  /// return type 'R'.
+  ///
+  /// \param base The metatype of the return type 'R'.
+  static OverloadChoice getDeclViaFunctionResult(Type base, ValueDecl *value,
+                                                 FunctionRefInfo functionRefInfo) {
+    OverloadChoice result;
+    result.BaseAndDeclKind.setPointer(base);
+    result.BaseAndDeclKind.setInt(IsDeclViaFunctionResult);
+    result.DeclOrKind = value;
+    result.TheFunctionRefInfo = functionRefInfo;
+    return result;
+  }
+
   /// Retrieve an overload choice for a declaration that was found via
   /// dynamic member lookup. The `ValueDecl` is a `subscript(dynamicMember:...)`
   /// method.
@@ -252,9 +274,11 @@ public:
       switch (BaseAndDeclKind.getInt()) {
       case IsDeclViaBridge: return OverloadChoiceKind::DeclViaBridge;
       case IsDeclViaDynamic: return OverloadChoiceKind::DeclViaDynamic;
-      case IsDeclViaUnwrappedOptional:
-      case IsFallbackDeclViaUnwrappedOptional:
-        return OverloadChoiceKind::DeclViaUnwrappedOptional;
+      // IsDeclViaUnwrappedOptional, IsFallbackDeclViaUnwrappedOptional, and
+      // IsDeclViaFunctionResult are deliberately not mapped to distinct kinds;
+      // each reads as a plain Decl and is distinguished via a predicate
+      // (isDeclViaUnwrappedOptional / isFallbackMemberOnUnwrappedBase,
+      // isDeclViaFunctionResult).
       default: return OverloadChoiceKind::Decl;
       }
     }
@@ -270,7 +294,6 @@ public:
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaDynamic:
-    case OverloadChoiceKind::DeclViaUnwrappedOptional:
     case OverloadChoiceKind::DynamicMemberLookup:
     case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       return true;
@@ -308,6 +331,23 @@ public:
   /// members found directly on `Optional` didn't match.
   bool isFallbackMemberOnUnwrappedBase() const {
     return BaseAndDeclKind.getInt() == IsFallbackDeclViaUnwrappedOptional;
+  }
+
+  /// Whether this choice was found by unwrapping an optional context type (the
+  /// member lives on the wrapped type). Such a choice is an ordinary \c Decl
+  /// (\c getKind() returns \c Decl); this covers both the regular and the
+  /// fallback form (see \c isFallbackMemberOnUnwrappedBase).
+  bool isDeclViaUnwrappedOptional() const {
+    return BaseAndDeclKind.getInt() == IsDeclViaUnwrappedOptional ||
+           BaseAndDeclKind.getInt() == IsFallbackDeclViaUnwrappedOptional;
+  }
+
+  /// Whether this choice was found by looking through a function-typed context
+  /// '(P...) -> R' to a static member of the return type 'R'. Such a choice is
+  /// an ordinary \c Decl (\c getKind() returns \c Decl) but must be scored
+  /// strictly below a member found directly on the expected type.
+  bool isDeclViaFunctionResult() const {
+    return BaseAndDeclKind.getInt() == IsDeclViaFunctionResult;
   }
 
   /// Whether this choice is for any kind of dynamic member lookup.

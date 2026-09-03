@@ -2181,6 +2181,13 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                                                 const OverloadChoice &overload,
                                                 DeclContext *useDC) {
+  // A member found by unwrapping an optional base reads as a plain Decl, but
+  // its member type does not account for the T -> T? promotion at the use site,
+  // so -- as when DeclViaUnwrappedOptional was a distinct kind -- don't offer a
+  // simplified type for it (which would mislead disjunction pre-filtering).
+  if (overload.isDeclViaUnwrappedOptional())
+    return Type();
+
   switch (overload.getKind()) {
   case OverloadChoiceKind::Decl:
     // Declaration choices are handled below.
@@ -2188,7 +2195,6 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
 
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup:
   case OverloadChoiceKind::KeyPathApplication:
@@ -2394,7 +2400,6 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaBridge:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::TupleIndex:
   case OverloadChoiceKind::MaterializePack:
   case OverloadChoiceKind::ExtractFunctionIsolation:
@@ -2974,7 +2979,6 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
     Type openedType, thrownErrorType;
@@ -3294,6 +3298,15 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
 
   if (choice.isFallbackMemberOnUnwrappedBase()) {
     increaseScore(SK_UnresolvedMemberViaOptional, locator);
+  }
+
+  // A member found by looking through a function-typed context to its return
+  // type is strictly lower priority than any member found directly, so that a
+  // direct candidate always wins when one exists. This is the one place that
+  // distinguishes such a choice from an ordinary Decl (see
+  // OverloadChoice::isDeclViaFunctionResult).
+  if (choice.isDeclViaFunctionResult()) {
+    increaseScore(SK_UnresolvedMemberViaFunctionResult, locator);
   }
 }
 

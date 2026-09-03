@@ -678,6 +678,11 @@ EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
 /// Emit `resignRemoteID` calls in remote distributed actor deinits.
 EXPERIMENTAL_FEATURE(DistributedActorResignRemoteID, false)
 
+/// Extend implicit member syntax (the leading dot) so that, when the expected
+/// type is a function type '(P...) -> R', member lookup also considers static
+/// members (such as enum cases with payloads) of the return type 'R'.
+EXPERIMENTAL_FEATURE(ImplicitMemberOnFunctionType, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

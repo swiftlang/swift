@@ -297,7 +297,8 @@ static bool isArithmeticOperator(ValueDecl *decl) {
 /// that would they'd require solving to figure out whether they are a
 /// potential match or not.
 static bool isSupportedGenericOverloadChoice(ValueDecl *decl,
-                                             GenericFunctionType *choiceType) {
+                                             GenericFunctionType *choiceType,
+                                             bool hasImplicitMemberArgs) {
   // Same type requirements cannot be handled because each
   // candidate-parameter pair is (currently) considered in isolation.
   if (llvm::any_of(choiceType->getRequirements(), [](const Requirement &req) {
@@ -322,14 +323,38 @@ static bool isSupportedGenericOverloadChoice(ValueDecl *decl,
   if (!paramList)
     return false;
 
-  return llvm::all_of(paramList->getArray(), [](const ParamDecl *P) {
+  return llvm::all_of(paramList->getArray(), [&](const ParamDecl *P) {
     auto paramType = P->getInterfaceType();
-    return paramType->is<GenericTypeParamType>() ||
-           !paramType->hasTypeParameter();
+    if (paramType->is<GenericTypeParamType>() ||
+        !paramType->hasTypeParameter())
+      return true;
+
+    // If the call has implicit member (leading-dot) arguments, allow
+    // function-typed parameters composed of generic parameters and/or
+    // concrete types i.e. `(P) -> Event`. Such parameters can be
+    // analyzed through the name of the member (via the return type)
+    // even though their types are only partially concrete.
+    if (hasImplicitMemberArgs) {
+      if (auto *fnTy = paramType->getAs<AnyFunctionType>()) {
+        auto isAnalyzable = [](Type type) {
+          return type->is<GenericTypeParamType>() ||
+                 !type->hasTypeParameter();
+        };
+
+        return llvm::all_of(fnTy->getParams(),
+                            [&](const auto &param) {
+                              return isAnalyzable(param.getPlainType());
+                            }) &&
+               isAnalyzable(fnTy->getResult());
+      }
+    }
+
+    return false;
   });
 }
 
-static bool isSupportedDisjunction(Constraint *disjunction) {
+static bool isSupportedDisjunction(Constraint *disjunction,
+                                   bool hasImplicitMemberArgs = false) {
   auto choices = disjunction->getNestedConstraints();
 
   if (isOperatorDisjunction(disjunction))
@@ -365,7 +390,8 @@ static bool isSupportedDisjunction(Constraint *disjunction) {
         return true;
 
       if (auto *genericFn = choiceType->getAs<GenericFunctionType>())
-        return isSupportedGenericOverloadChoice(decl, genericFn);
+        return isSupportedGenericOverloadChoice(decl, genericFn,
+                                                hasImplicitMemberArgs);
 
       return false;
     }
@@ -408,6 +434,189 @@ static ValueDecl *isViableOverloadChoice(ConstraintSystem &cs,
     return nullptr;
 
   return decl;
+}
+
+namespace {
+
+/// An implicit member (leading-dot) argument i.e. `.foo`, `.foo(...)`,
+/// or `.foo.bar`, for which only the name of the leading member is known
+/// before the contextual type is resolved.
+struct ImplicitMemberArgument {
+  /// The name of the leading (base) member of the chain.
+  DeclNameRef name;
+  /// Whether the leading member has postfix syntax applied to it
+  /// (a call, member access, etc.), which means that the type of the
+  /// whole argument is not the type of the leading member reference.
+  bool hasPostfix;
+};
+
+} // end anonymous namespace
+
+/// If the given argument expression is an implicit member expression
+/// (or a chain rooted in one), extract information about it.
+static std::optional<ImplicitMemberArgument>
+getImplicitMemberArgument(Expr *argument) {
+  // Look through parentheses.
+  while (auto *PE = dyn_cast_or_null<ParenExpr>(argument))
+    argument = PE->getSubExpr();
+
+  if (!argument)
+    return std::nullopt;
+
+  if (auto *chain = dyn_cast<UnresolvedMemberChainResultExpr>(argument)) {
+    if (auto *base = chain->getChainBase()) {
+      return ImplicitMemberArgument{base->getName(),
+                                    /*hasPostfix=*/chain->getSubExpr() !=
+                                        base};
+    }
+    return std::nullopt;
+  }
+
+  // Defensive: a bare unresolved member that wasn't wrapped in a chain
+  // result expression.
+  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(argument))
+    return ImplicitMemberArgument{UME->getName(), /*hasPostfix=*/false};
+
+  return std::nullopt;
+}
+
+/// Attempt to determine whether an implicit member (leading-dot) argument
+/// could match the given parameter type, based only on a (cached) lookup
+/// of the member name and cheap shape checks that never resolve any types.
+///
+/// Returns:
+///  - \c std::nullopt when nothing could be determined;
+///  - \c 0 when the parameter provably cannot accept the argument
+///    because the very same member lookup the solver would perform
+///    cannot succeed;
+///  - a positive score when a member with a compatible shape exists.
+static std::optional<unsigned>
+scoreImplicitMemberArgument(ConstraintSystem &cs,
+                            const ImplicitMemberArgument &argument,
+                            Type paramType) {
+  auto &ctx = cs.getASTContext();
+  auto name = argument.name;
+
+  // Only simple, non-special names can be analyzed; e.g. `.init` refers
+  // to constructors, `$`-prefixed names to property wrappers, and module
+  // selectors change the lookup.
+  if (!name.isSimpleName() || name.isSpecial() || name.hasModuleSelector() ||
+      name.getBaseIdentifier().hasDollarPrefix())
+    return std::nullopt;
+
+  // `.isolation` has special meaning for @isolated(any) function types.
+  if (name.getBaseIdentifier() == ctx.Id_isolation)
+    return std::nullopt;
+
+  // If the contextual type is optional, members could come from the
+  // wrapped type or from `Optional` itself (i.e. `.some`, `.none`, or
+  // an unapplied instance member like `.map`). If the name exists on
+  // `Optional`, the possibilities can't be told apart cheaply.
+  {
+    Type unwrappedTy = paramType->lookThroughAllOptionalTypes();
+    if (!unwrappedTy->isEqual(paramType)) {
+      auto &optionalLookup = cs.lookupMember(paramType, name, SourceLoc());
+      if (!optionalLookup.empty())
+        return std::nullopt;
+
+      paramType = unwrappedTy;
+
+      // An optional-of-function parameter is not analyzable: member
+      // lookup through it is not the same as lookup into the function
+      // type itself.
+      if (paramType->is<FunctionType>())
+        return std::nullopt;
+    }
+  }
+
+  // A function-typed parameter: function types themselves have no
+  // members, so a leading dot can only resolve through the return type
+  // (and only when the feature that enables that is turned on).
+  bool viaFunctionResult = false;
+  unsigned expectedArity = 0;
+  if (auto *fnTy = paramType->getAs<FunctionType>()) {
+    if (!ctx.LangOpts.hasFeature(Feature::ImplicitMemberOnFunctionType))
+      return 0;
+
+    viaFunctionResult = true;
+    expectedArity = fnTy->getNumParams();
+    // Note: return-type lookup doesn't itself look through optionals
+    // or a second level of function types, so the result is used as-is.
+    paramType = fnTy->getResult();
+  }
+
+  // The base of the lookup has to be a fully concrete nominal type
+  // without any lookup "escape hatches".
+  if (paramType->hasTypeVariable() || paramType->hasTypeParameter() ||
+      paramType->hasUnboundGenericType() || paramType->hasError() ||
+      paramType->hasArchetype() || paramType->is<DynamicSelfType>())
+    return std::nullopt;
+
+  if (paramType->isExistentialType() || paramType->isAnyObject())
+    return std::nullopt;
+
+  // `String` members could come from the bridged `NSString`; `Double`
+  // and `CGFloat` are implicitly convertible to each other, so for them
+  // the lookup type is not guaranteed to be the parameter type.
+  if (paramType->isString() || paramType->isDouble() || paramType->isCGFloat())
+    return std::nullopt;
+
+  if (!paramType->getAnyNominal())
+    return std::nullopt;
+
+  // This is exactly the (cached) lookup the solver is going to use to
+  // find candidates for the unresolved member, so if it comes up empty
+  // the overload choice cannot possibly succeed.
+  auto &lookup = cs.lookupMember(paramType, name, SourceLoc());
+  if (lookup.empty())
+    return 0;
+
+  // With postfix syntax applied (i.e. `.foo(...)` or `.foo.bar`) the
+  // type of the argument is not the type of the leading member, so
+  // existence of the member is all that can be checked.
+  if (argument.hasPostfix)
+    return 30;
+
+  // A bare implicit member: the unapplied reference to the member has
+  // to be convertible to the parameter type. Without resolving any
+  // types it's only possible to reason about shapes:
+  //
+  //  - function conversions preserve arity, so an enum element can only
+  //    match a function-typed parameter if it has a payload with the
+  //    same number of elements;
+  //  - a no-payload enum element is a value of the enum type and can
+  //    never match a function type;
+  //  - an unapplied reference to a function (or a payload enum element)
+  //    is always function-typed and can never match a non-function
+  //    nominal parameter type.
+  //
+  // Everything else (variables, nested types, etc.) is conservatively
+  // considered viable.
+  bool anyViable = false;
+  for (const auto &entry : lookup) {
+    auto *decl = entry.getValueDecl();
+
+    if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
+      if (viaFunctionResult) {
+        anyViable |= EED->hasAssociatedValues() &&
+                     EED->getParameterList()->size() == expectedArity;
+      } else {
+        anyViable |= !EED->hasAssociatedValues();
+      }
+      continue;
+    }
+
+    if (isa<FuncDecl>(decl)) {
+      // Arity of functions is not checked because of curried self,
+      // default arguments, variadics, etc.
+      anyViable |= viaFunctionResult;
+      continue;
+    }
+
+    anyViable = true;
+  }
+
+  return anyViable ? 30 : 0;
 }
 
 /// If the given expression represents a chain of operators that have
@@ -623,6 +832,12 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 
   if (!isExpr<ApplyExpr>(
           cs.getParentExpr(argumentList->getUnlabeledUnaryExpr())))
+    return std::nullopt;
+
+  // Implicit member (leading-dot) arguments carry no type information,
+  // but they can be analyzed based on their member name by the general
+  // argument matching below.
+  if (getImplicitMemberArgument(argumentList->getUnlabeledUnaryExpr()))
     return std::nullopt;
 
   // The hack rolled back favoring choices if one of the overloads was a
@@ -1209,6 +1424,19 @@ static DisjunctionInfo computeDisjunctionInfo(
     }
   }
 
+  // Implicit member (leading-dot) arguments i.e. `.member` don't have
+  // any type information associated with them before the contextual
+  // type is resolved, but the name of the member is known and can be
+  // used to check whether a particular overload choice could possibly
+  // have a member with a matching name and shape.
+  SmallVector<std::optional<ImplicitMemberArgument>, 4> implicitMemberArgs;
+  bool hasImplicitMemberArgs = false;
+  for (const auto &argument : *argumentList) {
+    auto member = getImplicitMemberArgument(argument.getExpr());
+    hasImplicitMemberArgs |= member.has_value();
+    implicitMemberArgs.push_back(member);
+  }
+
   // This maintains an "old hack" behavior where overloads
   // of `OverloadedDeclRef` calls were favored purely
   // based on arity of arguments and parameters matching.
@@ -1233,7 +1461,7 @@ static DisjunctionInfo computeDisjunctionInfo(
     return info.value();
   }
 
-  if (!isSupportedDisjunction(disjunction))
+  if (!isSupportedDisjunction(disjunction, hasImplicitMemberArgs))
     return DisjunctionInfo();
 
   SmallVector<FunctionType::Param, 8> argsWithLabels;
@@ -1456,6 +1684,76 @@ static DisjunctionInfo computeDisjunctionInfo(
                               /*allow fixes*/ false, listener, std::nullopt);
   };
 
+  // Analyze an implicit member argument against the parameter it's
+  // matched to. Always starts from the raw parameter so that both the
+  // coverage pre-pass below and the scoring pass produce identical
+  // results.
+  auto analyzeImplicitMemberParam =
+      [&](const AnyFunctionType::Param &param,
+          const ImplicitMemberArgument &member) -> std::optional<unsigned> {
+    auto flags = param.getParameterFlags();
+    // Variadic arity is unknown and `inout` requires an l-value; neither
+    // is analyzable through a member name.
+    if (flags.isVariadic() || flags.isInOut())
+      return std::nullopt;
+
+    auto paramType = param.getPlainType();
+    if (flags.isAutoClosure())
+      paramType = paramType->castTo<AnyFunctionType>()->getResult();
+
+    return scoreImplicitMemberArgument(cs, member, paramType);
+  };
+
+  // Implicit member scores may only be used when the analysis is
+  // definitive for *every* viable overload choice the argument could
+  // be matched to. Favoring one choice while a competing choice is
+  // merely *unanalyzable* (e.g. its parameter is a `Double`, `String`,
+  // or an existential) would place the unanalyzable choice in a later
+  // partition and let the solver skip it entirely once the favored
+  // choice succeeds - changing overload resolution and suppressing
+  // ambiguities in existing code.
+  SmallVector<bool, 4> implicitMemberAnalysisIsDefinitive;
+  if (hasImplicitMemberArgs) {
+    implicitMemberAnalysisIsDefinitive.resize(implicitMemberArgs.size());
+    for (unsigned i : indices(implicitMemberArgs))
+      implicitMemberAnalysisIsDefinitive[i] = implicitMemberArgs[i].has_value();
+
+    forEachDisjunctionChoice(
+        cs, disjunction,
+        [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
+          auto matchings =
+              matchArguments(choice->getOverloadChoice(), overloadType);
+          // A choice that cannot match the argument list at all never
+          // gets favored or scored, so it doesn't participate in the
+          // analysis (this mirrors the scoring loop below).
+          if (!matchings)
+            return;
+
+          for (unsigned paramIdx = 0, n = overloadType->getNumParams();
+               paramIdx != n; ++paramIdx) {
+            auto argIndices = matchings->parameterBindings[paramIdx];
+            // Mirror the scoring loop: multiple argument matchings drop
+            // the choice from scoring entirely.
+            if (argIndices.size() > 1)
+              return;
+            if (argIndices.empty())
+              continue;
+
+            auto argIdx = argIndices.front();
+            if (argIdx >= implicitMemberArgs.size())
+              continue;
+
+            auto member = implicitMemberArgs[argIdx];
+            if (!member)
+              continue;
+
+            if (!analyzeImplicitMemberParam(
+                    overloadType->getParams()[paramIdx], *member))
+              implicitMemberAnalysisIsDefinitive[argIdx] = false;
+          }
+        });
+  }
+
   // The choice with the best score.
   unsigned bestScore = 0;
   SmallVector<std::pair<Constraint *, unsigned>, 2> favoredChoices;
@@ -1507,10 +1805,6 @@ static DisjunctionInfo computeDisjunctionInfo(
 
           auto argIdx = argIndices.front();
 
-          // Looks like there is nothing know about the argument.
-          if (argumentCandidates[argIdx].empty())
-            continue;
-
           const auto paramFlags = param.getParameterFlags();
 
           // If parameter is variadic we cannot compare because we don't know
@@ -1522,6 +1816,30 @@ static DisjunctionInfo computeDisjunctionInfo(
 
           if (paramFlags.isAutoClosure())
             paramType = paramType->castTo<AnyFunctionType>()->getResult();
+
+          // Looks like there is nothing known about the argument except,
+          // possibly, that it's an implicit member reference i.e. `.foo`,
+          // which can be analyzed based on the name of the member (but
+          // only when the analysis is definitive for every choice, see
+          // the coverage pre-pass above).
+          if (argumentCandidates[argIdx].empty()) {
+            if (argIdx < implicitMemberAnalysisIsDefinitive.size() &&
+                implicitMemberAnalysisIsDefinitive[argIdx]) {
+              if (auto member = implicitMemberArgs[argIdx]) {
+                if (auto memberScore =
+                        analyzeImplicitMemberParam(param, *member)) {
+                  // Member lookup into this parameter type cannot find
+                  // the named member, so the overload cannot possibly
+                  // match; drop it from any further consideration.
+                  if (*memberScore == 0)
+                    return;
+
+                  score += *memberScore;
+                }
+              }
+            }
+            continue;
+          }
 
           // FIXME: Let's skip matching function types for now
           // because they have special rules for e.g. Concurrency
@@ -1662,6 +1980,23 @@ static DisjunctionInfo computeDisjunctionInfo(
           bestScore = std::max(bestScore, score);
         }
       });
+
+  // If the implicit member argument analysis didn't produce any
+  // favorings, restore the previous treatment of this disjunction:
+  // both a unary call with an implicit member argument (which used to
+  // be terminated by the unary argument hack above) and a disjunction
+  // that is only "supported" due to having implicit member arguments
+  // used to be ranked as not optimizable.
+  if (favoredChoices.empty() && hasImplicitMemberArgs) {
+    bool wasHandledByUnaryHack =
+        argumentList->isUnlabeledUnary() && implicitMemberArgs[0].has_value() &&
+        isExpr<ApplyExpr>(
+            cs.getParentExpr(argumentList->getUnlabeledUnaryExpr()));
+
+    if (wasHandledByUnaryHack ||
+        !isSupportedDisjunction(disjunction, /*hasImplicitMemberArgs=*/false))
+      return DisjunctionInfo::none();
+  }
 
   // Determine if the score and favoring decisions here are
   // based only on "speculative" sources i.e. inference from

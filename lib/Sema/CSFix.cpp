@@ -594,6 +594,21 @@ bool ContextualMismatch::diagnoseForAmbiguity(
     return primary.second->diagnose(*primary.first, /*asNote=*/false);
   }
 
+  // The types don't match across solutions, but this fix belongs to an
+  // unresolved member chain (a leading dot like `.foo`) that failed the
+  // same way in every solution. This happens when the member reference is
+  // passed to an overloaded call, so each overload imposes a different
+  // contextual type -- and, if the member resolves through a function-typed
+  // parameter's return type, potentially a different member per overload.
+  // The member-chain diagnostic explains why the member cannot be used in
+  // this position; emit it once from the primary solution rather than
+  // failing to produce any diagnostic.
+  if (getLocator()
+          ->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
+    const auto &primary = commonFixes.front();
+    return primary.second->diagnose(*primary.first, /*asNote=*/false);
+  }
+
   return false;
 }
 

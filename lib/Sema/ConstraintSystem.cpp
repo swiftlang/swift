@@ -1987,7 +1987,6 @@ DeclName OverloadChoice::getName() const {
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::DeclViaBridge:
-    case OverloadChoiceKind::DeclViaUnwrappedOptional:
       return getDecl()->getName();
 
     case OverloadChoiceKind::KeyPathApplication:
@@ -3401,8 +3400,7 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
       switch (choice.getKind()) {
       case OverloadChoiceKind::Decl:
       case OverloadChoiceKind::DeclViaDynamic:
-      case OverloadChoiceKind::DeclViaBridge:
-      case OverloadChoiceKind::DeclViaUnwrappedOptional: {
+      case OverloadChoiceKind::DeclViaBridge: {
         // FIXME: show deduced types, etc, etc.
         auto decl = choice.getDecl();
         if (EmittedDecls.insert(decl).second) {
