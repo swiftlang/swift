@@ -411,7 +411,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
     if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl))
       return nominalDecl->getDeclaredType();
 
-    assert(isa<ModuleDecl>(typeDecl));
+    assert((isa<ModuleDecl, NamespaceDecl>(typeDecl)));
     return typeDecl->getDeclaredInterfaceType();
   }
 

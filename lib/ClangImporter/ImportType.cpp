@@ -2159,6 +2159,7 @@ private:
   VISIT(AnyMetatypeType, recurse)
 
   VISIT(ModuleType, pass)
+  NEVER_VISIT(NamespaceType)
   VISIT(DynamicSelfType, pass)
 
   // Ignore attributes placed on generic parameter references and

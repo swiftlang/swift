@@ -244,6 +244,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::TopLevelCode:
     case DeclKind::Missing:
     case DeclKind::MissingMember:
+    case DeclKind::Namespace:
     case DeclKind::Module:
     case DeclKind::OpaqueType:
     case DeclKind::BuiltinTuple:

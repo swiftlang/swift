@@ -185,6 +185,7 @@ public:
   bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
   UNINTERESTING(TopLevelCode);
   UNINTERESTING(Import);
+  UNINTERESTING(Namespace);
   UNINTERESTING(PrecedenceGroup);
   UNINTERESTING(EnumCase);
   UNINTERESTING(Operator);

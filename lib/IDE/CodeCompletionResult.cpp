@@ -319,6 +319,8 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
     llvm_unreachable("not expecting such a declaration result");
   case DeclKind::Module:
     return CodeCompletionDeclKind::Module;
+  case DeclKind::Namespace:
+    return CodeCompletionDeclKind::Module;
   case DeclKind::TypeAlias:
     return CodeCompletionDeclKind::TypeAlias;
   case DeclKind::AssociatedType:

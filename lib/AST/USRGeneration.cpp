@@ -243,7 +243,9 @@ swift::SwiftUSRGenerationRequest::evaluate(Evaluator &evaluator,
   auto declIFaceTy = D->getInterfaceType();
 
   // Invalid code.
-  if (declIFaceTy.findIf([](Type t) -> bool { return t->is<ModuleType>(); }))
+  if (declIFaceTy.findIf([](Type t) -> bool {
+        return t->is<ModuleType>() || t->is<NamespaceType>();
+      }))
     return std::string();
 
   using namespace Mangle;

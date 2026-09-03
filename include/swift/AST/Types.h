@@ -105,6 +105,8 @@ class TypeVariableType;
 class ValueDecl;
 class ModuleDecl;
 class ModuleType;
+class NamespaceDecl;
+class NamespaceType;
 class ProtocolConformance;
 enum PointerTypeKind : unsigned;
 struct ValueOwnershipKind;
@@ -1195,6 +1197,7 @@ public:
   bool mayHaveMembers() {
     return (is<ArchetypeType>() ||
             is<ModuleType>() ||
+            is<NamespaceType>() ||
             isExistentialType() ||
             getAnyNominal() ||
             is<TupleType>());
@@ -3438,6 +3441,29 @@ private:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ModuleType, Type)
+
+/// The canonical qualifier type for a namespace declaration.
+///
+/// NamespaceType participates in qualified lookup but is not a value type or
+/// metatype and must not reach SIL or IR lowering.
+class NamespaceType : public TypeBase {
+  NamespaceDecl *const TheNamespace;
+
+public:
+  static NamespaceType *get(NamespaceDecl *N);
+
+  NamespaceDecl *getNamespace() const { return TheNamespace; }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Namespace;
+  }
+
+private:
+  NamespaceType(NamespaceDecl *N, const ASTContext &Ctx)
+      : TypeBase(TypeKind::Namespace, &Ctx, RecursiveTypeProperties()),
+        TheNamespace(N) {}
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(NamespaceType, Type)
   
 /// The type given to a dynamic \c Self return type.
 ///

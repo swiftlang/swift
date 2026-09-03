@@ -1410,6 +1410,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::Meet:
     case TypeKind::ErrorUnion:
     case TypeKind::Module:
+    case TypeKind::Namespace:
     case TypeKind::BuiltinUnboundGeneric:
     case TypeKind::PrimaryArchetype:
     case TypeKind::PackArchetype:
@@ -2729,6 +2730,13 @@ void ASTMangler::appendContext(const DeclContext *ctx,
     return;
   case DeclContextKind::Module:
     return appendModule(cast<ModuleDecl>(ctx), useModuleName);
+
+  case DeclContextKind::NamespaceDecl:
+    ABORT([&](llvm::raw_ostream &out) {
+      out << "Cannot mangle a declaration in a namespace context before "
+             "namespace mangling is implemented:\n";
+      cast<NamespaceDecl>(ctx)->dump(out);
+    });
 
   case DeclContextKind::FileUnit:
     assert(!isa<BuiltinUnit>(ctx) && "mangling member of builtin module!");
@@ -5536,6 +5544,7 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::OpaqueType:
     case DeclKind::GenericTypeParam:
     case DeclKind::AssociatedType:
+    case DeclKind::Namespace:
     case DeclKind::Module:
     case DeclKind::Param:
     case DeclKind::Macro:

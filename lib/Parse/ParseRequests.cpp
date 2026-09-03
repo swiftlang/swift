@@ -129,10 +129,10 @@ void registerDeclWithOpaqueResultType(SourceFile *SF, ArrayRef<Decl *> items) {
 FingerprintAndMembers
 ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
-  SourceFile *sf = idc->getAsGenericContext()->getParentSourceFile();
+  SourceFile *sf = idc->getAsDeclContext()->getParentSourceFile();
   ASTContext &ctx = idc->getDecl()->getASTContext();
   auto fileUnit
-    = dyn_cast<FileUnit>(idc->getAsGenericContext()->getModuleScopeContext());
+    = dyn_cast<FileUnit>(idc->getAsDeclContext()->getModuleScopeContext());
   if (!sf) {
     // If there is no parent source file, this is a deserialized or synthesized
     // declaration context, in which case `getMembers()` has all of the members.

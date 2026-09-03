@@ -2680,7 +2680,8 @@ void namelookup::extractDirectlyReferencedNominalTypes(
 
 void namelookup::tryExtractDirectlyReferencedNominalTypes(
     Type type, SmallVectorImpl<NominalTypeDecl *> &decls) {
-  if (!type->is<ModuleType>() && type->mayHaveMembers())
+  if (!type->is<ModuleType>() && !type->is<NamespaceType>() &&
+      type->mayHaveMembers())
     namelookup::extractDirectlyReferencedNominalTypes(type, decls);
 }
 
@@ -2703,6 +2704,10 @@ bool DeclContext::lookupQualified(Type type,
   if (auto moduleTy = type->getAs<ModuleType>())
     return lookupQualified(moduleTy->getModule(), member,
                            loc, options, decls);
+
+  // Namespace member lookup is added with the qualified-lookup slice.
+  if (type->is<NamespaceType>())
+    return false;
 
   // Figure out which nominal types we will look into.
   SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;
@@ -3144,6 +3149,10 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       modulesFound.push_back(module);
       continue;
     }
+
+    // Namespace declarations are lookup qualifiers, not nominal types.
+    if (isa<NamespaceDecl>(typeDecl))
+      continue;
 
     // Make sure we didn't miss some interesting kind of type declaration.
     assert(isa<GenericTypeParamDecl>(typeDecl) ||

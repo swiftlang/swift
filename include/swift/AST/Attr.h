@@ -342,6 +342,7 @@ public:
     OnValue = 0
 #define DECL(Name, _)
 #define VALUE_DECL(Name, _) |On##Name
+#define ITERABLE_NONGENERIC_DECL(Name, _) |On##Name
 #include "swift/AST/DeclNodes.def"
     ,
 

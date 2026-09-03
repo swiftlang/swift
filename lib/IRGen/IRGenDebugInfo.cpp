@@ -783,6 +783,8 @@ private:
     case DeclContextKind::Module:
       return getOrCreateModule(
           {ImportPath::Access(), cast<ModuleDecl>(DC)});
+    case DeclContextKind::NamespaceDecl:
+      llvm_unreachable("namespace debug context is not implemented");
     case DeclContextKind::FileUnit:
       // A module may contain multiple files.
       return getOrCreateContext(DC->getParent());
@@ -2050,6 +2052,7 @@ private:
     case TypeKind::Join:
     case TypeKind::Meet:
     case TypeKind::Module:
+    case TypeKind::Namespace:
     case TypeKind::BuiltinUnboundGeneric:
     case TypeKind::BuiltinBorrow:
       ABORT([&](llvm::raw_ostream &out) {

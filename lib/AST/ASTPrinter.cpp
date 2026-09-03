@@ -3269,6 +3269,8 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma, bool openBracket,
       // in an unstable order.
       std::stable_sort(Members.begin(), Members.end(), sortClangDecls);
     }
+  } else if (auto *namespaceDecl = dyn_cast<NamespaceDecl>(D)) {
+    AddMembers(namespaceDecl);
   }
   printMembers(Members, needComma, openBracket, closeBracket, doIndent);
 }
@@ -4129,6 +4131,18 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
     printDeclGenericRequirements(decl);
   }
+}
+
+void PrintAST::visitNamespaceDecl(NamespaceDecl *decl) {
+  printDocumentationComment(decl);
+  printAttributes(decl);
+  Printer.printIntroducerKeyword("namespace", Options, " ");
+  printContextIfNeeded(decl);
+  recordDeclLoc(decl, [&] {
+    Printer.printName(decl->getName(), getTypeMemberPrintNameContext(decl));
+  });
+  if (Options.TypeDefinitions)
+    printMembersOfDecl(decl);
 }
 
 void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
@@ -7135,6 +7149,13 @@ public:
     // Should print the module real name in case module aliasing is
     // used (see -module-alias), since that's the actual binary name.
     Printer.printModuleRef(T->getModule(), T->getModule()->getRealName());
+    Printer << ">";
+  }
+
+  void visitNamespaceType(NamespaceType *T,
+                          NonRecursivePrintOptions nrOptions) {
+    Printer << "namespace<";
+    Printer.printName(T->getNamespace()->getName());
     Printer << ">";
   }
 

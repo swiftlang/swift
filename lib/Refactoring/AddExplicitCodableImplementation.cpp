@@ -33,6 +33,8 @@ class AddCodableContext {
       return cast<NominalTypeDecl>(IDC);
     case IterableDeclContextKind::ExtensionDecl:
       return cast<ExtensionDecl>(IDC)->getExtendedNominal();
+    case IterableDeclContextKind::NamespaceDecl:
+      llvm_unreachable("a namespace cannot be a Codable context");
     }
     assert(false && "unhandled IterableDeclContextKind");
   }
@@ -44,6 +46,8 @@ class AddCodableContext {
       return cast<NominalTypeDecl>(IDC)->getBraces().Start;
     case IterableDeclContextKind::ExtensionDecl:
       return cast<ExtensionDecl>(IDC)->getBraces().Start;
+    case IterableDeclContextKind::NamespaceDecl:
+      llvm_unreachable("a namespace cannot be a Codable context");
     }
     assert(false && "unhandled IterableDeclContextKind");
   }

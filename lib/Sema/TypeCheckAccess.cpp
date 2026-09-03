@@ -692,6 +692,7 @@ public:
   UNREACHABLE(Operator, "cannot appear in a type context")
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
+  UNREACHABLE(Namespace, "namespace access checking is not implemented")
   UNREACHABLE(Using, "cannot appear in a type context")
 
   UNREACHABLE(Param, "does not have access control")
@@ -1457,6 +1458,7 @@ public:
   UNREACHABLE(Operator, "cannot appear in a type context")
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
+  UNREACHABLE(Namespace, "namespace access checking is not implemented")
   UNREACHABLE(Using, "cannot appear in a type context")
 
   UNREACHABLE(Param, "does not have access control")
@@ -2376,6 +2378,7 @@ public:
   UNREACHABLE(Import, "not applicable")
   UNREACHABLE(TopLevelCode, "not applicable")
   UNREACHABLE(Module, "not applicable")
+  UNREACHABLE(Namespace, "namespace availability checking is not implemented")
   UNREACHABLE(Missing, "not applicable")
   UNREACHABLE(Using, "not applicable")
 

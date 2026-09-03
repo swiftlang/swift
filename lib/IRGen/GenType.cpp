@@ -2548,6 +2548,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertMetatypeType(cast<MetatypeType>(ty));
   case TypeKind::Module:
     return convertModuleType(cast<ModuleType>(ty));
+  case TypeKind::Namespace:
+    llvm_unreachable("NamespaceType made it to IRGen");
   case TypeKind::DynamicSelf: {
     // DynamicSelf has the same representation as its superclass type.
     auto dynamicSelf = cast<DynamicSelfType>(ty);

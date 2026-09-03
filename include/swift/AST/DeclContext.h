@@ -106,6 +106,7 @@ enum class DeclContextKind : unsigned {
   Package,
   Module,
   FileUnit,
+  NamespaceDecl,
   GenericTypeDecl,
   ExtensionDecl,
   Last_DeclContextKind = ExtensionDecl
@@ -298,6 +299,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
     case DeclContextKind::Package:
       return ASTHierarchy::Package;
     case DeclContextKind::Module:
+    case DeclContextKind::NamespaceDecl:
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
@@ -805,6 +807,7 @@ using DeclRange = iterator_range<DeclIterator>;
 enum class IterableDeclContextKind : uint8_t {  
   NominalTypeDecl = 0,
   ExtensionDecl,
+  NamespaceDecl,
 };
 
 /// A declaration context that tracks the declarations it (directly)
@@ -826,7 +829,7 @@ class IterableDeclContext {
 
   /// The last declaration in this context, used for efficient insertion,
   /// along with the kind of iterable declaration context.
-  mutable llvm::PointerIntPair<Decl *, 1, IterableDeclContextKind>
+  mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind>
     LastDeclAndKind;
 
   /// The DeclID this IDC was deserialized from, if any. Used for named lazy
@@ -1071,7 +1074,14 @@ public:
   /// Return 'this' as a \c Decl.
   const Decl *getDecl() const;
 
-  /// Return 'this' as a \c GenericContext.
+  /// Return the declaration context represented by this iterable context.
+  DeclContext *getAsDeclContext();
+  const DeclContext *getAsDeclContext() const {
+    return const_cast<IterableDeclContext *>(this)->getAsDeclContext();
+  }
+
+  /// Return 'this' as a \c GenericContext, or null for a non-generic iterable
+  /// context.
   GenericContext *getAsGenericContext();
   const GenericContext *getAsGenericContext() const {
     return const_cast<IterableDeclContext *>(this)->getAsGenericContext();

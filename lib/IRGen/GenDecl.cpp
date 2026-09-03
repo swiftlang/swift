@@ -866,6 +866,9 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
     }
     return {getAddrOfModuleContextDescriptor(cast<ModuleDecl>(parent)),
             ConstantReference::Direct};
+
+  case DeclContextKind::NamespaceDecl:
+    llvm_unreachable("namespace metadata context is not implemented");
   }
   llvm_unreachable("unhandled kind");
 }
@@ -2728,6 +2731,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
   case DeclKind::Module:
     return;
+
+  case DeclKind::Namespace:
+    llvm_unreachable("NamespaceDecl made it to IRGen");
       
   case DeclKind::OpaqueType:
     // TODO: Eventually we'll need to emit descriptors to access the opaque
@@ -5973,6 +5979,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
     case DeclKind::Param:
+    case DeclKind::Namespace:
     case DeclKind::Module:
     case DeclKind::PrecedenceGroup:
     case DeclKind::Using:

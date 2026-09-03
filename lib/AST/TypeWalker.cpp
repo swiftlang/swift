@@ -107,6 +107,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitModuleType(ModuleType *ty) { return false; }
+  bool visitNamespaceType(NamespaceType *ty) { return false; }
   bool visitDynamicSelfType(DynamicSelfType *ty) { 
     return doIt(ty->getSelfType());
   }

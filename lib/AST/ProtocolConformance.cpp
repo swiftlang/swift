@@ -1576,6 +1576,8 @@ LookupAllConformancesInContextRequest::evaluate(
     Evaluator &eval, const IterableDeclContext *IDC) const {
   // Dig out the nominal type.
   const auto dc = IDC->getAsGenericContext();
+  if (!dc)
+    return {};
   const auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal) {
     return { };
@@ -1662,6 +1664,8 @@ IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
       // Look for a Sendable conformance globally. If it is synthesized
       // and matches this declaration context, use it.
       auto dc = getAsGenericContext();
+      if (!dc)
+        break;
 
       SmallPtrSet<ProtocolConformance *, 4> known;
       for (auto conformance : findSynthesizedConformances(dc)) {
@@ -1690,6 +1694,8 @@ IterableDeclContext::takeConformanceDiagnostics() const {
 
   // Dig out the nominal type.
   const auto dc = getAsGenericContext();
+  if (!dc)
+    return result;
   const auto nominal = dc->getSelfNominalTypeDecl();
 
   if (!nominal) {

@@ -678,6 +678,9 @@ EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
 /// Emit `resignRemoteID` calls in remote distributed actor deinits.
 EXPERIMENTAL_FEATURE(DistributedActorResignRemoteID, false)
 
+// Non-nominal declaration contexts used solely to qualify declarations.
+EXPERIMENTAL_FEATURE(Namespaces, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

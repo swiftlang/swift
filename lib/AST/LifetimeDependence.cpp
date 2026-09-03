@@ -238,7 +238,7 @@ static bool isDiagnosedNonEscapable(Type type) {
   // ModuleType created with ModuleType::get methods are ~Copyable and
   // ~Escapable because the Copyable and Escapable conformance is not added to
   // them by default.
-  if (type->is<ModuleType>()) {
+  if (type->is<ModuleType>() || type->is<NamespaceType>()) {
     return false;
   }
   return !type->isEscapable();

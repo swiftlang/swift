@@ -233,6 +233,9 @@ std::string declUSR(const Decl *D) {
   if (!D)
     return "";
 
+  if (isa<NamespaceDecl>(D))
+    return "";
+
   // Certain local synthesized declarations won't be assigned a local
   // discriminator, later causing an assertion if we try to generate a USR
   // for them. Avoid these.
@@ -260,7 +263,7 @@ std::string typeUSR(Type type) {
   if (!type)
     return "";
 
-  if (type->is<ModuleType>()) {
+  if (type->is<ModuleType>() || type->is<NamespaceType>()) {
     // ASTMangler does not support "module types". This can appear, for
     // example, on the left-hand side of a `DotSyntaxBaseIgnoredExpr` for a
     // module-qualified free function call: `Swift.print()`.
@@ -2101,6 +2104,8 @@ namespace {
         case IterableDeclContextKind::ExtensionDecl:
           printInherited(cast<ExtensionDecl>(DC)->getInherited());
           break;
+        case IterableDeclContextKind::NamespaceDecl:
+          break;
         }
         return;
       }
@@ -2497,10 +2502,13 @@ namespace {
         printWhereRequirements(NTD);
         break;
       }
-      case IterableDeclContextKind::ExtensionDecl:
+      case IterableDeclContextKind::ExtensionDecl: {
         const auto ED = cast<ExtensionDecl>(IDC);
         printInheritance(ED);
         printWhereRequirements(ED);
+        break;
+      }
+      case IterableDeclContextKind::NamespaceDecl:
         break;
       }
 
@@ -3048,6 +3056,11 @@ namespace {
       printFoot();
     }
 
+    void visitNamespaceDecl(NamespaceDecl *ND, Label label) {
+      printCommon(ND, "namespace_decl", label);
+      printCommonPost(ND);
+    }
+
     void visitMissingDecl(MissingDecl *missing, Label label) {
       printCommon(missing, "missing_decl", label);
       printFoot();
@@ -3129,6 +3142,10 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
 
   case DeclContextKind::Module:
     printName(os, cast<ModuleDecl>(dc)->getRealName());
+    break;
+
+  case DeclContextKind::NamespaceDecl:
+    printName(os, cast<NamespaceDecl>(dc)->getName());
     break;
 
   case DeclContextKind::FileUnit:
@@ -6544,6 +6561,13 @@ namespace {
       printCommon("module_type", label);
       printDeclName(T->getModule(), Label::always("module"));
       printFlag(T->getModule()->isNonSwiftModule(), "foreign");
+      printFoot();
+    }
+
+    void visitNamespaceType(NamespaceType *T, Label label) {
+      printCommon("namespace_type", label);
+      printFieldQuoted(T->getNamespace()->getName().str(),
+                       Label::always("namespace"));
       printFoot();
     }
 

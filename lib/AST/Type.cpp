@@ -330,6 +330,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::Metatype:
   case TypeKind::ExistentialMetatype:
   case TypeKind::Module:
+  case TypeKind::Namespace:
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::TypeVariable:
@@ -4921,6 +4922,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::Metatype:
   case TypeKind::ExistentialMetatype:
   case TypeKind::Module:
+  case TypeKind::Namespace:
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::TypeVariable:

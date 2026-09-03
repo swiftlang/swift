@@ -2093,6 +2093,7 @@ namespace {
     }
 
     UNSUPPORTED_METADATA(Module)
+    UNSUPPORTED_METADATA(Namespace)
 
     MetadataResponse visitDynamicSelfType(CanDynamicSelfType type,
                                           DynamicMetadataRequest request) {

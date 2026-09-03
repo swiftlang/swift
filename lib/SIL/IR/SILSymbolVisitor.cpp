@@ -818,6 +818,7 @@ public:
     case DeclKind::Class:
     case DeclKind::Protocol:
     case DeclKind::GenericTypeParam:
+    case DeclKind::Namespace:
     case DeclKind::Module:
     case DeclKind::Param:
     case DeclKind::EnumElement:

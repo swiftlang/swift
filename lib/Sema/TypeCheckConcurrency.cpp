@@ -5764,6 +5764,7 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::AssociatedType:
   case DeclKind::OpaqueType:
   case DeclKind::Param:
+  case DeclKind::Namespace:
   case DeclKind::Module:
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
@@ -8605,6 +8606,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::InfixOperator:
   case DeclKind::Missing:
   case DeclKind::MissingMember:
+  case DeclKind::Namespace:
   case DeclKind::Module:
   case DeclKind::PatternBinding:
   case DeclKind::PostfixOperator:

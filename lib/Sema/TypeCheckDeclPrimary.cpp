@@ -3807,6 +3807,10 @@ public:
 
   void visitModuleDecl(ModuleDecl *) { }
 
+  void visitNamespaceDecl(NamespaceDecl *) {
+    llvm_unreachable("namespace type checking is not implemented");
+  }
+
   void visitEnumCaseDecl(EnumCaseDecl *ECD) {
     // The type-checker doesn't care about how these are grouped.
   }

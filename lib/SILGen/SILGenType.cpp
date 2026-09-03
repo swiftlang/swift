@@ -1535,6 +1535,9 @@ public:
   void visitGenericTypeParamDecl(GenericTypeParamDecl *d) {}
   void visitAssociatedTypeDecl(AssociatedTypeDecl *d) {}
   void visitModuleDecl(ModuleDecl *md) {}
+  void visitNamespaceDecl(NamespaceDecl *) {
+    llvm_unreachable("namespace SIL generation is not implemented");
+  }
   void visitMissingMemberDecl(MissingMemberDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
@@ -1705,6 +1708,9 @@ public:
   void visitGenericTypeParamDecl(GenericTypeParamDecl *d) {}
   void visitAssociatedTypeDecl(AssociatedTypeDecl *d) {}
   void visitModuleDecl(ModuleDecl *md) {}
+  void visitNamespaceDecl(NamespaceDecl *) {
+    llvm_unreachable("namespace SIL generation is not implemented");
+  }
   void visitMissingMemberDecl(MissingMemberDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();

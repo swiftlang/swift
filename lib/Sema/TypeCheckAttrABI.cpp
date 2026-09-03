@@ -665,6 +665,7 @@ public:
   UNSUPPORTED_DECL(TypeAlias)
   UNSUPPORTED_DECL(GenericTypeParam)
   UNSUPPORTED_DECL(AssociatedType)
+  UNSUPPORTED_DECL(Namespace)
   UNSUPPORTED_DECL(Module)
   UNSUPPORTED_DECL(Param)
   UNSUPPORTED_DECL(Destructor)

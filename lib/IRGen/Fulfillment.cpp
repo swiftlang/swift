@@ -66,6 +66,8 @@ static bool isLeafTypeMetadata(CanType type) {
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Module:
     return true;
+  case TypeKind::Namespace:
+    llvm_unreachable("namespace qualifier type does not have metadata");
 
   // Type parameters are statically opaque.
   case TypeKind::PrimaryArchetype:

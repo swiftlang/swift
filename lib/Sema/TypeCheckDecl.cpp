@@ -2421,6 +2421,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::PrecedenceGroup:
   case DeclKind::Missing:
   case DeclKind::MissingMember:
+  case DeclKind::Namespace:
   case DeclKind::Module:
   case DeclKind::OpaqueType:
   case DeclKind::MacroExpansion:
@@ -3393,6 +3394,11 @@ SourceLoc PrettyPrintDeclRequest::evaluate(Evaluator &eval, const Decl *decl) co
       case DeclContextKind::ExtensionDecl:
         nameComponents.push_back(
             cast<ExtensionDecl>(dc)->getExtendedType().getString());
+        break;
+
+      case DeclContextKind::NamespaceDecl:
+        nameComponents.push_back(
+            cast<NamespaceDecl>(dc)->getName().str().str());
         break;
 
       case DeclContextKind::GenericTypeDecl:

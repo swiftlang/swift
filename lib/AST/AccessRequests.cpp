@@ -139,6 +139,7 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     return AccessLevel::Package;
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
+  case DeclContextKind::NamespaceDecl:
     return AccessLevel::Internal;
   case DeclContextKind::GenericTypeDecl: {
     auto generic = cast<GenericTypeDecl>(DC);

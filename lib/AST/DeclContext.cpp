@@ -381,6 +381,7 @@ SourceFile *DeclContext::getParentSourceFile() const {
       case DeclContextKind::EnumElementDecl:
       case DeclContextKind::ExtensionDecl:
       case DeclContextKind::GenericTypeDecl:
+      case DeclContextKind::NamespaceDecl:
       case DeclContextKind::MacroDecl:
       case DeclContextKind::SubscriptDecl:
       case DeclContextKind::TopLevelCodeDecl:
@@ -702,6 +703,8 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     return false;
   case DeclContextKind::Module:
     return cast<ModuleDecl>(this)->walk(Walker);
+  case DeclContextKind::NamespaceDecl:
+    return cast<NamespaceDecl>(this)->walk(Walker);
   case DeclContextKind::FileUnit:
     return cast<FileUnit>(this)->walk(Walker);
   case DeclContextKind::AbstractClosureExpr:
@@ -797,6 +800,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
   case DeclContextKind::Package:          Kind = "Package"; break;
   case DeclContextKind::Module:           Kind = "Module"; break;
   case DeclContextKind::FileUnit:         Kind = "FileUnit"; break;
+  case DeclContextKind::NamespaceDecl:    Kind = "NamespaceDecl"; break;
   case DeclContextKind::AbstractClosureExpr:
     Kind = "AbstractClosureExpr";
     break;
@@ -832,6 +836,9 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
     break;
   case DeclContextKind::Module:
     OS << " name=" << cast<ModuleDecl>(this)->getName();
+    break;
+  case DeclContextKind::NamespaceDecl:
+    OS << " name=" << cast<NamespaceDecl>(this)->getName();
     break;
   case DeclContextKind::FileUnit:
     switch (cast<FileUnit>(this)->getKind()) {
@@ -982,6 +989,9 @@ IterableDeclContext::getDecl() const {
   case IterableDeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(this);
     break;
+
+  case IterableDeclContextKind::NamespaceDecl:
+    return cast<NamespaceDecl>(this);
   }
   llvm_unreachable("Unhandled IterableDeclContextKind in switch.");
 }
@@ -992,6 +1002,20 @@ GenericContext *IterableDeclContext::getAsGenericContext() {
     return cast<NominalTypeDecl>(this);
   case IterableDeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(this);
+  case IterableDeclContextKind::NamespaceDecl:
+    return nullptr;
+  }
+  llvm_unreachable("Unhandled IterableDeclContextKind in switch.");
+}
+
+DeclContext *IterableDeclContext::getAsDeclContext() {
+  switch (getIterableContextKind()) {
+  case IterableDeclContextKind::NominalTypeDecl:
+    return cast<NominalTypeDecl>(this);
+  case IterableDeclContextKind::ExtensionDecl:
+    return cast<ExtensionDecl>(this);
+  case IterableDeclContextKind::NamespaceDecl:
+    return cast<NamespaceDecl>(this);
   }
   llvm_unreachable("Unhandled IterableDeclContextKind in switch.");
 }
@@ -1009,6 +1033,9 @@ SourceRange IterableDeclContext::getBraces() const {
   case IterableDeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(this)->getBraces();
     break;
+
+  case IterableDeclContextKind::NamespaceDecl:
+    return cast<NamespaceDecl>(this)->getBraces();
   }
 }
 
@@ -1097,6 +1124,14 @@ void IterableDeclContext::addMember(Decl *member, Decl *hint, bool insertAtHead)
     auto ext = cast<ExtensionDecl>(this);
     ext->addedMember(member);
     assert(member->getDeclContext() == ext &&
+           "Added member to the wrong context");
+    break;
+  }
+
+  case IterableDeclContextKind::NamespaceDecl: {
+    auto *namespaceDecl = cast<NamespaceDecl>(this);
+    assert(member->getDeclContext() ==
+               static_cast<DeclContext *>(namespaceDecl) &&
            "Added member to the wrong context");
     break;
   }
@@ -1221,7 +1256,7 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   if (AddedParsedMembers)
     return false;
 
-  if (!getAsGenericContext()->getParentSourceFile()) {
+  if (!getAsDeclContext()->getParentSourceFile()) {
     // There will never be any parsed members to add, so set the flag to say
     // we are done so we can short-circuit next time.
     const_cast<IterableDeclContext *>(this)->AddedParsedMembers = 1;
@@ -1233,7 +1268,7 @@ bool IterableDeclContext::hasUnparsedMembers() const {
 
 void IterableDeclContext::addParsedMembers() const {
   // For contexts within a source file, get the list of parsed members.
-  if (getAsGenericContext()->getParentSourceFile()) {
+  if (getAsDeclContext()->getParentSourceFile()) {
     // Retrieve the parsed members. Even if we've already added the parsed
     // members to this context, this call is important for recording the
     // dependency edge.
@@ -1430,7 +1465,7 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
 }
 
 bool IterableDeclContext::wasDeserialized() const {
-  const DeclContext *DC = getAsGenericContext();
+  const DeclContext *DC = getAsDeclContext();
   if (auto F = dyn_cast<FileUnit>(DC->getModuleScopeContext())) {
     return F->getKind() == FileUnitKind::SerializedAST;
   }
@@ -1461,7 +1496,8 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
 }
 
 std::optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
-  auto fileUnit = dyn_cast<FileUnit>(getAsGenericContext()->getModuleScopeContext());
+  auto fileUnit =
+      dyn_cast<FileUnit>(getAsDeclContext()->getModuleScopeContext());
   if (!fileUnit)
     return std::nullopt;
 
@@ -1668,6 +1704,8 @@ DeclContextKind DeclContext::getContextKind() const {
     switch (decl->getKind()) {
     case DeclKind::Module:
       return DeclContextKind::Module;
+    case DeclKind::Namespace:
+      return DeclContextKind::NamespaceDecl;
     case DeclKind::TopLevelCode:
       return DeclContextKind::TopLevelCodeDecl;
     case DeclKind::Subscript:
@@ -1712,6 +1750,7 @@ bool DeclContext::isAsyncContext() const {
   case DeclContextKind::Package:
   case DeclContextKind::Module:
   case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::NamespaceDecl:
   case DeclContextKind::MacroDecl:
     return false;
   case DeclContextKind::FileUnit:
@@ -1741,6 +1780,7 @@ SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::NamespaceDecl:
   case DeclContextKind::SubscriptDecl:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::MacroDecl:

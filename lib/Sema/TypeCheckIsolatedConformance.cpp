@@ -95,6 +95,7 @@ public:
   UNREACHABLE(Import, "not applicable")
   UNREACHABLE(TopLevelCode, "not applicable")
   UNREACHABLE(Module, "not applicable")
+  UNREACHABLE(Namespace, "namespace conformance checking is not implemented")
   UNREACHABLE(Missing, "not applicable")
   UNREACHABLE(Using, "not applicable")
 

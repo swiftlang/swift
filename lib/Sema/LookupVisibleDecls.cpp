@@ -333,6 +333,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
 #define DECL(ID, SUPER) \
       case DeclKind::ID:
 #define VALUE_DECL(ID, SUPER)
+#define ITERABLE_NONGENERIC_DECL(ID, SUPER)
 #include "swift/AST/DeclNodes.def"
         llvm_unreachable("not a ValueDecl!");
 
@@ -360,6 +361,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       // These cases are probably impossible here but can also just
       // be safely ignored.
       case DeclKind::Param:
+      case DeclKind::Namespace:
       case DeclKind::Module:
       case DeclKind::EnumElement:
         return;

@@ -382,6 +382,26 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitNamespaceDecl(NamespaceDecl *ND) {
+#ifndef NDEBUG
+    PrettyStackTraceDecl debugStack("walking into", ND);
+#endif
+    for (Decl *member : ND->getMembers()) {
+      if (doIt(member))
+        return true;
+
+      if (Walker.shouldWalkAccessorsTheOldWay()) {
+        if (auto *storage = dyn_cast<AbstractStorageDecl>(member)) {
+          for (auto *accessor : storage->getAllAccessors()) {
+            if (doIt(accessor))
+              return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   bool visitVarDecl(VarDecl *VD) {
     if (!Walker.shouldWalkAccessorsTheOldWay()) {
       for (auto *AD : VD->getAllAccessors())

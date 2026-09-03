@@ -357,6 +357,7 @@ swift::constraints::getConversionBehavior(Type type) {
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
   case TypeKind::Module:
+  case TypeKind::Namespace:
   case TypeKind::Join:
   case TypeKind::Meet:
     return ConversionBehavior::Unknown;

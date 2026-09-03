@@ -139,6 +139,10 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
       fn(cast<GenericTypeDecl>(DC));
       break;
 
+    case DeclContextKind::NamespaceDecl:
+      fn(cast<NamespaceDecl>(DC));
+      break;
+
     case DeclContextKind::ExtensionDecl:
       fn(cast<ExtensionDecl>(DC));
       break;

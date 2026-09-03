@@ -192,6 +192,7 @@ swift::refactoring::checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
   case swift::DeclContextKind::Package:
   case swift::DeclContextKind::Module:
   case swift::DeclContextKind::FileUnit:
+  case swift::DeclContextKind::NamespaceDecl:
   case swift::DeclContextKind::GenericTypeDecl:
   case swift::DeclContextKind::ExtensionDecl:
   case swift::DeclContextKind::MacroDecl:

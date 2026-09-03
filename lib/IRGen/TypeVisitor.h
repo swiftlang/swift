@@ -40,6 +40,7 @@ class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
   TYPE(LValue)
   TYPE(Metatype)
   TYPE(Module)
+  TYPE(Namespace)
   TYPE(Enum)
   TYPE(ReferenceStorage)
   TYPE(Struct)

@@ -47,8 +47,7 @@
 
 /// ITERABLE_NONGENERIC_DECL(Id, Parent)
 ///   Used for Decls that are also IterableDeclContexts and DeclContexts. The
-///   default behavior is to do the same as for CONTEXT_DECL. This combination
-///   does not exist at the moment.
+///   default behavior is to do the same as for CONTEXT_DECL.
 #ifndef ITERABLE_NONGENERIC_DECL
 #ifdef ITERABLE_DECL
 #define ITERABLE_NONGENERIC_DECL(Id, Parent) ITERABLE_DECL(Id, Parent)
@@ -165,6 +164,7 @@ ABSTRACT_DECL(Value, Decl)
       DECL_RANGE(GenericType, Enum, TypeAlias)
     VALUE_DECL(GenericTypeParam, TypeDecl)
     VALUE_DECL(AssociatedType, TypeDecl)
+    ITERABLE_NONGENERIC_DECL(Namespace, TypeDecl)
     CONTEXT_VALUE_DECL(Module, TypeDecl)
     DECL_RANGE(Type, Enum, Module)
   ABSTRACT_DECL(AbstractStorage, ValueDecl)

@@ -7995,6 +7995,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Error:
   case TypeKind::Module:
+  case TypeKind::Namespace:
   case TypeKind::Enum:
   case TypeKind::Struct:
   case TypeKind::Protocol:
@@ -8065,6 +8066,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Error:
   case TypeKind::Module:
+  case TypeKind::Namespace:
   case TypeKind::Tuple:
   case TypeKind::Enum:
   case TypeKind::Struct:
@@ -8771,6 +8773,7 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
       case DeclContextKind::FileUnit:
       case DeclContextKind::Package:
       case DeclContextKind::Module:
+      case DeclContextKind::NamespaceDecl:
       case DeclContextKind::TopLevelCodeDecl:
       case DeclContextKind::SerializedTopLevelCodeDecl:
       case DeclContextKind::MacroDecl:

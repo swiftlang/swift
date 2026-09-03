@@ -100,6 +100,7 @@ namespace swift {
   class MacroDecl;
   class MacroDefinition;
   class ModuleDecl;
+  class NamespaceDecl;
   class NamedPattern;
   class EnumCaseDecl;
   class EnumElementDecl;
@@ -211,6 +212,7 @@ enum class DescriptiveDeclKind : uint8_t {
   DidSet,
   EnumElement,
   Module,
+  Namespace,
   Missing,
   MissingMember,
   Requirement,
@@ -632,6 +634,8 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
+
+  SWIFT_INLINE_BITFIELD_EMPTY(NamespaceDecl, TypeDecl);
 
   SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, TypeDecl, 16+16+3+1,
     Depth : 16,
@@ -3669,6 +3673,51 @@ public:
   static int compare(T * const* type1, T * const* type2) {
     return compare(*type1, *type2);
   }
+};
+
+/// A non-nominal declaration context used solely to qualify declarations.
+///
+/// A namespace has no instances, metatype, generic signature, or implicit
+/// `Self`. Its interface type is a canonical NamespaceType lookup qualifier.
+class NamespaceDecl final : public DeclContext, public TypeDecl,
+                            public IterableDeclContext {
+  SourceLoc NamespaceLoc;
+  SourceRange Braces;
+
+  NamespaceDecl(SourceLoc namespaceLoc, Identifier name, SourceLoc nameLoc,
+                DeclContext *parent);
+
+public:
+  using TypeDecl::getASTContext;
+
+  static NamespaceDecl *create(ASTContext &ctx, SourceLoc namespaceLoc,
+                               Identifier name, SourceLoc nameLoc,
+                               DeclContext *parent);
+
+  SourceLoc getNamespaceLoc() const { return NamespaceLoc; }
+  SourceLoc getStartLoc() const { return NamespaceLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange::combine(NamespaceLoc, getNameLoc(), Braces);
+  }
+
+  SourceRange getBraces() const { return Braces; }
+  void setBraces(SourceRange braces) { Braces = braces; }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Namespace;
+  }
+  static bool classof(const DeclContext *C) {
+    if (auto *D = C->getAsDecl())
+      return classof(D);
+    return false;
+  }
+  static bool classof(const IterableDeclContext *C) {
+    return C->getIterableContextKind() ==
+           IterableDeclContextKind::NamespaceDecl;
+  }
+
+  using DeclContext::operator new;
+  using DeclContext::operator delete;
 };
 
 /// A type declaration that  have generic parameters attached to it. Because

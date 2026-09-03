@@ -459,6 +459,13 @@ public:
   VISIT_AND_CREATE_WHOLE_PORTION(OpaqueTypeDecl, OpaqueTypeScope)
 #undef VISIT_AND_CREATE_WHOLE_PORTION
 
+  ASTScopeImpl *visitNamespaceDecl(NamespaceDecl *, ASTScopeImpl *parent,
+                                   ScopeCreator &) {
+    // Namespace source scopes are introduced with parser support. Until then,
+    // keep a synthesized namespace from perturbing the surrounding scope.
+    return parent;
+  }
+
   ASTScopeImpl *visitBuiltinTupleDecl(BuiltinTupleDecl *btd, ASTScopeImpl *p,
                                       ScopeCreator &scopeCreator) {
     llvm_unreachable("BuiltinTupleDecl should never appear in a source file");

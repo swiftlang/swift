@@ -772,6 +772,7 @@ public:
     FUNCTION_LIKE(SubscriptDecl)
     FUNCTION_LIKE(MacroDecl)
     TYPE_LIKE(NominalTypeDecl)
+    TYPE_LIKE(NamespaceDecl)
     TYPE_LIKE(ExtensionDecl)
 
 #undef TYPE_LIKE

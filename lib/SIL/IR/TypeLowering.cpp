@@ -368,6 +368,11 @@ namespace {
 
 #undef IMPL
 
+    RetTy visitNamespaceType(CanNamespaceType, AbstractionPattern,
+                             IsTypeExpansionSensitive_t) {
+      llvm_unreachable("NamespaceType made it to SIL lowering");
+    }
+
     RetTy visitBuiltinUnboundGenericType(CanBuiltinUnboundGenericType type,
                                          AbstractionPattern origType,
                                          IsTypeExpansionSensitive_t isSensitive){
@@ -3660,6 +3665,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           // ModuleTypes are trivial but don't warrant being given a
           // conformance to BitwiseCopyable (case (3)).
           if (isa<ModuleType>(ty) ||
+              isa<NamespaceType>(ty) ||
               isa<SILTokenType>(ty) ||
               isa<IntegerType>(ty)) {
             // These types should never appear within aggregates.

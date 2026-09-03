@@ -6907,6 +6907,8 @@ static bool isImpliedByConformancePredatingConcurrency(
 
 void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   auto *const dc = idc->getAsGenericContext();
+  if (!dc)
+    return;
   auto *sf = dc->getParentSourceFile();
 
   assert(sf != nullptr &&

@@ -188,6 +188,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(EnumElement);
   TRIVIAL_KIND(Param);
   TRIVIAL_KIND(Module);
+  TRIVIAL_KIND(Namespace);
   TRIVIAL_KIND(Missing);
   TRIVIAL_KIND(MissingMember);
   TRIVIAL_KIND(Macro);
@@ -403,6 +404,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(InitAccessor, "init accessor");
   ENTRY(EnumElement, "enum case");
   ENTRY(Module, "module");
+  ENTRY(Namespace, "namespace");
   ENTRY(Missing, "missing decl");
   ENTRY(MissingMember, "missing member placeholder");
   ENTRY(Requirement, "requirement");
@@ -807,6 +809,8 @@ DeclContext *Decl::getInnermostDeclContext() const {
     return const_cast<SubscriptDecl*>(subscript);
   if (auto type = dyn_cast<GenericTypeDecl>(this))
     return const_cast<GenericTypeDecl*>(type);
+  if (auto namespaceDecl = dyn_cast<NamespaceDecl>(this))
+    return const_cast<NamespaceDecl *>(namespaceDecl);
   if (auto ext = dyn_cast<ExtensionDecl>(this))
     return const_cast<ExtensionDecl*>(ext);
   if (auto topLevel = dyn_cast<TopLevelCodeDecl>(this))
@@ -820,6 +824,7 @@ DeclContext *Decl::getInnermostDeclContext() const {
 bool Decl::isInvalid() const {
   switch (getKind()) {
 #define VALUE_DECL(ID, PARENT)
+#define ITERABLE_NONGENERIC_DECL(ID, PARENT)
 #define DECL(ID, PARENT) \
   case DeclKind::ID:
 #include "swift/AST/DeclNodes.def"
@@ -842,6 +847,7 @@ bool Decl::isInvalid() const {
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
+  case DeclKind::Namespace:
   case DeclKind::Module:
   case DeclKind::Var:
   case DeclKind::Subscript:
@@ -871,6 +877,7 @@ void Decl::setInvalidBit() { Bits.Decl.Invalid = true; }
 void Decl::setInvalid() {
   switch (getKind()) {
 #define VALUE_DECL(ID, PARENT)
+#define ITERABLE_NONGENERIC_DECL(ID, PARENT)
 #define DECL(ID, PARENT) \
   case DeclKind::ID:
 #include "swift/AST/DeclNodes.def"
@@ -884,6 +891,7 @@ void Decl::setInvalid() {
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
+  case DeclKind::Namespace:
   case DeclKind::Module:
   case DeclKind::Var:
   case DeclKind::Param:
@@ -1864,6 +1872,9 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
     return ImportKind::Struct;
       
   case DeclKind::OpaqueType:
+    return ImportKind::Type;
+
+  case DeclKind::Namespace:
     return ImportKind::Type;
 
   case DeclKind::TypeAlias: {
@@ -4219,6 +4230,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
   case DeclKind::OpaqueType:
+  case DeclKind::Namespace:
     // Types are not instance members.
     return false;
 
@@ -5297,6 +5309,7 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   const Decl *introDecl = this;
 
   switch (getKind()) {
+  case DeclKind::Namespace:
   case DeclKind::Module:
   case DeclKind::TopLevelCode:
   case DeclKind::Missing:
@@ -6126,6 +6139,9 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
 
+  if (isa<NamespaceDecl>(this))
+    return getInterfaceType();
+
   if (auto *ATD = dyn_cast<AssociatedTypeDecl>(this)) {
     auto &ctx = getASTContext();
     auto selfTy = getDeclContext()->getSelfInterfaceType();
@@ -6137,6 +6153,21 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   }
 
   return getInterfaceType()->getMetatypeInstanceType();
+}
+
+NamespaceDecl::NamespaceDecl(SourceLoc namespaceLoc, Identifier name,
+                             SourceLoc nameLoc, DeclContext *parent)
+    : DeclContext(DeclContextKind::NamespaceDecl, parent),
+      TypeDecl(DeclKind::Namespace, parent, name, nameLoc, {}),
+      IterableDeclContext(IterableDeclContextKind::NamespaceDecl),
+      NamespaceLoc(namespaceLoc) {
+  setInterfaceType(NamespaceType::get(this));
+}
+
+NamespaceDecl *NamespaceDecl::create(ASTContext &ctx, SourceLoc namespaceLoc,
+                                     Identifier name, SourceLoc nameLoc,
+                                     DeclContext *parent) {
+  return new (ctx) NamespaceDecl(namespaceLoc, name, nameLoc, parent);
 }
 
 int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
@@ -13782,6 +13813,7 @@ MacroDiscriminatorContext::getInnermostMacroContext(DeclContext *dc) {
   case DeclContextKind::Package:
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
+  case DeclContextKind::NamespaceDecl:
   case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::MacroDecl:

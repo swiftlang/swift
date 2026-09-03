@@ -627,6 +627,8 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit: // Skip up to the module
     return DeclContextID();
+  case DeclContextKind::NamespaceDecl:
+    llvm_unreachable("namespace serialization is not implemented");
   default:
     break;
   }
@@ -2280,6 +2282,8 @@ static bool shouldSerializeMember(Decl *D) {
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
     llvm_unreachable("decl should never be a member");
+  case DeclKind::Namespace:
+    llvm_unreachable("namespace serialization is not implemented");
   case DeclKind::Missing:
     llvm_unreachable("attempting to serialize a missing decl");
 
@@ -2401,6 +2405,9 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     llvm_unreachable("should only cross-reference something within a module");
   case DeclContextKind::Module:
     llvm_unreachable("should only cross-reference something within a file");
+
+  case DeclContextKind::NamespaceDecl:
+    llvm_unreachable("namespace cross references are not implemented");
 
   case DeclContextKind::FileUnit:
     abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
@@ -5534,6 +5541,10 @@ public:
     llvm_unreachable("module decls are not serialized");
   }
 
+  void visitNamespaceDecl(const NamespaceDecl *) {
+    llvm_unreachable("namespace serialization is not implemented");
+  }
+
   void visitMissingDecl(const MissingDecl *) {
     llvm_unreachable("missing decls are not serialized");
   }
@@ -5864,6 +5875,7 @@ public:
     }
 
   UNSUPPORTED_TYPE(Module)
+  UNSUPPORTED_TYPE(Namespace)
   UNSUPPORTED_TYPE(InOut)
   UNSUPPORTED_TYPE(LValue)
   UNSUPPORTED_TYPE(TypeVariable)

@@ -666,6 +666,7 @@ struct ASTContext::Implementation {
   };
 
   llvm::DenseMap<ModuleDecl*, ModuleType*> ModuleTypes;
+  llvm::DenseMap<NamespaceDecl *, NamespaceType *> NamespaceTypes;
   llvm::FoldingSet<GenericTypeParamType> GenericParamTypes;
   llvm::FoldingSet<GenericFunctionType> GenericFunctionTypes;
   llvm::FoldingSet<SILFunctionType> SILFunctionTypes;
@@ -957,6 +958,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE_AND_BYTES(NextMacroDiscriminator);
   SIZE_AND_BYTES(NextDiscriminator);
   SIZE_AND_BYTES(ModuleTypes);
+  SIZE_AND_BYTES(NamespaceTypes);
   SIZE_AND_BYTES(SILBlockStorageTypes);
   SIZE_AND_BYTES(SILMoveOnlyWrappedTypes);
   SIZE_AND_BYTES(BuiltinIntegerTypes);
@@ -3463,7 +3465,8 @@ ASTContext::getOrCreateLazyContextData(const Decl *decl,
   ASSERT(lazyLoader && "Queried lazy data for non-lazy iterable context");
   if (isa<ProtocolDecl>(decl)) {
     entry = Allocate<LazyProtocolData>();
-  } else if (isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl)) {
+  } else if (isa<NominalTypeDecl>(decl) || isa<NamespaceDecl>(decl) ||
+             isa<ExtensionDecl>(decl)) {
     entry = Allocate<LazyIterableDeclContextData>();
   } else if (isa<OpaqueTypeDecl>(decl)) {
     entry = Allocate<LazyOpaqueTypeData>();
@@ -3479,14 +3482,8 @@ ASTContext::getOrCreateLazyContextData(const Decl *decl,
 LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
                                             const IterableDeclContext *idc,
                                             LazyMemberLoader *lazyLoader) {
-  if (auto ext = dyn_cast<ExtensionDecl>(idc)) {
-    return (LazyIterableDeclContextData *)getOrCreateLazyContextData(
-                                                              ext, lazyLoader);
-  }
-
-  auto nominal = cast<NominalTypeDecl>(idc);
-  return (LazyIterableDeclContextData *)getOrCreateLazyContextData(nominal,
-                                                                   lazyLoader);
+  return static_cast<LazyIterableDeclContextData *>(
+      getOrCreateLazyContextData(idc->getDecl(), lazyLoader));
 }
 
 bool ASTContext::hasDelayedConformanceErrors(
@@ -3632,6 +3629,7 @@ size_t ASTContext::getTotalMemory() const {
     getImpl().Cleanups.capacity() +
     llvm::capacity_in_bytes(getImpl().ModuleLoaders) +
     llvm::capacity_in_bytes(getImpl().ModuleTypes) +
+    llvm::capacity_in_bytes(getImpl().NamespaceTypes) +
     // getImpl().GenericParamTypes ?
     // getImpl().GenericFunctionTypes ?
     // getImpl().SILFunctionTypes ?
@@ -5038,6 +5036,17 @@ ModuleType *ModuleType::get(ModuleDecl *M) {
   if (Entry) return Entry;
 
   return Entry = new (C, AllocationArena::Permanent) ModuleType(M, C);
+}
+
+NamespaceType *NamespaceType::get(NamespaceDecl *N) {
+  ASTContext &C = N->getASTContext();
+
+  NamespaceType *&Entry = C.getImpl().NamespaceTypes[N];
+  if (Entry)
+    return Entry;
+
+  return Entry =
+             new (C, AllocationArena::Permanent) NamespaceType(N, C);
 }
 
 DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {

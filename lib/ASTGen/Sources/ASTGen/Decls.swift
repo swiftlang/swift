@@ -52,6 +52,8 @@ extension ASTGenVisitor {
       return self.generate(macroExpansionDecl: node).asDecl
     case .missingDecl(let node):
       return self.generate(missingDecl: node)?.asDecl
+    case .namespaceDecl:
+      fatalError("Namespace declarations are not yet lowered by ASTGen")
     case .operatorDecl(let node):
       return self.generate(operatorDecl: node)?.asDecl
     case .poundSourceLocation:

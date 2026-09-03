@@ -208,6 +208,7 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::EnumElement:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
+  case DeclKind::Namespace:
   case DeclKind::Param:
   case DeclKind::OpaqueType:
   case DeclKind::Macro:

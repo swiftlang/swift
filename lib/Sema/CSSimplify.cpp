@@ -7757,6 +7757,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     case TypeKind::Module:
+    case TypeKind::Namespace:
     case TypeKind::PrimaryArchetype:
     case TypeKind::PackArchetype:
     case TypeKind::ElementArchetype: {
@@ -8772,6 +8773,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::Module:
+  case TypeKind::Namespace:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
   case TypeKind::PackElement: {

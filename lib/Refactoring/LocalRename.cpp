@@ -282,6 +282,7 @@ DeclContext *getRenameScope(const ValueDecl *VD) {
   // There may be sibling decls that the renamed symbol is visible from.
   switch (Scope->getContextKind()) {
   case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::NamespaceDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::SubscriptDecl:

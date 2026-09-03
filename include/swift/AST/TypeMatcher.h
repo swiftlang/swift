@@ -279,6 +279,7 @@ private:
     }
 
     TRIVIAL_CASE(ModuleType)
+    TRIVIAL_CASE(NamespaceType)
 
     bool visitArchetypeType(CanArchetypeType firstArchetype,
                             Type secondType,

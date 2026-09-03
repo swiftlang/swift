@@ -272,6 +272,8 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
     case swift::DeclContextKind::FileUnit:
     case swift::DeclContextKind::MacroDecl:
       break;
+    case swift::DeclContextKind::NamespaceDecl:
+      break;
   }
 }
 

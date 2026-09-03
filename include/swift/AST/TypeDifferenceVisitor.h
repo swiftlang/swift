@@ -233,6 +233,12 @@ public:
     return asImpl().visitDifferentTypeStructure(type1, type2);
   }
 
+  bool visitNamespaceType(CanNamespaceType type1, CanNamespaceType type2) {
+    if (type1->getNamespace() != type2->getNamespace())
+      return asImpl().visitDifferentTypeStructure(type1, type2);
+    return false;
+  }
+
   bool visitDynamicSelfType(CanDynamicSelfType type1,
                             CanDynamicSelfType type2) {
     return asImpl().visit(type1.getSelfType(), type2.getSelfType());

@@ -115,6 +115,7 @@ case TypeKind::Id:
     case TypeKind::Placeholder:
     case TypeKind::SILToken:
     case TypeKind::Module:
+    case TypeKind::Namespace:
     case TypeKind::BuiltinTuple:
     case TypeKind::Integer:
     case TypeKind::Hidden:
