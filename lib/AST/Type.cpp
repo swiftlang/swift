@@ -262,6 +262,20 @@ Type TypeBase::findAlwaysUnsafeType() const {
       [](NominalTypeDecl *typeDecl) { return typeDecl->isAlwaysUnsafe(); });
 }
 
+
+static std::optional<ReferenceCounting>
+getHiddenTypeReferenceCounting(CanHiddenType type) {
+  auto *layoutInfoDecl = type->getLayoutInfoDecl();
+  // TODO: Remove this legacy fallback once every HiddenType carries an
+  // abstract layout.
+  if (!layoutInfoDecl)
+    return std::nullopt;
+
+  assert(layoutInfoDecl->Layout &&
+         "HiddenTypeLayoutInfoDecl should have abstract layout");
+  return layoutInfoDecl->Layout->referenceCountingSystem;
+}
+
 bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
                                   bool functionsCount) {
   switch (type->getKind()) {
@@ -314,6 +328,9 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::SILFunction:
     return functionsCount;
 
+  case TypeKind::Hidden:
+    return getHiddenTypeReferenceCounting(cast<HiddenType>(type)).has_value();
+
   // Nothing else is statically just a class reference.
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
@@ -349,7 +366,6 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
-  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:
@@ -4905,6 +4921,14 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     return cast<ExistentialType>(type)->getConstraintType()
         ->getReferenceCounting();
 
+  case TypeKind::Hidden: {
+    auto referenceCounting =
+        getHiddenTypeReferenceCounting(cast<HiddenType>(type));
+    assert(referenceCounting &&
+           "non-reference HiddenType does not have a reference-counting system");
+    return *referenceCounting;
+  }
+
   case TypeKind::Function:
   case TypeKind::GenericFunction:
   case TypeKind::SILFunction:
@@ -4944,7 +4968,6 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
-  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:

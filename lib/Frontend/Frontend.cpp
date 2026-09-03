@@ -313,6 +313,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.EnableSerializationRemarks =
       getLangOptions().EnableModuleSerializationRemarks;
+  serializationOpts.EnableHiddenTypeLayoutSerializationRemarks =
+      getLangOptions().EnableHiddenTypeLayoutSerializationRemarks;
 
   return serializationOpts;
 }
