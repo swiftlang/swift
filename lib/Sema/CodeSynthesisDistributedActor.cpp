@@ -1327,10 +1327,16 @@ bool CanSynthesizeDistributedActorCodableConformanceRequest::evaluate(
   if (!systemTy)
     return false;
 
-  if (!systemTy->getAnyNominal())
+  auto *systemNominal = systemTy->getAnyNominal();
+  if (!systemNominal)
     return false;
 
-  auto idTy = getDistributedActorSystemActorIDType(systemTy->getAnyNominal());
+  // A 'distributed actor' cannot be its own actor system; this is diagnosed
+  // elsewhere, don't attempt to synthesize the Codable conformance for it
+  if (systemNominal->isDistributedActor())
+    return false;
+
+  auto idTy = getDistributedActorSystemActorIDType(systemNominal);
   if (!idTy)
     return false;
 
