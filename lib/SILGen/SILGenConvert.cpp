@@ -51,7 +51,7 @@ SILGenFunction::emitInjectOptional(SILLocation loc,
 
   // If the value is loadable, just emit and wrap.
   // TODO: honor +0 contexts?
-  if (optTL.isLoadable() || !silConv.useLoweredAddresses()) {
+  if (optTL.isLoadableOrOpaque(F)) {
     ManagedValue objectResult = generator(SGFContext());
     return B.createEnum(loc, objectResult, someDecl, optTy);
   }
@@ -113,7 +113,7 @@ void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
 /// works for loadable enum types.
 SILValue SILGenFunction::getOptionalNoneValue(SILLocation loc,
                                               const TypeLowering &optTL) {
-  assert((optTL.isLoadable() || !silConv.useLoweredAddresses()) &&
+  assert((optTL.isLoadableOrOpaque(F)) &&
          "Address-only optionals cannot use this");
   assert(optTL.getLoweredType().getOptionalObjectType());
 
@@ -126,7 +126,7 @@ SILValue SILGenFunction::getOptionalNoneValue(SILLocation loc,
 ManagedValue SILGenFunction::
 getOptionalSomeValue(SILLocation loc, ManagedValue value,
                      const TypeLowering &optTL) {
-  assert((optTL.isLoadable() || !silConv.useLoweredAddresses()) &&
+  assert((optTL.isLoadableOrOpaque(F)) &&
          "Address-only optionals cannot use this");
   SILType optType = optTL.getLoweredType();
   auto formalOptType = optType.getASTType();
@@ -367,7 +367,7 @@ SILGenFunction::emitOptionalSome(SILLocation loc, SILType optTy,
 
   // If the type is loadable or we're not lowering address-only types
   // in SILGen, use a simple scalar pattern.
-  if (!silConv.useLoweredAddresses() || optTL.isLoadable()) {
+  if (optTL.isLoadableOrOpaque(F)) {
     auto value = produceValue(*this, loc, SGFContext());
     return getOptionalSomeValue(loc, value, optTL);
   }
