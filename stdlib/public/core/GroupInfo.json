@@ -5,6 +5,7 @@
   ],
   "UncheckedString": [
     "UncheckedString.swift",
+    "UncheckedString+Codable.swift",
     "UncheckedString+Encoding.swift",
     "UncheckedString+FastPath.swift",
     "UncheckedString+Literals.swift",

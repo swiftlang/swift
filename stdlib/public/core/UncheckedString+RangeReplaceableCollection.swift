@@ -563,7 +563,7 @@ extension UncheckedSubString: RangeReplaceableCollection {
     precondition(subrange.lowerBound >= startIndex && subrange.lowerBound < endIndex)
     precondition(subrange.upperBound >= startIndex && subrange.upperBound <= endIndex)
 
-    base.replaceSubrange(subrange, with: newElements)
+    _base.replaceSubrange(subrange, with: newElements)
   }
 
 }

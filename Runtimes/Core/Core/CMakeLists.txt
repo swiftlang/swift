@@ -212,6 +212,7 @@ add_library(swiftCore
   TemporaryAllocation.swift
   UIntBuffer.swift
   UncheckedString.swift
+  UncheckedString+Codable.swift
   UncheckedString+Encoding.swift
   UncheckedString+FastPath.swift
   UncheckedString+Literals.swift

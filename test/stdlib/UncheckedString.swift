@@ -411,4 +411,251 @@ UncheckedStringTests.test("noStorageDemotionOnShrink/UInt16") {
   checkNoStorageDemotionOnShrink(capacity: 7, of: UInt16.self)
 }
 
+// MARK: Codable
+
+// A minimal, self-contained `Encoder`/`Decoder` pair backed by a flat
+// `[Any]`, used only to exercise `UncheckedString`'s `Codable` conformance
+// without pulling in a Foundation dependency. It supports exactly what
+// that conformance needs -- a top-level unkeyed container, and single
+// value containers nested underneath it for the fixed-width integer
+// element types this file's tests use -- and `fatalError`s on anything
+// else, since nothing else is ever exercised here.
+private final class ArrayCoderStorage {
+  var elements: [Any] = []
+  var readIndex = 0
+  // Lets a test simulate a decoder whose reported `count` doesn't match
+  // the actual number of elements present.
+  var countOverride: Int? = nil
+}
+
+private struct ArrayEncoder: Encoder {
+  let storage: ArrayCoderStorage
+  var codingPath: [any CodingKey] = []
+  var userInfo: [CodingUserInfoKey: Any] = [:]
+
+  func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> {
+    fatalError("not implemented")
+  }
+  func unkeyedContainer() -> any UnkeyedEncodingContainer {
+    return ArrayUnkeyedEncoding(storage: storage)
+  }
+  func singleValueContainer() -> any SingleValueEncodingContainer {
+    return ArraySingleValueEncoding(storage: storage)
+  }
+}
+
+private struct ArrayUnkeyedEncoding: UnkeyedEncodingContainer {
+  let storage: ArrayCoderStorage
+  var codingPath: [any CodingKey] = []
+  var count: Int { storage.elements.count }
+
+  mutating func encodeNil() throws { storage.elements.append(Optional<Any>.none as Any) }
+  mutating func encode(_ value: Bool) throws { fatalError("not implemented") }
+  mutating func encode(_ value: String) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Double) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Float) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Int) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Int8) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Int16) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Int32) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Int64) throws { fatalError("not implemented") }
+  mutating func encode(_ value: UInt) throws { fatalError("not implemented") }
+  mutating func encode(_ value: UInt8) throws { fatalError("not implemented") }
+  mutating func encode(_ value: UInt16) throws { fatalError("not implemented") }
+  mutating func encode(_ value: UInt32) throws { fatalError("not implemented") }
+  mutating func encode(_ value: UInt64) throws { fatalError("not implemented") }
+  mutating func encode<T: Encodable>(_ value: T) throws {
+    // `UncheckedString.encode(to:)` calls `container.encode(data[i])`
+    // generically over `Element: Encodable`, so it always lands here,
+    // never on one of the concrete-type overloads above -- those exist
+    // only to satisfy the protocol requirement and are otherwise unused
+    // by this harness. This nests a fresh single-value container to
+    // capture whatever concrete primitive `UInt8`/`UInt16`'s own
+    // `encode(to:)` writes through it.
+    try value.encode(to: ArrayEncoder(storage: storage))
+  }
+  mutating func nestedContainer<NestedKey>(
+    keyedBy keyType: NestedKey.Type
+  ) -> KeyedEncodingContainer<NestedKey> {
+    fatalError("not implemented")
+  }
+  mutating func nestedUnkeyedContainer() -> any UnkeyedEncodingContainer {
+    fatalError("not implemented")
+  }
+  mutating func superEncoder() -> any Encoder {
+    fatalError("not implemented")
+  }
+}
+
+private struct ArraySingleValueEncoding: SingleValueEncodingContainer {
+  let storage: ArrayCoderStorage
+  var codingPath: [any CodingKey] = []
+
+  mutating func encodeNil() throws { storage.elements.append(Optional<Any>.none as Any) }
+  mutating func encode(_ value: Bool) throws { fatalError("not implemented") }
+  mutating func encode(_ value: String) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Double) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Float) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Int) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Int8) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Int16) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Int32) throws { fatalError("not implemented") }
+  mutating func encode(_ value: Int64) throws { fatalError("not implemented") }
+  mutating func encode(_ value: UInt) throws { fatalError("not implemented") }
+  mutating func encode(_ value: UInt8) throws { storage.elements.append(value) }
+  mutating func encode(_ value: UInt16) throws { storage.elements.append(value) }
+  mutating func encode(_ value: UInt32) throws { fatalError("not implemented") }
+  mutating func encode(_ value: UInt64) throws { fatalError("not implemented") }
+  mutating func encode<T: Encodable>(_ value: T) throws {
+    try value.encode(to: ArrayEncoder(storage: storage))
+  }
+}
+
+private struct ArrayDecoder: Decoder {
+  let storage: ArrayCoderStorage
+  var codingPath: [any CodingKey] = []
+  var userInfo: [CodingUserInfoKey: Any] = [:]
+
+  func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> {
+    fatalError("not implemented")
+  }
+  func unkeyedContainer() throws -> any UnkeyedDecodingContainer {
+    return ArrayUnkeyedDecoding(storage: storage)
+  }
+  func singleValueContainer() throws -> any SingleValueDecodingContainer {
+    return ArraySingleValueDecoding(storage: storage)
+  }
+}
+
+private struct ArrayUnkeyedDecoding: UnkeyedDecodingContainer {
+  let storage: ArrayCoderStorage
+  var codingPath: [any CodingKey] = []
+  var count: Int? { storage.countOverride ?? storage.elements.count }
+  var isAtEnd: Bool { storage.readIndex >= storage.elements.count }
+  var currentIndex: Int { storage.readIndex }
+
+  mutating func decodeNil() throws -> Bool { fatalError("not implemented") }
+  mutating func decode(_ type: Bool.Type) throws -> Bool { fatalError("not implemented") }
+  mutating func decode(_ type: String.Type) throws -> String { fatalError("not implemented") }
+  mutating func decode(_ type: Double.Type) throws -> Double { fatalError("not implemented") }
+  mutating func decode(_ type: Float.Type) throws -> Float { fatalError("not implemented") }
+  mutating func decode(_ type: Int.Type) throws -> Int { fatalError("not implemented") }
+  mutating func decode(_ type: Int8.Type) throws -> Int8 { fatalError("not implemented") }
+  mutating func decode(_ type: Int16.Type) throws -> Int16 { fatalError("not implemented") }
+  mutating func decode(_ type: Int32.Type) throws -> Int32 { fatalError("not implemented") }
+  mutating func decode(_ type: Int64.Type) throws -> Int64 { fatalError("not implemented") }
+  mutating func decode(_ type: UInt.Type) throws -> UInt { fatalError("not implemented") }
+  mutating func decode(_ type: UInt8.Type) throws -> UInt8 { fatalError("not implemented") }
+  mutating func decode(_ type: UInt16.Type) throws -> UInt16 { fatalError("not implemented") }
+  mutating func decode(_ type: UInt32.Type) throws -> UInt32 { fatalError("not implemented") }
+  mutating func decode(_ type: UInt64.Type) throws -> UInt64 { fatalError("not implemented") }
+  mutating func decode<T: Decodable>(_ type: T.Type) throws -> T {
+    // As with `ArrayUnkeyedEncoding.encode<T: Encodable>(_:)` above,
+    // `UncheckedString.init(from:)` calls `container.decode(Element.self)`
+    // generically over `Element: Decodable`, so this generic fallback --
+    // not any of the concrete-type overloads above -- is the one that
+    // actually runs.
+    return try T(from: ArrayDecoder(storage: storage))
+  }
+  mutating func nestedContainer<NestedKey>(
+    keyedBy type: NestedKey.Type
+  ) throws -> KeyedDecodingContainer<NestedKey> {
+    fatalError("not implemented")
+  }
+  mutating func nestedUnkeyedContainer() throws -> any UnkeyedDecodingContainer {
+    fatalError("not implemented")
+  }
+  mutating func superDecoder() throws -> any Decoder {
+    fatalError("not implemented")
+  }
+}
+
+private struct ArraySingleValueDecoding: SingleValueDecodingContainer {
+  let storage: ArrayCoderStorage
+  var codingPath: [any CodingKey] = []
+
+  func decodeNil() -> Bool { fatalError("not implemented") }
+  func decode(_ type: Bool.Type) throws -> Bool { fatalError("not implemented") }
+  func decode(_ type: String.Type) throws -> String { fatalError("not implemented") }
+  func decode(_ type: Double.Type) throws -> Double { fatalError("not implemented") }
+  func decode(_ type: Float.Type) throws -> Float { fatalError("not implemented") }
+  func decode(_ type: Int.Type) throws -> Int { fatalError("not implemented") }
+  func decode(_ type: Int8.Type) throws -> Int8 { fatalError("not implemented") }
+  func decode(_ type: Int16.Type) throws -> Int16 { fatalError("not implemented") }
+  func decode(_ type: Int32.Type) throws -> Int32 { fatalError("not implemented") }
+  func decode(_ type: Int64.Type) throws -> Int64 { fatalError("not implemented") }
+  func decode(_ type: UInt.Type) throws -> UInt { fatalError("not implemented") }
+  func decode(_ type: UInt8.Type) throws -> UInt8 {
+    defer { storage.readIndex += 1 }
+    return storage.elements[storage.readIndex] as! UInt8
+  }
+  func decode(_ type: UInt16.Type) throws -> UInt16 {
+    defer { storage.readIndex += 1 }
+    return storage.elements[storage.readIndex] as! UInt16
+  }
+  func decode(_ type: UInt32.Type) throws -> UInt32 { fatalError("not implemented") }
+  func decode(_ type: UInt64.Type) throws -> UInt64 { fatalError("not implemented") }
+  func decode<T: Decodable>(_ type: T.Type) throws -> T { fatalError("not implemented") }
+}
+
+private func encodeToArray<T: Encodable>(_ value: T) throws -> [Any] {
+  let storage = ArrayCoderStorage()
+  try value.encode(to: ArrayEncoder(storage: storage))
+  return storage.elements
+}
+
+private func decodeFromArray<T: Decodable>(
+  _ type: T.Type, _ elements: [Any], countOverride: Int? = nil
+) throws -> T {
+  let storage = ArrayCoderStorage()
+  storage.elements = elements
+  storage.countOverride = countOverride
+  return try T(from: ArrayDecoder(storage: storage))
+}
+
+UncheckedStringTests.test("Codable/UInt8") {
+  // Non-ASCII, `\x{hh}`-escaped content round-trips as an array of raw
+  // `UInt8` code units -- not as text.
+  let s: UncheckedString<UInt8> = "Ren\x{e9} Descartes"
+  let encoded = try! encodeToArray(s)
+  expectEqual(encoded.count, s.count)
+  expectTrue((encoded as! [UInt8]).elementsEqual([
+    82, 101, 110, 233, 32, 68, 101, 115, 99, 97, 114, 116, 101, 115
+  ]))
+
+  let decoded = try! decodeFromArray(UncheckedString<UInt8>.self, encoded)
+  expectTrue(decoded == s)
+}
+
+UncheckedStringTests.test("Codable/UInt16") {
+  let s: UncheckedString<UInt16> = "hello, world!"
+  let encoded = try! encodeToArray(s)
+  let decoded = try! decodeFromArray(UncheckedString<UInt16>.self, encoded)
+  expectTrue(decoded == s)
+}
+
+UncheckedStringTests.test("Codable/underestimatedCount") {
+  // `init(from:)` reserves capacity based on the decoder's reported
+  // `count`, but must not trust it for anything beyond that hint --
+  // mirroring `Data.init(from:)`'s guard against an underestimate. Here
+  // the container claims 2 elements but 5 are actually present; all 5
+  // must still be decoded.
+  let elements: [Any] = [UInt8(1), UInt8(2), UInt8(3), UInt8(4), UInt8(5)]
+  let decoded = try! decodeFromArray(
+    UncheckedString<UInt8>.self, elements, countOverride: 2
+  )
+  expectTrue(decoded == UncheckedString<UInt8>([1, 2, 3, 4, 5]))
+}
+
+UncheckedStringTests.test("Codable/subStringViaConversion") {
+  // `UncheckedSubString`, like `Substring`, does not conform to `Codable`.
+  // Converting to `UncheckedString` first (already free via the existing
+  // `Collection`-based initializer) is the supported path.
+  let s: UncheckedString<UInt8> = "Ren\x{e9} Descartes"
+  let sub = s[s.startIndex..<s.index(s.startIndex, offsetBy: 3)]
+  let encoded = try! encodeToArray(UncheckedString(sub))
+  let decoded = try! decodeFromArray(UncheckedString<UInt8>.self, encoded)
+  expectTrue(decoded == UncheckedString(sub))
+}
+
 runAllTests()

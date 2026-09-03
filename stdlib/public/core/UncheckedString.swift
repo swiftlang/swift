@@ -149,7 +149,8 @@ public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
   /// N.B. This initializer will append a `NUL` to the array if it keeps it.
   ///
   /// - Parameter a: The array of character elements to adopt.
-  init(taking a: consuming Array<Element>) {
+  @usableFromInline
+  internal init(taking a: consuming Array<Element>) {
     if a.count == 0 {
       storage = .empty
       _ = consume a
@@ -739,7 +740,12 @@ public struct UncheckedSubString<E: FixedWidthInteger>
   public typealias Index = Int
 
   /// The string of which this is a subsequence.
-  public var base: UncheckedString<Element>
+  public var base: UncheckedString<Element> {
+    _base
+  }
+
+  @usableFromInline
+  internal var _base: UncheckedString<Element>
   /// The range of `base`'s indices that this subsequence covers.
   @usableFromInline
   var bounds: Range<Self.Index>
@@ -777,13 +783,13 @@ public struct UncheckedSubString<E: FixedWidthInteger>
 
   /// Creates an empty substring.
   public init() {
-    self.base = UncheckedString()
+    self._base = UncheckedString()
     self.bounds = 0..<0
   }
 
   /// Creates a substring over the given range of `base`'s indices.
   init(base: UncheckedString<Element>, bounds: Range<Self.Index>) {
-    self.base = base
+    self._base = base
     self.bounds = bounds
   }
 
@@ -871,6 +877,15 @@ public struct UncheckedSubString<E: FixedWidthInteger>
     bounds == other.bounds && base.isTriviallyIdentical(to: other.base)
   }
 }
+
+// MARK: Sendability
+
+// Both UncheckedString and UncheckedSubString are Sendable.
+@available(SwiftStdlib 9999, *)
+extension UncheckedString: Sendable {}
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedSubString: Sendable {}
 
 // MARK: fast_strlen
 
