@@ -193,6 +193,14 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
         baseTy->getRValueType()->is<AnyMetatypeType>()) {
       if (decl->getDeclContext()->isMetatypeExtension())
         return true;
+      // `T.f()` where `T.Type: P` applies the metatype as `self`. A missing
+      // conformacne denotes an unbound reference such as `Q.f`.
+      if (auto *PD = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+        auto conformance = lookupConformance(baseTy->getRValueType(), PD,
+                                             /*allowMissing=*/true);
+        if (conformance && !conformance.hasMissingConformance())
+          return true;
+      }
       return false;
     }
   }
@@ -9013,7 +9021,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
   // Dig out the fixed type to which this type refers.
   type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
-  if (shouldAttemptFixes() && type->isPlaceholder()) {
+  bool isPlaceholder = type->isPlaceholder();
+  if (auto *metatype = type->getAs<AnyMetatypeType>())
+    isPlaceholder |= metatype->getInstanceType()->hasPlaceholder();
+
+  if (shouldAttemptFixes() && isPlaceholder) {
     // If the type associated with this conformance check is a "hole" in the
     // constraint system, let's consider this check a success without recording
     // a fix, because it's just a consequence of the other failure, e.g.
@@ -9042,6 +9054,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // solve this yet.
   if (type->isTypeVariableOrMember())
     return formUnsolved();
+
+  // Wai tuntil the instance type of an unresolved metatype is known.
+  if (auto *metatype = type->getAs<AnyMetatypeType>())
+    if (metatype->getInstanceType()->isTypeVariableOrMember())
+      return formUnsolved();
 
   // If we have a function type and are checking for Sendable conformance we
   // need to delay if we have Sendable dependence.
@@ -10671,6 +10688,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // have already been excluded.
   llvm::SmallPtrSet<ValueDecl *, 2> excludedDynamicMembers;
 
+  // Protocol requirements found through a metatype conformance are viable
+  // directly on the metatype base.
+  llvm::SmallPtrSet<ValueDecl *, 2> metatypeConformanceMembers;
+
   // Local function that adds the given declaration if it is a
   // reasonable choice.
   auto addChoice = [&](OverloadChoice candidate) {
@@ -10795,6 +10816,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         // metatype type itself.  They are accessed directly on the protocol
         // metatype value (e.g. P.value), not on an instance of the protocol.
         if (decl->getDeclContext()->isMetatypeExtension()) {
+          result.addViable(candidate);
+          return;
+        }
+
+        // This requirement was found through a conformance of the metatype, so
+        // do not perform the usual adjustment to the instance type.
+        if (metatypeConformanceMembers.count(decl)) {
           result.addViable(candidate);
           return;
         }
@@ -11059,6 +11087,57 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     addChoice(getOverloadChoice(result.getValueDecl(),
                                 /*isBridged=*/false,
                                 /*isUnwrappedOptional=*/false));
+
+  // Include requirements of protocols to which the metatype conforms.
+  if (baseObjTy->is<AnyMetatypeType>()) {
+    auto addMetatypeConformanceMembers = [&](ProtocolDecl *protocol) {
+      SmallVector<ValueDecl *, 4> members;
+      DC->lookupQualified(protocol, DeclNameRef(lookupName.getFullName()),
+                          SourceLoc(), NLFlags::QualifiedDefault, members);
+      for (auto *member : members) {
+        if (auto *VD = dyn_cast<ValueDecl>(member)) {
+          metatypeConformanceMembers.insert(VD);
+          addChoice(getOverloadChoice(VD, /*isBridged=*/false,
+                                      /*isUnwrappedOptional=*/false));
+        }
+      }
+    };
+
+    auto signature = DC->getGenericSignatureOfContext();
+    auto *metatype = baseObjTy->castTo<AnyMetatypeType>();
+    auto instanceType = metatype->getInstanceType();
+    Type interfaceType;
+    if (auto *archetype = instanceType->getAs<ArchetypeType>()) {
+      if (auto *environment = archetype->getGenericEnvironment()) {
+        signature = environment->getGenericSignature();
+        interfaceType = MetatypeType::get(archetype->getInterfaceType());
+      }
+    }
+
+    if (signature) {
+      if (!interfaceType) {
+        if (baseObjTy->hasArchetype())
+          interfaceType = baseObjTy->mapTypeOutOfEnvironment();
+        else if (baseObjTy->hasTypeParameter())
+          interfaceType = baseObjTy;
+      }
+
+      if (interfaceType &&
+          interfaceType->getMetatypeInstanceType()->isTypeParameter()) {
+        for (auto *protocol : signature->getRequiredProtocols(interfaceType))
+          addMetatypeConformanceMembers(protocol);
+      }
+    }
+
+    if (!baseObjTy->hasTypeParameter()) {
+      for (auto kind : { KnownProtocolKind::COMInterface,
+                         KnownProtocolKind::COMActivatable }) {
+        auto *protocol = ctx.getProtocol(kind);
+        if (protocol && lookupConformance(baseObjTy, protocol))
+          addMetatypeConformanceMembers(protocol);
+      }
+    }
+  }
 
   // Backward compatibility hack. In Swift 4, `init` and init were
   // the same name, so you could write "foo.init" to look up a
@@ -12696,7 +12775,11 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
   if (!type2->isTypeVariableOrMember()) {
     Type dynamicType2;
     if (type2->isAnyExistentialType()) {
-      dynamicType2 = ExistentialMetatypeType::get(type2);
+      auto layout = type2->getExistentialLayout();
+      if (layout.getCOMInterface())
+        dynamicType2 = ExistentialMetatypeType::get(getASTContext().TheAnyType);
+      else
+        dynamicType2 = ExistentialMetatypeType::get(type2);
     } else {
       dynamicType2 = MetatypeType::get(type2);
     }

@@ -370,6 +370,7 @@ static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
   case SILFunctionTypeRepresentation::Block:
     return false;
   case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Method:
@@ -469,11 +470,70 @@ static bool metatypeWithInstanceTypeIsSendable(Type instanceType) {
   return false;
 }
 
+static ProtocolConformanceRef getPackTypeConformance(
+    PackType *type, ProtocolDecl *protocol);
+
 /// Synthesize a builtin metatype type conformance to the given protocol, if
 /// appropriate.
 static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     Type type, const AnyMetatypeType *metatypeType, ProtocolDecl *protocol) {
   ASTContext &ctx = protocol->getASTContext();
+
+  // Substituting a parameter pack into `repeat (each T).Type: P` produces a
+  // metatype whose instance is a pack. Form the corresponding pack of
+  // metatypes so that each repeated conformance can be looked up separately.
+  if (auto *pack = metatypeType->getInstanceType()->getAs<PackType>()) {
+    auto getMetatype = [&](Type instance) -> Type {
+      if (metatypeType->hasRepresentation())
+        return MetatypeType::get(instance,
+                                 metatypeType->getRepresentation());
+      return MetatypeType::get(instance);
+    };
+
+    SmallVector<Type, 2> elements;
+    for (auto element : pack->getElementTypes()) {
+      if (auto *expansion = element->getAs<PackExpansionType>()) {
+        elements.push_back(PackExpansionType::get(
+            getMetatype(expansion->getPatternType()),
+            expansion->getCountType()));
+      } else {
+        elements.push_back(getMetatype(element));
+      }
+    }
+
+    return getPackTypeConformance(PackType::get(ctx, elements), protocol);
+  }
+
+  // The metatype of an exact COM interface existential carries that interface's
+  // identity and therefore conforms to COMInterface. The existential value
+  // itself does not.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface)) {
+    Type instanceType = metatypeType->getInstanceType();
+    if (instanceType->isExistentialType()) {
+      auto layout = instanceType->getExistentialLayout();
+      if (layout.getCOMInterface()) {
+        auto conformance =
+            ctx.getBuiltinConformance(type, protocol,
+                                      BuiltinConformanceKind::COMIdentityMetatype);
+        return ProtocolConformanceRef(conformance);
+      }
+    }
+  }
+
+  // An activatable COM class metatype carries the class identity from its
+  // declaration.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::COMActivatable)) {
+    if (auto *CD = metatypeType->getInstanceType()->getClassOrBoundGenericClass()) {
+      if (auto *info = CD->getCOMDeclInfo()) {
+        if (info->isImplementation() && info->getImplementationID()) {
+          auto conformance =
+              ctx.getBuiltinConformance(type, protocol,
+                                        BuiltinConformanceKind::COMIdentityMetatype);
+          return ProtocolConformanceRef(conformance);
+        }
+      }
+    }
+  }
 
   // All metatypes are Copyable, Escapable, and BitwiseCopyable.
   if (auto kp = protocol->getKnownProtocolKind()) {
@@ -493,6 +553,26 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
                                     BuiltinConformanceKind::Synthesized));
     default:
       break;
+    }
+  }
+
+  Type instanceType = metatypeType->getInstanceType();
+
+  // Type parameters have abstract conformances. Preserve that behavior when
+  // the type parameter's metatype is the subject of the requirement.
+  if (instanceType->isTypeParameter())
+    return ProtocolConformanceRef::forAbstract(type, protocol);
+
+  // For a metatype of an archetype (e.g. 'T.Type' in a generic context), an
+  // abstract metatype conformance is provided by the generic environment's
+  // 'T.Type: P' requirement, which the RequirementMachine records with a
+  // metatype subject ('T.[metatype]').
+  if (auto *archetype = instanceType->getAs<ArchetypeType>()) {
+    if (auto *gamma = archetype->getGenericEnvironment()) {
+      auto interfaceType = MetatypeType::get(archetype->getInterfaceType());
+      if (gamma->getGenericSignature()->requiresProtocol(interfaceType,
+                                                         protocol))
+        return ProtocolConformanceRef::forAbstract(type, protocol);
     }
   }
 

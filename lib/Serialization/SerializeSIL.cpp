@@ -2326,6 +2326,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::Name##ToRefInst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialBoxInst:
   case SILInstructionKind::OpenExistentialValueInst:
@@ -2947,6 +2948,20 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
         (unsigned)SI.getKind(), S.addTypeRef(Ty.getRawASTType()),
         (unsigned)Ty.getCategory(), ListOfValues);
+    break;
+  }
+  case SILInstructionKind::COMMethodInst: {
+    const COMMethodInst *CMI = cast<COMMethodInst>(&SI);
+    SILType Ty = CMI->getType();
+    SmallVector<uint64_t, 8> ListOfValues;
+    handleMethodInst(CMI, CMI->getOperand(), ListOfValues);
+
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+                                       SILAbbrCodes[SILOneTypeValuesLayout::Code],
+                                       static_cast<unsigned>(SI.getKind()),
+                                       S.addTypeRef(Ty.getRawASTType()),
+                                       static_cast<unsigned>(Ty.getCategory()),
+                                       ListOfValues);
     break;
   }
   case SILInstructionKind::ObjCSuperMethodInst: {
@@ -3756,10 +3771,19 @@ void SILSerializer::writeSILWitnessTableEntry(
     addReferencedSILFunction(witness, true);
     witnessID = S.addUniquedStringRef(witness->getName());
   }
+  IdentifierID interfaceID = 0;
+  SILFunction *interface = methodWitness.InterfaceEntry;
+  if (interface &&
+      interface->hasValidLinkageForFragileRef(IsSerialized)) {
+    addReferencedSILFunction(interface, true);
+    interfaceID = S.addUniquedStringRef(interface->getName());
+  }
   WitnessMethodEntryLayout::emitRecord(Out, ScratchRecord,
       SILAbbrCodes[WitnessMethodEntryLayout::Code],
       // SILFunction name
       witnessID,
+      // Native COM entry name
+      interfaceID,
       ListOfValues);
 }
 
@@ -4005,7 +4029,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Write out fragile WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
-    if ((Options.SerializeAllSIL || wt.isAnySerialized()) &&
+    if ((Options.SerializeAllSIL || wt.isAnySerialized() ||
+         wt.hasOpenInterfaceEntries()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
                                          wt.getConformance()->getDeclContext()))
       writeSILWitnessTable(wt);

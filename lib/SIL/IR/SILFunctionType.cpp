@@ -3578,6 +3578,7 @@ static CanSILFunctionType getNativeSILFunctionType(
         TC, origType, substInterfaceType, extInfoBuilder, constant);
 
   case SILFunctionType::Representation::Thin:
+  case SILFunctionType::Representation::COMMethod:
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::Thick:
   case SILFunctionType::Representation::Method:
@@ -4415,12 +4416,18 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
-    auto clangType = func->getType().getTypePtr();
+    auto clangType = func->getType();
     AbstractionPattern origPattern =
         foreignInfo.self.isImportAsMember()
-            ? AbstractionPattern::getCFunctionAsMethod(origType, clangType,
+            ? AbstractionPattern::getCFunctionAsMethod(origType,
+                                                       clangType.getTypePtr(),
                                                        foreignInfo.self)
-            : AbstractionPattern(origType, clangType);
+            : AbstractionPattern(origType, clangType.getTypePtr());
+    if (shouldStoreClangType(extInfoBuilder.getRepresentation())) {
+      auto clangPointerType =
+          func->getASTContext().getPointerType(clangType).getTypePtr();
+      extInfoBuilder = extInfoBuilder.withClangFunctionType(clangPointerType);
+    }
     return getSILFunctionType(
         TC, TypeExpansionContext::minimal(), origPattern, substInterfaceType,
         extInfoBuilder, CFunctionConventions(func, TC.Context), foreignInfo,
@@ -5431,6 +5438,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     bridgedResultType = resultType;
     break;
 
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer: {

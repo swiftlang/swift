@@ -552,6 +552,8 @@ emitFixedSizeWitnessTablePack(IRGenFunction &IGF,
     auto *wtable =
         emitWitnessTableRef(IGF, packType.getElementType(i),
                             /*srcMetadataCache=*/&_metadata, conformance);
+    if (wtable->getType()->isIntegerTy())
+      wtable = IGF.Builder.CreateIntToPtr(wtable, IGF.IGM.WitnessTablePtrTy);
 
     IGF.Builder.CreateStore(wtable, slot);
   }
@@ -575,6 +577,8 @@ static llvm::Value *emitPackExpansionElementWitnessTable(
   // Emit the element witness table.
   auto *wtable = emitWitnessTableRef(IGF, instantiatedPatternTy,
                                      srcMetadataCache, instantiatedConformance);
+  if (wtable->getType()->isIntegerTy())
+    wtable = IGF.Builder.CreateIntToPtr(wtable, IGF.IGM.WitnessTablePtrTy);
   return wtable;
 }
 
@@ -1066,14 +1070,15 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
   llvm::DenseMap<CanType, llvm::SmallVector<ProtocolConformanceRef, 2>>
       conformancesForType;
   auto isDerivedFromPackElementGenericTypeParam = [&](CanType ty) -> bool {
-    // Is this type itself an openable pack parameter OR a dependent type of
-    // one?
-    return openablePackParams.contains(
-        ty->getRootGenericParam()->getCanonicalType());
+    return ty.findIf([&](CanType component) {
+      auto genericParam = dyn_cast<GenericTypeParamType>(component);
+      return genericParam &&
+             openablePackParams.contains(genericParam->getCanonicalType());
+    });
   };
 
   enumerateGenericSignatureRequirements(
-      environment->getGenericSignature().getCanonicalSignature(),
+      subs.getGenericSignature().getCanonicalSignature(),
       [&](GenericRequirement requirement) {
         switch (requirement.getKind()) {
         case GenericRequirement::Kind::MetadataPack: {
@@ -1084,6 +1089,7 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
           conformancesForType.insert({ty, {}});
           break;
         }
+        case GenericRequirement::Kind::WitnessTable:
         case GenericRequirement::Kind::WitnessTablePack: {
           auto ty = requirement.getTypeParameter();
           if (!isDerivedFromPackElementGenericTypeParam(ty))
@@ -1098,18 +1104,39 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
         }
         case GenericRequirement::Kind::Shape:
         case GenericRequirement::Kind::Metadata:
-        case GenericRequirement::Kind::WitnessTable:
         case GenericRequirement::Kind::Value:
           break;
         }
       });
 
-  // For each archetype to be bound, find the corresponding conformances and
-  // bind the metadata and wtables.
+  // For each element type to be bound, find the corresponding conformances
+  // and bind the metadata and witness tables.
   for (auto ty : types) {
     auto conformances = conformancesForType.find(ty)->getSecond();
-    auto archetype = cast<ElementArchetypeType>(
-        environment->mapPackTypeIntoElementContext(ty)->getCanonicalType());
+    auto elementType =
+        environment->mapPackTypeIntoElementContext(ty)->getCanonicalType();
+
+    // A conformance requirement can apply to a type derived from an opened
+    // element, such as its metatype, without requiring metadata for that type.
+    // Index the corresponding witness-table pack and bind the result directly
+    // to the derived element type.
+    if (!isa<ElementArchetypeType>(elementType)) {
+      assert(!conformances.empty());
+      auto substitutedType = ty.subst(subs)->getCanonicalType();
+      for (auto conformance : conformances) {
+        auto *wtablePack = IGF.tryGetLocalTypeData(
+            substitutedType,
+            LocalTypeDataKind::forProtocolWitnessTable(conformance));
+        assert(wtablePack && "witness-table pack not bound in local context");
+        auto elementConformance = ProtocolConformanceRef::forAbstract(
+            elementType, conformance.getProtocol());
+        bindWitnessTableAtIndex(IGF, elementType, elementConformance,
+                                wtablePack, index);
+      }
+      continue;
+    }
+
+    auto archetype = cast<ElementArchetypeType>(elementType);
     auto packType = cast<PackType>(ty.subst(subs)->getCanonicalType());
 
     llvm::SmallVector<llvm::Value *, 2> wtables;

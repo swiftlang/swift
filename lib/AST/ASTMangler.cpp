@@ -306,7 +306,9 @@ std::string ASTMangler::mangleWitnessTable(const ProtocolConformance *C) {
   if (auto *sc = dyn_cast<SpecializedProtocolConformance>(C)) {
     appendProtocolConformance(sc);
     appendOperator("WP");
-  } else if (isa<NormalProtocolConformance>(C) || isa<InheritedProtocolConformance>(C)) {
+  } else if (isa<NormalProtocolConformance>(C) ||
+             isa<InheritedProtocolConformance>(C) ||
+             isa<BuiltinProtocolConformance>(C)) {
     appendProtocolConformance(C);
     appendOperator("WP");
   } else if (isa<SelfProtocolConformance>(C)) {
@@ -318,16 +320,11 @@ std::string ASTMangler::mangleWitnessTable(const ProtocolConformance *C) {
   return finalize();
 }
 
-std::string ASTMangler::mangleWitnessThunk(
-                                     const ProtocolConformance *Conformance,
-                                           const ValueDecl *Requirement) {
-  beginMangling();
+void ASTMangler::appendWitnessThunkEntity(
+    const ProtocolConformance *Conformance, const ValueDecl *Requirement) {
   // Concrete witness thunks get a special mangling.
-  if (Conformance) {
-    if (!isa<SelfProtocolConformance>(Conformance)) {
-      appendProtocolConformance(Conformance);
-    }
-  }
+  if (Conformance && !isa<SelfProtocolConformance>(Conformance))
+    appendProtocolConformance(Conformance);
 
   if (auto ctor = dyn_cast<ConstructorDecl>(Requirement)) {
     appendConstructorEntity(ctor, /*isAllocating=*/true);
@@ -335,6 +332,12 @@ std::string ASTMangler::mangleWitnessThunk(
     assert(isa<FuncDecl>(Requirement) && "expected function");
     appendEntity(cast<FuncDecl>(Requirement));
   }
+}
+
+std::string ASTMangler::mangleWitnessThunk(
+    const ProtocolConformance *Conformance, const ValueDecl *Requirement) {
+  beginMangling();
+  appendWitnessThunkEntity(Conformance, Requirement);
 
   if (Conformance) {
     if (isa<SelfProtocolConformance>(Conformance)) {
@@ -344,6 +347,15 @@ std::string ASTMangler::mangleWitnessThunk(
     }
   }
 
+  return finalize();
+}
+
+std::string ASTMangler::mangleCOMMethodWitnessThunk(
+    const ProtocolConformance *Conformance, const ValueDecl *Requirement) {
+  assert(Conformance && !isa<SelfProtocolConformance>(Conformance));
+  beginMangling();
+  appendWitnessThunkEntity(Conformance, Requirement);
+  appendOperator("TWV");
   return finalize();
 }
 
@@ -2410,6 +2422,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     case SILFunctionTypeRepresentation::WitnessMethod:
       OpArgs.push_back('W');
       break;
+    case SILFunctionTypeRepresentation::COMMethod:
+      OpArgs.push_back('V');
+      break;
     case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
     case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
     case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
@@ -3840,6 +3855,14 @@ ASTMangler::RequirementSubject ASTMangler::appendRequirementSubject(
                          : RequirementSubject::AssociatedType,
       gpBase
     };
+  }
+
+  // A metatype subject, e.g. 'T.Type: P'. Mangle the metatype as the subject
+  // type and use the substitution-style requirement operator, which references
+  // the preceding mangled type rather than a generic parameter index.
+  if (subjectType->is<AnyMetatypeType>()) {
+    appendType(subjectType, sig);
+    return RequirementSubject { RequirementSubject::Substitution };
   }
 
   GenericTypeParamType *gpBase = subjectType->castTo<GenericTypeParamType>();

@@ -51,6 +51,10 @@ public:
     /// This can be null in case dead function elimination has removed the method
     /// or if the method was not serialized (for de-serialized witness tables).
     SILFunction *Witness;
+
+    /// The entry exposed through a native COM vtable. This is present only for
+    /// concrete conformances of native COM implementations.
+    SILFunction *InterfaceEntry = nullptr;
   };
   
   /// A witness table entry describing the witness for an associated type.
@@ -266,6 +270,9 @@ public:
 
   /// Return all of the witness table entries.
   ArrayRef<Entry> getEntries() const { return Entries; }
+
+  /// Whether this table contains interface entries for an open class.
+  bool hasOpenInterfaceEntries() const;
 
   /// Return all of the conditional conformances.
   ArrayRef<ProtocolConformanceRef> getConditionalConformances() const {

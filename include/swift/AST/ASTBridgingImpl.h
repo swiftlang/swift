@@ -271,6 +271,10 @@ bool BridgedDeclObj::Class_isForeign() const {
   return getAs<swift::ClassDecl>()->isForeign();
 }
 
+bool BridgedDeclObj::Class_isCOMImplementation() const {
+  return getAs<swift::ClassDecl>()->isCOMImplementation();
+}
+
 bool BridgedDeclObj::ProtocolDecl_requiresClass() const {
   return getAs<swift::ProtocolDecl>()->requiresClass();
 }
@@ -807,6 +811,7 @@ BridgedASTType::FunctionTypeRepresentation BridgedASTType::getFunctionTypeRepres
   static_assert((int)FunctionTypeRepresentation::KeyPathAccessorSetter == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorSetter);
   static_assert((int)FunctionTypeRepresentation::KeyPathAccessorEquals == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorEquals);
   static_assert((int)FunctionTypeRepresentation::KeyPathAccessorHash == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorHash);
+  static_assert((int)FunctionTypeRepresentation::COMMethod == (int)swift::SILFunctionTypeRepresentation::COMMethod);
 
   auto fnType = unbridged()->castTo<swift::SILFunctionType>();
   return (FunctionTypeRepresentation)(fnType->getRepresentation());

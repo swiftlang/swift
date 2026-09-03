@@ -8229,6 +8229,25 @@ class ObjCMethodInst final
          SILDeclRef Member, SILType Ty, SILFunction *F);
 };
 
+/// COMMethodInst - Loads a protocol requirement from a COM interface vtable.
+class COMMethodInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::COMMethodInst, COMMethodInst, MethodInst>
+{
+  friend SILBuilder;
+
+  COMMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
+                ArrayRef<SILValue> TypeDependentOperands, SILDeclRef Member,
+                SILType Ty)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                                      TypeDependentOperands, Ty,
+                                                      Member) {}
+
+  static COMMethodInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILDeclRef Member,
+         SILType Ty, SILFunction *F);
+};
+
 /// ObjCSuperMethodInst - Given the address of a value of class type and a method
 /// constant, extracts the implementation of that method for the superclass of
 /// the static type of the class.
@@ -8295,8 +8314,8 @@ public:
 };
 
 /// Access allowed to the opened value by the open_existential_addr instruction.
-/// Allowing mutable access to the opened existential requires a boxed
-/// existential value's box to be unique.
+/// Allowing mutable access to a boxed existential requires its box to be
+/// unique.
 enum class OpenedExistentialAccess { Immutable, Mutable };
 
 OpenedExistentialAccess getOpenedExistentialAccessFor(AccessKind access);
@@ -8362,6 +8381,25 @@ class OpenExistentialRefInst
 
   OpenExistentialRefInst(SILDebugLocation DebugLoc, SILValue Operand,
                          SILType Ty,
+                         ValueOwnershipKind forwardingOwnershipKind);
+
+public:
+  CanExistentialArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
+};
+
+/// Opens a COM existential while preserving its one-word interface-pointer
+/// representation. The result is not a Swift class reference.
+class OpenCOMExistentialInst
+    : public UnaryInstructionBase<SILInstructionKind::OpenCOMExistentialInst,
+                                  OwnershipForwardingSingleValueInstruction> {
+  friend SILBuilder;
+
+  OpenCOMExistentialInst(SILDebugLocation dl, SILValue operand, SILType type,
                          ValueOwnershipKind forwardingOwnershipKind);
 
 public:
@@ -12006,6 +12044,7 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:

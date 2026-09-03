@@ -15,14 +15,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/ABI/Metadata.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/ExtInfo.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
@@ -47,6 +50,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
@@ -1401,12 +1405,14 @@ public:
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
   void visitObjCMethodInst(ObjCMethodInst *i);
+  void visitCOMMethodInst(COMMethodInst *i);
   void visitObjCSuperMethodInst(ObjCSuperMethodInst *i);
   void visitWitnessMethodInst(WitnessMethodInst *i);
 
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *i);
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
+  void visitOpenCOMExistentialInst(OpenCOMExistentialInst *i);
   void visitOpenExistentialValueInst(OpenExistentialValueInst *i);
   void visitInitExistentialAddrInst(InitExistentialAddrInst *i);
   void visitInitExistentialValueInst(InitExistentialValueInst *i);
@@ -2456,9 +2462,45 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   unsigned nextArgTyIdx = 0;
 
-  // Handle the arguments of an ObjC method.
-  if (IGF.CurSILFn->getRepresentation() ==
-        SILFunctionTypeRepresentation::ObjCMethod) {
+  switch (IGF.CurSILFn->getRepresentation()) {
+  case SILFunctionTypeRepresentation::COMMethod: {
+    // A native COM entry receives its interface pointer as physical argument
+    // zero. Recover the native object and bind it as the thunk's logical self.
+
+    SILArgument *self = args.back();
+    args = args.drop_back();
+
+    auto *object = emitCOMObjectRecovery(IGF, params.claimNext());
+    auto &TI = IGF.getTypeInfo(self->getType());
+    auto *value = object;
+
+    if (self->getType().isAddress()) {
+      auto storage =
+          IGF.createAlloca(TI.getStorageType(), TI.getBestKnownAlignment(),
+                           "com.object.storage");
+      if (value->getType() != TI.getStorageType())
+        value = IGF.Builder.CreateBitCast(value, TI.getStorageType());
+      IGF.Builder.CreateStore(value, storage);
+      IGF.setLoweredAddress(self, TI.getAddressForPointer(storage.getAddress()));
+    } else {
+      auto &LTI = cast<LoadableTypeInfo>(TI);
+      auto schema = LTI.getSchema();
+      assert(schema.size() == 1 && "COM method self must be a single value");
+      auto *Ty = schema.begin()->getScalarType();
+      if (value->getType() != Ty)
+        value = IGF.coerceValue(value, Ty, IGF.IGM.DataLayout);
+
+      Explosion result;
+      result.add(value);
+      IGF.setLoweredExplosion(self, result);
+    }
+
+    nextArgTyIdx = 1;
+    break;
+  }
+  case SILFunctionTypeRepresentation::ObjCMethod: {
+    // Handle the arguments of an ObjC method.
+
     // Claim the self argument from the end of the formal arguments.
     SILArgument *selfArg = args.back();
     args = args.slice(0, args.size() - 1);
@@ -2484,6 +2526,8 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     // generating explosions for the remaining arguments we can skip
     // these.
     nextArgTyIdx = 2;
+    break;
+  }
   }
 
   assert(args.size() == (FI.arg_size() - nextArgTyIdx) &&
@@ -3436,8 +3480,15 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   SILType opType = op->getType();
 
   switch (opType.getPreferredExistentialRepresentation()) {
-  case ExistentialRepresentation::COM:
-    llvm_unreachable("COM existential metatype projection is not implemented");
+  case ExistentialRepresentation::COM: {
+    Explosion existential = getLoweredExplosion(op);
+    auto *interface = existential.claimNext();
+    auto *metadata = emitTypeMetadataRef(opType.getASTType());
+    auto *dynamicType = Builder.CreateCall(
+        IGM.getGetCOMDynamicTypeFunctionPointer(), {interface, metadata});
+    result.add(dynamicType);
+    break;
+  }
   case ExistentialRepresentation::Metatype: {
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfMetatype(*this, existential, opType, result);
@@ -3566,6 +3617,12 @@ emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
   auto substConformance =
       substCalleeType->getWitnessMethodConformanceOrInvalid();
 
+  // For a conformance of a protocol metatype itself (e.g. from `T.Type: P`)
+  // the conforming type is the metatype, not its instance.
+  if (substConformance && substConformance.getType() &&
+      substConformance.getType()->is<AnyMetatypeType>())
+    substSelfType = substConformance.getType()->getCanonicalType();
+
   llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
   llvm::Value *wtable =
     emitWitnessTableRef(IGF, substSelfType, &argMetadata, substConformance);
@@ -3612,6 +3669,7 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
       return getBlockPointerCallee(IGF, functionValue, std::move(calleeInfo));
 
     case SILFunctionType::Representation::ObjCMethod:
+    case SILFunctionType::Representation::COMMethod:
     case SILFunctionType::Representation::CXXMethod:
     case SILFunctionType::Representation::Thick:
       llvm_unreachable("unexpected function with singleton representation");
@@ -3679,6 +3737,7 @@ static std::unique_ptr<CallEmission> getCallEmissionForLoweredValue(
   }
 
   case SILFunctionType::Representation::ObjCMethod:
+  case SILFunctionType::Representation::COMMethod:
   case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::Thick:
   case SILFunctionType::Representation::Block:
@@ -3897,11 +3956,51 @@ void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
 }
 
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
+  if (auto *witness = dyn_cast<WitnessMethodInst>(i->getCallee())) {
+    auto *protocol =
+        cast<ProtocolDecl>(witness->getMember().getDecl()->getDeclContext());
+
+    if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface) ||
+        protocol->isSpecificProtocol(KnownProtocolKind::COMActivatable)) {
+      auto kind = classifyCOMIdentityRequirement(witness->getMember().getDecl());
+      ASSERT(kind && "unsupported COMInterface requirement");
+
+      switch (*kind) {
+      case COMIdentityRequirementKind::InterfaceID:
+      case COMIdentityRequirementKind::ClassID: {
+        llvm::Value *cache = nullptr;
+        auto *identity =
+            emitWitnessTableRef(*this, witness->getLookupType(), &cache,
+                                witness->getConformance());
+
+        auto RTy = i->getType();
+        auto &TI = cast<LoadableTypeInfo>(getTypeInfo(RTy));
+        Explosion result;
+        TI.loadAsCopy(*this,
+                      Address(identity, TI.getStorageType(), Alignment(4)),
+                      result);
+        setLoweredExplosion(i, result);
+        return;
+      }
+      }
+
+      llvm_unreachable("unhandled COMInterface requirement");
+    }
+  }
+
   visitFullApplySite(i);
 }
 
 void IRGenSILFunction::visitTryApplyInst(swift::TryApplyInst *i) {
   visitFullApplySite(i);
+}
+
+namespace {
+llvm::Value *loadCOMInterfacePointer(IRGenModule &IGM, IRBuilder &Builder,
+                                     Address address, const llvm::Twine &name) {
+  Address storage(address.getAddress(), IGM.Int8PtrTy, IGM.getPointerAlignment());
+  return Builder.CreateLoad(storage, name);
+}
 }
 
 void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
@@ -3942,7 +4041,20 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     SILValue selfArg = args.back();
     args = args.drop_back();
 
-    if (selfArg->getType().isObject()) {
+    if (origCalleeType->getRepresentation() == SILFunctionTypeRepresentation::COMMethod) {
+      Address storage = getLoweredAddress(selfArg);
+      auto *method = cast<COMMethodInst>(site.getCallee());
+      auto Ty = selfArg->getType().getASTType()->getCanonicalType();
+      if (Ty->is<ArchetypeType>() && !Ty->is<ExistentialArchetypeType>()) {
+        auto *protocol =
+            cast<ProtocolDecl>(method->getMember().getDecl()->getDeclContext());
+        auto conformance = ProtocolConformanceRef::forAbstract(Ty, protocol);
+        selfValue = emitCOMInterfaceProjection(*this, storage.getAddress(),
+                                               Ty, protocol, conformance);
+      } else {
+        selfValue = loadCOMInterfacePointer(IGM, Builder, storage, "com.self");
+      }
+    } else if (selfArg->getType().isObject()) {
       selfValue = getLoweredSingletonExplosion(selfArg);
     } else {
       selfValue = getLoweredAddress(selfArg).getAddress();
@@ -4227,6 +4339,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::Block:
     case SILFunctionTypeRepresentation::ObjCMethod:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
       llvm_unreachable("partial_apply of foreign functions not implemented");
 
@@ -6569,6 +6682,17 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
       swift::StrongCopy##Name##ValueInst *i) {                                 \
     Explosion in = getLoweredExplosion(i->getOperand());                       \
     auto silTy = i->getOperand()->getType();                                   \
+    Type resultTy = i->getType().getASTType();                                 \
+    if (auto objectTy = resultTy->getOptionalObjectType())                     \
+      resultTy = objectTy;                                                     \
+    if (resultTy->isExistentialType() &&                                       \
+        resultTy->getExistentialLayout().getCOMInterface()) {                  \
+      auto &ti = cast<LoadableTypeInfo>(getTypeInfo(i->getType()));            \
+      Explosion output;                                                        \
+      ti.copy(*this, in, output, irgen::Atomicity::Atomic);                    \
+      setLoweredExplosion(i, output);                                          \
+      return;                                                                  \
+    }                                                                          \
     auto &ti = getReferentTypeInfo(*this, silTy);                              \
     /* Since we are unchecked, we just use strong retain here. We do not       \
      * perform any checks */                                                   \
@@ -8394,8 +8518,54 @@ void IRGenSILFunction::visitInitExistentialMetatypeInst(
 }
 
 void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
-  Explosion instance = getLoweredExplosion(i->getOperand());
   Explosion result;
+
+  if (i->getType().canUseExistentialRepresentation(ExistentialRepresentation::COM,
+                                                   i->getFormalConcreteType())) {
+    auto *interface =
+        i->getType().getASTType().getExistentialLayout().getCOMInterface();
+    assert(interface && "COM existential must identify an interface");
+
+    ProtocolConformanceRef concrete;
+    for (auto conformance : i->getConformances()) {
+      if (conformance.getProtocol() == interface) {
+        concrete = conformance;
+        break;
+      }
+    }
+
+    if (i->getOperand()->getType().isAddress()) {
+      auto value = getLoweredAddress(i->getOperand());
+
+      llvm::Value *projected =
+          i->getFormalConcreteType()->is<ExistentialArchetypeType>()
+              ? Builder.CreateLoad(value, "com.interface")
+              : emitCOMInterfaceProjection(*this, value.getAddress(),
+                                           i->getFormalConcreteType(), interface,
+                                           concrete);
+
+      // Projection from an opaque generic value borrows the stored object.
+      // Retain the interface pointer for the owned existential result before
+      // the generic source temporary is destroyed.
+      Explosion borrowed;
+      borrowed.add(projected);
+      cast<LoadableTypeInfo>(getTypeInfo(i->getType()))
+          .copy(*this, borrowed, result, getDefaultAtomicity());
+    } else {
+      Explosion instance = getLoweredExplosion(i->getOperand());
+      auto *value = instance.claimNext();
+      assert(instance.empty() &&
+             "a COM projection source must contain exactly one pointer");
+      result.add(emitCOMInterfaceProjection(*this, value,
+                                            i->getFormalConcreteType(),
+                                            interface, concrete));
+    }
+
+    setLoweredExplosion(i, result);
+    return;
+  }
+
+  Explosion instance = getLoweredExplosion(i->getOperand());
   emitClassExistentialContainer(*this,
                                result, i->getType(),
                                instance.claimNext(),
@@ -8425,6 +8595,12 @@ void IRGenSILFunction::visitOpenExistentialAddrInst(OpenExistentialAddrInst *i) 
 
   auto openedArchetype = i->getType().castTo<ArchetypeType>();
 
+  if (baseTy.canUseExistentialRepresentation(ExistentialRepresentation::COM)) {
+    bindOpenedCOMExistentialArchetype(*this, openedArchetype);
+    setLoweredAddress(i, base);
+    return;
+  }
+
   // Insert a copy of the boxed value for COW semantics if necessary.
   auto accessKind = i->getAccessKind();
   Address object = emitOpaqueBoxedExistentialProjection(
@@ -8443,6 +8619,17 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
   llvm::Value *instance
     = emitClassExistentialProjection(*this, base, baseTy, openedArchetype);
   result.add(instance);
+  setLoweredExplosion(i, result);
+}
+
+void IRGenSILFunction::visitOpenCOMExistentialInst(OpenCOMExistentialInst *i) {
+  Explosion base = getLoweredExplosion(i->getOperand());
+
+  bindOpenedCOMExistentialArchetype(*this, i->getType().castTo<ArchetypeType>());
+
+  Explosion result;
+  result.add(base.claimNext());
+  assert(base.empty() && "COM existential must contain exactly one pointer");
   setLoweredExplosion(i, result);
 }
 
@@ -8644,6 +8831,27 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
   PrettyStackTraceSILDeclRef entry("lowering use of witness method", member);
+
+  auto *protocol = cast<ProtocolDecl>(member.getDecl()->getDeclContext());
+  if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface) ||
+      protocol->isSpecificProtocol(KnownProtocolKind::COMActivatable)) {
+    auto kind = classifyCOMIdentityRequirement(member.getDecl());
+    ASSERT(kind && "unsupported COIM identity requirement");
+
+    switch (*kind) {
+    case COMIdentityRequirementKind::InterfaceID:
+    case COMIdentityRequirementKind::ClassID: {
+      for (auto *use : i->getUses())
+        assert(isa<ApplyInst>(use->getUser()) &&
+               "COM identity witness must be applied directly");
+      Explosion empty;
+      setLoweredExplosion(i, empty);
+      return;
+    }
+    }
+
+    llvm_unreachable("unhandled COM identity requirement");
+  }
 
   auto fnType = IGM.getSILTypes().getConstantFunctionType(
       IGM.getMaximalTypeExpansionContext(), member);
@@ -8991,6 +9199,83 @@ void IRGenSILFunction::visitObjCMethodInst(swift::ObjCMethodInst *i) {
   // to happen when the method is called.
   assert(i->getMember().isForeign);
   setLoweredObjCMethod(i, i->getMember());
+}
+
+namespace {
+class COMMethodSlotVisitor final
+    : public SILWitnessVisitor<COMMethodSlotVisitor> {
+  SILDeclRef Target;
+  // `QueryInterface`, `AddRef`, `Release` are the common prefix for every COM
+  // interface vtable.
+  unsigned NextSlot = 3;
+  std::optional<unsigned> TargetSlot;
+
+public:
+  explicit COMMethodSlotVisitor(SILDeclRef target) : Target(target) { }
+
+  void addProtocolConformanceDescriptor() { }
+  void addOutOfLineBaseProtocol(ProtocolDecl *) { }
+  void addAssociatedType(AssociatedTypeDecl *) { }
+  void addAssociatedConformance(AssociatedConformance) { }
+
+  void addMethod(SILDeclRef method) {
+    if (method == Target)
+      TargetSlot = NextSlot;
+    ++NextSlot;
+  }
+  void addPlaceholder(MissingMemberDecl *) {
+    ++NextSlot;
+  }
+
+  std::optional<unsigned> getTargetSlot() const {
+    return TargetSlot;
+  }
+};
+}
+
+void IRGenSILFunction::visitCOMMethodInst(swift::COMMethodInst *i) {
+  SILDeclRef member = i->getMember();
+  auto *protocol = cast<ProtocolDecl>(member.getDecl()->getDeclContext());
+  auto *hierarchy = protocol->getCOMInterfaceHierarchy();
+  assert(hierarchy && !hierarchy->isInvalid());
+
+  COMMethodSlotVisitor visitor(member);
+  for (auto *interface : hierarchy->getABIChain())
+    visitor.visitProtocolDecl(interface);
+
+  auto index = visitor.getTargetSlot();
+  assert(index && "COM method is absent from its interface ABI");
+
+  llvm::Value *interface;
+  if (i->getOperand()->getType().isAddress()) {
+    auto Ty = i->getOperand()->getType().getASTType()->getCanonicalType();
+    Address storage = getLoweredAddress(i->getOperand());
+    if (Ty->is<ArchetypeType>() && !Ty->is<ExistentialArchetypeType>()) {
+      auto conformance = ProtocolConformanceRef::forAbstract(Ty, protocol);
+      interface = emitCOMInterfaceProjection(*this, storage.getAddress(), Ty,
+                                             protocol, conformance);
+    } else {
+      interface = loadCOMInterfacePointer(IGM, Builder, storage, "com.interface");
+    }
+  } else {
+    interface = getLoweredSingletonExplosion(i->getOperand());
+  }
+
+  Address pUnk(interface, IGM.Int8PtrTy, IGM.getPointerAlignment());
+
+  auto *vtable = Builder.CreateLoad(pUnk, "com.vtable");
+  Address lpVtbl(vtable, IGM.Int8PtrTy, IGM.getPointerAlignment());
+
+  auto slot = Builder.CreateConstArrayGEP(lpVtbl, *index, IGM.getPointerSize(),
+                                          "com.method.slot");
+  auto *method = Builder.CreateLoad(slot, "com.method");
+
+  auto FTy = i->getType().castTo<SILFunctionType>();
+  auto signature = IGM.getSignature(FTy);
+  auto function =
+      FunctionPointer::createUnsigned(FunctionPointer::Kind::Function, method,
+                                      signature);
+  setLoweredFunctionPointer(i, function);
 }
 
 void IRGenSILFunction::visitGetAsyncContinuationInst(

@@ -193,8 +193,14 @@ ValueDecl *ProtocolConformance::getWitnessDecl(ValueDecl *requirement) const {
   case ProtocolConformanceKind::Specialized:
     return cast<SpecializedProtocolConformance>(this)
       ->getGenericConformance()->getWitnessDecl(requirement);
-  case ProtocolConformanceKind::Builtin:
+  case ProtocolConformanceKind::Builtin: {
+    auto conformance =
+        cast<BuiltinProtocolConformance>(this)->getBuiltinConformanceKind();
+    if (conformance == BuiltinConformanceKind::COMIdentityMetatype)
+      return cast<BuiltinProtocolConformance>(this)->getWitness(requirement)
+              .getDecl();
     return requirement;
+  }
   }
   llvm_unreachable("unhandled kind");
 }
@@ -379,6 +385,9 @@ bool RootProtocolConformance::hasWitness(ValueDecl *requirement) const {
 bool RootProtocolConformance::isSynthesized() const {
   if (auto normal = dyn_cast<NormalProtocolConformance>(this))
     return normal->isSynthesizedNonUnique() || normal->isConformanceOfProtocol();
+
+  if (auto builtin = dyn_cast<BuiltinProtocolConformance>(this))
+    return builtin->getBuiltinConformanceKind() == BuiltinConformanceKind::COMIdentityMetatype;
 
   return false;
 }
@@ -1530,6 +1539,9 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
       trySynthesize(getKnownProtocolKind(ip));
 
     trySynthesize(KnownProtocolKind::BitwiseCopyable);
+
+    if (nominal->getAttrs().hasAttribute<COMAttr>())
+      trySynthesize(KnownProtocolKind::ISwiftObject);
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those
@@ -1799,6 +1811,50 @@ BuiltinProtocolConformance::BuiltinProtocolConformance(
     : RootProtocolConformance(ProtocolConformanceKind::Builtin, conformingType),
       protocol(protocol) {
   Bits.BuiltinProtocolConformance.Kind = unsigned(kind);
+}
+
+std::optional<COMIdentityRequirementKind>
+swift::classifyCOMIdentityRequirement(ValueDecl *requirement) {
+  AbstractStorageDecl *storage = dyn_cast<AbstractStorageDecl>(requirement);
+  if (auto *accessor = dyn_cast<AccessorDecl>(requirement))
+    storage = accessor->getStorage();
+
+  auto *property = dyn_cast_or_null<VarDecl>(storage);
+  auto *protocol = property ? dyn_cast<ProtocolDecl>(property->getDeclContext())
+                            : nullptr;
+  if (!protocol)
+    return std::nullopt;
+
+  auto &context = property->getASTContext();
+  if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface) &&
+      property->getBaseName() == context.Id_IID)
+    return COMIdentityRequirementKind::InterfaceID;
+  if (protocol->isSpecificProtocol(KnownProtocolKind::COMActivatable) &&
+      property->getBaseName() == context.Id_CLSID)
+    return COMIdentityRequirementKind::ClassID;
+  return std::nullopt;
+}
+
+bool BuiltinProtocolConformance::hasWitness(ValueDecl *requirement) const {
+  return static_cast<bool>(getWitness(requirement));
+}
+
+Witness
+BuiltinProtocolConformance::getWitness(ValueDecl *requirement) const {
+  auto kind = getBuiltinConformanceKind();
+  if (kind != BuiltinConformanceKind::COMIdentityMetatype)
+    llvm_unreachable("builtin conformance has no requirement witnesses");
+
+  auto requirementKind = classifyCOMIdentityRequirement(requirement);
+  ASSERT(requirementKind && "unsupported COM identity requirement");
+
+  switch (*requirementKind) {
+  case COMIdentityRequirementKind::InterfaceID:
+  case COMIdentityRequirementKind::ClassID:
+    return Witness(requirement);
+  }
+
+  llvm_unreachable("unhandled COM identity requirement");
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

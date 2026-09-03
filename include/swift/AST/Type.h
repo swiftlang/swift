@@ -430,6 +430,7 @@ public:
   ///   - class types, generic or not
   ///   - archetypes with class or class protocol bounds
   ///   - existentials with class or class protocol bounds
+  ///   - COM interface existentials
   /// But not:
   ///   - function types
   bool allowsOwnership(const GenericSignatureImpl *sig) const {

@@ -2319,9 +2319,34 @@ ERROR(com_interface_refinement_requires_identity, none,
 ERROR(com_interface_repeated_iid, none,
       "COM interface %0 and inherited interface %1 use the same interface "
       "identifier '%2'", (DeclName, DeclName, StringRef))
-ERROR(com_cominterface_existential, none,
-      "'any COMInterface' is invalid because 'COMInterface' does not identify a COM interface",
-      ())
+ERROR(com_interface_static_requirement, none,
+      "static requirement %0 cannot be used in a COM interface", (DeclName))
+ERROR(com_interface_generic_requirement, none,
+      "generic requirement %0 cannot be used in a COM interface", (DeclName))
+ERROR(com_interface_async_requirement, none,
+      "async requirement %0 cannot be used in a COM interface", (DeclName))
+ERROR(com_interface_throwing_requirement, none,
+      "throwing requirement %0 cannot be used in a COM interface", (DeclName))
+ERROR(com_interface_unsupported_parameter, none,
+      "parameter %0 of COM interface requirement %1 cannot be represented in C",
+      (DeclName, DeclName))
+ERROR(com_interface_unsupported_type, none,
+      "type %0 of COM interface requirement %1 cannot be represented in C",
+      (Type, DeclName))
+ERROR(com_interface_unsupported_requirement, none,
+      "requirement %0 cannot be represented in a COM interface", (DeclName))
+ERROR(com_identity_existential, none,
+      "'any %0' is invalid because '%0' describes a COM metatype identity",
+      (StringRef))
+ERROR(com_identity_explicit_conformance, none,
+      "%0 conformance is compiler-managed and cannot be declared explicitly",
+      (DeclName))
+ERROR(com_identity_invalid_requirement, none,
+      "expected '%0' to declare 'var %1: %1 { get }'",
+      (StringRef, StringRef))
+ERROR(com_identity_unsupported_requirement, none,
+      "requirement %0 of %1 is not supported by this compiler",
+      (DeclName, DeclName))
 ERROR(com_existential_multiple_interfaces, none,
       "COM existential cannot contain interfaces %0 and %1 because neither refines the other",
       (DeclName, DeclName))
@@ -2350,6 +2375,17 @@ ERROR(com_non_native_implementation, none,
 ERROR(com_generic_activatable_implementation, none,
       "generic class %0 cannot declare a COM implementation identifier",
       (DeclName))
+ERROR(com_runtime_missing_entry, none,
+      "function '%0' not found in the 'COM' module", (StringRef))
+ERROR(com_runtime_ambiguous_entry, none,
+      "multiple direct C entry points named '%0' found in the 'COM' module",
+      (StringRef))
+ERROR(com_runtime_invalid_entry, none,
+      "function '%0' in the 'COM' module must provide a direct C entry point",
+      (StringRef))
+ERROR(com_runtime_entry_type, none,
+      "function '%0' in the 'COM' module has type %1; expected %2",
+      (StringRef, Type, Type))
 
 ERROR(metatype_extension_com_only, none,
       "protocol metatype extensions are reserved for COM interop", ())
@@ -6885,6 +6921,13 @@ ERROR(invalid_ownership_incompatible_class,none,
 ERROR(invalid_ownership_incompatible_foreign_reference_type,none,
       "%0 is incompatible with 'weak' references, because it is a foreign reference type",
       (Type))
+ERROR(invalid_ownership_com_existential,none,
+      "%0 is incompatible with %1 references because COM interface "
+      "existentials do not support managed reference storage",
+      (Type, ReferenceOwnership))
+NOTE(com_existential_reference_ownership_unmanaged,none,
+     "use 'unowned(unsafe)' to store the interface without ownership tracking",
+     ())
 ERROR(downcast_to_foreign_reference_type,none,
       "downcast from %0 to %1 is not supported for foreign reference types",
       (Type, Type))

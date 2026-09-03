@@ -29,6 +29,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
+#include <optional>
 #include <utility>
 
 namespace swift {
@@ -97,12 +98,27 @@ enum class ProtocolConformanceState {
 enum class BuiltinConformanceKind {
   // A builtin conformance that has been synthesized by the implementation.
   Synthesized = 0,
+
+  // The compiler-managed conformance of a COM interface or implementation
+  // metatype to its identity protocol.
+  COMIdentityMetatype,
+
   // A missing conformance that we have nonetheless synthesized so that
   // we can diagnose it later.
   Missing,
 
   Last_Kind = Missing
 };
+
+/// Requirements of COM identity protocols that have compiler-provided witneses.
+enum class COMIdentityRequirementKind {
+  InterfaceID,
+  ClassID,
+};
+
+/// Classify a compiler-managed COM identity requirement.
+std::optional<COMIdentityRequirementKind>
+classifyCOMIdentityRequirement(ValueDecl *requirement);
 
 enum : unsigned {
   NumProtocolConformanceStateBits =
@@ -1319,6 +1335,7 @@ public:
   bool isInvalid() const {
     switch (getBuiltinConformanceKind()) {
     case BuiltinConformanceKind::Synthesized:
+    case BuiltinConformanceKind::COMIdentityMetatype:
       return false;
     case BuiltinConformanceKind::Missing:
       return true;
@@ -1363,9 +1380,7 @@ public:
     llvm_unreachable("builtin-conformances never have associated types");
   }
 
-  bool hasWitness(ValueDecl *requirement) const {
-    llvm_unreachable("builtin-conformances never have requirement witnesses");
-  }
+  bool hasWitness(ValueDecl *requirement) const;
 
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
@@ -1375,9 +1390,7 @@ public:
     llvm_unreachable("builtin-conformances never have associated types");
   }
 
-  Witness getWitness(ValueDecl *requirement) const {
-    llvm_unreachable("builtin-conformances never have requirement witnesses");
-  }
+  Witness getWitness(ValueDecl *requirement) const;
 
   /// Given that the requirement signature of the protocol directly states
   /// that the given dependent type must conform to the given protocol,
@@ -1389,6 +1402,9 @@ public:
 
   /// Retrieve the witness corresponding to the given value requirement.
   ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement) const {
+    auto conformance = getBuiltinConformanceKind();
+    if (conformance == BuiltinConformanceKind::COMIdentityMetatype)
+      return RootProtocolConformance::getWitnessDeclRef(requirement);
     return ConcreteDeclRef(requirement);
   }
 

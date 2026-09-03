@@ -903,7 +903,8 @@ namespace {
     virtual bool isLoadingPure() const override { return true; }
 
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
-                         ManagedValue base) && override {
+                         ManagedValue base) &&
+        override {
       assert(base && "invalid value for element base");
       if (base.getType().isObject()) {
         return SGF.B.createTupleExtract(loc, base, ElementIndex);
@@ -1010,8 +1011,7 @@ namespace {
     virtual bool isLoadingPure() const override { return true; }
 
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
-                         ManagedValue base) &&
-        override {
+                         ManagedValue base) && override {
       return SGF.emitPreconditionOptionalHasValue(loc, base, isImplicitUnwrap);
     }
 
@@ -1023,11 +1023,11 @@ namespace {
 
   /// A physical path component which projects out an opened archetype
   /// from an existential.
-  class OpenOpaqueExistentialComponent : public PhysicalPathComponent {
+  class OpenAddressExistentialComponent : public PhysicalPathComponent {
   public:
-    OpenOpaqueExistentialComponent(CanArchetypeType openedArchetype,
-                                   LValueTypeData typeData)
-        : PhysicalPathComponent(typeData, OpenOpaqueExistentialKind,
+    OpenAddressExistentialComponent(CanArchetypeType openedArchetype,
+                                    LValueTypeData typeData)
+        : PhysicalPathComponent(typeData, OpenAddressExistentialKind,
                                 /*actorIsolation=*/std::nullopt) {
       assert(getSubstFormalType() == openedArchetype);
     }
@@ -1049,9 +1049,10 @@ namespace {
       auto rep = base.getType().getPreferredExistentialRepresentation();
       switch (rep) {
       case ExistentialRepresentation::COM:
-        llvm_unreachable("opening a COM existential is not implemented");
       case ExistentialRepresentation::Opaque:
         if (!base.getValue()->getType().isAddress()) {
+          assert(rep == ExistentialRepresentation::Opaque &&
+                 "COM existential lvalue must be an address");
           assert(!SGF.useLoweredAddresses());
           auto borrow = SGF.B.createBeginBorrow(
               loc, base.getValue(), IsNotLexical, DoesNotHavePointerEscape);
@@ -1093,7 +1094,7 @@ namespace {
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
-      OS.indent(indent) << "OpenOpaqueExistentialComponent("
+      OS.indent(indent) << "OpenAddressExistentialComponent("
                         << getSubstFormalType() << ")\n";
     }
   };
@@ -6045,10 +6046,9 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
     .getPreferredExistentialRepresentation();
   switch (rep) {
   case ExistentialRepresentation::COM:
-    llvm_unreachable("opening a COM existential is not implemented");
   case ExistentialRepresentation::Opaque:
   case ExistentialRepresentation::Boxed: {
-    lv.add<OpenOpaqueExistentialComponent>(openedArchetype, typeData);
+    lv.add<OpenAddressExistentialComponent>(openedArchetype, typeData);
     break;
   }
   case ExistentialRepresentation::Metatype:

@@ -11,8 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Heap.h"
+#include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Metadata.h"
+#include <gtest/gtest.h>
 
-#include "gtest/gtest.h"
+using namespace swift;
 
 void shouldAlloc(size_t size, size_t alignMask) {
   void *ptr = swift::swift_slowAlloc(size, alignMask);
@@ -70,3 +73,61 @@ TEST(HeapTest, slowAllocTyped) {
   shouldAllocTyped(1093);
 }
 
+TEST(HeapTest, allocObjectInitializesInstancePrefix) {
+  constexpr size_t PrefixSize = 2 * sizeof(void *);
+  constexpr size_t InstanceAlignment = 4 * sizeof(void *);
+  constexpr size_t AddressPoint = InstanceAlignment;
+  constexpr size_t DescriptorStorageSize =
+      sizeof(ClassDescriptor) + sizeof(ClassInstancePrefixDescriptor) +
+      PrefixSize + alignof(ClassInstancePrefixDescriptor);
+
+  auto *descriptorStorage =
+      static_cast<unsigned char *>(std::calloc(1, DescriptorStorageSize));
+  ASSERT_NE(descriptorStorage, nullptr);
+  auto *descriptor = reinterpret_cast<ClassDescriptor *>(descriptorStorage);
+
+  TypeContextDescriptorFlags typeFlags;
+  typeFlags.class_setHasInstancePrefix(true);
+  descriptor->Flags =
+      ContextDescriptorFlags(ContextDescriptorKind::Class,
+                             /*isGeneric=*/false,
+                             /*isUnique=*/true,
+                             /*hasInvertibleProtocols=*/false,
+                             typeFlags.getOpaqueValue());
+
+  ClassInstancePrefixDescriptor *prefixDescriptor =
+    const_cast<decltype(prefixDescriptor)>(descriptor->getInstancePrefixDescriptor());
+  auto *prefixTemplate =
+      reinterpret_cast<unsigned char *>(prefixDescriptor + 1);
+  std::array<unsigned char, PrefixSize> expected;
+  for (size_t index = 0; index != expected.size(); ++index)
+    expected[index] = static_cast<unsigned char>(index * 17 + 3);
+  std::memcpy(prefixTemplate, expected.data(), expected.size());
+
+  prefixDescriptor->Version = ClassInstancePrefixDescriptor::CurrentVersion;
+  prefixDescriptor->PrefixSizeInWords = PrefixSize / sizeof(void *);
+  using PrefixTemplatePointer = decltype(prefixDescriptor->PrefixTemplate);
+  new (&prefixDescriptor->PrefixTemplate) PrefixTemplatePointer(prefixTemplate);
+
+  FullMetadata<ClassMetadata> metadata = {
+      {{nullptr}, {nullptr}, {&VALUE_WITNESS_SYM(Bo)}},
+      {{nullptr}, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0}
+  };
+  metadata.setDescription(descriptor);
+  metadata.setInstanceAddressPoint(AddressPoint);
+  metadata.setInstanceSize(AddressPoint + sizeof(HeapObject));
+  metadata.setInstanceAlignMask(InstanceAlignment - 1);
+
+  auto *object =
+      swift_allocObject(&metadata, metadata.getInstanceSize(),
+                        metadata.getInstanceAlignMask());
+  EXPECT_EQ(object->metadata, &metadata);
+  auto *allocationBase =
+      reinterpret_cast<unsigned char *>(object) - AddressPoint;
+  auto *prefixAddress = allocationBase + AddressPoint - PrefixSize;
+  EXPECT_EQ(std::memcmp(prefixAddress, expected.data(), expected.size()), 0);
+
+  swift_deallocObject(object, metadata.getInstanceSize(),
+                      metadata.getInstanceAlignMask());
+  std::free(descriptorStorage);
+}

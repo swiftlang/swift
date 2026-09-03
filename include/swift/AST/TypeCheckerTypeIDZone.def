@@ -119,6 +119,8 @@ SWIFT_REQUEST(TypeChecker, COMDeclInfoRequest,
 SWIFT_REQUEST(TypeChecker, COMInterfaceHierarchyRequest,
               const COMInterfaceHierarchy *(ProtocolDecl *), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, COMRuntimeEntryRequest,
+              FuncDecl *(ModuleDecl *, Identifier), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDefaultActorRequest,
               bool(ClassDecl *, ModuleDecl *, ResilienceExpansion),
               Cached, NoLocationInfo)
@@ -458,10 +460,6 @@ SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SynthesizeCOMInterfaceIDRequest,
-              VarDecl *(ProtocolDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SynthesizeCOMCLSIDRequest,
-              VarDecl *(ClassDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckPrimaryFileRequest,
               bool(SouceFile *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ConformanceAccessScopeRequest,

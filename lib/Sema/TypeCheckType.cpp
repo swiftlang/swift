@@ -4969,6 +4969,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
         .Case("thin", SILFunctionType::Representation::Thin)
         .Case("c", SILFunctionType::Representation::CFunctionPointer)
         .Case("method", SILFunctionType::Representation::Method)
+        .Case("com_method", SILFunctionType::Representation::COMMethod)
         .Case("objc_method",
               SILFunctionType::Representation::ObjCMethod)
         .Case("witness_method",
@@ -6574,8 +6575,9 @@ TypeResolver::validateCOMExistential(Type constraintType, TypeRepr *repr,
 
   auto layout = constraintType->getExistentialLayout();
   auto resolution = layout.resolveCOMInterface();
-  if (resolution.containsCOMInterfaceProtocol) {
-    diagnose(repr->getLoc(), diag::com_cominterface_existential);
+  if (resolution.identityProtocol) {
+    diagnose(repr->getLoc(), diag::com_identity_existential,
+             resolution.identityProtocol->getName().str());
     repr->setInvalid();
     return ErrorType::get(ctx);
   }

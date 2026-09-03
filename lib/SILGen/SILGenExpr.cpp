@@ -1942,6 +1942,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::COMMethod:
     case SILFunctionType::Representation::CXXMethod:
     case SILFunctionType::Representation::KeyPathAccessorGetter:
     case SILFunctionType::Representation::KeyPathAccessorSetter:
@@ -1976,6 +1977,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::COMMethod:
     case SILFunctionType::Representation::CXXMethod:
     case SILFunctionType::Representation::KeyPathAccessorGetter:
     case SILFunctionType::Representation::KeyPathAccessorSetter:
@@ -2489,7 +2491,16 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
       }
     }
   }
-  ManagedValue operand = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto resultObjectType =
+      E->getType()->getCanonicalType().getOptionalObjectType();
+  bool isCOMInterfaceCast =
+      resultObjectType && resultObjectType->isAnyExistentialType() &&
+      resultObjectType->getExistentialLayout().getCOMInterface();
+  ManagedValue operand =
+      SGF.emitRValueAsSingleValue(E->getSubExpr(),
+                                  isCOMInterfaceCast
+                                     ? SGFContext::AllowGuaranteedPlusZero
+                                     : SGFContext());
   return emitConditionalCheckedCast(SGF, E, operand, E->getSubExpr()->getType(),
                                     E->getType(), E->getCastKind(), C,
                                     trueCount, falseCount);
@@ -3164,14 +3175,16 @@ static ManagedValue emitMetatypeOperand(SILGenFunction &SGF, Expr *baseExpr) {
                                      SGFContext::AllowImmediatePlusZero);
 }
 
-SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
+SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr,
+                                             CanType resultType) {
   Type formalBaseType = baseExpr->getType()->getWithoutSpecifierType();
   CanType baseTy = formalBaseType->getCanonicalType();
 
   // For class, archetype, and protocol types, look up the dynamic metatype.
   if (baseTy.isAnyExistentialType()) {
-    SILType metaTy = getLoweredLoadableType(
-                                      CanExistentialMetatypeType::get(baseTy));
+    if (!resultType)
+      resultType = CanExistentialMetatypeType::get(baseTy);
+    SILType metaTy = getLoweredLoadableType(resultType);
     FormalEvaluationScope scope(*this);
     auto base = emitMetatypeOperand(*this, baseExpr).getValue();
     return B.createExistentialMetatype(loc, metaTy, base);
@@ -3205,7 +3218,8 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
 }
 
 RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
-  auto metatype = SGF.emitMetatypeOfValue(E, E->getBase());
+  auto metatype = SGF.emitMetatypeOfValue(
+      E, E->getBase(), E->getType()->getCanonicalType());
   return RValue(SGF, E,
                 ManagedValue::forObjectRValueWithoutOwnership(metatype));
 }

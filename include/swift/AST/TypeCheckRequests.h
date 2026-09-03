@@ -1304,6 +1304,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Find a direct C entry point supplied by the COM module.
+class COMRuntimeEntryRequest
+    : public SimpleRequest<COMRuntimeEntryRequest,
+                           FuncDecl *(ModuleDecl *, Identifier),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, ModuleDecl *module,
+                     Identifier name) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Determine whether the given class is a default actor.
 class IsDefaultActorRequest :
     public SimpleRequest<IsDefaultActorRequest,
@@ -3048,48 +3066,6 @@ private:
   // Evaluation.
   ConstructorDecl * evaluate(Evaluator &evaluator,
                              NominalTypeDecl *decl) const;
-
-public:
-  // Caching.
-  bool isCached() const { return true; }
-};
-
-/// Synthesizes the implicit metatype extension carrying \c var \c IID for a
-/// \c @com protocol.  The GUID is read from the protocol's own \c COMAttr, so
-/// the property is re-derived in modules importing a binary \c .swiftmodule.
-class SynthesizeCOMInterfaceIDRequest
-    : public SimpleRequest<SynthesizeCOMInterfaceIDRequest,
-                           VarDecl *(ProtocolDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  VarDecl *evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
-
-public:
-  // Caching.
-  bool isCached() const { return true; }
-};
-
-/// Synthesizes the Microsoft COM model's \c static \c var \c CLSID member on a
-/// \c @com class. The GUID is read from the class's own \c COMAttr. Rootless
-/// models retian the implementation identity without introducing this
-/// Microsoft-specific API.
-class SynthesizeCOMCLSIDRequest
-    : public SimpleRequest<SynthesizeCOMCLSIDRequest, VarDecl *(ClassDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  VarDecl *evaluate(Evaluator &evaluator, ClassDecl *decl) const;
 
 public:
   // Caching.

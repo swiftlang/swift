@@ -723,7 +723,7 @@ extension FunctionWorklist {
       switch entry {
       case .invalid, .associatedType:
         break
-      case .method(_, let witness):
+      case .method(_, let witness, _):
         if let method = witness,
            // A new witness table can still contain a generic function if the method couldn't be specialized for
            // some reason and an error has been printed. Exclude generic functions to not run into an assert later.

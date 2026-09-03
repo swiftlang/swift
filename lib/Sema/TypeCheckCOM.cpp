@@ -12,28 +12,21 @@
 
 #include "TypeCheckCOM.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ArgumentList.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ParameterList.h"
-#include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/Stmt.h"
-#include "swift/AST/StorageImpl.h"
-#include "swift/AST/SynthesizedDeclBuilder.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/UUID.h"
-#include "llvm/ADT/StringExtras.h"
 
 
 namespace {
@@ -83,180 +76,6 @@ TypeDecl *lookup(ASTContext &ASTContext, DeclContext *DC, Identifier name,
   }
 
   return cast<TypeDecl>(results.front());
-}
-
-/// Body synthesizer for a GUID getter.  Produces:
-/// \code
-///   return ID(data1: 0x…, data2: 0x…, data3: 0x…,
-///             data4: (0x…, 0x…, 0x…, 0x…, 0x…, 0x…, 0x…, 0x…))
-/// \endcode
-std::pair<BraceStmt *, bool>
-materializeGUID(AbstractFunctionDecl *AFD, void *context) {
-  auto &ASTContext = AFD->getASTContext();
-
-  std::optional<UUID> uuid =
-      UUID::fromString(static_cast<const char *>(context));
-  ASSERT(uuid && "GUID string should have been validated by Sema");
-  // Not uuid->Value: it is native-endian on a Windows host, which would bake
-  // byte-swapped field literals. The field values must not depend on the host.
-  unsigned char V[UUID::Size];
-  uuid->getCanonicalBytes(V);
-
-  auto hex = [&](uint64_t value) -> IntegerLiteralExpr * {
-    auto literal = ASTContext.AllocateCopy("0x" + llvm::utohexstr(value));
-    return new (ASTContext) IntegerLiteralExpr(literal, {}, /*implicit=*/true);
-  };
-
-  // RFC 4122 network byte order -> COM GUID fields.
-  Expr *data1 = hex((uint32_t(V[0]) << 24) | (V[1] << 16) | (V[2] << 8) | V[3]);
-  Expr *data2 = hex((uint16_t(V[4]) << 8) | V[5]);
-  Expr *data3 = hex((uint16_t(V[6]) << 8) | V[7]);
-
-  SmallVector<Expr *, 8> elements;
-  for (unsigned i = 0; i < 8; ++i)
-    elements.push_back(hex(V[8 + i]));
-  Expr *data4 = TupleExpr::createImplicit(ASTContext, elements, {});
-
-  Argument args[] = {
-      {SourceLoc(), ASTContext.getIdentifier("data1"), data1},
-      {SourceLoc(), ASTContext.getIdentifier("data2"), data2},
-      {SourceLoc(), ASTContext.getIdentifier("data3"), data3},
-      {SourceLoc(), ASTContext.getIdentifier("data4"), data4},
-  };
-
-  Type DeclTy = cast<AccessorDecl>(AFD)->getResultInterfaceType();
-  CallExpr *call =
-      CallExpr::createImplicit(ASTContext,
-                               TypeExpr::createImplicit(DeclTy, ASTContext),
-                               ArgumentList::createImplicit(ASTContext, args));
-
-  return {BraceStmt::create(ASTContext, SourceLoc(),
-                            ASTNode(ReturnStmt::createImplicit(ASTContext, call)),
-                            SourceLoc()),
-          /*isTypeChecked=*/false};
-}
-
-/// Synthesize a computed GUID property named \p identifier holding \p value;
-/// its type is the same-named \c GUID specialization (\c IID or \c CLSID).
-/// The property is created in \p DC and copies its formal access from \p decl,
-/// the interface or class the ID belongs to. For a \c CLSID these coincide;
-/// for an \c IID the property lives in a metatype extension, so \p DC is that
-/// extension while \p decl is the protocol.
-VarDecl *generateIDAccessor(ASTContext &ASTContext, DeclContext *DC,
-                            ValueDecl *decl, Identifier identifier,
-                            StringRef value, bool isStatic, bool aeic) {
-  TypeDecl *Ty =
-      lookup(ASTContext, decl->getDeclContext(), identifier, decl->getLoc());
-  if (!Ty)
-    return nullptr;
-  Type GUIDTy = Ty->getDeclaredInterfaceType();
-
-  // Null-terminate: UUID::fromString expects a C string.
-  std::string str = value.str();
-  StringRef uuid{str.c_str(), str.size() + 1};
-  StringRef stored = ASTContext.AllocateCopy(uuid);
-
-  // `decl` is the property's parent context only when the property is created
-  // directly in it (the CLSID case); the IID's parent is the extension.
-  bool enclosing = decl == DC->getAsDecl();
-
-  return VarDeclBuilder(DC, identifier)
-      .introducer(VarDecl::Introducer::Var)
-      .static_(isStatic)
-      .type(GUIDTy)
-      .readAccess(formalAccessForSynthesizedMember(decl, enclosing))
-      .usableFromInline(decl->getAttrs().hasAttribute<UsableFromInlineAttr>())
-      .getter(materializeGUID, const_cast<char *>(stored.data()))
-      .alwaysEmitIntoClient(aeic);
-}
-
-/// Synthesize \c var \c IID: \c GUID in an \c extension \c P.Protocol for a
-/// \c @com protocol.  The getter is \c @_alwaysEmitIntoClient.
-///
-/// The IID lives on the protocol metatype rather than on conforming types:
-/// it is the identity of the interface itself, so it is reached as
-/// `P.IID` and is not inherited by types that conform to `P`.  This is
-/// exactly what a protocol metatype extension provides, so the synthesized
-/// extension is marked as one.  Because the extended type is `P.Protocol`
-/// (the metatype), the accessor is a non-static instance member of the
-/// metatype, which the relaxed static-member rule for metatype extensions
-/// permits.
-VarDecl *synthesizeIIDProperty(ProtocolDecl *PD, ASTContext &ASTContext,
-                               StringRef value) {
-  // Create an implicit `extension P.Protocol`.
-  ExtensionDecl *ext =
-      ExtensionDecl::create(ASTContext, SourceLoc(), nullptr, {},
-                            PD->getModuleScopeContext(), nullptr);
-  ext->setImplicit();
-  // The extended type is the protocol metatype `(any P).Type`; that is what
-  // marks this as a protocol metatype extension; there is no separate flag.
-  ASTContext.evaluator.cacheOutput(
-      ExtendedTypeRequest{ext},
-      MetatypeType::get(ExistentialType::get(PD->getDeclaredInterfaceType())));
-  ext->setExtendedNominal(PD);
-  PD->addExtension(ext);
-
-  // Route the extension through the synthesized file unit so it is code-gen'd
-  // and serialized: the `IID` accessor must be emitted for the current module
-  // and reachable by name lookup in modules that import it.  Synthesis only
-  // happens for source-file protocols (see SynthesizeCOMInterfaceIDRequest);
-  // imported protocols recover the extension from the deserialized module.
-  if (auto *file = dyn_cast<FileUnit>(PD->getModuleScopeContext()))
-    file->getOrCreateSynthesizedFile().addTopLevelDecl(ext);
-
-  VarDecl *property =
-      generateIDAccessor(ASTContext, /*DC=*/ext, /*decl=*/PD,
-                         /*identifier=*/ASTContext.Id_IID, value,
-                         /*isStatic=*/false, /*aeic=*/true);
-  if (!property)
-    return nullptr;
-
-  PatternBindingDecl *binding = PatternBindingDeclBuilder(property);
-  ext->addMember(property);
-  ext->addMember(binding);
-  return property;
-}
-
-/// Synthesize \c static \c var \c CLSID: \c GUID on a \c @com class.
-VarDecl *synthesizeCLSIDProperty(ClassDecl *CD, ASTContext &ASTContext,
-                                 StringRef value) {
-  VarDecl *property =
-      generateIDAccessor(ASTContext, /*DC=*/CD, /*decl=*/CD,
-                         /*identifier=*/ASTContext.Id_CLSID, value,
-                         /*isStatic=*/true, /*aeic=*/false);
-  if (!property)
-    return nullptr;
-
-  PatternBindingDecl *binding = PatternBindingDeclBuilder(property);
-  CD->addMember(property);
-  CD->addMember(binding);
-  return property;
-}
-
-/// Recover the synthesized `IID` accessor for an imported or swiftinterface
-/// `@com` protocol: it lives in the deserialized metatype extension, so find it
-/// by name lookup rather than re-synthesizing.
-VarDecl *lookupCOMInterfaceID(ProtocolDecl *PD) {
-  for (auto *ref : PD->lookupDirect(PD->getASTContext().Id_IID)) {
-    auto *prop = dyn_cast<VarDecl>(ref);
-    if (!prop)
-      continue;
-    if (auto *ext = dyn_cast<ExtensionDecl>(prop->getDeclContext()))
-      if (ext->isMetatypeExtension())
-        return prop;
-  }
-  return nullptr;
-}
-
-/// Recover the synthesized `CLSID` accessor for an imported or swiftinterface
-/// `@com` class.
-VarDecl *lookupCOMImplementationID(ClassDecl *CD) {
-  for (auto *ref : CD->lookupDirect(CD->getASTContext().Id_CLSID)) {
-    auto *prop = dyn_cast<VarDecl>(ref);
-    if (prop && prop->getDeclContext() == CD)
-      return prop;
-  }
-  return nullptr;
 }
 
 const COMAttr *getAttribute(const ClassDecl *CD) {
@@ -318,6 +137,57 @@ ProtocolDecl *findInterface(ArrayRef<ProtocolDecl *> chain,
       return interface;
   }
   return nullptr;
+}
+
+bool validateInterfaceMethod(AbstractFunctionDecl *AFD) {
+  bool invalid = false;
+
+  if (isa<ConstructorDecl>(AFD)) {
+    AFD->diagnose(diag::com_interface_unsupported_requirement, AFD->getName());
+    return true;
+  }
+
+  if (AFD->isStatic()) {
+    AFD->diagnose(diag::com_interface_static_requirement, AFD->getName());
+    invalid = true;
+  }
+
+  if (AFD->hasGenericParamList()) {
+    AFD->diagnose(diag::com_interface_generic_requirement, AFD->getName());
+    invalid = true;
+  }
+
+  if (AFD->hasAsync()) {
+    AFD->diagnose(diag::com_interface_async_requirement, AFD->getName());
+    invalid = true;
+  }
+
+  if (AFD->hasThrows()) {
+    AFD->diagnose(diag::com_interface_throwing_requirement, AFD->getName());
+    invalid = true;
+  }
+
+  Type RTy = cast<FuncDecl>(AFD)->getResultInterfaceType();
+  if (!RTy->isVoid() && !RTy->isRepresentableIn(ForeignLanguage::C, AFD)) {
+    AFD->diagnose(diag::com_interface_unsupported_type, RTy, AFD->getName());
+    invalid = true;
+  }
+
+  for (auto *P : *AFD->getParameters()) {
+    if (P->isVariadic() || P->getSpecifier() != ParamSpecifier::Default) {
+      P->diagnose(diag::com_interface_unsupported_parameter,
+                  P->getName(), AFD->getName());
+      invalid = true;
+    }
+
+    Type PTy = P->getTypeInContext();
+    if (!PTy->isRepresentableIn(ForeignLanguage::C, AFD)) {
+      P->diagnose(diag::com_interface_unsupported_type, PTy, AFD->getName());
+      invalid = true;
+    }
+  }
+
+  return invalid;
 }
 
 }
@@ -536,10 +406,117 @@ COMInterfaceHierarchyRequest::evaluate(Evaluator &evaluator,
       COMInterfaceHierarchy(C.AllocateCopy(markers), C.AllocateCopy(chain)));
 }
 
+static Type getCOMRuntimeEntryType(ASTContext &C, Identifier name) {
+  auto mutableRawPointer = C.getUnsafeMutableRawPointerType();
+  StringRef entry = name.str();
+
+  SmallVector<AnyFunctionType::Param, 3> parameters;
+  Type result;
+  if (entry == "QueryInterface" || entry == "AggregatedQueryInterface") {
+    auto rawPointer = C.getUnsafeRawPointerType();
+    auto optionalMutableRawPointer = OptionalType::get(mutableRawPointer);
+    auto mutableRawPointerPointer = BoundGenericType::get(
+        C.getUnsafeMutablePointerDecl(), Type(), {optionalMutableRawPointer});
+
+    parameters.emplace_back(mutableRawPointer);
+    parameters.emplace_back(rawPointer);
+    parameters.emplace_back(mutableRawPointerPointer);
+    result = C.getInt32Type();
+  } else if (entry == "AddRef" || entry == "AggregatedAddRef" ||
+             entry == "Release" || entry == "AggregatedRelease") {
+    parameters.emplace_back(mutableRawPointer);
+    result = C.getUInt32Type();
+  } else {
+    return Type();
+  }
+
+  return FunctionType::get(parameters, result, FunctionType::ExtInfo());
+}
+
+static bool hasCOMRuntimeEntryType(FuncDecl *entry, Type expected) {
+  auto *function = expected->castTo<FunctionType>();
+  auto *parameters = entry->getParameters();
+  if (parameters->size() != function->getParams().size())
+    return false;
+
+  for (unsigned index = 0; index < parameters->size(); ++index) {
+    if (!parameters->get(index)->getInterfaceType()->isEqual(
+            function->getParams()[index].getPlainType()))
+      return false;
+  }
+
+  return entry->getResultInterfaceType()->isEqual(function->getResult());
+}
+
+FuncDecl *COMRuntimeEntryRequest::evaluate(Evaluator &evaluator,
+                                           ModuleDecl *module,
+                                           Identifier name) const {
+  auto &C = module->getASTContext();
+  SmallVector<ValueDecl *, 2> results;
+  C.lookupInModule(module, name.str(), results);
+
+  FuncDecl *entry = nullptr;
+  bool found = false;
+  for (auto *result : results) {
+    auto *candidate = dyn_cast<FuncDecl>(result);
+    if (!candidate)
+      continue;
+
+    found = true;
+    if (!candidate->hasOnlyCEntryPoint())
+      continue;
+
+    if (entry) {
+      C.Diags.diagnose(SourceLoc(), diag::com_runtime_ambiguous_entry,
+                       name.str());
+      return nullptr;
+    }
+    entry = candidate;
+  }
+
+  if (entry) {
+    Type expected = getCOMRuntimeEntryType(C, name);
+    if (!expected || hasCOMRuntimeEntryType(entry, expected))
+      return entry;
+
+    C.Diags.diagnose(SourceLoc(), diag::com_runtime_entry_type, name.str(),
+                     entry->getInterfaceType(), expected);
+    return nullptr;
+  }
+
+  if (found)
+    C.Diags.diagnose(SourceLoc(), diag::com_runtime_invalid_entry, name.str());
+  else
+    C.Diags.diagnose(SourceLoc(), diag::com_runtime_missing_entry, name.str());
+  return nullptr;
+}
+
 void com::validateImplementation(ClassDecl *CD) {
   auto *info = CD->getCOMDeclInfo();
   if (!info)
     return;
+
+  auto &C = CD->getASTContext();
+  auto *M = C.getLoadedModule(C.Id_COM);
+  if (!M && C.MainModule && C.MainModule->getName() == C.Id_COM)
+    M = C.MainModule;
+
+  if (M) {
+    bool aggregated = false;
+    if (auto *PD = C.getProtocol(KnownProtocolKind::COMAggregatable)) {
+      auto conformance = lookupConformance(CD->getDeclaredInterfaceType(), PD);
+      aggregated = !conformance.isInvalid();
+    }
+
+    for (StringRef name : {
+             aggregated ? "AggregatedQueryInterface" : "QueryInterface",
+             aggregated ? "AggregatedAddRef" : "AddRef",
+             aggregated ? "AggregatedRelease" : "Release",
+         }) {
+      auto request = COMRuntimeEntryRequest{M, C.getIdentifier(name)};
+      (void)evaluateOrDefault(C.evaluator, request, nullptr);
+    }
+  }
 
   if (CD->isActor())
     CD->diagnose(diag::com_actor_implementation, CD->getName());
@@ -557,34 +534,104 @@ void com::validateConformance(ProtocolConformance *conformance) {
       normal->getSourceKind() != ConformanceEntryKind::Explicit)
     return;
 
+  auto &diagnostics = normal->getDeclContext()->getASTContext().Diags;
+
   auto *protocol = normal->getProtocol();
+  if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface) ||
+      protocol->isSpecificProtocol(KnownProtocolKind::COMActivatable)) {
+    diagnostics.diagnose(normal->getLoc(),
+                         diag::com_identity_explicit_conformance,
+                         protocol->getName());
+    normal->setInvalid();
+    return;
+  }
+
   if (!protocol->isCOMInterface())
     return;
 
   Type type = normal->getType();
   auto *nominal = type->getAnyNominal();
   auto *CD = dyn_cast_or_null<ClassDecl>(nominal);
-  auto &context = normal->getDeclContext()->getASTContext();
   if (!CD) {
-    context.Diags.diagnose(normal->getLoc(),
-                           diag::com_conformance_requires_class, type,
-                           protocol->getDeclaredInterfaceType());
+    diagnostics.diagnose(normal->getLoc(), diag::com_conformance_requires_class,
+                         type, protocol->getDeclaredInterfaceType());
     return;
   }
 
   auto *typeModule = CD->getParentModule();
   auto *conformanceModule = normal->getDeclContext()->getParentModule();
-  if (!typeModule->isSameModuleLookingThroughOverlays(conformanceModule)) {
-    context.Diags.diagnose(normal->getLoc(),
-                           diag::com_conformance_must_be_in_type_module, type,
-                           protocol->getDeclaredInterfaceType());
+  if (!typeModule->isSameModuleLookingThroughOverlays(conformanceModule))
+    diagnostics.diagnose(normal->getLoc(),
+                         diag::com_conformance_must_be_in_type_module, type,
+                         protocol->getDeclaredInterfaceType());
+
+  if (!normal->getConditionalRequirements().empty())
+    diagnostics.diagnose(normal->getLoc(), diag::com_conditional_conformance,
+                         type, protocol->getDeclaredInterfaceType());
+}
+
+void com::validateIdentityProtocol(ProtocolDecl *PD) {
+  bool interface = PD->isSpecificProtocol(KnownProtocolKind::COMInterface);
+  bool activatable = PD->isSpecificProtocol(KnownProtocolKind::COMActivatable);
+  if (!interface && !activatable)
+    return;
+
+  VarDecl *identity = nullptr;
+  for (auto *requirement : PD->getProtocolRequirements()) {
+    auto kind = classifyCOMIdentityRequirement(requirement);
+    if (!kind) {
+      requirement->diagnose(diag::com_identity_unsupported_requirement,
+                            requirement->getName(), PD->getName());
+      PD->setInvalid();
+      continue;
+    }
+
+    switch (*kind) {
+    case COMIdentityRequirementKind::InterfaceID:
+    case COMIdentityRequirementKind::ClassID:
+      identity = dyn_cast<VarDecl>(requirement);
+      break;
+    }
   }
 
-  if (!normal->getConditionalRequirements().empty()) {
-    context.Diags.diagnose(normal->getLoc(),
-                           diag::com_conditional_conformance, type,
-                           protocol->getDeclaredInterfaceType());
+  auto &context = PD->getASTContext();
+  Identifier ident = interface ? context.Id_IID : context.Id_CLSID;
+  auto *decl = ::com::lookup(context, PD->getDeclContext(), ident, PD->getLoc());
+
+  bool hasValidIdentity =
+      identity && !identity->isStatic() && !identity->isSettable(nullptr) &&
+      decl && identity->getValueInterfaceType()->isEqual(decl->getDeclaredInterfaceType());
+  if (!hasValidIdentity) {
+    PD->diagnose(diag::com_identity_invalid_requirement,
+                 PD->getName().str(), ident.str());
+    PD->setInvalid();
   }
+}
+
+void com::validateInterfaceRequirements(ProtocolDecl *PD) {
+  if (!PD->isCOMInterface() ||
+      PD->isSpecificProtocol(KnownProtocolKind::COMInterface))
+    return;
+
+  bool invalid = false;
+  for (auto *AT : PD->getAssociatedTypeMembers()) {
+    AT->diagnose(diag::com_interface_unsupported_requirement, AT->getName());
+    invalid = true;
+  }
+
+  for (auto *member : PD->getABIMembers()) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member)) {
+      invalid |= ::com::validateInterfaceMethod(AFD);
+    } else if (auto *storage = dyn_cast<AbstractStorageDecl>(member)) {
+      storage->visitOpaqueAccessors([&](AccessorDecl *accessor) {
+        if (accessor->requiresNewWitnessTableEntry())
+          invalid |= ::com::validateInterfaceMethod(accessor);
+      });
+    }
+  }
+
+  if (invalid)
+    PD->setInvalid();
 }
 
 ProtocolConformance *
@@ -631,49 +678,11 @@ com::deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP) {
       context.getNormalConformance(NTD->getDeclaredInterfaceType(), protocol,
                                    NTD->getLoc(), /*inheritedTypeRepr=*/nullptr,
                                    /*conformanceDC=*/NTD,
-                                   ProtocolConformanceState::Complete,
+                                   ProtocolConformanceState::Incomplete,
                                    ProtocolConformanceOptions());
   conformance->setSourceKindAndImplyingConformance(ConformanceEntryKind::Synthesized,
                                                    nullptr);
   NTD->registerProtocolConformance(conformance, /*synthesized=*/true);
   return conformance;
-}
-
-VarDecl *SynthesizeCOMInterfaceIDRequest::evaluate(Evaluator &evaluator,
-                                                   ProtocolDecl *PD) const {
-  auto &ASTContext = PD->getASTContext();
-  auto *info = PD->getCOMDeclInfo();
-  if (!info)
-    return nullptr;
-  // Only synthesize for a protocol defined in a source file of the module being
-  // compiled.  A deserialized module or swiftinterface already carries the
-  // synthesized extension, so find its `IID` by name lookup; re-synthesizing
-  // would duplicate it, or fabricate a member absent from an older interface.
-  if (!PD->isInSwiftSourceFile())
-    return ::com::lookupCOMInterfaceID(PD);
-  return ::com::synthesizeIIDProperty(PD, ASTContext, info->getInterfaceID());
-}
-
-VarDecl *SynthesizeCOMCLSIDRequest::evaluate(Evaluator &evaluator,
-                                             ClassDecl *CD) const {
-  auto &ASTContext = CD->getASTContext();
-
-  // CLSID is the Microsoft model's spelling and activation surface. Other
-  // models may consume the implementation UUID through their own policy, but
-  // must not acquire a synthetic Microsoft-named member.
-  if (ASTContext.LangOpts.COMModel != LangOptions::COMInteropModel::Microsoft)
-    return nullptr;
-
-  auto *info = CD->getCOMDeclInfo();
-  if (!info)
-    return nullptr;
-  auto implementationID = info->getImplementationID();
-  if (!implementationID)
-    return nullptr;
-  // Synthesize only for a source-file class; recover the imported member by
-  // name lookup (see SynthesizeCOMInterfaceIDRequest).
-  if (!CD->isInSwiftSourceFile())
-    return ::com::lookupCOMImplementationID(CD);
-  return ::com::synthesizeCLSIDProperty(CD, ASTContext, *implementationID);
 }
 }

@@ -141,6 +141,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::COMMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::UpcastInst:
@@ -239,6 +240,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialBoxInst:

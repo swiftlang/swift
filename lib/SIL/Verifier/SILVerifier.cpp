@@ -1302,24 +1302,18 @@ public:
     forbidObjectType(UnownedStorageType, value, valueDescription);
   }
 
-  // Require that the operand is a reference-counted type, or an Optional
+  // Require that the operand permits reference storage, or is an Optional
   // thereof.
   void requireReferenceOrOptionalReferenceValue(SILValue value,
                                                 const Twine &valueDescription) {
     require(value->getType().isObject(), valueDescription +" must be an object");
-    
-    auto objectTy = value->getType().unwrapOptionalType();
-    
-    // Immortal C++ foreign reference types are represented as trivially lowered
-    // types since they do not require retain/release calls.
-    bool isImmortalFRT = objectTy.isForeignReferenceType() &&
-                         objectTy.getASTType()->getReferenceCounting() ==
-                             ReferenceCounting::None;
 
-    require(objectTy.isReferenceCounted(F.getModule()) || isImmortalFRT,
+    auto objectTy = value->getType().unwrapOptionalType();
+    require(objectTy.getASTType()->allowsOwnership(
+                F.getGenericSignature().getPointer()),
             valueDescription + " must have reference semantics");
   }
-  
+
   // Require that the operand is a type that supports reference storage
   // modifiers.
   void requireReferenceStorageCapableValue(SILValue value,
@@ -4142,6 +4136,12 @@ public:
     // metatype with the same constraint type as its existential operand.
     auto formalInstanceTy
       = MI->getType().castTo<ExistentialMetatypeType>().getInstanceType();
+    if (MI->getOperand()->getType().canUseExistentialRepresentation(
+            ExistentialRepresentation::COM)) {
+      require(formalInstanceTy->isAny(),
+              "COM existential_metatype result must be Any.Type");
+      return;
+    }
     if (formalInstanceTy->isConstraintType()) {
       require(MI->getOperand()->getType().is<ExistentialType>(),
               "existential_metatype operand must be an existential type");
@@ -4556,7 +4556,13 @@ public:
       require(AMI->getTypeDependentOperands().empty() || lookupType->hasLocalArchetype(),
               "Should not have an operand for the opened existential");
     }
-    if (!isa<ArchetypeType>(lookupType) && !isa<DynamicSelfType>(lookupType)) {
+    bool isArchetypeMetatype = false;
+    // The metatype of an archetype (e.g. 'T.Type' for a 'T.Type: P'
+    // requirement) uses an abstract metatype conformance, like an archetype.
+    if (auto metatype = dyn_cast<AnyMetatypeType>(lookupType))
+      isArchetypeMetatype = isa<ArchetypeType>(metatype.getInstanceType());
+    if (!isa<ArchetypeType>(lookupType) && !isa<DynamicSelfType>(lookupType) &&
+        !isArchetypeMetatype) {
       require(AMI->getConformance().isConcrete(),
               "concrete type lookup requires concrete conformance");
       auto conformance = AMI->getConformance().getConcrete();
@@ -4796,6 +4802,31 @@ public:
 #endif
   }
 
+  void checkCOMMethodInst(COMMethodInst *CMI) {
+    auto member = CMI->getMember();
+    auto *protocol = member.getDecl()->getDeclContext()->getSelfProtocolDecl();
+    require(protocol && protocol->isCOMInterface(),
+            "com_method must reference a COM interface requirement");
+
+    auto methodType =
+        requireObjectType(SILFunctionType, CMI, "result of com_method");
+    require(!methodType->getExtInfo().hasContext(),
+            "result method must be of a context-free function type");
+    require(methodType->getRepresentation() == SILFunctionTypeRepresentation::COMMethod,
+            "wrong function type representation");
+
+    auto operandType = CMI->getOperand()->getType();
+    // The generic COM method convention passes Self indirectly, so SILGen may
+    // materialize the opened interface reference and use its address here.
+    auto archetype = operandType.getASTType()->getAs<ArchetypeType>();
+    require(archetype && llvm::any_of(archetype->getConformsTo(),
+                                      [&](ProtocolDecl *constraint) {
+              return constraint == protocol || constraint->inheritsFrom(protocol);
+            }),
+            "com_method operand must be an archetype constrained to the declaring COM interface");
+    verifyLocalArchetype(CMI, operandType.getASTType());
+  }
+
   void checkObjCSuperMethodInst(ObjCSuperMethodInst *OMI) {
     auto member = OMI->getMember();
     auto overrideTy =
@@ -4829,9 +4860,12 @@ public:
     SILType operandType = OEI->getOperand()->getType();
     require(operandType.isAddress(),
             "open_existential_addr must be applied to address");
-    require(operandType.canUseExistentialRepresentation(
-                                        ExistentialRepresentation::Opaque),
-           "open_existential_addr must be applied to opaque existential");
+    auto representation = operandType.getPreferredExistentialRepresentation();
+    bool supported = representation == ExistentialRepresentation::Opaque ||
+                     representation == ExistentialRepresentation::COM;
+    require(supported,
+            "open_existential_addr must be applied to opaque or COM "
+            "existential");
 
     require(OEI->getType().isAddress(),
             "open_existential_addr result must be an address");
@@ -4877,6 +4911,23 @@ public:
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_ref should be registered in "
             "SILFunction");
+  }
+
+  void checkOpenCOMExistentialInst(OpenCOMExistentialInst *OCE) {
+    SILType operandType = OCE->getOperand()->getType();
+    require(operandType.isObject(),
+            "open_com_existential operand must not be address");
+    require(operandType.canUseExistentialRepresentation(ExistentialRepresentation::COM),
+            "open_com_existential operand must be a COM existential");
+
+    require(OCE->getType().isObject(),
+            "open_com_existential result must not be an address");
+
+    auto archetype = getOpenedArchetypeOf(OCE->getType().getASTType());
+    require(archetype,
+            "open_com_existential result must be an opened existential archetype");
+    require(OCE->getModule().getRootLocalArchetypeDefInst(archetype, OCE->getFunction()) == OCE,
+            "Archetype opened by open_com_existential should be registered in SILFunction");
   }
 
   void checkOpenExistentialBoxInst(OpenExistentialBoxInst *OEI) {
@@ -5069,12 +5120,18 @@ public:
 
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
     SILType concreteType = IEI->getOperand()->getType();
-    require(concreteType.getASTType()->isBridgeableObjectType(),
-            "init_existential_ref operand must be a class instance");
-    require(IEI->getType().canUseExistentialRepresentation(
-                                     ExistentialRepresentation::Class,
-                                     IEI->getFormalConcreteType()),
-            "init_existential_ref must be used with a class existential type");
+    bool isCOMProjection =
+        IEI->getType()
+            .canUseExistentialRepresentation(ExistentialRepresentation::COM,
+                                             IEI->getFormalConcreteType());
+    require(isCOMProjection ||
+            concreteType.getASTType()->isBridgeableObjectType(),
+            "init_existential_ref operand must be a class instance or a COM interface value");
+    require(isCOMProjection ||
+            IEI->getType()
+                .canUseExistentialRepresentation(ExistentialRepresentation::Class,
+                                                 IEI->getFormalConcreteType()),
+            "init_existential_ref must be used with a class or COM existential type");
     require(IEI->getType().isObject(),
             "init_existential_ref result must not be an address");
     
@@ -7880,6 +7937,19 @@ void SILWitnessTable::verify(const SILModule &mod) const {
       continue;
 
     auto *witnessFunction = entry.getMethodWitness().Witness;
+    auto *interface = entry.getMethodWitness().InterfaceEntry;
+
+    if (interface) {
+      assert(getProtocol()->isCOMInterface() &&
+             "only COM conformances may have native interface entries");
+      assert(interface->getLoweredFunctionType()->getRepresentation() ==
+                 SILFunctionTypeRepresentation::COMMethod &&
+             "native COM interface entries must have com_method representation");
+      if (hasOpenInterfaceEntries())
+        assert(interface->hasValidLinkageForFragileRef(IsSerialized) &&
+               "open COM conformances must expose native interface entries");
+    }
+
     if (!witnessFunction)
       continue;
 

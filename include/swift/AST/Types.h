@@ -1321,6 +1321,11 @@ public:
   /// retain/release runtime functions.
   bool hasRetainablePointerRepresentation();
 
+  /// Determines whether this type has the representation of a single pointer
+  /// managed by a foreign object model and can be passed directly through the
+  /// C ABI. This includes one level of optionality.
+  bool hasCCompatibleForeignReferenceRepresentation();
+
   /// Given that this type is a reference type, which kind of reference
   /// counting does it use?
   ReferenceCounting getReferenceCounting();
@@ -7859,7 +7864,8 @@ END_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 /// The storage type of a variable with non-strong reference
 /// ownership semantics.
 ///
-/// The referent type always satisfies allowsOwnership().
+/// The referent type always satisfies allowsOwnership(). Managed ownership
+/// may still be rejected for a particular reference model.
 ///
 /// These types may appear in the AST only as the type of a variable;
 /// getTypeOfReference strips this layer from the formal type of a
