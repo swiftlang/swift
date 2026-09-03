@@ -294,6 +294,10 @@ module Aliases {
   header "Aliases.h"
 }
 
+module AliasesObjc {
+  header "AliasesObjc.h"
+}
+
 module RetroactiveVersioning {
   header "versioning.h"
 }
