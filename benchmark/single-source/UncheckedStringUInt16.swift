@@ -13,10 +13,10 @@
 // Test UncheckedString<UInt16> performance over the operations it actually
 // supports: element (raw UTF-16 code unit) iteration, byte-wise comparison
 // and hashing, hasPrefix/hasSuffix, appending (small vs. dynamic storage),
-// replaceSubrange, and encode/decode round-tripping with String. This
-// module is compiled with -Xfrontend -disable-availability-checking (see
-// benchmark/CMakeLists.txt / benchmark/Package.swift), since UncheckedString
-// is still `@available(SwiftStdlib 9999, *)`.
+// replaceSubrange, and encode/decode round-tripping with String.
+// UncheckedString is still `@available(SwiftStdlib 9999, *)`, so every
+// declaration below that touches it is gated the same way, and `main.swift`
+// only registers these benchmarks inside `if #available(SwiftStdlib 9999, *)`.
 //
 // This is the UInt16 counterpart of UncheckedStringUInt8.swift -- same
 // families and corpora, different concrete `Element` (which also means a
@@ -25,11 +25,13 @@
 
 import TestsUtils
 
+@available(SwiftStdlib 9999, *)
 private typealias UStr = UncheckedString<UInt16>
 
 private let uncheckedStringTags: [BenchmarkCategory] =
   [.validation, .api, .UncheckedString]
 
+@available(SwiftStdlib 9999, *)
 public let benchmarks: [BenchmarkInfo] = [
   BenchmarkInfo(
     name: "UncheckedStr16.Walk.Ascii",
@@ -146,14 +148,18 @@ public let benchmarks: [BenchmarkInfo] = [
 
 // MARK: - Walk
 
+@available(SwiftStdlib 9999, *)
 private let asciiWalk: UStr =
   "siebenhundertsiebenundsiebzigtausendsiebenhundertsiebenundsiebzig"
+@available(SwiftStdlib 9999, *)
 private let emojiWalk: UStr = "😀🧀😃😄😁🤣😂😅😆👍🙌🎉"
+@available(SwiftStdlib 9999, *)
 private let cjkWalk: UStr =
   "今回のアップデートでSwiftに大幅な改良が施され、安定していてしかも直感的に使うことができるAppleプラットフォーム向けプログラミング言語になりました。"
 
 private let walkMultiplier = 2000
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 private func countForward(_ s: UStr) -> Int {
   var count = 0
@@ -163,6 +169,7 @@ private func countForward(_ s: UStr) -> Int {
   return count
 }
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 private func countIndices(_ s: UStr) -> Int {
   var count = 0
@@ -172,6 +179,7 @@ private func countIndices(_ s: UStr) -> Int {
   return count
 }
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 private func countBackwards(_ s: UStr) -> Int {
   var count = 0
@@ -181,6 +189,7 @@ private func countBackwards(_ s: UStr) -> Int {
   return count
 }
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 public func run_UncheckedStr16_Walk_Ascii(_ n: Int) {
   for _ in 1...walkMultiplier*n {
@@ -188,6 +197,7 @@ public func run_UncheckedStr16_Walk_Ascii(_ n: Int) {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 public func run_UncheckedStr16_Walk_Ascii_Indices(_ n: Int) {
   for _ in 1...walkMultiplier*n {
@@ -195,6 +205,7 @@ public func run_UncheckedStr16_Walk_Ascii_Indices(_ n: Int) {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 public func run_UncheckedStr16_Walk_Ascii_Backwards(_ n: Int) {
   for _ in 1...walkMultiplier*n {
@@ -202,6 +213,7 @@ public func run_UncheckedStr16_Walk_Ascii_Backwards(_ n: Int) {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 public func run_UncheckedStr16_Walk_Emoji(_ n: Int) {
   for _ in 1...walkMultiplier*n {
@@ -209,6 +221,7 @@ public func run_UncheckedStr16_Walk_Emoji(_ n: Int) {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 public func run_UncheckedStr16_Walk_CJK(_ n: Int) {
   for _ in 1...walkMultiplier*n {
@@ -218,6 +231,7 @@ public func run_UncheckedStr16_Walk_CJK(_ n: Int) {
 
 // MARK: - Comparison / Hashing
 
+@available(SwiftStdlib 9999, *)
 private struct Workload {
   static let n = 100
 
@@ -230,6 +244,7 @@ private struct Workload {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 private let comparisonAscii = Workload(
   name: "Ascii",
   payload: [
@@ -239,6 +254,7 @@ private let comparisonAscii = Workload(
     "Discoidea",
   ])
 
+@available(SwiftStdlib 9999, *)
 private let comparisonEmoji = Workload(
   name: "Emoji",
   payload: [
@@ -249,6 +265,7 @@ private let comparisonEmoji = Workload(
   ],
   scaleMultiplier: 1.0 / 4.0)
 
+@available(SwiftStdlib 9999, *)
 private let comparisonCJK = Workload(
   name: "CJK",
   payload: [
@@ -260,6 +277,7 @@ private let comparisonCJK = Workload(
   ],
   scaleMultiplier: 1.0 / 2.0)
 
+@available(SwiftStdlib 9999, *)
 private let comparisonSharedPrefix = Workload(
   name: "SharedPrefix",
   payload: [
@@ -269,6 +287,7 @@ private let comparisonSharedPrefix = Workload(
     "http://www.dogbook.com/dog/239495828/friends/mutual/3910583739/shared2",
   ])
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 private func compareLoop(_ n: Int, _ w: Workload) {
   let tripCount = w.tripCount
@@ -282,6 +301,7 @@ private func compareLoop(_ n: Int, _ w: Workload) {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 private func hashLoop(_ n: Int, _ w: Workload) {
   let tripCount = w.tripCount
@@ -295,15 +315,24 @@ private func hashLoop(_ n: Int, _ w: Workload) {
 
 // MARK: - hasPrefix / hasSuffix
 
+@available(SwiftStdlib 9999, *)
 private let hasPrefixAsciiPrefix: UStr = "prefix"
+@available(SwiftStdlib 9999, *)
 private let hasPrefixAsciiString: UStr = "prefixedString"
+@available(SwiftStdlib 9999, *)
 private let hasSuffixAsciiSuffix: UStr = "Suffixed"
+@available(SwiftStdlib 9999, *)
 private let hasSuffixAsciiString: UStr = "StringSuffixed"
+@available(SwiftStdlib 9999, *)
 private let hasPrefixUnicodePrefix: UStr = "❄️prefix"
+@available(SwiftStdlib 9999, *)
 private let hasPrefixUnicodeString: UStr = "❄️prefixedString"
+@available(SwiftStdlib 9999, *)
 private let hasSuffixUnicodeSuffix: UStr = "❄️Suffixed"
+@available(SwiftStdlib 9999, *)
 private let hasSuffixUnicodeString: UStr = "String❄️Suffixed"
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 private func hasPrefixLoop(_ n: Int, _ s: UStr, _ p: UStr, _ iterations: Int) {
   for _ in 0 ..< n {
@@ -313,6 +342,7 @@ private func hasPrefixLoop(_ n: Int, _ s: UStr, _ p: UStr, _ iterations: Int) {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 private func hasSuffixLoop(_ n: Int, _ s: UStr, _ p: UStr, _ iterations: Int) {
   for _ in 0 ..< n {
@@ -324,11 +354,16 @@ private func hasSuffixLoop(_ n: Int, _ s: UStr, _ p: UStr, _ iterations: Int) {
 
 // MARK: - Builder
 
+@available(SwiftStdlib 9999, *)
 private let builderSmallSeed: UStr = "a"
+@available(SwiftStdlib 9999, *)
 private let builderWordB: UStr = "b"
+@available(SwiftStdlib 9999, *)
 private let builderWordC: UStr = "c"
+@available(SwiftStdlib 9999, *)
 private let builderWordD: UStr = "d"
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 private func buildSmall(_ seed: UStr) -> UStr {
   var sb = seed
@@ -338,6 +373,7 @@ private func buildSmall(_ seed: UStr) -> UStr {
   return sb
 }
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 public func run_UncheckedStr16_Builder_Small(_ n: Int) {
   for _ in 1...5000*n {
@@ -345,10 +381,13 @@ public func run_UncheckedStr16_Builder_Small(_ n: Int) {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 private let builderDynamicSeed: UStr = "seed"
+@available(SwiftStdlib 9999, *)
 private let builderLongWord: UStr =
   "bumfuzzlebumfuzzlebumfuzzlebumfuzzlebumfuzzle"
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 private func buildDynamic(_ seed: UStr) -> UStr {
   var sb = seed
@@ -356,6 +395,7 @@ private func buildDynamic(_ seed: UStr) -> UStr {
   return sb
 }
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 public func run_UncheckedStr16_Builder_Dynamic(_ n: Int) {
   for _ in 1...500*n {
@@ -365,11 +405,15 @@ public func run_UncheckedStr16_Builder_Dynamic(_ n: Int) {
 
 // MARK: - replaceSubrange
 
+@available(SwiftStdlib 9999, *)
 private let replaceSmallBase: UStr = "coffee"
+@available(SwiftStdlib 9999, *)
 private let replaceLargeBase: UStr =
   "coffeecoffeecoffeecoffeecoffeecoffeecoffeecoffee"
+@available(SwiftStdlib 9999, *)
 private let replacement: UStr = "T"
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 private func replaceSubrangeLoop(_ n: Int, _ base: UStr, _ with: UStr) {
   var copy = base
@@ -386,11 +430,14 @@ private let encodeAsciiSource =
 private let encodeUnicodeSource =
   "Dagmar Karin Sørbøe visited 東京 for the show"
 
+@available(SwiftStdlib 9999, *)
 private let decodeAsciiSource: UStr =
   "The quick brown fox jumps over the lazy dog, again and again and again."
+@available(SwiftStdlib 9999, *)
 private let decodeUnicodeSource: UStr =
   "Dagmar Karin Sørbøe visited 東京 for the show"
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 private func encodeLoop(_ n: Int, _ source: String) {
   for _ in 0 ..< 2000 * n {
@@ -399,6 +446,7 @@ private func encodeLoop(_ n: Int, _ source: String) {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @inline(never)
 private func decodeLoop(_ n: Int, _ source: UStr) {
   for _ in 0 ..< 2000 * n {

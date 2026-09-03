@@ -451,8 +451,10 @@ register(TwoSum.benchmarks)
 register(TypeFlood.benchmarks)
 register(UTF8Decode.benchmarks)
 register(UTF16Decode.benchmarks)
-register(UncheckedStringUInt8.benchmarks)
-register(UncheckedStringUInt16.benchmarks)
+if #available(SwiftStdlib 9999, *) {
+  register(UncheckedStringUInt8.benchmarks)
+  register(UncheckedStringUInt16.benchmarks)
+}
 register(Walsh.benchmarks)
 register(TaskDeadlines.benchmarks)
 register(WithUnsafeCurrentTask.benchmarks)

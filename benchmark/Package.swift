@@ -12,6 +12,16 @@ unsupportedTests.insert("ObjectiveCBridgingStubs")
 
 unsupportedTests.insert("SimpleArraySpecialization")
 
+// UncheckedString is still pre-release (@available(SwiftStdlib 9999, *)).
+// Unlike the stdlib's own build, this package doesn't otherwise define the
+// `SwiftStdlib` availability domain, so anything that uses
+// `@available(SwiftStdlib 9999, *)`/`if #available(SwiftStdlib 9999, *)`
+// needs these flags too.
+let uncheckedStringAvailabilityFlags = [
+  "-Xfrontend", "-define-availability",
+  "-Xfrontend", "SwiftStdlib 9999:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999",
+]
+
 //===---
 // Single Source Libraries
 //
@@ -137,7 +147,8 @@ targets.append(
     path: "utils",
     sources: ["main.swift"],
     cxxSettings: [.headerSearchPath("../utils/CxxTests")],
-    swiftSettings: [.interoperabilityMode(.Cxx)]))
+    swiftSettings: [.interoperabilityMode(.Cxx),
+                    .unsafeFlags(uncheckedStringAvailabilityFlags)]))
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 targets.append(
@@ -164,14 +175,16 @@ targets += singleSourceLibraries.map { name in
   }
   if name == "UncheckedStringUInt8" || name == "UncheckedStringUInt16" {
     // UncheckedString is still pre-release (@available(SwiftStdlib 9999, *)),
-    // so these benchmarks need availability checking disabled to compile.
+    // so these benchmarks need the `SwiftStdlib` availability domain defined
+    // (normally supplied by the stdlib's own build, which these benchmarks
+    // don't share) in order to use `@available(SwiftStdlib 9999, *)` and
+    // `if #available(SwiftStdlib 9999, *)`.
     return .target(
       name: name,
       dependencies: singleSourceDeps,
       path: path,
       sources: ["\(name).swift"],
-      swiftSettings: [.unsafeFlags(["-Xfrontend",
-                                    "-disable-availability-checking"])])
+      swiftSettings: [.unsafeFlags(uncheckedStringAvailabilityFlags)])
   }
   return .target(name: name,
       dependencies: singleSourceDeps,
