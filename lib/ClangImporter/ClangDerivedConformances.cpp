@@ -906,6 +906,13 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
 
   auto valueType = clangCtx.getTypeDeclType(value_type);
 
+  if (getCxxValueSemanticsKind(valueType.getTypePtr(), impl) !=
+      CxxValueSemanticsKind::Copyable) {
+    // CxxOptional doesn't support ~Copyable elements, so skip the constructor
+    // synthesis and the conformance, if the wrapped value is move-only.
+    return;
+  }
+
   auto constRefValueType =
       clangCtx.getLValueReferenceType(valueType.withConst());
   // Create a fake variable with type of the wrapped value.

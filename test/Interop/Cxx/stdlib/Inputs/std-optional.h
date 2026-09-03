@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 using StdOptionalInt = std::optional<int>;
 using StdOptionalBool = std::optional<bool>;
@@ -24,6 +25,8 @@ struct HasDeletedCopyCtor {
   HasDeletedCopyCtor(HasDeletedCopyCtor &&other) = default;
 };
 using StdOptionalHasDeletedCopyCtor = std::optional<HasDeletedCopyCtor>;
+using StdOptionalMoveOnlyVector =
+    std::optional<std::vector<HasDeletedCopyCtor>>;
 
 struct HasDeletedMoveCtor {
   int value;
@@ -39,6 +42,13 @@ inline StdOptionalInt getNilOptional() { return {std::nullopt}; }
 
 inline StdOptionalHasDeletedCopyCtor getNonNilOptionalHasDeletedCopyCtor() {
   return StdOptionalHasDeletedCopyCtor(HasDeletedCopyCtor(654));
+}
+
+inline StdOptionalMoveOnlyVector getNonNilOptionalMoveOnlyVector() {
+  std::vector<HasDeletedCopyCtor> vec;
+  vec.emplace_back(789);
+  vec.emplace_back(987);
+  return StdOptionalMoveOnlyVector(std::move(vec));
 }
 
 inline bool takesOptionalInt(std::optional<int> arg) { return (bool)arg; }
