@@ -84,6 +84,11 @@ VARIABLE(SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES, boolean, true,
 VARIABLE(SWIFT_DEBUG_ENABLE_TASK_REGISTRY, boolean, true,
          "Enable the global live-task tracking registry.")
 
+VARIABLE(SWIFT_WASI_EXECUTOR_THREADS, uint32, 0,
+         "Number of worker threads in the wasm32-unknown-wasip1-threads global "
+         "executor's pool (0 = automatic: the online CPU count when the host "
+         "reports one, else 4; capped at 16).")
+
 #ifndef NDEBUG
 
 VARIABLE(SWIFT_DEBUG_ENABLE_PROTOCOL_CONFORMANCES_LOOKUP_LOG,

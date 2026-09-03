@@ -225,6 +225,7 @@ elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "wasi")
   )
   set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
     ExecutorImpl.swift
+    WASIExecutor.swift
     PlatformExecutorWASI.swift
   )
 else()

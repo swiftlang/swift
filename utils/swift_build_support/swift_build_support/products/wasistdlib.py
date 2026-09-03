@@ -97,6 +97,10 @@ class WASIStdlib(cmake_product.CMakeProduct):
 
     def _append_threading_options(self, cmake_options):
         cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
+        # No threads: Swift Concurrency runs on the single-threaded
+        # cooperative executor.
+        cmake_options.define(
+            'SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL', 'TRUE')
 
     def test(self, host_target):
         self._test(host_target, 'wasm32-wasip1')
@@ -194,11 +198,12 @@ class WASIThreadsStdlib(WASIStdlib):
                              '-Xcc;-pthread;-Xcc;-ftls-model=local-exec')
         cmake_options.define('SWIFT_ENABLE_WASI_THREADS:BOOL', 'TRUE')
         # The threads triple has real OS threads (shared memory + atomics +
-        # thread_spawn), so Swift Concurrency should use a multithreaded global
+        # thread_spawn), so Swift Concurrency uses a multithreaded global
         # executor rather than the single-threaded cooperative one the plain
-        # wasip1 stdlib inherits. Disable the single-threaded default and select
-        # the WASI thread-pool executor (stdlib/public/Concurrency/
-        # PlatformExecutorWASI.swift + WASIGlobalExecutor.cpp). This is what lets
+        # wasip1 stdlib uses: a runtime that is NOT single-threaded (so the
+        # actor runtime can tell pool workers from the main thread) plus the
+        # WASI thread-pool executor (stdlib/public/Concurrency/
+        # WASIExecutor.swift + WASIGlobalExecutor.cpp). This is what lets
         # Task / TaskGroup / async let fan out across wasi threads.
         cmake_options.define(
             'SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL', 'FALSE')

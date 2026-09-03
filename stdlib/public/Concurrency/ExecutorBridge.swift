@@ -138,6 +138,35 @@ internal func _dispatchEnqueueWithDeadline(_ global: CBool,
 @_silgen_name("swift_dispatchAssertMainQueue")
 internal func _dispatchAssertMainQueue()
 
+#if os(WASI)
+// The wasm32-unknown-wasip1-threads thread-pool executors
+// (WASIGlobalExecutor.cpp / WASIExecutor.swift).
+
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("swift_wasiEnqueueGlobal")
+internal func _wasiEnqueueGlobal(_ job: UnownedJob)
+
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("swift_wasiEnqueueGlobalWithDelay")
+internal func _wasiEnqueueGlobalWithDelay(_ sec: CLongLong,
+                                          _ nsec: CLongLong,
+                                          _ clock: CInt,
+                                          _ job: UnownedJob)
+
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("swift_wasiEnqueueMain")
+internal func _wasiEnqueueMain(_ job: UnownedJob)
+
+/// Blocks until the main queue has a job, then dequeues it.
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("swift_wasiWaitForMainJob")
+internal func _wasiWaitForMainJob() -> UnownedJob
+
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("swift_wasiIsMainThread")
+internal func _wasiIsMainThread() -> Bool
+#endif
+
 @_silgen_name("swift_createDefaultExecutorsOnce")
 func _createDefaultExecutorsOnce()
 
