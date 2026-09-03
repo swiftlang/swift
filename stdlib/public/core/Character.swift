@@ -204,10 +204,10 @@ extension Character: CustomDebugStringConvertible {
 extension String {
   /// Creates a string containing the given character.
   ///
-  /// - Parameter c: The character to convert to a string.
+  /// - Parameter character: The character to convert to a string.
   @inlinable @inline(__always)
-  public init(_ c: Character) {
-    self.init(c._str._guts)
+  public init(_ character: Character) {
+    self.init(character._str._guts)
   }
 }
 
