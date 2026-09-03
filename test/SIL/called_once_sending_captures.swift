@@ -135,7 +135,7 @@ extension CalledOnceActor {
 
 // AssignNeverSendableIntoSendingResult: a `@called(once)` closure with a
 // `sending` result, returning a captured value that was never itself sent.
-func calledOnceResult(_ f: @called(once) () -> sending NS) {}
+func calledOnceResult(_ f: @escaping @called(once) () -> sending NS) {}
 
 func testAssignNeverSendableIntoSendingResult(ns: NS) {
   calledOnceResult { ns } // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' cannot be a 'sending' result. Code in the current task may race with caller uses}}
@@ -225,7 +225,7 @@ func testInOutSendingCaptureAliasedWithReturnValue(_ x: inout sending NS) -> sen
 actor CustomActorInstance {}
 @globalActor struct CustomActor { static let shared = CustomActorInstance() }
 
-struct CalledOnceAsyncTask { init(_ ns: @called(once) () async -> Void) {} }
+struct CalledOnceAsyncTask { init(_ ns: @escaping @called(once) () async -> Void) {} }
 
 @MainActor
 struct MergeAcrossGlobalActors {

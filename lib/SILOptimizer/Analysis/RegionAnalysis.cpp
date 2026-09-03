@@ -2307,6 +2307,71 @@ class PartitionOpTranslator {
     partialApplyReachabilityDataflow.propagateReachability();
   }
 
+  /// The argument is a non-escaping `@called(once)` value,
+  /// if it's a closure, attempt to undo send of it's implicitly
+  /// sending captures if the values weren't actually sent in the
+  /// body of the closure.
+  void tryUndoSendOfValuesCapturedByNonescapingCalledOnceClosure(
+      Operand *calledOnceArgument) {
+    auto closure = calledOnceArgument->get();
+
+    // Dig up partial_apply that represents the closure.
+    while (true) {
+      SILValue tmp = closure;
+
+      // Look through conversions
+      if (isa<ConvertEscapeToNoEscapeInst>(tmp) ||
+          isa<ConvertFunctionInst>(tmp)) {
+        tmp = cast<SingleValueInstruction>(tmp)->getOperand(0);
+      }
+
+      // Look through re-abstraction thunks
+      if (auto *pai = dyn_cast<PartialApplyInst>(tmp)) {
+        if (auto *calleeFn = pai->getCalleeFunction()) {
+          if (calleeFn->isThunk())
+            tmp = pai->getArgument(0);
+        }
+      }
+
+      if (closure == tmp)
+        break;
+
+      closure = tmp;
+    }
+
+    auto *pai = dyn_cast<PartialApplyInst>(closure);
+    if (!pai || !pai->isCalledOnce())
+      return;
+
+    auto *calleeFn = pai->getCalleeFunction();
+    if (!calleeFn)
+      return;
+
+    PostOrderFunctionInfo calleePOFI(calleeFn);
+    RegionAnalysisFunctionInfo calleeInfo(calleeFn, &calleePOFI);
+
+    if (!calleeInfo.isSupportedFunction())
+      return;
+
+    ApplySite callSite(pai);
+    for (auto &op : pai->getArgumentOperands()) {
+      auto trackedValue = tryToTrackValue(op.get());
+      if (!trackedValue)
+        continue;
+
+      // Skip explicitly `sending` captures.
+      if (callSite.getParamInfoForOperand(op).hasOption(
+              SILParameterInfo::Sending))
+        continue;
+
+      unsigned argIndex = callSite.getSubstCalleeArgIndex(op);
+      assert(argIndex < calleeFn->getArguments().size());
+
+      if (!calleeInfo.wasValueEverSent(calleeFn->getArgument(argIndex)))
+        builder.addUndoSend(trackedValue->value, calledOnceArgument->getUser());
+    }
+  }
+
 public:
   PartitionOpTranslator(SILFunction *function, PostOrderFunctionInfo *pofi,
                         RegionAnalysisValueMap &valueMap,
@@ -2905,6 +2970,9 @@ public:
     // For non-self parameters, gather all of the sending parameters and
     // gather our non-sending parameters.
     SmallVector<Operand *, 8> nonSendingParameters;
+    // Non-escaping `@called(once)` closures require a post-call undo
+    // of their un-sent captures.
+    SmallVector<Operand *, 2> nonescapingCalledOnceArguments;
     SmallVector<Operand *, 8> sendingIndirectResults;
 
     // NOTE: We want to process indirect parameters as if they are
@@ -2924,6 +2992,16 @@ public:
       // If our parameter is not sending, just add it to the non-sending
       // parameters array and continue.
       if (!fas.isSending(op)) {
+        auto argumentType = op.get()->getType();
+
+        // Non-escaping @called(once) closures require special
+        // handling to undo send of non-Sendable captures that
+        // weren't sent in the body.
+        if (argumentType.isCalledOnce() &&
+            argumentType.containsNoEscapeFunction()) {
+          nonescapingCalledOnceArguments.push_back(&op);
+        }
+
         nonSendingParameters.push_back(&op);
         continue;
       }
@@ -2950,6 +3028,12 @@ public:
         if (auto lookupResult = tryToTrackValue(op.get())) {
           builder.addUndoSend(lookupResult->value, op.getUser());
         }
+      }
+
+      // Attempt to undo send of captures that weren't sent in the body of
+      // a non-escaping `@called(once)` closure.
+      for (Operand *op : nonescapingCalledOnceArguments) {
+        tryUndoSendOfValuesCapturedByNonescapingCalledOnceClosure(op);
       }
     };
 
