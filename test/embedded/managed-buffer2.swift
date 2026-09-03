@@ -16,7 +16,7 @@ struct CountAndCapacity {
 final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
   class func create(_ capacity: Int) -> TestManagedBuffer {
     let r = super.create(minimumCapacity: capacity) {
-      CountAndCapacity(count: 0, capacity: $0.capacity)
+      CountAndCapacity(count: 0, capacity: capacity)
     }
     return r as! TestManagedBuffer
 
