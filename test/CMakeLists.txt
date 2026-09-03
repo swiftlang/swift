@@ -160,6 +160,7 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "WINDOWS") OR
      ("${SDK}" STREQUAL "HAIKU") OR
      ("${SDK}" STREQUAL "WASI") OR
+     ("${SDK}" STREQUAL "WASIP2") OR
      ("${SDK}" STREQUAL "EMSCRIPTEN"))
     # No extra dependencies.
   else()

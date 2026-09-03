@@ -55,21 +55,33 @@ class WasmKit(product.Product):
         """
         install_destdir = self.host_install_destdir(host_target)
         build_toolchain_path = install_destdir + self.args.install_prefix + '/bin'
-        bin_path = run_swift_build(host_target, self, 'wasmkit-cli', set_installation_rpath=True)
-        shutil.copy(bin_path, build_toolchain_path + '/wasmkit')
+        for swiftpm_product, dest_name in (
+            ('wasmkit-cli', 'wasmkit'),
+            ('wasmkit-component-ld', 'wasmkit-component-ld'),
+        ):
+            bin_path = run_swift_build(
+                host_target, self, swiftpm_product, set_installation_rpath=True)
+            shutil.copy(bin_path, os.path.join(build_toolchain_path, dest_name))
 
     def build(self, host_target):
-        bin_path = run_swift_build(host_target, self, 'wasmkit-cli')
-        print("Built wasmkit-cli at: " + bin_path, flush=True)
-        # Copy the built binary to ./bin
-        dest_bin_path = self.__class__.cli_file_path(self.build_dir)
-        print("Copying wasmkit-cli to: " + dest_bin_path, flush=True)
-        os.makedirs(os.path.dirname(dest_bin_path), exist_ok=True)
-        shutil.copy(bin_path, dest_bin_path)
+        for swiftpm_product, dest in (
+            ('wasmkit-cli', self.__class__.cli_file_path(self.build_dir)),
+            ('wasmkit-component-ld',
+             self.__class__.component_ld_file_path(self.build_dir)),
+        ):
+            bin_path = run_swift_build(host_target, self, swiftpm_product)
+            print("Built %s at: %s" % (swiftpm_product, bin_path), flush=True)
+            print("Copying %s to: %s" % (swiftpm_product, dest), flush=True)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            shutil.copy(bin_path, dest)
 
     @classmethod
     def cli_file_path(cls, build_dir):
         return os.path.join(build_dir, 'bin', 'wasmkit')
+
+    @classmethod
+    def component_ld_file_path(cls, build_dir):
+        return os.path.join(build_dir, 'bin', 'wasmkit-component-ld')
 
 
 def run_swift_build(host_target, product, swiftpm_package_product_name, set_installation_rpath=False):
@@ -101,7 +113,7 @@ def run_swift_build(host_target, product, swiftpm_package_product_name, set_inst
         '--package-path', os.path.join(product.source_dir),
         '--build-path', product.build_dir,
         '--configuration', 'release',
-        '--traits', 'WasmDebuggingSupport',
+        '--traits', 'ComponentModel,FileSystem,WasmDebuggingSupport',
     ] + platform_args
 
     if product.args.verbose_build:
