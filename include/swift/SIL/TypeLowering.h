@@ -16,6 +16,7 @@
 #include "swift/ABI/ProtocolDispatchStrategy.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/AccessControls.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILInstruction.h"
@@ -142,9 +143,21 @@ public:
   /// is address-only if it is a resilient value type, or if it is a fragile
   /// value type with a resilient member. In either case, the full layout of
   /// values of the type is unavailable to the compiler.
+  SWIFT_UNAVAILABLE_IN_SILGEN_MSG(
+      "use `!isLoadableOrOpaque(F)` or `isAddress()` depending on your needs")
   bool isAddressOnly() const {
     return Properties.isAddressOnly();
   }
+  /// isLoadableOrOpaque - Returns true if values of this type can be handled as
+  /// direct, loaded SSA values.
+  ///
+  /// The SIL pass AddressLowering transforms a function so that types with
+  /// opaque layouts, i.e., "address-only", are no longer used as a loadable
+  /// type. That's why this query is dependent on the current function F.
+  ///  
+  /// Mirrors SILType::isLoadableOrOpaque.
+  bool isLoadableOrOpaque(const SILFunction &F) const;
+
   /// isLoadable - Returns true if the type is loadable, in other words, its
   /// full layout is available to the compiler. This is the inverse of
   /// isAddressOnly.
@@ -187,7 +200,7 @@ public:
   /// Address-only types are by address (\c $*T) when \p loweredAddresses is
   /// true and opaque SSA values (\c $T) otherwise.
   SILType getLoweredType(bool loweredAddresses) const {
-    return LoweredType.getCategoryType((loweredAddresses && isAddressOnly())
+    return LoweredType.getCategoryType((loweredAddresses && Properties.isAddressOnly())
                                            ? SILValueCategory::Address
                                            : SILValueCategory::Object);
   }

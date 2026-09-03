@@ -489,7 +489,7 @@ ManagedValue Transform::transform(ManagedValue v,
   // expect this.
   if (v.getType().isAddress()) {
     auto &inputTL = SGF.getTypeLowering(v.getType());
-    if (!inputTL.isAddressOnly() || !SGF.silConv.useLoweredAddresses()) {
+    if (inputTL.isLoadableOrOpaque(SGF.F)) {
       v = emitManagedLoad(SGF, Loc, v, inputTL);
     }
   }
@@ -917,7 +917,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
                                        SGFContext ctxt) {
   const TypeLowering &outputTL =
     SGF.getTypeLowering(outputLoweredTy);
-  assert((outputTL.isAddressOnly() == inputTuple.getType().isAddress() ||
+  assert((outputTL.getRecursiveProperties().isAddressOnly() == inputTuple.getType().isAddress() ||
           !SGF.silConv.useLoweredAddresses()) &&
          "expected loadable inputs to have been loaded");
 
@@ -933,7 +933,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
 
   // If the tuple is address only, we need to do the operation in memory.
   SILValue outputAddr;
-  if (outputTL.isAddressOnly() && SGF.silConv.useLoweredAddresses())
+  if (!outputTL.isLoadableOrOpaque(SGF.F))
     outputAddr = SGF.getBufferForExprResult(Loc, outputLoweredTy, ctxt);
 
   // Explode the tuple into individual managed values.
@@ -947,7 +947,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
   for (auto index : indices(inputType->getElementTypes())) {
     auto &inputEltTL = SGF.getTypeLowering(inputElts[index].getType());
     ManagedValue inputElt = inputElts[index];
-    if (inputElt.getType().isAddress() && !inputEltTL.isAddressOnly()) {
+    if (inputElt.getType().isAddress() && !inputEltTL.getRecursiveProperties().isAddressOnly()) {
       inputElt = emitManagedLoad(SGF, Loc, inputElt, inputEltTL);
     }
 
@@ -965,7 +965,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
       SILValue outputEltAddr =
         SGF.B.createTupleElementAddr(Loc, outputAddr, index);
       auto &outputEltTL = SGF.getTypeLowering(outputEltLoweredTy);
-      assert(outputEltTL.isAddressOnly() == inputEltTL.isAddressOnly());
+      assert(outputEltTL.getRecursiveProperties().isAddressOnly() == inputEltTL.getRecursiveProperties().isAddressOnly());
       auto cleanup =
         SGF.enterDormantTemporaryCleanup(outputEltAddr, outputEltTL);
       outputEltTemp.emplace(outputEltAddr, cleanup);
@@ -982,7 +982,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     // later assembly into a tuple.
     if (!outputEltTemp) {
       assert(outputElt);
-      assert(!inputEltTL.isAddressOnly() || !SGF.silConv.useLoweredAddresses());
+      assert(inputEltTL.isLoadableOrOpaque(SGF.F));
       outputElts.push_back(outputElt);
       continue;
     }
@@ -1255,7 +1255,7 @@ class ParamInfo {
       return false;
     }
     auto &tl = getTypeLowering(SGF);
-    if (tl.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
+    if (!tl.isLoadableOrOpaque(SGF.F)) {
       // In address-lowered mode, address-only types can't be loaded in the
       // first place before being store_borrow'd.
       return false;
@@ -7642,9 +7642,9 @@ void SILGenFunction::emitProtocolWitness(
       // Load the actor instance if necessary.
       if (actorParamVal.getType().isAddress()) {
         auto &actorInstanceTL = getTypeLowering(actorParamVal.getType());
-        if (!actorInstanceTL.isAddressOnly()) {
-          actorParamVal =
-              emitManagedLoad(*this, loc, actorParamVal, actorInstanceTL);
+        if (!actorInstanceTL.getRecursiveProperties().isAddressOnly()) {
+          actorParamVal = emitManagedLoad(
+              *this, loc, actorParamVal, actorInstanceTL);
         }
       }
 

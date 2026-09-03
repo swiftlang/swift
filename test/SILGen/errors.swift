@@ -983,15 +983,18 @@ func testOptionalTryAddressOnlyVar<T>(_ obj: T) {
 // CHECK-NEXT: destroy_value [[RESULT]] : $Optional<(Cat, Cat)>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : @owned $any Error):
-// CHECK-NEXT: destroy_value [[ERROR]]
+// The 'try?' landing pad takes no argument: each throw site discards its own
+// in-flight error before branching here.
+// CHECK: [[FAILURE:bb[0-9]+]]:
 // CHECK-NEXT: [[NONE:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<(Cat, Cat)>)
 // CHECK: [[CLEANUPS_1]]([[ERROR:%.+]] : @owned $any Error):
-// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $any Error)
+// CHECK-NEXT: destroy_value [[ERROR]]
+// CHECK-NEXT: br [[FAILURE]]
 // CHECK: [[CLEANUPS_2]]([[ERROR:%.+]] : @owned $any Error):
+// CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: destroy_value [[VALUE_1]] : $Cat
-// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $any Error)
+// CHECK-NEXT: br [[FAILURE]]
 // CHECK: } // end sil function '$s6errors23testOptionalTryMultipleyyF'
 func testOptionalTryMultiple() {
   _ = try? (make_a_cat(), make_a_cat())

@@ -1,5 +1,5 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -swift-version 5 %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -swift-version 5 %s
+// RUN: %target-swift-emit-sil -sil-verify-all -o /dev/null -enable-sil-opaque-values -swift-version 5 %s
 
 // 'try?' on delegations to 'Optional' initializers should never flatten
 // optionals, or else we do not discern the difference between a failure and a
@@ -168,13 +168,13 @@ extension Optional {
     // CHECK-NEXT: [[RET:%[0-9]+]] = tuple ()
     // CHECK-NEXT: return [[RET]] : $()
     //
-    // CHECK: bb7([[ERR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: destroy_value [[ERR]]
+    // CHECK: bb7:
     // CHECK-NEXT: inject_enum_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.none!enumelt
     // CHECK-NEXT: br bb2
     //
     // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: br bb7([[ERR]] : $any Error)
+    // CHECK-NEXT: destroy_value [[ERR]]
+    // CHECK-NEXT: br bb7
     // CHECK-NEXT: }
   }
 
@@ -249,13 +249,13 @@ extension Optional {
     // CHECK-NEXT: [[RET:%[0-9]+]] = tuple ()
     // CHECK-NEXT: return [[RET]] : $()
     //
-    // CHECK: bb10([[ERROR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: destroy_value [[ERROR]]
+    // CHECK: bb10:
     // CHECK-NEXT: inject_enum_addr [[OPT_OPT_RESULT_ADDR]] : {{.*}}, #Optional.none!enumelt
     // CHECK-NEXT: br bb2
     //
     // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: br bb10([[ERROR]] : $any Error)
+    // CHECK-NEXT: destroy_value [[ERROR]]
+    // CHECK-NEXT: br bb10
     // CHECK-NEXT: }
   }
 
@@ -320,14 +320,14 @@ extension Optional {
     // CHECK-NEXT: [[RET:%[0-9]+]] = tuple ()
     // CHECK-NEXT: return [[RET]] : $()
     //
-    // CHECK: bb9([[ERROR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: destroy_value [[ERROR]]
+    // CHECK: bb9:
     // CHECK-NEXT: inject_enum_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.none!enumelt
     // CHECK-NEXT: br bb4
     //
     // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $any Error):
+    // CHECK-NEXT: destroy_value [[ERROR]]
     // CHECK-NEXT: dealloc_stack [[TMP_OPT_RESULT_ADDR]]
-    // CHECK-NEXT: br bb9([[ERROR]] : $any Error)
+    // CHECK-NEXT: br bb9
     // CHECK-NEXT: }
   }
 
@@ -514,13 +514,13 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK: bb9([[RET:%[0-9]+]] : $Optional<Optional<Optional<Bool>>>):
     // CHECK-NEXT: return [[RET]]
     //
-    // CHECK: bb10([[ERROR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: destroy_value [[ERROR]]
+    // CHECK: bb10:
     // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<Optional<Optional<Bool>>>>, #Optional.none!enumelt
     // CHECK-NEXT: br bb2([[NIL]] : $Optional<Optional<Optional<Optional<Bool>>>>)
     //
     // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: br bb10([[ERROR]] : $any Error)
+    // CHECK-NEXT: destroy_value [[ERROR]]
+    // CHECK-NEXT: br bb10
     // CHECK-NEXT: }
     try? self.init(SpecFailableAndThrows: ())
   }
