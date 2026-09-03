@@ -1640,6 +1640,11 @@ Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
       // just become non-Sendable.
       return std::make_pair(Type(), false);
     }
+    std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
+      // Fold away the @called(once) dependence if present, the function type will
+      // just become non-@called(once).
+      return std::make_pair(Type(), false);
+    }
   };
   return Transform(getASTContext()).doIt(this, TypePosition::Invariant);
 }
