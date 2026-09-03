@@ -96,7 +96,8 @@ lookupCxxTypeMember(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
     return nullptr; // Was not a clang::TypeDecl
 
   if (mustBeComplete &&
-      !Sema.isCompleteType({}, td->getASTContext().getTypeDeclType(td)))
+      !Sema.isCompleteType(td->getLocation(),
+                           td->getASTContext().getTypeDeclType(td)))
     return nullptr;
 
   return td;
