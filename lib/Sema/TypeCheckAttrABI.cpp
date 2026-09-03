@@ -684,6 +684,7 @@ public:
   UNSUPPORTED_DECL(PostfixOperator)
   UNSUPPORTED_DECL(MacroExpansion)
   UNSUPPORTED_DECL(Using)
+  UNSUPPORTED_DECL(HiddenTypeLayoutInfo)
 
   bool visitAbstractFunctionDecl(AbstractFunctionDecl *api,
                                  AbstractFunctionDecl *abi) {

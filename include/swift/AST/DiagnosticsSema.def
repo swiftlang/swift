@@ -898,6 +898,24 @@ REMARK(serialization_skipped_invalid_type,none,
 REMARK(serialization_skipped_invalid_type_unknown_name,none,
        "serialization skipped for invalid type",
        ())
+REMARK(serialization_scheduled_implementation_only_hidden_type_layout,none,
+       "serializing abstract layout for hidden type %0 because its defining "
+       "module was imported with '@_implementationOnly' and it contributes "
+       "to the ABI-exposed layout of %kind1 through %kind2",
+       (Type, const ValueDecl *, const ValueDecl *))
+REMARK(serialization_scheduled_internal_bridging_header_hidden_type_layout,none,
+       "serializing abstract layout for hidden type %0 because it was "
+       "imported through '-internal-import-bridging-header' and contributes "
+       "to the ABI-exposed layout of %kind1 through %kind2",
+       (Type, const ValueDecl *, const ValueDecl *))
+REMARK(serialization_scheduled_recovered_hidden_type_layout,none,
+       "serializing abstract layout for hidden type %0 because it was "
+       "recovered from a hidden type representation and contributes to the "
+       "ABI-exposed layout of %kind1 through %kind2",
+       (Type, const ValueDecl *, const ValueDecl *))
+NOTE(serialization_hidden_type_layout_abi_exposure,none,
+     "layout of %kind0 is ABI-exposed through %kind1",
+     (const ValueDecl *, const ValueDecl *))
 ERROR(serialization_failed,none,
       "serialization of module %0 failed due to the errors above",
       (const ModuleDecl *))

@@ -2428,6 +2428,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     llvm_unreachable("should not get here");
     return Type();
 
+  case DeclKind::HiddenTypeLayoutInfo:
+    llvm_unreachable("hidden layout declaration types are not implemented yet");
+
   case DeclKind::GenericTypeParam: {
     auto *paramDecl = cast<GenericTypeParamDecl>(D);
 

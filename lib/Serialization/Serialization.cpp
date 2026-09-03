@@ -25,6 +25,7 @@
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/HiddenTypeLayout.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
@@ -81,6 +82,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <functional>
 #include <vector>
 
 #define DEBUG_TYPE "Serialization"
@@ -2277,6 +2279,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Module:
   case DeclKind::PrecedenceGroup:
   case DeclKind::Using:
+  case DeclKind::HiddenTypeLayoutInfo:
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
     llvm_unreachable("decl should never be a member");
@@ -4395,6 +4398,11 @@ public:
   /// If this gets referenced, we forgot to handle a decl.
   void visitDecl(const Decl *) = delete;
 
+  void visitHiddenTypeLayoutInfoDecl(const HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable(
+        "hidden layout declaration serialization is not implemented yet");
+  }
+
   /// Add all of the inherited entries to the result vector.
   ///
   /// \returns the number of entries added.
@@ -4914,7 +4922,8 @@ public:
     if (auto mangledName = ctx.lookupTypeToHideWhenEmittingModule(
             ty->getCanonicalType())) {
       ty = HiddenType::get(ctx, *mangledName,
-                           var->getDeclContext()->getParentModule());
+                           var->getDeclContext()->getParentModule(), nullptr,
+                           CanType());
     }
     SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)
@@ -6763,6 +6772,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<InheritedProtocolsLayout>();
 
   registerDeclTypeAbbr<DifferentiationParamIndicesLayout>();
+  registerDeclTypeAbbr<HiddenTypeLayoutInfoLayout>();
 
 #define DECL_ATTR(X, NAME, ...) \
   registerDeclTypeAbbr<NAME##DeclAttrLayout>();
@@ -6792,7 +6802,22 @@ void Serializer::writeAllDeclsAndTypes() {
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(PackConformancesToSerialize);
     wroteSomething |= writeASTBlockEntitiesIfNeeded(SILLayoutsToSerialize);
+    wroteSomething |= writeHiddenTypeLayoutInformationIfNeeded();
   } while (wroteSomething);
+}
+
+bool Serializer::writeHiddenTypeLayoutInformationIfNeeded() {
+  if (HiddenTypeLayoutsToSerialize.empty())
+    return false;
+
+  using namespace decls_block;
+  unsigned abbrCode = DeclTypeAbbrCodes[HiddenTypeLayoutInfoLayout::Code];
+  while (!HiddenTypeLayoutsToSerialize.empty()) {
+    const Decl *decl = HiddenTypeLayoutsToSerialize.pop_back_val();
+    HiddenTypeLayoutInfoLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addDeclRef(decl));
+  }
+  return true;
 }
 
 std::vector<CharOffset> Serializer::writeAllIdentifiers() {
@@ -7251,6 +7276,70 @@ static void collectInterestingNestedDeclarations(
   }
 }
 
+static bool scheduleHiddenTypeLayoutSerialization(
+    const Decl *D,
+    llvm::SmallSetVector<const Decl *, 16> &layoutsToSerialize) {
+  // We assume the standard library will always be available,
+  // so no need to serialize hidden representations of types defined within.
+  if (D->isStdlibDecl())
+    return false;
+
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
+    if (auto *parentNominal =
+            nominal->getDeclContext()->getSelfNominalTypeDecl())
+      scheduleHiddenTypeLayoutSerialization(parentNominal,
+                                            layoutsToSerialize);
+  } else if (auto *hiddenDecl = dyn_cast<HiddenTypeLayoutInfoDecl>(D)) {
+    if (auto *parentTypeDecl = hiddenDecl->ParentDecl)
+      scheduleHiddenTypeLayoutSerialization(parentTypeDecl,
+                                            layoutsToSerialize);
+  }
+
+  return layoutsToSerialize.insert(D);
+}
+
+void Serializer::handleHiddenTypeLayoutRequirement(
+    const HiddenTypeLayoutRequirement &requirement) {
+  if (!scheduleHiddenTypeLayoutSerialization(
+          requirement.LayoutDecl, HiddenTypeLayoutsToSerialize) ||
+      !Options.EnableHiddenTypeLayoutSerializationRemarks)
+    return;
+
+  auto *abiExposedLeaf = requirement.LayoutAffectingStorage->getDeclContext()
+                             ->getSelfNominalTypeDecl();
+  assert(abiExposedLeaf);
+
+  auto &diags = getASTContext().Diags;
+  switch (requirement.Origin) {
+  case HiddenTypeLayoutOrigin::ImplementationOnly:
+    diags.diagnose(
+        requirement.LayoutAffectingStorage->getLoc(),
+        diag::serialization_scheduled_implementation_only_hidden_type_layout,
+        requirement.HiddenType, abiExposedLeaf,
+        requirement.LayoutAffectingStorage);
+    break;
+  case HiddenTypeLayoutOrigin::InternalBridgingHeader:
+    diags.diagnose(
+        requirement.LayoutAffectingStorage->getLoc(),
+        diag::serialization_scheduled_internal_bridging_header_hidden_type_layout,
+        requirement.HiddenType, abiExposedLeaf,
+        requirement.LayoutAffectingStorage);
+    break;
+  case HiddenTypeLayoutOrigin::RecoveredHiddenType:
+    diags.diagnose(
+        requirement.LayoutAffectingStorage->getLoc(),
+        diag::serialization_scheduled_recovered_hidden_type_layout,
+        requirement.HiddenType, abiExposedLeaf,
+        requirement.LayoutAffectingStorage);
+    break;
+  }
+
+  if (abiExposedLeaf != requirement.ABIExposedType)
+    diags.diagnose(requirement.ABIExposedType->getLoc(),
+                   diag::serialization_hidden_type_layout_abi_exposure,
+                   abiExposedLeaf, requirement.ABIExposedType);
+}
+
 void Serializer::writeAST(ModuleOrSourceFile DC) {
   DeclTable topLevelDecls, operatorDecls, operatorMethodDecls;
   DeclTable precedenceGroupDecls;
@@ -7395,6 +7484,16 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       auto MangledName = Mangler.mangleOpaqueTypeDecl(OTD);
       opaqueReturnTypeGenerator.insert(MangledName, addDeclRef(OTD));
     }
+  }
+
+  auto &langOpts = M->getASTContext().LangOpts;
+  if (langOpts.hasFeature(
+          Feature::SerializeAbstractTypeLayoutForHiddenTypes) &&
+      M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+    forEachRequiredHiddenTypeLayout(
+        M, files, [&](const HiddenTypeLayoutRequirement &requirement) {
+          handleHiddenTypeLayoutRequirement(requirement);
+        });
   }
 
   writeAllDeclsAndTypes();
