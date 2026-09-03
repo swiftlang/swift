@@ -261,13 +261,13 @@ struct ThrowStruct {
   // CHECK: bb6([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
   // CHECK-NEXT: return [[RET]]
   //
-  // CHECK: bb7([[ERR:%[0-9]+]] : @owned $any Error):
-  // CHECK-NEXT: destroy_value [[ERR]]
+  // CHECK: bb7:
   // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
   // CHECK-NEXT: br bb2([[NIL]] : $Optional<ThrowStruct>)
   //
   // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $any Error):
-  // CHECK-NEXT: br bb7([[ERR]] : $any Error)
+  // CHECK-NEXT: destroy_value [[ERR]]
+  // CHECK-NEXT: br bb7
   // CHECK-NEXT: }
   init?(failable: ()) {
     try? self.init(throws: ())
@@ -355,13 +355,13 @@ struct ThrowStruct {
   // CHECK: bb9([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
   // CHECK-NEXT: return [[RET]]
   //
-  // CHECK: bb10([[ERR:%[0-9]+]] : @owned $any Error):
-  // CHECK-NEXT: destroy_value [[ERR]]
+  // CHECK: bb10:
   // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<ThrowStruct>>, #Optional.none!enumelt
   // CHECK-NEXT: br bb2([[NIL]] : $Optional<Optional<ThrowStruct>>)
   //
   // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $any Error):
-  // CHECK-NEXT: br bb10([[ERR]] : $any Error)
+  // CHECK-NEXT: destroy_value [[ERR]]
+  // CHECK-NEXT: br bb10
   // CHECK-NEXT: }
   init?(failable4: ()) {
     try? self.init(failableAndThrows: ())

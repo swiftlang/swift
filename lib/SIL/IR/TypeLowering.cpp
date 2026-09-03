@@ -5779,6 +5779,10 @@ uint16_t FunctionType::getPointerAuthDiscriminator(
   return functionType->getPointerAuthDiscriminator(nullptr);
 }
 
+bool TypeLowering::isLoadableOrOpaque(const SILFunction &F) const {
+  return isLoadable() || !F.hasLoweredAddresses();
+}
+
 void TypeLowering::print(llvm::raw_ostream &os) const {
   auto BOOL = [&](bool b) -> StringRef {
     if (b)
