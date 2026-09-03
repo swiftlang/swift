@@ -6875,6 +6875,12 @@ namespace {
       : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A,
                               isTriviallyDestroyable, isBT, copyable,
                               alwaysFixedSize, isABIAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   /// TypeInfo for loadable enum types.
@@ -6891,6 +6897,12 @@ namespace {
       : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A,
                               isTriviallyDestroyable, copyable,
                               alwaysFixedSize, isABIAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
@@ -6963,6 +6975,12 @@ namespace {
                          IsCopyable_t copy,
                          IsABIAccessible_t abiAccessible)
       : EnumTypeInfoBase(strategy, irTy, align, pod, bt, copy, abiAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   /// TypeInfo for dynamically-sized enum types.
@@ -6975,6 +6993,12 @@ namespace {
                           IsCopyable_t copyable,
                           IsABIAccessible_t abiAccessible)
       : EnumTypeInfoBase(strategy, irTy, copyable, abiAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   class BitwiseCopyableEnumTypeInfo
@@ -6983,6 +7007,12 @@ namespace {
     BitwiseCopyableEnumTypeInfo(EnumImplStrategy &strategy, llvm::Type *irTy,
                                 IsABIAccessible_t abiAccessible)
         : EnumTypeInfoBase(strategy, irTy, abiAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 } // end anonymous namespace
 

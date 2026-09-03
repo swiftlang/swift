@@ -281,6 +281,11 @@ TypeInfo::createSerializableHiddenTypeInfoRepresentation(
   return representation;
 }
 
+void TypeInfo::unsupportedSerializableHiddenTypeInfoRepresentation() const {
+  llvm::report_fatal_error(
+      "serializing this TypeInfo is not implemented yet");
+}
+
 void TypeInfo::populateSerializableHiddenTypeInfoRepresentation(
     IRGenModule &IGM,
     SerializableHiddenTypeInfoRepresentation &representation) const {
@@ -1215,6 +1220,13 @@ namespace {
                        IsTriviallyDestroyable,
                        IsCopyable,
                        IsFixedSize, IsABIAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     unsigned getExplosionSize() const override { return 0; }
     void getSchema(ExplosionSchema &schema) const override {}
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -1279,6 +1291,12 @@ namespace {
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align),
         PointeeAlign(pointeeAlign) {}
 
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
     }
@@ -1327,6 +1345,12 @@ namespace {
           storage, size,
           SpareBitVector::getConstant(size.getValueInBits(), false),
           align) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
@@ -1575,6 +1599,12 @@ namespace {
                               IsNotBitwiseTakable,
                               IsNotCopyable,
                               IsFixedSize, IsABIAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   /// A TypeInfo implementation for address-only types which can never
@@ -1589,6 +1619,12 @@ namespace {
                               IsNotFixedSize,
                               IsNotABIAccessible,
                               SpecialTypeInfoKind::None) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -1680,6 +1716,12 @@ namespace {
                          IsTriviallyDestroyable, IsBitwiseTakableAndBorrowable,
                          IsCopyable,
                          IsFixedSize, IsABIAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
@@ -2866,6 +2908,12 @@ public:
                     IsFixedSize /* irrelevant */,
                     IsABIAccessible),
       NumExtraInhabitants(node.NumExtraInhabitants) {}
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   TypeLayoutEntry
   *buildTypeLayoutEntry(IRGenModule &IGM,
