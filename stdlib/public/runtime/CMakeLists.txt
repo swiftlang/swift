@@ -202,6 +202,18 @@ add_swift_target_library(swiftImageRegistrationObjectCOFF
                   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
                   INSTALL_IN_COMPONENT none)
 
+add_swift_target_library(swiftImageRegistrationObjectCOFFDebug
+                  OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
+                  SwiftRT-COFF.cpp
+                  C_COMPILE_FLAGS
+                    ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                    ${swift_enable_backtracing}
+                    -D_DEBUG -D_ITERATOR_DEBUG_LEVEL=2
+                  LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
+                  TARGET_SDKS ${COFF_SDKS}
+                  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+                  INSTALL_IN_COMPONENT none)
+
 add_swift_target_library(swiftImageRegistrationObjectWASM
                   OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
                   SwiftRT-WASM.cpp
@@ -246,9 +258,33 @@ foreach(sdk ${SWIFT_SDKS})
                                   "${static_runtime_registrar}"
                                 DEPENDS
                                   "${swiftrtObject}")
+
+      set(runtime_registrars
+          "${shared_runtime_registrar}")
+
+      if(sdk STREQUAL "WINDOWS")
+        set(swiftrtdObject ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/swiftImageRegistrationObjectCOFFDebug-${arch_suffix}.dir/${swiftrtSourceName}${CMAKE_C_OUTPUT_EXTENSION})
+        set(shared_debug_runtime_registrar "${SWIFTLIB_DIR}/${arch_subdir}/swiftrtd${extension}")
+        set(static_debug_runtime_registrar "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swiftrtd${extension}")
+
+        add_custom_command_target(swiftImageRegistrationDebug-${arch_suffix}
+                                  COMMAND
+                                    "${CMAKE_COMMAND}" -E copy "${swiftrtdObject}" "${shared_debug_runtime_registrar}"
+                                  COMMAND
+                                    "${CMAKE_COMMAND}" -E copy "${swiftrtdObject}" "${static_debug_runtime_registrar}"
+                                  OUTPUT
+                                    "${shared_debug_runtime_registrar}"
+                                    "${static_debug_runtime_registrar}"
+                                  DEPENDS
+                                    "${swiftrtdObject}")
+
+        list(APPEND runtime_registrars
+             "${shared_debug_runtime_registrar}")
+      endif()
+
       if(SWIFT_BUILD_DYNAMIC_STDLIB AND NOT SWIFT_SDK_${sdk}_STATIC_ONLY)
         swift_install_in_component(FILES
-                                     "${shared_runtime_registrar}"
+                                     ${runtime_registrars}
                                    DESTINATION
                                      "lib/swift/${arch_subdir}"
                                    COMPONENT
