@@ -880,8 +880,13 @@ public struct UncheckedSubString<E: FixedWidthInteger>
 /// - Parameter str: A pointer to a NUL-terminated sequence of `T`s.
 ///
 /// - Returns The number of non-NUL elements preceding the terminating NUL.
+#if $Embedded
+@_specialize(where T == UInt8)
+@_specialize(where T == CChar)
+#else
 @_specialize(exported: true, where T == UInt8)
 @_specialize(exported: true, where T == CChar)
+#endif
 @inlinable
 @inline(__always)
 internal func fast_strlen<T: FixedWidthInteger>(_ str: UnsafePointer<T>) -> Int {

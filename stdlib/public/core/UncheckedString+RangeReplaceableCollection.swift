@@ -30,9 +30,15 @@ extension SmallUncheckedStringStorage {
   ///                          `count < Self.capacity`.
   @inline(__always)
   @usableFromInline
+  #if $Embedded
+  @_specialize(where CharType == UInt8)
+  @_specialize(where CharType == UInt16)
+  @_specialize(where CharType == CChar)
+  #else
   @_specialize(exported: true, where CharType == UInt8)
   @_specialize(exported: true, where CharType == UInt16)
   @_specialize(exported: true, where CharType == CChar)
+  #endif
   mutating func fastAppend(_ newElement: CharType) {
     let stride = MemoryLayout<CharType>.stride
     withUnsafeMutableBytes(of: &bytes) { buf in
@@ -48,9 +54,15 @@ extension SmallUncheckedStringStorage {
   ///                     `Int(count) + Int(other.count) <= Self.capacity`.
   @inline(__always)
   @usableFromInline
+  #if $Embedded
+  @_specialize(where CharType == UInt8)
+  @_specialize(where CharType == UInt16)
+  @_specialize(where CharType == CChar)
+  #else
   @_specialize(exported: true, where CharType == UInt8)
   @_specialize(exported: true, where CharType == UInt16)
   @_specialize(exported: true, where CharType == CChar)
+  #endif
   mutating func fastAppend(contentsOf other: Self) {
     let stride = MemoryLayout<CharType>.stride
     withUnsafeMutableBytes(of: &bytes) { buf in
@@ -71,9 +83,15 @@ extension SmallUncheckedStringStorage {
   ///        `count < Self.capacity` and `0 <= i && i <= count`.
   @inline(__always)
   @usableFromInline
+  #if $Embedded
+  @_specialize(where CharType == UInt8)
+  @_specialize(where CharType == UInt16)
+  @_specialize(where CharType == CChar)
+  #else
   @_specialize(exported: true, where CharType == UInt8)
   @_specialize(exported: true, where CharType == UInt16)
   @_specialize(exported: true, where CharType == CChar)
+  #endif
   mutating func fastInsert(_ newElement: CharType, at i: Int) {
     let stride = MemoryLayout<CharType>.stride
     withUnsafeMutableBytes(of: &bytes) { buf in
@@ -97,9 +115,15 @@ extension SmallUncheckedStringStorage {
   @inline(__always)
   @usableFromInline
   @discardableResult
+  #if $Embedded
+  @_specialize(where CharType == UInt8)
+  @_specialize(where CharType == UInt16)
+  @_specialize(where CharType == CChar)
+  #else
   @_specialize(exported: true, where CharType == UInt8)
   @_specialize(exported: true, where CharType == UInt16)
   @_specialize(exported: true, where CharType == CChar)
+  #endif
   mutating func fastRemove(at i: Int) -> CharType {
     let stride = MemoryLayout<CharType>.stride
     let removed: CharType = withUnsafeMutableBytes(of: &bytes) { buf in
@@ -125,9 +149,15 @@ extension SmallUncheckedStringStorage {
   ///   - newElements: The replacement elements.
   @inline(__always)
   @usableFromInline
+  #if $Embedded
+  @_specialize(where CharType == UInt8, C == UncheckedString<UInt8>)
+  @_specialize(where CharType == UInt16, C == UncheckedString<UInt16>)
+  @_specialize(where CharType == CChar, C == UncheckedString<CChar>)
+  #else
   @_specialize(exported: true, where CharType == UInt8, C == UncheckedString<UInt8>)
   @_specialize(exported: true, where CharType == UInt16, C == UncheckedString<UInt16>)
   @_specialize(exported: true, where CharType == CChar, C == UncheckedString<CChar>)
+  #endif
   mutating func fastReplaceSubrange<C: Collection>(
     _ subrange: Range<Int>, with newElements: C
   ) where C.Element == CharType {
@@ -288,9 +318,15 @@ extension UncheckedString: RangeReplaceableCollection {
   ///
   /// - Parameter newElements: The elements to append to the string.
   @inlinable
+  #if $Embedded
+  @_specialize(where Element == UInt8, S == UncheckedString<UInt8>)
+  @_specialize(where Element == UInt16, S == UncheckedString<UInt16>)
+  @_specialize(where Element == CChar, S == UncheckedString<CChar>)
+  #else
   @_specialize(exported: true, where Element == UInt8, S == UncheckedString<UInt8>)
   @_specialize(exported: true, where Element == UInt16, S == UncheckedString<UInt16>)
   @_specialize(exported: true, where Element == CChar, S == UncheckedString<CChar>)
+  #endif
   public mutating func append<S: Sequence>(
     contentsOf newElements: __owned S
   ) where S.Element == Element {
@@ -311,9 +347,15 @@ extension UncheckedString: RangeReplaceableCollection {
   ///
   /// - Parameter newElements: The elements to append to the string.
   @inlinable
+  #if $Embedded
+  @_specialize(where Element == UInt8, C == UncheckedString<UInt8>)
+  @_specialize(where Element == UInt16, C == UncheckedString<UInt16>)
+  @_specialize(where Element == CChar, C == UncheckedString<CChar>)
+  #else
   @_specialize(exported: true, where Element == UInt8, C == UncheckedString<UInt8>)
   @_specialize(exported: true, where Element == UInt16, C == UncheckedString<UInt16>)
   @_specialize(exported: true, where Element == CChar, C == UncheckedString<CChar>)
+  #endif
   public mutating func append<C: Collection>(
     contentsOf newElements: __owned C
   ) where C.Element == Element {
@@ -334,9 +376,15 @@ extension UncheckedString: RangeReplaceableCollection {
   ///
   /// - Parameter newElements: The string whose elements should be appended.
   @inlinable
+  #if $Embedded
+  @_specialize(where Element == UInt8)
+  @_specialize(where Element == UInt16)
+  @_specialize(where Element == CChar)
+  #else
   @_specialize(exported: true, where Element == UInt8)
   @_specialize(exported: true, where Element == UInt16)
   @_specialize(exported: true, where Element == CChar)
+  #endif
   public mutating func append(contentsOf newElements: UncheckedString<Element>) {
     if case .small(var data) = storage,
       case .small(let otherData) = newElements.storage,

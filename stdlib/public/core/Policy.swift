@@ -170,12 +170,11 @@ public typealias StringLiteralType = String
 @_unavailableInEmbedded
 public typealias PossiblyUncheckedStringLiteralType = String
 
-#if !$Embedded
 /// The default type for an otherwise-unconstrained string literal
 /// containing a `\x{hh}` raw code unit escape.
 @available(SwiftStdlib 9999, *)
+@_unavailableInEmbedded
 public typealias UncheckedStringLiteralType = UncheckedString<UInt8>
-#endif
 
 //===----------------------------------------------------------------------===//
 // Default types for unconstrained number literals
