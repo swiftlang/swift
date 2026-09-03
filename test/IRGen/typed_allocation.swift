@@ -2,6 +2,7 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=UNSAFEMUTABLEPOINTERALLOC
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=ERRORBOX
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=COROFRAME
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=PODREFCOUNTBOX
 
 // REQUIRES: OS=macosx
 // REQUIRES: SWIFT_STDLIB_ARCH=arm64
@@ -81,30 +82,34 @@ public func makeClosure(x: Int, y: MyClass) -> () -> Void {
   }
 }
 
+// An indirect enum with POD-type payload (PODBoxTypeInfo).
 public indirect enum Indirect {
   case x(Int, Int)
   case y(Int, Int)
 }
-
-// TODO: For some boxes we can't compute the typed malloc ID, because some of the fields are opaque,
-//       so this test would not pass right now.
-
-// DISABLED-CHECK-LABEL: define swiftcc i64 @"$e16typed_allocation8makeEnum1x1y1bAA8IndirectOSi_SiSbtF"(i64 %0, i64 %1, i1 %2) #0 {
-// DISABLED-CHECK: entry:
-// DISABLED-CHECK:   br i1 {{%.*}}, label %[[L1:.*]], label %[[L2:.*]]
-// DISABLED-CHECK: [[L1]]:
-// DISABLED-CHECK:   call noalias ptr @swift_allocObjectTyped(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata{{.*}}, i32 0, i32 2), i64 {{.*}}, i64 7, i64 {{.*}})
-// DISABLED-CHECK: [[L2]]:
-// DISABLED-CHECK:   call noalias ptr @swift_allocObjectTyped(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata{{.*}}, i32 0, i32 2), i64 {{.*}}, i64 7, i64 {{.*}})
-// DISABLED-CHECK:   ret i64 {{%.*}}
-// DISABLED-CHECK: }
-public func makeEnum(x: Int, y: Int, b: Bool) -> Indirect {
-  if b {
-    return .x(y, x)
-  }
-
-  return .y(x, y)
+@inline(never)
+public func makeAndDropEnum(x: Int, y: Int) {
+  _ = Indirect.x(x, y)
 }
+// PODREFCOUNTBOX-DAG: define swiftcc void @"$e16typed_allocation15makeAndDropEnum1x1yySi_SitF"(i64 %0, i64 %1)
+// PODREFCOUNTBOX-DAG:   call noalias ptr @swift_allocObjectTyped(ptr @metadata{{.*}}, i64 {{.*}}, i64 {{.*}}, i64 [[INDIRECT_BOX_TYPEID:[0-9]+]])
+// PODREFCOUNTBOX-DAG: define internal swiftcc void @__swift{{.*}}destructor{{.*}}(ptr swiftself %0)
+// PODREFCOUNTBOX-DAG:   call void @swift_deallocObjectTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[INDIRECT_BOX_TYPEID]])
+
+// An indirect enum with single refcounted payload (SingleRefcountedBoxTypeInfo)
+public class Payload {}
+public indirect enum IndirectRef {
+  case a(Payload)
+  case b(Payload)
+}
+@inline(never)
+public func makeAndDropRefEnum(p: Payload) {
+  _ = IndirectRef.a(p)
+}
+// PODREFCOUNTBOX-DAG: define swiftcc void @"$e16typed_allocation18makeAndDropRefEnum1pyAA7PayloadC_tF"(ptr %0)
+// PODREFCOUNTBOX-DAG:   call noalias ptr @swift_allocObjectTyped(ptr @metadata{{.*}}, i64 {{.*}}, i64 {{.*}}, i64 [[INDIRECT_REF_BOX_TYPEID:[0-9]+]])
+// PODREFCOUNTBOX-DAG: define internal swiftcc void @__swift{{.*}}destructor{{.*}}(ptr swiftself %0)
+// PODREFCOUNTBOX-DAG:   call void @swift_deallocObjectTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[INDIRECT_REF_BOX_TYPEID]])
 
 @inline(never)
 public func allocateInts(_ count: Int) -> UnsafeMutablePointer<Int> {
