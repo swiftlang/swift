@@ -547,6 +547,26 @@ getTypeRefImpl(IRGenModule &IGM,
     // in-process.
     IGM.IRGen.noteUseOfTypeMetadata(type);
 
+    // ObjC lightweight-generic classes (e.g. NSArray<T>) have their type
+    // parameters erased at runtime. The mangled type metadata string
+    // embeds the class name textually and the runtime resolves it via
+    // objc_getClass(). Without a linker-visible reference, the linker may
+    // not extract the archive member defining the class when linking
+    // static archives without -ObjC. Emit a classref to force extraction.
+    if (IGM.ObjCInterop) {
+      type.visit([&](Type t) {
+        auto *nominal = t->getAnyNominal();
+        if (!nominal)
+          return;
+        auto *classDecl = dyn_cast<ClassDecl>(nominal);
+        if (!classDecl)
+          return;
+        if (!classDecl->isTypeErasedGenericClass())
+          return;
+        (void)IGM.getAddrOfObjCClassRef(classDecl);
+      });
+    }
+
     // If the minimum deployment target's runtime demangler wouldn't understand
     // this mangled name, then fall back to generating a "mangled name" with a
     // symbolic reference with a callback function.
