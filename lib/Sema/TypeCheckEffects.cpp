@@ -1228,25 +1228,28 @@ public:
       if (var->isAsyncLet()) {
         // If the initializer could throw, we will have a 'try' in the
         // application of its autoclosure.
-        // FIXME: The type checker should record the thrown error type in
-        // the AST.
-        bool throws = false;
+        CallExpr *callExpr;
         if (auto init = var->getParentInitializer()) {
           if (auto await = dyn_cast<AwaitExpr>(init))
             init = await->getSubExpr();
-          if (isa<TryExpr>(init))
-            throws = true;
+          if (auto tryExpr = dyn_cast<TryExpr>(init))
+            init = tryExpr->getSubExpr();
+          if (auto autoclosure = dyn_cast<CallExpr>(init))
+            callExpr = autoclosure;
+          else
+            callExpr = nullptr;
+        } else {
+          callExpr = nullptr;
         }
 
         result.merge(Classification::forAsync(
                         ConditionalEffectKind::Always,
                         PotentialEffectReason::forAsyncLet()));
-        if (throws) {
-          ASTContext &ctx = var->getASTContext();
+        if (callExpr && callExpr->isThrowsSet()) {
+          Type thrownError = callExpr->throws().getThrownErrorType();
           result.merge(Classification::forThrows(
-                         /*FIXME:*/ctx.getErrorExistentialType(),
-                         ConditionalEffectKind::Always,
-                         PotentialEffectReason::forAsyncLet()));
+              thrownError, ConditionalEffectKind::Always,
+              PotentialEffectReason::forAsyncLet()));
         }
 
         return result;
@@ -1922,9 +1925,8 @@ public:
           break;
         case EffectKind::Throws:
           result.merge(Classification::forThrows(
-                         /*FIXME:*/ctx.getErrorExistentialType(),
-                         ConditionalEffectKind::Always,
-                         PotentialEffectReason::forApply()));
+              fnType->getThrownError(), ConditionalEffectKind::Always,
+              PotentialEffectReason::forApply()));
           break;
         case EffectKind::Unsafe:
           llvm_unreachable("@unsafe isn't handled in applies");

@@ -8323,9 +8323,16 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
   SILType loweredOpaquePatternType = getLoweredType(AbstractionPattern::getOpaque(),
                                                     formalPatternType);
 
-  auto asyncLetGet = childTask.isThrowing
-      ? SGM.getAsyncLetGetThrowing()
-      : SGM.getAsyncLetGet();
+  auto asyncLetGet = childTask.thrownError.has_value()
+                         ? SGM.getAsyncLetGetThrowing()
+                         : SGM.getAsyncLetGet();
+  std::optional<AsyncLetTypedErrorEmission> typedErrorEmission;
+
+  // If child task throws a typed error, emit it with the declared type
+  if (childTask.thrownError &&
+      !childTask.thrownError->isErrorExistentialType()) {
+    typedErrorEmission.emplace(*this, loc, *childTask.thrownError);
+  }
 
   // The intrinsic returns a pointer to the address of the result value inside
   // the async let task context.
@@ -8334,6 +8341,11 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
       {ManagedValue::forObjectRValueWithoutOwnership(childTask.asyncLet),
        ManagedValue::forObjectRValueWithoutOwnership(childTask.resultBuf)},
       SGFContext());
+
+  // Restore the original error destination.
+  if (typedErrorEmission) {
+    typedErrorEmission.reset();
+  }
 
   auto resultAddr = B.createPointerToAddress(loc, childTask.resultBuf,
                 loweredOpaquePatternType.getAddressType(),
