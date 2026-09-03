@@ -910,14 +910,6 @@ private:
 public:
   using super::getFields;
 
-  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const override {
-    auto representation =
-        std::make_unique<SerializableLoadableRecordTypeInfoRepresentation>();
-    populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
-    return representation;
-  }
-
   void loadAsCopy(IRGenFunction &IGF, Address addr,
                   Explosion &out) const override {
     forAllFields<&LoadableTypeInfo::loadAsCopy>(IGF, addr, out);

@@ -91,6 +91,12 @@ public:
       : super(fields, explosionSize, FieldsAreABIAccessible, ty, size, std::move(spareBits), align,
               isTriviallyDestroyable, IsCopyable, alwaysFixedSize, IsABIAccessible) {}
 
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                               const DifferentiableFuncFieldInfo &field) const {
     return field.projectAddress(IGF, addr, getNonFixedOffsets(IGF, T));
@@ -269,6 +275,12 @@ public:
                      IsFixedSize_t alwaysFixedSize)
       : super(fields, explosionSize, FieldsAreABIAccessible, ty, size, std::move(spareBits), align,
               isTriviallyDestroyable, IsCopyable, alwaysFixedSize, IsABIAccessible) {}
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                               const LinearFuncFieldInfo &field) const {

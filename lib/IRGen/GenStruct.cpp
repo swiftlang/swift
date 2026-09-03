@@ -591,6 +591,12 @@ namespace {
       (void)clangDecl;
     }
 
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
                           SILType T,
@@ -828,6 +834,12 @@ namespace {
       (void)ClangDecl;
     }
 
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     void destroy(IRGenFunction &IGF, Address address, SILType T,
                  bool isOutlined) const override {
       auto *destructor = getCXXDestructor(T);
@@ -1029,6 +1041,12 @@ namespace {
                            alwaysFixedSize, isABIAccessible)
     {}
 
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
       for (auto &field : getFields()) {
@@ -1130,6 +1148,12 @@ namespace {
                            isTriviallyDestroyable, isBT, isCopyable,
                            alwaysFixedSize, isABIAccessible)
     {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
@@ -1252,6 +1276,12 @@ namespace {
                            fields, fieldsAccessible,
                            T, align, isTriviallyDestroyable, isBT, isCopyable,
                            structAccessible) {
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
     }
 
     TypeLayoutEntry
@@ -1876,6 +1906,12 @@ namespace {
                             IsABIAccessible_t abiAccessible)
       : ResilientTypeInfo(T, copyable, abiAccessible) {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
     }
 
     TypeLayoutEntry
