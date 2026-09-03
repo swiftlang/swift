@@ -24,8 +24,10 @@
 // `UncheckedString<UInt16>` gets the same allocation-free small-storage
 // mutation as `UncheckedString<UInt8>`.
 extension SmallUncheckedStringStorage {
-  /// Appends `newElement` in place. The caller must ensure
-  /// `count < Self.capacity`.
+  /// Appends `newElement` in place.
+  ///
+  /// - Parameter newElement: The element to append. The caller must ensure
+  ///                          `count < Self.capacity`.
   @inline(__always)
   @usableFromInline
   @_specialize(exported: true, where CharType == UInt8)
@@ -41,21 +43,9 @@ extension SmallUncheckedStringStorage {
   }
 
   /// Appends every element of `other` in place, as a single raw byte copy.
-  /// The caller must ensure `Int(count) + Int(other.count) <= Self.capacity`.
   ///
-  /// Exists purely so that appending one `.small`-storage `UncheckedString`
-  /// to another (the common case for `+=`/`+`) can copy bytes directly
-  /// between the two packed tuples, instead of going through
-  /// `fastReplaceSubrange`'s generic `for element in newElements` loop --
-  /// which, for an `UncheckedString` source, means walking its `Collection`
-  /// conformance one element at a time via `IndexingIterator`'s protocol
-  /// witnesses and `UncheckedString`'s own `_read` subscript accessor.
-  /// Sampling this under `sample`(1) showed that per-element path spending
-  /// most of its time in a heap allocation/free pair for the accessor's
-  /// coroutine context -- vastly more expensive than the 1-4 actual bytes
-  /// being fetched. See `UncheckedString.append(contentsOf:
-  /// UncheckedString<Element>)` below, the concrete overload that calls
-  /// this.
+  /// - Parameter other: The elements to append. The caller must ensure
+  ///                     `Int(count) + Int(other.count) <= Self.capacity`.
   @inline(__always)
   @usableFromInline
   @_specialize(exported: true, where CharType == UInt8)
@@ -73,8 +63,12 @@ extension SmallUncheckedStringStorage {
     count += other.count
   }
 
-  /// Inserts `newElement` at position `i` in place. The caller must ensure
-  /// `count < Self.capacity` and `0 <= i && i <= count`.
+  /// Inserts `newElement` at position `i` in place.
+  ///
+  /// - Parameters:
+  ///   - newElement: The element to insert.
+  ///   - i: The position to insert at. The caller must ensure
+  ///        `count < Self.capacity` and `0 <= i && i <= count`.
   @inline(__always)
   @usableFromInline
   @_specialize(exported: true, where CharType == UInt8)
@@ -94,8 +88,12 @@ extension SmallUncheckedStringStorage {
     count += 1
   }
 
-  /// Removes and returns the element at position `i` in place. The caller
-  /// must ensure `0 <= i && i < count`.
+  /// Removes and returns the element at position `i` in place.
+  ///
+  /// - Parameter i: The position to remove. The caller must ensure
+  ///                `0 <= i && i < count`.
+  ///
+  /// - Returns The removed element.
   @inline(__always)
   @usableFromInline
   @discardableResult
@@ -118,21 +116,13 @@ extension SmallUncheckedStringStorage {
     return removed
   }
 
-  /// Replaces `subrange` with `newElements` in place. The caller must
-  /// ensure the resulting count (`Int(count) - subrange.count +
-  /// newElements.count`) does not exceed `Self.capacity`.
+  /// Replaces `subrange` with `newElements` in place.
   ///
-  /// `@inline(__always)` alone doesn't get this inlined into its callers
-  /// here: they call it while still generic over `C`/`CharType` themselves
-  /// (concrete types only become known further up the call chain, e.g. in
-  /// `UncheckedString.append<C: Collection>(contentsOf:)`), and a generic
-  /// function can't be inlined into a caller that hasn't itself been
-  /// specialized to concrete types yet. The `@_specialize`s below force
-  /// concrete `UInt8`/`UInt16`/`CChar` instantiations (each against the
-  /// matching `UncheckedString<CharType>`) to exist ahead of time so those
-  /// instantiations -- rather than a slow, witness-table-dispatched generic
-  /// call -- are what callers like `append(contentsOf:)` actually end up
-  /// calling for the common case.
+  /// - Parameters:
+  ///   - subrange: The range to replace. The caller must ensure the
+  ///               resulting count (`Int(count) - subrange.count +
+  ///               newElements.count`) does not exceed `Self.capacity`.
+  ///   - newElements: The replacement elements.
   @inline(__always)
   @usableFromInline
   @_specialize(exported: true, where CharType == UInt8, C == UncheckedString<UInt8>)
@@ -202,18 +192,9 @@ extension UncheckedString: RangeReplaceableCollection {
 
   /// Replaces `subrange` with `newElements`.
   ///
-  /// A `.dynamic` source keeps its storage kind unconditionally, regardless
-  /// of the resulting size (including down to zero elements): calling
-  /// `replaceSubrange` is itself evidence that the string is being actively
-  /// mutated, and further mutations are likely, so giving up the
-  /// underlying `Array`'s already-paid-for capacity -- whether by demoting
-  /// to `.small` or all the way to `.empty` -- risks an unnecessary
-  /// reallocation on the very next mutation. `.empty`/`.small`/`.immortal`
-  /// sources have no such capacity to lose (their "capacity" is either
-  /// nonexistent or, for `.small`, an intrinsic part of the value with no
-  /// separate heap buffer to reallocate), so they're still chosen purely by
-  /// the resulting size: `.empty` if empty, `.small` if it fits, otherwise
-  /// promoted to `.dynamic`.
+  /// - Parameters:
+  ///   - subrange: The range of elements to replace.
+  ///   - newElements: The new elements to insert into the string.
   @inlinable
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Self.Index>,
@@ -299,29 +280,9 @@ extension UncheckedString: RangeReplaceableCollection {
 
   /// Replaces `subrange` with the elements of another `UncheckedString`.
   ///
-  /// Concrete, non-generic overload of `replaceSubrange(_:with:)`, for the
-  /// specific case of another `UncheckedString<Element>` -- what
-  /// `append(contentsOf:)` above calls this with once a source no longer
-  /// fits in `.small` storage. Overload resolution prefers this over the
-  /// `C: Collection`-constrained version above for the same reason as the
-  /// analogous `append(contentsOf:)` overloads: a concrete, non-generic
-  /// parameter type outranks a generic one that merely happens to be
-  /// satisfiable.
-  ///
-  /// Without this, the generic version's own `Array.replaceSubrange(_:
-  /// with: newElements)` call has to fetch `newElements`'s bytes through
-  /// `Array`'s fully generic `C: Collection` path, which reaches
-  /// `newElements.withContiguousStorageIfAvailable` through a chain of
-  /// dispatch thunks and protocol witnesses (confirmed by sampling this
-  /// path, which showed a large fraction of its time in
-  /// `__swift_instantiateCanonicalPrespecializedGenericMetadata` -- i.e.
-  /// paying for fresh generic metadata instantiation on every call, not
-  /// just dispatch). Unpacking `newElements` directly here, via a
-  /// concretely-typed call to its own `withCharacterData`, and handing
-  /// `Array` a plain `UnsafeBufferPointer<Element>` instead of the abstract
-  /// `UncheckedString`, skips all of that: `Array.replaceSubrange(_:with:
-  /// UnsafeBufferPointer<Element>)` is a far simpler generic instantiation
-  /// with no witness-table indirection to reach the source's bytes.
+  /// - Parameters:
+  ///   - subrange: The range of elements to replace.
+  ///   - newElements: The new elements to insert into the string.
   @inlinable
   public mutating func replaceSubrange(
     _ subrange: Range<Self.Index>,
@@ -336,17 +297,7 @@ extension UncheckedString: RangeReplaceableCollection {
 
   /// Adds a new element to the end of this string.
   ///
-  /// The default `RangeReplaceableCollection.append(_:)` implementation
-  /// routes through `insert(at:)` -> `replaceSubrange`, which re-derives
-  /// the storage case and the new total count on every call. This
-  /// dispatches on `storage` directly instead. In particular, `.dynamic`
-  /// storage's backing array always keeps a trailing NUL as its last
-  /// element (see `UncheckedStringStorage.count`), so appending in place
-  /// means overwriting that NUL with the new element and appending a fresh
-  /// one -- two O(1)-amortized `Array` operations with no element
-  /// shifting, versus a full `replaceSubrange` call. The `.small` case
-  /// mutates the packed byte tuple directly (see `fastAppend` above)
-  /// instead of round-tripping through a temporary `Array`.
+  /// - Parameter newElement: The element to append to the string.
   @inlinable
   public mutating func append(_ newElement: Element) {
     switch storage {
@@ -376,14 +327,7 @@ extension UncheckedString: RangeReplaceableCollection {
 
   /// Adds the elements of a sequence to the end of this string.
   ///
-  /// The default `RangeReplaceableCollection.append(contentsOf:)`
-  /// implementation calls `append(_:)` once per element, paying the full
-  /// storage-case dispatch for each individual element instead of once for
-  /// the whole batch. For `.dynamic` storage -- the common case for a
-  /// string that's being built up incrementally -- the trailing NUL is
-  /// dropped, the whole sequence is appended in one bulk
-  /// `Array.append(contentsOf:)` call (which already reserves capacity
-  /// geometrically), and a fresh NUL is appended once at the end.
+  /// - Parameter newElements: The elements to append to the string.
   @inlinable
   @_specialize(exported: true, where Element == UInt8, S == UncheckedString<UInt8>)
   @_specialize(exported: true, where Element == UInt16, S == UncheckedString<UInt16>)
@@ -406,19 +350,7 @@ extension UncheckedString: RangeReplaceableCollection {
 
   /// Adds the elements of a collection to the end of this string.
   ///
-  /// Overload of `append(contentsOf:)` above, constrained to `Collection`
-  /// instead of `Sequence`. `newElements` here already has a known count and
-  /// can be iterated more than once, so the `.empty`/`.small`/`.immortal`
-  /// branch can hand it straight to `replaceSubrange` (whose own `.small`
-  /// fast path, `fastReplaceSubrange`, iterates any `Collection` in place)
-  /// instead of first materializing it into a throwaway `Array` -- avoiding
-  /// a heap allocation for the common case of appending one small
-  /// `UncheckedString` to another. Overload resolution prefers this over
-  /// the `Sequence`-constrained version above whenever the argument's
-  /// static type is already known to conform to `Collection` (e.g. another
-  /// `UncheckedString`, as `+=`/`+` below call this with), the same way
-  /// `BidirectionalCollection.reversed()` is preferred over
-  /// `Sequence.reversed()` for a `Collection`-typed argument.
+  /// - Parameter newElements: The elements to append to the string.
   @inlinable
   @_specialize(exported: true, where Element == UInt8, C == UncheckedString<UInt8>)
   @_specialize(exported: true, where Element == UInt16, C == UncheckedString<UInt16>)
@@ -441,19 +373,7 @@ extension UncheckedString: RangeReplaceableCollection {
 
   /// Adds the elements of another `UncheckedString` to the end of this one.
   ///
-  /// Concrete, non-generic overload of `append(contentsOf:)`, for the
-  /// specific case of another `UncheckedString<Element>` -- what `+=`/`+`
-  /// below actually call this with. Overload resolution prefers this over
-  /// the `C: Collection`-constrained version above for the same reason that
-  /// version is preferred over the `S: Sequence` one: a concrete,
-  /// non-generic parameter type outranks a generic one that merely happens
-  /// to be satisfiable. When both sides are `.small` and the combined
-  /// length still fits, this reaches `fastAppend(contentsOf:)` (see above),
-  /// which copies bytes directly between the two packed tuples with no
-  /// per-element iteration at all -- the fastest path available, and the
-  /// one that matters for the common case of building up a short string a
-  /// few pieces at a time. Every other storage combination falls back to
-  /// the same logic as the `Collection`-constrained overload above.
+  /// - Parameter newElements: The string whose elements should be appended.
   @inlinable
   @_specialize(exported: true, where Element == UInt8)
   @_specialize(exported: true, where Element == UInt16)
@@ -483,12 +403,8 @@ extension UncheckedString: RangeReplaceableCollection {
 
   /// Reserves enough space to store the specified number of elements.
   ///
-  /// The default `RangeReplaceableCollection.reserveCapacity(_:)` is a
-  /// no-op, which leaves no way to avoid repeated reallocation while
-  /// building up a string one append at a time. `.dynamic` storage forwards
-  /// directly to `Array.reserveCapacity`. `.empty`/`.small`/`.immortal`
-  /// storage is promoted to `.dynamic` up front whenever the requested
-  /// capacity wouldn't fit in `.small` storage anyway.
+  /// - Parameter n: The minimum number of elements the string should be
+  ///                able to store without reallocating.
   @inlinable
   public mutating func reserveCapacity(_ n: Int) {
     switch storage {
@@ -511,12 +427,10 @@ extension UncheckedString: RangeReplaceableCollection {
 
   /// Inserts a new element into this string at the specified position.
   ///
-  /// The default `RangeReplaceableCollection.insert(_:at:)` always goes
-  /// through `replaceSubrange`, even when `i == endIndex` and the call is
-  /// really just an append. This fast-paths that common case to
-  /// `append(_:)` instead, and the `.small`, non-`endIndex` case mutates
-  /// the packed byte tuple directly (see `fastInsert` above) instead of
-  /// round-tripping through a temporary `Array`.
+  /// - Parameters:
+  ///   - newElement: The new element to insert into the string.
+  ///   - i: The position at which to insert the new element. `i` must be a
+  ///        valid index into the string.
   @inlinable
   public mutating func insert(_ newElement: Element, at i: Index) {
     if i == endIndex {
@@ -535,8 +449,10 @@ extension UncheckedString: RangeReplaceableCollection {
   /// Inserts the elements of a collection into this string at the
   /// specified position.
   ///
-  /// Fast-paths `i == endIndex` to `append(contentsOf:)`, for the same
-  /// reason as `insert(_:at:)` above.
+  /// - Parameters:
+  ///   - newElements: The new elements to insert into the string.
+  ///   - i: The position at which to insert the new elements. `i` must be a
+  ///        valid index into the string.
   @inlinable
   public mutating func insert<C: Collection>(
     contentsOf newElements: __owned C, at i: Index
@@ -550,10 +466,11 @@ extension UncheckedString: RangeReplaceableCollection {
 
   /// Removes and returns the element at the specified position.
   ///
-  /// The default `RangeReplaceableCollection.remove(at:)` always goes
-  /// through `replaceSubrange`. This fast-paths the `.small` case to mutate
-  /// the packed byte tuple directly (see `fastRemove` above) instead of
-  /// round-tripping through a temporary `Array`.
+  /// - Parameter i: The position of the element to remove. `i` must be a
+  ///                valid index into the string, and not equal to the
+  ///                string's end index.
+  ///
+  /// - Returns The removed element.
   @discardableResult
   @inlinable
   public mutating func remove(at i: Index) -> Element {
@@ -570,23 +487,10 @@ extension UncheckedString: RangeReplaceableCollection {
 
   /// Removes all elements from this string.
   ///
-  /// When asked to keep capacity, goes through a `.dynamic` source directly:
-  /// clearing the backing `Array` in place reuses its existing buffer with
-  /// no reallocation, staying `.dynamic` (zero-length) rather than giving
-  /// up that buffer -- same reasoning as `replaceSubrange` above: a string
-  /// already being mutated via `removeAll` is likely to be mutated
-  /// further. `keepCapacity == false`, by contrast, is the caller
-  /// explicitly saying it does *not* need the capacity kept, so it drops
-  /// straight to `.empty`, same as every other source (`.empty`/`.small`/
-  /// `.immortal`, which have no heap buffer worth keeping regardless of
-  /// `keepCapacity`).
-  ///
-  /// Caveat: at a concretely-typed call site, this override isn't actually
-  /// reached at all -- see the comment above the `+`/`+=` operators below.
-  /// `RangeReplaceableCollection`'s own default takes the exact same
-  /// `keepCapacity == false` -> `self = Self()` shortcut in that case
-  /// (never calling `replaceSubrange` either), so the observed behavior
-  /// matches this override's regardless.
+  /// - Parameter keepCapacity: If `true` and the string's storage already
+  ///                           has spare heap capacity, that capacity is
+  ///                           retained for subsequent mutations; otherwise
+  ///                           the string reverts to empty storage.
   @inlinable
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     switch storage {
@@ -623,19 +527,11 @@ extension UncheckedString: RangeReplaceableCollection {
 extension UncheckedString {
   /// Concatenates two `UncheckedString` values.
   ///
-  /// `RangeReplaceableCollection` already provides a fully generic `+`
-  /// (`Self, Other: RangeReplaceableCollection where Other.Element == Self.Element`),
-  /// but its `Other` parameter is a bare generic parameter that doesn't name
-  /// any concrete type. When an operand is a string literal, the constraint
-  /// solver has nothing there to offer as a candidate binding beyond the
-  /// literal's own default (`String`) -- which doesn't satisfy
-  /// `Element == Element`, so the whole expression fails to type-check
-  /// whenever both operands are literals, regardless of context.
+  /// - Parameters:
+  ///   - lhs: The first string to concatenate.
+  ///   - rhs: The second string to concatenate.
   ///
-  /// This concrete, non-generic overload gives the solver a directly
-  /// nameable target type (`UncheckedString<Element>`) to try instead, which
-  /// resolves the problem for the common case of concatenating two
-  /// `UncheckedString` values (including literals).
+  /// - Returns The result of appending `rhs` to `lhs`.
   @inlinable
   public static func + (
     lhs: UncheckedString<Element>,
@@ -648,12 +544,9 @@ extension UncheckedString {
 
   /// Appends `rhs` to `lhs` in place.
   ///
-  /// `RangeReplaceableCollection` already provides a fully generic `+=`;
-  /// this concrete, non-generic overload exists purely for performance
-  /// (see the comment above this extension) so that a call with both
-  /// operands statically typed as `UncheckedString<Element>` resolves
-  /// directly to `append(contentsOf:)` instead of through the generic
-  /// default's own indirection.
+  /// - Parameters:
+  ///   - lhs: The string to append to.
+  ///   - rhs: The string to append.
   @inlinable
   public static func += (
     lhs: inout UncheckedString<Element>,
@@ -668,6 +561,11 @@ extension UncheckedString {
 @available(SwiftStdlib 9999, *)
 extension UncheckedSubString: RangeReplaceableCollection {
 
+  /// Replaces `subrange` with `newElements`.
+  ///
+  /// - Parameters:
+  ///   - subrange: The range of elements to replace.
+  ///   - newElements: The new elements to insert into the substring.
   @inlinable
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Self.Index>,

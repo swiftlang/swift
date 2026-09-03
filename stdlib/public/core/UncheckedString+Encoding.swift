@@ -10,11 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Selects the "fail" policy for handling characters that cannot be
+/// represented in a given encoding.
 public enum UncheckedStringFailEncoding {
+  /// Causes the operation to return `nil` (or fail) rather than substitute
+  /// a replacement character.
   case fail
 }
 
+/// Selects the "substitute" policy for handling characters that cannot be
+/// represented in a given encoding.
 public enum UncheckedStringSubstituteEncoding {
+  /// Causes the operation to substitute a replacement character rather
+  /// than fail.
   case substitute
 }
 

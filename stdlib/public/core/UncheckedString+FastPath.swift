@@ -72,6 +72,14 @@ import SwiftShims
 
 @available(SwiftStdlib 9999, *)
 extension UncheckedString {
+  /// Returns a Boolean value indicating whether two strings are equal.
+  ///
+  /// - Parameters:
+  ///   - lhs: A string to compare.
+  ///   - rhs: Another string to compare.
+  ///
+  /// - Returns `true` if `lhs` and `rhs` contain the same elements;
+  ///           otherwise, `false`.
   @inlinable
   public static func == (lhs: Self, rhs: Self) -> Bool {
     if lhs.count != rhs.count { return false }
@@ -92,6 +100,14 @@ extension UncheckedString {
     }
   }
 
+  /// Returns a Boolean value indicating whether the first string is
+  /// ordered before the second, by elementwise comparison.
+  ///
+  /// - Parameters:
+  ///   - lhs: A string to compare.
+  ///   - rhs: Another string to compare.
+  ///
+  /// - Returns `true` if `lhs` is ordered before `rhs`; otherwise, `false`.
   @inlinable
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.withCharacterData { l in
@@ -123,6 +139,11 @@ extension UncheckedString {
     }
   }
 
+  /// Hashes the essential components of this string by feeding them into
+  /// the given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///                      of this string.
   @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(count)
@@ -136,6 +157,14 @@ extension UncheckedString {
 
 @available(SwiftStdlib 9999, *)
 extension UncheckedSubString {
+  /// Returns a Boolean value indicating whether two substrings are equal.
+  ///
+  /// - Parameters:
+  ///   - lhs: A substring to compare.
+  ///   - rhs: Another substring to compare.
+  ///
+  /// - Returns `true` if `lhs` and `rhs` contain the same elements;
+  ///           otherwise, `false`.
   @inlinable
   public static func == (lhs: Self, rhs: Self) -> Bool {
     if lhs.count != rhs.count { return false }
@@ -156,6 +185,14 @@ extension UncheckedSubString {
     }
   }
 
+  /// Returns a Boolean value indicating whether the first substring is
+  /// ordered before the second, by elementwise comparison.
+  ///
+  /// - Parameters:
+  ///   - lhs: A substring to compare.
+  ///   - rhs: Another substring to compare.
+  ///
+  /// - Returns `true` if `lhs` is ordered before `rhs`; otherwise, `false`.
   @inlinable
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.withCharacterData { l in
@@ -187,6 +224,11 @@ extension UncheckedSubString {
     }
   }
 
+  /// Hashes the essential components of this substring by feeding them
+  /// into the given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///                      of this substring.
   @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(count)

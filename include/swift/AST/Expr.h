@@ -923,6 +923,8 @@ public:
   /// The `\x{hh}` raw code unit escapes found in this literal, if any. See
   /// `RawCodeUnitSplice`.
   ArrayRef<RawCodeUnitSplice> getRawSplices() const { return Splices; }
+
+  /// Whether this literal contains any `\x{hh}` raw code unit escapes.
   bool hasRawSplices() const { return !Splices.empty(); }
 
   /// Determine the encoding that should be used for this string literal.

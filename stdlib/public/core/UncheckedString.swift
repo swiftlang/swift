@@ -83,27 +83,27 @@
 @available(SwiftStdlib 9999, *)
 @frozen
 public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
+  /// The type of the elements (code units) that make up this string.
   public typealias Element = E
 
+  /// The underlying representation of a string's contents.
   @usableFromInline
   typealias Storage = UncheckedStringStorage<Element>
 
+  /// This string's underlying representation.
   @safe
   @usableFromInline
   var storage: Storage
 
+  /// The number of elements in the string.
   @inlinable
   public var count: Int { return storage.count }
 
-  /// `Collection`'s own default implementation of `isEmpty` (`startIndex ==
-  /// endIndex`) has no concrete override on `UncheckedString`, so a call to
-  /// it goes through full protocol-witness dispatch for both `startIndex`
-  /// and `endIndex` -- and `endIndex` itself calls through to `count` --
-  /// confirmed by sampling profiler to dominate this path's cost, for what
-  /// should just be a single field read. This overrides it directly.
+  /// A Boolean value indicating whether the string contains no characters.
   @inlinable
   public var isEmpty: Bool { return storage.count == 0 }
 
+  /// Creates a string with the given underlying representation.
   @inlinable
   internal init(_ storage: Storage) {
     self.storage = storage
@@ -147,6 +147,8 @@ public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
   /// storage array for the `UncheckedString` directly.
   ///
   /// N.B. This initializer will append a `NUL` to the array if it keeps it.
+  ///
+  /// - Parameter a: The array of character elements to adopt.
   init(taking a: consuming Array<Element>) {
     if a.count == 0 {
       storage = .empty
@@ -171,14 +173,10 @@ public struct UncheckedString<E: FixedWidthInteger>: UncheckedStringProtocol {
 /// Unpacks a `.small` string's packed byte tuple into `buffer`, filling in
 /// `data.count` elements starting at `buffer[0]`.
 ///
-/// `data.bytes` is a packed tuple of `UInt8`s with no alignment guarantee
-/// wider than 1 byte, so elements must be read with an alignment-agnostic
-/// load, not by rebinding to `Element`.
-///
-/// Factored out of `withCString`/`withCharacterData` (which are themselves
-/// generic over an unconstrained result/failure type and so cannot be
-/// fully `@_specialize`d) so that this loop -- the only part of those
-/// functions whose cost actually depends on `Element`'s width -- can be.
+/// - Parameters:
+///   - data: The small-storage payload to unpack.
+///   - buffer: The buffer to fill; must have room for at least `data.count`
+///             elements.
 @_specialize(where Element == UInt8)
 @_specialize(where Element == CChar)
 @_specialize(where Element == UInt16)
@@ -200,6 +198,11 @@ internal func _unpackSmallUncheckedString<Element: FixedWidthInteger>(
 extension UncheckedString {
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a NUL-terminated sequence of `Element`s.
+  ///
+  /// - Parameter body: A closure that takes a pointer to the string's
+  ///                    NUL-terminated contents.
+  ///
+  /// - Returns The value returned by `body`.
   @inlinable
   public func withCString<R, Failure>(
     _ body: (UnsafePointer<Element>) throws(Failure) -> R
@@ -250,8 +253,13 @@ extension UncheckedString {
 /// This always produces a NUL-terminated buffer: reusing the string's
 /// existing storage directly when it's already NUL-terminated (`.dynamic`
 /// storage always is; `.immortal` storage sometimes is), and materializing a
-/// fresh NUL-terminated buffer otherwise -- mirroring `withCString`'s own
-/// switch over `storage` above.
+/// fresh NUL-terminated buffer otherwise.
+///
+/// - Parameter str: The `UncheckedString` to convert.
+///
+/// - Returns A tuple of the object that owns the buffer (if any, so its
+///           lifetime can be extended for the duration of the call) and a
+///           pointer to the buffer's NUL-terminated contents.
 @available(SwiftStdlib 9999, *)
 @_transparent
 public // COMPILER_INTRINSIC
@@ -290,6 +298,11 @@ func _convertConstUncheckedStringToPointerArgument<
 extension UncheckedString where Element == UInt8 {
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a NUL-terminated sequence of `Element`s.
+  ///
+  /// - Parameter body: A closure that takes a pointer to the string's
+  ///                    NUL-terminated contents, addressed as `CChar`.
+  ///
+  /// - Returns The value returned by `body`.
   @inlinable
   public func withCString<R, Failure>(
     _ body: (UnsafePointer<CChar>) throws(Failure) -> R
@@ -306,6 +319,9 @@ extension UncheckedString where Element == UInt8 {
 @available(SwiftStdlib 9999, *)
 extension UncheckedString {
   /// Creates a string from a NUL-terminated sequence of characters.
+  ///
+  /// - Parameter cString: A pointer to a NUL-terminated sequence of
+  ///                      `Element`s.
   @_specialize(where Element == UInt8)
   @_specialize(where Element == CChar)
   @_specialize(where Element == UInt16)
@@ -342,6 +358,9 @@ extension UncheckedString {
 @available(SwiftStdlib 9999, *)
 extension UncheckedString where Element == UInt8 {
   /// Creates a string from a NUL-terminated sequence of characters.
+  ///
+  /// - Parameter nullTerminatedCharacters: A pointer to a NUL-terminated
+  ///                                       sequence of `CChar`s.
   @inlinable
   public init(cString nullTerminatedCharacters: UnsafePointer<CChar>) {
     unsafe self.init(
@@ -357,6 +376,9 @@ extension UncheckedString where Element == UInt8 {
 @available(SwiftStdlib 9999, *)
 extension UncheckedString {
   /// Creates a string from a NUL-terminated immortal string.
+  ///
+  /// - Parameter immortalString: A pointer to a permanently-alive,
+  ///                             NUL-terminated sequence of `Element`s.
   @_specialize(where Element == UInt8)
   @_specialize(where Element == CChar)
   @_specialize(where Element == UInt16)
@@ -388,10 +410,14 @@ extension UncheckedString {
   /// Creates a string from an immortal string whose contents are given by
   /// `immortalString`.
   ///
-  /// Pass `nulTerminated: true` only if a `0`-valued `Element` is known to
-  /// immediately follow `immortalString`'s contents in memory (e.g. because
-  /// it is itself a slice of a NUL-terminated buffer); this lets later
-  /// C-interop calls skip re-copying the contents to add one.
+  /// - Parameters:
+  ///   - immortalString: A buffer over the permanently-alive character
+  ///                      data to adopt.
+  ///   - nulTerminated: Pass `true` only if a `0`-valued `Element` is known
+  ///                     to immediately follow `immortalString`'s contents
+  ///                     in memory (e.g. because it is itself a slice of a
+  ///                     NUL-terminated buffer); this lets later C-interop
+  ///                     calls skip re-copying the contents to add one.
   @_specialize(where Element == UInt8)
   @_specialize(where Element == CChar)
   @_specialize(where Element == UInt16)
@@ -431,6 +457,9 @@ extension UncheckedString {
 @available(SwiftStdlib 9999, *)
 extension UncheckedString where Element == UInt16 {
   /// Creates a string from a NUL-terminated sequence of characters.
+  ///
+  /// - Parameter cString: A pointer to a NUL-terminated sequence of
+  ///                      `UInt16`s.
   @inlinable
   public init(cString: UnsafePointer<UInt16>) {
     let len = unsafe fast_strlen(cString)
@@ -460,6 +489,9 @@ extension UncheckedString where Element == UInt16 {
   }
 
   /// Creates a string from a NUL-terminated immortal string.
+  ///
+  /// - Parameter immortalString: A pointer to a permanently-alive,
+  ///                             NUL-terminated sequence of `UInt16`s.
   @inlinable
   public init(immortalString: UnsafePointer<UInt16>) {
     let len = unsafe fast_strlen(immortalString)
@@ -491,36 +523,10 @@ extension UncheckedString {
   /// Calls the given closure with a buffer of `Element`s,
   /// which are *not* necessarily NUL-terminated.
   ///
-  /// For a single-byte `Element` (`UInt8`, `CChar`/`Int8`, ...), `.small`
-  /// storage's packed byte tuple needs no unpacking at all: a single-byte
-  /// integer has no alignment requirement beyond 1 byte, so the tuple's
-  /// bytes already *are* a valid `Span<Element>` in place, reinterpreted
-  /// via `bindMemory` rather than copied element-by-element through
-  /// `_unpackSmallUncheckedString` into a temporary buffer (needed only for
-  /// wider `Element`s, whose alignment the packed tuple does *not*
-  /// guarantee). `MemoryLayout<Element>.size == 1` is a runtime check, but
-  /// one that folds away to a compile-time constant once this function is
-  /// specialized for a concrete `Element` (same as the `Element.self ==
-  /// UInt8.self` checks elsewhere in this file) -- and checking the size
-  /// rather than a specific type's identity means every single-byte
-  /// `FixedWidthInteger` gets the fast path for free, with nothing to
-  /// update if another one is added later.
+  /// - Parameter body: A closure that takes a `Span` over the string's
+  ///                    contents.
   ///
-  /// This check belongs here, inside the one and only implementation of
-  /// this (protocol-required) method, rather than split across a second,
-  /// `Element == UInt8`-constrained sibling extension providing an
-  /// alternate witness for the same requirement (as an earlier revision of
-  /// this function did): that split is only reached by callers whose *own*
-  /// static context already knows `Element == UInt8` concretely --
-  /// `==`/`<`/`hash(into:)` (UncheckedString+FastPath.swift), which are
-  /// themselves generic over `Element`, call `self.withCharacterData` from
-  /// a still-generic context and so could never resolve to that sibling,
-  /// no matter what `Element` turned out to be at their own concrete call
-  /// sites (confirmed by sampling profiler, which caught `<` still paying
-  /// for the temporary-buffer unpack on `UInt8` data despite that sibling
-  /// existing). Doing the check inside this single implementation instead
-  /// means every caller -- generic or concrete, present or future -- reaches
-  /// the fast path automatically, with no caller-side awareness needed.
+  /// - Returns The value returned by `body`.
   @inlinable
   public func withCharacterData<R, Failure>(
     _ body: (Span<Element>) throws(Failure) -> R
@@ -569,23 +575,54 @@ extension UncheckedString {
 
 @available(SwiftStdlib 9999, *)
 extension UncheckedString: BidirectionalCollection {
+  /// The type of a contiguous subrange of this string's elements.
   public typealias SubSequence = UncheckedSubString<Element>
+  /// The type used to index into this string.
   public typealias Index = Int
 
+  /// The position of the first element in a nonempty string.
+  ///
+  /// For an instance of `UncheckedString`, `startIndex` is always zero. If
+  /// the string is empty, `startIndex` is equal to `endIndex`.
   @inlinable
   public var startIndex: Self.Index { 0 }
+
+  /// The string's "past the end" position -- that is, the position one
+  /// greater than the last valid subscript argument.
+  ///
+  /// If the string is empty, `endIndex` is equal to `startIndex`.
   @inlinable
   public var endIndex: Self.Index { count }
 
+  /// Returns the position immediately before the given index.
+  ///
+  /// - Parameter i: A valid index of the string. `i` must be greater than
+  ///                `startIndex`.
+  ///
+  /// - Returns The index immediately before `i`.
   @inlinable
   public func index(before i: Self.Index) -> Self.Index {
     return i - 1
   }
+
+  /// Returns the position immediately after the given index.
+  ///
+  /// - Parameter i: A valid index of the string. `i` must be less than
+  ///                `endIndex`.
+  ///
+  /// - Returns The index immediately after `i`.
   @inlinable
   public func index(after i: Self.Index) -> Self.Index {
     return i + 1
   }
 
+  /// Accesses the element at the specified position.
+  ///
+  /// - Parameter ndx: The position of the element to access. `ndx` must be
+  ///                   a valid index of the string that is not equal to the
+  ///                   string's end index.
+  ///
+  /// - Returns The element at `ndx`.
   @inlinable
   public subscript(_ ndx: Self.Index) -> Self.Element {
     precondition(ndx >= 0 && ndx < endIndex)
@@ -606,6 +643,11 @@ extension UncheckedString: BidirectionalCollection {
     }
   }
 
+  /// Accesses a contiguous subrange of the string's elements.
+  ///
+  /// - Parameter bounds: A range of the string's indices.
+  ///
+  /// - Returns A view of the elements at `bounds`.
   public subscript(bounds: Range<Self.Index>) -> UncheckedSubString<Element> {
     return UncheckedSubString<Element>(base: self, bounds: bounds)
   }
@@ -615,12 +657,11 @@ extension UncheckedString: BidirectionalCollection {
 extension UncheckedString {
   /// Provides bulk access to this string's contents as contiguous storage.
   ///
-  /// Without this override, `Sequence`'s default implementation (which
-  /// returns `nil` unconditionally) would force every generic algorithm
-  /// that tries this fast path first (e.g. `Array(_:)`, `elementsEqual`)
-  /// back onto element-by-element iteration via `subscript(_:)`, paying
-  /// repeated closure-dispatch and bounds-check overhead in place of a
-  /// single bulk copy.
+  /// - Parameter body: A closure that takes a buffer over the string's
+  ///                    contents, if contiguous storage is available.
+  ///
+  /// - Returns The value returned by `body`, or `nil` if this string's
+  ///           contents are not available as contiguous storage.
   @inlinable
   @safe
   public func withContiguousStorageIfAvailable<R>(
@@ -631,11 +672,10 @@ extension UncheckedString {
 
   /// Bulk-copies this string's elements into `buffer`.
   ///
-  /// Without this override, `Sequence`'s default implementation copies one
-  /// element at a time via `makeIterator()`/`subscript(_:)`, hitting the
-  /// same per-element dispatch cost described on
-  /// `withContiguousStorageIfAvailable` above. This is the hook that
-  /// `Array(_:)`/`_copyCollectionToContiguousArray` actually calls.
+  /// - Parameter buffer: The buffer to copy this string's elements into.
+  ///
+  /// - Returns An iterator positioned just after the copied elements, and
+  ///           the buffer index just after the last element written.
   @inlinable
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
@@ -653,6 +693,11 @@ extension UncheckedString {
   /// implementation details such as the memory location of any underlying
   /// storage. Therefore, identical strings are guaranteed to compare equal
   /// with `==`, but not all equal strings are considered identical.
+  ///
+  /// - Parameter other: The string to compare this string to.
+  ///
+  /// - Returns `true` if this string is trivially identical to `other`;
+  ///           otherwise, `false`.
   ///
   /// - Complexity: O(1)
   @inlinable
@@ -679,55 +724,101 @@ extension UncheckedString {
 
 // MARK: UncheckedSubString
 
+/// A view into a contiguous subrange of the elements of some base
+/// `UncheckedString`.
 @available(SwiftStdlib 9999, *)
 @frozen
 public struct UncheckedSubString<E: FixedWidthInteger>
   : UncheckedStringProtocol
 {
+  /// The type of the elements (code units) that make up this substring.
   public typealias Element = E
+  /// The type of a contiguous subrange of this substring's elements.
   public typealias SubSequence = UncheckedSubString<Element>
+  /// The type used to index into this substring.
   public typealias Index = Int
 
+  /// The string of which this is a subsequence.
   public var base: UncheckedString<Element>
+  /// The range of `base`'s indices that this subsequence covers.
   @usableFromInline
   var bounds: Range<Self.Index>
 
+  /// The position of the first element in a nonempty substring.
   @inlinable
   public var startIndex: Self.Index { return bounds.lowerBound }
+
+  /// The substring's "past the end" position -- that is, the position one
+  /// greater than the last valid subscript argument.
   @inlinable
   public var endIndex: Self.Index { return bounds.upperBound }
 
+  /// Returns the position immediately before the given index.
+  ///
+  /// - Parameter i: A valid index of the substring. `i` must be greater
+  ///                than `startIndex`.
+  ///
+  /// - Returns The index immediately before `i`.
   @inlinable
   public func index(before i: Self.Index) -> Self.Index {
     return i - 1
   }
+
+  /// Returns the position immediately after the given index.
+  ///
+  /// - Parameter i: A valid index of the substring. `i` must be less than
+  ///                `endIndex`.
+  ///
+  /// - Returns The index immediately after `i`.
   @inlinable
   public func index(after i: Self.Index) -> Self.Index {
     return i + 1
   }
 
+  /// Creates an empty substring.
   public init() {
     self.base = UncheckedString()
     self.bounds = 0..<0
   }
 
+  /// Creates a substring over the given range of `base`'s indices.
   init(base: UncheckedString<Element>, bounds: Range<Self.Index>) {
     self.base = base
     self.bounds = bounds
   }
 
+  /// Accesses the element at the specified position.
+  ///
+  /// - Parameter ndx: The position of the element to access. `ndx` must be
+  ///                   a valid index of the substring that is not equal to
+  ///                   the substring's end index.
+  ///
+  /// - Returns The element at `ndx`.
   @inlinable
   public subscript(_ ndx: Self.Index) -> Self.Element {
     precondition(bounds.contains(ndx))
     return base[ndx]
   }
 
+  /// Accesses a contiguous subrange of the substring's elements.
+  ///
+  /// - Parameter bounds: A range of the substring's indices.
+  ///
+  /// - Returns A view of the elements at `bounds`.
   public subscript(bounds: Range<Self.Index>) -> UncheckedSubString<Element> {
     precondition(bounds.lowerBound >= startIndex && bounds.lowerBound < endIndex)
     precondition(bounds.upperBound >= startIndex && bounds.upperBound <= endIndex)
     return UncheckedSubString<Element>(base: base, bounds: bounds)
   }
 
+  /// Provides bulk access to this substring's contents as contiguous
+  /// storage.
+  ///
+  /// - Parameter body: A closure that takes a buffer over the substring's
+  ///                    contents, if contiguous storage is available.
+  ///
+  /// - Returns The value returned by `body`, or `nil` if this substring's
+  ///           contents are not available as contiguous storage.
   @inlinable
   @safe
   public func withContiguousStorageIfAvailable<R>(
@@ -736,6 +827,13 @@ public struct UncheckedSubString<E: FixedWidthInteger>
     return try unsafe _uncheckedStringWithContiguousStorage(self, body)
   }
 
+  /// Bulk-copies this substring's elements into `buffer`.
+  ///
+  /// - Parameter buffer: The buffer to copy this substring's elements
+  ///                      into.
+  ///
+  /// - Returns An iterator positioned just after the copied elements, and
+  ///           the buffer index just after the last element written.
   @inlinable
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
@@ -743,6 +841,13 @@ public struct UncheckedSubString<E: FixedWidthInteger>
     return unsafe _uncheckedStringCopyContents(self, initializing: buffer)
   }
 
+  /// Calls the given closure with a buffer of `Element`s,
+  /// which are *not* necessarily NUL-terminated.
+  ///
+  /// - Parameter body: A closure that takes a `Span` over the substring's
+  ///                    contents.
+  ///
+  /// - Returns The value returned by `body`.
   @inlinable
   public func withCharacterData<R, Failure>(
     _ body: (Span<Element>) throws(Failure) -> R
@@ -755,6 +860,11 @@ public struct UncheckedSubString<E: FixedWidthInteger>
   /// Returns a Boolean value indicating whether this string is trivially
   /// identical to `other`.
   ///
+  /// - Parameter other: The string to compare this string to.
+  ///
+  /// - Returns `true` if this string is trivially identical to `other`;
+  ///           otherwise, `false`.
+  ///
   /// - Complexity: O(1)
   @inlinable
   public func isTriviallyIdentical(to other: Self) -> Bool {
@@ -764,6 +874,12 @@ public struct UncheckedSubString<E: FixedWidthInteger>
 
 // MARK: fast_strlen
 
+/// Returns the number of `T` elements preceding the first NUL element at
+/// or after `str`.
+///
+/// - Parameter str: A pointer to a NUL-terminated sequence of `T`s.
+///
+/// - Returns The number of non-NUL elements preceding the terminating NUL.
 @_specialize(exported: true, where T == UInt8)
 @_specialize(exported: true, where T == CChar)
 @inlinable
@@ -777,13 +893,27 @@ internal func fast_strlen<T: FixedWidthInteger>(_ str: UnsafePointer<T>) -> Int 
   return unsafe ptr - str
 }
 
+/// Returns whether any of the four `UInt16` code units packed into `word`
+/// (in the host's native endianness) is zero.
+///
+/// - Parameter word: Four packed `UInt16` code units.
+///
+/// - Returns `true` if any of the four code units in `word` is zero;
+///           otherwise, `false`.
 @inlinable
 @inline(__always)
 internal func containsNul16(_ word: UInt64) -> Bool {
   return ((word &- 0x0001000100010001) & ~word & 0x8000800080008000) != 0
 }
 
-// For UInt16, this is faster than the above
+/// Returns the number of `UInt16` elements preceding the first NUL element
+/// at or after `str`.
+///
+/// For `UInt16`, this is faster than the generic `fast_strlen(_:)` above.
+///
+/// - Parameter str: A pointer to a NUL-terminated sequence of `UInt16`s.
+///
+/// - Returns The number of non-NUL elements preceding the terminating NUL.
 @inlinable
 internal func fast_strlen(_ str: UnsafePointer<UInt16>) -> Int {
   var ptr = unsafe str

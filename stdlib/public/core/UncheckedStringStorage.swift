@@ -11,12 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 // MARK: Flags
+
+/// Flags describing an `UncheckedString`'s underlying character data.
 @frozen
 @usableFromInline
 struct UncheckedStringStorageFlags: OptionSet {
+  /// The raw bitmask value of this set of flags.
   @usableFromInline
   let rawValue: UInt8
 
+  /// Creates a flags value with the given raw bitmask.
+  ///
+  /// - Parameter rawValue: The raw bitmask to create the flags value from.
   @inlinable
   init(rawValue: UInt8) {
     self.rawValue = rawValue
@@ -24,6 +30,8 @@ struct UncheckedStringStorageFlags: OptionSet {
 }
 
 extension UncheckedStringStorageFlags {
+  /// Indicates that a `0`-valued element is known to immediately follow
+  /// the storage's character data in memory.
   @inlinable
   static var nulTerminated: UncheckedStringStorageFlags {
     UncheckedStringStorageFlags(rawValue: 1 << 0)
@@ -38,9 +46,13 @@ extension UncheckedStringStorageFlags {
 // structures must take up 15 bytes (because UncheckedStringStorage needs a
 // discriminator byte).
 
+/// Backing storage for an `UncheckedString` short enough to be stored
+/// inline, without a separate heap allocation.
 @frozen
 @usableFromInline
 struct SmallUncheckedStringStorage<CharType: FixedWidthInteger> {
+  /// The tuple type used to pack this storage's character data into
+  /// `UncheckedStringStorage`'s available inline bytes.
   @usableFromInline
   typealias Bytes = (
     UInt8, UInt8, UInt8, UInt8,
@@ -49,8 +61,10 @@ struct SmallUncheckedStringStorage<CharType: FixedWidthInteger> {
     UInt8, UInt8
   )
 
+  /// The number of elements stored inline in `bytes`.
   @usableFromInline
   var count: UInt8 = 0
+  /// The packed byte representation of this storage's character data.
   @usableFromInline
   var bytes: Bytes = (0, 0, 0, 0,
                       0, 0, 0, 0,
@@ -58,22 +72,36 @@ struct SmallUncheckedStringStorage<CharType: FixedWidthInteger> {
                       0, 0)
 }
 
+/// Backing storage for an `UncheckedString` whose character data is
+/// permanently alive (e.g. because it points into a string literal or
+/// other static data), and so needs no reference counting or copying.
 @safe
 @frozen
 @usableFromInline
 struct ImmortalUncheckedStringStorage<CharType: FixedWidthInteger> {
+  /// A pointer to the permanently-alive character data.
   @usableFromInline
   var characters: UnsafePointer<CharType>
+  /// The number of elements at `characters`.
   @safe
   @usableFromInline
   var count: UInt32
+  /// Flags describing this storage's character data.
   @safe
   @usableFromInline
   var flags: UncheckedStringStorageFlags
+  /// Reserved for future use.
   @safe
   @usableFromInline
   var _reserved: (UInt8, UInt8) = (0, 0)
 
+  /// Creates storage over the given permanently-alive character data.
+  ///
+  /// - Parameters:
+  ///   - characters: A pointer to the permanently-alive character data.
+  ///   - count: The number of elements at `characters`.
+  ///   - flags: Flags describing the character data.
+  ///   - _reserved: Reserved for future use.
   @inlinable
   init(
     characters: UnsafePointer<CharType>,
@@ -88,28 +116,33 @@ struct ImmortalUncheckedStringStorage<CharType: FixedWidthInteger> {
   }
 }
 
+/// Backing storage for an `UncheckedString` whose character data is held
+/// in a separate, reference-counted, heap-allocated `Array`.
 @frozen
 @usableFromInline
 struct DynamicUncheckedStringStorage<CharType: FixedWidthInteger> {
+  /// The heap-allocated character data, including a trailing NUL element.
   @usableFromInline
   var characters: [CharType]
   /// The logical element count, i.e. `characters.count - 1` (excluding the
-  /// trailing NUL terminator `.dynamic` storage always keeps). Cached here
-  /// so that `UncheckedStringStorage.count`'s `.dynamic` case can read an
-  /// inline field instead of dereferencing through `characters`' heap
-  /// buffer header on every `count`/`isEmpty` access -- mirroring how
-  /// `String`'s `_StringObject` keeps its count in an inline word rather
-  /// than behind the character-buffer pointer. Every construction site and
-  /// every mutation of `characters` must keep this in sync; there is no
-  /// default value, so a missed site is a compile error, not a silent
-  /// stale-count bug.
+  /// trailing NUL terminator `.dynamic` storage always keeps).
   @usableFromInline
   var count: UInt32
+  /// Flags describing this storage's character data.
   @usableFromInline
   var flags: UncheckedStringStorageFlags
+  /// Reserved for future use.
   @usableFromInline
   var _reserved2: (UInt8, UInt8) = (0, 0)
 
+  /// Creates storage that adopts the given character data.
+  ///
+  /// - Parameters:
+  ///   - characters: The heap-allocated character data, including a
+  ///                 trailing NUL element.
+  ///   - count: The logical element count, i.e. `characters.count - 1`.
+  ///   - flags: Flags describing the character data.
+  ///   - _reserved2: Reserved for future use.
   @inlinable
   init(
     characters: [CharType],
@@ -130,31 +163,49 @@ struct DynamicUncheckedStringStorage<CharType: FixedWidthInteger> {
 // structures must take up 7 bytes (because UncheckedStringStorage needs a
 // discriminator byte).
 
+/// Backing storage for an `UncheckedString` short enough to be stored
+/// inline, without a separate heap allocation.
 @frozen
 @usableFromInline
 struct SmallUncheckedStringStorage<CharType: FixedWidthInteger> {
+  /// The tuple type used to pack this storage's character data into
+  /// `UncheckedStringStorage`'s available inline bytes.
   @usableFromInline
   typealias Bytes = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
 
+  /// The number of elements stored inline in `bytes`.
   @usableFromInline
   var count: UInt8 = 0
+  /// The packed byte representation of this storage's character data.
   @usableFromInline
   var bytes: Bytes = (0, 0, 0, 0, 0, 0)
 }
 
+/// Backing storage for an `UncheckedString` whose character data is
+/// permanently alive (e.g. because it points into a string literal or
+/// other static data), and so needs no reference counting or copying.
 @safe
 @frozen
 @usableFromInline
 struct ImmortalUncheckedStringStorage<CharType: FixedWidthInteger> {
+  /// A pointer to the permanently-alive character data.
   @usableFromInline
   var characters: UnsafePointer<CharType>
+  /// The number of elements at `characters`.
   @safe
   @usableFromInline
   var count: UInt16
+  /// Flags describing this storage's character data.
   @safe
   @usableFromInline
   var flags: UncheckedStringStorageFlags
 
+  /// Creates storage over the given permanently-alive character data.
+  ///
+  /// - Parameters:
+  ///   - characters: A pointer to the permanently-alive character data.
+  ///   - count: The number of elements at `characters`.
+  ///   - flags: Flags describing the character data.
   @inlinable
   init(
     characters: UnsafePointer<CharType>,
@@ -167,24 +218,35 @@ struct ImmortalUncheckedStringStorage<CharType: FixedWidthInteger> {
   }
 }
 
+/// Backing storage for an `UncheckedString` whose character data is held
+/// in a separate, reference-counted, heap-allocated `Array`.
 @frozen
 @usableFromInline
 struct DynamicUncheckedStringStorage<CharType: FixedWidthInteger> {
+  /// The heap-allocated character data, including a trailing NUL element.
   @usableFromInline
   var characters: [CharType]
+  /// Flags describing this storage's character data.
   @usableFromInline
   var flags: UncheckedStringStorageFlags
+  /// Reserved for future use.
   @usableFromInline
   var _reserved: (UInt8, UInt8) = (0, 0)
 
-  /// 32-bit `DynamicUncheckedStringStorage` has no spare byte to cache
-  /// `count` in (unlike the 64-bit layout above), so it's computed exactly
-  /// as before. `init(count:)` still accepts the count for call-site
-  /// symmetry with the 64-bit initializer, but only uses it to sanity-check
-  /// the caller's arithmetic in debug builds.
+  /// The logical element count, computed as `characters.count - 1`.
   @inlinable
   var count: Int { characters.count - 1 }
 
+  /// Creates storage that adopts the given character data.
+  ///
+  /// - Parameters:
+  ///   - characters: The heap-allocated character data, including a
+  ///                 trailing NUL element.
+  ///   - count: The logical element count, i.e. `characters.count - 1`.
+  ///            Only used to sanity-check the caller's arithmetic in debug
+  ///            builds; the stored `count` is computed on demand instead.
+  ///   - flags: Flags describing the character data.
+  ///   - _reserved: Reserved for future use.
   @inlinable
   init(
     characters: [CharType],
@@ -208,6 +270,11 @@ struct DynamicUncheckedStringStorage<CharType: FixedWidthInteger> {
 #endif
 
 extension SmallUncheckedStringStorage {
+  /// Creates storage by packing the elements of `collection` into `bytes`.
+  ///
+  /// - Parameter collection: A `Collection` containing the character
+  ///                          elements. The caller must ensure
+  ///                          `collection.count <= Self.capacity`.
   @inlinable
   init<C: Collection>(_ collection: C) where C.Element == CharType {
     precondition(collection.count <= Self.capacity)
@@ -226,20 +293,28 @@ extension SmallUncheckedStringStorage {
     }
   }
 
+  /// The maximum number of elements this storage kind can hold inline.
   @inlinable
   static var capacity: Int {
     return MemoryLayout<Bytes>.size / MemoryLayout<CharType>.stride
   }
 }
 
+/// The underlying representation of an `UncheckedString`'s contents,
+/// chosen according to the string's size and lifetime.
 @frozen
 @usableFromInline
 enum UncheckedStringStorage<CharType: FixedWidthInteger> {
+  /// An empty string, with no character data at all.
   case empty
+  /// A string short enough to be stored inline.
   case small(SmallUncheckedStringStorage<CharType>)
+  /// A string whose character data is permanently alive.
   case immortal(ImmortalUncheckedStringStorage<CharType>)
+  /// A string whose character data is held in a heap-allocated `Array`.
   case `dynamic`(DynamicUncheckedStringStorage<CharType>)
 
+  /// The number of elements in the string.
   @inlinable
   var count: Int {
     switch self {

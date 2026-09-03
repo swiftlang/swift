@@ -33,6 +33,11 @@ public protocol CustomUncheckedStringConvertible {
 
   /// Calls the given closure with a buffer containing this value's raw
   /// `UncheckedStringElement` representation.
+  ///
+  /// - Parameter body: A closure that takes a `Span` over this value's raw
+  ///                    representation.
+  ///
+  /// - Returns The value returned by `body`.
   func withUncheckedStringRepresentation<R, Failure>(
     _ body: (Span<UncheckedStringElement>) throws(Failure) -> R
   ) throws(Failure) -> R
@@ -51,10 +56,16 @@ public protocol UncheckedStringProtocol
     SubSequence: UncheckedStringProtocol,
     UncheckedStringElement == Element
 {
+  /// The type of a contiguous subrange of this string's elements.
   typealias SubSequence = UncheckedSubString<Element>
 
   /// Calls the given closure with a buffer of `Element`s,
   /// which are *not* necessarily NUL-terminated.
+  ///
+  /// - Parameter body: A closure that takes a `Span` over the string's
+  ///                    contents.
+  ///
+  /// - Returns The value returned by `body`.
   func withCharacterData<R, E>(
     _ body: (Span<Element>) throws(E) -> R
   ) throws(E) -> R
@@ -62,6 +73,13 @@ public protocol UncheckedStringProtocol
 
 @available(SwiftStdlib 9999, *)
 extension UncheckedStringProtocol {
+  /// Calls the given closure with a buffer containing this value's raw
+  /// `UncheckedStringElement` representation.
+  ///
+  /// - Parameter body: A closure that takes a `Span` over this value's raw
+  ///                    representation.
+  ///
+  /// - Returns The value returned by `body`.
   public func withUncheckedStringRepresentation<R, Failure>(
     _ body: (Span<Element>) throws(Failure) -> R
   ) throws(Failure) -> R {
@@ -71,6 +89,14 @@ extension UncheckedStringProtocol {
 
 @available(SwiftStdlib 9999, *)
 extension UncheckedStringProtocol {
+  /// Returns a Boolean value indicating whether two strings are equal.
+  ///
+  /// - Parameters:
+  ///   - lhs: A string to compare.
+  ///   - rhs: Another string to compare.
+  ///
+  /// - Returns `true` if `lhs` and `rhs` contain the same elements;
+  ///           otherwise, `false`.
   public static func == (lhs: Self, rhs: Self) -> Bool {
     if lhs.count != rhs.count {
       return false
@@ -86,6 +112,11 @@ extension UncheckedStringProtocol {
 
 @available(SwiftStdlib 9999, *)
 extension UncheckedStringProtocol {
+  /// Hashes the essential components of this string by feeding them into
+  /// the given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///                      of this string.
   public func hash(into hasher: inout Hasher) {
     hasher.combine(count)
     withCharacterData {
@@ -96,6 +127,14 @@ extension UncheckedStringProtocol {
 
 @available(SwiftStdlib 9999, *)
 extension UncheckedStringProtocol {
+  /// Returns a Boolean value indicating whether the first string is
+  /// ordered before the second, by elementwise comparison.
+  ///
+  /// - Parameters:
+  ///   - lhs: A string to compare.
+  ///   - rhs: Another string to compare.
+  ///
+  /// - Returns `true` if `lhs` is ordered before `rhs`; otherwise, `false`.
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.withCharacterData { lhsData in
       rhs.withCharacterData { rhsData in
@@ -117,6 +156,9 @@ extension UncheckedStringProtocol {
 
 @available(SwiftStdlib 9999, *)
 extension UncheckedStringProtocol {
+  /// A textual representation of this string, suitable for debugging.
+  ///
+  /// Non-printable and non-ASCII elements are rendered as `\x{hh}` escapes.
   public var debugDescription: String {
     return withCharacterData { data in
       var result = "\""
@@ -146,17 +188,10 @@ extension UncheckedStringProtocol {
 extension UncheckedStringProtocol where Iterator == IndexingIterator<Self> {
   /// Bulk-copies this string's elements into `buffer`.
   ///
-  /// Without this override, `Sequence`'s default implementation copies one
-  /// element at a time via `makeIterator()`/`subscript(_:)`, paying
-  /// repeated closure-dispatch and bounds-check overhead in place of a
-  /// single bulk copy. This is the hook that
-  /// `Array(_:)`/`_copyCollectionToContiguousArray` actually calls.
+  /// - Parameter buffer: The buffer to copy this string's elements into.
   ///
-  /// `UncheckedString`/`UncheckedSubString` additionally provide their own
-  /// concrete override of this and of `withContiguousStorageIfAvailable`
-  /// (in `UncheckedString.swift`) rather than relying solely on this
-  /// protocol-extension default -- verified by testing that both are
-  /// actually reached through `Array(_:)` for every storage case.
+  /// - Returns An iterator positioned just after the copied elements, and
+  ///           the buffer index just after the last element written.
   @inlinable
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
@@ -167,9 +202,12 @@ extension UncheckedStringProtocol where Iterator == IndexingIterator<Self> {
 
 /// Provides bulk access to `str`'s contents as contiguous storage.
 ///
-/// Shared implementation called from both `UncheckedString`'s and
-/// `UncheckedSubString`'s own concrete `withContiguousStorageIfAvailable`
-/// overrides, so the two types don't duplicate this body.
+/// - Parameters:
+///   - str: The string whose contents should be provided.
+///   - body: A closure that takes a buffer over `str`'s contents.
+///
+/// - Returns The value returned by `body`, or `nil` if `str`'s contents
+///           are not available as contiguous storage.
 @available(SwiftStdlib 9999, *)
 @inlinable
 @inline(__always)
@@ -184,9 +222,12 @@ internal func _uncheckedStringWithContiguousStorage<S: UncheckedStringProtocol, 
 
 /// Bulk-copies `str`'s elements into `buffer`.
 ///
-/// Shared implementation called from both `UncheckedString`'s and
-/// `UncheckedSubString`'s own concrete `_copyContents` overrides, so the
-/// two types don't duplicate this body.
+/// - Parameters:
+///   - str: The string whose elements should be copied.
+///   - buffer: The buffer to copy `str`'s elements into.
+///
+/// - Returns An iterator positioned just after the copied elements, and
+///           the buffer index just after the last element written.
 @available(SwiftStdlib 9999, *)
 @inlinable
 internal func _uncheckedStringCopyContents<S: UncheckedStringProtocol>(
@@ -213,6 +254,11 @@ internal func _uncheckedStringCopyContents<S: UncheckedStringProtocol>(
 extension UncheckedStringProtocol {
   /// Returns a Boolean value indicating whether this string begins with the
   /// specified prefix.
+  ///
+  /// - Parameter prefix: The prefix to test for.
+  ///
+  /// - Returns `true` if this string begins with `prefix`; otherwise,
+  ///           `false`.
   public func hasPrefix<Other: UncheckedStringProtocol>(
     _ prefix: Other
   ) -> Bool where Other.Element == Element {
@@ -226,6 +272,11 @@ extension UncheckedStringProtocol {
 
   /// Returns a Boolean value indicating whether this string ends with the
   /// specified suffix.
+  ///
+  /// - Parameter suffix: The suffix to test for.
+  ///
+  /// - Returns `true` if this string ends with `suffix`; otherwise,
+  ///           `false`.
   public func hasSuffix<Other: UncheckedStringProtocol>(
     _ suffix: Other
   ) -> Bool where Other.Element == Element {

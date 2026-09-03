@@ -20,6 +20,10 @@ extension UncheckedString: _ExpressibleByBuiltinUncheckedStringLiteral {
   /// data, matching `init(immortalString:)`'s requirements. IRGen also
   /// guarantees a `0`-valued `Element` immediately follows the literal's
   /// data, so the result is marked NUL-terminated.
+  ///
+  /// - Parameters:
+  ///   - start: A pointer to the literal's code units.
+  ///   - unitCount: The number of code units at `start`.
   @_specialize(where Element == UInt8)
   @_specialize(where Element == CChar)
   @_specialize(where Element == UInt16)
@@ -39,8 +43,12 @@ extension UncheckedString: _ExpressibleByBuiltinUncheckedStringLiteral {
 
 @available(SwiftStdlib 9999, *)
 extension UncheckedString: ExpressibleByUncheckedStringLiteral {
+  /// The type of an unchecked string literal.
   public typealias UncheckedStringLiteralType = UncheckedString<Element>
 
+  /// Creates an instance initialized to the given unchecked string value.
+  ///
+  /// - Parameter value: The value of the new instance.
   @_transparent
   public init(uncheckedStringLiteral value: UncheckedString<Element>) {
     self = value
@@ -61,14 +69,26 @@ extension UncheckedString {
   /// as text would require an encoding `UncheckedString` deliberately
   /// doesn't have.
   public struct StringInterpolation: StringInterpolationProtocol {
+    /// The character data accumulated from the literal's segments so far.
     @usableFromInline
     internal var chars: [Element]
 
+    /// Creates an interpolation with storage reserved for the given
+    /// expected literal and interpolation sizes.
+    ///
+    /// - Parameters:
+    ///   - literalCapacity: The approximate size of all literal segments
+    ///                      combined.
+    ///   - interpolationCount: The number of interpolations expected.
     public init(literalCapacity: Int, interpolationCount: Int) {
       chars = []
       chars.reserveCapacity(literalCapacity + interpolationCount)
     }
 
+    /// Appends a literal segment of the string.
+    ///
+    /// - Parameter literal: A string literal containing the characters
+    ///                       that appear next in the string literal.
     public mutating func appendLiteral(_ literal: UncheckedString<Element>) {
       literal.withCharacterData { data in
         data.withUnsafeBufferPointer { buffer in
@@ -80,6 +100,8 @@ extension UncheckedString {
     /// Appends the raw representation of `value`, which must produce
     /// `Element`s directly -- no encoding, transcoding, or textual
     /// description is involved.
+    ///
+    /// - Parameter value: The value to append.
     public mutating func appendInterpolation<T: CustomUncheckedStringConvertible>(
       _ value: T
     ) where T.UncheckedStringElement == Element {
@@ -94,6 +116,11 @@ extension UncheckedString {
 
 @available(SwiftStdlib 9999, *)
 extension UncheckedString: ExpressibleByUncheckedStringInterpolation {
+  /// Creates an instance from a string interpolation.
+  ///
+  /// - Parameter stringInterpolation: An instance of `StringInterpolation`
+  ///             which has had each segment of the string literal appended
+  ///             to it.
   public init(stringInterpolation: StringInterpolation) {
     self.init(taking: stringInterpolation.chars)
   }
