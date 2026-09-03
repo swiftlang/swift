@@ -844,6 +844,15 @@ public:
         if (Ty->is<ErrorType>()) {
           return false;
         }
+        // A variadic parameter's type is `T...`, but that spelling is only
+        // grammatical in parameter position. Instead, we should report Array 
+        // for being accurate and valid to insert as a type annotation.
+        Ty = Ty.transformRec([](Type type) -> std::optional<Type> {
+          if (auto *variadic = dyn_cast<VariadicSequenceType>(type.getPointer())) {
+            return Type(ArraySliceType::get(variadic->getBaseType()));
+          }
+          return std::nullopt;
+        });
         Ty->print(OS, Options);
       }
       // Transfer the type to `OS` if needed and get the offset of this string
