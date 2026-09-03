@@ -222,6 +222,7 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::Module:
   case DeclKind::MacroExpansion:
   case DeclKind::Using:
+  case DeclKind::HiddenTypeLayoutInfo:
     return "";
   }
 

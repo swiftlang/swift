@@ -46,6 +46,7 @@ public func registerAST() {
   registerDecl(PrefixOperatorDecl.self)
   registerDecl(PostfixOperatorDecl.self)
   registerDecl(MacroExpansionDecl.self)
+  registerDecl(HiddenTypeLayoutInfoDecl.self)
 }
 
 private func registerDecl<T: AnyObject>(_ cl: T.Type) {

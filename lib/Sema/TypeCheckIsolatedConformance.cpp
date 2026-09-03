@@ -36,6 +36,10 @@ class IsolatedConformanceUseChecker
 public:
   explicit IsolatedConformanceUseChecker() {}
 
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden layout declarations are not type checked");
+  }
+
   void checkType(Type type, const TypeRepr *typeRepr, const Decl *context) {
     if (!type || (type && type->hasError()))
       return;

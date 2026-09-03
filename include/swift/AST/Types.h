@@ -94,6 +94,7 @@ class TypeAliasDecl;
 class TypeDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
+class HiddenTypeLayoutInfoDecl;
 enum class EffectKind : uint8_t;
 class EnumDecl;
 class EnumElementDecl;
@@ -8422,44 +8423,54 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
 
-/// A placeholder type for a stored-property field whose real type has been
-/// elided from a serialized module because it was imported via an internal
-/// bridging header. The type carries the mangled name of the original type,
-/// which is used for deduplication and (eventually) for recovering the real
-/// type when the client has access to the defining header.
-///
-/// HiddenType is never produced by type-checking user code. It is synthesized
-/// only on the serialization path and consumed by deserialization and IRGen.
-///
-/// Each HiddenType also carries the ModuleDecl it was emitted from (the
-/// "defining module"). That module's HiddenTypeLayouts table holds the
-/// AbstractTypeLayout entry that backs this placeholder; IRGen resolves the
-/// layout via that module.
+// The language includes a few mechanisms for hiding implementation details
+// from the interface of a module (@_implementationOnly, -internal-import-bridging-header).
+// Such types may not participate in the public API of a module, but they may still
+// affect the ABI of the module. In order to communicate that ABI information to clients,
+// we serialize some abstract layout information about the type, but elide details included
+// in the AST based definition like field names which are unimportant.
+//
+// A hidden type represents a type derived from this abstract layout information.
 class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   StringRef MangledName;
   ModuleDecl *DefiningModule;
+  HiddenTypeLayoutInfoDecl *LayoutInfoDecl = nullptr;
+  CanType Parent;
 
   HiddenType(StringRef mangledName, ModuleDecl *definingModule,
+             HiddenTypeLayoutInfoDecl *layoutInfoDecl, CanType parent,
              const ASTContext &ctx)
-      : TypeBase(TypeKind::Hidden, &ctx, RecursiveTypeProperties()),
-        MangledName(mangledName), DefiningModule(definingModule) {}
+      : TypeBase(TypeKind::Hidden, &ctx,
+                 parent ? parent->getRecursiveProperties()
+                        : RecursiveTypeProperties()),
+        MangledName(mangledName), DefiningModule(definingModule),
+        LayoutInfoDecl(layoutInfoDecl), Parent(parent) {}
 
 public:
   static HiddenType *get(const ASTContext &ctx, StringRef mangledName,
-                         ModuleDecl *definingModule);
+                         ModuleDecl *definingModule,
+                         HiddenTypeLayoutInfoDecl *layoutInfoDecl,
+                         CanType parent);
 
   StringRef getMangledName() const { return MangledName; }
   ModuleDecl *getDefiningModule() const { return DefiningModule; }
+  HiddenTypeLayoutInfoDecl *getLayoutInfoDecl() const { return LayoutInfoDecl; }
+  CanType getParent() const { return Parent; }
 
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getMangledName(), getDefiningModule());
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, getMangledName(), getDefiningModule(), getLayoutInfoDecl(),
+            getParent());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName,
-                      ModuleDecl *definingModule) {
+                      ModuleDecl *definingModule,
+                      HiddenTypeLayoutInfoDecl *layoutInfoDecl,
+                      CanType parent) {
     ID.AddString(mangledName);
     ID.AddPointer(definingModule);
+    ID.AddPointer(layoutInfoDecl);
+    ID.AddPointer(parent.getPointer());
   }
 
   static bool classof(const TypeBase *T) {
