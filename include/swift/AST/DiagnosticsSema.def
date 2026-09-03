@@ -2526,6 +2526,27 @@ ERROR(optional_attribute_missing_explicit_objc,none,
       ())
 ERROR(objcmembers_attribute_nonclass,none,
       "'@objcMembers' attribute can only be applied to a class", ())
+
+ERROR(objc_direct_not_final,none,
+      "'@objcDirect' methods must be 'final' to prevent overriding", ())
+ERROR(objc_direct_in_protocol,none,
+      "'@objcDirect' cannot be applied to protocol requirements", ())
+ERROR(objc_direct_access_level,none,
+      "'private' or 'fileprivate' methods cannot be '@objcDirect'", ())
+ERROR(objc_direct_with_async,none,
+      "'@objcDirect' is not supported with 'async' methods", ())
+ERROR(objc_direct_override,none,
+      "'@objcDirect' methods cannot override superclass methods", ())
+ERROR(objc_direct_on_deinit,none,
+      "'@objcDirect' cannot be applied to 'deinit'", ())
+ERROR(objc_direct_required_init,none,
+      "'@objcDirect' cannot be applied to 'required' initializers", ())
+ERROR(objc_direct_requires_precondition_thunk,none,
+      "'@objcDirect' requires '-fobjc-direct-precondition-thunk'", ())
+ERROR(objc_direct_not_in_class,none,
+      "'@objcDirect' can only be applied to members of a class", ())
+ERROR(objc_direct_in_generic_class,none,
+      "'@objcDirect' cannot be applied to members of a generic class", ())
 ERROR(optional_attribute_initializer,none,
       "'optional' cannot be applied to an initializer", ())
 ERROR(unavailable_method_non_objc_protocol,none,

@@ -784,6 +784,21 @@ IRGenModule::getForeignFunctionInfo(CanSILFunctionType type) {
   return sigInfo.getSignature(*this).getForeignInfo();
 }
 
+ForeignFunctionInfo
+IRGenModule::getForeignFunctionInfo(CanSILFunctionType type, bool isDirect) {
+  // An @objcDirect entry point uses the direct signature, which omits the
+  // implicit _cmd selector argument. Everything else keeps the normal
+  // message-send signature.
+  if (isDirect &&
+      type->getRepresentation() == SILFunctionType::Representation::ObjCMethod) {
+    auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
+    auto &objcSigInfo = static_cast<const ObjCFuncSignatureInfo &>(sigInfo);
+    return objcSigInfo.getDirectSignature(*this).getForeignInfo();
+  }
+
+  return getForeignFunctionInfo(type);
+}
+
 static void emitApplyArgument(IRGenFunction &IGF,
                               CanSILFunctionType origFnTy,
                               SILParameterInfo origParam,

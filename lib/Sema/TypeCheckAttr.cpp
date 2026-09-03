@@ -55,8 +55,10 @@
 #include "swift/Basic/UUID.h"  // for COM
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/CodeGenOptions.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -414,6 +416,7 @@ public:
   void visitNonObjCAttr(NonObjCAttr *attr);
   void visitObjCImplementationAttr(ObjCImplementationAttr *attr);
   void visitObjCMembersAttr(ObjCMembersAttr *attr);
+  void visitObjCDirectAttr(ObjCDirectAttr *attr);
 
   void visitOptionalAttr(OptionalAttr *attr);
 
@@ -1927,6 +1930,106 @@ void AttributeChecker::visitObjCMembersAttr(ObjCMembersAttr *attr) {
   auto reason = ObjCReason(ObjCReason::ExplicitlyObjCMembers, attr);
   auto behavior = behaviorLimitForObjCReason(reason, Ctx);
   diagnoseObjCAttrWithoutFoundation(attr, D, reason, behavior);
+}
+
+void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
+  auto *fn = dyn_cast<AbstractFunctionDecl>(D);
+  if (!fn) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_not_in_class);
+    return;
+  }
+
+  // @objcDirect is only correct when Clang's direct-method precondition-thunk
+  // ABI is enabled. Without it the method is still dropped from the ObjC
+  // metadata and statically dispatched, but no caller-side nil-check thunk is
+  // generated and the symbol mangles without the direct-ABI suffix -- i.e. only
+  // half-functional. Reject it up front rather than emit a broken method. This
+  // reads the same CodeGenOpt the mangler does (see SILDeclRef::mangle); the
+  // ClangImporter and its Clang invocation are created during frontend setup,
+  // before type checking, so the option is populated by the time we get here.
+  auto *importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  if (!importer || !importer->getCodeGenOpts().ObjCDirectPreconditionThunk) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_requires_precondition_thunk);
+    return;
+  }
+
+  // Disallow on deinit.
+  if (isa<DestructorDecl>(fn)) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_on_deinit);
+    return;
+  }
+
+  // Must be in a class, not a protocol.
+  if (isa<ProtocolDecl>(fn->getDeclContext())) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_in_protocol);
+    return;
+  }
+
+  // The direct symbol's class-name segment is the printed @interface name, so
+  // the method has to belong to a class that is actually printed. A global
+  // function, or a member of a struct or enum, has no such name.
+  auto *classDecl = fn->getDeclContext()->getSelfClassDecl();
+  if (!classDecl) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_not_in_class);
+    return;
+  }
+
+  // A generic class is never printed to the generated header, so a direct
+  // symbol on one could not be referenced from Objective-C even though the
+  // standard @objc check permits the member. Reject it rather than emit a
+  // symbol nothing can call.
+  if (classDecl->isGenericContext()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_in_generic_class);
+    return;
+  }
+
+  // Must be final (except for initializers, which can't be overridden the
+  // same way).
+  if (!isa<ConstructorDecl>(fn) && !fn->isFinal()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_not_final);
+    return;
+  }
+
+  // Required initializers must be inherited - incompatible with direct.
+  if (auto *ctor = dyn_cast<ConstructorDecl>(fn)) {
+    if (ctor->isRequired()) {
+      diagnoseAndRemoveAttr(attr, diag::objc_direct_required_init);
+      return;
+    }
+  }
+
+  // Cannot override a superclass method.
+  if (fn->getOverriddenDecl()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_override);
+    return;
+  }
+
+  // Access level must be at least internal.
+  if (fn->getFormalAccess() < AccessLevel::Internal) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_access_level);
+    return;
+  }
+
+  // No async support yet.
+  if (fn->hasAsync()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_with_async);
+    return;
+  }
+
+  // @objcDirect implies @objc. Add an implicit unnamed @objc if the decl does
+  // not already have one, and let the normal @objc machinery validate it, so a
+  // signature that is not representable in Objective-C is still rejected by the
+  // standard @objc diagnostics rather than slipping through. An explicit
+  // @objc(name:) rename is left alone: the mangler uses the renamed selector
+  // and the generated header prints the same name, so a rename flows through
+  // end to end.
+  if (!fn->getAttrs().hasAttribute<ObjCAttr>())
+    fn->getAttrs().add(ObjCAttr::createUnnamedImplicit(Ctx));
+
+  // Force the standard @objc checking now, so any representability error is
+  // diagnosed as part of applying @objcDirect. The request is memoized, so this
+  // does not double-diagnose against the later natural evaluation.
+  (void)fn->isObjC();
 }
 
 void AttributeChecker::visitOptionalAttr(OptionalAttr *attr) {

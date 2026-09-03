@@ -165,9 +165,15 @@ public:
     if (method->getAttrs().hasAttribute<NSManagedAttr>())
       return;
 
+    // @objcDirect methods are not msgSend-dispatchable, so they must not be
+    // registered via class_replaceMethod either (this mirrors the metadata
+    // exclusion in GenClass.cpp's ClassDataBuilder).
+    if (method->isObjCDirect())
+      return;
+
     auto descriptor = emitObjCMethodDescriptorParts(IGM, method,
                                                     /*concrete*/true);
-    
+
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
     llvm::Value *sel = Builder.CreateCall(
@@ -188,6 +194,11 @@ public:
 
   void visitConstructorDecl(ConstructorDecl *constructor) {
     if (!requiresObjCMethodDescriptor(constructor)) return;
+
+    // @objcDirect initializers are not msgSend-dispatchable either.
+    if (constructor->isObjCDirect())
+      return;
+
     auto descriptor = emitObjCMethodDescriptorParts(IGM, constructor,
                                                     /*concrete*/true);
 
@@ -3647,7 +3658,10 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   // This might generate new functions, so we should do it before computing
   // the insert-before point.
   llvm::Constant *clangAddr = nullptr;
-  bool isObjCDirect = false;
+  // The function may be a direct method imported from Clang, in which case the
+  // Clang decl below tells us so, or a Swift @objcDirect method being exported
+  // to ObjC, in which case the SIL function's AST attribute tells us.
+  bool isObjCDirect = f->isObjCDirect();
   if (clangDecl) {
     // If we have an Objective-C Clang declaration, it must be a direct
     // method and we want to generate the IR declaration ourselves.
@@ -3675,6 +3689,36 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   }
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+
+  // An @objcDirect method's exported implementation needs External linkage so
+  // ObjC callers can resolve it, with a visibility matching its Swift access
+  // level. This has to happen here, on the LinkInfo, rather than on the
+  // llvm::Function after the fact: createFunction() calls
+  // markGlobalAsUsedBasedOnLinkage(), and LinkInfo::isUsed() is true for
+  // External + Default -- which is exactly what a non-public direct method's
+  // LinkInfo looks like at this point -- so fixing it up afterwards would leave
+  // the symbol pinned in llvm.used and defeat dead-code elimination.
+  // Note this tests the AST attribute, not the local isObjCDirect flag, which
+  // is also set for direct methods imported *from* Clang -- those keep the
+  // linkage Clang gave them.
+  if (forDefinition && f->isObjCDirect()) {
+    // Prefer the decl ref, falling back to the location that isObjCDirect()
+    // itself consults, so the override is never silently skipped.
+    auto *AFD =
+        dyn_cast_or_null<AbstractFunctionDecl>(f->getDeclRef().getDecl());
+    if (!AFD)
+      AFD = f->getLocation().getAsASTNode<AbstractFunctionDecl>();
+    if (AFD) {
+      link.setLinkage(llvm::GlobalValue::ExternalLinkage);
+      // Use the context-capped effective access rather than the declared
+      // access: a public member of an internal class is not reachable outside
+      // the module, so it must stay hidden to remain DCE-eligible.
+      link.setVisibility(AFD->getFormalAccessScope().isPublic()
+                             ? llvm::GlobalValue::DefaultVisibility
+                             : llvm::GlobalValue::HiddenVisibility);
+    }
+  }
+
   bool isDefinition = f->isDefinition();
   bool hasOrderNumber =
       isDefinition && !shouldCallPreviousImplementation;

@@ -1779,6 +1779,9 @@ namespace {
       // Don't emit getters/setters for @NSManaged methods.
       if (method->getAttrs().hasAttribute<NSManagedAttr>()) return;
 
+      // @objcDirect methods are not callable via objc_msgSend.
+      if (method->getAttrs().hasAttribute<ObjCDirectAttr>()) return;
+
       getMethodList(method).push_back(method);
     }
 
@@ -1786,6 +1789,10 @@ namespace {
     void visitConstructorDecl(ConstructorDecl *constructor) {
       if (!isBuildingProtocol() &&
           !requiresObjCMethodDescriptor(constructor)) return;
+
+      // @objcDirect initializers are not callable via objc_msgSend.
+      if (constructor->getAttrs().hasAttribute<ObjCDirectAttr>()) return;
+
       getMethodList(constructor).push_back(constructor);
     }
 

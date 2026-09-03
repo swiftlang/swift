@@ -8685,6 +8685,11 @@ public:
   /// instance method.
   bool isObjCInstanceMethod() const;
 
+  /// Returns true if this method has the @objcDirect attribute.
+  bool isObjCDirect() const {
+    return getAttrs().hasAttribute<ObjCDirectAttr>();
+  }
+
   /// Get the foreign language targeted by a @c-style attribute, if any.
   /// Used to abstract away the change in meaning of @c vs @_cdecl while
   /// formalizing the attribute.
