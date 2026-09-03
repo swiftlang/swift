@@ -880,12 +880,13 @@ public struct UncheckedSubString<E: FixedWidthInteger>
 
 // MARK: Sendability
 
-// Both UncheckedString and UncheckedSubString are Sendable.
+// Both UncheckedString and UncheckedSubString are Sendable when their
+// `Element` type is.
 @available(SwiftStdlib 9999, *)
-extension UncheckedString: Sendable {}
+extension UncheckedString: Sendable where E: Sendable {}
 
 @available(SwiftStdlib 9999, *)
-extension UncheckedSubString: Sendable {}
+extension UncheckedSubString: Sendable where E: Sendable {}
 
 // MARK: fast_strlen
 

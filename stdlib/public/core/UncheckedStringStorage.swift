@@ -269,6 +269,20 @@ struct DynamicUncheckedStringStorage<CharType: FixedWidthInteger> {
 
 #endif
 
+// `ImmortalUncheckedStringStorage`'s `characters` pointer is safe to share
+// across threads when `CharType` is `Sendable`: it points to
+// permanently-alive data (e.g. a string literal) that this type never
+// writes through -- `UncheckedString` mutation always promotes `.immortal`
+// storage to `.dynamic` first instead of mutating in place. `@unchecked` is
+// still required because a raw pointer is never automatically `Sendable`,
+// regardless of its `Pointee`.
+extension ImmortalUncheckedStringStorage: @unchecked Sendable
+where CharType: Sendable {}
+
+// `DynamicUncheckedStringStorage`'s `characters` array is `Sendable`
+// whenever `Array<CharType>` is, i.e. whenever `CharType: Sendable`.
+extension DynamicUncheckedStringStorage: Sendable where CharType: Sendable {}
+
 extension SmallUncheckedStringStorage {
   /// Creates storage by packing the elements of `collection` into `bytes`.
   ///
@@ -325,3 +339,5 @@ enum UncheckedStringStorage<CharType: FixedWidthInteger> {
     }
   }
 }
+
+extension UncheckedStringStorage: Sendable where CharType: Sendable {}
