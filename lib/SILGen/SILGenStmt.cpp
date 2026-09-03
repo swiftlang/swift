@@ -1845,9 +1845,9 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     args.push_back(exn);
   } else if (shouldDiscard) {
     if (exn->getType().isAddress())
-      B.createDestroyAddr(loc, exn);
+      B.emitDestroyAddrAndFold(loc, exn);
     else
-      B.createDestroyValue(loc, exn);
+      B.emitDestroyValueOperation(loc, exn);
   }
 
   // Emit clean-ups needed prior to entering throw block.

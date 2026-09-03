@@ -478,8 +478,7 @@ void LogicalPathComponent::writeback(SILGenFunction &SGF, SILLocation loc,
 
   assert(temporary.getType().isAddress());
   auto &tempTL = SGF.getTypeLowering(temporary.getType());
-  if (!tempTL.isAddressOnly() || !isFinal ||
-      !SGF.silConv.useLoweredAddresses()) {
+  if (tempTL.isLoadableOrOpaque(SGF.F) || !isFinal) {
     if (isFinal) temporary.forward(SGF);
     temporary = SGF.emitLoad(loc, temporary.getValue(), tempTL,
                              SGFContext(), IsTake_t(isFinal));
@@ -5129,7 +5128,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                        (isAddrGuaranteed ? C.isGuaranteedPlusZeroOk()
                                           : C.isImmediatePlusZeroOk()));
 
-  if (rvalueTL.isAddressOnly() && silConv.useLoweredAddresses()) {
+  if (!rvalueTL.isLoadableOrOpaque(F)) {
     // If the client is cool with a +0 rvalue, the decl has an address-only
     // type, and there are no conversions, then we can return this as a +0
     // address RValue.
@@ -5196,7 +5195,7 @@ ManagedValue SILGenFunction::emitFormalAccessLoad(SILLocation loc,
       (isTake == IsNotTake && (isAddressGuaranteed ? C.isGuaranteedPlusZeroOk()
                                                  : C.isImmediatePlusZeroOk()));
 
-  if (rvalueTL.isAddressOnly() && silConv.useLoweredAddresses()) {
+  if (!rvalueTL.isLoadableOrOpaque(F)) {
     // If the client is cool with a +0 rvalue, the decl has an address-only
     // type, and there are no conversions, then we can return this as a +0
     // address RValue.
