@@ -688,3 +688,11 @@ func takesArbitraryAndRethrows<T>(_ value: T, body: () throws -> Void) rethrows 
 func testArbitraryAndRethrows() {
   takesArbitraryAndRethrows(throwingFunc) { }
 }
+
+func testTryOutsideClosure() {
+  try call { // expected-warning {{no calls to throwing functions occur within 'try' expression; 'try' does not cover calls inside a closure}}
+    raise() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  }
+
+  try call { noraise() } // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+}

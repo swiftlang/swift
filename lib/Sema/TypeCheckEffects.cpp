@@ -3588,6 +3588,9 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
       /// Does an enclosing 'if' or 'switch' expr have an 'unsafe'?
       StmtExprCoversUnsafe = 0x4000,
+
+      /// Is there a throwing site inside a nested closure?
+      HasThrowSiteInClosure = 0x8000,
     };
   private:
     unsigned Bits;
@@ -3613,6 +3616,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       result.set(IsInTry);
       result.set(HasAnyThrowSite);
       result.set(HasTryThrowSite);
+      result.set(HasThrowSiteInClosure);
       return result;
     }
 
@@ -3768,6 +3772,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.Flags.set(ContextFlags::IsInTry);
       Self.Flags.set(ContextFlags::IsTryCovered);
       Self.Flags.clear(ContextFlags::HasTryThrowSite);
+      Self.Flags.clear(ContextFlags::HasThrowSiteInClosure);
     }
 
     void enterAwait(SourceLoc awaitLoc) {
@@ -3833,6 +3838,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       // body for the purposes of deciding whether a try contained
       // a throwing call.
       OldFlags.mergeFrom(ContextFlags::HasTryThrowSite, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::HasThrowSiteInClosure, Self.Flags);
 
       // "await" doesn't work this way; the "await" needs to be part of
       // the autoclosure expression itself, and the autoclosure must be
@@ -3840,6 +3846,13 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
       OldFlags.mergeFrom(ContextFlags::HasAnyUnsafe, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::HasAnyUnsafeSite, Self.Flags);
+    }
+
+    void preserveThrowSitesFromClosure() {
+      if (Self.Flags.has(ContextFlags::HasAnyThrowSite) ||
+          Self.Flags.has(ContextFlags::HasThrowSiteInClosure)) {
+        OldFlags.set(ContextFlags::HasThrowSiteInClosure);
+      }
     }
 
     void setCoverageForSingleValueStmtExpr() {
@@ -3860,6 +3873,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       // We need to preserve whether we saw any throwing sites, to avoid warning
       // on 'do { let x = if .random() { try ... } else { ... } } catch { ... }'
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::HasThrowSiteInClosure, Self.Flags);
 
       // We need to preserve the throwing kind to correctly handle rethrows.
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
@@ -3922,6 +3936,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     void preserveCoverageFromInterpolatedString() {
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::HasTryThrowSite, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::HasThrowSiteInClosure, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::HasAnyAsyncSite, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::HasAnyAwait, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::HasAnyUnsafeSite, Self.Flags);
@@ -4030,6 +4045,7 @@ private:
     scope.enterSubFunction();
     scope.resetCoverage();
     E->getBody()->walk(*this);
+    scope.preserveThrowSitesFromClosure();
     return ShouldNotRecurse;
   }
 
@@ -4726,7 +4742,10 @@ private:
         .highlight(E->getTryLoc());
       return;
     }
-    Ctx.Diags.diagnose(E->getTryLoc(), diag::no_throw_in_try);
+    auto diagnostic = Flags.has(ContextFlags::HasThrowSiteInClosure)
+        ? diag::no_throw_in_try_with_throwing_closure
+        : diag::no_throw_in_try;
+    Ctx.Diags.diagnose(E->getTryLoc(), diagnostic);
   }
 
   void diagnoseRedundantAwait(AwaitExpr *E) const {
