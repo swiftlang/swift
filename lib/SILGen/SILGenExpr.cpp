@@ -881,9 +881,14 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
   // to the delegating initializer is a metatype. Thus, we perform a
   // load_borrow. And move from WillSharedBorrowSelf -> DidSharedBorrowSelf.
   if (SelfInitDelegationState == SILGenFunction::WillSharedBorrowSelf) {
-    assert(C.isGuaranteedPlusZeroOk() &&
-           "This should only be called if guaranteed plus zero is ok");
     SelfInitDelegationState = SILGenFunction::DidSharedBorrowSelf;
+    // If +1 is requested, it's a misuse of self that we expect
+    // definite initialization to diagnose.
+    if (!C.isGuaranteedPlusZeroOk()) {
+      const auto &typeLowering = getTypeLowering(addr->getType());
+      ManagedValue result = emitLoad(loc, addr, typeLowering, C, IsNotTake);
+      return RValue(*this, loc, refType, result);
+    }
     ManagedValue result =
         B.createLoadBorrow(loc, ManagedValue::forBorrowedAddressRValue(addr));
     return RValue(*this, loc, refType, result);
@@ -892,8 +897,12 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
   // If we are already in the did shared borrow self state, just return the
   // shared borrow value.
   if (SelfInitDelegationState == SILGenFunction::DidSharedBorrowSelf) {
-    assert(C.isGuaranteedPlusZeroOk() &&
-           "This should only be called if guaranteed plus zero is ok");
+    // As above, +1 indicates a misuse of self for definite initialization to diagnose.
+    if (!C.isGuaranteedPlusZeroOk()) {
+      const auto &typeLowering = getTypeLowering(addr->getType());
+      ManagedValue result = emitLoad(loc, addr, typeLowering, C, IsNotTake);
+      return RValue(*this, loc, refType, result);
+    }
     ManagedValue result =
         B.createLoadBorrow(loc, ManagedValue::forBorrowedAddressRValue(addr));
     return RValue(*this, loc, refType, result);
