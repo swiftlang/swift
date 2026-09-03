@@ -5915,8 +5915,13 @@ void ConformanceChecker::resolveValueWitnesses() {
         // The witness must also be @objc.
         if (!witness->isObjC()) {
           bool isOptional =
-            requirement->getAttrs().hasAttribute<OptionalAttr>();
+              requirement->getAttrs().hasAttribute<OptionalAttr>();
           SourceLoc diagLoc = getLocForDiagnosingWitness(Conformance, witness);
+          // Members of protocol extensions cannot be exposed to Objective-C.
+          // Avoid suggesting an invalid @objc attribute for such witnesses.
+          bool canAddObjCAttribute =
+              !isa<ExtensionDecl>(witness->getDeclContext()) ||
+              !witness->getDeclContext()->getSelfProtocolDecl();
           if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness)) {
             auto diagInfo = getObjCMethodDiagInfo(witnessFunc);
             std::optional<InFlightDiagnostic> fixItDiag = C.Diags.diagnose(
@@ -5924,14 +5929,15 @@ void ConformanceChecker::resolveValueWitnesses() {
                 isOptional ? diag::witness_non_objc_optional
                            : diag::witness_non_objc,
                 diagInfo.first, diagInfo.second, Proto->getName());
-            if (diagLoc != witness->getLoc()) {
+            if (canAddObjCAttribute && diagLoc != witness->getLoc()) {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.emplace(
                   witness->diagnose(diag::make_decl_objc, witness));
             }
-            if (!witness->canInferObjCFromRequirement(requirement)) {
+            if (canAddObjCAttribute &&
+                !witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
                   fixItDiag.value(), witness,
                   witness->getObjCRuntimeName().value_or(ObjCSelector()),
@@ -5943,14 +5949,15 @@ void ConformanceChecker::resolveValueWitnesses() {
                 isOptional ? diag::witness_non_objc_storage_optional
                            : diag::witness_non_objc_storage,
                 /*isSubscript=*/false, witness->getName(), Proto->getName());
-            if (diagLoc != witness->getLoc()) {
+            if (canAddObjCAttribute && diagLoc != witness->getLoc()) {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.emplace(
                   witness->diagnose(diag::make_decl_objc, witness));
             }
-            if (!witness->canInferObjCFromRequirement(requirement)) {
+            if (canAddObjCAttribute &&
+                !witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
                   fixItDiag.value(), witness,
                   witness->getObjCRuntimeName().value_or(ObjCSelector()),
@@ -5962,15 +5969,20 @@ void ConformanceChecker::resolveValueWitnesses() {
                 isOptional ? diag::witness_non_objc_storage_optional
                            : diag::witness_non_objc_storage,
                 /*isSubscript=*/true, witness->getName(), Proto->getName());
-            if (diagLoc != witness->getLoc()) {
+            if (canAddObjCAttribute && diagLoc != witness->getLoc()) {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.emplace(
                   witness->diagnose(diag::make_decl_objc, witness));
             }
-            fixItDiag->fixItInsert(witness->getAttributeInsertionLoc(false),
-                                   "@objc ");
+            if (canAddObjCAttribute) {
+              fixItDiag->fixItInsert(witness->getAttributeInsertionLoc(false),
+                                     "@objc ");
+            }
+          }
+          if (!canAddObjCAttribute) {
+            witness->diagnose(diag::witness_non_objc_protocol_extension);
           }
 
           // If the requirement is optional, @nonobjc suppresses the

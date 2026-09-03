@@ -7357,6 +7357,9 @@ WARNING(witness_non_objc_storage_optional,none,
       "optional requirement of '@objc' protocol %2",
       (bool, DeclName, Identifier))
 
+NOTE(witness_non_objc_protocol_extension,none,
+     "members of protocol extensions cannot be exposed to Objective-C", ())
+
 ERROR(nonobjc_not_allowed,none,
       "declaration is %" OBJC_ATTR_SELECT "0, and cannot be marked '@nonobjc'",
       (unsigned))
