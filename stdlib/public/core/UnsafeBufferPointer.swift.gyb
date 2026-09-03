@@ -1749,6 +1749,48 @@ where Element: ~Copyable {
 }
 
 extension Unsafe${Mutable}BufferPointer: ConvertibleToBytes {}
+
+extension Unsafe${Mutable}BufferPointer {
+
+  @inlinable
+  func elementsEqualOtherNonContiguous<OtherSequence: Sequence>(
+    _ other: OtherSequence,
+    by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
+  ) rethrows -> Bool {
+    var iter1 = unsafe self.makeIterator()
+    var iter2 = other.makeIterator()
+    while true {
+      switch (unsafe iter1.next(), iter2.next()) {
+      case let (e1?, e2?):
+        if try !areEquivalent(e1, e2) {
+          return false
+        }
+      case (_?, nil), (nil, _?): return false
+      case (nil, nil):           return true
+      }
+    }
+    fatalError()
+  }
+
+  @inlinable
+  func elementsEqual<OtherSequence: Sequence>(
+    _ other: OtherSequence,
+    by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
+  ) rethrows -> Bool {
+    let contigResult = try other.withContiguousStorageIfAvailable { buffer in
+      guard count == buffer.count else { return false }
+      var i = 0
+      while i < count {
+        guard unsafe try areEquivalent(self[i], buffer[i]) else { return false }
+        i &+= 1
+      }
+      return true
+    }
+    if let contigResult { return contigResult }
+    return try unsafe elementsEqualOtherNonContiguous(other, by: areEquivalent)
+  }
+}
+
 %end
 
 // ${'Local Variables'}:
