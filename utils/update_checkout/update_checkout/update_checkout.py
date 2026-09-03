@@ -915,7 +915,7 @@ def obtain_all_additional_swift_sources(
                         break
 
         else:
-            repo_exists = repo_path.joinpath(".git").is_dir()
+            repo_exists = repo_path.joinpath(".git").exists()
 
         if repo_exists:
             skipped_repositories.append(
