@@ -84,9 +84,6 @@ public:
   // This is useful for metaprogramming.
   static bool isFixed() { return true; }
 
-  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const override;
-
   /// Whether this type is known to be empty.
   bool isKnownEmpty(ResilienceExpansion expansion) const {
     return (isFixedSize(expansion) && getFixedSize().isZero());

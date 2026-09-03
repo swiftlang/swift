@@ -382,6 +382,12 @@ public:
                        elementTI.isABIAccessible())
   {
   }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
   
   unsigned getExplosionSize() const override {
     return Element.getExplosionSize() * ArraySize;
@@ -510,6 +516,13 @@ public:
                        elementTI.isABIAccessible())
   {
   }
+
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 };
 
 // NOTE: This does not simply use WitnessSizedTypeInfo in order to avoid
@@ -521,6 +534,15 @@ class NonFixedArrayTypeInfo final
                              TypeInfo> {
   using super = ArrayTypeInfoBase<IndirectTypeInfo<NonFixedArrayTypeInfo, TypeInfo>,
                                   TypeInfo>;
+
+public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
+private:
   
   llvm::Value *getArraySize(IRGenFunction &IGF, SILType T) const override {
     if (auto fixedSize = getFixedArraySize(T)) {

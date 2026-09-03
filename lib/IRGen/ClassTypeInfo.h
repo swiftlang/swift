@@ -48,6 +48,12 @@ class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
                              bool forBackwardDeployment) const;
 
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   ClassTypeInfo(llvm::PointerType *irType, Size size, SpareBitVector spareBits,
                 Alignment align, ClassDecl *theClass,
                 ReferenceCounting refcount, llvm::StructType *classLayoutType)
