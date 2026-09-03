@@ -423,6 +423,11 @@ public:
   /// Emit names of struct stored properties and enum cases.
   unsigned EnableReflectionNames : 1;
 
+  /// Omit the Objective-C ivar list of Swift classes that cannot need it,
+  /// i.e. classes with a Swift-only superclass hierarchy and a fixed metadata
+  /// layout.
+  unsigned DisableObjCIvarMetadata : 1;
+
   unsigned DisableLLVMMergeFunctions : 1;
 
   /// Emit mangled names of anonymous context descriptors.
@@ -667,7 +672,8 @@ public:
         SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
         HasValueNamesSetting(false), ValueNames(false),
         ReflectionMetadata(ReflectionMetadataMode::Runtime),
-        EnableReflectionNames(true), DisableLLVMMergeFunctions(false),
+        EnableReflectionNames(true), DisableObjCIvarMetadata(false),
+        DisableLLVMMergeFunctions(false),
         EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
         LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false),
