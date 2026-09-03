@@ -1565,7 +1565,7 @@ bool IsPatternInitialization::tryEmitNoncopyablePatternMatch(
   // to bind.
   SGF.B.setInsertionPoint(contBB);
   ManagedValue payload;
-  if (targetTL.isAddressOnly()) {
+  if (!targetTL.isLoadableOrOpaque(SGF.F)) {
     payload = SGF.emitManagedBufferWithCleanup(destAddr, targetTL);
   } else {
     payload = SGF.emitManagedRValueWithCleanup(
