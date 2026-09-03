@@ -38,37 +38,24 @@ import SwiftShims
 //    check once `Element` is concretely known at a specialized call site)
 //    to reuse the same memcmp-based fast path as `==`.
 //
+// Each operator has a single implementation, with the `UInt8` case handled
+// by a runtime branch inside it rather than a second, more specific
+// extension: Swift's witness selection for `Equatable`/`Comparable`'s
+// operator requirements does not reliably prefer a more-constrained sibling
+// extension over a generic one on the same concrete type, so splitting
+// these into two competing extensions doesn't reliably dispatch to the
+// specialized one anyway.
+//
 // Getting actual *data* out of `.small` storage fast for single-byte
 // elements (as opposed to just picking a fast comparison algorithm once the
 // data is already in hand) is handled inside `withCharacterData` itself
-// (UncheckedString.swift), not here -- see the comment there for why that
-// has to be the one and only implementation of that method, rather than a
-// second `Element == UInt8`-constrained sibling.
-//
-// Important: earlier revisions of this file tried a *two-tier* design for
-// `==`/`<`/`hash(into:)` themselves -- this same generic implementation,
-// plus an *additional*, more specific `extension UncheckedString where
-// Element == UInt8` overload of each operator. Unlike `withCharacterData`
-// (a single protocol-required method with, correctly, a single
-// implementation), `==`/`<`/`hash(into:)`'s witnesses would have been two
-// competing extensions *on the same concrete generic type*
-// (`UncheckedString`), and empirically (verified by instrumenting both
-// candidates and observing which one actually ran), Swift's witness
-// selection for `Equatable`/`Comparable`'s operator requirements does not
-// reliably prefer the more constrained sibling in that situation -- it kept
-// choosing the generic one regardless. Hence a single implementation per
-// operator, with the `Element.self == UInt8.self` runtime branch doing the
-// specialization *inside* one function instead of via a second competing
-// extension.
+// (UncheckedString.swift), not here.
 //
 // `UncheckedSubString` gets the identical trio below, for the identical
 // reason (its own conformances also come only from `UncheckedStringProtocol`'s
-// generic default otherwise). Unlike `withCharacterData`,
-// `UncheckedSubString.withCharacterData` doesn't need its own duplicate here:
-// it just forwards to `base.withCharacterData` (UncheckedString.swift), and
-// since *that* is fast for single-byte elements regardless of the calling
-// context (see the comment there), so is everything built on top of it --
-// including these three, and including callers other than these three.
+// generic default otherwise). Its `withCharacterData` just forwards to
+// `base.withCharacterData`, so it doesn't need its own duplicate of that
+// method's fast path.
 
 @available(SwiftStdlib 9999, *)
 extension UncheckedString {

@@ -152,41 +152,6 @@ extension SmallUncheckedStringStorage {
   }
 }
 
-// `RangeReplaceableCollection`'s own default implementations of `+=`, `+`,
-// `append`, `insert`, `remove`, and `removeAll` are unconditionally
-// available (no `@available` gate at all). Since this extension's
-// overrides of them are gated at `SwiftStdlib 9999` (like everything else
-// in this feature -- `UncheckedString` doesn't exist before then), the
-// constraint solver treats these overrides as strictly *less* available
-// than those defaults, and at any concretely-typed call site it
-// disqualifies/deprioritizes the less-available choice regardless of
-// specificity. Confirmed with `-Xfrontend -debug-constraints`, which shows
-// e.g. `(skipping unavailable disjunction choice ... UncheckedString
-// extension.removeAll ...)`, even though normal overload ranking
-// (`CSRanking.cpp`) otherwise correctly prefers a concrete override over a
-// protocol-extension default.
-//
-// Tried and reverted: gating this extension at `StdlibDeploymentTarget
-// 9999` (or a real, finite `StdlibDeploymentTarget` version below it, e.g.
-// `6.4`) instead of `SwiftStdlib 9999`, on the theory that
-// `StdlibDeploymentTarget`'s "collapses to the current deployment target in
-// development builds" behavior would remove the asymmetry without
-// affecting release builds. `StdlibDeploymentTarget 9999` didn't change
-// anything (`AddSwiftStdlib.cmake`'s macro generation explicitly excludes
-// the literal version `9999` from ever being downgraded -- confirmed via
-// the actual generated `-define-availability` response file). A real
-// finite version (`6.4`, which *does* get downgraded, to this build's
-// actual `STDLIB_DEPLOYMENT_VERSION` of macOS 13.0) does remove the
-// asymmetry for this extension specifically, but can't be applied to
-// `UncheckedString`/`UncheckedSubString`/`UncheckedStringProtocol`
-// themselves (a member can't be gated less restrictively than its
-// enclosing type) without breaking their use of `Span` (via
-// `withCharacterData`), which has a real, undowngraded macOS 26.0
-// requirement -- above this build's macOS 13.0 deployment floor. Left at
-// `SwiftStdlib 9999` pending investigation of whether the constraint
-// solver's "use of an unavailable declaration" scoring should itself treat
-// `9999` as available in non-strict-availability (development) builds, the
-// same way the hard-error diagnostic path already does.
 @available(SwiftStdlib 9999, *)
 extension UncheckedString: RangeReplaceableCollection {
 
@@ -247,17 +212,11 @@ extension UncheckedString: RangeReplaceableCollection {
       } else {
         // .small or .immortal
         //
-        // Reserve the final size up front, into a freshly-empty array
-        // (rather than unpacking the small-storage bytes into their own
-        // exactly-sized array first and reserving afterwards), so there's
-        // only ever one allocation total: an exactly-sized initial unpack
-        // followed by `reserveCapacity` to a *larger* size is still two
-        // allocations (the unpack's own, immediately superseded by the
-        // reserve's regrow-and-copy) -- confirmed by sampling this path,
-        // which showed most of its time in `_consumeAndCreateNew`
-        // releasing that discarded first buffer. Appending into a
-        // pre-reserved empty array instead means the unpack itself never
-        // allocates its own buffer.
+        // Reserve the final size up front, into a freshly-empty array,
+        // rather than unpacking the small-storage bytes into their own
+        // exactly-sized array first and reserving afterwards -- that would
+        // allocate twice, since the reserve would immediately regrow and
+        // copy past the exactly-sized first buffer.
         var chars = [Element]()
         chars.reserveCapacity(finalCount + 1)
         withCharacterData { data in
@@ -507,22 +466,6 @@ extension UncheckedString: RangeReplaceableCollection {
 
 }
 
-// `+`/`+=` are the operators that originally surfaced the issue described
-// in the comment above `extension UncheckedString: RangeReplaceableCollection`
-// further up in this file: `swift-frontend -emit-sil` on a call site with
-// both operands statically typed as `UncheckedString<UInt8>` showed the
-// call resolving to `RangeReplaceableCollection`'s generic `+=`
-// (`function_ref static RangeReplaceableCollection.+= infix<A>(_:_:)`),
-// never to the concrete overload below -- even though `Array`'s own
-// `+=`/`+` overrides in Array.swift (which carry no availability
-// annotation at all, since `Array` needs none) follow this exact same
-// pattern successfully. `-Xfrontend -debug-constraints` traced this to the
-// asymmetric availability itself: the constraint solver
-// disqualifies/deprioritizes an `@available`-gated override in favor of an
-// ungated protocol-extension default, regardless of specificity. See that
-// same comment for why `StdlibDeploymentTarget` doesn't fix this for
-// `UncheckedString` itself, and why this is left at `SwiftStdlib 9999` for
-// now.
 @available(SwiftStdlib 9999, *)
 extension UncheckedString {
   /// Concatenates two `UncheckedString` values.
@@ -556,8 +499,6 @@ extension UncheckedString {
   }
 }
 
-// See the comment above `extension UncheckedString: RangeReplaceableCollection`
-// further up in this file re: `SwiftStdlib 9999` vs `StdlibDeploymentTarget`.
 @available(SwiftStdlib 9999, *)
 extension UncheckedSubString: RangeReplaceableCollection {
 
