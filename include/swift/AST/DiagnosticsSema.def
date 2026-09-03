@@ -869,6 +869,8 @@ ERROR(sema_no_import,Fatal,
       "no such module '%0'", (StringRef))
 NOTE(did_you_mean_cxxstdlib,none,
       "did you mean 'CxxStdlib'?'", ())
+NOTE(sema_no_import_case_mismatch,none,
+     "did you mean %0?", (Identifier))
 ERROR(sema_no_import_target,Fatal,
       "could not find module '%0' for target '%1'; "
       "found: %2, at: %3", (StringRef, StringRef, StringRef, StringRef))
