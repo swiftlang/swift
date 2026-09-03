@@ -566,8 +566,13 @@ public:
   /// content. Delegates to clang for everything except construction of the
   /// replica.
   ///
+  /// \param cached If true, the emitted PCH is also published in the in-memory
+  /// module cache shared with the ClangImporter's CompilerInstance. This is
+  /// required whenever that instance is going to import the PCH afterwards.
+  ///
   /// \sa clang::GeneratePCHAction
-  bool emitBridgingPCH(StringRef headerPath, StringRef outputPCHPath);
+  bool emitBridgingPCH(StringRef headerPath, StringRef outputPCHPath,
+                       bool cached);
 
   /// Returns true if a clang CompilerInstance can successfully read in a PCH,
   /// assuming it exists, with the current options. This can be used to find out
@@ -740,7 +745,7 @@ public:
 
   std::optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
-                 StringRef SwiftPCHHash);
+                 StringRef SwiftPCHHash, bool Cached);
   std::optional<std::string>
   /// \param isExplicit true if the PCH filename was passed directly
   /// with -import-objc-header option.
