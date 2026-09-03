@@ -789,6 +789,13 @@ public:
                              sendableDependentType, calledOnceDependentType, lifetimeDependencies);
   }
 
+  [[nodiscard]] ASTExtInfoBuilder
+  withCalledOnceDependentType(Type calledOnceDependentType) const {
+    return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
+                             sendableDependentType, calledOnceDependentType,
+                             lifetimeDependencies);
+  }
+
   [[nodiscard]]
   ASTExtInfoBuilder withThrows() const {
     return withThrows(true, Type());
@@ -1034,6 +1041,11 @@ public:
   [[nodiscard]]
   ASTExtInfo withSendableDependentType(Type sendableDependentType) const {
     return builder.withSendableDependentType(sendableDependentType).build();
+  }
+
+  [[nodiscard]] ASTExtInfo
+  withCalledOnceDependentType(Type calledOnceDependentType) const {
+    return builder.withCalledOnceDependentType(calledOnceDependentType).build();
   }
 
   [[nodiscard]] ASTExtInfo withSendingResult(bool sending = true) const {

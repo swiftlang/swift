@@ -5074,6 +5074,11 @@ AnyFunctionType *AnyFunctionType::withSendable(bool newValue) const {
   return withExtInfo(info);
 }
 
+AnyFunctionType *AnyFunctionType::withCalledOnce(bool newValue) const {
+  auto info = getExtInfo().intoBuilder().withCalledOnce(newValue).build();
+  return withExtInfo(info);
+}
+
 std::optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
   // A non-throwing function... has no thrown interface type.
   if (!isThrowing())

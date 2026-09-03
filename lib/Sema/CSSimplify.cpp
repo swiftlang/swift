@@ -2965,6 +2965,59 @@ ConstraintSystem::SolutionKind ConstraintSystem::matchFunctionSendability(
   return SolutionKind::Solved;
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::matchFunctionExecutionSemantics(
+    FunctionType *func1, FunctionType *func2, ConstraintKind kind,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *constraint = Constraint::create(*this, kind, func1, func2,
+                                            getConstraintLocator(locator));
+      addUnsolvedConstraint(constraint);
+      return SolutionKind::Solved;
+    }
+    return SolutionKind::Unsolved;
+  };
+
+  // First check to see if we have any @called(once) dependent function types,
+  // if any of them still have unresolved type variables we need to wait until
+  // they're fully resolved.
+  auto dep1 = func1->getCalledOnceDependentType();
+  if (dep1) {
+    dep1 = simplifyType(dep1);
+    if (dep1->hasTypeVariable())
+      return formUnsolved();
+  }
+  auto dep2 = func2->getCalledOnceDependentType();
+  if (dep2) {
+    dep2 = simplifyType(dep2);
+    if (dep2->hasTypeVariable())
+      return formUnsolved();
+  }
+
+  // Sendability is given by either the sendability of the dependent type if
+  // present, otherwise it's given by the function itself.
+  auto func1CalledOnce = dep1 ? dep1->isNoncopyable() : func1->isCalledOnce();
+  auto func2CalledOnce = dep2 ? dep2->isNoncopyable() : func2->isCalledOnce();
+
+  if (func1CalledOnce != func2CalledOnce) {
+    if (func1CalledOnce || kind < ConstraintKind::Subtype) {
+      if (!shouldAttemptFixes())
+        return SolutionKind::Error;
+
+      auto *fix = ExecutionSemanticsMismatch::create(
+          *this, func1, func2, getConstraintLocator(locator));
+      if (recordFix(fix, FixImpact::FunctionTypeMismatch))
+        return SolutionKind::Error;
+    }
+
+    increaseScore(SK_FunctionConversion, locator);
+  }
+
+  return SolutionKind::Solved;
+}
+
 static bool isWitnessMatching(ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   (void) locator.getLocatorParts(path);
@@ -3223,10 +3276,15 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
-  // If the locator is for a @Sendable match, that's all we want to do.
+  // If the locator is for a @Sendable or execution semantics match, that's all
+  // we want to do.
   if (auto last = locator.last()) {
     if (last->is<LocatorPathElt::FunctionSendability>())
       return matchFunctionSendability(func1, func2, kind, flags, locator);
+
+    if (last->is<LocatorPathElt::FunctionExecutionSemantics>())
+      return matchFunctionExecutionSemantics(func1, func2, kind, flags,
+                                             locator);
   }
 
   // Match the 'throws' effect.
@@ -3261,19 +3319,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       increaseScore(SK_SyncInAsync, locator);
   }
 
-  if (func1->isCalledOnce() != func2->isCalledOnce()) {
-    if (func1->isCalledOnce() || kind < ConstraintKind::Subtype) {
-      if (!shouldAttemptFixes())
-        return SolutionKind::Error;
-
-      auto *fix = ExecutionSemanticsMismatch::create(
-          *this, func1, func2, getConstraintLocator(locator));
-      if (recordFix(fix, FixImpact::FunctionTypeMismatch))
-        return SolutionKind::Error;
-    }
-
-    increaseScore(SK_FunctionConversion, locator);
-  }
+  auto execResult = matchFunctionExecutionSemantics(
+      func1, func2, kind, TMF_GenerateConstraints,
+      locator.withPathElement(ConstraintLocator::FunctionExecutionSemantics));
+  if (execResult == SolutionKind::Error)
+    return execResult;
 
   // Match @Sendable.
   auto sendableResult = matchFunctionSendability(
