@@ -194,13 +194,22 @@ private struct Uses {
   // Exit blocks of the load/copy_value's liverange which don't have a destroy.
   // Those are successor blocks of terminators, like `switch_enum`, which do _not_ forward the value.
   // E.g. the none-case of a switch_enum of an Optional.
-  private(set) var nonDestroyingLiverangeExits: Stack<Instruction>
+  // Note: we cannot just store the first instruction of a basic block, because that might get deleted
+  //       before we use the results of `nonDestroyingLiverangeExitBlocks`.
+  private(set) var nonDestroyingLiverangeExitBlocks: Stack<BasicBlock>
+
+  // Forwarding instructions which end the lifetime without a destroy, e.g. an `unchecked_enum_data`
+  // which extracts a trivial payload out of a non-trivial enum.
+  // Note: we cannot just store the next instruction after the forwarding instruction (which we eventually
+  //       need) because that might get deleted before we use the results of `nonDestroyingForwardingEnds`.
+  private(set) var nonDestroyingForwardingEnds: Stack<ForwardingInstruction>
 
   init(_ context: FunctionPassContext) {
     self.context = context
     self.forwardingUses = Stack(context)
     self.destroys = Stack(context)
-    self.nonDestroyingLiverangeExits = Stack(context)
+    self.nonDestroyingLiverangeExitBlocks = Stack(context)
+    self.nonDestroyingForwardingEnds = Stack(context)
   }
 
   mutating func collectUses(of initialValue: SingleValueInstruction) -> Bool {
@@ -287,20 +296,21 @@ private struct Uses {
       // A terminator instruction can implicitly end the lifetime of its operand in a success block,
       // e.g. a `switch_enum` with a non-payload case block. Such success blocks need an `end_borrow`, though.
       for succ in termInst.successors where !succ.arguments.contains(where: {$0.ownership == .owned}) {
-        nonDestroyingLiverangeExits.append(succ.instructions.first!)
+        nonDestroyingLiverangeExitBlocks.append(succ)
       }
     } else if !forwardingInst.forwardedResults.contains(where: { $0.ownership == .owned }) {
       // The forwarding instruction has no owned result, which means it ends the lifetime of its owned operand.
       // This can happen with an `unchecked_enum_data` which extracts a trivial payload out of a
       // non-trivial enum.
-      nonDestroyingLiverangeExits.append(forwardingInst.next!)
+      nonDestroyingForwardingEnds.append(forwardingInst)
     }
   }
 
   mutating func deinitialize() {
     forwardingUses.deinitialize()
     destroys.deinitialize()
-    nonDestroyingLiverangeExits.deinitialize()
+    nonDestroyingLiverangeExitBlocks.deinitialize()
+    nonDestroyingForwardingEnds.deinitialize()
   }
 }
 
@@ -483,7 +493,12 @@ private func createEndBorrows(for beginBorrow: Value,
 
   var allLifetimeEndingInstructions = InstructionWorklist(context)
   allLifetimeEndingInstructions.pushIfNotVisited(contentsOf: collectedUses.destroys.lazy.map { $0 })
-  allLifetimeEndingInstructions.pushIfNotVisited(contentsOf: collectedUses.nonDestroyingLiverangeExits)
+  allLifetimeEndingInstructions.pushIfNotVisited(contentsOf: collectedUses.nonDestroyingLiverangeExitBlocks.lazy.map {
+    $0.instructions.first!
+  })
+  allLifetimeEndingInstructions.pushIfNotVisited(contentsOf: collectedUses.nonDestroyingForwardingEnds.lazy.map {
+    $0.next!
+  })
 
   defer {
     allLifetimeEndingInstructions.deinitialize()

@@ -133,6 +133,8 @@ class ClassLet {
   @_hasStorage var aVar: Klass
   @_hasStorage let aLetTuple: (Klass, Klass)
   @_hasStorage let anOptionalLet: FakeOptional<Klass>
+  @_hasStorage let aTupleWithOptional: (Klass, FakeOptional<Klass>)
+  @_hasStorage let aMultiPayloadTuple: (Klass, MultiPayload)
 
   @_hasStorage let anotherLet: ClassLet
 }
@@ -2735,5 +2737,57 @@ bb0(%0 : @owned $C):
   store %1 to [init] %2
   destroy_value [dead_end] %0
   unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @end_borrow_at_begin_of_non_destroying_liverange_exit :
+// CHECK:         [[OUTER:%.*]] = begin_borrow %0
+// CHECK:         [[INNER:%.*]] = load_borrow
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-LABEL: } // end sil function 'end_borrow_at_begin_of_non_destroying_liverange_exit'
+sil [ossa] @end_borrow_at_begin_of_non_destroying_liverange_exit : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%0 : @owned $ClassLet):
+  %1 = begin_borrow %0 : $ClassLet
+  %2 = ref_element_addr [immutable] %1 : $ClassLet, #ClassLet.aTupleWithOptional
+  %3 = load [copy] %2 : $*(Klass, FakeOptional<Klass>)
+  (%4, %5) = destructure_tuple %3 : $(Klass, FakeOptional<Klass>)
+  switch_enum %5 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%6 : @owned $Klass):
+  destroy_value %6 : $Klass
+  destroy_value %4 : $Klass
+  end_borrow %1 : $ClassLet
+  br bb3
+
+bb2:
+  end_borrow %1 : $ClassLet
+  destroy_value %4 : $Klass
+  br bb3
+
+bb3:
+  destroy_value %0 : $ClassLet
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @end_borrow_after_non_destroying_forwarding_end :
+// CHECK:         [[OUTER:%.*]] = begin_borrow %0
+// CHECK:         [[INNER:%.*]] = load_borrow
+// CHECK:         end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-LABEL: } // end sil function 'end_borrow_after_non_destroying_forwarding_end'
+sil [ossa] @end_borrow_after_non_destroying_forwarding_end : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%0 : @owned $ClassLet):
+  %1 = begin_borrow %0 : $ClassLet
+  %2 = ref_element_addr [immutable] %1 : $ClassLet, #ClassLet.aMultiPayloadTuple
+  %3 = load [copy] %2 : $*(Klass, MultiPayload)
+  (%4, %5) = destructure_tuple %3 : $(Klass, MultiPayload)
+  %6 = unchecked_enum_data %5 : $MultiPayload, #MultiPayload.b!enumelt
+  end_borrow %1 : $ClassLet
+  destroy_value %4 : $Klass
+  destroy_value %0 : $ClassLet
+  %r = tuple ()
+  return %r : $()
 }
 
