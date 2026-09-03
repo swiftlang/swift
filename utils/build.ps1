@@ -2941,7 +2941,7 @@ function Get-CompilersDefines([Hashtable] $Platform,
     SWIFT_ENABLE_SYNCHRONIZATION = "YES";
     SWIFT_ENABLE_VOLATILE = "YES";
     SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
-    SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
+    SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-string-processing";
     SWIFT_PATH_TO_SWIFT_SDK = $SwiftSDK;
     SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
     SWIFT_STDLIB_ASSERTIONS = "NO";

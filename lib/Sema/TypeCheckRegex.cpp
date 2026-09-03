@@ -57,7 +57,7 @@ static bool decodeRegexCaptureTypes(ASTContext &ctx,
   // 〚`(T0, T1, ...)` (top level)〛 ==> 〚`T0`〛, 〚`T1`〛, ...
   // 〚`(T0, T1, ...)`〛 ==> .beginTuple, 〚`T0`〛, 〚`T1`〛, ..., .endTuple
   //
-  // For details, see apple/swift-experimental-string-processing.
+  // For details, see swiftlang/swift-string-processing.
   using Version = CaptureStructureSerializationVersion;
   static const Version implVersion = 1;
   unsigned size = serialization.size();

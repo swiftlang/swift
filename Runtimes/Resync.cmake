@@ -216,7 +216,7 @@ copy_files(public/Platform Overlay/Windows/CRT
 
 if(NOT DEFINED StringProcessing_ROOT_DIR)
   find_path(StringProcessing_ROOT_DIR
-    "swift-experimental-string-processing/Package.swift"
+    "swift-string-processing/Package.swift"
     HINTS "${CMAKE_CURRENT_LIST_DIR}/../../")
 endif()
 message(STATUS "String Processing Root: ${StringProcessing_ROOT_DIR}")
@@ -232,13 +232,13 @@ copy_library_sources("" "public/RuntimeModule" "Supplemental/Runtime")
 copy_library_sources("" "public/libexec/swift-backtrace" "Supplemental/StackWalker")
 
 copy_library_sources(_RegexParser "Sources" "Supplemental/StringProcessing"
-  ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
+  ROOT "${StringProcessing_ROOT_DIR}/swift-string-processing")
 copy_library_sources(_StringProcessing "Sources" "Supplemental/StringProcessing"
-  ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
+  ROOT "${StringProcessing_ROOT_DIR}/swift-string-processing")
 copy_library_sources(_CUnicode "Sources" "Supplemental/StringProcessing/_StringProcessing"
-  ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
+  ROOT "${StringProcessing_ROOT_DIR}/swift-string-processing")
 copy_library_sources(RegexBuilder "Sources" "Supplemental/StringProcessing"
-  ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
+  ROOT "${StringProcessing_ROOT_DIR}/swift-string-processing")
 
 copy_library_sources("linker-support" "" "Supplemental/Differentiation")
 copy_library_sources(include "" "Supplemental/Distributed")
