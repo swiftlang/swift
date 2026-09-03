@@ -211,10 +211,10 @@ NOTE(mark_safe_to_import, none, "annotate method '%0' with SWIFT_RETURNS_INDEPEN
                                 "make it available in Swift",
      (StringRef))
 
-NOTE(cxx_unsafe_decl_reason, none, "%0 is unsafe because %1",
-     (const ValueDecl *, StringRef))
-NOTE(cxx_unsafe_type_reason, none, "%0 is unsafe because %1",
-     (Type, StringRef))
+NOTE(cxx_unsafe_decl_reason, none, "'%0' is unsafe because %1",
+     (StringRef, StringRef))
+NOTE(cxx_unsafe_type_reason, none, "type '%0' is unsafe because %1",
+     (StringRef, StringRef))
 
 NOTE(at_to_subscript, none, "do you want to replace it with a call "
                             "to the subscript operator?",

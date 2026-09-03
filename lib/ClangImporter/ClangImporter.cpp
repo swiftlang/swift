@@ -8065,28 +8065,45 @@ bool ClangImporter::isUnsafeCXXMethod(const FuncDecl *func) {
 
 void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
                                               SourceLoc useLoc) {
-  if (!decl || !decl->hasClangNode())
+  // A declaration: explain which rule made this method unsafe.
+  if (decl && decl->hasClangNode()) {
+    if (auto *method = dyn_cast_or_null<clang::CXXMethodDecl>(
+            decl->getClangNode().getAsDecl())) {
+      // An annotation written in the header speaks for itself. Do not
+      // paraphrase it, and never let a heuristic explain a decision the
+      // heuristic did not make.
+      if (importer::hasSwiftAttribute(method, {"unsafe", "unsafe(always)"}))
+        return;
+
+      if (auto reason = importer::shouldRenameCXXMethodAsUnsafe(
+              method, Impl.SwiftContext)) {
+        Impl.diagnose(HeaderLoc(method->getLocation(), useLoc),
+                      diag::cxx_unsafe_decl_reason, method->getNameAsString(),
+                      importer::describe(*reason));
+        return;
+      }
+    }
+  }
+
+  // A type: explain which part of the record is responsible.
+  if (!type)
+    return;
+  auto *nominal = type->getAnyNominal();
+  if (!nominal || !nominal->hasClangNode())
+    return;
+  auto *recordDecl =
+      dyn_cast_or_null<clang::RecordDecl>(nominal->getClangNode().getAsDecl());
+  if (!recordDecl)
+    return;
+  if (importer::hasSwiftAttributeOnAnyRedecl(recordDecl,
+                                             {"unsafe", "unsafe(always)"}))
     return;
 
-  auto *method =
-      dyn_cast_or_null<clang::CXXMethodDecl>(decl->getClangNode().getAsDecl());
-  if (!method)
-    return;
-
-  // An annotation written in the header speaks for itself. Do not paraphrase
-  // it, and never let a heuristic explain a decision the heuristic did not
-  // make.
-  if (importer::hasSwiftAttribute(method, {"unsafe", "unsafe(always)"}))
-    return;
-
-  auto reason =
-      importer::shouldRenameCXXMethodAsUnsafe(method, Impl.SwiftContext);
-  if (!reason)
-    return;
-
-  Impl.diagnose(HeaderLoc(method->getLocation(), useLoc),
-                diag::cxx_unsafe_decl_reason, decl,
-                importer::describe(*reason));
+  if (auto unsafe =
+          importer::explainRecordUnsafety(recordDecl, Impl.SwiftContext))
+    Impl.diagnose(HeaderLoc(recordDecl->getLocation(), useLoc),
+                  diag::cxx_unsafe_type_reason, recordDecl->getNameAsString(),
+                  importer::describe(unsafe->reason, unsafe->culprit));
 }
 
 bool ClangImporter::isAnnotatedWith(const clang::CXXMethodDecl *method,
@@ -8806,8 +8823,27 @@ SourceLoc swift::extractNearestSourceLoc(ClangDeclExplicitSafetyDescriptor desc)
   return SourceLoc();
 }
 
-ExplicitSafety ClangDeclExplicitSafety::evaluate(
-    Evaluator &evaluator, ClangDeclExplicitSafetyDescriptor desc) const {
+/// A safety verdict, with the reason behind it when it is Unsafe.
+struct SafetyResult {
+  ExplicitSafety safety;
+  std::optional<importer::CxxUnsafetyExplanation> unsafe;
+};
+
+/// The shared implementation of ClangDeclExplicitSafety.
+///
+/// Deriving the reason here, rather than in a parallel walk, is what keeps an
+/// explanation from contradicting the verdict it explains.
+static SafetyResult
+computeClangDeclExplicitSafety(Evaluator &evaluator,
+                               ClangDeclExplicitSafetyDescriptor desc) {
+  auto unsafeBecause = [](importer::CxxUnsafetyReason reason,
+                          const clang::NamedDecl *blame) {
+    return SafetyResult{ExplicitSafety::Unsafe,
+                        importer::CxxUnsafetyExplanation{reason, blame}};
+  };
+  auto verdict = [](ExplicitSafety safety) {
+    return SafetyResult{safety, std::nullopt};
+  };
   // FIXME: Also similar to hasPointerInSubobjects
 
   // Clang record types are considered explicitly unsafe if any of their fields,
@@ -8862,7 +8898,8 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
     };
 
     if (hasAttrs({"unsafe", "unsafe(always)"}))
-      return ExplicitSafety::Unsafe;
+      return unsafeBecause(importer::CxxUnsafetyReason::ExplicitAnnotation,
+                           dyn_cast<clang::NamedDecl>(decl));
 
     if (hasAttrs({"safe"}))
       continue;
@@ -8897,7 +8934,7 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
     if (!recordDecl) {
       if (decl == desc.decl)
         // If desc.decl is not a RecordDecl or EnumDecl, safety is unspecified.
-        return ExplicitSafety::Unspecified;
+        return verdict(ExplicitSafety::Unspecified);
       // If we encountered non-Record non-Enum decl during recursive traversal,
       // we need to continue checking safety of other decls.
       continue;
@@ -8916,7 +8953,8 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
       // with more complex lifetime dependencies are imported as unsafe.
       if (importer::isDirectViewType(recordDecl->getTypeForDecl(), evaluator))
         continue;
-      return ExplicitSafety::Unsafe;
+      return unsafeBecause(importer::CxxUnsafetyReason::IndirectView,
+                           recordDecl);
     case CxxEscapability::Unknown:
       // Fall through to the field/base and template-argument checks below.
       break;
@@ -8930,13 +8968,17 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
         switch (arg.getKind()) {
         case clang::TemplateArgument::Type:
           if (isUnsafe(arg.getAsType()))
-            return ExplicitSafety::Unsafe;
+            return unsafeBecause(
+                importer::CxxUnsafetyReason::UnsafeTemplateArgument,
+                arg.getAsType()->getAsRecordDecl());
           break;
         case clang::TemplateArgument::Pack:
           for (auto pkArg : arg.getPackAsArray()) {
             if (pkArg.getKind() == clang::TemplateArgument::Type &&
                 isUnsafe(pkArg.getAsType()))
-              return ExplicitSafety::Unsafe;
+              return unsafeBecause(
+                  importer::CxxUnsafetyReason::UnsafeTemplateArgument,
+                  pkArg.getAsType()->getAsRecordDecl());
           }
           break;
         default:
@@ -8949,7 +8991,7 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
     if (!recordDecl) {
       if (decl == desc.decl)
         // If desc.decl doesn't have a definition, safety is unspecified.
-        return ExplicitSafety::Unspecified;
+        return verdict(ExplicitSafety::Unspecified);
       // If we encountered decl without definition during recursive traversal,
       // we need to continue checking safety of other decls.
       continue;
@@ -8958,13 +9000,14 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
     if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
       for (auto base : cxxRecordDecl->bases()) {
         if (isUnsafe(base.getType()))
-          return ExplicitSafety::Unsafe;
+          return unsafeBecause(importer::CxxUnsafetyReason::UnsafeBase,
+                               base.getType()->getAsRecordDecl());
       }
     }
 
     for (auto *field : recordDecl->fields()) {
       if (isUnsafe(field->getType()))
-        return ExplicitSafety::Unsafe;
+        return unsafeBecause(importer::CxxUnsafetyReason::UnsafeField, field);
     }
   }
 
@@ -8972,7 +9015,21 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
   // reachable from desc.decl are considered unsafe either. Cases where we would
   // consider desc.decl's safety unspecified should have returned early from the
   // loop. Thus, we can conclude that desc.decl is safe.
-  return ExplicitSafety::Safe;
+  return verdict(ExplicitSafety::Safe);
+}
+
+ExplicitSafety ClangDeclExplicitSafety::evaluate(
+    Evaluator &evaluator, ClangDeclExplicitSafetyDescriptor desc) const {
+  return computeClangDeclExplicitSafety(evaluator, desc).safety;
+}
+
+std::optional<importer::CxxUnsafetyExplanation>
+importer::explainRecordUnsafety(const clang::RecordDecl *recordDecl,
+                                ASTContext &ctx) {
+  return computeClangDeclExplicitSafety(
+             ctx.evaluator,
+             ClangDeclExplicitSafetyDescriptor(recordDecl, /*isClass=*/false))
+      .unsafe;
 }
 
 bool ClangDeclExplicitSafety::isCached() const {

@@ -27,7 +27,16 @@ bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, {"import_reference"});
 }
 
-StringRef importer::describe(CxxUnsafetyReason reason) {
+std::string importer::describe(CxxUnsafetyReason reason,
+                               const clang::NamedDecl *culprit) {
+  // Reasons that name something fall back to wording without a name, so no
+  // caller has to check whether there is one.
+  auto named = [&](StringRef withName, StringRef withoutName) {
+    if (!culprit)
+      return withoutName.str();
+    return (withName + " '" + culprit->getName() + "'").str();
+  };
+
   switch (reason) {
   case CxxUnsafetyReason::IteratorFromBeginEnd:
     return "'begin' and 'end' are assumed to return iterators, which do not "
@@ -43,6 +52,22 @@ StringRef importer::describe(CxxUnsafetyReason reason) {
            "alive";
   case CxxUnsafetyReason::ViewProjection:
     return "it returns a view into a type that owns its storage";
+
+  case CxxUnsafetyReason::UnsafeField:
+    return named("it has an unsafe field", "it has an unsafe field");
+  case CxxUnsafetyReason::UnsafeBase:
+    return named("it has an unsafe base class", "it has an unsafe base class");
+  case CxxUnsafetyReason::UnsafeTemplateArgument:
+    return named("it has an unsafe template argument",
+                 "it has an unsafe template argument");
+  case CxxUnsafetyReason::ExplicitAnnotation:
+    return culprit ? (llvm::Twine("'") + culprit->getName() +
+                      "' is annotated unsafe in C++")
+                         .str()
+                   : std::string("it is annotated unsafe in C++");
+  case CxxUnsafetyReason::IndirectView:
+    return "it is a non-escapable view whose lifetime dependency Swift cannot "
+           "track";
   }
   llvm_unreachable("covered switch");
 }

@@ -2397,6 +2397,13 @@ bool isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx);
 /// derived from \c swift::RefCountedClass).
 bool isSwiftClassType(const clang::CXXRecordDecl *decl);
 
+/// Which part of \p recordDecl made it unsafe, or nothing when it is not.
+///
+/// Shares the ClangDeclExplicitSafety walk rather than repeating it, so the
+/// reason cannot contradict the verdict.
+std::optional<CxxUnsafetyExplanation>
+explainRecordUnsafety(const clang::RecordDecl *recordDecl, ASTContext &ctx);
+
 /// Whether the C++ method \p method can be safely used in Swift, i.e. it is not
 /// a projection that could yield a dangling pointer/reference/iterator. Methods
 /// that are not safe are imported under a \c __<name>Unsafe name and/or marked

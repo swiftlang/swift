@@ -15,6 +15,11 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
+#include <string>
+
+namespace clang {
+class NamedDecl;
+} // end namespace clang
 
 namespace swift::importer {
 
@@ -32,11 +37,33 @@ enum class CxxUnsafetyReason {
   ReturnsIterator,
   /// Returns a view into a type that owns its storage.
   ViewProjection,
+
+  /// A field of the record is unsafe.
+  UnsafeField,
+  /// A base class of the record is unsafe.
+  UnsafeBase,
+  /// A template argument of the record is unsafe.
+  UnsafeTemplateArgument,
+  /// The record carries an explicit unsafe annotation.
+  ExplicitAnnotation,
+  /// A non-escapable view with a lifetime dependency Swift cannot track.
+  IndirectView,
+};
+
+/// Why an entity is unsafe, and what to blame for it.
+struct CxxUnsafetyExplanation {
+  CxxUnsafetyReason reason;
+  /// The declaration to name, or null for reasons that have nothing to name.
+  const clang::NamedDecl *culprit = nullptr;
 };
 
 /// A phrase completing "'x' is unsafe because ...". No leading capital, no
 /// trailing period.
-StringRef describe(CxxUnsafetyReason reason);
+///
+/// Reasons that name a declaration fall back to wording without one when
+/// \p culprit is null, so callers need not check.
+std::string describe(CxxUnsafetyReason reason,
+                     const clang::NamedDecl *culprit = nullptr);
 
 } // end namespace swift::importer
 

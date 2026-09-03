@@ -21,11 +21,12 @@ module Proj {
 
 // The user-declared copy constructor makes Owner self-contained, so returning
 // a pointer out of it is a projection.
+// expected-note@+1 {{type 'Owner' is unsafe because its field 'ptr' is unsafe}}
 struct Owner {
   void *ptr;
   Owner(const Owner &);
 
-  // expected-note@+1 {{is unsafe because it returns a pointer or reference into a type that owns its storage}}
+  // expected-note@+1 {{'data' is unsafe because it returns a pointer or reference into a type that owns its storage}}
   int *data() const;
 };
 
