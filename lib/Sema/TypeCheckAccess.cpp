@@ -17,6 +17,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckDeclInterface.h"
 #include "TypeCheckUnsafe.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -41,33 +42,6 @@ using namespace swift;
 #define DEBUG_TYPE "TypeCheckAccess"
 
 namespace {
-
-/// Calls \p callback for each type in each requirement provided by
-/// \p source.
-static void forAllRequirementTypes(
-    WhereClauseOwner &&source,
-    llvm::function_ref<void(Type, TypeRepr *)> callback) {
-  std::move(source).visitRequirements(TypeResolutionStage::Interface,
-      [&](const Requirement &req, RequirementRepr *reqRepr) {
-    switch (req.getKind()) {
-    case RequirementKind::SameShape:
-    case RequirementKind::Conformance:
-    case RequirementKind::SameType:
-    case RequirementKind::Superclass:
-      callback(req.getFirstType(),
-               RequirementRepr::getFirstTypeRepr(reqRepr));
-      callback(req.getSecondType(),
-               RequirementRepr::getSecondTypeRepr(reqRepr));
-      break;
-
-    case RequirementKind::Layout:
-      callback(req.getFirstType(),
-               RequirementRepr::getFirstTypeRepr(reqRepr));
-      break;
-    }
-    return false;
-  });
-}
 
 /// \see checkTypeAccess
 using CheckTypeAccessCallback =
@@ -112,10 +86,11 @@ protected:
       AccessScope accessScope,
       const DeclContext *useDC,
       llvm::function_ref<CheckTypeAccessCallback> diagnose) {
-    forAllRequirementTypes(std::move(source), [&](Type type, TypeRepr *typeRepr) {
-      checkTypeAccessImpl(type, typeRepr, accessScope, useDC,
-                          /*mayBeInferred*/false, diagnose);
-    });
+    std::move(source).forAllRequirementTypes(
+        [&](Type type, TypeRepr *typeRepr) {
+          checkTypeAccessImpl(type, typeRepr, accessScope, useDC,
+                              /*mayBeInferred*/ false, diagnose);
+        });
   }
 
   void checkAvailabilityDomains(const Decl *D);
@@ -1133,7 +1108,8 @@ public:
       });
     }
 
-    forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
+    WhereClauseOwner(proto).forAllRequirementTypes([&](Type type,
+                                                       TypeRepr *typeRepr) {
       checkTypeAccess(
           type, typeRepr, proto,
           /*mayBeInferred*/ false,
@@ -2203,19 +2179,9 @@ swift::getDisallowedOriginKind(const Decl *decl,
 namespace {
 
 /// Diagnose declarations whose signatures refer to unavailable types.
-class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
+class DeclAvailabilityChecker
+    : public DeclInterfaceTypeChecker<DeclAvailabilityChecker> {
   ExportContext Where;
-
-  void checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
-                 ExportabilityReason reason = ExportabilityReason::General,
-                 DeclAvailabilityFlags flags = std::nullopt) {
-    // Don't bother checking errors.
-    if (type && type->hasError())
-      return;
-
-    diagnoseTypeAvailability(typeRepr, type, context->getLoc(),
-                             Where.withReason(reason), flags);
-  }
 
   /// Identify the AsyncSequence.flatMap set of functions from the
   /// _Concurrency module.
@@ -2236,58 +2202,37 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     return !func->getName().isSimpleName("flatMap");
   }
 
-  void checkGenericParams(const GenericContext *ownerCtx,
-                          const ValueDecl *ownerDecl) {
-    if (!ownerCtx->isGenericContext())
+  void checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
+                 ExportabilityReason reason,
+                 DeclAvailabilityFlags flags = std::nullopt) {
+    // Don't bother checking errors.
+    if (type && type->hasError())
       return;
 
-    if (auto params = ownerCtx->getGenericParams()) {
-      for (auto param : *params) {
-        auto inheritedEntries = param->getInherited().getEntries();
-        if (inheritedEntries.empty())
-          continue;
-        assert(inheritedEntries.size() == 1);
-        auto inherited = inheritedEntries.front();
-        checkType(inherited.getType(), inherited.getTypeRepr(), ownerDecl,
-                  ExportabilityReason::General,
-                  DeclAvailabilityFlag::DisableUnsafeChecking);
-      }
-    }
-
-    if (ownerCtx->getTrailingWhereClause()) {
-      // Ignore the where clause for AsyncSequence.flatMap from the
-      // _Concurrency module. This is an egregious hack to allow us to
-      // use overloading tricks to retain the behavior previously
-      // afforded by rethrowing conformances.
-      if (isAsyncSequenceFlatMap(ownerCtx))
-        return;
-
-      forAllRequirementTypes(WhereClauseOwner(
-                               const_cast<GenericContext *>(ownerCtx)),
-                             [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, ownerDecl,
-                  ExportabilityReason::General,
-                  DeclAvailabilityFlag::DisableUnsafeChecking);
-      });
-    }
+    diagnoseTypeAvailability(typeRepr, type, context->getLoc(),
+                             Where.withReason(reason), flags);
   }
 
 public:
   explicit DeclAvailabilityChecker(ExportContext where)
     : Where(where) {}
 
-  void checkGlobalActor(Decl *D) {
-    auto globalActor = D->getGlobalActorAttr();
-    if (!globalActor)
-      return;
+  void checkType(Type type, const TypeRepr *typeRepr, const Decl *context) {
+    checkType(type, typeRepr, context, ExportabilityReason::General);
+  }
 
-    // Avoid checking the availability for a @MainActor constraint since it does
-    // not carry an inherent ABI impact.
-    if (globalActor->second->isMainActor())
-      return;
+  /// Ignore the where clause for AsyncSequence.flatMap from the
+  /// _Concurrency module. This is an egregious hack to allow us to
+  /// use overloading tricks to retain the behavior previously
+  /// afforded by rethrowing conformances.
+  bool shouldSkipGenericWhereClause(const GenericContext *ownerCtx) {
+    return isAsyncSequenceFlatMap(ownerCtx);
+  }
 
-    auto customAttr = globalActor->first;
-    checkType(customAttr->getType(), customAttr->getTypeRepr(), D);
+  void checkGenericRequirementType(Type type, const TypeRepr *typeRepr,
+                                   const Decl *context) {
+    checkType(type, typeRepr, context, ExportabilityReason::General,
+              DeclAvailabilityFlag::DisableUnsafeChecking);
   }
 
   void checkAttachedMacros(const Decl *D) {
@@ -2303,14 +2248,15 @@ public:
   }
 
   /// Pick the appropriate \c ExportabilityReason for stored properties.
-  ExportabilityReason
-  getVarDeclExportabilityReason(const VarDecl *varDecl) const {
+  static ExportabilityReason
+  getVarDeclExportabilityReason(const ExportContext &where,
+                                const VarDecl *varDecl) {
     // If explicit use library-evolution style reason.
-    if (Where.getExportedLevel() != ExportedLevel::ImplicitlyExported)
+    if (where.getExportedLevel() != ExportedLevel::ImplicitlyExported)
       return ExportabilityReason::PublicVarDecl;
 
     // Reasons specific to classes in non-library-evolution mode or embedded.
-    auto *CD = dyn_cast_or_null<ClassDecl>(Where.getDeclContext()->getAsDecl());
+    auto *CD = dyn_cast_or_null<ClassDecl>(where.getDeclContext()->getAsDecl());
     if (CD) {
       if (CD->getFormalAccess() == AccessLevel::Open)
         return ExportabilityReason::ImplicitlyPublicVarDeclOpenClass;
@@ -2337,6 +2283,22 @@ public:
     }
 
     return ExportabilityReason::ImplicitlyPublicVarDecl;
+  }
+
+  void checkPatternVarType(Type type, const TypeRepr *typeRepr,
+                           const Decl *context, const VarDecl *reasonSource) {
+    checkType(type, typeRepr, context,
+              getVarDeclExportabilityReason(Where, reasonSource));
+  }
+
+  void checkStoredPropertyWrapperType(Type type, const TypeRepr *typeRepr,
+                                      const Decl *context) {
+    checkType(type, typeRepr, context, ExportabilityReason::PropertyWrapper);
+  }
+
+  void checkResultBuilderType(Type type, const TypeRepr *typeRepr,
+                              const Decl *context) {
+    checkType(type, typeRepr, context, ExportabilityReason::ResultBuilder);
   }
 
   void checkAvailabilityDomains(const Decl *D) {
@@ -2385,148 +2347,13 @@ public:
     }
   }
 
-  void visit(Decl *D) {
-    DeclVisitor<DeclAvailabilityChecker>::visit(D);
-    checkGlobalActor(D);
+  void checkAdditional(const Decl *D) {
     checkAttachedMacros(D);
     checkAvailabilityDomains(D);
   }
-  
-  // Force all kinds to be handled at a lower level.
-  void visitDecl(Decl *D) = delete;
-  void visitValueDecl(ValueDecl *D) = delete;
 
-#define UNREACHABLE(KIND, REASON) \
-  void visit##KIND##Decl(KIND##Decl *D) { \
-    llvm_unreachable(REASON); \
-  }
-  UNREACHABLE(Import, "not applicable")
-  UNREACHABLE(TopLevelCode, "not applicable")
-  UNREACHABLE(Module, "not applicable")
-  UNREACHABLE(Missing, "not applicable")
-  UNREACHABLE(Using, "not applicable")
-
-  UNREACHABLE(Param, "handled by the enclosing declaration")
-  UNREACHABLE(GenericTypeParam, "handled by the enclosing declaration")
-  UNREACHABLE(MissingMember, "handled by the enclosing declaration")
-  UNREACHABLE(MacroExpansion, "handled by the enclosing declaration")
-#undef UNREACHABLE
-
-#define UNINTERESTING(KIND) \
-  void visit##KIND##Decl(KIND##Decl *D) {}
-
-  UNINTERESTING(PrefixOperator) // Does not reference other decls.
-  UNINTERESTING(PostfixOperator) // Does not reference other decls.
-  UNINTERESTING(EnumCase) // Handled at the EnumElement level.
-  UNINTERESTING(Destructor) // Always correct.
-  UNINTERESTING(Accessor) // Handled by the Var or Subscript.
-  UNINTERESTING(OpaqueType) // TODO
-
-  // Handled at the PatternBinding level; if the pattern has a simple
-  // "name: TheType" form, we can get better results by diagnosing the TypeRepr.
-  UNINTERESTING(Var)
-
-
-  /// \see visitPatternBindingDecl
-  void checkNamedPattern(const NamedPattern *NP,
-                         const llvm::DenseSet<const VarDecl *> &seenVars) {
-    const VarDecl *theVar = NP->getDecl();
-
-    // Only check the type of individual variables if we didn't check an
-    // enclosing TypedPattern.
-    if (seenVars.count(theVar))
-      return;
-
-    auto reason = getVarDeclExportabilityReason(theVar);
-
-    checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar,
-              reason);
-
-    for (auto attr : theVar->getAttachedPropertyWrappers()) {
-      checkType(attr->getType(), attr->getTypeRepr(), theVar,
-                ExportabilityReason::PropertyWrapper);
-    }
-  }
-
-  /// \see visitPatternBindingDecl
-  void checkTypedPattern(PatternBindingDecl *PBD,
-                         const TypedPattern *TP,
-                         llvm::DenseSet<const VarDecl *> &seenVars) {
-    // FIXME: We need to figure out if this is a stored or computed property,
-    // so we pull out some random VarDecl in the pattern. They're all going to
-    // be the same, but still, ick.
-    const VarDecl *anyVar = nullptr;
-    TP->forEachVariable([&](VarDecl *V) {
-      seenVars.insert(V);
-      anyVar = V;
-    });
-
-    auto reason = getVarDeclExportabilityReason(anyVar);
-
-    checkType(TP->hasType() ? TP->getType() : Type(),
-              TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD,
-              reason);
-
-    // Check the property wrapper types.
-    if (anyVar) {
-      for (auto attr : anyVar->getAttachedPropertyWrappers()) {
-        checkType(attr->getType(), attr->getTypeRepr(), anyVar,
-                  ExportabilityReason::PropertyWrapper);
-      }
-
-      if (auto attr = anyVar->getAttachedResultBuilder()) {
-        checkType(anyVar->getResultBuilderType(),
-                  attr->getTypeRepr(), anyVar,
-                  ExportabilityReason::ResultBuilder);
-      }
-    }
-  }
-
-  void visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    llvm::DenseSet<const VarDecl *> seenVars;
-    for (auto idx : range(PBD->getNumPatternEntries())) {
-      PBD->getPattern(idx)->forEachNode([&](const Pattern *P) {
-        if (auto *NP = dyn_cast<NamedPattern>(P)) {
-          checkNamedPattern(NP, seenVars);
-          return;
-        }
-
-        auto *TP = dyn_cast<TypedPattern>(P);
-        if (!TP)
-          return;
-        checkTypedPattern(PBD, TP, seenVars);
-      });
-      seenVars.clear();
-    }
-  }
-
-  void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    checkGenericParams(TAD, TAD);
-    checkType(TAD->getUnderlyingType(),
-              TAD->getUnderlyingTypeRepr(), TAD);
-  }
-
-  void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
-    for (TypeLoc requirement : assocType->getInherited().getEntries()) {
-      checkType(requirement.getType(), requirement.getTypeRepr(),
-                assocType);
-    }
-    checkType(assocType->getDefaultDefinitionType(),
-              assocType->getDefaultDefinitionTypeRepr(), assocType);
-
-    if (assocType->getTrailingWhereClause()) {
-      forAllRequirementTypes(assocType,
-                             [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, assocType,
-                  ExportabilityReason::General,
-                  DeclAvailabilityFlag::DisableUnsafeChecking);
-      });
-    }
-  }
-
-  void visitNominalTypeDecl(const NominalTypeDecl *nominal) {
-    checkGenericParams(nominal, nominal);
-
+  void checkNominalInheritedType(const NominalTypeDecl *nominal,
+                                 TypeLoc inherited) {
     DeclAvailabilityFlags flags =
         DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
 
@@ -2547,106 +2374,39 @@ public:
       Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
         ExportabilityReason::ImplicitlyPublicInheritance :
         ExportabilityReason::Inheritance;
-    for (TypeLoc inherited : nominal->getInherited().getEntries()) {
-      checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
-                reason,
-                flags | DeclAvailabilityFlag::DisableUnsafeChecking);
-    }
+    checkType(inherited.getType(), inherited.getTypeRepr(), nominal, reason,
+              flags | DeclAvailabilityFlag::DisableUnsafeChecking);
   }
 
-  void visitProtocolDecl(ProtocolDecl *proto) {
-    for (TypeLoc requirement : proto->getInherited().getEntries()) {
-
-      // Inherited protocols can be less available than this protocol, only if
-      // this protocol has defined a @reparented extension and thus default
-      // conformance. Otherwise, clients compiled for an older version of the
-      // library could send types into a newer library that fails to provide
-      // the default witness table for the inherited protocol's requirements.
-      if (auto inheritedTy = requirement.getType()->getAs<ProtocolType>()) {
-        ProtocolDecl const *inherited = inheritedTy->getDecl();
-        bool isForReparenting = llvm::any_of(
-            proto->getReparentingProtocols(), [=](auto const &tup) {
-              return std::get<ProtocolDecl *>(tup) == inherited;
-            });
-        if (isForReparenting) {
-          continue;
-        }
+  void checkProtocolInheritedType(ProtocolDecl *proto, TypeLoc requirement) {
+    // Inherited protocols can be less available than this protocol, only if
+    // this protocol has defined a @reparented extension and thus default
+    // conformance. Otherwise, clients compiled for an older version of the
+    // library could send types into a newer library that fails to provide
+    // the default witness table for the inherited protocol's requirements.
+    if (auto inheritedTy = requirement.getType()->getAs<ProtocolType>()) {
+      ProtocolDecl const *inherited = inheritedTy->getDecl();
+      bool isForReparenting =
+          llvm::any_of(proto->getReparentingProtocols(), [=](auto const &tup) {
+            return std::get<ProtocolDecl *>(tup) == inherited;
+          });
+      if (isForReparenting) {
+        return;
       }
-
-      checkType(requirement.getType(), requirement.getTypeRepr(), proto,
-                ExportabilityReason::General,
-                DeclAvailabilityFlag::DisableUnsafeChecking);
     }
 
-    if (proto->getTrailingWhereClause()) {
-      forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, proto, ExportabilityReason::General,
-                  DeclAvailabilityFlag::DisableUnsafeChecking);
-      });
-    }
+    checkType(requirement.getType(), requirement.getTypeRepr(), proto,
+              ExportabilityReason::General,
+              DeclAvailabilityFlag::DisableUnsafeChecking);
   }
 
-  void visitSubscriptDecl(SubscriptDecl *SD) {
-    checkGenericParams(SD, SD);
-
-    for (auto &P : *SD->getIndices()) {
-      checkType(P->getInterfaceType(), P->getTypeRepr(), SD);
-    }
-    checkType(SD->getElementInterfaceType(), SD->getElementTypeRepr(), SD);
-  }
-
-  void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {
-    checkGenericParams(fn, fn);
-
-    for (auto *P : *fn->getParameters()) {
-      auto wrapperAttrs = P->getAttachedPropertyWrappers();
-      for (auto index : indices(wrapperAttrs)) {
-        auto wrapperType = P->getAttachedPropertyWrapperType(index);
-        checkType(wrapperType, wrapperAttrs[index]->getTypeRepr(), fn);
-      }
-
-      if (auto attr = P->getAttachedResultBuilder())
-        checkType(P->getResultBuilderType(), attr->getTypeRepr(), fn);
-
-      checkType(P->getInterfaceType(), P->getTypeRepr(), fn);
-    }
-
-    if (auto thrownTypeRepr = fn->getThrownTypeRepr()) {
-      checkType(fn->getThrownInterfaceType(), thrownTypeRepr, fn);
-    }
-  }
-
-  void visitFuncDecl(FuncDecl *FD) {
-    visitAbstractFunctionDecl(FD);
-    checkType(FD->getResultInterfaceType(), FD->getResultTypeRepr(), FD);
-
-    if (auto attr = FD->getAttachedResultBuilder()) {
-      checkType(FD->getResultBuilderType(),
-                attr->getTypeRepr(), FD,
-                ExportabilityReason::ResultBuilder);
-    }
-  }
-
-  void visitEnumElementDecl(EnumElementDecl *EED) {
-    if (!EED->hasAssociatedValues())
-      return;
+  void checkEnumElementAssociatedValueType(Type type, const TypeRepr *typeRepr,
+                                           const Decl *context) {
     ExportabilityReason reason =
-      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
-        ExportabilityReason::ImplicitlyPublicAssociatedValue :
-        ExportabilityReason::AssociatedValue;
-    for (auto &P : *EED->getParameterList())
-      checkType(P->getInterfaceType(), P->getTypeRepr(), EED, reason);
-  }
-
-  void visitMacroDecl(MacroDecl *MD) {
-    checkGenericParams(MD, MD);
-
-    if (MD->parameterList) {
-      for (auto P : *MD->parameterList) {
-        checkType(P->getInterfaceType(), P->getTypeRepr(), MD);
-      }
-    }
-    checkType(MD->getResultInterfaceType(), MD->resultType.getTypeRepr(), MD);
+        Where.getExportedLevel() == ExportedLevel::ImplicitlyExported
+            ? ExportabilityReason::ImplicitlyPublicAssociatedValue
+            : ExportabilityReason::AssociatedValue;
+    checkType(type, typeRepr, context, reason);
   }
 
   void checkConstrainedExtensionRequirements(ExtensionDecl *ED,
@@ -2654,10 +2414,11 @@ public:
     if (!ED->getTrailingWhereClause())
       return;
 
-    forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, ED, reason,
-                DeclAvailabilityFlag::DisableUnsafeChecking);
-    });
+    WhereClauseOwner(ED).forAllRequirementTypes(
+        [&](Type type, TypeRepr *typeRepr) {
+          checkType(type, typeRepr, ED, reason,
+                    DeclAvailabilityFlag::DisableUnsafeChecking);
+        });
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -2972,7 +2733,8 @@ void registerPackageAccessForPackageExtendedType(ExtensionDecl *ED) {
           typeRepr ? typeRepr->getLoc() : ED->getLoc());
     };
 
-    forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
+    WhereClauseOwner(ED).forAllRequirementTypes([&](Type type,
+                                                    TypeRepr *typeRepr) {
       if (typeRepr) {
         typeRepr->walk(DeclRefTypeReprFinder([&](const DeclRefTypeRepr *TR) {
           record(TR->getBoundDecl(), TR);

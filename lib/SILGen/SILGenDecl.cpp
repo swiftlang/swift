@@ -635,7 +635,7 @@ public:
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
-
+    
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.
     SGF.Cleanups.pushCleanupInState<DestroyLocalVariable>(CleanupState::Dormant,
@@ -853,7 +853,7 @@ public:
     SGF.Cleanups.pushCleanupInState<DestroyLocalVariable>(
       CleanupState::Dormant, vd);
     DestroyCleanup = SGF.Cleanups.getTopCleanup();
-
+    
     // If the binding has an addressable buffer forced, it should be cleaned
     // up at this scope.
     SGF.enterLocalVariableAddressableBufferScope(vd, DestroyCleanup);
@@ -2014,6 +2014,34 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
 }
 
 namespace {
+class EndFormalScopeCleanup : public Cleanup {
+  SILValue v;
+public:
+  EndFormalScopeCleanup(SILValue v) : v(v) {
+    ASSERT(v && "formal scope value binding must be nonnull");
+  }
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.B.createEndFormalScope(l, v);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "EndFormalScope\n"
+                 << "State:" << getState() << "\n"
+                 << "Value:" << v << "\n";
+#endif
+  }
+};
+}
+
+void SILGenFunction::enterFormalScopeCleanup(SILLocation loc,
+                                             SILValue value) {
+  Cleanups.pushCleanup<EndFormalScopeCleanup>(value);
+}
+
+namespace {
 class EndLifetimeCleanup : public Cleanup {
   SILValue v;
 public:
@@ -2293,6 +2321,8 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
       B.emitDestroyValueOperation(silLoc, value);
     }
   };
+  
+  B.createEndFormalScope(silLoc, VarLocs[vd].value);
 
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.

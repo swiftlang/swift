@@ -1897,6 +1897,20 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     }
 
     if (!AFD->getImplementedObjCDecl()) {
+      // A @cxx function whose signature is not representable in C++ cannot
+      // match anything; the representability diagnostics explain the failure
+      // better than "not found" would, so check them first and stand down if
+      // they fire.
+      if (auto *cxxAttr = AFD->getAttrs().getAttribute<CxxDeclAttr>(
+              /*AllowInvalid=*/true)) {
+        auto *FD = dyn_cast<FuncDecl>(AFD);
+        if (FD && !cxxAttr->isInvalid())
+          evaluateOrDefault(Ctx.evaluator,
+                            TypeCheckForeignFunctionRequest{FD, cxxAttr}, {});
+        if (cxxAttr->isInvalid())
+          return;
+      }
+
       StringRef name = AFD->getCDeclName();
       if (name.empty())
         name = AFD->getNameStr();
@@ -8289,13 +8303,27 @@ void AttributeChecker::visitActorAttr(ActorAttr *attr) {
 void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
   auto dc = D->getDeclContext();
 
-  // distributed can be applied to actor definitions and their methods
+  // distributed can be applied to actor definitions and their funcs or vars
   if (auto varDecl = dyn_cast<VarDecl>(D)) {
     if (varDecl->isDistributed()) {
+      // distributed var must be declared inside a distributed actor
+      auto selfTy = dc->isTypeContext() ? dc->getSelfTypeInContext() : Type();
+      if (!selfTy || !selfTy->isDistributedActor()) {
+        auto diagnostic = diagnoseAndRemoveAttr(
+            attr, diag::distributed_actor_func_not_in_distributed_actor,
+            /*isComputedProperty=*/true);
+
+        if (auto *protoDecl = dc->getSelfProtocolDecl()) {
+          diagnoseDistributedFunctionInNonDistributedActorProtocol(protoDecl,
+                                                                   diagnostic);
+        }
+        return;
+      }
+
       if (checkDistributedActorProperty(varDecl, /*diagnose=*/true))
         return;
     } else {
-      // distributed can not be applied to stored properties
+      // distributed can not be applied to local properties
       diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
       return;
     }
@@ -8310,9 +8338,10 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       // good: `distributed actor`
       return;
     }
-  } else if (dyn_cast<StructDecl>(D) || dyn_cast<EnumDecl>(D)) {
+  } else if (isa<StructDecl>(D) || isa<EnumDecl>(D)) {
     diagnoseAndRemoveAttr(
-        attr, diag::distributed_actor_func_not_in_distributed_actor);
+        attr, diag::distributed_actor_func_not_in_distributed_actor,
+        /*isComputedProperty=*/false);
     return;
   }
 
@@ -8333,10 +8362,20 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
     }
 
     // distributed func must be declared inside an distributed actor
+    // A 'distributed func' at file scope, or in any other non-type context,
+    // has no 'Self' type to inspect, so reject it before asking for one
+    if (!dc->isTypeContext()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::distributed_actor_func_not_in_distributed_actor,
+          /*isComputedProperty=*/false);
+      return;
+    }
+
     auto selfTy = dc->getSelfTypeInContext();
-    if (!selfTy->isDistributedActor()) {
+    if (!selfTy || !selfTy->isDistributedActor()) {
       auto diagnostic = diagnoseAndRemoveAttr(
-        attr, diag::distributed_actor_func_not_in_distributed_actor);
+        attr, diag::distributed_actor_func_not_in_distributed_actor,
+        /*isComputedProperty=*/false);
 
       if (auto *protoDecl = dc->getSelfProtocolDecl()) {
         diagnoseDistributedFunctionInNonDistributedActorProtocol(protoDecl,

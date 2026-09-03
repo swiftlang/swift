@@ -18,6 +18,7 @@
 #define SWIFT_SEMA_SUBTYPING_H
 
 #include "swift/Basic/OptionSet.h"
+#include "swift/Sema/ConformanceCache.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
@@ -25,9 +26,12 @@ namespace swift {
 class GenericSignature;
 class ProtocolDecl;
 class Type;
+class TypeVariableType;
+struct TypePosition;
 
 namespace constraints {
 
+class ConstraintLocator;
 class ConstraintSystem;
 
 /// Checks if two types can unify if we record a bind constraint between them.
@@ -130,16 +134,6 @@ void getTypeVariablesWithVariance(
     Type type, TypePosition pos,
     bool funcResultIsInvariant=false);
 
-/// Suppose we are given a type T and a protocol P, and T conv U for
-/// some type U; if U conforms to P, does it follow that T conforms to P?
-bool checkTransitiveSupertypeConformance(ConstraintSystem &cs,
-                                         Type type, ProtocolDecl *proto);
-
-/// Suppose we are given a type T and a protocol P, and U conv T for
-/// some type U; if U conforms to P, does it follow that T conforms to P?
-bool checkTransitiveSubtypeConformance(ConstraintSystem &cs,
-                                       Type type, ProtocolDecl *proto);
-
 /// Check if there exist any subtypes of the given type, other than
 /// the type itself. If the type contains type variables, this will
 /// give a conservative approximation.
@@ -174,7 +168,15 @@ enum ConflictFlag : unsigned {
   Conformance = 1 << 10,
   TupleArity = 1 << 11,
   TupleElement = 1 << 12,
-  Existential = 1 << 13
+  Existential = 1 << 13,
+  FunctionResult = 1 << 14,
+  FunctionParamCount = 1 << 15,
+  FunctionParamFlags = 1 << 16,
+  FunctionParamType = 1 << 17,
+  FunctionNoEscape = 1 << 18,
+  FunctionAsync = 1 << 19,
+  FunctionThrows = 1 << 20,
+  FunctionSendable = 1 << 21
 };
 using ConflictReason = OptionSet<ConflictFlag>;
 
@@ -193,14 +195,14 @@ void simple_display(llvm::raw_ostream &out, ConflictReason reason);
 ///
 /// Even if the types do not contain type variables or type parameters,
 /// this does not give a completely accurate answer, yet.
-ConflictReason checkConversion(ConstraintSystem &cs,
+ConflictReason checkConversion(ConformanceCache &cache,
                                Type lhs, Type rhs,
                                GenericSignature sig);
 
 /// More meaningful overload for when you want a boolean result.
-bool canConvertTo(ConstraintSystem &cs,
+bool canConvertTo(ConformanceCache &cache,
                   Type lhs, Type rhs,
-                  GenericSignature sig);
+                  GenericSignature sig = GenericSignature());
 
 /// Computes the join between two types.
 ///

@@ -2,21 +2,18 @@
 // RUN: split-file %s %t
 // RUN: mkdir -p %t/pch
 
-// RUN: %target-swift-frontend %t/SwiftMod.swift -module-name SwiftMod -emit-module -o %t/SwiftMod.swiftmodule -I %t -enable-experimental-cxx-interop -Xcc -DFIRSTPASS
+// RUN: %target-swift-frontend %t/SwiftMod.swift -module-name SwiftMod -emit-module -o %t/SwiftMod.swiftmodule -I %t -cxx-interoperability-mode=default -Xcc -DFIRSTPASS
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %s
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -source-filename=x -enable-experimental-cxx-interop -Xcc -DINCMOD | %FileCheck %s
-
-// RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 -Xcc -DINCMOD | %FileCheck --check-prefixes=CHECK,CHECKLATEST %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift -Xcc -DINCMOD | %FileCheck --check-prefixes=CHECK,CHECKLATEST %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -source-filename=x -cxx-interoperability-mode=default -Xcc -DINCMOD | %FileCheck %s
 
 // Test through the use of the bridging header
-// RUN: %target-swift-frontend -emit-ir -I %t -import-objc-header %t/Inputs/header.h -enable-experimental-cxx-interop -DBRIDGING_HEADER_TEST -disable-availability-checking %t/SwiftMod.swift
+// RUN: %target-swift-frontend -emit-ir -I %t -import-objc-header %t/Inputs/header.h -cxx-interoperability-mode=default -DBRIDGING_HEADER_TEST -disable-availability-checking %t/SwiftMod.swift
 
 // Precompile the bridging header and test the use of that.
-// RUN: %target-swift-frontend -emit-pch -I %t -pch-output-dir %t/pch %t/Inputs/header.h -enable-experimental-cxx-interop
-// RUN: %target-swift-frontend -emit-ir -I %t -pch-output-dir %t/pch -import-objc-header %t/Inputs/header.h -enable-experimental-cxx-interop -DBRIDGING_HEADER_TEST -disable-availability-checking %t/SwiftMod.swift
+// RUN: %target-swift-frontend -emit-pch -I %t -pch-output-dir %t/pch %t/Inputs/header.h -cxx-interoperability-mode=default
+// RUN: %target-swift-frontend -emit-ir -I %t -pch-output-dir %t/pch -import-objc-header %t/Inputs/header.h -cxx-interoperability-mode=default -DBRIDGING_HEADER_TEST -disable-availability-checking %t/SwiftMod.swift
 
 
 //--- SwiftMod.swift
@@ -158,4 +155,4 @@ private:
 
 // CHECK: struct UnsafeSendable : @unchecked Sendable {
 
-// CHECKLATEST: struct NonCopyableCopyable
+// CHECK: struct NonCopyableCopyable

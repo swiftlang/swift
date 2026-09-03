@@ -79,8 +79,7 @@ and the Emscripten stdlib:
   --emscripten-path /opt/homebrew/Cellar/emscripten/<VERSION>/libexec \
   --skip-test-emscripten-stdlib \
   --sccache \
-  --install-swift --install-llvm \
-  --skip-build-benchmarks
+  --install-swift --install-llvm
 ```
 
 Replace `<VERSION>` with your installed Emscripten version (e.g. `5.0.2`).

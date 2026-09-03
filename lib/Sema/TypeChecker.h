@@ -594,6 +594,27 @@ CheckGenericArgumentsResult
 checkGenericArgumentsForDiagnostics(GenericSignature signature,
                                     TypeSubstitutionFn substitutions);
 
+/// Check \p requirements (from \p signature, substituted via
+/// \p substitutions) specifically for isolated conformances that conflict
+/// with a `Sendable`/`SendableMetatype` requirement on the corresponding
+/// generic parameter, and report on any failures in detail for diagnostic
+/// needs.
+CheckGenericArgumentsResult
+checkIsolatedConformancesForDiagnostics(GenericSignature signature,
+                                        ArrayRef<Requirement> requirements,
+                                        TypeSubstitutionFn substitutions);
+
+/// Search \p type for bound generic types whose generic arguments were
+/// substituted using an isolated conformance where the corresponding
+/// generic parameter carries a `Sendable` or `SendableMetatype` requirement
+/// that prohibits it, and diagnose each violation at \p loc.
+void checkIsolatedConformancesInType(Type type, SourceLoc loc);
+
+/// Search \p D's interface type for bound generic types whose generic arguments
+/// were substituted using an isolated conformance where the corresponding
+/// generic parameter carries a `Sendable` or `SendableMetatype` requirement
+/// that prohibits it.
+void checkIsolatedConfromancesInDecl(Decl *D);
 
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions

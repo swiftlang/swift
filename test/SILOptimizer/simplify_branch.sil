@@ -1,11 +1,29 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplification -simplify-instruction=br | %FileCheck %s
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=br -sil-print-debuginfo | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
 
-
 import Swift
 import Builtin
 
 class C {}
+
+struct S {
+  var c: C
+}
+
+struct TwoInts {
+  var x: Builtin.Int64
+  var y: Builtin.Int64
+}
+
+struct TwoRefs {
+  var a: C
+  var b: C
+}
+
+struct Mixed {
+  var x: Builtin.Int64
+  var c: C
+}
 
 // CHECK-LABEL: sil @merge_blocks_same_location1
 // CHECK:         %0 = integer_literal $Builtin.Int64, 0
@@ -179,3 +197,229 @@ bb3(%r : @reborrow $C):
   return %t : $()
 }
 
+// The incoming values don't need to be matching aggregate instructions. Hoisting the "unwrap"
+// into the predecessors is beneficial on its own, because a smaller value is passed to the phi.
+// An owned aggregate must be consumed by the hoisted unwrap, therefore a `destructure_struct`
+// is created.
+// CHECK-LABEL: sil [ossa] @hoist_unwrap_of_owned_struct
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value %1 : $S
+// CHECK-NEXT:    [[D1:%.*]] = destructure_struct %0 : $S
+// CHECK-NEXT:    br bb3([[D1]] : $C)
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %0 : $S
+// CHECK-NEXT:    [[D2:%.*]] = destructure_struct %1 : $S
+// CHECK-NEXT:    br bb3([[D2]] : $C)
+// CHECK:       bb3([[A:%.*]] : @owned $C):
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[A]] : $C
+// CHECK-NEXT:    fix_lifetime [[B]] : $C
+// CHECK-NEXT:    end_borrow [[B]] : $C
+// CHECK-NEXT:    return [[A]] : $C
+// CHECK:       } // end sil function 'hoist_unwrap_of_owned_struct'
+sil [ossa] @hoist_unwrap_of_owned_struct : $@convention(thin) (@owned S, @owned S) -> @owned C {
+bb0(%0 : @owned $S, %1 : @owned $S):
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $S
+  br bb3(%0 : $S)
+
+bb2:
+  destroy_value %0 : $S
+  br bb3(%1 : $S)
+
+bb3(%4 : @owned $S):
+  %5 = begin_borrow %4 : $S
+  %6 = struct_extract %5 : $S, #S.c
+  fix_lifetime %6 : $C
+  end_borrow %5 : $S
+  %7 = destructure_struct %4 : $S
+  return %7 : $C
+}
+
+// A guaranteed aggregate is not consumed, therefore a `struct_extract` is created.
+// CHECK-LABEL: sil [ossa] @hoist_unwrap_of_guaranteed_struct
+// CHECK:       bb1:
+// CHECK-NEXT:    [[E1:%.*]] = struct_extract %0 : $S, #S.c
+// CHECK-NEXT:    br bb3([[E1]] : $C)
+// CHECK:       bb2:
+// CHECK-NEXT:    [[E2:%.*]] = struct_extract %1 : $S, #S.c
+// CHECK-NEXT:    br bb3([[E2]] : $C)
+// CHECK:       bb3([[A:%.*]] : @guaranteed $C):
+// CHECK-NEXT:    [[BF:%.*]] = borrowed [[A]] : $C from (
+// CHECK-NEXT:    fix_lifetime [[BF]] : $C
+// CHECK:       } // end sil function 'hoist_unwrap_of_guaranteed_struct'
+sil [ossa] @hoist_unwrap_of_guaranteed_struct : $@convention(thin) (@guaranteed S, @guaranteed S) -> () {
+bb0(%0 : @guaranteed $S, %1 : @guaranteed $S):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $S)
+
+bb2:
+  br bb3(%1 : $S)
+
+bb3(%4 : @guaranteed $S):
+  %5 = borrowed %4 from (%0 : $S, %1 : $S)
+  %6 = struct_extract %5 : $S, #S.c
+  fix_lifetime %6 : $C
+  %t = tuple ()
+  return %t : $()
+}
+
+// If different elements of the aggregate are extracted, the phi cannot be unwrapped.
+// CHECK-LABEL: sil [ossa] @dont_unwrap_different_elements
+// CHECK:       bb3({{%.*}} : $TwoInts):
+// CHECK:       } // end sil function 'dont_unwrap_different_elements'
+sil [ossa] @dont_unwrap_different_elements : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = struct $TwoInts (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+  br bb3(%2 : $TwoInts)
+
+bb2:
+  %3 = struct $TwoInts (%1 : $Builtin.Int64, %0 : $Builtin.Int64)
+  br bb3(%3 : $TwoInts)
+
+bb3(%4 : $TwoInts):
+  %5 = struct_extract %4 : $TwoInts, #TwoInts.x
+  %6 = struct_extract %4 : $TwoInts, #TwoInts.y
+  %7 = builtin "add_Int64"(%5 : $Builtin.Int64, %6 : $Builtin.Int64) : $Builtin.Int64
+  return %7 : $Builtin.Int64
+}
+
+// The phi must not have any uses beside the "unwraps" (and borrow scopes of it).
+// CHECK-LABEL: sil [ossa] @dont_unwrap_with_other_use
+// CHECK:       bb3({{%.*}} : @owned $S):
+// CHECK-NEXT:    fix_lifetime
+// CHECK:       } // end sil function 'dont_unwrap_with_other_use'
+sil [ossa] @dont_unwrap_with_other_use : $@convention(thin) (@guaranteed C, @guaranteed C) -> @owned C {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %0 : $C
+  %3 = struct $S (%2 : $C)
+  br bb3(%3 : $S)
+
+bb2:
+  %4 = copy_value %1 : $C
+  %5 = struct $S (%4 : $C)
+  br bb3(%5 : $S)
+
+bb3(%6 : @owned $S):
+  fix_lifetime %6 : $S
+  %7 = destructure_struct %6 : $S
+  return %7 : $C
+}
+
+// A `destructure` of which more than one result is used cannot be hoisted.
+// CHECK-LABEL: sil [ossa] @dont_unwrap_multiple_used_destructure_results
+// CHECK:       bb3({{%.*}} : @owned $TwoRefs):
+// CHECK-NEXT:    ({{.*}}) = destructure_struct
+// CHECK:       } // end sil function 'dont_unwrap_multiple_used_destructure_results'
+sil [ossa] @dont_unwrap_multiple_used_destructure_results : $@convention(thin) (@owned C, @owned C) -> () {
+bb0(%0 : @owned $C, %1 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = struct $TwoRefs (%0 : $C, %1 : $C)
+  br bb3(%2 : $TwoRefs)
+
+bb2:
+  %3 = struct $TwoRefs (%1 : $C, %0 : $C)
+  br bb3(%3 : $TwoRefs)
+
+bb3(%4 : @owned $TwoRefs):
+  (%5, %6) = destructure_struct %4 : $TwoRefs
+  destroy_value %5 : $C
+  destroy_value %6 : $C
+  %t = tuple ()
+  return %t : $()
+}
+
+// A re-borrow phi cannot be unwrapped: the incoming values of a re-borrow must be
+// borrow-introducing instructions, but a hoisted "unwrap" is a forwarding instruction.
+// CHECK-LABEL: sil [ossa] @dont_unwrap_reborrow_phi
+// CHECK:       bb3({{%.*}} : @reborrow $S):
+// CHECK:       } // end sil function 'dont_unwrap_reborrow_phi'
+sil [ossa] @dont_unwrap_reborrow_phi : $@convention(thin) (@owned S, @owned S) -> () {
+bb0(%0 : @owned $S, %1 : @owned $S):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = begin_borrow %0 : $S
+  br bb3(%2 : $S)
+
+bb2:
+  %3 = begin_borrow %1 : $S
+  br bb3(%3 : $S)
+
+bb3(%4 : @reborrow $S):
+  %5 = borrowed %4 : $S from (%0 : $S, %1 : $S)
+  %6 = struct_extract %5 : $S, #S.c
+  fix_lifetime %6 : $C
+  end_borrow %5 : $S
+  destroy_value %0 : $S
+  destroy_value %1 : $S
+  %t = tuple ()
+  return %t : $()
+}
+
+// If the unwrapped element is trivial, the borrow scopes of the phi are removed, because a
+// trivial value cannot be borrowed.
+// CHECK-LABEL: sil [ossa] @unwrap_trivial_element_in_borrow_scope
+// CHECK:       bb1:
+// CHECK-NEXT:    [[E1:%.*]] = struct_extract %0 : $Mixed, #Mixed.x
+// CHECK-NEXT:    br bb3([[E1]] : $Builtin.Int64)
+// CHECK:       bb3([[A:%.*]] : $Builtin.Int64):
+// CHECK-NEXT:    return [[A]] : $Builtin.Int64
+// CHECK:       } // end sil function 'unwrap_trivial_element_in_borrow_scope'
+sil [ossa] @unwrap_trivial_element_in_borrow_scope : $@convention(thin) (@guaranteed Mixed, @guaranteed Mixed) -> Builtin.Int64 {
+bb0(%0 : @guaranteed $Mixed, %1 : @guaranteed $Mixed):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Mixed)
+
+bb2:
+  br bb3(%1 : $Mixed)
+
+bb3(%4 : @guaranteed $Mixed):
+  %5 = borrowed %4 : $Mixed from (%0 : $Mixed, %1 : $Mixed)
+  %6 = begin_borrow %5 : $Mixed
+  %7 = struct_extract %6 : $Mixed, #Mixed.x
+  end_borrow %6 : $Mixed
+  return %7 : $Builtin.Int64
+}
+
+// The same, but with a second unwrap directly on the phi - beside the one in the borrow scope.
+// CHECK-LABEL: sil [ossa] @unwrap_trivial_element_in_and_outside_borrow_scope
+// CHECK:       bb1:
+// CHECK-NEXT:    [[E1:%.*]] = struct_extract %0 : $Mixed, #Mixed.x
+// CHECK-NEXT:    br bb3([[E1]] : $Builtin.Int64)
+// CHECK:       bb3([[A:%.*]] : $Builtin.Int64):
+// CHECK-NEXT:    [[R:%.*]] = builtin "add_Int64"([[A]] : $Builtin.Int64, [[A]] : $Builtin.Int64)
+// CHECK-NEXT:    return [[R]] : $Builtin.Int64
+// CHECK:       } // end sil function 'unwrap_trivial_element_in_and_outside_borrow_scope'
+sil [ossa] @unwrap_trivial_element_in_and_outside_borrow_scope : $@convention(thin) (@guaranteed Mixed, @guaranteed Mixed) -> Builtin.Int64 {
+bb0(%0 : @guaranteed $Mixed, %1 : @guaranteed $Mixed):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Mixed)
+
+bb2:
+  br bb3(%1 : $Mixed)
+
+bb3(%4 : @guaranteed $Mixed):
+  %5 = borrowed %4 : $Mixed from (%0 : $Mixed, %1 : $Mixed)
+  %6 = begin_borrow %5 : $Mixed
+  %7 = struct_extract %6 : $Mixed, #Mixed.x
+  end_borrow %6 : $Mixed
+  %8 = struct_extract %5 : $Mixed, #Mixed.x
+  %9 = builtin "add_Int64"(%7 : $Builtin.Int64, %8 : $Builtin.Int64) : $Builtin.Int64
+  return %9 : $Builtin.Int64
+}

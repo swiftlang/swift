@@ -373,6 +373,10 @@ bool BridgedType::isTrivial(BridgedFunction f) const {
   return unbridged().isTrivial(f.getFunction());
 }
 
+bool BridgedType::isNonTrivialOnlyBecauseNonEscapable(BridgedFunction f) const {
+  return unbridged().isNonTrivialOnlyBecauseNonEscapable(*f.getFunction());
+}
+
 bool BridgedType::isNonTrivialOrContainsRawPointer(BridgedFunction f) const {
   return unbridged().isNonTrivialOrContainsRawPointer(f.getFunction());
 }
@@ -3287,6 +3291,12 @@ BridgedInstruction BridgedBuilder::createEndCOWMutation(BridgedValue instance, b
 BridgedInstruction
 BridgedBuilder::createEndCOWMutationAddr(BridgedValue instance) const {
   return {unbridged().createEndCOWMutationAddr(regularLoc(),
+                                               instance.getSILValue())};
+}
+
+BridgedInstruction
+BridgedBuilder::createEndFormalScope(BridgedValue instance) const {
+  return {unbridged().createEndFormalScope(regularLoc(),
                                                instance.getSILValue())};
 }
 

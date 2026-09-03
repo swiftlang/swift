@@ -96,3 +96,40 @@ class InferMeDefaults {
 protocol PDerived: P {}
 
 @MainActor struct ImpliedConformanceInference: PDerived { func f() {} }
+
+// Used to cause a cycle because Iterator typealias could be found through makeIterator while trying
+// determine `S: Sequence` isolation.
+
+@MainActor
+struct RecursiveCollection: RandomAccessCollection {
+  nonisolated var startIndex: Int { 0 }
+  nonisolated var endIndex: Int { 0 }
+  nonisolated subscript(position: Int) -> Int { 0 }
+
+  typealias Iterator = IndexingIterator<RecursiveCollection> // Ok
+  typealias SubSequence = Slice<RecursiveCollection>
+}
+
+struct MyIndexingIterator<T: Collection & Sendable>: IteratorProtocol { // expected-note 2 {{requirement specified as 'T' : 'Collection' [with T = RecursiveCollectionIsolated]}}
+  init(elements: T) { // expected-note {{'init(elements:)' declared here}}
+  }
+
+  mutating func next() -> T.Element? {
+    nil
+  }
+}
+
+@MainActor
+struct RecursiveCollectionIsolated: RandomAccessCollection {
+  nonisolated var startIndex: Int { 0 }
+  nonisolated var endIndex: Int { 0 }
+  nonisolated subscript(position: Int) -> Int { 0 }
+  func makeIterator() -> MyIndexingIterator<RecursiveCollectionIsolated> {
+    // expected-error@-1 {{main actor-isolated conformance of 'RecursiveCollectionIsolated' to 'Collection' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+    MyIndexingIterator(elements: self)
+    // expected-error@-1 2 {{main actor-isolated conformance of 'RecursiveCollectionIsolated' to 'Collection' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  }
+  typealias Iterator = MyIndexingIterator<RecursiveCollectionIsolated>
+  // expected-error@-1 {{main actor-isolated conformance of 'RecursiveCollectionIsolated' to 'Collection' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  typealias SubSequence = Slice<RecursiveCollectionIsolated>
+}

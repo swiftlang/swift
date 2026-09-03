@@ -55,6 +55,7 @@ SILValue SILGenFunction::emitSelfDeclForClassDeinit(VarDecl *selfDecl) {
   VarLocs[selfDecl] = VarLoc(selfValue, SILAccessEnforcement::Unknown);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
+  enterFormalScopeCleanup(PrologueLoc, selfValue);
   B.emitDebugDescription(PrologueLoc, selfValue, dv);
   return selfValue;
 }
@@ -90,6 +91,7 @@ SILValue SILGenFunction::emitSelfDeclForMoveOnlyDeinit(VarDecl *selfDecl) {
   VarLocs[selfDecl] = VarLoc(selfValue, SILAccessEnforcement::Unknown);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
+  enterFormalScopeCleanup(PrologueLoc, selfValue);
   B.emitDebugDescription(PrologueLoc, selfValue, dv);
   return selfValue;
 }
@@ -996,6 +998,7 @@ private:
     if (!argrv.getType().isAddress()) {
       // NOTE: We setup SGF.VarLocs[pd] in updateArgumentValueForBinding.
       updateArgumentValueForBinding(argrv, loc, pd, varinfo);
+      SGF.enterFormalScopeCleanup(loc, argrv.getValue());
       SGF.enterLocalVariableAddressableBufferScope(pd);
       return;
     }
@@ -1010,6 +1013,7 @@ private:
       }
       SGF.VarLocs[pd] = SILGenFunction::VarLoc(allocStack,
         SILAccessEnforcement::Unknown);
+      SGF.enterFormalScopeCleanup(pd, allocStack);
       SGF.enterLocalVariableAddressableBufferScope(pd);
       return;
     }
@@ -1130,6 +1134,7 @@ private:
     }
     
     SGF.VarLocs[pd] = SILGenFunction::VarLoc(argrv.getValue(), access);
+    SGF.enterFormalScopeCleanup(pd, argrv.getValue());
     SGF.enterLocalVariableAddressableBufferScope(pd);
   }
 
@@ -1510,6 +1515,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 
   SGF.VarLocs[VD] = SILGenFunction::VarLoc(arg, enforcement, box);
+  SGF.enterFormalScopeCleanup(VD, arg);
   SGF.enterLocalVariableAddressableBufferScope(VD);
   SILDebugVariable DbgVar(VD->isLet(), ArgNo);
   if (auto *AllocStack = dyn_cast<AllocStackInst>(arg)) {

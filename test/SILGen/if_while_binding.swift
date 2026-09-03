@@ -312,6 +312,7 @@ func if_leading_boolean(_ a : Int) {
   // CHECK: [[ELSE]]:
   // CHECK:   br [[IFDONE]]
   // CHECK: [[IFDONE]]:
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: tuple ()
 
 }

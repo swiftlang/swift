@@ -1204,6 +1204,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     PrologueLoc.markAsPrologue();
     SILDebugVariable DbgVar(selfDecl->isLet(), ++ArgNo);
     B.emitDebugDescription(PrologueLoc, selfArg.getValue(), DbgVar);
+    enterFormalScopeCleanup(selfDecl, selfArg.getValue());
   }
 
   if (selfClassDecl->isRootDefaultActor() && !isDelegating) {

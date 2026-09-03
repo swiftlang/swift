@@ -55,6 +55,7 @@ func throwsClassError() throws(ClassError) {
 // CHECK: apply [[FN]]<E>([[ERROR_ALLOC]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
 // CHECK: copy_addr [take] [[ERROR_ALLOC]] to [init] %0 : $*E
 // CHECK: dealloc_stack [[ERROR_ALLOC]] : $*E
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: throw_addr
 func throwsIndirectError<E: Error>(_ error: E) throws(E) {
   throw error

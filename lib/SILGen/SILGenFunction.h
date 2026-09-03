@@ -3407,6 +3407,23 @@ public:
   /// If context is init accessor, find a mapping between the given type
   /// property and argument declaration synthesized for it.
   ParamDecl *isMappedToInitAccessorArgument(VarDecl *property);
+  
+  /// Arrange for an end-of-formal-scope marker for the given variable
+  /// binding value to be emitted when the current scope is exited.
+  /// 
+  /// This instruction by itself does not have any effects, but serves as a
+  /// marker for lifetime resolution so that it can reason about the formal
+  /// scopes of variables.
+  void enterFormalScopeCleanup(SILLocation loc, SILValue value);
+  
+  /// Arrange for an end-of-formal-scope marker for the given variable
+  /// binding value (which may not yet be determined, but must be bound before
+  /// the cleanup runs) to be emitted when the current scope is exited.
+  /// 
+  /// This instruction by itself does not have any effects, but serves as a
+  /// marker for lifetime resolution so that it can reason about the formal
+  /// scopes of variables.
+  void enterLetBindingFormalScopeCleanup(VarDecl *vd);
 };
 
 

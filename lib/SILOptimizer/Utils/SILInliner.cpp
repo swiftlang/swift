@@ -1245,7 +1245,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ThickToObjCMetatypeInst:
   case SILInstructionKind::ObjCToThickMetatypeInst:
     return InlineCost::Expensive;
-    
+
   // TODO: Bridge object conversions imply a masking operation that should be
   // "hella cheap" but not really expensive.
   case SILInstructionKind::BridgeObjectToRefInst:
@@ -1282,6 +1282,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::EndCOWMutationAddrInst:
+  case SILInstructionKind::EndFormalScopeInst:
     return InlineCost::Free;
 
   // Turning the task reference into a continuation should be basically free.

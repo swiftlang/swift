@@ -156,7 +156,7 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   public final var isDeinitBarrier: Bool {
     switch self {
-    case SIL.isFullApplySite, is EndApplyInst, is AbortApplyInst:
+    case SIL.isFullApplySite, is EndApplyInst, is AbortApplyInst, is YieldInst:
       return true
 
     case is LoadWeakInst, is LoadUnownedInst, is StrongCopyUnownedValueInst, is StrongCopyUnmanagedValueInst:
@@ -1604,6 +1604,9 @@ final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction
 final public class EndCOWMutationAddrInst : Instruction, UnaryInstruction {
   public var address: Value { operand.value }
 }
+final public class EndFormalScopeInst : Instruction, UnaryInstruction {
+  public var address: Value { operand.value }
+}
 
 final public
 class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
@@ -2320,6 +2323,10 @@ final public class BranchInst : TermInst {
   /// Returns the target block argument for the cond_br `operand`.
   public func getArgument(for operand: Operand) -> Argument {
     return targetBlock.arguments[operand.index]
+  }
+
+  public func getPhi(for operand: Operand) -> Phi {
+    return Phi(getArgument(for: operand))!
   }
 }
 

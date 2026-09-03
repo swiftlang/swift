@@ -2441,14 +2441,14 @@ public:
     checkRedeclaration(OD);
     if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD))
       (void)IOD->getPrecedenceGroup();
-    checkAccessControl(OD);
+    checkDeclCommon(OD);
   }
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
     TypeChecker::checkDeclAttributes(PGD);
     validatePrecedenceGroup(PGD);
     checkRedeclaration(PGD);
-    checkAccessControl(PGD);
+    checkDeclCommon(PGD);
   }
 
   void visitMissingDecl(MissingDecl *missing) {  }
@@ -2470,7 +2470,7 @@ public:
 
   void visitMacroDecl(MacroDecl *MD) {
     TypeChecker::checkDeclAttributes(MD);
-    checkAccessControl(MD);
+    checkDeclCommon(MD);
 
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
@@ -2866,8 +2866,7 @@ public:
 
     TypeChecker::checkDeclAttributes(PBD);
 
-    checkAccessControl(PBD);
-
+    checkDeclCommon(PBD);
     checkExplicitAvailability(PBD);
 
     // If the initializers in the PBD aren't checked yet, do so now.
@@ -2967,7 +2966,7 @@ public:
 
     TypeChecker::checkDeclAttributes(SD);
 
-    checkAccessControl(SD);
+    checkDeclCommon(SD);
 
     checkExplicitAvailability(SD);
 
@@ -3053,10 +3052,8 @@ public:
     // Force requests that can emit diagnostics.
     (void) TAD->getUnderlyingType();
 
-    // Make sure to check the underlying type.
-    
     TypeChecker::checkDeclAttributes(TAD);
-    checkAccessControl(TAD);
+    checkDeclCommon(TAD);
     checkGenericParams(TAD);
   }
   
@@ -3079,10 +3076,10 @@ public:
       AT->diagnose(diag::associated_type_objc, AT->getName(), proto->getName());
     }
 
-    checkAccessControl(AT);
+    checkDeclCommon(AT);
 
     // Trigger the checking for overridden declarations.
-    (void) AT->getOverriddenDecls();
+    (void)AT->getOverriddenDecls();
 
     auto defaultType = AT->getDefaultDefinitionType();
     if (defaultType && !defaultType->hasError()) {
@@ -3209,7 +3206,7 @@ public:
 
     checkInheritanceClause(ED);
     diagnoseMissingExplicitSendable(ED);
-    checkAccessControl(ED);
+    checkDeclCommon(ED);
 
     auto &DE = Ctx.Diags;
     if (auto rawTy = ED->getRawType()) {
@@ -3289,8 +3286,7 @@ public:
     checkInheritanceClause(SD);
     diagnoseMissingExplicitSendable(SD);
 
-    checkAccessControl(SD);
-
+    checkDeclCommon(SD);
     checkExplicitAvailability(SD);
 
     TypeChecker::checkDeclCircularity(SD);
@@ -3588,7 +3584,8 @@ public:
       com::validateImplementation(CD);
     diagnoseMissingExplicitSendable(CD);
 
-    checkAccessControl(CD);
+
+    checkDeclCommon(CD);
 
     checkExplicitAvailability(CD);
 
@@ -3629,7 +3626,7 @@ public:
     for (auto Member : PD->getMembers())
       visit(Member);
 
-    checkAccessControl(PD);
+    checkDeclCommon(PD);
 
     checkProtocolRefinementRequirements(PD);
 
@@ -3703,7 +3700,7 @@ public:
       TypeChecker::checkParameterList(FD->getParameters(), FD);
     }
 
-    checkAccessControl(FD);
+    checkDeclCommon(FD);
 
     TypeChecker::checkDeclAttributes(FD);
     TypeChecker::checkDistributedFunc(FD);
@@ -3798,10 +3795,15 @@ public:
       }
     }
 
-    // If the function is exported to C, it must be representable in (Obj-)C.
-    if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
+    // If the function is exported to a foreign language, its signature must be
+    // representable in that language.
+    DeclAttribute *foreignLangAttr =
+        FD->getAttrs().getAttribute<swift::CDeclAttr>();
+    if (!foreignLangAttr)
+      foreignLangAttr = FD->getAttrs().getAttribute<swift::CxxDeclAttr>();
+    if (foreignLangAttr) {
       evaluateOrDefault(Ctx.evaluator,
-                        TypeCheckCDeclFunctionRequest{FD, CDeclAttr},
+                        TypeCheckForeignFunctionRequest{FD, foreignLangAttr},
                         {});
     }
 
@@ -3822,7 +3824,6 @@ public:
 
     if (auto *PL = EED->getParameterList()) {
       TypeChecker::checkParameterList(PL, EED);
-
       checkDefaultArguments(PL);
       checkVariadicParameters(PL, EED);
     }
@@ -3845,7 +3846,7 @@ public:
       EED->setInvalid();
     }
 
-    checkAccessControl(EED);
+    checkDeclCommon(EED);
   }
 
   /// The extended type must be '(repeat each Element)' or a generic
@@ -4095,7 +4096,7 @@ public:
 
     TypeChecker::checkConformancesInContext(ED);
 
-    checkAccessControl(ED);
+    checkDeclCommon(ED);
 
     checkExplicitAvailability(ED);
 
@@ -4130,6 +4131,7 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
     TypeChecker::checkParameterList(CD->getParameters(), CD);
+
     checkEmbeddedRestrictionsInSignature(CD);
 
     if (CD->getAsyncLoc().isValid())
@@ -4248,7 +4250,7 @@ public:
       }
     }
 
-    checkAccessControl(CD);
+    checkDeclCommon(CD);
 
     checkExplicitAvailability(CD);
 
@@ -4296,6 +4298,11 @@ public:
 
   void visitBuiltinTupleDecl(BuiltinTupleDecl *BTD) {
     llvm_unreachable("BuiltinTupleDecl should not show up here");
+  }
+
+  void checkDeclCommon(Decl *D) {
+    checkAccessControl(D);
+    TypeChecker::checkIsolatedConfromancesInDecl(D);
   }
 };
 } // end anonymous namespace

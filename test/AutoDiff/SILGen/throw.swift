@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
+// REQUIRES: optimized_stdlib
+
 import _Differentiation
 
 // Nothing special for throwing functions
@@ -43,7 +45,10 @@ func catching(input: Float) -> Float {
 // CHECK:   %[[ZERO:.*]] = float_literal $Builtin.FPIEEE32, 0x0
 // CHECK:   %[[ZERO_ADJ:.*]] = struct $Float (%[[ZERO]] : $Builtin.FPIEEE32)
 // CHECK:   %[[OPT_PULLBACK:.*]] = tuple_extract %{{.*}} : $(_: Optional<@callee_guaranteed (Float) -> Float>), 0
-// CHECK:   switch_enum %[[OPT_PULLBACK]] : $Optional<@callee_guaranteed (Float) -> Float>, case #Optional.some!enumelt: [[BB_NORMAL:.*]], case #Optional.none!enumelt: [[BB_ERROR:.*]] //
+// The phi of the merge block is "unwrapped": it passes the Optional instead of the 1-element tuple.
+// CHECK:   br [[BB_UNWRAP:bb[0-9]+]](%[[OPT_PULLBACK]] : $Optional<@callee_guaranteed (Float) -> Float>)
+// CHECK: [[BB_UNWRAP]](%[[PHI_PULLBACK:.*]] : $Optional<@callee_guaranteed (Float) -> Float>):
+// CHECK:   switch_enum %[[PHI_PULLBACK]] : $Optional<@callee_guaranteed (Float) -> Float>, case #Optional.some!enumelt: [[BB_NORMAL:.*]], case #Optional.none!enumelt: [[BB_ERROR:.*]] //
 // CHECK: [[BB_NORMAL]](%[[PULLBACK:.*]] : $@callee_guaranteed (Float) -> Float)
 // Call pullback (with the incoming adjoint seed) and accumulate adjoints
 // CHECK:   %[[CALLEE_ADJ:.*]] = apply %[[PULLBACK]](%[[SEED]]) : $@callee_guaranteed (Float) -> Float

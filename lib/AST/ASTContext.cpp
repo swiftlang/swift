@@ -424,6 +424,13 @@ struct ASTContext::Implementation {
   ///    -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastDecl = nullptr;
 
+  /// func _stdlib_isOSVersionAtLeast_AEIC(
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.word)
+  ///  -> Builtin.Int1
+  FuncDecl *IsOSVersionAtLeastAEICDecl = nullptr;
+
   /// func _stdlib_isVariantOSVersionAtLeast(
   ///   Builtin.Word,
   ///   Builtin.Word,
@@ -1591,7 +1598,7 @@ MacroDecl *ASTContext::getBuiltinDerivedConformanceMacroDecl(
     break;
   case BuiltinDerivedConformanceMacroKind::DeriveCaseIterable:
     macro = makeMacro("_deriveCaseIterable", "DeriveCaseIterableMacro",
-                      {stringParam("", "infos"), stringParam("", "witness")},
+                      {stringParam("", "infos")},
                       MacroIntroducedDeclName::getArbitrary());
     break;
   case BuiltinDerivedConformanceMacroKind::DeriveEncodable:
@@ -2119,37 +2126,58 @@ ConstructorDecl *ASTContext::getMakeUTF8StringDecl() const {
   return nullptr;
 }
 
-FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
-  if (getImpl().IsOSVersionAtLeastDecl)
-    return getImpl().IsOSVersionAtLeastDecl;
-
-  // Look for the function.
-  auto decl =
-      findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast");
-  if (!decl)
-    return nullptr;
-
+/// Returns true if `decl` has the signature that the OS version query
+/// functions which take a single version share:
+/// `(Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1`.
+static bool hasOSVersionQuerySignature(FuncDecl *decl) {
   auto *fnType = getIntrinsicCandidateType(decl, /*allowTypeMembers=*/false);
   if (!fnType)
-    return nullptr;
+    return false;
 
   // Input must be (Builtin.Word, Builtin.Word, Builtin.Word)
   auto intrinsicsParams = fnType->getParams();
   if (intrinsicsParams.size() != 3)
-    return nullptr;
+    return false;
 
   if (llvm::any_of(intrinsicsParams, [](AnyFunctionType::Param param) {
     return (param.isVariadic() || param.isInOut() ||
             !isBuiltinWordType(param.getPlainType()));
   })) {
-    return nullptr;
+    return false;
   }
 
   // Output must be Builtin.Int1
-  if (!isBuiltinInt1Type(fnType->getResult()))
+  return isBuiltinInt1Type(fnType->getResult());
+}
+
+FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
+  if (getImpl().IsOSVersionAtLeastDecl)
+    return getImpl().IsOSVersionAtLeastDecl;
+
+  // Look for the function.
+  auto decl = findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast");
+  if (!decl)
+    return nullptr;
+
+  if (!hasOSVersionQuerySignature(decl))
     return nullptr;
 
   getImpl().IsOSVersionAtLeastDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getIsOSVersionAtLeastAEICDecl() const {
+  if (getImpl().IsOSVersionAtLeastAEICDecl)
+    return getImpl().IsOSVersionAtLeastAEICDecl;
+
+  auto decl = findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast_AEIC");
+  if (!decl)
+    return nullptr;
+
+  if (!hasOSVersionQuerySignature(decl))
+    return nullptr;
+
+  getImpl().IsOSVersionAtLeastAEICDecl = decl;
   return decl;
 }
 
@@ -4965,6 +4993,7 @@ MetatypeType *MetatypeType::get(Type T,
                                 std::optional<MetatypeRepresentation> Repr,
                                 const ASTContext &Ctx) {
   auto properties = T->getRecursiveProperties();
+  properties.removeIsUnsafe();
   auto arena = getArena(properties);
 
   unsigned reprKey;
@@ -4997,6 +5026,7 @@ ExistentialMetatypeType::get(Type T, std::optional<MetatypeRepresentation> repr,
     T = existential->getConstraintType();
 
   auto properties = T->getRecursiveProperties();
+  properties.removeIsUnsafe();
   auto arena = getArena(properties);
 
   unsigned reprKey;
@@ -6916,13 +6946,14 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   // Language-specific filtering.
   switch (language) {
   case ForeignLanguage::C:
-    // Ignore _ObjectiveCBridgeable conformances in C.
+  case ForeignLanguage::Cxx:
+    // Ignore _ObjectiveCBridgeable conformances in C and C++.
     if (conformance &&
         conformance->getProtocol()->isSpecificProtocol(
           KnownProtocolKind::ObjectiveCBridgeable))
       return ForeignRepresentationInfo::forNone();
 
-    // Ignore error bridging in C.
+    // Ignore error bridging in C and C++.
     if (entry.getKind() == ForeignRepresentableKind::BridgedError)
       return ForeignRepresentationInfo::forNone();
 

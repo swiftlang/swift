@@ -25,6 +25,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
+#include "swift/Basic/UUID.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -1360,6 +1361,24 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 
 #include "swift/Runtime/RuntimeFunctions.def"
 
+llvm::Constant *
+IRGenModule::getCOMIdentityConstant(StringRef identity) {
+  std::optional<UUID> uuid = UUID::fromString(identity.str().c_str());
+  ASSERT(uuid && "COM interface ID should have been validated by Sema");
+
+  unsigned char bytes[UUID::Size];
+  uuid->getCanonicalBytes(bytes);
+
+  if (!Triple.isLittleEndian())
+    return llvm::ConstantDataArray::get(getLLVMContext(), llvm::ArrayRef(bytes));
+
+  std::reverse(bytes + 0, bytes + 4);
+  std::reverse(bytes + 4, bytes + 6);
+  std::reverse(bytes + 6, bytes + 8);
+
+  return llvm::ConstantDataArray::get(getLLVMContext(), llvm::ArrayRef(bytes));
+}
+
 std::pair<llvm::GlobalVariable *, llvm::Constant *>
 IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
                                   StringRef sectionName, StringRef name) {
@@ -1639,6 +1658,8 @@ void IRGenModule::constructInitialFnAttributes(
   // Add/remove MinSize based on the appropriate setting.
   if (FuncOptMode == OptimizationMode::NotSet)
     FuncOptMode = IRGen.Opts.OptMode;
+  // Mirror Clang (getTrivialDefaultFunctionAttributes): only size-optimized
+  // functions get OptimizeForSize/MinSize; speed functions get neither.
   if (FuncOptMode == OptimizationMode::ForSize) {
     Attrs.addAttribute(llvm::Attribute::OptimizeForSize);
     Attrs.addAttribute(llvm::Attribute::MinSize);
