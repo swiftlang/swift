@@ -945,7 +945,13 @@ DECL_ATTR(cxx, CxxDecl,
   178)
 DECL_ATTR_FEATURE_REQUIREMENT(CxxDecl, CxxImplementation)
 
-LAST_DECL_ATTR(CxxDecl)
+DECL_ATTR(remoteCall, RemoteCall,
+  OnFunc | OnAccessor | OnVar,
+  AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  179)
+DECL_ATTR_FEATURE_REQUIREMENT(RemoteCall, DistributedRemoteCallSemantics)
+
+LAST_DECL_ATTR(RemoteCall)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

@@ -6591,6 +6591,41 @@ NOTE(distributed_actor_synchronous_access_distributed_computed_property,none,
       "access to %kind0 from outside the distributed actor %1 must be asynchronous",
       (const ValueDecl *, DeclName))
 
+ERROR(distributed_remotecall_requires_distributed,none,
+      "'@remoteCall' can only be applied to 'distributed' methods "
+      "and computed properties",
+      ())
+
+ERROR(distributed_remotecall_oneway_requires_void_result,none,
+      "'@remoteCall(oneway)' %kind0 must return 'Void'",
+      (const ValueDecl *))
+
+ERROR(distributed_remotecall_oneway_on_computed_property,none,
+      "'@remoteCall(oneway)' cannot be applied to properties; use a method instead",
+      ())
+
+ERROR(distributed_remotecall_on_accessor,none,
+      "'@remoteCall' cannot be applied to an accessor; "
+      "apply it to the property declaration instead",
+      ())
+
+ERROR(distributed_remotecall_blocking_oneway_illegal_combination,none,
+      "illegal combination of remote call semantics: "
+      "a 'oneway' remote call cannot also be 'blocking'",
+      ())
+
+NOTE(distributed_remotecall_semantics_declared_here,none,
+      "remote call '%0' semantics declared here",
+      (StringRef))
+
+GROUPED_WARNING(distributed_remotecall_duplicate_semantics,DuplicateRemoteCallSemantics,none,
+      "remote call semantic '%0' specified more than once has no additional effect",
+      (StringRef))
+
+ERROR(distributed_remotecall_semantics_only_version_newer,none,
+      "remote call semantics are only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))

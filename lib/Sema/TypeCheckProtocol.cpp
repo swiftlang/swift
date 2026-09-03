@@ -7056,10 +7056,13 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   // Check all conformances.
   groupChecker.checkAllConformances();
 
-  // Check actor isolation.
   for (auto *member : idc->getMembers()) {
     if (auto *valueDecl = dyn_cast<ValueDecl>(member)) {
+      // Check actor isolation.
       (void)getActorIsolation(valueDecl);
+
+      // Check '@remoteCall(...)' semantics
+      checkDistributedEffectiveCallSemantics(valueDecl);
     }
   }
 

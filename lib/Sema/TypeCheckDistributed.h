@@ -53,6 +53,13 @@ bool checkDistributedActorSystem(const NominalTypeDecl *system);
 /// Typecheck a distributed method declaration
 bool checkDistributedFunction(AbstractFunctionDecl *decl);
 
+/// Validate the '@remoteCall(...)' semantics of a distributed member by
+/// resolving its effective semantics (the declaration's own attributes unioned
+/// with those on the distributed protocol requirement(s) it witnesses), which
+/// emits the '@remoteCall' diagnostics as a cached side effect. Must run after
+/// conformance checking so the witnessed requirements are visible.
+void checkDistributedEffectiveCallSemantics(ValueDecl *valueDecl);
+
 /// Typecheck a distributed computed (get-only) property declaration.
 /// They are effectively checked the same way as argument-less methods.
 bool checkDistributedActorProperty(VarDecl *decl, bool diagnose);

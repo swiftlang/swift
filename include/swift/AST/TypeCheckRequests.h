@@ -24,6 +24,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/CatchNode.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericParamList.h"
@@ -1423,6 +1424,28 @@ private:
   /// \returns \c true if there was a problem with the function declaration,
   /// \c false otherwise.
   bool evaluate(Evaluator &evaluator, AbstractFunctionDecl *) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Validate and obtain the effective '@remoteCall(...)' semantics of a distributed decl.
+///
+/// Combines the decl's own '@remoteCall' attrs combined with
+/// inherited ones from witnessed protocol requirements.
+class ResolveDistributedEffectiveRemoteCallSemanticsRequest :
+    public SimpleRequest<ResolveDistributedEffectiveRemoteCallSemanticsRequest,
+                         std::optional<DistributedRemoteCallSemantics>(ValueDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<DistributedRemoteCallSemantics>
+  evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Caching

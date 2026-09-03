@@ -58,6 +58,7 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     -enable-experimental-feature AllowUnsafeAttribute
+    -enable-experimental-feature DistributedRemoteCallSemantics
     -strict-memory-safety
 
   LINK_FLAGS

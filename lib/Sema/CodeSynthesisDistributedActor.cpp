@@ -461,41 +461,75 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   }
 
   // === Prepare the 'RemoteCallTarget'
-  VarDecl *targetVar = VarDeclBuilder(thunk, C.Id_target)
-                           .introducer(VarDecl::Introducer::Let)
-                           .type(remoteCallTargetTy);
 
-  {
-    // --- Mangle the thunk name
-    auto mangledAccessorRecordName =
-        mangleDistributedThunkForAccessorRecordName(C, thunk);
+  // -- Handle @remoteCall semantics
+  //
+  // Resolve the effective semantics from the declaration and any distributed
+  // protocol requirement it witnesses (the requirement is the source of truth;
+  // nothing is copied onto the witness). This is a cached request, already
+  // evaluated -- and its diagnostics emitted -- during conformance checking.
+  auto remoteCallSemantics = getDistributedEffectiveRemoteCallSemantics(func);
+  bool isOneway = remoteCallSemantics.isOneway;
+  bool isBlocking = remoteCallSemantics.isBlocking;
 
-    StringLiteralExpr *mangledTargetStringLiteral =
-        new (C) StringLiteralExpr(mangledAccessorRecordName,
-                                  SourceRange(), implicit);
+  // Introduce the target with `var` if we're going to mutate it
+  bool mutatesTarget = isOneway || isBlocking;
+  VarDecl *targetVar =
+      VarDeclBuilder(thunk, C.Id_target)
+          .introducer(mutatesTarget ? VarDecl::Introducer::Var
+                                    : VarDecl::Introducer::Let)
+          .type(remoteCallTargetTy);
 
-    // --- let target = RemoteCallTarget(<mangled name>)
-    Pattern *targetPattern = NamedPattern::createImplicit(C, targetVar);
+  // --- Mangle the thunk name
+  auto mangledAccessorRecordName =
+      mangleDistributedThunkForAccessorRecordName(C, thunk);
 
-    auto remoteCallTargetInitDecl =
-        RCT->getDistributedRemoteCallTargetInitFunction();
-    auto remoteCallTargetInitDeclRef = UnresolvedDeclRefExpr::createImplicit(
-        C, remoteCallTargetInitDecl->getEffectiveFullName());
+  StringLiteralExpr *mangledTargetStringLiteral =
+      new (C) StringLiteralExpr(mangledAccessorRecordName,
+                                SourceRange(), implicit);
 
-    auto initTargetExpr = UnresolvedDeclRefExpr::createImplicit(
-        C, RCT->getName());
-    auto initTargetArgs = ArgumentList::forImplicitCallTo(
-        remoteCallTargetInitDeclRef->getName(),
-        {mangledTargetStringLiteral}, C);
+  // --- let/var target = RemoteCallTarget(<mangled name>)
+  Pattern *targetPattern = NamedPattern::createImplicit(C, targetVar);
 
-    auto initTargetCallExpr =
-        CallExpr::createImplicit(C, initTargetExpr, initTargetArgs);
+  auto remoteCallTargetInitDecl =
+      RCT->getDistributedRemoteCallTargetInitFunction();
+  auto remoteCallTargetInitDeclRef = UnresolvedDeclRefExpr::createImplicit(
+      C, remoteCallTargetInitDecl->getEffectiveFullName());
 
-    auto targetPB = PatternBindingDecl::createImplicit(
-        C, StaticSpellingKind::None, targetPattern, initTargetCallExpr, thunk);
+  auto initTargetExpr = UnresolvedDeclRefExpr::createImplicit(
+      C, RCT->getName());
+  auto initTargetArgs = ArgumentList::forImplicitCallTo(
+      remoteCallTargetInitDeclRef->getName(),
+      {mangledTargetStringLiteral}, C);
 
-    remoteBranchStmts.push_back(targetPB);
-    remoteBranchStmts.push_back(targetVar);
+  auto initTargetCallExpr =
+      CallExpr::createImplicit(C, initTargetExpr, initTargetArgs);
+
+  auto targetPB = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, targetPattern, initTargetCallExpr, thunk);
+
+  remoteBranchStmts.push_back(targetPB);
+  remoteBranchStmts.push_back(targetVar);
+
+  // --- Set the '@remoteCall(...)' semantics flags
+  //     target.isOnewayRemoteCall = true
+  //     ...
+  auto setTargetSemanticsFlag = [&](Identifier name) {
+    auto *targetRef = new (C) DeclRefExpr(
+        ConcreteDeclRef(targetVar), dloc, implicit, AccessSemantics::Ordinary,
+        remoteCallTargetTy);
+    auto *flagRef =
+        UnresolvedDotExpr::createImplicit(C, targetRef, name);
+    auto *trueExpr = new (C) BooleanLiteralExpr(true, sloc, implicit);
+    auto *assign = new (C) AssignExpr(flagRef, sloc, trueExpr, implicit);
+    remoteBranchStmts.push_back(assign);
+  };
+
+  if (isOneway) {
+    setTargetSemanticsFlag(C.Id_isOnewayRemoteCall);
+  }
+  if (isBlocking) {
+    setTargetSemanticsFlag(C.Id_isSynchronousBlockingRemoteCall);
   }
 
   // === Make the 'remoteCall(Void)(...)'

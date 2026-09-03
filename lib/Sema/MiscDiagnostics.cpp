@@ -33,6 +33,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SemanticAttrs.h"
@@ -7235,4 +7236,37 @@ void DeferredDiag::emit(swift::ASTContext &ctx) {
   assert(loc && "no loc... already emitted?");
   ctx.Diags.diagnose(loc, diag);
   loc = SourceLoc();
+}
+
+void swift::fixItRemoveReturnType(InFlightDiagnostic &diag,
+                                  const FuncDecl *func) {
+  SourceRange resultRange = func->getResultTypeSourceRange();
+  if (resultRange.isInvalid())
+    return;
+
+  auto &SM = func->getASTContext().SourceMgr;
+
+  // The result type source range covers only the type itself, not the '->'
+  // arrow. Find the arrow by scanning forward from the end of the parameter
+  // list, past any 'async'/'throws' effect specifiers, so the fix-it removes
+  // the whole '-> ReturnType' clause rather than leaving a dangling arrow.
+  SourceLoc arrowLoc;
+  if (auto *params = func->getParameters()) {
+    SourceLoc loc = params->getEndLoc();
+    while (loc.isValid() && SM.isBeforeInBuffer(loc, resultRange.Start)) {
+      Token tok = Lexer::getTokenAtLocation(
+          SM, loc, CommentRetentionMode::AttachToNextToken);
+      if (tok.is(tok::arrow)) {
+        arrowLoc = tok.getLoc();
+        break;
+      }
+      SourceLoc next = Lexer::getLocForEndOfToken(SM, tok.getLoc());
+      if (next.isInvalid() || !SM.isBeforeInBuffer(loc, next))
+        break;
+      loc = next;
+    }
+  }
+
+  SourceLoc start = arrowLoc.isValid() ? arrowLoc : resultRange.Start;
+  diag.fixItRemove(SourceRange(start, resultRange.End));
 }

@@ -152,6 +152,11 @@ enum : unsigned {
       static_cast<unsigned>(ExecutionSemantics::Last_ExecutionSemantics))
 };
 
+enum : unsigned {
+  NumRemoteCallSemanticsBits =
+    countBitsUsed(static_cast<unsigned>(RemoteCallSemantics::Last_RemoteCallSemantics))
+};
+
 enum : unsigned { NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1) };
 
 enum : unsigned { NumTypeAttrKindBits = countBitsUsed(NumTypeAttrKinds - 1) };
@@ -305,6 +310,10 @@ protected:
 
     SWIFT_INLINE_BITFIELD(CalledAttr, DeclAttribute, NumExecutionSemanticsBits,
       Semantics : NumExecutionSemanticsBits
+    );
+
+    SWIFT_INLINE_BITFIELD(RemoteCallAttr, DeclAttribute, NumRemoteCallSemanticsBits,
+      Semantics : NumRemoteCallSemanticsBits
     );
   } Bits;
   // clang-format on
@@ -3928,6 +3937,49 @@ public:
   }
 
   bool isEquivalent(const CalledAttr *other, Decl *attachedTo) const {
+    return getSemantics() == other->getSemantics();
+  }
+};
+
+class RemoteCallAttr : public DeclAttribute {
+public:
+  RemoteCallAttr(SourceLoc atLoc, SourceRange range,
+                 RemoteCallSemantics semantics, bool implicit = false)
+      : DeclAttribute(DeclAttrKind::RemoteCall, atLoc, range, implicit) {
+    Bits.RemoteCallAttr.Semantics = unsigned(semantics);
+  }
+
+  explicit RemoteCallAttr(RemoteCallSemantics semantics)
+      : RemoteCallAttr(SourceLoc(), SourceRange(), semantics) {}
+
+  RemoteCallSemantics getSemantics() const {
+    return RemoteCallSemantics(Bits.RemoteCallAttr.Semantics);
+  }
+
+  bool isOneway() const {
+    return getSemantics() == RemoteCallSemantics::Oneway;
+  }
+
+  bool isBlocking() const {
+    return getSemantics() == RemoteCallSemantics::SynchronousBlocking;
+  }
+
+  static RemoteCallAttr *
+  createImplicit(ASTContext &ctx,
+                 RemoteCallSemantics semantics = RemoteCallSemantics::SynchronousBlocking) {
+    return new (ctx) RemoteCallAttr(/*atLoc*/ {}, /*range*/ {}, semantics,
+                                    /*implicit=*/true);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::RemoteCall;
+  }
+
+  RemoteCallAttr *clone(ASTContext &ctx) const {
+    return new (ctx) RemoteCallAttr(AtLoc, Range, getSemantics(), isImplicit());
+  }
+
+  bool isEquivalent(const RemoteCallAttr *other, Decl *attachedTo) const {
     return getSemantics() == other->getSemantics();
   }
 };

@@ -1440,6 +1440,13 @@ BridgedCalledAttr_createParsed(BridgedASTContext cContext,
                                swift::SourceLoc atLoc, swift::SourceRange range,
                                swift::ExecutionSemantics semantics);
 
+SWIFT_NAME("BridgedRemoteCallAttr.createParsed(_:atLoc:range:semantics:)")
+BridgedRemoteCallAttr
+BridgedRemoteCallAttr_createParsed(BridgedASTContext cContext,
+                                   swift::SourceLoc atLoc,
+                                   swift::SourceRange range,
+                                   swift::RemoteCallSemantics semantics);
+
 //===----------------------------------------------------------------------===//
 // MARK: Decls
 //===----------------------------------------------------------------------===//

@@ -31,6 +31,32 @@ class DeclContext;
 class FuncDecl;
 class NominalTypeDecl;
 class ProtocolDecl;
+class ValueDecl;
+
+/// The effective '@remoteCall(...)' semantics of a distributed decl.
+struct DistributedRemoteCallSemantics {
+  bool isOneway = false;
+  bool isBlocking = false;
+
+  bool empty() const { return !isOneway && !isBlocking; }
+
+  friend bool operator==(const DistributedRemoteCallSemantics &lhs,
+                         const DistributedRemoteCallSemantics &rhs) {
+    return lhs.isOneway == rhs.isOneway && lhs.isBlocking == rhs.isBlocking;
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const DistributedRemoteCallSemantics &semantics);
+
+/// Resolve the effective '@remoteCall(...)' semantics for \p decl (a distributed
+/// function or distributed computed property), unioning the decl's own
+/// attributes with those inherited from any distributed protocol requirement it
+/// witnesses. Evaluating this also emits the '@remoteCall' validation
+/// diagnostics (once, cached). Must be invoked only after protocol witness
+/// matching for the enclosing type has completed.
+DistributedRemoteCallSemantics
+getDistributedEffectiveRemoteCallSemantics(const ValueDecl *decl);
 
 Type getAssociatedTypeOfDistributedSystemOfActor(DeclContext *actorOrExtension,
                                                  Identifier member);

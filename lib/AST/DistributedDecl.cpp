@@ -1491,6 +1491,32 @@ bool ValueDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           const DistributedRemoteCallSemantics &semantics) {
+  if (semantics.isOneway)
+    out << "(oneway)";
+  if (semantics.isBlocking)
+    out << "(blocking)";
+}
+
+DistributedRemoteCallSemantics
+swift::getDistributedEffectiveRemoteCallSemantics(const ValueDecl *decl) {
+  if (!decl)
+    return {};
+
+  // '@remoteCall' semantics belong to the storage decl
+  const ValueDecl *attrDecl = decl;
+  if (auto *accessor = dyn_cast<AccessorDecl>(attrDecl))
+    attrDecl = accessor->getStorage();
+
+  auto *mutableDecl = const_cast<ValueDecl *>(attrDecl);
+  return evaluateOrDefault(
+             mutableDecl->getASTContext().evaluator,
+             ResolveDistributedEffectiveRemoteCallSemanticsRequest{mutableDecl},
+             std::nullopt)
+      .value_or(DistributedRemoteCallSemantics{});
+}
+
 bool ValueDecl::isDistributedGetAccessor() const {
   if (auto accessor = dyn_cast<AccessorDecl>(this)) {
     if (accessor->getAccessorKind() == AccessorKind::DistributedGet) {
