@@ -459,11 +459,10 @@ public:
   VISIT_AND_CREATE_WHOLE_PORTION(OpaqueTypeDecl, OpaqueTypeScope)
 #undef VISIT_AND_CREATE_WHOLE_PORTION
 
-  ASTScopeImpl *visitNamespaceDecl(NamespaceDecl *, ASTScopeImpl *parent,
-                                   ScopeCreator &) {
-    // Namespace source scopes are introduced with parser support. Until then,
-    // keep a synthesized namespace from perturbing the surrounding scope.
-    return parent;
+  ASTScopeImpl *visitNamespaceDecl(NamespaceDecl *decl, ASTScopeImpl *parent,
+                                   ScopeCreator &scopeCreator) {
+    return scopeCreator.constructExpandAndInsert<NamespaceDeclScope>(parent,
+                                                                      decl);
   }
 
   ASTScopeImpl *visitBuiltinTupleDecl(BuiltinTupleDecl *btd, ASTScopeImpl *p,
@@ -815,6 +814,8 @@ CREATES_NEW_INSERTION_POINT(ABIAttributeScope)
 
 NO_NEW_INSERTION_POINT(FunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
+NO_NEW_INSERTION_POINT(NamespaceDeclScope)
+NO_NEW_INSERTION_POINT(NamespaceBodyScope)
 NO_NEW_INSERTION_POINT(CustomAttributeScope)
 NO_NEW_INSERTION_POINT(EnumElementScope)
 NO_NEW_INSERTION_POINT(GuardStmtBodyScope)
@@ -1062,6 +1063,21 @@ ABIAttributeScope::expandAScopeThatCreatesANewInsertionPoint(
 #pragma mark expandAScopeThatDoesNotCreateANewInsertionPoint
 
 // Create child scopes for every declaration in a body.
+
+void NamespaceDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  scopeCreator.addChildrenForKnownAttributes(decl, this);
+
+  auto braces = decl->getBraces();
+  if (braces.isValid() && braces.Start != braces.End)
+    scopeCreator.constructExpandAndInsert<NamespaceBodyScope>(this, decl);
+}
+
+void NamespaceBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  for (auto *member : decl->getMembers())
+    scopeCreator.addToScopeTree(ASTNode(member), this);
+}
 
 namespace {
   /// Retrieve the opaque generic parameter list if present, otherwise the normal generic parameter list.
@@ -1444,6 +1460,16 @@ NullablePtr<ASTScopeImpl> ASTScopeImpl::insertionPointForDeferredExpansion() {
 
 NullablePtr<ASTScopeImpl>
 FunctionBodyScope::insertionPointForDeferredExpansion() {
+  return getParent().get();
+}
+
+NullablePtr<ASTScopeImpl>
+NamespaceDeclScope::insertionPointForDeferredExpansion() {
+  return getParent().get();
+}
+
+NullablePtr<ASTScopeImpl>
+NamespaceBodyScope::insertionPointForDeferredExpansion() {
   return getParent().get();
 }
 

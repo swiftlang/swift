@@ -50,6 +50,8 @@
 #endif
 
 SCOPE_NODE(ASTSourceFile)
+DECL_SCOPE_NODE(NamespaceDecl)
+DECL_SCOPE_NODE(NamespaceBody)
 DECL_SCOPE_NODE(NominalType)
 DECL_SCOPE_NODE(Extension)
 DECL_SCOPE_NODE(TypeAlias)

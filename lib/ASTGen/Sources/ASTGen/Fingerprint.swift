@@ -92,9 +92,13 @@ func getSourceFileFingerprint(
 }
 
 extension ASTGenVisitor {
-  func generateFingerprint(declGroup node: some DeclGroupSyntax) -> Fingerprint {
+  func generateFingerprint(memberBlock node: MemberBlockSyntax) -> Fingerprint {
     let visitor = FingerprintVisitor(configuredRegions: self.configuredRegions)
-    visitor.walk(node.memberBlock)
+    visitor.walk(node)
     return visitor.finalize()
+  }
+
+  func generateFingerprint(declGroup node: some DeclGroupSyntax) -> Fingerprint {
+    return self.generateFingerprint(memberBlock: node.memberBlock)
   }
 }

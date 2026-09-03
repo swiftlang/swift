@@ -324,6 +324,17 @@ BridgedTypeAliasDecl BridgedTypeAliasDecl_createParsed(
   return decl;
 }
 
+BridgedNamespaceDecl BridgedNamespaceDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    SourceLoc namespaceKeywordLoc, swift::Identifier name, SourceLoc nameLoc,
+    SourceRange braceRange) {
+  ASTContext &context = cContext.unbridged();
+  auto *decl = NamespaceDecl::create(context, namespaceKeywordLoc, name,
+                                     nameLoc, cDeclContext.unbridged());
+  decl->setBraces(braceRange);
+  return decl;
+}
+
 static void setParsedMembers(IterableDeclContext *IDC, BridgedArrayRef cMembers,
                              BridgedFingerprint cFingerprint) {
   auto &ctx = IDC->getDecl()->getASTContext();
@@ -344,6 +355,12 @@ static void setParsedMembers(IterableDeclContext *IDC, BridgedArrayRef cMembers,
 void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl cDecl,
                                              BridgedArrayRef cMembers,
                                              BridgedFingerprint cFingerprint) {
+  setParsedMembers(cDecl.unbridged(), cMembers, cFingerprint);
+}
+
+void BridgedNamespaceDecl_setParsedMembers(BridgedNamespaceDecl cDecl,
+                                           BridgedArrayRef cMembers,
+                                           BridgedFingerprint cFingerprint) {
   setParsedMembers(cDecl.unbridged(), cMembers, cFingerprint);
 }
 

@@ -52,8 +52,8 @@ extension ASTGenVisitor {
       return self.generate(macroExpansionDecl: node).asDecl
     case .missingDecl(let node):
       return self.generate(missingDecl: node)?.asDecl
-    case .namespaceDecl:
-      fatalError("Namespace declarations are not yet lowered by ASTGen")
+    case .namespaceDecl(let node):
+      return self.generate(namespaceDecl: node)?.asDecl
     case .operatorDecl(let node):
       return self.generate(operatorDecl: node)?.asDecl
     case .poundSourceLocation:
@@ -88,6 +88,37 @@ extension ASTGenVisitor {
       return nil
     }
     return result
+  }
+
+  func generate(namespaceDecl node: NamespaceDeclSyntax) -> BridgedNamespaceDecl? {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
+    guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
+      return nil
+    }
+
+    let decl = BridgedNamespaceDecl.createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      namespaceKeywordLoc: self.generateSourceLoc(node.namespaceKeyword),
+      name: name,
+      nameLoc: nameLoc,
+      braceRange: self.generateSourceRange(
+        start: node.memberBlock.leftBrace,
+        end: node.memberBlock.rightBrace
+      )
+    )
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
+
+    let members = self.withDeclContext(decl.asDeclContext) {
+      self.generate(memberBlockItemList: node.memberBlock.members)
+    }
+    let fingerprint = self.generateFingerprint(memberBlock: node.memberBlock)
+    decl.setParsedMembers(
+      members.lazy.bridgedArray(in: self),
+      fingerprint: fingerprint.bridged
+    )
+
+    return decl
   }
 
   func generate(typeAliasDecl node: TypeAliasDeclSyntax) -> BridgedTypeAliasDecl? {

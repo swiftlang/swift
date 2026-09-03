@@ -153,6 +153,14 @@ void ASTSourceFileScope::printSpecifics(
   out << "'" << SF->getFilename() << "'";
 }
 
+void NamespaceDeclScope::printSpecifics(llvm::raw_ostream &out) const {
+  out << "'" << decl->getName() << "'";
+}
+
+void NamespaceBodyScope::printSpecifics(llvm::raw_ostream &out) const {
+  out << "'" << decl->getName() << "'";
+}
+
 NullablePtr<const void> ASTScopeImpl::addressForPrinting() const {
   if (auto *p = getDeclIfAny().getPtrOrNull())
     return p;

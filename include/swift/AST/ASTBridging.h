@@ -345,6 +345,7 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getParent() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableDeclContext getDeclContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclContext asGenericContext() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclContext asNamespaceDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclContext asTopLevelCodeDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclContext asModuleDecl() const;
   BRIDGED_INLINE void setImplicit() const;
@@ -1595,6 +1596,19 @@ BridgedTypeAliasDecl BridgedTypeAliasDecl_createParsed(
     swift::SourceLoc nameLoc, BridgedNullableGenericParamList genericParamList,
     swift::SourceLoc equalLoc, BridgedTypeRepr underlyingType,
     BridgedNullableTrailingWhereClause genericWhereClause);
+
+SWIFT_NAME(
+    "BridgedNamespaceDecl.createParsed(_:declContext:namespaceKeywordLoc:name:"
+    "nameLoc:braceRange:)")
+BridgedNamespaceDecl BridgedNamespaceDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    swift::SourceLoc namespaceKeywordLoc, swift::Identifier name,
+    swift::SourceLoc nameLoc, swift::SourceRange braceRange);
+
+SWIFT_NAME("BridgedNamespaceDecl.setParsedMembers(self:_:fingerprint:)")
+void BridgedNamespaceDecl_setParsedMembers(BridgedNamespaceDecl decl,
+                                           BridgedArrayRef members,
+                                           BridgedFingerprint fingerprint);
 
 SWIFT_NAME("BridgedExtensionDecl.setParsedMembers(self:_:fingerprint:)")
 void BridgedExtensionDecl_setParsedMembers(BridgedExtensionDecl decl,

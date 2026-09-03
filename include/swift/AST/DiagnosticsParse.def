@@ -351,6 +351,20 @@ ERROR(expected_rbrace_extension,none,
 ERROR(extension_type_expected,none,
       "expected type name in extension declaration", ())
 
+// Namespace
+ERROR(expected_lbrace_namespace,PointsToFirstBadToken,
+      "expected '{' in namespace", ())
+ERROR(expected_rbrace_namespace,none,
+      "expected '}' at end of namespace", ())
+ERROR(namespace_qualified_name,none,
+      "namespace names must be a single identifier", ())
+ERROR(namespace_generic_parameters,none,
+      "namespaces cannot have generic parameters", ())
+ERROR(namespace_inheritance_clause,none,
+      "namespaces cannot have an inheritance clause", ())
+ERROR(namespace_where_clause,none,
+      "namespaces cannot have a 'where' clause", ())
+
 // TypeAlias
 ERROR(expected_equal_in_typealias,PointsToFirstBadToken,
       "expected '=' in type alias declaration", ())

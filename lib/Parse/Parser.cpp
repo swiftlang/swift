@@ -182,8 +182,9 @@ void Parser::performIDEInspectionSecondPassImpl(
   }
 
   case IDEInspectionDelayedDeclKind::Decl: {
-    assert((DC->isTypeContext() || DC->isModuleScopeContext()) &&
-           "Delayed decl must be a type member or a top-level decl");
+    assert((DC->isTypeContext() || DC->isModuleScopeContext() ||
+            isa<NamespaceDecl>(DC)) &&
+           "Delayed decl must be a member or a top-level decl");
     ContextChange CC(*this, DC);
 
     parseDecl(/*IsAtStartOfLineOrPreviousHadSemi=*/true,
@@ -192,6 +193,8 @@ void Parser::performIDEInspectionSecondPassImpl(
                   NTD->addMemberPreservingSourceOrder(D);
                 } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
                   ED->addMemberPreservingSourceOrder(D);
+                } else if (auto *ND = dyn_cast<NamespaceDecl>(DC)) {
+                  ND->addMemberPreservingSourceOrder(D);
                 } else if (auto *SF = dyn_cast<SourceFile>(DC)) {
                   SF->addTopLevelDecl(D);
                 } else {

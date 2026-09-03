@@ -188,6 +188,10 @@ BridgedDeclContext BridgedDeclObj::asGenericContext() const {
   return {static_cast<swift::DeclContext *>(getAs<swift::GenericContext>())};
 }
 
+BridgedDeclContext BridgedDeclObj::asNamespaceDecl() const {
+  return {static_cast<swift::DeclContext *>(getAs<swift::NamespaceDecl>())};
+}
+
 BridgedDeclContext BridgedDeclObj::asTopLevelCodeDecl() const {
   return {static_cast<swift::DeclContext *>(getAs<swift::TopLevelCodeDecl>())};
 }

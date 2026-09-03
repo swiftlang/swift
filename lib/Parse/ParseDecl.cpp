@@ -5905,6 +5905,111 @@ static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
           Tok2.isContextualKeyword("infix"));
 }
 
+/// Consume a balanced angle-bracket clause without constructing generic
+/// parameter declarations. Namespace generic syntax is recovery-only and must
+/// not register semantic generic parameters in the enclosing context.
+static bool consumeNamespaceGenericParameterClause(Parser &parser) {
+  if (!parser.startsWithLess(parser.Tok))
+    return false;
+
+  parser.consumeStartingLess();
+  unsigned depth = 1;
+  while (parser.Tok.isNot(tok::eof, tok::l_brace, tok::r_brace)) {
+    if (parser.startsWithLess(parser.Tok)) {
+      parser.consumeStartingLess();
+      ++depth;
+      continue;
+    }
+    if (parser.startsWithGreater(parser.Tok)) {
+      parser.consumeStartingGreater();
+      if (--depth == 0)
+        return true;
+      continue;
+    }
+    parser.consumeToken();
+  }
+  return false;
+}
+
+bool Parser::isStartOfNamespaceDeclaration(bool allowRecovery) {
+  if (!Context.LangOpts.hasFeature(Feature::Namespaces) ||
+      !Tok.isContextualKeyword("namespace"))
+    return false;
+
+  BacktrackingScope backtrack(*this);
+  consumeToken(tok::identifier);
+
+  if (Tok.is(tok::identifier)) {
+    consumeToken(tok::identifier);
+    if (Tok.is(tok::l_brace))
+      return true;
+
+    bool consumedMalformedSyntax = false;
+
+    while (consumeIf(tok::period)) {
+      if (!Tok.is(tok::identifier))
+        return allowRecovery;
+      consumeToken(tok::identifier);
+      consumedMalformedSyntax = true;
+    }
+
+    if (startsWithLess(Tok)) {
+      if (!consumeNamespaceGenericParameterClause(*this))
+        return allowRecovery;
+      consumedMalformedSyntax = true;
+    }
+
+    if (consumeIf(tok::colon)) {
+      if (!canParseType())
+        return allowRecovery;
+      while (consumeIf(tok::comma)) {
+        if (!canParseType())
+          return allowRecovery;
+      }
+      consumedMalformedSyntax = true;
+    }
+
+    if (consumeIf(tok::kw_where)) {
+      auto canParseTypeOrIntegerLiteral = [&]() {
+        if (Tok.is(tok::integer_literal)) {
+          consumeToken();
+          return true;
+        }
+        return canParseType();
+      };
+
+      do {
+        if (!canParseTypeOrIntegerLiteral())
+          return allowRecovery;
+        if (!consumeIf(tok::colon)) {
+          if (!Tok.isAnyOperator() || Tok.getText() != "==")
+            return allowRecovery;
+          consumeToken();
+        }
+        if (!canParseTypeOrIntegerLiteral())
+          return allowRecovery;
+      } while (consumeIf(tok::comma));
+      consumedMalformedSyntax = true;
+    }
+
+    if (consumedMalformedSyntax && Tok.is(tok::l_brace))
+      return true;
+    return allowRecovery;
+  }
+
+  if (allowRecovery && Tok.isAny(tok::l_brace, tok::r_brace, tok::eof))
+    return true;
+
+  if (Tok.isKeyword() ||
+      Tok.isAny(tok::integer_literal, tok::floating_literal, tok::dollarident,
+                tok::kw__, tok::unknown)) {
+    consumeToken();
+    return Tok.is(tok::l_brace);
+  }
+
+  return false;
+}
+
 /// Diagnose issues with fixity attributes, if any.
 static void diagnoseOperatorFixityAttributes(Parser &P,
                                              DeclAttributes &Attrs,
@@ -5997,10 +6102,11 @@ static unsigned skipUntilMatchingRBrace(Parser &P, bool &HasPoundDirective,
     HasPoundDirective |= P.Tok.isAny(tok::pound_if, tok::pound_else,
                                      tok::pound_endif, tok::pound_elseif);
 
-    HasNestedTypeDeclarations |= P.Tok.isAny(tok::kw_class, tok::kw_struct,
-                                             tok::kw_enum, tok::kw_typealias,
-                                             tok::kw_protocol)
-                              || P.Tok.isContextualKeyword("actor");
+    HasNestedTypeDeclarations |=
+        P.Tok.isAny(tok::kw_class, tok::kw_struct, tok::kw_enum,
+                    tok::kw_typealias, tok::kw_protocol) ||
+        P.Tok.isContextualKeyword("actor") ||
+        P.isStartOfNamespaceDeclaration(/*allowRecovery=*/false);
 
     if (P.consumeIf(tok::at_sign)) {
       if (P.Tok.is(tok::identifier)) {
@@ -6301,6 +6407,12 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
   const Token &Tok2 = peekToken();
   if (isStartOfOperatorDecl(Tok, Tok2))
     return true;
+
+  bool allowNamespaceRecovery = hadAttrsOrModifiers ||
+                                CurDeclContext->isTypeContext() ||
+                                isa<NamespaceDecl>(CurDeclContext);
+  if (isStartOfNamespaceDeclaration(allowNamespaceRecovery))
+    return true;
     
   // If this can't possibly be a contextual keyword, then this identifier is
   // not interesting.  Bail out.
@@ -6508,6 +6620,9 @@ static Parser::ParseDeclOptions getParseDeclOptions(DeclContext *DC) {
 
   case DeclKind::Struct:
     return ParseDeclOptions(Parser::PD_HasContainerType | Parser::PD_InStruct);
+
+  case DeclKind::Namespace:
+    return Parser::PD_InNamespace;
 
   default:
     llvm_unreachable("Bad iterable decl context kinds.");
@@ -6745,6 +6860,14 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
       break;
     }
 
+    bool allowNamespaceRecovery =
+        !Attributes.isEmpty() || Flags.contains(PD_HasContainerType) ||
+        Flags.contains(PD_InNamespace) || StaticLoc.isValid();
+    if (isStartOfNamespaceDeclaration(allowNamespaceRecovery)) {
+      DeclResult = parseDeclNamespace(Flags, Attributes);
+      break;
+    }
+
     if (Tok.isContextualKeyword("actor") && peekToken().is(tok::identifier)) {
       Tok.setKind(tok::contextual_keyword);
       DeclResult = parseDeclClass(Flags, Attributes);
@@ -6768,7 +6891,8 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
       }
     }
 
-    if (Flags.contains(PD_HasContainerType) &&
+    if ((Flags.contains(PD_HasContainerType) ||
+         Flags.contains(PD_InNamespace)) &&
         IsAtStartOfLineOrPreviousHadSemi) {
 
       // Emit diagnostics if we meet an identifier/operator where a declaration
@@ -6933,13 +7057,7 @@ std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
 Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   Decl *D = const_cast<Decl*>(IDC->getDecl());
   DeclContext *DC = cast<DeclContext>(D);
-  SourceRange BodyRange;
-  if (auto ext = dyn_cast<ExtensionDecl>(IDC)) {
-    BodyRange = ext->getBraces();
-  } else {
-    auto *ntd = cast<NominalTypeDecl>(IDC);
-    BodyRange = ntd->getBraces();
-  }
+  SourceRange BodyRange = IDC->getBraces();
 
   if (BodyRange.isInvalid()) {
     assert(D->isImplicit());
@@ -6980,6 +7098,7 @@ Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   Diag<> Id;
   switch (D->getKind()) {
   case DeclKind::Extension: Id = diag::expected_rbrace_extension; break;
+  case DeclKind::Namespace: Id = diag::expected_rbrace_namespace; break;
   case DeclKind::Enum: Id = diag::expected_rbrace_enum; break;
   case DeclKind::Protocol: Id = diag::expected_rbrace_protocol; break;
   case DeclKind::Class: Id = diag::expected_rbrace_class; break;
@@ -7363,6 +7482,104 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
 
   P.diagnose(P.Tok, diag::expected_identifier_in_decl, DeclKindName);
   return makeParserError();
+}
+
+/// Parse a namespace declaration.
+///
+/// A namespace has a single identifier name and a declaration-only member
+/// block. Dotted names and generic, inheritance, or where clauses are consumed
+/// for recovery but intentionally carry no semantic meaning.
+ParserResult<NamespaceDecl>
+Parser::parseDeclNamespace(ParseDeclOptions Flags,
+                           DeclAttributes &Attributes) {
+  Tok.setKind(tok::contextual_keyword);
+  SourceLoc namespaceLoc = consumeToken();
+
+  const bool hadValidName = Tok.is(tok::identifier);
+  const SourceLoc originalNameLoc = Tok.getLoc();
+  Identifier name;
+  SourceLoc nameLoc;
+  ParserStatus status = parseIdentifierDeclName(
+      *this, name, nameLoc, "namespace", [&](const Token &next) {
+        return next.isAny(tok::l_brace, tok::period, tok::colon,
+                          tok::kw_where) ||
+               startsWithLess(next);
+      });
+
+  // ASTGen does not form a semantic declaration when the syntax name is
+  // missing or malformed. Keep the legacy AST in parity while still consuming
+  // an unambiguous member block for parser recovery.
+  if (!hadValidName) {
+    if (Tok.getLoc() == originalNameLoc &&
+        Tok.isNot(tok::l_brace, tok::r_brace, tok::eof))
+      consumeToken();
+    if (Tok.is(tok::l_brace))
+      status |= skipSingle();
+    status.setIsParseError();
+    return status;
+  }
+
+  auto *decl = NamespaceDecl::create(Context, namespaceLoc, name, nameLoc,
+                                     CurDeclContext);
+  decl->attachParsedAttrs(Attributes);
+
+  if (Tok.is(tok::period)) {
+    diagnose(Tok, diag::namespace_qualified_name);
+    status.setIsParseError();
+    while (consumeIf(tok::period)) {
+      Identifier component;
+      SourceLoc componentLoc;
+      auto componentStatus = parseIdentifierDeclName(
+          *this, component, componentLoc, "namespace", [&](const Token &next) {
+            return next.isAny(tok::l_brace, tok::period, tok::colon,
+                              tok::kw_where) ||
+                   startsWithLess(next);
+          });
+      status |= componentStatus;
+      if (componentStatus.isErrorOrHasCompletion())
+        break;
+    }
+  }
+
+  if (startsWithLess(Tok)) {
+    diagnose(Tok, diag::namespace_generic_parameters);
+    consumeNamespaceGenericParameterClause(*this);
+    status.setIsParseError();
+  }
+
+  if (Tok.is(tok::colon)) {
+    diagnose(Tok, diag::namespace_inheritance_clause);
+    SmallVector<InheritedEntry, 2> inherited;
+    status |= parseInheritance(inherited,
+                               /*allowClassRequirement=*/false,
+                               /*allowAnyObject=*/false);
+    status.setIsParseError();
+  }
+
+  if (Tok.is(tok::kw_where)) {
+    diagnose(Tok, diag::namespace_where_clause);
+    SourceLoc whereLoc, endLoc;
+    SmallVector<RequirementRepr, 4> requirements;
+    status |= parseGenericWhereClause(whereLoc, endLoc, requirements);
+    status.setIsParseError();
+  }
+
+  ParseDeclOptions memberFlags(PD_InNamespace);
+  if (Flags.contains(PD_StubOnly))
+    memberFlags |= PD_StubOnly;
+
+  SourceLoc leftBraceLoc, rightBraceLoc;
+  {
+    ContextChange contextChange(*this, decl);
+    if (parseMemberDeclList(leftBraceLoc, rightBraceLoc,
+                            diag::expected_lbrace_namespace,
+                            diag::expected_rbrace_namespace, decl,
+                            memberFlags))
+      status.setIsParseError();
+  }
+  decl->setBraces({leftBraceLoc, rightBraceLoc});
+
+  return makeParserResult(status, decl);
 }
 
 /// Add a fix-it to remove the space in consecutive identifiers.
@@ -9180,7 +9397,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
   assert(StaticLoc.isInvalid() || StaticSpelling != StaticSpellingKind::None);
 
   if (StaticLoc.isValid()) {
-    if (!Flags.contains(PD_HasContainerType)) {
+    if (!Flags.contains(PD_HasContainerType) &&
+        !Flags.contains(PD_InNamespace)) {
       diagnose(Tok, diag::static_var_decl_global_scope, StaticSpelling)
           .fixItRemove(StaticLoc);
       StaticLoc = SourceLoc();
@@ -9449,7 +9667,8 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   assert(StaticLoc.isInvalid() || StaticSpelling != StaticSpellingKind::None);
 
   if (StaticLoc.isValid()) {
-    if (!Flags.contains(PD_HasContainerType)) {
+    if (!Flags.contains(PD_HasContainerType) &&
+        !Flags.contains(PD_InNamespace)) {
       // Reject static functions at global scope.
       diagnose(Tok, diag::static_func_decl_global_scope, StaticSpelling)
           .fixItRemove(StaticLoc);

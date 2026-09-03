@@ -209,6 +209,16 @@ SourceRange ASTSourceFileScope::getSourceRangeOfThisASTNode(
   return SourceRange(charRange.getStart(), charRange.getEnd());
 }
 
+SourceRange NamespaceDeclScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return decl->getSourceRangeIncludingAttrs();
+}
+
+SourceRange NamespaceBodyScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return decl->getBraces();
+}
+
 SourceRange GenericTypeOrExtensionScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   return portion->getChildlessSourceRangeOf(this, omitAssertions);

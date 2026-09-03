@@ -95,6 +95,7 @@ extension Parser.LanguageFeatures {
     mapFeature(.BorrowAndMutateAccessors, to: .borrowAndMutateAccessors)
     mapFeature(.LiteralExpressions, to: .literalExpressions)
     mapFeature(.CalledAttribute, to: .calledAttribute)
+    mapFeature(.Namespaces, to: .namespaces)
   }
 }
 

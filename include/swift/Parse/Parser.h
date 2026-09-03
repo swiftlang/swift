@@ -918,6 +918,9 @@ public:
   bool isStartOfSwiftDecl(bool allowPoundIfAttributes = true,
                           bool hadAttrsOrModifiers = false);
 
+  /// Returns true if parser is at the start of a namespace declaration.
+  bool isStartOfNamespaceDeclaration(bool allowRecovery);
+
   /// Returns true if the parser is at the start of a SIL decl.
   bool isStartOfSILDecl();
 
@@ -948,6 +951,7 @@ public:
     PD_InStruct             = 1 << 8,
     PD_InEnum               = 1 << 9,
     PD_StubOnly             = 1 << 10,
+    PD_InNamespace          = 1 << 11,
   };
 
   /// Options that control the parsing of declarations.
@@ -1260,6 +1264,8 @@ public:
                 bool &hadError);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
+  ParserResult<NamespaceDecl>
+  parseDeclNamespace(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
   ParserResult<EnumCaseDecl>

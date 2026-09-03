@@ -465,6 +465,64 @@ public:
   }
 };
 
+/// The declaration portion of a namespace. Unlike a nominal type scope, this
+/// scope has no generic parameters or implicit Self semantics.
+class NamespaceDeclScope final : public ASTScopeImpl {
+public:
+  NamespaceDecl *const decl;
+
+  NamespaceDeclScope(NamespaceDecl *decl)
+      : ASTScopeImpl(ScopeKind::NamespaceDecl), decl(decl) {}
+
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  Decl *getDecl() const { return decl; }
+  bool ignoreInDebugInfo() const override { return true; }
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+  void printSpecifics(llvm::raw_ostream &out) const override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
+  NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
+
+  static bool classof(const ASTScopeImpl *scope) {
+    return scope->getKind() == ScopeKind::NamespaceDecl;
+  }
+};
+
+/// The member-body portion of a namespace. It is structural only: namespace
+/// member lookup is deliberately implemented by a later semantic slice.
+class NamespaceBodyScope final : public ASTScopeImpl {
+public:
+  NamespaceDecl *const decl;
+
+  NamespaceBodyScope(NamespaceDecl *decl)
+      : ASTScopeImpl(ScopeKind::NamespaceBody), decl(decl) {}
+
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  Decl *getDecl() const { return decl; }
+  bool ignoreInDebugInfo() const override { return true; }
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+  void printSpecifics(llvm::raw_ostream &out) const override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
+  NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
+
+  static bool classof(const ASTScopeImpl *scope) {
+    return scope->getKind() == ScopeKind::NamespaceBody;
+  }
+};
+
 class Portion : public ASTAllocated<ASTScopeImpl> {
 public:
   const char *portionName;
