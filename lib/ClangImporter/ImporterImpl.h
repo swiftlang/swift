@@ -2397,6 +2397,15 @@ bool isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx);
 /// derived from \c swift::RefCountedClass).
 bool isSwiftClassType(const clang::CXXRecordDecl *decl);
 
+/// Why \p recordDecl's escapability is unknown, or nothing when it is known --
+/// or when no reason could be attributed, since a note that cannot be justified
+/// is worse than none.
+///
+/// Shares the ClangTypeEscapability computation rather than repeating it.
+std::optional<CxxUnknownEscapability>
+explainUnknownEscapability(const clang::RecordDecl *recordDecl,
+                           ASTContext &ctx);
+
 /// Which part of \p recordDecl made it unsafe, or nothing when it is not.
 ///
 /// Shares the ClangDeclExplicitSafety walk rather than repeating it, so the

@@ -5730,9 +5730,29 @@ static bool canDeriveEscapabilityFromMembers(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
-CxxEscapability
-ClangTypeEscapability::evaluate(Evaluator &evaluator,
-                                EscapabilityLookupDescriptor desc) const {
+/// An escapability verdict, with the reason behind it when it is Unknown.
+///
+/// The reason is absent on paths that reach Unknown without recording one -- an
+/// explicit unsafe annotation short-circuits the traversal, for one -- so its
+/// presence, rather than a separate flag, tells a caller whether there is
+/// anything to explain.
+struct EscapabilityResult {
+  CxxEscapability escapability;
+  std::optional<importer::CxxUnknownEscapability> unknown;
+};
+
+/// The shared implementation of ClangTypeEscapability.
+static EscapabilityResult
+computeClangTypeEscapability(Evaluator &evaluator,
+                             EscapabilityLookupDescriptor desc) {
+  std::optional<importer::CxxUnknownEscapability> unknown;
+  auto unknownBecause = [&](importer::CxxUnknownEscapabilityReason reason,
+                            const clang::NamedDecl *blame) {
+    // The first reason found wins: it is the one that made the answer Unknown.
+    if (!unknown)
+      unknown = importer::CxxUnknownEscapability{reason, blame};
+    return true;
+  };
 
   // Escapability inference rules:
   // - array and vector types have the same escapability as their element type
@@ -5769,7 +5789,7 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
     if (const auto *recordType = type->getAs<clang::RecordType>()) {
       auto recordDecl = recordType->getDecl();
       if (hasNonEscapableAttr(recordDecl))
-        return CxxEscapability::NonEscapable;
+        return {CxxEscapability::NonEscapable, std::nullopt};
       if (hasEscapableAttr(recordDecl))
         continue;
       // A foreign reference type is imported as a Swift class, which is always
@@ -5779,7 +5799,9 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       if (importer::isForeignReferenceRecord(recordDecl, evaluator))
         continue;
       if (hasSwiftAttribute(recordDecl, {"unsafe", "unsafe(always)"}))
-        return CxxEscapability::Unknown;
+        // Reached without recording a reason, so there is nothing to explain:
+        // the annotation in the header already says it.
+        return {CxxEscapability::Unknown, std::nullopt};
       llvm::ArrayRef<int> STLParams;
       if (recordDecl->isInStdNamespace()) {
         STLParams = getSTLConditionalParams(recordDecl->getName());
@@ -5790,9 +5812,12 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       auto conditionalParams = getConditionalEscapableAttrParams(recordDecl);
 
       if (!STLParams.empty() || !conditionalParams.empty()) {
-        hasUnknown |= checkConditionalParams<CxxEscapability>(
-            recordDecl, desc.impl, STLParams, conditionalParams,
-            maybePushToStack);
+        if (checkConditionalParams<CxxEscapability>(
+                recordDecl, desc.impl, STLParams, conditionalParams,
+                maybePushToStack))
+          hasUnknown |= unknownBecause(
+              importer::CxxUnknownEscapabilityReason::ConditionalArgument,
+              recordDecl);
         continue;
       }
       // Only try to infer escapability if the record doesn't have any
@@ -5810,7 +5835,9 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         // We only infer escapability for simple types, such as aggregates and
         // RecordDecls that are not CxxRecordDecls. For more complex
         // CxxRecordDecls, we rely solely on escapability annotations.
-        hasUnknown = true;
+        hasUnknown = unknownBecause(
+            importer::CxxUnknownEscapabilityReason::CannotDeriveFromMembers,
+            recordDecl);
       }
     } else if (type->isArrayType()) {
       auto elemTy = cast<clang::ArrayType>(type)
@@ -5823,10 +5850,28 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
                type->isMemberPointerType() || type->isReferenceType()) {
       // pointer and reference types are currently imported as unknown
       // (importing them as non-escapable broke backward compatibility)
-      hasUnknown = true;
+      hasUnknown =
+          unknownBecause(importer::CxxUnknownEscapabilityReason::Pointer,
+                         nullptr);
     }
   }
-  return hasUnknown ? CxxEscapability::Unknown : CxxEscapability::Escapable;
+  if (!hasUnknown)
+    return {CxxEscapability::Escapable, std::nullopt};
+  return {CxxEscapability::Unknown, unknown};
+}
+
+CxxEscapability
+ClangTypeEscapability::evaluate(Evaluator &evaluator,
+                                EscapabilityLookupDescriptor desc) const {
+  return computeClangTypeEscapability(evaluator, desc).escapability;
+}
+
+std::optional<importer::CxxUnknownEscapability>
+importer::explainUnknownEscapability(const clang::RecordDecl *recordDecl,
+                                     ASTContext &ctx) {
+  return computeClangTypeEscapability(ctx.evaluator,
+                                      {recordDecl->getTypeForDecl(), nullptr})
+      .unknown;
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -8063,6 +8108,14 @@ bool ClangImporter::isUnsafeCXXMethod(const FuncDecl *func) {
   return id.starts_with("__") && id.ends_with("Unsafe");
 }
 
+/// Whether a note at \p loc would land in a system header. Such a note names
+/// something the user cannot annotate (a libc++ implementation detail, say), so
+/// it is dropped in favour of explaining a type they control.
+static bool isInSystemHeader(const clang::Decl *decl) {
+  return decl->getASTContext().getSourceManager().isInSystemHeader(
+      decl->getLocation());
+}
+
 void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
                                               SourceLoc useLoc) {
   // A declaration: explain which rule made this method unsafe.
@@ -8097,6 +8150,44 @@ void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
     return;
   if (importer::hasSwiftAttributeOnAnyRedecl(recordDecl,
                                              {"unsafe", "unsafe(always)"}))
+    return;
+
+  // Unknown escapability is the root cause when it applies, and it is what the
+  // user can act on. The safety walk falls through it to the fields, so without
+  // this a conditionally-escapable type such as std::shared_ptr would be
+  // explained by whichever raw pointer its implementation happens to hold.
+  if (auto unknown =
+          importer::explainUnknownEscapability(recordDecl, Impl.SwiftContext)) {
+    // The recorded reason belongs to whichever type in the traversal triggered
+    // it, which is not always the one being explained. When it is another type,
+    // say only that the dependency is unknown here and let the follow-up note
+    // explain that type on its own terms.
+    auto *blamed = dyn_cast_or_null<clang::RecordDecl>(unknown->culprit);
+    bool blameIsElsewhere = blamed && blamed != recordDecl;
+    if (!isInSystemHeader(recordDecl))
+      Impl.diagnose(
+          HeaderLoc(recordDecl->getLocation(), useLoc),
+          diag::cxx_unknown_escapability_reason, recordDecl->getNameAsString(),
+          blameIsElsewhere
+              ? importer::describe(
+                    importer::CxxUnknownEscapabilityReason::ConditionalArgument,
+                    blamed)
+              : importer::describe(unknown->reason, unknown->culprit));
+
+    // If the blame lies with another type, say why that one is unknown too:
+    // that is where the annotation belongs.
+    if (blameIsElsewhere)
+      if (auto nested =
+              importer::explainUnknownEscapability(blamed, Impl.SwiftContext);
+          nested && !isInSystemHeader(blamed))
+        Impl.diagnose(HeaderLoc(blamed->getLocation(), useLoc),
+                      diag::cxx_unknown_escapability_reason,
+                      blamed->getNameAsString(),
+                      importer::describe(nested->reason, nested->culprit));
+    return;
+  }
+
+  if (isInSystemHeader(recordDecl))
     return;
 
   if (auto unsafe =

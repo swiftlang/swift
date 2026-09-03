@@ -21,7 +21,7 @@ module Proj {
 
 // The user-declared copy constructor makes Owner self-contained, so returning
 // a pointer out of it is a projection.
-// expected-note@+1 {{type 'Owner' is unsafe because its field 'ptr' is unsafe}}
+// expected-note@+1 {{type 'Owner' has unknown escapability because Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
 struct Owner {
   void *ptr;
   Owner(const Owner &);

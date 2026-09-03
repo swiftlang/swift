@@ -50,9 +50,29 @@ enum class CxxUnsafetyReason {
   IndirectView,
 };
 
+/// Why a C++ type's escapability could not be determined. Each case is one
+/// place ClangTypeEscapability gives up; that computation records the reason, so
+/// an explanation cannot contradict the verdict it explains.
+enum class CxxUnknownEscapabilityReason {
+  /// A conditionally-escapable type (std::shared_ptr, SWIFT_ESCAPABLE_IF) whose
+  /// argument has unknown escapability.
+  ConditionalArgument,
+  /// A record too complex to infer from, so only an annotation would settle it.
+  CannotDeriveFromMembers,
+  /// A pointer or reference, which is deliberately treated as unknown.
+  Pointer,
+};
+
 /// Why an entity is unsafe, and what to blame for it.
 struct CxxUnsafetyExplanation {
   CxxUnsafetyReason reason;
+  /// The declaration to name, or null for reasons that have nothing to name.
+  const clang::NamedDecl *culprit = nullptr;
+};
+
+/// Why a type's escapability is unknown, and what to blame for it.
+struct CxxUnknownEscapability {
+  CxxUnknownEscapabilityReason reason;
   /// The declaration to name, or null for reasons that have nothing to name.
   const clang::NamedDecl *culprit = nullptr;
 };
@@ -63,6 +83,10 @@ struct CxxUnsafetyExplanation {
 /// Reasons that name a declaration fall back to wording without one when
 /// \p culprit is null, so callers need not check.
 std::string describe(CxxUnsafetyReason reason,
+                     const clang::NamedDecl *culprit = nullptr);
+
+/// A phrase completing "'x' has unknown escapability because ...".
+std::string describe(CxxUnknownEscapabilityReason reason,
                      const clang::NamedDecl *culprit = nullptr);
 
 } // end namespace swift::importer

@@ -72,6 +72,25 @@ std::string importer::describe(CxxUnsafetyReason reason,
   llvm_unreachable("covered switch");
 }
 
+std::string importer::describe(CxxUnknownEscapabilityReason reason,
+                               const clang::NamedDecl *culprit) {
+  switch (reason) {
+  case CxxUnknownEscapabilityReason::ConditionalArgument:
+    return culprit ? (llvm::Twine("its escapability depends on '") +
+                      culprit->getName() + "', whose escapability is unknown")
+                         .str()
+                   : std::string("its escapability depends on a type whose "
+                                 "escapability is unknown");
+  case CxxUnknownEscapabilityReason::CannotDeriveFromMembers:
+    return "Swift cannot infer it from the type's members; annotate the type "
+           "with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE";
+  case CxxUnknownEscapabilityReason::Pointer:
+    return "it is a pointer or reference, and Swift cannot tell whether it "
+           "owns what it points to";
+  }
+  llvm_unreachable("covered switch");
+}
+
 bool importer::hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
                                             ArrayRef<StringRef> attrs) {
   return llvm::any_of(decl->redecls(), [&](const clang::Decl *redecl) {
