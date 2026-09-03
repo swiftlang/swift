@@ -9251,9 +9251,18 @@ importer::getCxxReferencePointeeTypeOrNone(const clang::Type *type) {
   return {};
 }
 
-bool importer::isCxxConstReferenceType(const clang::Type *type) {
-  auto pointeeType = getCxxReferencePointeeTypeOrNone(type);
-  return pointeeType && pointeeType->isConstQualified();
+std::optional<importer::CxxReferenceParameter>
+importer::classifyCxxReferenceParameter(clang::QualType type) {
+  auto pointeeType = getCxxReferencePointeeTypeOrNone(type.getTypePtr());
+  if (!pointeeType)
+    return std::nullopt;
+
+  auto kind = CxxReferenceParameterKind::Borrowed;
+  if (!pointeeType->isConstQualified())
+    kind = type->isRValueReferenceType()
+               ? CxxReferenceParameterKind::Consuming
+               : CxxReferenceParameterKind::Mutating;
+  return CxxReferenceParameter{*pointeeType, kind};
 }
 
 AccessLevel importer::convertClangAccess(clang::AccessSpecifier access) {
