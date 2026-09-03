@@ -217,7 +217,9 @@ llvm::raw_ostream &DeclName::print(llvm::raw_ostream &os,
 }
 
 llvm::raw_ostream &DeclName::printPretty(llvm::raw_ostream &os) const {
-  return print(os, /*skipEmptyArgumentNames=*/!isSpecial());
+  return print(os,
+               /*skipEmptyArgumentNames=*/
+               !isSpecial() && (!isCompoundName() || isOperator()));
 }
 
 DeclNameRef DeclNameRef::createSelf(const ASTContext &ctx) {
@@ -342,5 +344,3 @@ StringRef ObjCSelector::getString(llvm::SmallVectorImpl<char> &scratch) const {
 void ObjCSelector::dump() const {
   llvm::errs() << *this << "\n";
 }
-
-
