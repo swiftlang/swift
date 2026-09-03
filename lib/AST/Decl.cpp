@@ -13441,6 +13441,20 @@ void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
     return;
   auto *module = getModuleContext();
 
+  // Once we've found a declaration produced by this macro reference, any
+  // macros attached to *that* declaration can introduce further declarations
+  // that are visible in the same scope. Recursively visit them; there is no
+  // need to filter by macro reference at this point, because everything we
+  // find is nested within an expansion we've already matched.
+  std::function<void(Decl *)> visitNested = [&](Decl *decl) {
+    decl->visitAuxiliaryDecls([&](Decl *nestedDecl) {
+      if (auto *vd = dyn_cast<ValueDecl>(nestedDecl))
+        callback(vd);
+
+      visitNested(nestedDecl);
+    });
+  };
+
   baseDecl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
     SourceFile *sf = auxiliaryDecl->getLoc()
         ? module->getSourceFileContainingLocation(auxiliaryDecl->getLoc())
@@ -13461,6 +13475,11 @@ void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
     }
     if (auto *vd = dyn_cast<ValueDecl>(auxiliaryDecl))
       callback(vd);
+
+    // Macros attached to the expanded declaration can introduce declarations
+    // of their own, which are equally visible at the point where this macro
+    // was expanded. Visit them, too.
+    visitNested(auxiliaryDecl);
   });
 }
 

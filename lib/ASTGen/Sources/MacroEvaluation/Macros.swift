@@ -517,7 +517,12 @@ func expandFreestandingMacroImpl(
         in: sourceFilePtr,
         pluginProtocolVersion: pluginProtocolVersion
       )!,
-      lexicalContext: pluginLexicalContext(of: expansionSyntax, pluginProtocolVersion: pluginProtocolVersion),
+      lexicalContext: pluginLexicalContext(
+        of: expansionSyntax,
+        in: sourceFilePtr,
+        cContext: cContext,
+        pluginProtocolVersion: pluginProtocolVersion
+      ),
       staticBuildConfiguration: try cContext.staticBuildConfiguration.asJSON
     )
     let result = try macro.plugin.sendMessageAndWait(message)
@@ -639,16 +644,56 @@ func expandAttachedMacro(
 
 /// Produce the full lexical context of the given node to pass along to
 /// macro expansion.
-private func lexicalContext(of node: some SyntaxProtocol) -> [Syntax] {
-  // FIXME: Should we query the source manager to get the macro expansion
-  // information?
-  node.allMacroLexicalContexts()
+///
+/// A syntax tree only spans a single source buffer, so walking up from a node
+/// inside a macro expansion buffer stops at that buffer's root and never
+/// reaches the code the macro was expanded within. Whenever the walk runs out
+/// of buffer, ask the compiler for the declaration that lexically encloses
+/// the buffer and resume the walk there, which stitches the context back
+/// together across any number of nested expansions.
+private func lexicalContext(
+  of node: some SyntaxProtocol,
+  in sourceFilePtr: UnsafePointer<ExportedSourceFile>?,
+  cContext: BridgedASTContext
+) -> [Syntax] {
+  var currentSourceFile = sourceFilePtr
+
+  return node.allMacroLexicalContexts { _ in
+    // Any location within the buffer identifies it to the compiler. Use the
+    // start of the buffer rather than a position from the syntax tree, which
+    // may be detached and therefore not correspond to this buffer at all.
+    guard let sourceFile = currentSourceFile,
+      let bufferStart = sourceFile.pointee.buffer.baseAddress
+    else {
+      return nil
+    }
+
+    let enclosing = cContext.macroExpansionEnclosingDecl(at: SourceLoc(raw: bufferStart))
+    guard let enclosingSourceFile = enclosing.exportedSourceFile else {
+      return nil
+    }
+
+    currentSourceFile = UnsafePointer(enclosingSourceFile.assumingMemoryBound(to: ExportedSourceFile.self))
+
+    // Resume from the enclosing declaration itself, so that it is counted as
+    // part of the lexical context along with everything that encloses it.
+    return findSyntaxNodeInSourceFile(
+      sourceFilePtr: enclosingSourceFile,
+      sourceLocationPtr: enclosing.location.getRaw()?.assumingMemoryBound(to: UInt8.self),
+      where: { $0.isProtocol((any DeclSyntaxProtocol).self) }
+    )
+  }
 }
 
 /// Produce the full lexical context of the given node to pass along to
 /// macro expansion.
-private func pluginLexicalContext(of node: some SyntaxProtocol, pluginProtocolVersion: Int) -> [PluginMessage.Syntax] {
-  lexicalContext(of: node).compactMap {
+private func pluginLexicalContext(
+  of node: some SyntaxProtocol,
+  in sourceFilePtr: UnsafePointer<ExportedSourceFile>?,
+  cContext: BridgedASTContext,
+  pluginProtocolVersion: Int
+) -> [PluginMessage.Syntax] {
+  lexicalContext(of: node, in: sourceFilePtr, cContext: cContext).compactMap {
     .init(syntax: $0, pluginProtocolVersion: pluginProtocolVersion)
   }
 }
@@ -746,6 +791,8 @@ func expandAttachedMacroImpl(
       conformanceListSyntax: conformanceListSyntax,
       lexicalContext: pluginLexicalContext(
         of: declarationNode,
+        in: declarationSourceFilePtr,
+        cContext: cContext,
         pluginProtocolVersion: pluginProtocolVersion
       ),
       staticBuildConfiguration: try cContext.staticBuildConfiguration.asJSON

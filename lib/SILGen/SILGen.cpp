@@ -2267,13 +2267,19 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
     emitEntryPoint(sf);
   }
 
-  for (auto *D : sf->getTopLevelDecls()) {
-    // Emit auxiliary decls.
+  // Emit a declaration along with its auxiliary decls. Auxiliary decls can
+  // themselves have auxiliary decls, e.g. when a macro expands to a
+  // declaration that has another macro attached to it, so this recurses.
+  std::function<void(Decl *)> emitDecl = [&](Decl *D) {
     D->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-      visit(auxiliaryDecl);
+      emitDecl(auxiliaryDecl);
     });
 
     visit(D);
+  };
+
+  for (auto *D : sf->getTopLevelDecls()) {
+    emitDecl(D);
   }
 
   // Visit extensions recorded in the synthesized file separately. The code

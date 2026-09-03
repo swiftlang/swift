@@ -15,6 +15,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/AvailabilitySpec.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Bridging/BasicSwift.h"
 
 using namespace swift;
@@ -143,4 +145,50 @@ void *BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext) {
   }
 
   return staticBuildConfiguration;
+}
+
+BridgedMacroExpansionEnclosingDecl
+BridgedASTContext_macroExpansionEnclosingDecl(BridgedASTContext cContext,
+                                              SourceLoc location) {
+  BridgedMacroExpansionEnclosingDecl none{nullptr, SourceLoc()};
+
+  if (location.isInvalid())
+    return none;
+
+  ASTContext &ctx = cContext.unbridged();
+  SourceManager &sourceMgr = ctx.SourceMgr;
+
+  auto bufferID = sourceMgr.findBufferContainingLoc(location);
+  auto *generatedInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
+  if (!generatedInfo)
+    return none;
+
+  // The declaration context recorded for the buffer is where the expansion
+  // logically resides, which already accounts for the macro role, e.g. peer
+  // macro expansions are recorded against the context of the declaration the
+  // macro is attached to rather than that declaration.
+  auto *dc = generatedInfo->declContext;
+  if (!dc || dc->isModuleScopeContext())
+    return none;
+
+  auto *decl = dc->getAsDecl();
+  if (!decl)
+    decl = dc->getInnermostDeclarationDeclContext();
+  if (!decl)
+    return none;
+
+  auto declLoc = decl->getStartLoc();
+  if (declLoc.isInvalid())
+    return none;
+
+  auto *sourceFile =
+      decl->getModuleContext()->getSourceFileContainingLocation(declLoc);
+  if (!sourceFile)
+    return none;
+
+  auto *exportedSourceFile = sourceFile->getExportedSourceFile();
+  if (!exportedSourceFile)
+    return none;
+
+  return {exportedSourceFile, declLoc};
 }
