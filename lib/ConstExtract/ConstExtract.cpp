@@ -26,6 +26,7 @@
 #include "swift/ConstExtract/ConstExtractRequests.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/PrefixMapper.h"
@@ -175,11 +176,23 @@ getResultBuilderMembersFromBraceStmt(BraceStmt *braceStmt,
                                      const DeclContext *declContext);
 
 static std::shared_ptr<CompileTimeValue>
+extractCompileTimeValue(Expr *expr, const DeclContext *declContext,
+                        llvm::SmallPtrSet<VarDecl *, 4> &resolutionCache);
+
+static std::shared_ptr<CompileTimeValue>
 extractCompileTimeValue(Expr *expr, const DeclContext *declContext);
+
+static ConstValueTypePropertyInfo
+extractTypePropertyInfo(VarDecl *propertyDecl,
+                        llvm::SmallPtrSet<VarDecl *, 4> &resolutionCache);
+
+static ConstValueTypePropertyInfo
+extractTypePropertyInfo(VarDecl *propertyDecl);
 
 static std::vector<FunctionParameter>
 extractFunctionArguments(const ArgumentList *args,
-                         const DeclContext *declContext) {
+                         const DeclContext *declContext,
+                         llvm::SmallPtrSet<VarDecl *, 4> &resolutionCache) {
   std::vector<FunctionParameter> parameters;
 
   for (auto arg : *args) {
@@ -195,7 +208,7 @@ extractFunctionArguments(const ArgumentList *args,
       argExpr = optionalInject->getSubExpr();
     }
     parameters.push_back(
-        {label, type, extractCompileTimeValue(argExpr, declContext)});
+        {label, type, extractCompileTimeValue(argExpr, declContext, resolutionCache)});
   }
 
   return parameters;
@@ -232,7 +245,8 @@ static std::optional<std::string> extractRawLiteral(Expr *expr) {
 }
 
 static std::shared_ptr<CompileTimeValue>
-extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
+extractCompileTimeValue(Expr *expr, const DeclContext *declContext,
+                        llvm::SmallPtrSet<VarDecl *, 4> &resolutionCache) {
   if (expr) {
     switch (expr->getKind()) {
     case ExprKind::BooleanLiteral:
@@ -256,7 +270,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       std::vector<std::shared_ptr<CompileTimeValue>> elementValues;
       for (const auto elementExpr : arrayExpr->getElements()) {
         elementValues.push_back(
-            extractCompileTimeValue(elementExpr, declContext));
+            extractCompileTimeValue(elementExpr, declContext, resolutionCache));
       }
       return std::make_shared<ArrayValue>(elementValues);
     }
@@ -265,7 +279,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       auto dictionaryExpr = cast<DictionaryExpr>(expr);
       std::vector<std::shared_ptr<TupleValue>> tuples;
       for (auto elementExpr : dictionaryExpr->getElements()) {
-        auto elementValue = extractCompileTimeValue(elementExpr, declContext);
+        auto elementValue = extractCompileTimeValue(elementExpr, declContext, resolutionCache);
         if (isa<TupleValue>(elementValue.get())) {
           tuples.push_back(std::static_pointer_cast<TupleValue>(elementValue));
         }
@@ -290,13 +304,13 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
 
           elements.push_back(
               {label, elementExpr->getType(),
-               extractCompileTimeValue(elementExpr, declContext)});
+               extractCompileTimeValue(elementExpr, declContext, resolutionCache)});
         }
       } else {
         for (auto elementExpr : tupleExpr->getElements()) {
           elements.push_back(
               {std::nullopt, elementExpr->getType(),
-               extractCompileTimeValue(elementExpr, declContext)});
+               extractCompileTimeValue(elementExpr, declContext, resolutionCache)});
         }
       }
       return std::make_shared<TupleValue>(elements);
@@ -310,13 +324,13 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
             declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
 
         std::vector<FunctionParameter> parameters =
-            extractFunctionArguments(callExpr->getArgs(), declContext);
+            extractFunctionArguments(callExpr->getArgs(), declContext, resolutionCache);
         return std::make_shared<FunctionCallValue>(identifier, parameters);
       }
 
       if (isa<ConstructorRefCallExpr>(callExpr->getFn())) {
         std::vector<FunctionParameter> parameters =
-            extractFunctionArguments(callExpr->getArgs(), declContext);
+            extractFunctionArguments(callExpr->getArgs(), declContext, resolutionCache);
         return std::make_shared<InitCallValue>(callExpr->getType(), parameters);
       }
 
@@ -327,7 +341,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
               declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
 
           std::vector<FunctionParameter> parameters =
-              extractFunctionArguments(callExpr->getArgs(), declContext);
+              extractFunctionArguments(callExpr->getArgs(), declContext, resolutionCache);
 
           auto declRef = dotSyntaxCallExpr->getFn()->getReferencedDecl();
           switch (declRef.getDecl()->getKind()) {
@@ -345,7 +359,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
             return std::make_shared<MemberFunctionCallValue>(
                 baseIdentifierName,
                 extractCompileTimeValue(dotSyntaxCallExpr->getBase(),
-                                        declContext),
+                                        declContext, resolutionCache),
                 parameters);
           }
 
@@ -362,7 +376,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
               declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
 
           std::vector<FunctionParameter> parameters =
-              extractFunctionArguments(callExpr->getArgs(), declContext);
+              extractFunctionArguments(callExpr->getArgs(), declContext, resolutionCache);
           return std::make_shared<FunctionCallValue>(identifier, parameters);
         }
       }
@@ -384,23 +398,23 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
 
     case ExprKind::Erasure: {
       auto erasureExpr = cast<ErasureExpr>(expr);
-      return extractCompileTimeValue(erasureExpr->getSubExpr(), declContext);
+      return extractCompileTimeValue(erasureExpr->getSubExpr(), declContext, resolutionCache);
     }
 
     case ExprKind::Paren: {
       auto parenExpr = cast<ParenExpr>(expr);
-      return extractCompileTimeValue(parenExpr->getSubExpr(), declContext);
+      return extractCompileTimeValue(parenExpr->getSubExpr(), declContext, resolutionCache);
     }
 
     case ExprKind::PropertyWrapperValuePlaceholder: {
       auto placeholderExpr = cast<PropertyWrapperValuePlaceholderExpr>(expr);
       return extractCompileTimeValue(placeholderExpr->getOriginalWrappedValue(),
-                                     declContext);
+                                     declContext, resolutionCache);
     }
 
     case ExprKind::Coerce: {
       auto coerceExpr = cast<CoerceExpr>(expr);
-      return extractCompileTimeValue(coerceExpr->getSubExpr(), declContext);
+      return extractCompileTimeValue(coerceExpr->getSubExpr(), declContext, resolutionCache);
     }
 
     case ExprKind::DotSelf: {
@@ -415,7 +429,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
     case ExprKind::UnderlyingToOpaque: {
       auto underlyingToOpaque = cast<UnderlyingToOpaqueExpr>(expr);
       return extractCompileTimeValue(underlyingToOpaque->getSubExpr(),
-                                     declContext);
+                                     declContext, resolutionCache);
     }
 
     case ExprKind::DefaultArgument: {
@@ -467,12 +481,12 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
     case ExprKind::InjectIntoOptional: {
       auto injectIntoOptionalExpr = cast<InjectIntoOptionalExpr>(expr);
       return extractCompileTimeValue(injectIntoOptionalExpr->getSubExpr(),
-                                     declContext);
+                                     declContext, resolutionCache);
     }
 
     case ExprKind::Load: {
       auto loadExpr = cast<LoadExpr>(expr);
-      return extractCompileTimeValue(loadExpr->getSubExpr(), declContext);
+      return extractCompileTimeValue(loadExpr->getSubExpr(), declContext, resolutionCache);
     }
 
     case ExprKind::MemberRef: {
@@ -480,6 +494,22 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       if (isa<TypeExpr>(memberExpr->getBase())) {
         auto baseTypeExpr = cast<TypeExpr>(memberExpr->getBase());
         auto label = memberExpr->getDecl().getDecl()->getBaseIdentifier().str();
+
+        // Attempt to resolve static stored/computed properties to their
+        // compile-time value. Account for cycles.
+        if (auto *varDecl =
+                dyn_cast<VarDecl>(memberExpr->getDecl().getDecl())) {
+          if (varDecl->isStatic()) {
+            if (resolutionCache.insert(varDecl).second) {
+              auto info = extractTypePropertyInfo(varDecl, resolutionCache);
+              resolutionCache.erase(varDecl);
+              if (!isa<RuntimeValue>(info.Value.get())) {
+                return info.Value;
+              }
+            }
+          }
+        }
+
         return std::make_shared<MemberReferenceValue>(
             baseTypeExpr->getInstanceType(), label.str());
       }
@@ -496,7 +526,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
           Ctx, [&](bool isInterpolation, CallExpr *segment) -> void {
             auto arg = segment->getArgs()->get(0);
             auto expr = arg.getExpr();
-            segments.push_back(extractCompileTimeValue(expr, declContext));
+            segments.push_back(extractCompileTimeValue(expr, declContext, resolutionCache));
           });
 
       return std::make_shared<InterpolatedStringLiteralValue>(segments);
@@ -516,22 +546,22 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
 
     case ExprKind::DerivedToBase: {
       auto derivedExpr = cast<DerivedToBaseExpr>(expr);
-      return extractCompileTimeValue(derivedExpr->getSubExpr(), declContext);
+      return extractCompileTimeValue(derivedExpr->getSubExpr(), declContext, resolutionCache);
     }
 
     case ExprKind::OpenExistential: {
       auto openExistentialExpr = cast<OpenExistentialExpr>(expr);
-      return extractCompileTimeValue(openExistentialExpr->getExistentialValue(), declContext);
+      return extractCompileTimeValue(openExistentialExpr->getExistentialValue(), declContext, resolutionCache);
     }
 
     case ExprKind::VarargExpansion: {
       auto varargExpansionExpr = cast<VarargExpansionExpr>(expr);
-      return extractCompileTimeValue(varargExpansionExpr->getSubExpr(), declContext);
+      return extractCompileTimeValue(varargExpansionExpr->getSubExpr(), declContext, resolutionCache);
     }
 
     case ExprKind::ForceValue: {
       auto forceValueExpr = cast<ForceValueExpr>(expr);
-      return extractCompileTimeValue(forceValueExpr->getSubExpr(), declContext);
+      return extractCompileTimeValue(forceValueExpr->getSubExpr(), declContext, resolutionCache);
     }
 
     default: {
@@ -543,8 +573,15 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
   return std::make_shared<RuntimeValue>();
 }
 
+static std::shared_ptr<CompileTimeValue>
+extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
+  llvm::SmallPtrSet<VarDecl *, 4> resolutionCache;
+  return extractCompileTimeValue(expr, declContext, resolutionCache);
+}
+
 static CustomAttrValue extractAttributeValue(const CustomAttr *attr,
-                                             const DeclContext *declContext) {
+                                             const DeclContext *declContext,
+                                             llvm::SmallPtrSet<VarDecl *, 4> &resolutionCache) {
   std::vector<FunctionParameter> parameters;
   if (const auto *args = attr->getArgs()) {
     for (auto arg : *args) {
@@ -558,32 +595,37 @@ static CustomAttrValue extractAttributeValue(const CustomAttr *attr,
         }
       }
       parameters.push_back({label, argExpr->getType(),
-                            extractCompileTimeValue(argExpr, declContext)});
+                            extractCompileTimeValue(argExpr, declContext, resolutionCache)});
     }
   }
   return {attr, parameters};
 }
 
 static AttrValueVector
-extractPropertyWrapperAttrValues(VarDecl *propertyDecl) {
+extractPropertyWrapperAttrValues(VarDecl *propertyDecl,
+                                 llvm::SmallPtrSet<VarDecl *, 4> &resolutionCache) {
   AttrValueVector customAttrValues;
   for (auto *propertyWrapper : propertyDecl->getAttachedPropertyWrappers())
     customAttrValues.push_back(
-        extractAttributeValue(propertyWrapper, propertyDecl->getDeclContext()));
+        extractAttributeValue(propertyWrapper, propertyDecl->getDeclContext(),
+                              resolutionCache));
   return customAttrValues;
 }
 
 static ConstValueTypePropertyInfo
-extractTypePropertyInfo(VarDecl *propertyDecl) {
+extractTypePropertyInfo(VarDecl *propertyDecl,
+                        llvm::SmallPtrSet<VarDecl *, 4> &resolutionCache) {
   std::optional<AttrValueVector> propertyWrapperValues;
   if (propertyDecl->hasAttachedPropertyWrapper())
-    propertyWrapperValues = extractPropertyWrapperAttrValues(propertyDecl);
+    propertyWrapperValues = extractPropertyWrapperAttrValues(propertyDecl,
+                                                             resolutionCache);
 
   if (const auto binding = propertyDecl->getParentPatternBinding()) {
     if (const auto originalInit = binding->getInit(0)) {
       return {propertyDecl,
               extractCompileTimeValue(originalInit,
-                                      propertyDecl->getInnermostDeclContext()),
+                                      propertyDecl->getInnermostDeclContext(),
+                                      resolutionCache),
               propertyWrapperValues};
     }
   }
@@ -596,7 +638,8 @@ extractTypePropertyInfo(VarDecl *propertyDecl) {
           return {
               propertyDecl,
               extractCompileTimeValue(cast<ReturnStmt>(stmt)->getResult(),
-                                      accessorDecl->getInnermostDeclContext()),
+                                      accessorDecl->getInnermostDeclContext(),
+                                      resolutionCache),
               propertyWrapperValues};
         }
       }
@@ -604,6 +647,12 @@ extractTypePropertyInfo(VarDecl *propertyDecl) {
   }
 
   return {propertyDecl, std::make_shared<RuntimeValue>()};
+}
+
+static ConstValueTypePropertyInfo
+extractTypePropertyInfo(VarDecl *propertyDecl) {
+  llvm::SmallPtrSet<VarDecl *, 4> resolutionCache;
+  return extractTypePropertyInfo(propertyDecl, resolutionCache);
 }
 
 std::optional<std::vector<EnumElementDeclValue>>
