@@ -59,12 +59,9 @@ UncheckedStringTests.test("isTriviallyIdentical/small") {
 
   // Equal content constructed independently is not required to be
   // (and, for the small-string case, generally won't be) identical.
-  // NOTE: deliberately not `"ab" + "c"` here -- a string literal used as
-  // an *operand* to an operator (rather than the direct initializer of a
-  // typed `let`/`var`) doesn't have a contextual type available at the
-  // point its own literal protocol is chosen, so it can't route through
-  // `ExpressibleByUncheckedStringLiteral`; this is a known, currently
-  // unsupported case, distinct from what this test is checking.
+  // `append(contentsOf:)` is used here (rather than `+`, which also works --
+  // see the "operators" test below) simply to build `c` via a different
+  // construction path than `a`'s literal.
   var c: UncheckedString<UInt16> = "ab"
   c.append(contentsOf: "c" as UncheckedString<UInt16>)
   expectTrue(a == c)
@@ -242,6 +239,13 @@ UncheckedStringTests.test("operators") {
 
   let ab_escape: UncheckedString<UInt8> = "ab" + "\x{41}"
   expectTrue(ab_escape == "abA" as UncheckedString<UInt8>)
+
+  // The three-operand chain from the proposal's own motivating example,
+  // including a non-ASCII, multi-byte-in-UTF-8 character, resolves under
+  // the contextual type of the `let` even though none of the individual
+  // literal operands carries one on its own.
+  let name: UncheckedString<UInt8> = "René" + " " + "Descartes"
+  expectTrue(name == "René Descartes" as UncheckedString<UInt8>)
 }
 
 UncheckedStringTests.test("singleCharacterLiterals") {
