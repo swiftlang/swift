@@ -756,6 +756,8 @@ ERROR(expr_selector_module_missing,none,
 ERROR(expr_selector_no_declaration,none,
       "argument of '#selector' does not refer to an '@objc' method, property, "
       "or initializer", ())
+NOTE(expr_selector_remove_call,none,
+     "remove the parentheses to reference the method", ())
 ERROR(expr_selector_not_method,none,
       "argument of '#selector' cannot refer to %select{local|global}0 "
       "function %1", (bool, const ValueDecl *))

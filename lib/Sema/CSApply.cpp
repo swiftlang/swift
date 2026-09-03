@@ -4987,6 +4987,13 @@ namespace {
       if (!foundDecl) {
         de.diagnose(E->getLoc(), diag::expr_selector_no_declaration)
             .highlight(subExpr->getSourceRange());
+        if (auto *call = dyn_cast<CallExpr>(subExpr)) {
+          auto *args = call->getArgs();
+          if (args->empty()) {
+            de.diagnose(args->getLParenLoc(), diag::expr_selector_remove_call)
+                .fixItRemove(args->getSourceRange());
+          }
+        }
         return E;
       }
 
