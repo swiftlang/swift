@@ -778,9 +778,13 @@ namespace {
         }
 
         auto paramQualType = *param;
-        if (paramQualType->isReferenceType() &&
-            paramQualType->getPointeeType().isConstQualified())
-          paramQualType = paramQualType->getPointeeType();
+        // `inout` is not expressible in `@convention(c)`, so a mutable lvalue
+        // reference stays a pointer; SIL passes it directly to match. Every
+        // other reference kind is lowered indirectly, so it has to be
+        // flattened to the pointee here.
+        if (auto ref = classifyCxxReferenceParameter(paramQualType))
+          if (ref->kind != CxxReferenceParameterKind::Mutating)
+            paramQualType = ref->pointeeType;
 
         // Mark any `sending` parameters if need be.
         ImportTypeAttrs paramAttributes;
@@ -2644,25 +2648,16 @@ ClangImporter::Implementation::importParameterType(
   if (!swiftParamTy) {
     // C++ reference types are brought in as direct
     // types most commonly.
-    if (auto refPointeeType =
-            getCxxReferencePointeeTypeOrNone(paramTy.getTypePtr())) {
+    if (auto ref = classifyCxxReferenceParameter(paramTy)) {
       // We don't support reference type to a dependent type, just bail.
-      if ((*refPointeeType)->isDependentType()) {
+      if (ref->pointeeType->isDependentType())
         return std::nullopt;
-      }
 
-      bool isRvalueRef = paramTy->isRValueReferenceType();
-      // A C++ parameter of type `const <type> &` or `<type> &` becomes `<type>`
-      // or `inout <type>`. Moreover, `const <type> &&` or `<type> &&`
-      // becomes `<type>` or `consuming <type>`. Note that SILGen will use the
-      // indirect parameter convention for such a type.
-      paramTy = *refPointeeType;
-      if (!paramTy.isConstQualified()) {
-        if (isRvalueRef)
-          isConsuming = true;
-        else
-          isInOut = true;
-      }
+      // Note that SILGen will use the indirect parameter convention for such
+      // a type.
+      paramTy = ref->pointeeType;
+      isInOut |= ref->kind == CxxReferenceParameterKind::Mutating;
+      isConsuming |= ref->kind == CxxReferenceParameterKind::Consuming;
       bridging = Bridgeability::None;
     }
   }
@@ -2718,14 +2713,17 @@ ClangImporter::Implementation::importParameterType(
     swiftParamTy = importedType.getType();
   }
 
-  // `isInOut` is set above if we stripped off a mutable `&` before importing
-  // the type. Normally, we want to use an `inout` parameter in this situation.
-  // However, if the parameter belongs to a foreign reference type *and* the
-  // reference we stripped out was directly to that type (rather than to a
-  // pointer to that type), the foreign reference type should "eat" the
-  // indirection of the `&`, so we *don't* want to use an `inout` parameter.
-  if (isInOut && isDirectUseOfForeignReferenceType(paramTy, swiftParamTy))
+  // `isInOut`/`isConsuming` is set above if we stripped off a mutable `&` or an
+  // `&&` before importing the type. Normally, we want an `inout`/`consuming`
+  // parameter in that situation. However, if the parameter belongs to a foreign
+  // reference type *and* the reference we stripped out was directly to that type
+  // (rather than to a pointer to that type), the foreign reference type should
+  // "eat" the indirection of the reference, so we don't want either.
+  if ((isInOut || isConsuming) &&
+      isDirectUseOfForeignReferenceType(paramTy, swiftParamTy)) {
     isInOut = false;
+    isConsuming = false;
+  }
 
   return ImportParameterTypeResult{swiftParamTy, isInOut, isConsuming,
                                    isParamTypeImplicitlyUnwrapped};
