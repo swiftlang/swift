@@ -33,6 +33,7 @@ namespace swift {
   class DeclContext;
   class Decl;
   class Expr;
+  class FuncDecl;
   class InFlightDiagnostic;
   class Stmt;
   class TopLevelCodeDecl;
@@ -190,6 +191,9 @@ namespace swift {
 
   /// Diagnose a declaration of typed throws at the given location.
   void diagnoseUntypedThrows(const DeclContext *dc, SourceLoc throwsLoc);
+
+  /// Add a fix-it to \p diag that removes the '-> ReturnType' result clause
+  void fixItRemoveReturnType(InFlightDiagnostic &diag, const FuncDecl *func);
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H
