@@ -5439,7 +5439,7 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
                                           const TypeLowering &rvalueTL,
                                           IsTake_t isTake) {
   assert(srcTL.getLoweredType().getAddressType() == src->getType());
-  assert(rvalueTL.isLoadable() || !silConv.useLoweredAddresses());
+  assert(rvalueTL.isLoadableOrOpaque(F));
 
   SILType srcType = srcTL.getLoweredType();
   SILType rvalueType = rvalueTL.getLoweredType();
