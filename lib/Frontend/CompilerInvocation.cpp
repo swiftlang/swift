@@ -4358,6 +4358,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.UseCASBackend |= Args.hasArg(OPT_cas_backend);
   Opts.EmitCASIDFile |= Args.hasArg(OPT_cas_emit_casid_file);
+  Opts.PrintLLVMBackendDiagnostics |=
+      Args.hasArg(OPT_print_llvm_backend_diagnostics);
 
   if (CASOpts.WriteOutputHashXAttr && Opts.UseCASBackend) {
     Diags.diagnose(SourceLoc(), diag::error_option_incompatible,
