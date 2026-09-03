@@ -525,3 +525,27 @@ void ConstantAggregateBuilderBase::addUniqueHash(StringRef data) {
   auto truncHash = llvm::ArrayRef(rawHash).slice(0, NumBytes_UniqueHash);
   add(llvm::ConstantDataArray::get(IGM().getLLVMContext(), truncHash));
 }
+
+bool irgen::tryFlattenConstantBytes(IRGenModule &IGM, llvm::Constant *C,
+                                    llvm::SmallVectorImpl<char> &bytes) {
+  const llvm::DataLayout &DL = IGM.DataLayout;
+  uint64_t size = DL.getTypeAllocSize(C->getType());
+  bytes.reserve(bytes.size() + size);
+  for (uint64_t offset = 0; offset < size; ++offset) {
+    llvm::Constant *byte = llvm::ConstantFoldLoadFromConst(
+        C, IGM.Int8Ty, llvm::APInt(64, offset), DL);
+    if (!byte)
+      return false;
+    if (auto *intByte = dyn_cast<llvm::ConstantInt>(byte)) {
+      bytes.push_back(static_cast<char>(intByte->getZExtValue()));
+    } else if (isa<llvm::UndefValue>(byte)) {
+      // Padding (or otherwise-poison) bytes: emit as zero for determinism.
+      bytes.push_back(0);
+    } else {
+      // A byte we can't resolve to a concrete value, e.g. one that overlaps a
+      // relocatable pointer. Custom sections can't carry relocations.
+      return false;
+    }
+  }
+  return true;
+}

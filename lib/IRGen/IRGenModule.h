@@ -1746,6 +1746,12 @@ public:
   void maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *D);
 
   void emitSILGlobalVariable(SILGlobalVariable *gv);
+
+  /// If \p var is a WebAssembly `@section(".custom_section.*")` global, emit its
+  /// constant bytes into a Wasm custom section via `wasm.custom_sections` module
+  /// metadata (no `llvm::GlobalVariable` is created) and return true. Otherwise
+  /// return false, leaving the global to be emitted normally.
+  bool tryEmitWasmCustomSection(SILGlobalVariable *var);
   void emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings);
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);

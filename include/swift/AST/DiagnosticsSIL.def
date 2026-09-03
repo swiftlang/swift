@@ -1388,5 +1388,11 @@ ERROR(invalid_multiple_return_borrow_accessor, none,
 ERROR(unsupported_borrow_abstraction, none,
       "cannot witness borrow requirement for result type %0",
       (Type))
+
+// WebAssembly custom sections
+ERROR(wasm_custom_section_not_addressable, none,
+      "cannot reference %0 placed in a WebAssembly custom section; a custom "
+      "section has no address at runtime and cannot be read or written",
+      (const ValueDecl *))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
