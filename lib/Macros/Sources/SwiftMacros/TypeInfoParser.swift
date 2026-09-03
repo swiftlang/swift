@@ -571,7 +571,7 @@ extension AvailabilityQuery: TypeInfoProtocol {
         .stringArg("primaryRange").toOptional(),
         .stringArg("variantRange").toOptional(),
         .boolArg("isUnavailability"),
-        .boolArg("constantResult").toOptional(),
+        .boolArg("constantResult").toOptional()
       )
     return Self(
       domain: domain, primaryRange: primaryRange, variantRange: variantRange,
