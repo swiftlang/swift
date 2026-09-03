@@ -43,6 +43,10 @@ bool DerivedConformance::canDeriveDistributedActorSystem(
     NominalTypeDecl *nominal, DeclContext *dc) {
   auto &C = nominal->getASTContext();
 
+  // A 'distributed actor' cannot implement the actor system itself
+  if (nominal->isDistributedActor())
+    return false;
+
   // Make sure ad-hoc requirements that we'll use in synthesis are present, before we try to use them.
   // This leads to better error reporting because we already have errors happening (missing witnesses).
   if (auto handlerType = getDistributedActorSystemResultHandlerType(nominal)) {
@@ -467,8 +471,20 @@ deriveDistributedActorType_ActorSystem(
   if (!defaultDistributedActorSystemTypeDecl)
     return nullptr;
 
+  auto defaultSystemTy =
+      defaultDistributedActorSystemTypeDecl->getDeclaredInterfaceType();
+
+  // A 'distributed actor' cannot double as the actor system it is using,
+  // so don't adopt such module-wide default. Doing so would make the actor
+  // its own actor system, and we'd crash looking for the system's
+  // associated types on a distributed actor
+  if (auto systemNominal = defaultSystemTy->getAnyNominal()) {
+    if (systemNominal->isDistributedActor())
+      return nullptr;
+  }
+
   // Return the default system type.
-  return defaultDistributedActorSystemTypeDecl->getDeclaredInterfaceType();
+  return defaultSystemTy;
 }
 
 static Type
@@ -488,8 +504,14 @@ deriveDistributedActorType_SerializationRequirement(
   if (!DAS)
     return nullptr;
 
-  if (auto systemNominal = systemTy->getAnyNominal())
+  if (auto systemNominal = systemTy->getAnyNominal()) {
+    // A 'distributed actor' cannot be its own actor system; this is diagnosed
+    // elsewhere, so just fail to synthesize here
+    if (systemNominal->isDistributedActor())
+      return nullptr;
+
     return getDistributedActorSystemSerializationType(systemNominal);
+  }
 
   return nullptr;
 }
