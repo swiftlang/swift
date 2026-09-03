@@ -213,6 +213,7 @@ add_library(swiftCore
   UIntBuffer.swift
   UncheckedString.swift
   UncheckedString+Encoding.swift
+  UncheckedString+FastPath.swift
   UncheckedString+Literals.swift
   UncheckedString+RangeReplaceableCollection.swift
   UncheckedStringProtocol.swift
