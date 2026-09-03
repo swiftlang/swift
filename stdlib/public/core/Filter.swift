@@ -105,6 +105,16 @@ extension LazyFilterSequence: Sequence {
     guard _predicate(element) else { return false }
     return _base._customContainsEquatableElement(element)
   }
+
+  @_alwaysEmitIntoClient
+  @inlinable // lazy-performance
+  public func first(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Element? {
+    return try _base.first {
+      try _predicate($0) && predicate($0)
+    }
+  }
 }
 
 extension LazyFilterSequence: LazySequenceProtocol { }
@@ -122,6 +132,20 @@ public typealias LazyFilterCollection<T: Collection> = LazyFilterSequence<T>
 
 extension LazyFilterCollection: Collection {
   public typealias SubSequence = LazyFilterCollection<Base.SubSequence>
+
+  @_alwaysEmitIntoClient
+  @inlinable // lazy-performance
+  public var first: Element? {
+    var index = _base.startIndex
+    while index != _base.endIndex {
+      let element = _base[index]
+      if _predicate(element) {
+        return element
+      }
+      _base.formIndex(after: &index)
+    }
+    return nil
+  }
 
   // https://github.com/apple/swift/issues/46747
   // Any estimate of the number of elements that pass `_predicate` requires
@@ -305,6 +329,52 @@ extension LazyFilterCollection: LazyCollectionProtocol { }
 
 extension LazyFilterCollection: BidirectionalCollection
   where Base: BidirectionalCollection {
+
+  @_alwaysEmitIntoClient
+  @inlinable // lazy-performance
+  public var last: Element? {
+    var index = _base.endIndex
+    while index != _base.startIndex {
+      _base.formIndex(before: &index)
+      let element = _base[index]
+      if _predicate(element) {
+        return element
+      }
+    }
+    return nil
+  }
+
+  @_alwaysEmitIntoClient
+  @inlinable // lazy-performance
+  public func last(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Element? {
+    var index = _base.endIndex
+    while index != _base.startIndex {
+      _base.formIndex(before: &index)
+      let element = _base[index]
+      if try _predicate(element) && predicate(element) {
+        return element
+      }
+    }
+    return nil
+  }
+
+  @_alwaysEmitIntoClient
+  @inlinable // lazy-performance
+  public func lastIndex(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Index? {
+    var index = _base.endIndex
+    while index != _base.startIndex {
+      _base.formIndex(before: &index)
+      let element = _base[index]
+      if try _predicate(element) && predicate(element) {
+        return index
+      }
+    }
+    return nil
+  }
 
   @inlinable // lazy-performance
   public func index(before i: Index) -> Index {
