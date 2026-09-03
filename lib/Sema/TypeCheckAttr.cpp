@@ -2204,8 +2204,16 @@ void AttributeChecker::visitDynamicMemberLookupAttr(
   }
 
   attr->setInvalid();
-  if (!diagnosed)
-    diagnose(attr->getStartLoc(), diag::invalid_dynamic_member_lookup_type, type);
+  if (!diagnosed) {
+    auto diag = diagnose(attr->getStartLoc(), diag::invalid_dynamic_member_lookup_type, type);
+    auto braces = decl->getBraces();
+    if (braces.Start.isValid()) {
+      diag.fixItInsertAfter(braces.Start,
+          "\n  subscript(dynamicMember member: String) -> <#Value#> {\n"
+          "    <#code#>\n"
+          "  }");
+    }
+  }
 }
 
 /// Get the innermost enclosing declaration for a declaration.
