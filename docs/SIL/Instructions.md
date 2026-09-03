@@ -2106,7 +2106,7 @@ Checks whether %0 is the address of a unique reference to a memory object.
 Returns 1 if the strong reference count is 1, and 0 if the strong reference
 count is greater than 1.
 
-A discussion of the semantics can be found in the [ARC Optimization](ARC-Optimization.md) document.
+A discussion of the semantics can be found in the [ARC Optimization](ARCOptimization.md) document.
 
 ### begin_cow_mutation
 
