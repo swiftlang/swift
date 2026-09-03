@@ -173,7 +173,8 @@ void SILFunctionBuilder::addFunctionAttributes(
   }
 
   // @_silgen_name and @_cdecl functions may be called from C code somewhere.
-  if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
+  if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>() ||
+      Attrs.hasAttribute<CxxDeclAttr>())
     F->setHasCReferences(true);
 
   for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {

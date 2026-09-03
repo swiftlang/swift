@@ -1,6 +1,8 @@
 #ifndef TEST_INTEROP_CXX_CXX_IMPL_FUNCTIONS_H
 #define TEST_INTEROP_CXX_CXX_IMPL_FUNCTIONS_H
 
+#include <stdint.h>
+
 struct TrivialStruct {
   int x;
   int y;
@@ -27,6 +29,8 @@ int defer(int x);
 void takesPrimitives(int i, long l, char c, float f, double d, bool b);
 int returnsInt();
 
+int64_t takesInt64(int64_t x);
+
 // Pointers
 
 void takesPtrToInt(int *p);
@@ -49,9 +53,24 @@ int *returnsPtrToInt();
 int *_Nullable returnsNullablePtrToInt();
 int *_Nonnull returnsNonnullPtrToInt();
 
+void swapInts(int *p, int *q);
+
 // Trivial struct
 
 void takesTrivialStruct(TrivialStruct s);
 TrivialStruct returnsTrivialStruct();
+
+// Overloads
+
+int overloadedByArity(int x);
+int overloadedByArity(int x, int y);
+
+// Default arg
+
+int withDefaultArg(int a, int b = 10);
+
+// Linkage
+
+extern "C" int externCFunc(int x);
 
 #endif // !TEST_INTEROP_CXX_CXX_IMPL_FUNCTIONS_H
