@@ -61,6 +61,20 @@ STATISTIC(ImportNameNumCacheMisses, "# of times the import name cache was missed
 using namespace swift;
 using namespace importer;
 
+void ImportNameVersion::dump(llvm::raw_ostream &out) const {
+  if (*this == raw())
+    out << "raw";
+  else
+    out << asClangVersionTuple().getAsString();
+  if (supportsConcurrency())
+    out << " (concurrency)";
+}
+
+void ImportNameVersion::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << "\n";
+}
+
 Identifier importer::getOperatorName(ASTContext &ctx,
                                      clang::OverloadedOperatorKind op) {
   switch (op) {
