@@ -81,7 +81,7 @@ extension Array.ArrayTangentVector {
   }
   
   @inlinable
-  var count: Int {
+  public var count: Int {
     switch self.storage {
     case .zero:
       return 0
