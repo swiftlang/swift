@@ -191,9 +191,17 @@ extension Array: Differentiable where Element: Differentiable {
 
   @inlinable
   public mutating func move(by offset: TangentVector) {
-    var view = DifferentiableView(self)
-    view.move(by: offset)
-    self = view.base
+    if offset.base.isEmpty {
+      return
+    }
+    precondition(
+      self.count == offset.base.count, """
+        Count mismatch: \(self.count) ('self') and \(offset.base.count) \
+        ('direction')
+        """)
+    for i in offset.base.indices {
+      self[i].move(by: offset.base[i])
+    }
   }
 }
 
