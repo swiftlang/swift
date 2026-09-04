@@ -2129,6 +2129,7 @@ private:
                                         llvm::Type *overrideDeclType = nullptr);
 
   void emitLazyPrivateDefinitions();
+  void emitDirectRuntimeAsm();
   void addRuntimeResolvableType(GenericTypeDecl *nominal);
 
   /// Add all conformances of the given \c IterableDeclContext
