@@ -5824,12 +5824,12 @@ location.
 The result `%borrow` has a lifetime dependency on the borrow stored
 at the memory location `%target`.
 
-### dereference_addr_borrow
+### dereference_borrow_addr
 
 ```none
-sil-instruction ::= 'dereference_addr_borrow' sil-value
+sil-instruction ::= 'dereference_borrow_addr' sil-value
 
-%target: $*T = dereference_addr_borrow %borrow: $Builtin.Borrow<T>
+%target: $*T = dereference_borrow_addr %borrow: $Builtin.Borrow<T>
 ```
 
 Returns the address of the value referenced by a `Builtin.Borrow`.

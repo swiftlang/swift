@@ -1171,7 +1171,7 @@ static bool doesNotNeedStackAllocation(SILValue value) {
   // It is, however, valid in OSSA to have uses of an owned value produced by a
   // begin_apply outside of the coroutine range.  So in that case, it is
   // necessary to introduce new storage and move to it.
-  if (isa<LoadBorrowInst>(defInst) ||
+  if (isa<LoadBorrowInst>(defInst) || isa<DereferenceBorrowInst>(defInst) ||
       (isa<BeginApplyInst>(defInst) &&
        value->getOwnershipKind() == OwnershipKind::Guaranteed))
     return true;
@@ -3358,6 +3358,24 @@ void ReturnRewriter::rewriteThrow(ThrowInst *throwInst) {
   pass.deleter.forceDelete(throwInst);
 }
 
+// Find the address that a @guaranteed_address result's returned value was
+// borrowed from. If the value is opaque, it has an entry in the value-storage
+// map recording the address it was rewritten to. Otherwise (e.g. the loadable
+// referent of an @_addressableForDependencies `Builtin.Borrow`, or a trivial
+// referent), it was never entered into that map, so its address is simply the
+// operand it was loaded from.
+static SILValue getGuaranteedAddressResultAddress(SILValue oldResult,
+                                                  AddressLoweringState &pass) {
+  if (pass.valueStorageMap.contains(oldResult)) {
+    ValueStorage &storage = pass.valueStorageMap.getStorage(oldResult);
+    assert(storage.isRewritten);
+    return storage.storageAddress;
+  }
+  if (auto *lbi = dyn_cast<LoadBorrowInst>(oldResult))
+    return lbi->getOperand();
+  return cast<LoadInst>(oldResult)->getOperand();
+}
+
 void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
   auto &astCtx = pass.getModule()->getASTContext();
   auto typeCtx = pass.function->getTypeExpansionContext();
@@ -3390,10 +3408,8 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
                // A @guaranteed_address's lowering directly returns an address.
                if (pass.loweredFnConv.isAddressResult(resultInfo) &&
                    oldResult->getType().isObject()) {
-                 ValueStorage &storage =
-                     pass.valueStorageMap.getStorage(oldResult);
-                 assert(storage.isRewritten);
-                 newDirectResults.push_back(storage.storageAddress);
+                 newDirectResults.push_back(
+                     getGuaranteedAddressResultAddress(oldResult, pass));
                  return;
                }
                newDirectResults.push_back(oldResult);
@@ -3443,11 +3459,10 @@ void ReturnRewriter::rewriteReturnBorrow(ReturnBorrowInst *returnBorrowInst) {
   assert(pass.loweredFnConv.hasGuaranteedAddressResult() &&
          "return_borrow requires a @guaranteed_address result");
   SILValue oldResult = returnBorrowInst->getReturnValue();
-  ValueStorage &storage = pass.valueStorageMap.getStorage(oldResult);
-  assert(storage.isRewritten);
+  SILValue resultAddr = getGuaranteedAddressResultAddress(oldResult, pass);
 
   auto returnBuilder = pass.getBuilder(returnBorrowInst->getIterator());
-  returnBuilder.createReturn(returnBorrowInst->getLoc(), storage.storageAddress);
+  returnBuilder.createReturn(returnBorrowInst->getLoc(), resultAddr);
   pass.deleter.forceDelete(returnBorrowInst);
 }
 
@@ -3745,6 +3760,13 @@ protected:
     SILValue address = pass.valueStorageMap.getStorage(value).storageAddress;
     builder.createFixLifetime(fli->getLoc(), address);
     pass.deleter.forceDelete(fli);
+  }
+
+  void visitMakeBorrowInst(MakeBorrowInst *mbi) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    auto* makeAddrBorrow = builder.createMakeAddrBorrow(mbi->getLoc(), addr);
+    mbi->replaceAllUsesWith(makeAddrBorrow);
+    pass.deleter.forceDelete(mbi);
   }
 
   void visitMarkDependenceInst(MarkDependenceInst *mdi) {
@@ -4503,6 +4525,11 @@ protected:
       bi->dump();
       llvm::report_fatal_error("^^^ Unimplemented builtin opaque value def.");
     }
+  }
+
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *dbi) {
+    auto *addr = builder.createDereferenceAddrBorrow(dbi->getLoc(), dbi->getOperand());
+    pass.valueStorageMap.setStorageAddress(dbi, addr);
   }
 
   // Rewrite the apply for an indirect result.
