@@ -899,7 +899,16 @@ ManglingError Remangler::mangleBoundGenericFunction(Node *node,
   if (!unspec.isSuccess())
     return unspec.error();
   NodePointer unboundFunction = unspec.result();
-  RETURN_IF_ERROR(mangleFunction(unboundFunction, depth + 1));
+  switch (unboundFunction->getKind()) {
+  case Node::Kind::Function:
+    RETURN_IF_ERROR(mangleFunction(unboundFunction, depth + 1));
+    break;
+  case Node::Kind::Constructor:
+    RETURN_IF_ERROR(mangleConstructor(unboundFunction, depth + 1));
+    break;
+  default:
+    return MANGLING_ERROR(ManglingError::BadNodeKind, unboundFunction);
+  }
   char Separator = 'y';
   RETURN_IF_ERROR(mangleGenericArgs(node, Separator, depth + 1));
   Buffer << 'G';
@@ -1493,16 +1502,24 @@ ManglingError Remangler::mangleFullTypeMetadata(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleFunction(Node *node, unsigned depth) {
+  // The node should have a context, a name, an optional list of parameter
+  // labels, and a type.
+  DEMANGLER_ASSERT(node->getNumChildren() >= 3, node);
+
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1)); // context
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1)); // name
 
   bool hasLabels = node->getChild(2)->getKind() == Node::Kind::LabelList;
+  if (hasLabels)
+    DEMANGLER_ASSERT(node->getNumChildren() >= 4, node);
   Node *FuncType = getSingleChild(node->getChild(hasLabels ? 3 : 2));
+  DEMANGLER_ASSERT(FuncType, node);
 
   if (hasLabels)
     RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1)); // parameter labels
 
   if (FuncType->getKind() == Node::Kind::DependentGenericType) {
+    DEMANGLER_ASSERT(FuncType->getNumChildren() >= 2, FuncType);
     RETURN_IF_ERROR(mangleFunctionSignature(
         getSingleChild(FuncType->getChild(1)), depth + 1));
     RETURN_IF_ERROR(
