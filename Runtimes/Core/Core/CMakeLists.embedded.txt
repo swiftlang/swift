@@ -1,0 +1,245 @@
+# TODO: Lookup build commands for
+# - lib/swift/embedded/Swift.swiftmodule/arm64-apple-macos.swiftmodule
+# - lib/swift/embedded/Swift.swiftmodule/arm64-apple-macos.swiftmodule
+# from old build system
+
+gyb_expand(FloatingPointTypes.swift.gyb FloatingPointTypes.swift
+  FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
+gyb_expand(IntegerTypes.swift.gyb IntegerTypes.swift
+  FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
+gyb_expand(LegacyInt128.swift.gyb LegacyInt128.swift
+  FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
+gyb_expand(Tuple.swift.gyb Tuple.swift
+  FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
+gyb_expand(UnsafeBufferPointer.swift.gyb UnsafeBufferPointer.swift
+  FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
+gyb_expand(UnsafeRawBufferPointer.swift.gyb UnsafeRawBufferPointer.swift
+  FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
+
+# Please sort alphabetically
+add_library(swiftCore
+    ASCII.swift
+    Algorithm.swift
+    AnyHashable.swift
+    Array.swift
+    ArrayBody.swift
+    ArrayBuffer.swift
+    ArrayBufferProtocol.swift
+    ArrayCast.swift
+    ArrayShared.swift
+    ArraySlice.swift
+    ArrayType.swift
+    Assert.swift
+    AssertCommon.swift
+    Availability.swift
+    BidirectionalCollection.swift
+    Bitset.swift
+    Bool.swift
+    BridgeStorage.swift
+    Builtin.swift
+    BuiltinMath.swift
+    CString.swift
+    CTypes.swift
+    Character.swift
+    CharacterProperties.swift
+    ClosedRange.swift
+    Collection.swift
+    CollectionAlgorithms.swift
+    CollectionDifference.swift
+    CollectionOfOne.swift
+    Comparable.swift
+    CompilerProtocols.swift
+    ContiguousArray.swift
+    ContiguousArrayBuffer.swift
+    ContiguouslyStored.swift
+    Dictionary.swift
+    DictionaryBridging.swift
+    DictionaryBuilder.swift
+    DictionaryCasting.swift
+    DictionaryStorage.swift
+    DictionaryVariant.swift
+    Diffing.swift
+    DiscontiguousSlice.swift
+    DropWhile.swift
+    Duration.swift
+    DurationProtocol.swift
+    EmbeddedPrint.swift
+    EmbeddedRuntime.swift
+    EmbeddedStubs.swift
+    EmptyCollection.swift
+    EnumeratedSequence.swift
+    Equatable.swift
+    ErrorType.swift
+    Exclusivity.swift
+    ExistentialCollection.swift
+    Filter.swift
+    FlatMap.swift
+    Flatten.swift
+    FloatingPoint.swift
+    FloatingPointToString.swift
+    FloatingPointFromString.swift
+    FloatingPointRandom.swift
+    FloatingPointTypes.swift
+    HashTable.swift
+    Hashable.swift
+    Hasher.swift
+    Identifiable.swift
+    Indices.swift
+    InlineArray.swift
+    InputStream.swift
+    Instant.swift
+    Int128.swift
+    IntegerParsing.swift
+    IntegerTypes.swift
+    Integers.swift
+    Join.swift
+    KeyPath.swift
+    KeyValuePairs.swift
+    LazyCollection.swift
+    LazySequence.swift
+    LegacyInt128.swift
+    LifetimeManager.swift
+    ManagedBuffer.swift
+    Map.swift
+    MemoryLayout.swift
+    MigrationSupport.swift
+    Mirror.swift
+    Misc.swift
+    MutableCollection.swift
+    NFC.swift
+    NFD.swift
+    NativeDictionary.swift
+    NativeSet.swift
+    NewtypeWrapper.swift
+    ObjectIdentifier.swift
+    OptionSet.swift
+    Optional.swift
+    OutputStream.swift
+    Pointer.swift
+    Policy.swift
+    PrefixWhile.swift
+    PtrAuth.swift
+    Random.swift
+    RandomAccessCollection.swift
+    Range.swift
+    RangeReplaceableCollection.swift
+    RangeSet.swift
+    RangeSetRanges.swift
+    Repeat.swift
+    Result.swift
+    Reverse.swift
+    Runtime.swift
+    Sendable.swift
+    Sequence.swift
+    SequenceAlgorithms.swift
+    Set.swift
+    SetAlgebra.swift
+    SetBuilder.swift
+    SetCasting.swift
+    SetStorage.swift
+    SetVariant.swift
+    ShadowProtocols.swift
+    SipHash.swift
+    Slice.swift
+    SliceBuffer.swift
+    SmallString.swift
+    Sort.swift
+    Span/MutableRawSpan.swift
+    Span/MutableSpan.swift
+    Span/OutputRawSpan.swift
+    Span/OutputSpan.swift
+    Span/RawSpan.swift
+    Span/Span.swift
+    StaticBigInt.swift
+    StaticPrint.swift
+    StaticString.swift
+    Stride.swift
+    String.swift
+    StringBreadcrumbs.swift
+    StringBridge.swift
+    StringCharacterView.swift
+    StringComparable.swift
+    StringComparison.swift
+    StringCreate.swift
+    StringGraphemeBreaking.swift
+    StringGuts.swift
+    StringGutsRangeReplaceable.swift
+    StringGutsSlice.swift
+    StringHashable.swift
+    StringIndex.swift
+    StringIndexConversions.swift
+    StringIndexValidation.swift
+    StringInterpolation.swift
+    StringLegacy.swift
+    StringNormalization.swift
+    StringObject.swift
+    StringProtocol.swift
+    StringRangeReplaceableCollection.swift
+    StringStorage.swift
+    StringStorageBridge.swift
+    StringSwitch.swift
+    StringTesting.swift
+    StringUTF16View.swift
+    StringUTF8Validation.swift
+    StringUTF8View.swift
+    StringUnicodeScalarView.swift
+    StringWordBreaking.swift
+    Substring.swift
+    SwiftNativeNSArray.swift
+    SwiftifyImport.swift
+    TemporaryAllocation.swift
+    Tuple.swift
+    UInt128.swift
+    UIntBuffer.swift
+    UTF16.swift
+    UTF32.swift
+    UTF8.swift
+    UTF8EncodingError.swift
+    UTF8Span.swift
+    UTF8SpanBits.swift
+    UTF8SpanComparisons.swift
+    UTF8SpanFundamentals.swift
+    UTF8SpanInternalHelpers.swift
+    UTF8SpanIterators.swift
+    UTFEncoding.swift
+    UnavailableStringAPIs.swift
+    UnfoldSequence.swift
+    Unicode.swift
+    UnicodeBreakProperty.swift
+    UnicodeData.swift
+    UnicodeEncoding.swift
+    UnicodeHelpers.swift
+    UnicodeParser.swift
+    UnicodeSPI.swift
+    UnicodeScalar.swift
+    UnicodeScalarProperties.swift
+    Unmanaged.swift
+    UnmanagedOpaqueString.swift
+    UnmanagedString.swift
+    UnsafeBufferPointer.swift
+    UnsafeBufferPointerSlice.swift
+    UnsafePointer.swift
+    UnsafeRawBufferPointer.swift
+    UnsafeRawPointer.swift
+    ValidUTF8Buffer.swift
+    WriteBackMutableSlice.swift
+    Zip.swift
+    _InlineArray.swift)
+
+if(SwiftCore_ENABLE_VECTOR_TYPES)
+  gyb_expand(SIMDIntegerConcreteOperations.swift.gyb SIMDIntegerConcreteOperations.swift)
+  gyb_expand(SIMDFloatConcreteOperations.swift.gyb SIMDFloatConcreteOperations.swift)
+  gyb_expand(SIMDMaskConcreteOperations.swift.gyb SIMDMaskConcreteOperations.swift)
+  gyb_expand(SIMDVectorTypes.swift.gyb SIMDVectorTypes.swift)
+
+  target_sources(swiftCore PRIVATE
+    SIMDVector.swift
+    SIMDIntegerConcreteOperations.swift
+    SIMDFloatConcreteOperations.swift
+    SIMDMaskConcreteOperations.swift
+    SIMDVectorTypes.swift)
+endif()
+
+set_target_properties(swiftCore PROPERTIES
+  Swift_MODULE_NAME Swift)
+# vim:set et sw=2 ts=2 sts=2 ft=cmake tw=80:
