@@ -39,9 +39,9 @@ def _repr(cls, args):
 
     _args = []
     for key, value in args.items():
-        _args.append('{}={}'.format(key, repr(value)))
+        _args.append(f'{key}={value!r}')
 
-    return '{}({})'.format(type(cls).__name__, ', '.join(_args))
+    return f'{type(cls).__name__}({", ".join(_args)})'
 
 
 class BoolType(object):
@@ -65,7 +65,7 @@ class BoolType(object):
         elif value in self._false_values:
             return False
         else:
-            raise ArgumentTypeError('{} is not a boolean value'.format(value))
+            raise ArgumentTypeError(f'{value} is not a boolean value')
 
     def __repr__(self):
         return _repr(self, {
@@ -89,10 +89,10 @@ class PathType(object):
         path = os.path.abspath(path)
 
         if self._assert_exists and not os.path.exists(path):
-            raise ArgumentTypeError('{} does not exist'.format(path))
+            raise ArgumentTypeError(f'{path} does not exist')
 
         if self._assert_executable and not PathType._is_executable(path):
-            raise ArgumentTypeError('{} is not an executable'.format(path))
+            raise ArgumentTypeError(f'{path} is not an executable')
 
         return path
 
