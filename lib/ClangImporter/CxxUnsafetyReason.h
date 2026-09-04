@@ -49,6 +49,24 @@ enum class CxxUnsafetyReason {
   ExplicitAnnotation,
   /// A non-escapable view with a lifetime dependency Swift cannot track.
   IndirectView,
+
+  /// The result is non-escapable and its lifetime was inferred, not written.
+  InferredResultDependence,
+  /// A non-escapable parameter has no lifetime annotation.
+  UnannotatedNonEscapableParam,
+
+  // A lifetime annotation was written but Swift could not represent it. Each
+  // case names the situation that defeated it.
+  //
+  /// The annotated result is Escapable, so Swift drops the dependency.
+  SkippedLifetimeEscapableResult,
+  /// The annotated parameter is imported as a class.
+  SkippedLifetimeImportedAsClass,
+  /// The annotated parameter is an rvalue reference, so it is not guaranteed to
+  /// outlive the call.
+  SkippedLifetimeRValueReference,
+  /// The annotated parameter has no borrowable storage.
+  SkippedLifetimeNoBorrowableStorage,
 };
 
 /// Why a C++ type's escapability could not be determined. Each case is one

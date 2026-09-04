@@ -8141,16 +8141,31 @@ void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
                                               SourceLoc useLoc) {
   // A declaration: explain which rule made this method unsafe.
   if (decl && decl->hasClangNode()) {
-    if (auto *method = dyn_cast_or_null<clang::CXXMethodDecl>(
-            decl->getClangNode().getAsDecl())) {
-      // An annotation written in the header speaks for itself. Do not
-      // paraphrase it, and never let a heuristic explain a decision the
-      // heuristic did not make.
-      if (importer::hasSwiftAttribute(method, {"unsafe", "unsafe(always)"}))
+    auto *clangDecl = decl->getClangNode().getAsDecl();
+
+    // An annotation written in the header speaks for itself, whatever kind of
+    // declaration carries it.
+    if (auto *named = dyn_cast_or_null<clang::NamedDecl>(clangDecl))
+      if (importer::hasSwiftAttribute(named, {"unsafe", "unsafe(always)"}))
         return;
 
-      if (auto reason = importer::shouldRenameCXXMethodAsUnsafe(
-              method, Impl.SwiftContext)) {
+    // Lifetime inference records its reason when it adds the attribute, since
+    // inferred annotations might make it impossible to reconstruct the same
+    // decision later.
+    auto recorded = Impl.LifetimeUnsafetyReasons.find(decl);
+    if (recorded != Impl.LifetimeUnsafetyReasons.end()) {
+      Impl.diagnose(HeaderLoc(clangDecl->getLocation(), useLoc),
+                    diag::cxx_unsafe_decl_reason,
+                    cast<clang::NamedDecl>(clangDecl)->getNameAsString(),
+                    importer::describe(recorded->second.reason,
+                                       recorded->second.culprit));
+      return;
+    }
+
+    if (auto *method = dyn_cast_or_null<clang::CXXMethodDecl>(clangDecl)) {
+      if (auto reason =
+              importer::shouldRenameCXXMethodAsUnsafe(method,
+                                                      Impl.SwiftContext)) {
         Impl.diagnose(HeaderLoc(method->getLocation(), useLoc),
                       diag::cxx_unsafe_decl_reason, method->getNameAsString(),
                       importer::describe(*reason));

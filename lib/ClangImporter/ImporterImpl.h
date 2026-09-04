@@ -660,6 +660,17 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
+  /// Why a declaration was given an implicit '@unsafe' by the lifetime
+  /// inference in VisitFunctionDecl, for diagnostics.
+  ///
+  /// Recorded where the attribute is added rather than recomputed later: the
+  /// conditions depend on local state of the import (which annotations were
+  /// skipped, which parameters were annotated) that cannot be re-derived from
+  /// the Clang declaration alone. Recording keeps the reason and the verdict on
+  /// the same code path, as elsewhere.
+  llvm::DenseMap<const Decl *, importer::CxxUnsafetyExplanation>
+      LifetimeUnsafetyReasons;
+
   // Caches used by ObjCInterfaceAndImplementationRequest.
   llvm::DenseMap<Decl *, Decl *> ImplementationsByInterface;
   llvm::DenseMap<Decl *, llvm::TinyPtrVector<Decl*>> InterfacesByImplementation;

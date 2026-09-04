@@ -37,6 +37,15 @@ std::string importer::describe(CxxUnsafetyReason reason,
     return (withName + " '" + culprit->getName() + "'").str();
   };
 
+  // A skipped lifetime annotation sits either on a parameter or on 'self',
+  // which has no declaration to name.
+  auto annotated = [&](StringRef detail) {
+    return (named("Swift cannot represent the lifetime annotation on parameter",
+                  "Swift cannot represent the lifetime annotation on 'self'") +
+            ", " + detail)
+        .str();
+  };
+
   switch (reason) {
   case CxxUnsafetyReason::IteratorFromBeginEnd:
     return "'begin' and 'end' are assumed to return iterators, which do not "
@@ -68,6 +77,27 @@ std::string importer::describe(CxxUnsafetyReason reason,
   case CxxUnsafetyReason::IndirectView:
     return "it is a non-escapable view whose lifetime dependency Swift cannot "
            "track";
+
+  case CxxUnsafetyReason::InferredResultDependence:
+    return "it returns a non-escapable value whose lifetime Swift had to infer; "
+           "annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what "
+           "the result depends on";
+  case CxxUnsafetyReason::UnannotatedNonEscapableParam:
+    return named("its non-escapable parameter",
+                 "it takes a non-escapable parameter with no lifetime "
+                 "annotation") +
+           (culprit ? " has no lifetime annotation" : "");
+
+  case CxxUnsafetyReason::SkippedLifetimeEscapableResult:
+    return "its lifetime annotation is not enforced: the result is Escapable, "
+           "so Swift drops the dependency";
+  case CxxUnsafetyReason::SkippedLifetimeImportedAsClass:
+    return annotated("which is imported as a class");
+  case CxxUnsafetyReason::SkippedLifetimeRValueReference:
+    return annotated(
+        "an rvalue reference that is not guaranteed to outlive the call");
+  case CxxUnsafetyReason::SkippedLifetimeNoBorrowableStorage:
+    return annotated("which has no borrowable storage");
   }
   llvm_unreachable("covered switch");
 }
