@@ -3698,7 +3698,17 @@ protected:
   }
 
   void visitBuiltinInst(BuiltinInst *bi) {
-    switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
+    auto kind = bi->getBuiltinKind().value_or(BuiltinValueKind::None);
+    // Polymorphic builtins (e.g. "generic_add") only ever borrow their
+    // operands (see the InstantaneousUse classification in
+    // OperandOwnershipBuiltinClassifier), so every operand is handled the
+    // same way: materialize its address in place.
+    if (kind != BuiltinValueKind::None && isPolymorphicBuiltin(kind)) {
+      SILValue opAddr = addrMat.materializeAddress(use->get());
+      bi->setOperand(use->getOperandNumber(), opAddr);
+      return;
+    }
+    switch (kind) {
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::AddTaskLocalValue:
@@ -4488,7 +4498,34 @@ protected:
   }
 
   void visitBuiltinInst(BuiltinInst *bi) {
-    switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
+    auto kind = bi->getBuiltinKind().value_or(BuiltinValueKind::None);
+    if (kind != BuiltinValueKind::None && isPolymorphicBuiltin(kind)) {
+      // Rewrite the value-form (with already address-converted operands,
+      // see UseRewriter::visitBuiltinInst above):
+      //   %result = builtin "generic_add"<T>(%0 : $*T, %1 : $*T) : $T
+      // into the address-form that non-opaque-values SILGen already emits:
+      //   builtin "generic_add"<T>(%dest : $*T, %0 : $*T, %1 : $*T) : $()
+      addrMat.materializeAddress(bi);
+      SILValue destAddr = storage.storageAddress;
+      SmallVector<SILValue, 4> newArgs;
+      newArgs.push_back(destAddr);
+      for (SILValue arg : bi->getArguments()) {
+        // A polymorphic builtin is typed <T> (T, T) -> T, so an opaque result
+        // means opaque operands, which the UseRewriter has already given
+        // addresses. However, nothing enforces that on parsed SIL, and mixing
+        // a value operand into the address form below would go unnoticed.
+        assert(arg->getType().isAddress() &&
+               "polymorphic builtin operand should already be rewritten");
+        newArgs.push_back(arg);
+      }
+      auto &astCtx = pass.getModule()->getASTContext();
+      builder.createBuiltin(bi->getLoc(), bi->getName(),
+                            SILType::getEmptyTupleType(astCtx),
+                            bi->getSubstitutions(), newArgs);
+      storage.markRewritten();
+      return;
+    }
+    switch (kind) {
     case BuiltinValueKind::ZeroInitializer: {
       // Value-form `builtin "zeroInitializer"() : $T` with an opaque T.
       assert(bi->getNumOperands() == 0 &&
