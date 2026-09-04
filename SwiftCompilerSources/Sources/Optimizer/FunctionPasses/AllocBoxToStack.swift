@@ -254,7 +254,7 @@ private struct FunctionSpecializations {
       case let debugValue as DebugValueInst:
         if debugValue.debugReconstructionBlock != nil {
           // A box cannot be salvaged.
-          debugValue.killOperand(index: use.index)
+          debugValue.killOperand(index: use.index, context)
         } else {
           // A bare debug_value on an alloc_box describes the box content: repoint it to the alloc_stack with a deref.
           use.set(to: stack, context)

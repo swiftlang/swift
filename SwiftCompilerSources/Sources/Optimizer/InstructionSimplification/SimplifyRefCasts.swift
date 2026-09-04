@@ -32,6 +32,14 @@ extension UncheckedRefCastInst : OnoneSimplifiable {
   }
 }
 
+extension UncheckedRefCastInst : DebugReconstructionBlockSimplifiable {
+  /// Only fold undef: the cast-type analysis of `simplify` relies on the surrounding
+  /// function, which a reconstruction block has none of.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    foldUndefOperands(context)
+  }
+}
+
 private extension CheckedCastBranchInst {
 
   /// Removes the `checked_cast_br` if it is dead:

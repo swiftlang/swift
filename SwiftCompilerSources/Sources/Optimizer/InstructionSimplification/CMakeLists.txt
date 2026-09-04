@@ -23,6 +23,7 @@ swift_compiler_sources(Optimizer
   SimplifyConvertEscapeToNoEscape.swift
   SimplifyCopyBlock.swift
   SimplifyCopyValue.swift
+  SimplifyDebugReconstruction.swift
   SimplifyDebugStep.swift
   SimplifyDestroyValue.swift
   SimplifyDestructure.swift

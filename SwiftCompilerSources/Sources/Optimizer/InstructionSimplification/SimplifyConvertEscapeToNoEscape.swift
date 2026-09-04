@@ -18,6 +18,14 @@ extension ConvertEscapeToNoEscapeInst : OnoneSimplifiable {
   }
 }
 
+extension ConvertEscapeToNoEscapeInst : DebugReconstructionBlockSimplifiable {
+  /// Only fold undef: a `thin_to_thick_function` operand is never salvaged into a
+  /// reconstruction block.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    foldUndefOperands(context)
+  }
+}
+
 private extension ConvertEscapeToNoEscapeInst {
 
   /// Combine with a thin_to_thick_function operand:
