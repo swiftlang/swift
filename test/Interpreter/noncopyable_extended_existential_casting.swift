@@ -115,12 +115,76 @@ print("is boxed true:", isCheckBoxed(
 // CHECK: is boxed false: false
 print("is boxed false:", isCheckBoxed(Unrelated()))
 
-// Leak/double-free check: construct the boxed, canary-carrying payload
-// directly as a call argument (never bound to a named local -- doing so
-// currently trips an unrelated, pre-existing move-only-checker crash for
-// *any* consuming use of a boxed noncopyable existential local, unrelated
-// to casting), exercise a successful `is` check on it, and confirm the
-// class reference inside gets destroyed exactly once.
-_ = takeCanary(BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0))
+// Leak/double-free check: bind the boxed, canary-carrying payload to a local,
+// exercise a successful `is` check on it, and confirm the class reference
+// inside gets destroyed exactly once.
+func canaryLocalCheck() {
+  let canaryBox: any P<Int> & ~Copyable =
+    BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0)
+  _ = takeCanary(canaryBox)
+}
+canaryLocalCheck()
 // CHECK: canary deinit count: 1
 print("canary deinit count:", Canary.deinitCount)
+
+// MARK: - Cast patterns (`if case let x as T`)
+//
+// Same failed-cast-leaves-the-subject-intact property as the plain existential
+// test, but going through tryCastUnwrappingExtendedExistentialSource.
+
+func classifyInline(_ box: consuming any P<Int> & ~Copyable) -> Int {
+  if case let u as Unrelated = box { _ = u; return -1 }
+  if case let s as Small = box { return s.tag }
+  return -2
+}
+
+func classifyBoxed(_ box: consuming any P<Int> & ~Copyable) -> Int {
+  if case let u as Unrelated = box { _ = u; return -1 }
+  if case let b as Big = box { return b.tag }
+  return -2
+}
+
+// CHECK: if case chained inline: 7
+print("if case chained inline:", classifyInline(Small(tag: 7)))
+// CHECK: if case chained boxed: 8
+print("if case chained boxed:", classifyBoxed(
+  Big(tag: 8, pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0, pad6: 0)))
+
+// All patterns fail: the subject was never consumed, so it must be destroyed
+// exactly once at scope exit.
+func allPatternsFail(_ box: consuming any P<Int> & ~Copyable) -> Int {
+  if case let u as Unrelated = box { _ = u; return -1 }
+  if case let s as Small = box { _ = s; return -2 }
+  return 0
+}
+// CHECK: if case all failed: 0
+print("if case all failed:", allPatternsFail(
+  BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0)))
+// CHECK: canary deinit count after failed patterns: 2
+print("canary deinit count after failed patterns:", Canary.deinitCount)
+
+// MARK: - `as?` consumes unconditionally, unlike a cast pattern
+//
+// Same invariant as the plain existential test, through the extended-existential
+// runtime path: forming an Optional with `as?` consumes the subject even when
+// the cast fails, while a cast pattern leaves it intact on the failure edge.
+
+func optionalFormConsumesOnFailure() -> Int {
+  let box: any P<Int> & ~Copyable =
+    BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0)
+  if let u = box as? Unrelated { _ = u; return -1 }
+  return Canary.deinitCount
+}
+// CHECK: as? consumed on failure (3 => yes): 3
+print("as? consumed on failure (3 => yes):", optionalFormConsumesOnFailure())
+
+func patternFormDoesNotConsumeOnFailure() -> Int {
+  let before = Canary.deinitCount
+  let box: any P<Int> & ~Copyable =
+    BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0)
+  if case let u as Unrelated = box { _ = u; return -1 }
+  return Canary.deinitCount - before
+}
+// CHECK: pattern left subject alive on failure (0 => yes): 0
+print("pattern left subject alive on failure (0 => yes):",
+      patternFormDoesNotConsumeOnFailure())
