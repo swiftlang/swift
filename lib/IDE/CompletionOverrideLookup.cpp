@@ -15,8 +15,6 @@
 #include "CodeCompletionResultBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/IDE/CodeCompletionString.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 
 using namespace swift;

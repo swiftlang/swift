@@ -16,13 +16,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Pattern.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/IRGen/Linking.h"
-#include "llvm/IR/GlobalVariable.h"
-#include "llvm/IR/Module.h"
 
 #include "DebugTypeInfo.h"
 #include "GenTuple.h"

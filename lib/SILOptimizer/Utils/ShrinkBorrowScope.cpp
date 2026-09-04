@@ -15,9 +15,6 @@
 /// guaranteed values is preserved.
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Builtins.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"

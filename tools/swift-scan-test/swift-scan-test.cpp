@@ -16,7 +16,6 @@
 
 #include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/DependencyScan/DependencyScanJSON.h"
 #include "swift/DependencyScan/StringUtils.h"

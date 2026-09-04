@@ -24,7 +24,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/FormattedStream.h"
 
 namespace llvm {
 template <class T>

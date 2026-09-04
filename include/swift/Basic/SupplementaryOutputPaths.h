@@ -14,8 +14,6 @@
 #define SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H
 
 #include "swift/Basic/FileTypes.h"
-#include "swift/Basic/LLVM.h"
-#include "llvm/IR/Function.h"
 
 #include <string>
 

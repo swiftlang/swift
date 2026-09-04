@@ -23,7 +23,6 @@
 
 #include <algorithm>
 #include <cstdlib>
-#include <iostream>
 #include <system_error>
 
 namespace options {

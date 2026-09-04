@@ -20,7 +20,6 @@
 #ifndef SWIFT_BASIC_DIVERSELIST_H
 #define SWIFT_BASIC_DIVERSELIST_H
 
-#include "swift/Basic/Malloc.h"
 #include <cassert>
 #include <cstring>
 #include <utility>

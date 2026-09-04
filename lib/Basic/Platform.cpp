@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Pack.h"
 #include "swift/Basic/Platform.h"
 #include "llvm/ADT/StringExtras.h"

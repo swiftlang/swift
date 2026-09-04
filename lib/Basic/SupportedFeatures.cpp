@@ -15,7 +15,6 @@
 
 #include "swift/AST/DiagnosticGroups.h"
 #include "swift/Basic/Feature.h"
-#include "swift/Frontend/Frontend.h"
 
 #include "llvm/Support/raw_ostream.h"
 

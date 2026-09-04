@@ -12,7 +12,6 @@
 
 #include "swift/SILOptimizer/Utils/SILIsolationInfo.h"
 
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"

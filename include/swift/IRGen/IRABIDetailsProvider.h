@@ -19,12 +19,11 @@
 #include "swift/IRGen/GenericRequirement.h"
 #include "clang/AST/CharUnits.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <utility>
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 

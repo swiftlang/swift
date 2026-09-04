@@ -23,11 +23,9 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/Test.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Transforms/Utils/ModuleUtils.h"
 
 using namespace swift;
 

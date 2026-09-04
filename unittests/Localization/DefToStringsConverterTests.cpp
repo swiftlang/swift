@@ -12,19 +12,14 @@
 
 #include "LocalizationTest.h"
 #include "swift/Localization/LocalizationFormat.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/ToolOutputFile.h"
-#include "llvm/Support/raw_ostream.h"
 #include "gtest/gtest.h"
 #include <cstdlib>
 #include <random>
 #include <string>
-#include <system_error>
 
 using namespace swift;
 using namespace swift::diag;

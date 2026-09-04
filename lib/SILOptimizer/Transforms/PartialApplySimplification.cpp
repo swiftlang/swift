@@ -33,14 +33,10 @@
 
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/Statistic.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 
 STATISTIC(NumInvocationFunctionsChanged,
           "Number of invocation functions rewritten");

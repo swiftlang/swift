@@ -20,13 +20,11 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/NestedNameSpecifier.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Casting.h"
 
 using namespace swift;
 using namespace cxx_synthesis;

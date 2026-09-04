@@ -23,7 +23,6 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/SetVector.h"
 #include "RequirementMachine.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"

@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ASTVisitor.h"
 #include "LValue.h"
 #include "RValue.h"
 #include "SILGen.h"
@@ -19,7 +18,6 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 

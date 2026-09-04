@@ -18,7 +18,6 @@
 #ifndef SWIFT_BASIC_ASSERTIMPLEMENTS_H
 #define SWIFT_BASIC_ASSERTIMPLEMENTS_H
 
-#include <type_traits>
 
 namespace swift {
   template <class ExpectedType, class BaseType>

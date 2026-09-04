@@ -14,7 +14,6 @@
 #include "SILGenFunction.h"
 #include "Scope.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Assertions.h"
 
 #define DEBUG_TYPE "silgen"
 

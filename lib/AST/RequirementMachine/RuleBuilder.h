@@ -14,14 +14,14 @@
 #define SWIFT_RULEBUILDER_H
 
 #include "swift/AST/ASTContext.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/SmallVector.h"
 #include <vector>
 #include "RewriteContext.h"
 #include "Rule.h"
 #include "Symbol.h"
 #include "Term.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
   class raw_ostream;

@@ -17,12 +17,10 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_PROTOCOLCONFORMANCE_H
 
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Debug.h"
 
 namespace swift {
 

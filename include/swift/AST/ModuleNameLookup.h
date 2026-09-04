@@ -18,10 +18,10 @@
 #ifndef SWIFT_AST_MODULE_NAME_LOOKUP_H
 #define SWIFT_AST_MODULE_NAME_LOOKUP_H
 
-#include "llvm/ADT/SmallVector.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 class ValueDecl;

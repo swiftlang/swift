@@ -14,17 +14,13 @@
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_REFCOUNTSTATE_H
 
 #include "RCStateTransition.h"
-#include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/Basic/type_traits.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
-#include <algorithm>
 
 namespace swift {
 class AliasAnalysis;

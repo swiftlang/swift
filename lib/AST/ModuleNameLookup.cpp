@@ -16,7 +16,6 @@
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/ExprCXX.h"
 #include "llvm/Support/raw_ostream.h"

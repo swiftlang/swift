@@ -15,7 +15,6 @@
 
 #include "swift/AST/AttrKind.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSet.h"
 

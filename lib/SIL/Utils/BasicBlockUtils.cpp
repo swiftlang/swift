@@ -11,9 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
@@ -24,7 +21,6 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SIL/Test.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SCCIterator.h"
 
 using namespace swift;
