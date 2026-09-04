@@ -495,6 +495,22 @@ void _swift_mutex_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
  *   - mutex: The mutex to attempt to acquire.
  *
  * - Returns: Nonzero if the mutex was acquired, or zero if it was not acquired.
+ *
+ * This function is used to implement
+ * `Synchronization.Mutex.withLockIfAvailable(_:)`.
+ *
+ * - Important: The implementation must not be subject to spurious failures of
+ *   the kind that can occur when using a weak atomic compare-and-exchange
+ *   operation. As such, if your implementation is based on an atomic
+ *   compare-and-exchange operation, it _must_ use the strong variant or execute
+ *   the operation in a loop so that it is not subject to spurious failures.
+ *
+ *   If your implementation is based on C11's `mtx_trylock()` or C++11's
+ *   `std::mutex::try_lock()`, be aware that those languages' standards also
+ *   allow for spurious failures.
+ *
+ *   POSIX's `pthread_mutex_trylock()` function does not allow for spurious
+ *   failures.
  */
 __swift_ptrdiff_t _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
 
