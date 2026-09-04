@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/SmallBitVector.h"
@@ -687,6 +688,26 @@ RegionAnalysisValueMap::getIsolationRegion(SILValue value) const {
   return iter->getSecond().getIsolationRegionInfo();
 }
 
+/// A nonescaping mark_dependence result may have a Sendable type while its
+/// lifetime base is non-Sendable. Treat that specific result as non-Sendable
+/// inside region isolation without changing its type's Sendable conformance.
+static bool isSendableForRegionIsolation(SILValue value) {
+  auto *mdi = dyn_cast<MarkDependenceInst>(value);
+  bool isSendable = SILIsolationInfo::isSendable(value);
+  if (!isSendable || !mdi || !mdi->isNonEscaping())
+    return isSendable;
+
+  auto base = mdi->getBase();
+  if (SILIsolationInfo::isNonSendable(base))
+    return false;
+
+  if (base->getType().isAddress()) {
+    AddressBaseComputingVisitor visitor;
+    base = visitor.compute(base);
+  }
+  return SILIsolationInfo::isSendable(base);
+}
+
 std::pair<TrackableValue, bool>
 RegionAnalysisValueMap::initializeTrackableValue(
     SILValue value, SILIsolationInfo newInfo) const {
@@ -705,8 +726,9 @@ RegionAnalysisValueMap::initializeTrackableValue(
   // If we did not insert, just return the already stored value.
   self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
 
-  // Before we do anything, see if we have a Sendable value.
-  if (!SILIsolationInfo::isNonSendable(value)) {
+  // Before we do anything, see if we have a value that region isolation can
+  // ignore.
+  if (isSendableForRegionIsolation(value)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
     return {{iter.first->first, iter.first->second}, true};
   }
@@ -747,9 +769,8 @@ TrackableValue RegionAnalysisValueMap::getTrackableValueHelper(
     return {iter.first->first, iter.first->second};
   }
 
-  // Then check our oracle to see if the value is actually sendable. If we have
-  // a Sendable value, just return early.
-  if (SILIsolationInfo::isSendable(value)) {
+  // Then check our oracle to see if region isolation can ignore the value.
+  if (isSendableForRegionIsolation(value)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
     return {iter.first->first, iter.first->second};
   }
@@ -1021,6 +1042,45 @@ namespace {
 /// model. Otherwise, there is an implicit contract in between the frontend and
 /// the optimizer where both are following each other making it easy for the two
 /// to get out of sync.
+static SILValue getSingleInheritedLifetimeSource(ApplyInst *apply) {
+  FullApplySite applySite(apply);
+  auto dependence =
+      applySite.getSubstCalleeType()->getLifetimeDependenceForResult();
+  if (!dependence || !dependence->hasInheritLifetimeParamIndices() ||
+      dependence->hasScopeLifetimeParamIndices() || dependence->hasCaptures())
+    return {};
+
+  auto *indices = dependence->getInheritIndices();
+  if (indices->getNumIndices() != 1)
+    return {};
+
+  unsigned parameterIndex = *indices->begin();
+  auto arguments = applySite.getArgumentsWithoutIndirectResults();
+  if (parameterIndex >= arguments.size())
+    return {};
+  return arguments[parameterIndex];
+}
+
+/// Return true when \p value is forwarded from a nonescaping dependence by
+/// ordinary ownership forwarding or by a single-source inherited lifetime.
+static bool isForwardedFromNonescapingDependence(SILValue value) {
+  while (value) {
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(value))
+      return mdi->isNonEscaping();
+
+    if (auto *apply = dyn_cast<ApplyInst>(value)) {
+      value = getSingleInheritedLifetimeSource(apply);
+      continue;
+    }
+
+    auto *svi = dyn_cast<SingleValueInstruction>(value);
+    if (!svi || !isStaticallyLookThroughInst(svi))
+      return false;
+    value = svi->getOperand(0);
+  }
+  return false;
+}
+
 struct UnderlyingTrackedObjectValueVisitor {
   SILValue value;
 
@@ -1028,6 +1088,27 @@ private:
   /// Visit \p sourceValue returning a load base if we find one. The actual
   /// underlying object is value.
   SILValue visit(SILValue sourceValue) {
+    // Copies of a nonescaping mark_dependence result must resolve to the
+    // mark_dependence itself. It is the point where the dependent value is
+    // joined to its base region, even when the result's type is Sendable.
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(sourceValue);
+        mdi && mdi->isNonEscaping()) {
+      value = mdi;
+      return {};
+    }
+
+    // An inherited lifetime result, such as Span.extracting(...), forwards
+    // the dependence of its source without introducing another
+    // mark_dependence. Follow that result only when it leads back to the
+    // nonescaping dependence tracked here; ordinary Sendable apply results
+    // retain their existing behavior.
+    if (auto *apply = dyn_cast<ApplyInst>(sourceValue)) {
+      auto inheritedSource = getSingleInheritedLifetimeSource(apply);
+      if (inheritedSource &&
+          isForwardedFromNonescapingDependence(inheritedSource))
+        return inheritedSource;
+    }
+
     // If our result is ever Sendable, we record that as our value if we do
     // not have a value yet. We always want to take the first one.
     if (SILIsolationInfo::isSendable(sourceValue)) {
@@ -1930,6 +2011,22 @@ struct PartitionOpBuilder {
     currentInstPartitionOps->emplace_back(
         PartitionOp::Merge(lookupValueID(rep), lookupValueID(srcOperand->get()),
                            reason, srcOperand));
+  }
+
+  /// Merge a tracked source that is the non-Sendable base of \p srcOperand.
+  /// The operand is retained so diagnostics still point at the SIL use which
+  /// caused the regions to be joined.
+  void addMerge(TrackableValue destValue, TrackableValue srcValue,
+                Operand *srcOperand,
+                RegionMergeReason reason = RegionMergeReason::Unknown) {
+    if (destValue.isSendable() || srcValue.isSendable())
+      return;
+
+    if (destValue.getID() == srcValue.getID())
+      return;
+
+    currentInstPartitionOps->emplace_back(PartitionOp::Merge(
+        destValue.getID(), srcValue.getID(), reason, srcOperand));
   }
 
   /// Mark \p value artifically as being part of an actor-isolated region by
@@ -4444,6 +4541,32 @@ PartitionOpTranslator::visitRefToRawPointerInst(RefToRawPointerInst *r) {
 TranslationSemantics
 PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   assert(isStaticallyLookThroughInst(mdi) && "Out of sync");
+
+  // Nonescaping dependence isn't just a use of the base at this
+  // instruction. The dependent value (e.g. a Span) keeps using the borrowed
+  // storage until it dies, so put the result, value, and base in one region.
+  if (mdi->isNonEscaping()) {
+    translateSILMultiAssign(mdi->getResults(), ArrayRef<Operand *>(),
+                            makeOperandRefRange(mdi->getAllOperands()),
+                            RegionMergeReason::Assign);
+
+    // Multi-assign deliberately ignores Sendable operands. A Sendable address
+    // can still be rooted in the mutable non-Sendable capture box which a
+    // sending closure transfers. Join that base too.
+    auto result = tryToTrackValue(mdi);
+    if (!result)
+      return TranslationSemantics::Special;
+    for (Operand &operand : mdi->getAllOperands()) {
+      auto source = tryToTrackValue(operand.get());
+      if (source && source->value.isSendable() && source->base &&
+          source->base->isNonSendable()) {
+        builder.addMerge(result->value, *source->base, &operand,
+                         RegionMergeReason::Assign);
+      }
+    }
+    return TranslationSemantics::Special;
+  }
+
   translateSILLookThrough(mdi->getResults(), mdi->getValue());
   translateSILRequire(mdi->getBase());
   return TranslationSemantics::Special;
