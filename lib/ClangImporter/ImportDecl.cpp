@@ -185,7 +185,6 @@ importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
     const clang::NamedDecl *decl) {
   if (!decl->hasAttrs())
     return;
-
   for (const auto *attr : decl->getAttrs()) {
     if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
       if (swiftAttr->getAttribute() == "returns_unretained")
