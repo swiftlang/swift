@@ -229,5 +229,49 @@ StdVectorTestSuite.test("Subscript of VectorOfNonCopyable") {
     expectEqual(getNumber(v[2]), 3)
 }
 
+StdVectorTestSuite.test("VectorOfInt borrowing for loop").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+    let constArr : [Int32] = [1, 2, 3]
+    let constVec = Vector(constArr)
+    expectEqual(constVec.size(), constArr.count)
+    var counter = 0
+    for el in constVec {
+        expectEqual(el, constArr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+
+    var mutArr : [Int32] = [4, 5, 6, 7]
+    var mutVec = Vector(mutArr)
+    expectEqual(mutVec.size(), mutArr.count)
+    counter = 0
+    for el in mutVec {
+        expectEqual(el, mutArr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 4)
+}
+
+StdVectorTestSuite.test("VectorOfNonCopyable borrowing for loop").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+    let constVec = makeVectorOfNonCopyable()
+    let arr : [Int32] = [1, 2, 3]
+    expectEqual(constVec.size(), arr.count)
+    var counter = 0
+    for el in constVec {
+        expectEqual(el.number, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+
+    var mutVec = makeVectorOfNonCopyable()
+    expectEqual(mutVec.size(), arr.count)
+    counter = 0
+    for el in mutVec {
+        expectEqual(el.number, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+}
 
 runAllTests()
