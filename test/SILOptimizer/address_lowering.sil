@@ -3468,7 +3468,7 @@ bb0(%0 : @guaranteed $T):
 // CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $AnyObject
 // CHECK:         store [[SRC]] to [init] [[SRC_ADDR]] : $*AnyObject
 // CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
-// CHECK:         unconditional_checked_cast_addr AnyObject in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         unconditional_checked_cast_addr AnyObject in [[SRC_ADDR]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]]
 // CHECK:         load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
 // CHECK-LABEL: } // end sil function 'test_unconditional_checked_cast4'
 sil hidden [ossa] @test_unconditional_checked_cast4 : $@convention(thin) (@owned AnyObject) -> () {
@@ -3484,7 +3484,7 @@ entry(%instance : @owned $AnyObject):
 // CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast5 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[SRC_ADDR:%[^,]+]] :
 // CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
-// CHECK:         unconditional_checked_cast_addr T in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         unconditional_checked_cast_addr T in [[SRC_ADDR]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]]
 // CHECK:         load [trivial] [[DEST_ADDR]] : $*@thick any AnyObject.Type
 // CHECK-LABEL: } // end sil function 'test_unconditional_checked_cast5'
 sil [ossa] @test_unconditional_checked_cast5 : $@convention(thin) <T> (@in T) -> () {
