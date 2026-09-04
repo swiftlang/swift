@@ -2087,6 +2087,8 @@ BridgedInstruction::CastConsumptionKind BridgedInstruction::CheckedCastAddrBranc
                 (int)swift::CastConsumptionKind::TakeOnSuccess);
   static_assert((int)BridgedInstruction::CastConsumptionKind::CopyOnSuccess ==
                 (int)swift::CastConsumptionKind::CopyOnSuccess);
+  static_assert((int)BridgedInstruction::CastConsumptionKind::TestOnly ==
+                (int)swift::CastConsumptionKind::TestOnly);
 
   return static_cast<BridgedInstruction::CastConsumptionKind>(
            getAs<swift::CheckedCastAddrBranchInst>()->getConsumptionKind());

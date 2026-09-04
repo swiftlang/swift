@@ -950,6 +950,7 @@ struct ImmutableAddressUseVerifier {
         case CastConsumptionKind::BorrowAlways:
           llvm_unreachable("checked_cast_addr_br cannot have BorrowAlways");
         case CastConsumptionKind::CopyOnSuccess:
+        case CastConsumptionKind::TestOnly:
           break;
         case CastConsumptionKind::TakeAlways:
         case CastConsumptionKind::TakeOnSuccess:
@@ -5412,6 +5413,14 @@ public:
             "checked_cast_addr_br src must be an address");
     require(CCABI->getDest()->getType().isAddress(),
             "checked_cast_addr_br dest must be an address");
+
+    // A test_only cast produces no value, so it must not name storage that
+    // something could mistake for an initialized destination.
+    // Note that undef can occur on other cast types.
+    if (CCABI->getConsumptionKind() == CastConsumptionKind::TestOnly) {
+      require(isa<SILUndef>(CCABI->getDest()),
+              "checked_cast_addr_br with test_only must have an undef dest");
+    }
 
     require(
         CCABI->getSuccessBB()->args_size() == 0,

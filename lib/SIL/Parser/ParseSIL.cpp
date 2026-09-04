@@ -4653,6 +4653,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                     .Case("take_always", CastConsumptionKind::TakeAlways)
                     .Case("take_on_success", CastConsumptionKind::TakeOnSuccess)
                     .Case("copy_on_success", CastConsumptionKind::CopyOnSuccess)
+                    .Case("test_only", CastConsumptionKind::TestOnly)
                     .Default(std::nullopt);
 
     if (!kind) {
