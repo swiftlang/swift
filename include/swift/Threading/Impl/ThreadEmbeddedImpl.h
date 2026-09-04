@@ -31,8 +31,7 @@
 #define SWIFT_THREADING_USE_RESERVED_TLS_KEYS 1
 #define SWIFT_THREADING_HAS_LAZY_MUTEX 0
 #define SWIFT_THREADING_HAS_CONDITION_VARIABLE 0
-#define SWIFT_THREAD_LOCAL_STORAGE_KIND                                        \
-  _concurrency_current_task_storage_kind::platform_defined
+#define SWIFT_THREADING_PLATFORM_DEFINED 1
 
 static_assert(SWIFT_TLS_KEY_COUNT ==
                   static_cast<int>(swift::tls_key::exclusivity) + 1,
