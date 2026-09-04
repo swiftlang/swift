@@ -3414,8 +3414,16 @@ namespace {
                                           : ConstantConvertKind::None,
             isStatic, decl,
             importer::convertClangAccess(clangEnum->getAccess()));
-        Impl.ImportedDecls[Impl.getImportedDeclsKey(decl, getVersion())] =
-            result;
+
+        auto key = Impl.getImportedDeclsKey(decl, getVersion());
+        Impl.ImportedDecls[key] = result;
+
+        // We sometimes import an enum constant more than once when a
+        // redeclaration has changed its underlying type. Mark all but one as
+        // disfavored so this doesn't cause type-checking ambiguities.
+        if (key.first != decl->getCanonicalDecl())
+          result->addAttribute(
+            new (Impl.SwiftContext) DisfavoredOverloadAttr(/*Implicit=*/true));
 
         // If this is a compatibility stub, mark it as such.
         if (correctSwiftName)
