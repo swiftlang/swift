@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "artifacts": [
+        {
+          "location": {
+            "uri": "FILE[0]"
+          },
+          "mimeType": "text/x-swift",
+          "sourceLanguage": "swift"
+        }
+      ],
+      "invocations": [
+        {
+          "properties": {
+            "Frontend": {
+              "moduleName": "fixits"
+            },
+            "Language": {
+              "activeConcurrencyModel": "Standard",
+              "strictConcurrencyLevel": "Minimal"
+            }
+          }
+        }
+      ],
+      "results": [
+        {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "index": 0
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "endColumn": 15,
+                        "endLine": 16,
+                        "startColumn": 15,
+                        "startLine": 16
+                      },
+                      "insertedContent": {
+                        "text": "x: <#Int#>, y: <#Int#>"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": ""
+              }
+            }
+          ],
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "p",
+                  "kind": "variable",
+                  "name": "p"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 14,
+                  "startLine": 16
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "missing arguments for parameters 'x', 'y' in call"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "note",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "Point",
+                  "kind": "struct",
+                  "name": "Point"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 8,
+                  "startLine": 11
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "'init(x:y:)' declared here"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "index": 0
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "endColumn": 6,
+                        "endLine": 6,
+                        "startColumn": 3,
+                        "startLine": 6
+                      },
+                      "insertedContent": {
+                        "text": "let"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": ""
+              }
+            }
+          ],
+          "kind": "fail",
+          "level": "warning",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "testFixIt",
+                  "kind": "function",
+                  "name": "testFixIt"
+                },
+                {
+                  "fullyQualifiedName": "testFixIt.x",
+                  "kind": "variable",
+                  "name": "x",
+                  "parentIndex": 0
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 7,
+                  "startLine": 6
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "variable 'x' was never mutated; consider changing to 'let' constant"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://swift.org",
+          "name": "Swift Compiler",
+          "organization": "Swift Project",
+          "version": "6.3"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}
