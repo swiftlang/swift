@@ -1807,20 +1807,6 @@ public:
     return sharedUInt32().InstructionBaseWithTrailingOperands.numOperands;
   }
 
-protected:
-  /// Removes the last operand, shrinking the tail allocated operand list.
-  /// The other, previous, operands, remain fully valid.
-  /// If there are any OtherTrailingTypes, they need to be moved separately by
-  /// the callee.
-  void eraseLastOperandInPlace() {
-    auto operands = getAllOperands();
-    ASSERT(!operands.empty() && "no operand to erase");
-
-    operands.back().~Operand();
-    sharedUInt32().InstructionBaseWithTrailingOperands.numOperands =
-        operands.size() - 1;
-  }
-
 public:
   ArrayRef<Operand> getAllOperands() const {
     return this->template getTrailingObjectsNonStrict<Operand>(
@@ -5765,19 +5751,38 @@ public:
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
 class DebugValueInst final
-    : public InstructionBaseWithTrailingOperands<
-          SILInstructionKind::DebugValueInst, DebugValueInst,
-          NonValueInstruction, SILType, SILLocation, const SILDebugScope *,
-          SILDIExprElement, char>,
-      private SILDebugVariableSupplement {
+    : public InstructionBase<SILInstructionKind::DebugValueInst,
+                             NonValueInstruction>,
+      private SILDebugVariableSupplement,
+      private llvm::TrailingObjects<DebugValueInst, SILType, SILLocation,
+                                    const SILDebugScope *, SILDIExprElement,
+                                    Operand, char> {
   friend TrailingObjects;
   friend SILBuilder;
 
   TailAllocatedDebugVariable VarInfo;
   USE_SHARED_UINT8;
+  USE_SHARED_UINT32;
 
   /// Optional debug basic block holding reconstruction instructions.
   SILBasicBlock *ReconstructionBlock = nullptr;
+
+  /// Unlike other instructions with trailing operands, a debug_value's operand
+  /// list can grow through salvageDebugInfo. Growing the tail allocation is impossible, and
+  /// so is recreating the instruction, as salvageDebugInfo can't invalidate
+  /// iterators or worklists.
+  /// Therefore, once the operand list outgrows the tail allocation, it moves to a
+  /// separately allocated array. This is stored in the first tail allocated
+  /// operand slot, which is unused from then on.
+  struct OutOfLineOperands {
+    Operand *operands;
+    /// The number of operand slots in \c operands, which can be larger than the
+    /// number of operands: shrinking the operand list cannot reallocate.
+    /// The actual number of operands is stored in the sharedUInt32.
+    unsigned capacity;
+  };
+  static_assert(sizeof(OutOfLineOperands) <= sizeof(Operand),
+                "out-of-line operands must fit in a tail allocated slot");
 
   DebugValueInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> Operands,
                  SILModule &M, SILDebugVariable Var,
@@ -5789,15 +5794,47 @@ class DebugValueInst final
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
 
-  using InstructionBaseWithTrailingOperands::numTrailingObjects;
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
-  /// Removes the last operand, shrinking the tail allocated operand list.
+  size_t numTrailingObjects(OverloadToken<Operand>) const {
+    return sharedUInt32().DebugValueInst.tailCapacity;
+  }
+
+  OutOfLineOperands &getOutOfLineOperands() {
+    ASSERT(sharedUInt8().DebugValueInst.outOfLineOperands);
+    return *reinterpret_cast<OutOfLineOperands *>(
+        getTrailingObjectsNonStrict<Operand>());
+  }
+
+  /// Moves the operands to an array of \p capacity slots, which must be able
+  /// to hold all of them. Every operand is moved, so all `Operand` pointers of
+  /// this instruction are invalidated, as is any iterator over the use list
+  /// of an operand.
+  void reallocateOperands(unsigned capacity);
+
+public:
+  /// The maximum number of operands a debug value can have. Every operand has to
+  /// be kept available up to the debug value, so salvaging gives up rather than
+  /// growing the operand list beyond it.
+  static constexpr unsigned MaxOperands = 16;
+
+  ~DebugValueInst();
+
+  /// Removes the last operand, shrinking the operand list.
   /// Only the last operand can be removed, to avoid invalidating other
   /// existing Operand pointers. Pointers to this last operand are invalidated.
   void eraseLastOperand();
 
-public:
+  MutableArrayRef<Operand> getAllOperands() {
+    unsigned numOperands = sharedUInt32().DebugValueInst.numOperands;
+    if (sharedUInt8().DebugValueInst.outOfLineOperands)
+      return {getOutOfLineOperands().operands, numOperands};
+    return {getTrailingObjects<Operand>(), numOperands};
+  }
+  ArrayRef<Operand> getAllOperands() const {
+    return const_cast<DebugValueInst *>(this)->getAllOperands();
+  }
+
   /// Returns the single operand, asserting that there is exactly one.
   /// Should only be used in contexts where it is known that there is no
   /// debug reconstruction block.
@@ -5975,10 +6012,18 @@ public:
   /// value is no longer valid and cannot be salvaged.
   /// Uses inside a debug reconstruction block are replaced with undef. If this
   /// is the last operand, the operand list is shrunk.
-  /// Any pointers to the killed Operand are invalidated.
+  /// Any pointers to the killed Operand are invalidated. Other operands are
+  /// untouched.
   /// If \p operandType is specified, that undef will use that type (in the
   /// appropriate address/object form) instead of the current operand's type.
   void killOperand(unsigned operandIdx, SILType operandType = SILType());
+
+  /// Appends \p value to the operand list, growing it if needed.
+  /// The caller is responsible for the matching debug reconstruction block
+  /// argument. Growing moves every operand, so all `Operand` pointers of this
+  /// instruction may be invalidated, as is any iterator over the use list of
+  /// an operand.
+  void appendOperand(SILValue value);
 
   bool hasTrace() const { return sharedUInt8().DebugValueInst.trace; }
 

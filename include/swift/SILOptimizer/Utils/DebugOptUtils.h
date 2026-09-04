@@ -38,8 +38,14 @@ void deleteAllDebugUses(SILInstruction *inst, InstModCallbacks &callbacks,
 /// Pass \p salvage as false when the instruction already has been salvaged.
 void deleteAllDebugUses(SILInstruction *inst, bool salvage = true);
 
-/// Transfer debug info associated with (the result of) \p I to a
+/// Transfer debug info associated with (any result of) \p I to a
 /// new `debug_value` instruction before \p I is deleted.
+///
+/// This can update the operands of any debug user of \p I, which invalidates
+/// all `Operand` pointers and use list iterators.
+/// New instructions may be inserted in case a fragment is needed, or for
+/// store salvages. No instruction is deleted, so `debug_value` instructions
+/// and instruction iterators are safe to keep.
 void salvageDebugInfo(SILInstruction *I);
 
 /// Transfer debug info associated with the store-like instruction \p SI to a

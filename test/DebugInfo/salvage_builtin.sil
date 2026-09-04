@@ -58,12 +58,16 @@ bb0(%0 : $Builtin.Int64):
   return %t : $()
 }
 
-// Binary builtin with two live operands: both need phi args but debug BBs
-// only support one, so the debug value is killed.
+// Binary builtin with two live operands: the debug value takes an operand per
+// builtin operand, and the builtin is rebuilt from both in the debug BB.
 
 // CHECK-LABEL: sil @test_binary_builtin
 // CHECK:       bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
-// CHECK:         debug_value undef : $Builtin.Int64, let, name "result"
+// CHECK:         debug_value (%0 : $Builtin.Int64, %1 : $Builtin.Int64), let, name "result", {{.*}}transform {
+// CHECK:           bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+// CHECK:             %2 = builtin "add_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+// CHECK:             return %2 : $Builtin.Int64
+// CHECK:         }
 // CHECK:         return
 // CHECK-LABEL: } // end sil function 'test_binary_builtin'
 sil @test_binary_builtin : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
@@ -97,15 +101,16 @@ bb0(%0 : $Builtin.Int64):
 }
 
 // Binary builtin where the literal is the first operand (lhs) and the live
-// value is the second operand (rhs). The phi arg should wire to the rhs.
+// value is the second operand (rhs). Salvaging the literal into the block then
+// kills its operand.
 
 // CHECK-LABEL: sil @test_binary_builtin_literal_lhs
 // CHECK:       bb0(%0 : $Builtin.Int64):
-// CHECK:         debug_value %0 : $Builtin.Int64, let, name "result", {{.*}}transform {
-// CHECK:           bb0(%0 : $Builtin.Int64):
-// CHECK:             %1 = integer_literal $Builtin.Int64, 10
-// CHECK:             %2 = builtin "sub_Int64"(%1 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64
-// CHECK:             return %2 : $Builtin.Int64
+// CHECK:         debug_value (undef : $Builtin.Int64, %0 : $Builtin.Int64), let, name "result", {{.*}}transform {
+// CHECK:           bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+// CHECK:             %2 = integer_literal $Builtin.Int64, 10
+// CHECK:             %3 = builtin "sub_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+// CHECK:             return %3 : $Builtin.Int64
 // CHECK:         }
 // CHECK:         return
 // CHECK-LABEL: } // end sil function 'test_binary_builtin_literal_lhs'

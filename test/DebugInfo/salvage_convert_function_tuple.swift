@@ -4,11 +4,13 @@
 // () throws -> Any closure caused a verifier failure because
 // tryEliminateOnlyOwnershipUsedForwardingInst RAUW'ed instead of salvaging.
 
-// CHECK: debug_value {{%[0-9]+}}, let, name "$element", {{.*}}op_tuple_fragment:{{.*}}:1, transform {
+// CHECK: debug_value {{%[0-9]+}}, let, name "$element", transform {
 // CHECK-NEXT: // %0
 // CHECK-NEXT: bb0(%0 :
 // CHECK-NEXT:   %1 = convert_function %0 to $@callee_guaranteed () -> (@out Any, @error any Error)
-// CHECK-NEXT:   return %1
+// CHECK-NEXT:   %2 = tuple_extract undef : $(Int, {{.*}}), 0
+// CHECK-NEXT:   %3 = tuple (%2, %1)
+// CHECK-NEXT:   return %3
 // CHECK-NEXT: }
 
 func test() {
