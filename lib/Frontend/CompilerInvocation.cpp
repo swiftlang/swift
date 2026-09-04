@@ -4369,6 +4369,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.DebugCallsiteInfo |= Args.hasArg(OPT_debug_callsite_info);
+  // These are the conditions clang uses to emit call site info for optimized
+  // binaries.
+  if (Opts.shouldOptimize() &&
+      Opts.DebugInfoLevel >= IRGenDebugInfoLevel::ASTTypes &&
+      Triple.supportsDebugEntryValues())
+    Opts.DebugCallsiteInfo = true;
 
   if (Args.hasArg(OPT_mergeable_symbols))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
