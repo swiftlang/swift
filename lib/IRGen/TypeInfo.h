@@ -127,6 +127,10 @@ protected:
 
   bool CreatedFromSerializableHiddenTypeInfoRepresentation;
 
+  bool isDeserialized() const {
+    return CreatedFromSerializableHiddenTypeInfoRepresentation;
+  }
+
   void assertNotDeserialized(const char *operation) const;
 
   /// Change the minimum alignment of a stored value of this type.

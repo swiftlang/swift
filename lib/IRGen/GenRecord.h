@@ -208,6 +208,17 @@ public:
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
                       bool isOutlined) const override {
+    if (this->isDeserialized()) {
+      if (!this->isTriviallyDestroyable(ResilienceExpansion::Maximal))
+        this->assertNotDeserialized("RecordTypeInfo::assignWithCopy");
+      if constexpr (IsLoadable) {
+        return cast<LoadableTypeInfo>(this)
+            ->LoadableTypeInfo::initializeWithCopy(IGF, dest, src, T,
+                                                   isOutlined);
+      }
+      this->assertNotDeserialized("RecordTypeInfo::assignWithCopy");
+    }
+
     // If the fields are not ABI-accessible, use the value witness table.
     if (!AreFieldsABIAccessible) {
       return emitAssignWithCopyCall(IGF, T, dest, src);
@@ -231,6 +242,16 @@ public:
 
   void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                       bool isOutlined) const override {
+    if (this->isDeserialized()) {
+      if (!this->isTriviallyDestroyable(ResilienceExpansion::Maximal))
+        this->assertNotDeserialized("RecordTypeInfo::assignWithTake");
+      if constexpr (IsLoadable) {
+        return cast<LoadableTypeInfo>(this)->initializeWithTake(
+            IGF, dest, src, T, isOutlined, /*zeroizeIfSensitive=*/true);
+      }
+      this->assertNotDeserialized("RecordTypeInfo::assignWithTake");
+    }
+
     // If the fields are not ABI-accessible, use the value witness table.
     if (!AreFieldsABIAccessible) {
       return emitAssignWithTakeCall(IGF, T, dest, src);
@@ -262,6 +283,10 @@ public:
 
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                           SILType T, bool isOutlined) const override {
+    if (this->isDeserialized() &&
+        !this->isTriviallyDestroyable(ResilienceExpansion::Maximal))
+      this->assertNotDeserialized("RecordTypeInfo::initializeWithCopy");
+
     // If we're POD, use the generic routine.
     if (this->isTriviallyDestroyable(ResilienceExpansion::Maximal) &&
         isa<LoadableTypeInfo>(this)) {

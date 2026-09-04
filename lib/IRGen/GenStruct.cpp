@@ -148,8 +148,12 @@ namespace {
         return T.getFieldType(Field, IGM.getSILModule(),
                               IGM.getMaximalTypeExpansionContext());
 
-      // The Swift-field-less cases use opaque storage, which is
-      // guaranteed to ignore the type passed to it.
+      // Visible Swift-field-less cases use opaque storage. Reconstructed
+      // fields also lack a SILType, which only trivial operations can ignore.
+      if (!getTypeInfo().isTriviallyDestroyable(
+              ResilienceExpansion::Maximal))
+        llvm::report_fatal_error(
+            "nontrivial hidden Clang record fields require AST information");
       return {};
     }
   };
@@ -183,6 +187,7 @@ namespace {
 
     using super::asImpl;
     using super::assertNotDeserialized;
+    using super::isDeserialized;
 
   public:
 
@@ -219,8 +224,10 @@ namespace {
     /// single field.
     Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                                 const FieldInfoType &field) const {
-      // We can't access field.Field with deserialized TypeInfo.
-      assertNotDeserialized("StructTypeInfoBase::projectFieldAddress");
+      if (isDeserialized()) {
+        auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+        return field.projectAddress(IGF, addr, offsets);
+      }
       return asImpl().projectFieldAddress(IGF, addr, T, field.Field);
     }
 
@@ -328,9 +335,11 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
                  bool isOutlined) const override {
-      // The code below checks the AST to call a deinit method
-      // which we don't support from hidden representations yet
-      assertNotDeserialized("StructTypeInfoBase::destroy");
+      if (isDeserialized()) {
+        if (!this->isTriviallyDestroyable(ResilienceExpansion::Maximal))
+          assertNotDeserialized("StructTypeInfoBase::destroy");
+        return;
+      }
 
       // If the struct has a deinit declared, then call it to destroy the
       // value.
@@ -426,19 +435,6 @@ namespace {
     std::vector<SwiftAggLowering::StorageEntry> AggLoweringInputs;
     std::vector<std::unique_ptr<TypeInfo>> OwnedFieldTypeInfos;
 
-    void requireFaithfulSerializedRepresentation(IRGenModule &IGM) const {
-      if (HasReferenceField ||
-          !isTriviallyDestroyable(ResilienceExpansion::Maximal) ||
-          !isCopyable(ResilienceExpansion::Maximal))
-        llvm::report_fatal_error(
-            "hidden Clang record TypeInfo serialization does not support "
-            "nontrivial records");
-      if (getFixedExtraInhabitantCount(IGM) != 0)
-        llvm::report_fatal_error(
-            "hidden Clang record TypeInfo serialization does not support "
-            "extra inhabitants");
-    }
-
     static std::vector<SwiftAggLowering::StorageEntry>
     computeAggLoweringInputs(IRGenModule &IGM,
                              const clang::RecordDecl *clangDecl) {
@@ -510,14 +506,11 @@ namespace {
             input.type ? deserializeLLVMType(IGM, input.type) : nullptr,
         });
       }
-      requireFaithfulSerializedRepresentation(IGM);
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &IGM) const override {
-      requireFaithfulSerializedRepresentation(IGM);
-
       auto representation = std::make_unique<
           SerializableLoadableClangRecordTypeInfoRepresentation>();
       populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
