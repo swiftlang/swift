@@ -83,8 +83,18 @@ private:
 
   static bool identifierEquals(Node *lhs, Node *rhs);
 
-  bool deepEquals(Node *lhs, Node *rhs) const;
+  /// Compare two subtrees for equality.
+  ///
+  /// \p depth bounds the walk, as in RemanglerBase::hashForNode. A pair deeper
+  /// than the bound compares unequal, so an over-deep node is never used as a
+  /// substitution; the mangler's own depth limit then fails the mangling with
+  /// ManglingError::TooComplex.
+  bool deepEquals(Node *lhs, Node *rhs, unsigned depth = 0) const;
 };
+
+/// The limit on the depth of a node subtree walked while hashing or comparing
+/// substitution entries, to avoid stack exhaustion.
+constexpr unsigned MaxSubstitutionEntryDepth = 1024;
 
 /// The output string for the Remangler.
 ///
@@ -167,12 +177,19 @@ protected:
     : Factory(Factory), Buffer(Factory) { }
 
   /// Compute the hash for a node.
-  size_t hashForNode(Node *node, bool treatAsIdentifier = false);
+  ///
+  /// \p depth bounds the walk over \p node's subtree, which for an untrusted
+  /// mangled name can be deep enough to exhaust the stack. A subtree deeper
+  /// than the bound hashes as though it were truncated there, which costs
+  /// nothing: equality is decided by deepEquals, not by the hash.
+  size_t hashForNode(Node *node, bool treatAsIdentifier = false,
+                     unsigned depth = 0);
 
   /// Construct a SubstitutionEntry for a given node.
   /// This will look in the HashHash to see if we already know the hash,
   /// to avoid having to walk the entire subtree.
-  SubstitutionEntry entryForNode(Node *node, bool treatAsIdentifier = false);
+  SubstitutionEntry entryForNode(Node *node, bool treatAsIdentifier = false,
+                                 unsigned depth = 0);
 
   /// Find a substitution and return its index.
   /// Returns -1 if no substitution is found.
