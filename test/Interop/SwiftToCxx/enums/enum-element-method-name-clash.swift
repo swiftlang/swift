@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -module-name Enums -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/enums.h
 // RUN: %FileCheck %s < %t/enums.h
+// RUN: %check-interop-cxx-header-in-clang(%t/enums.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 public enum Foo: Hashable, Sendable {
     case bar(Parameters)
@@ -33,4 +34,5 @@ extension Foo {
 // CHECK-NEXT:  }
 // CHECK-EMPTY:
 // Before the fix, we had the static method's thunk here.
-// CHECK-NEXT:    swift::Int getHashValue() const
+// CHECK-NOT:     Foo bar(swift::Int version)
+// CHECK:         swift::Int getHashValue() const
