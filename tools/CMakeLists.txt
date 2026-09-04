@@ -38,6 +38,7 @@ endif()
 if(LLVM_USE_SANITIZE_COVERAGE)
 add_swift_tool_subdirectory(swift-demangle-fuzzer)
 add_swift_tool_subdirectory(swift-reflection-fuzzer)
+add_swift_tool_subdirectory(swift-elf-fuzzer)
 endif()
 
 if(SWIFT_BUILD_SOURCEKIT)
