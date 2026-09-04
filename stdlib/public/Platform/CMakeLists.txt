@@ -300,6 +300,38 @@ foreach(sdk ${SWIFT_SDKS})
     endif()
   endforeach()
 endforeach()
+
+# Put the API notes file in place.
+if("LINUX" IN_LIST SWIFT_SDKS OR "FREEBSD" IN_LIST SWIFT_SDKS OR
+   "OPENBSD" IN_LIST SWIFT_SDKS OR "CYGWIN" IN_LIST SWIFT_SDKS OR
+   "HAIKU" IN_LIST SWIFT_SDKS)
+  set(glibc_apinotes_source "SwiftGlibc.apinotes")
+  add_custom_command_target(
+    copy_glibc_apinotes_resource
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "make_directory" ${SWIFTLIB_DIR}/apinotes ${SWIFTSTATICLIB_DIR}/apinotes
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "copy_if_different"
+        "${CMAKE_CURRENT_SOURCE_DIR}/${glibc_apinotes_source}" ${SWIFTLIB_DIR}/apinotes
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "copy_if_different"
+        "${CMAKE_CURRENT_SOURCE_DIR}/${glibc_apinotes_source}" ${SWIFTSTATICLIB_DIR}/apinotes
+    OUTPUT
+      ${SWIFTLIB_DIR}/apinotes/${glibc_apinotes_source}
+      ${SWIFTSTATICLIB_DIR}/apinotes/${glibc_apinotes_source}
+    COMMENT "Copying SwiftGlibc API notes to resource directories")
+
+  list(APPEND glibc_modulemap_target_list ${copy_glibc_apinotes_resource})
+  swift_install_in_component(FILES "${glibc_apinotes_source}"
+                             DESTINATION "lib/swift/apinotes"
+                             COMPONENT sdk-overlay)
+  if(SWIFT_BUILD_STATIC_STDLIB)
+    swift_install_in_component(FILES "${glibc_apinotes_source}"
+                               DESTINATION "lib/swift_static/apinotes"
+                               COMPONENT sdk-overlay)
+  endif()
+endif()
+
 add_custom_target(glibc_modulemap DEPENDS ${glibc_modulemap_target_list})
 set_property(TARGET glibc_modulemap PROPERTY FOLDER "Miscellaneous")
 add_dependencies(sdk-overlay glibc_modulemap)

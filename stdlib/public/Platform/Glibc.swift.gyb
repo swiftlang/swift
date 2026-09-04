@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -83,3 +83,90 @@ nonisolated(unsafe) public var stderr: UnsafeMutablePointer<FILE>! {
   _swift_stdlib_stderr().assumingMemoryBound(to: FILE.self)
 }
 #endif
+
+#if os(Linux)
+// Glibc spells 'fd_set''s property as 'fds_bits' when '_XOPEN_SOURCE' is
+// defined, or as '__fds_bits' otherwise. Allow code written before we defined
+// '_GNU_SOURCE' to refer to the latter.
+%{
+  import textwrap
+  # <sys/select.h> declares the bit set as '__fd_mask fds_bits[1024 / N]',
+  # where '__fd_mask' is a 'long' and N is the bit width of 'long'.
+  FD_SET_BITS = 1024
+  widths = [(bits, FD_SET_BITS // bits) for bits in (64, 32)]
+}%
+// We must qualify which version of `fd_set` is being extended.
+extension SwiftGlibc.fd_set {
+% for bits, count in widths:
+#if _pointerBitWidth(_${bits})
+  @available(swift, deprecated: 7, renamed: "fds_bits")
+  @export(implementation)
+  public var __fds_bits: (
+${textwrap.fill(', '.join(['Int'] * count), width = 74,
+                initial_indent = '    ', subsequent_indent = '    ')}
+  ) {
+    get { fds_bits }
+    set { fds_bits = newValue }
+  }
+#endif
+% end
+}
+#endif // os(Linux)
+
+#if os(Linux)
+// The first parameter of these functions is 'int' in Glibc, unless
+// '__USE_GNU' is defined, when it is an enumeration instead. Swift can't
+// promote the int parameters to the enumeration, so we add overloads
+// with the type signature expected by existing callers.
+@export(implementation)
+public func getitimer(
+  _ which: CInt, _ value: UnsafeMutablePointer<itimerval>!
+) -> CInt {
+  SwiftGlibc.getitimer(
+    __itimer_which(rawValue: UInt32(bitPattern: which)), value)
+}
+
+@export(implementation)
+public func setitimer(
+  _ which: CInt, _ new: UnsafePointer<itimerval>!,
+  _ old: UnsafeMutablePointer<itimerval>!
+) -> CInt {
+  SwiftGlibc.setitimer(
+    __itimer_which(rawValue: UInt32(bitPattern: which)), new, old)
+}
+
+@export(implementation)
+public func getpriority(_ which: CInt, _ who: id_t) -> CInt {
+  SwiftGlibc.getpriority(
+    __priority_which(rawValue: UInt32(bitPattern: which)), who)
+}
+
+@export(implementation)
+public func setpriority(_ which: CInt, _ who: id_t, _ priority: CInt) -> CInt {
+  SwiftGlibc.setpriority(
+    __priority_which(rawValue: UInt32(bitPattern: which)), who, priority)
+}
+
+@export(implementation)
+public func getrlimit(
+  _ resource: CInt, _ rlimits: UnsafeMutablePointer<rlimit>
+) -> CInt {
+  SwiftGlibc.getrlimit(
+    __rlimit_resource(rawValue: UInt32(bitPattern: resource)), rlimits)
+}
+
+@export(implementation)
+public func setrlimit(
+  _ resource: CInt, _ rlimits: UnsafePointer<rlimit>
+) -> CInt {
+  SwiftGlibc.setrlimit(
+    __rlimit_resource(rawValue: UInt32(bitPattern: resource)), rlimits)
+}
+
+@export(implementation)
+public func getrusage(
+  _ who: CInt, _ usage: UnsafeMutablePointer<rusage>!
+) -> CInt {
+  SwiftGlibc.getrusage(__rusage_who(rawValue: who), usage)
+}
+#endif // os(Linux)
