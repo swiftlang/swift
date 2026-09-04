@@ -12,6 +12,8 @@ class NS {}
 
 func useValue(_ ns: NS) {}
 
+func useGeneric<T>(_ t: T) {}
+
 func calledOnce(_: @called(once) () -> Void) {}
 
 func testNeverSentUsableAfter() {
@@ -118,4 +120,45 @@ func testReabstractedEscapingClosure() {
 
   callOnce(identity(closure))
   useValue(ns) // Ok (nothing is sent in the closure)
+}
+
+func testGenericParameterCapture<T>(_ value: T) {
+  calledOnce {
+    useGeneric(value) // expected-error {{sending 'value' risks causing data races}} expected-note {{'value' is captured by a nonisolated closure. nonisolated uses in closure may race against code in the current isolation context}}
+  }
+
+  useGeneric(value)
+}
+
+func testGenericSendingParameterCapture<T>(_ value: sending T) {
+  calledOnce {
+    useGeneric(value)
+  }
+
+  useGeneric(value) // Ok
+}
+
+func testVarCapturedNotMutated() {
+  var value = NS()
+  value = NS()
+  calledOnce {
+    useValue(value)
+  }
+  useValue(value) // Ok
+}
+
+func testNoncopyableRefAndUndo() {
+  struct NCS: ~Copyable, ~Sendable {
+    func test() {}
+  }
+
+  // FIXME: There should be no errors here. This is currently considered to be
+  // a consuming use of `v` because `@called(once)` is never marked as `[on_stack]`.
+  // The move-only checker needs to be tought about non-escaping `@called(once)`.
+  let v = NCS() // expected-error {{'v' used after consume}}
+  calledOnce { // expected-note {{consumed here}}
+    v.test()
+  }
+
+  _ = v // expected-note {{used here}}
 }
