@@ -21,7 +21,7 @@
 
 // RUN: %swift-scan-test -action cache_query -id @%t/key.casid -cas-path %t/cas | %FileCheck %s --check-prefix=CHECK-QUERY
 
-// RUN: %swift-scan-test -action replay_result -cas-path %t/cas -id @%t/key.casid -threads 10 -- \
+// RUN: %swift-scan-test -action replay_result -cas-path %t/cas -id @%t/key.casid -scan-threads 10 -- \
 // RUN:   %target-swift-frontend-plain -cache-compile-job -Rcache-compile-job %s \
 // RUN:   -emit-module -emit-module-path %t/Test2.swiftmodule -c -emit-dependencies -module-name Test -o %t/test2.o -cas-path %t/cas \
 // RUN:   @%t/MyApp.cmd -Xllvm -aarch64-use-tbi
