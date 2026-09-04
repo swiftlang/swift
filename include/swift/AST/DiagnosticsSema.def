@@ -8181,6 +8181,9 @@ NOTE(property_wrapper_param_attr_arg,none,
 NOTE(property_wrapper_no_init_projected_value,none,
      "property wrapper type %0 does not support initialization from a "
      "projected value", (Type))
+ERROR(property_wrapper_no_init_wrapped_value,none,
+     "property wrapper type %0 does not support initialization from a "
+     "wrapped value", (Type))
 ERROR(property_wrapper_param_mutating,none,
       "property wrapper applied to parameter must have a nonmutating "
       "'wrappedValue' getter", ())
