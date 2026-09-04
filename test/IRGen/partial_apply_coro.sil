@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -Xllvm -sil-disable-pass=OnoneSimplification -I %t -emit-ir -disable-emit-type-malloc-for-coro-frame %s -o - | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-cpu
 
 // REQUIRES: concurrency
+// UNSUPPORTED: CPU=wasm32
 
 import Builtin
 import Swift

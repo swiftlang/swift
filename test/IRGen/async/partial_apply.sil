@@ -606,7 +606,7 @@ entry(%0 : $EmptyType, %1: $*SomeType, %3: $FixedType):
   return %40 : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc { ptr, ptr } @create_pa_f2(
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc {{{ ptr, ptr }|void}} @create_pa_f2(
 sil @create_pa_f2 : $@convention(thin) (@callee_guaranteed @async @convention(thick) (Int64, Int32) -> Int64, Int32) -> @owned @async @callee_guaranteed (Int64) -> Int64 {
 bb0(%thick : $@callee_guaranteed @async @convention(thick) (Int64, Int32) -> Int64 , %captured : $Int32):
   %pa_f = partial_apply [callee_guaranteed] %thick(%captured) : $@callee_guaranteed @async @convention(thick) (Int64, Int32) -> Int64
