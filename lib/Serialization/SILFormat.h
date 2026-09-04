@@ -90,6 +90,8 @@ enum class ExtraStringFlavor : uint8_t {
   WasmImportModule,
   /// wasm import field/name for @_extern(wasm)
   WasmImportName,
+  /// @_target string
+  TargetFeatures,
 };
 
 enum class IsNestedEncoding : uint8_t {

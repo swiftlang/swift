@@ -678,6 +678,9 @@ EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
 /// Emit `resignRemoteID` calls in remote distributed actor deinits.
 EXPERIMENTAL_FEATURE(DistributedActorResignRemoteID, false)
 
+/// Enable @_target, a per-function target-features/CPU override.
+EXPERIMENTAL_FEATURE(TargetAttribute, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
