@@ -1386,6 +1386,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::Target: {
+    Printer.printAttrName("@_target");
+    Printer << "(\"" << cast<TargetAttr>(this)->Value << "\")";
+    break;
+  }
+
   case DeclAttrKind::Diagnose: {
     auto diagnoseAttr = cast<DiagnoseAttr>(this);
     Printer.printAttrName("@diagnose(");
@@ -2183,6 +2189,8 @@ StringRef DeclAttribute::getAttrName() const {
     case ExecutionSemantics::Once:
       return "called(once)";
     }
+  case DeclAttrKind::Target:
+    return "_target";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

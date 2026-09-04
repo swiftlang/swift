@@ -5603,6 +5603,11 @@ public:
     printFieldQuoted(Attr->Value, Label::always("value"));
     printFoot();
   }
+  void visitTargetAttr(TargetAttr *Attr, Label label) {
+    printCommon(Attr, "target_attr", label);
+    printFieldQuoted(Attr->Value, Label::always("value"));
+    printFoot();
+  }
   void visitSetterAccessAttr(SetterAccessAttr *Attr, Label label) {
     printCommon(Attr, "setter_access_attr", label);
     printField(Attr->getAccess(), Label::always("access"));

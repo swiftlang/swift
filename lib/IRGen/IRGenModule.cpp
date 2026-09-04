@@ -37,6 +37,9 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/Diagnostic.h"
+#include "clang/Basic/DiagnosticIDs.h"
+#include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
@@ -48,6 +51,9 @@
 #include "clang/Lex/PreprocessorOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Frontend/Debug/Options.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
@@ -1690,6 +1696,58 @@ llvm::AttributeList IRGenModule::constructInitialAttributes() {
   llvm::AttrBuilder b(getLLVMContext());
   constructInitialFnAttributes(b);
   return llvm::AttributeList().addFnAttributes(getLLVMContext(), b);
+}
+
+void IRGenModule::addTargetAttrFunctionAttributes(llvm::Function *fn,
+                                                  StringRef targetString) {
+  if (targetString.empty())
+    return;
+  auto *clangImporter =
+      static_cast<ClangImporter *>(Context.getClangModuleLoader());
+  auto &TI = clangImporter->getTargetInfo();
+  clang::ParsedTargetAttr parsed = TI.parseTargetAttr(targetString);
+  StringRef targetCPU = TI.getTargetOpts().CPU;
+  StringRef tuneCPU = TI.getTargetOpts().TuneCPU;
+  if (!parsed.CPU.empty() && TI.isValidCPUName(parsed.CPU)) {
+    targetCPU = parsed.CPU;
+    tuneCPU = ""; // Clear the tune CPU
+  }
+  if (!parsed.Tune.empty() && TI.isValidCPUName(parsed.Tune))
+    tuneCPU = parsed.Tune;
+  llvm::StringMap<bool> featureMap;
+  static clang::DiagnosticOptions diagOpts;
+  clang::DiagnosticsEngine diags(clang::DiagnosticIDs::create(), diagOpts,
+                                 new clang::IgnoringDiagConsumer());
+  TI.initFeatureMap(featureMap, diags, targetCPU, parsed.Features);
+  if (!featureMap.empty()) {
+    std::vector<std::string> features;
+    for (auto &entry : featureMap)
+      features.push_back((entry.getValue() ? "+" : "-") + entry.getKey().str());
+    llvm::sort(features);
+    fn->addFnAttr("target-features", llvm::join(features, ","));
+  }
+  if (!targetCPU.empty())
+    fn->addFnAttr("target-cpu", targetCPU);
+  if (!tuneCPU.empty())
+    fn->addFnAttr("tune-cpu", tuneCPU);
+  if (!parsed.BranchProtection.empty()) {
+    clang::TargetInfo::BranchProtectionInfo BPI;
+    StringRef diagMsg;
+    if (TI.validateBranchProtection(parsed.BranchProtection, parsed.CPU, BPI,
+                                    clangImporter->getClangASTContext().getLangOpts(),
+                                    diagMsg)) {
+      if (BPI.SignReturnAddr != clang::LangOptions::SignReturnAddressScopeKind::None) {
+        fn->addFnAttr("sign-return-address", BPI.getSignReturnAddrStr());
+        fn->addFnAttr("sign-return-address-key", BPI.getSignKeyStr());
+      }
+      if (BPI.BranchTargetEnforcement)
+        fn->addFnAttr("branch-target-enforcement");
+      if (BPI.BranchProtectionPAuthLR)
+        fn->addFnAttr("branch-protection-pauth-lr");
+      if (BPI.GuardedControlStack)
+        fn->addFnAttr("guarded-control-stack");
+    }
+  }
 }
 
 llvm::ConstantInt *IRGenModule::getInt32(uint32_t value) {

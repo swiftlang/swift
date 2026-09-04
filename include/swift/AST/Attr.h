@@ -850,6 +850,32 @@ public:
   }
 };
 
+/// The `@_target` attribute, overriding the target CPU/features for functions.
+class TargetAttr : public DeclAttribute {
+public:
+  TargetAttr(StringRef Value, SourceLoc AtLoc, SourceRange Range,
+             bool Implicit)
+      : DeclAttribute(DeclAttrKind::Target, AtLoc, Range, Implicit),
+        Value(Value) {}
+
+  TargetAttr(StringRef Value, bool Implicit)
+      : TargetAttr(Value, SourceLoc(), SourceRange(), Implicit) {}
+
+  const StringRef Value;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Target;
+  }
+
+  TargetAttr *clone(ASTContext &ctx) const {
+    return new (ctx) TargetAttr(Value, AtLoc, Range, isImplicit());
+  }
+
+  bool isEquivalent(const TargetAttr *other, Decl *attachedTo) const {
+    return Value == other->Value;
+  }
+};
+
 /// Defines the @_alignment attribute.
 class AlignmentAttr : public DeclAttribute {
 public:
