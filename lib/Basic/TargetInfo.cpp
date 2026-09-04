@@ -157,6 +157,11 @@ void printTripleInfo(const CompilerInvocation &invocation,
   out << "    \"pointerWidthInBytes\": "
       << TI->getPointerWidth(clang::LangAS::Default) / TI->getCharWidth()
       << ",\n";
+  out << "    \"leastValidPointerValue\": "
+      << getLeastValidPointerValueForTriple(
+             triple, invocation.getLangOptions(),
+             invocation.getIRGenOptions().CustomLeastValidPointerValue)
+      << ",\n";
 
   if (runtimeVersion) {
     out << "    \"swiftRuntimeCompatibilityVersion\": \"";
