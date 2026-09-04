@@ -2756,9 +2756,8 @@ void UseAfterSendDiagnosticInferrer::infer() {
   }
 
   if (auto *pai = dyn_cast<PartialApplyInst>(sendingOp->getUser())) {
-    if (pai->isCalledOnce() && ApplySite(pai)
-                                   .getParamInfoForOperand(*sendingOp)
-                                   .hasOption(SILParameterInfo::Sending)) {
+    // @called(once) closures can have both implicit and explicit `sending` captures.
+    if (pai->isCalledOnce()) {
       if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
         return diagnosticEmitter.emitNamedUseofStronglySentValue(
             baseLoc, rootValueAndName->first);
@@ -3721,24 +3720,21 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
       }
     }
 
-    // A `sending` capture of an non-isolated `@called(once)` closure is
-    // translated by `translateSILCalledOncePartialApply` as a send of
-    // that specific operand -- so reaching this operand here means the
-    // capture itself crossed isolation, independent of whether the closure
-    // as a whole is isolated. Let's use the captured value's tracked
-    // isolation (when it is actor-isolated) as the caller isolation.
+    // Reaching this operand here means it was individually sent as a capture
+    // of a non-isolated `@called(once)` closure -- either because it was
+    // explicitly `sending`, or because it's an ordinary capture of a
+    // non-escaping closure (every non-Sendable capture of those is sent
+    // individually, independent of whether the closure as a whole is isolated.
+    // Let's use the captured value's tracked isolation (when it is
+    // actor-isolated) as the caller isolation.
     if (auto *pai = dyn_cast<PartialApplyInst>(op->getUser());
         pai && pai->isCalledOnce()) {
-      ApplySite apply(pai);
-      if (apply.getParamInfoForOperand(*op).hasOption(
-              SILParameterInfo::Sending)) {
-        std::optional<ActorIsolation> callerIsolation;
-        if (diagnosticEmitter.getIsolationRegionInfo()->hasActorIsolation())
-          callerIsolation =
-              diagnosticEmitter.getIsolationRegionInfo()->getActorIsolation();
-        if (initForIsolatedPartialApply(op, ace, callerIsolation))
-          return true;
-      }
+      std::optional<ActorIsolation> callerIsolation;
+      if (diagnosticEmitter.getIsolationRegionInfo()->hasActorIsolation())
+        callerIsolation =
+            diagnosticEmitter.getIsolationRegionInfo()->getActorIsolation();
+      if (initForIsolatedPartialApply(op, ace, callerIsolation))
+        return true;
     }
   }
 
