@@ -12632,6 +12632,15 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         closureExtInfo = closureExtInfo.withSendable();
       }
     }
+
+    // Infer `@called(once)` from the contextual type.
+    if (!closureExtInfo.isCalledOnce()) {
+      if (auto calledOnceTy = contextualFnType->getCalledOnceDependentType()) {
+        closureExtInfo = closureExtInfo.withCalledOnceDependentType(calledOnceTy);
+      } else if (contextualFnType->isCalledOnce()) {
+        closureExtInfo = closureExtInfo.withCalledOnce();
+      }
+    }
   }
 
   // Propagate sending result from the contextual type to the closure.
