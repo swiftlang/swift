@@ -1141,12 +1141,115 @@ swift::deriveRequirementViaMacro(DerivedConformance &derived,
   return witness;
 }
 
+bool swift::checkAvailabilityForElement(
+    const EnumElementDecl *elt, AvailabilityContext availabilityContext,
+    SmallVectorImpl<AvailabilityQuery> &availabilityQueries) {
+  auto &C = elt->getASTContext();
+
+  // A case should not be emitted for an element that is unreachable at runtime
+  // since otherwise that unavailable element could be constructed illegally via
+  // instantiation from a specific raw value. Hand-written versions of
+  // init(rawValue:) would most likely handle this by wrapping the case in an
+  // appropriate `#if` condition, which we cannot do in code synthesis. Leaving
+  // the case out also keeps its raw value from appearing in the generated code,
+  // which matters for an element that is hidden behind a disabled domain.
+  //
+  // An element of an enum that is itself unreachable is exempt. Every element
+  // of such an enum inherits its unreachability, so honoring it here would
+  // leave init(rawValue:) with no cases at all.
+  if (elt->isUnreachableAtRuntime() &&
+      !elt->getParentEnum()->isUnreachableAtRuntime())
+    return false;
+
+  for (auto const &restriction :
+       availabilityContext.allRestrictionsForDecl(elt)) {
+    // Deprecation doesn't prevent the case from being reached.
+    if (restriction.isDeprecated())
+      continue;
+
+    auto domain = restriction.getDomain();
+
+    // Unavailability restrictions must be handled carefully. If there is no
+    // way to express an availability query that corresponds to the restriction
+    // then a case cannot be synthesized for this element.
+    if (restriction.isUnavailable() &&
+        (domain.isVersioned() || !domain.supportsQueries()))
+      return false;
+
+    // Some restrictions are active for type checking but can't translate to
+    // runtime restrictions.
+    if (!restriction.isActiveForRuntimeQueries(C))
+      continue;
+
+    // There is no query that can guard the case, so it can never be reached.
+    if (!domain.supportsQueries())
+      return false;
+
+    // Comparisons must be made in the canonical domain for the current
+    // compilation, which may differ from the domain that was written.
+    auto domainAndRange = restriction.getDomainAndRange(C);
+    domain = domainAndRange.getDomain();
+
+    // Only a versioned domain takes a version argument in a query.
+    std::optional<AvailabilityRange> range;
+    if (domain.isVersioned())
+      range.emplace(domainAndRange.getRange());
+
+    auto query = AvailabilityQuery::forDomain(domain, range,
+                                              /*variantRange=*/std::nullopt)
+                     .asUnavailable(restriction.isUnavailable());
+
+    availabilityQueries.push_back(query);
+  }
+
+  return true;
+}
+
+/// Prints the minimum version of \p range as a string literal, or `nil` if the
+/// range does not constrain the version to \p out.
+static void printAvailabilityRange(llvm::raw_ostream &out,
+                                   std::optional<AvailabilityRange> range) {
+  if (!range || !range->hasMinimumVersion()) {
+    out << "nil";
+    return;
+  }
+
+  out << QuotedString(range->getRawMinimumVersion().getAsString());
+}
+
+/// Prints the AvailabilityDomain \p domain as a quoted string to \p
+/// out.
+static void printAvailabilityDomain(llvm::raw_ostream &out,
+                                    AvailabilityDomain domain) {
+  std::string scratch = {};
+  auto s = llvm::raw_string_ostream(scratch);
+  domain.print(s);
+  printAsQuotedString(out, s.str());
+}
+
+/// Prints a string containing swift syntax describing the AvailabilityQuery \p
+/// query to \p out.
+static void printAvailabilityQuery(llvm::raw_ostream &out,
+                                   const AvailabilityQuery &query) {
+  out << "AvailabilityQuery(domain: ";
+  printAvailabilityDomain(out, query.getDomain());
+  out << ", primaryRange: ";
+  printAvailabilityRange(out, query.getPrimaryRange());
+  out << ", variantRange: ";
+  printAvailabilityRange(out, query.getVariantRange());
+  out << ", isUnavailability: "
+      << (query.isUnavailability() ? "true" : "false");
+  out << ", constantResult: ";
+  auto constantResult = query.getConstantResult();
+  out << (constantResult ? ((*constantResult) ? "true" : "false") : "nil");
+  out << ")";
+}
+
 /// Prints a string containing swift syntax describing the case \p  decl with
 /// relevant information to \p out.
 static void printEnumCaseInfo(llvm::raw_ostream &out,
                               const EnumElementDecl *decl) {
-  bool markReachable = !decl->isUnreachableAtRuntime() ||
-                       decl->getParentEnum()->isUnreachableAtRuntime();
+  auto &C = decl->getASTContext();
   // Escape names as they must appear in source so a keyword-named case or
   // label (`init`, `class`, ...) round-trips as a valid reference in the
   // macros.
@@ -1165,7 +1268,21 @@ static void printEnumCaseInfo(llvm::raw_ostream &out,
                   name.str(), PrintNameContext::FunctionParameterExternal));
         }
       });
-  out << "], isReachable: " << (markReachable ? "true" : "false") << ")";
+  auto availabilityContext = AvailabilityContext::forDeploymentTarget(C);
+  SmallVector<AvailabilityQuery, 2> availabilityQueries;
+  bool isConstructible = checkAvailabilityForElement(decl, availabilityContext,
+                                                     availabilityQueries);
+  bool isReachable = !decl->isUnreachableAtRuntime() ||
+                     decl->getParentEnum()->isUnreachableAtRuntime();
+
+  out << "], isReachable: " << (isReachable ? "true" : "false")
+      << ", isConstructible: " << (isConstructible ? "true" : "false")
+      << ", runtimeAvailabilityQueries: [";
+  llvm::interleaveComma(availabilityQueries, out,
+                        [&out](const AvailabilityQuery &query) {
+                          printAvailabilityQuery(out, query);
+                        });
+  out << "])";
 }
 
 /// Prints a string containing swift syntax describing the enum \p
