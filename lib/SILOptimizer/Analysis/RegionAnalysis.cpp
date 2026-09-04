@@ -605,6 +605,34 @@ static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
   return *kind == BuiltinValueKind::StartAsyncLetWithLocalBuffer;
 }
 
+// Determine whether this partial application is only used as a non-escaping
+// value i.e. a closure that is passed to a non-escaping parameter.
+static bool isNoEscapePartialApply(PartialApplyInst *pai) {
+  SILValue value = pai;
+  while (true) {
+    // Look through re-abstraction and other thunks
+    if (auto *use = value->getSingleUse()) {
+      if (auto *maybeThunk = dyn_cast<PartialApplyInst>(use->getUser())) {
+        if (auto *fas = maybeThunk->getCalleeFunction();
+            fas && fas->isThunk()) {
+          value = maybeThunk;
+          continue;
+        }
+      }
+
+      // Look through function conversions
+      if (auto *cfi = dyn_cast<ConvertFunctionInst>(use->getUser())) {
+        value = cfi;
+        continue;
+      }
+
+      return isa<ConvertEscapeToNoEscapeInst>(use->getUser());
+    }
+
+    return false;
+  }
+}
+
 /// Returns true if this is a function argument that is able to be sent in the
 /// body of our function.
 ///
@@ -2697,6 +2725,26 @@ public:
       builder.addAssignFresh(lookupResult->value);
   }
 
+  void translateSILNoEscapeCalledOncePartialApply(PartialApplyInst *pai) {
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs()
+        << "Translating non-escaping `@called(once)` Partial Apply!\n");
+
+    for (auto &op : ApplySite(pai).getArgumentOperands()) {
+      // All of the non-Sendable captures are sent by default. This would
+      // be undone after the call if the value is not actually sent in the
+      // body.
+      if (auto lookupResult = tryToTrackValue(op.get())) {
+        builder.addRequire(*lookupResult);
+        builder.addSend(lookupResult->value, &op);
+      }
+    }
+
+    // Mark our partial_apply result as being returned fresh.
+    if (auto lookupResult = tryToTrackValue(pai))
+      builder.addAssignFresh(lookupResult->value);
+  }
+
   void translateSILCalledOncePartialApply(PartialApplyInst *pai) {
     ApplySite applySite(pai);
     REGIONBASEDISOLATION_LOG(llvm::dbgs()
@@ -2804,6 +2852,13 @@ public:
     // `@called(once)` closures are allowed to have `sending` captures which
     // need special handling.
     if (pai->isCalledOnce()) {
+      // no-escaping closures treat non-Sendable captures that aren't explicitly
+      // `sending` as individually sent and undo if the values were never
+      // actually sent in the body.
+      if (isNoEscapePartialApply(pai)) {
+        return translateSILNoEscapeCalledOncePartialApply(pai);
+      }
+
       return translateSILCalledOncePartialApply(pai);
     }
 
@@ -4933,7 +4988,7 @@ bool RegionAnalysisFunctionInfo::wasValueEverSent(SILValue value) {
 
   Element elt = trackableValue.value.getID();
 
-  for (auto [block, blockState] : getRange()) {
+  for (const auto &[block, blockState] : getRange()) {
     if (!blockState.getLiveness())
       continue;
 
