@@ -120,8 +120,42 @@ comparisons = [
     ))
   }
   
+  /// A vector mask with the result of a pointwise ${description} comparison.
+  ///
+  /// Each lane of the result is true if that lane of a is ${description} b,
+  /// and false otherwise.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in 0..<${n} {
+  ///   result[i] = (a[i] ${op} b)
+  /// }
+  /// ```
+  @export(implementation) @_transparent @_disfavoredOverload
+  public static func .${op}(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    a .${op} Self(repeating: b)
+  }
+
+  /// A vector mask with the result of a pointwise ${description} comparison.
+  ///
+  /// Each lane of the result is true if a is ${description} the corresponding
+  /// lane of b, and false otherwise.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in 0..<${n} {
+  ///   result[i] = (a ${op} b[i])
+  /// }
+  /// ```
+  @export(implementation) @_transparent @_disfavoredOverload
+  public static func .${op}(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    Self(repeating: a) .${op} b
+  }
+
 %  end
-    
+
   /// The wrapping sum of two vectors.
   @export(implementation)
   public static func &+(a: Self, b: Self) -> Self {
