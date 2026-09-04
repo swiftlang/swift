@@ -104,12 +104,126 @@ print("is boxed true:", isCheckBoxed(
 // CHECK: is boxed false: false
 print("is boxed false:", isCheckBoxed(Unrelated()))
 
-// Leak/double-free check: construct the boxed, canary-carrying payload
-// directly as a call argument (never bound to a named local -- doing so
-// currently trips an unrelated, pre-existing move-only-checker crash for
-// *any* consuming use of a boxed noncopyable existential local, unrelated
-// to casting), exercise a successful `is` check on it, and confirm the
-// class reference inside gets destroyed exactly once.
-_ = takeCanary(BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0))
+// Leak/double-free check: bind the boxed, canary-carrying payload to a local,
+// exercise a successful `is` check on it, and confirm the class reference
+// inside gets destroyed exactly once.
+func canaryLocalCheck() {
+  let canaryBox: any P & ~Copyable =
+    BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0)
+  _ = takeCanary(canaryBox)
+}
+canaryLocalCheck()
 // CHECK: canary deinit count: 1
 print("canary deinit count:", Canary.deinitCount)
+
+// MARK: - Cast patterns (`if case let x as T`)
+//
+// A *failed* cast pattern must leave the subject untouched, so a later pattern
+// can still match it.
+
+func classifyInline(_ box: consuming any P & ~Copyable) -> Int {
+  if case let u as Unrelated = box { _ = u; return -1 }
+  if case let s as Small = box { return s.tag }
+  return -2
+}
+
+func classifyBoxed(_ box: consuming any P & ~Copyable) -> Int {
+  if case let u as Unrelated = box { _ = u; return -1 }
+  if case let b as Big = box { return b.tag }
+  return -2
+}
+
+// The first pattern fails, so the second must still see an intact subject.
+// CHECK: if case chained inline: 7
+print("if case chained inline:", classifyInline(Small(tag: 7)))
+// CHECK: if case chained boxed: 8
+print("if case chained boxed:", classifyBoxed(
+  Big(tag: 8, pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0, pad6: 0)))
+
+// All patterns fail: the subject was never consumed, so it must be destroyed
+// exactly once when it goes out of scope -- not zero times (leak) and not
+// twice (double free).
+func allPatternsFail(_ box: consuming any P & ~Copyable) -> Int {
+  if case let u as Unrelated = box { _ = u; return -1 }
+  if case let s as Small = box { _ = s; return -2 }
+  return 0
+}
+// CHECK: if case all failed: 0
+print("if case all failed:", allPatternsFail(
+  BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0)))
+// CHECK: canary deinit count after failed patterns: 2
+print("canary deinit count after failed patterns:", Canary.deinitCount)
+
+// The subject may also be a local variable or a stored property, not just a
+// consuming parameter. These reach the cast's source operand through different
+// storage (project_box / struct_element_addr), so cover them too: a failed
+// pattern must still leave the subject intact.
+
+func chainedOnLocal() -> Int {
+  let box: any P & ~Copyable =
+    Big(tag: 11, pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0, pad6: 0)
+  if case let u as Unrelated = box { _ = u; return -1 }
+  if case let b as Big = box { return b.tag }
+  return -2
+}
+// CHECK: if case chained on local: 11
+print("if case chained on local:", chainedOnLocal())
+
+struct Holder: ~Copyable {
+  var inner: any P & ~Copyable
+}
+
+func chainedOnProperty(_ h: consuming Holder) -> Int {
+  if case let u as Unrelated = h.inner { _ = u; return -1 }
+  if case let b as Big = h.inner { return b.tag }
+  return -2
+}
+// CHECK: if case chained on property: 12
+print("if case chained on property:", chainedOnProperty(Holder(
+  inner: Big(tag: 12, pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0, pad6: 0))))
+
+// A local that no pattern matches is never consumed, so it must be destroyed
+// exactly once when it goes out of scope.
+func localAllPatternsFail() -> Int {
+  let box: any P & ~Copyable =
+    BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0)
+  if case let u as Unrelated = box { _ = u; return -1 }
+  return 0
+}
+// CHECK: if case local all failed: 0
+print("if case local all failed:", localAllPatternsFail())
+// CHECK: canary deinit count after local failed patterns: 3
+print("canary deinit count after local failed patterns:", Canary.deinitCount)
+
+// MARK: - `as?` consumes unconditionally, unlike a cast pattern
+//
+// Forming an `Optional` with `as?` consumes the subject whether or not the cast
+// succeeds: the result is a value, so there is no failure edge to leave the
+// subject on. Only control-flow-affecting cast operations (cast patterns)
+// consume conditionally. These two probes read the deinit count *before* scope
+// exit, which distinguishes "consumed by the failed cast" from "still alive,
+// destroyed later at scope exit".
+
+func optionalFormConsumesOnFailure() -> Int {
+  let box: any P & ~Copyable =
+    BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0)
+  if let u = box as? Unrelated { _ = u; return -1 }
+  // The `as?` failed, but it still consumed `box`, so the canary is already
+  // gone by the time we get here.
+  return Canary.deinitCount
+}
+// CHECK: as? consumed on failure (4 => yes): 4
+print("as? consumed on failure (4 => yes):", optionalFormConsumesOnFailure())
+
+func patternFormDoesNotConsumeOnFailure() -> Int {
+  let before = Canary.deinitCount
+  let box: any P & ~Copyable =
+    BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0)
+  if case let u as Unrelated = box { _ = u; return -1 }
+  // The pattern failed and left `box` intact, so nothing has been destroyed
+  // yet -- it goes out of scope after this.
+  return Canary.deinitCount - before
+}
+// CHECK: pattern left subject alive on failure (0 => yes): 0
+print("pattern left subject alive on failure (0 => yes):",
+      patternFormDoesNotConsumeOnFailure())
