@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2018 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2018 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -274,7 +274,9 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD2<Scalar>()
     for i in result.indices {
-      result[i] = self[Int(index[i]) % scalarCount]
+      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
+      if position < 0 { position &+= scalarCount }
+      result[i] = self[position]
     }
     return result
   }
@@ -289,7 +291,9 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD3<Scalar>()
     for i in result.indices {
-      result[i] = self[Int(index[i]) % scalarCount]
+      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
+      if position < 0 { position &+= scalarCount }
+      result[i] = self[position]
     }
     return result
   }
@@ -304,7 +308,9 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD4<Scalar>()
     for i in result.indices {
-      result[i] = self[Int(index[i]) % scalarCount]
+      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
+      if position < 0 { position &+= scalarCount }
+      result[i] = self[position]
     }
     return result
   }
@@ -319,7 +325,9 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD8<Scalar>()
     for i in result.indices {
-      result[i] = self[Int(index[i]) % scalarCount]
+      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
+      if position < 0 { position &+= scalarCount }
+      result[i] = self[position]
     }
     return result
   }
@@ -334,7 +342,9 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD16<Scalar>()
     for i in result.indices {
-      result[i] = self[Int(index[i]) % scalarCount]
+      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
+      if position < 0 { position &+= scalarCount }
+      result[i] = self[position]
     }
     return result
   }
@@ -349,7 +359,9 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD32<Scalar>()
     for i in result.indices {
-      result[i] = self[Int(index[i]) % scalarCount]
+      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
+      if position < 0 { position &+= scalarCount }
+      result[i] = self[position]
     }
     return result
   }
@@ -364,7 +376,9 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD64<Scalar>()
     for i in result.indices {
-      result[i] = self[Int(index[i]) % scalarCount]
+      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
+      if position < 0 { position &+= scalarCount }
+      result[i] = self[position]
     }
     return result
   }
