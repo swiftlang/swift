@@ -185,6 +185,30 @@ static SILFunctionConventions getLoweredCallConv(ApplySite call) {
       SILAddressConventions::forFullyLoweredModule(call.getModule()));
 }
 
+/// Does \p call return a @guaranteed_address result of trivial loadable type?
+///
+/// Such a result becomes a directly-returned address after lowering, but has no
+/// storage in `valueStorageMap` because it isn't address-only. ApplyRewriter
+/// therefore reloads it at the call site so that uses expecting an object keep
+/// working.
+///
+/// An address-only @guaranteed_address result needs none of this: it is mapped
+/// through `valueStorageMap` and rewritten by the DefRewriter.
+///
+/// FIXME: A non-trivial loadable result is not handled. Reloading it would need
+/// a load_borrow whose end_borrows are placed at the lifetime ends of its uses,
+/// and a borrowed value cannot satisfy a consuming use.
+static bool hasTrivialGuaranteedAddressResult(ApplySite call,
+                                              SILFunction *function) {
+  if (!getLoweredCallConv(call).hasGuaranteedAddressResult())
+    return false;
+  auto fullApply = call.asFullApplySite();
+  if (!fullApply || fullApply.getKind() != FullApplySiteKind::ApplyInst)
+    return false;
+  auto resultTy = fullApply.getResult()->getType();
+  return !resultTy.isAddressOnly(*function) && resultTy.isTrivial(*function);
+}
+
 //===----------------------------------------------------------------------===//
 //                                Multi-Result
 //
@@ -861,7 +885,10 @@ void OpaqueValueVisitor::checkForIndirectApply(ApplySite applySite) {
 
   if (applySite.getSubstCalleeType()->hasIndirectFormalResults() ||
       applySite.getSubstCalleeType()->hasIndirectFormalYields() ||
-      applySite.getSubstCalleeType()->hasIndirectErrorResult()) {
+      applySite.getSubstCalleeType()->hasIndirectErrorResult() ||
+      // A @guaranteed_address result is a *direct* address return rather than
+      // an indirect formal result, so it would otherwise be missed here.
+      hasTrivialGuaranteedAddressResult(applySite, pass.function)) {
     pass.indirectApplies.insert(applySite);
   }
 }
@@ -2773,8 +2800,19 @@ void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
   // address returned by the apply after lowering.
   if (guaranteedResult) {
     SILValue newResult = apply.getResult();
-    pass.valueStorageMap.setStorageAddress(guaranteedResult, newResult);
-    pass.valueStorageMap.getStorage(guaranteedResult).markRewritten();
+    if (guaranteedResult->getType().isAddressOnly(*pass.function)) {
+      pass.valueStorageMap.setStorageAddress(guaranteedResult, newResult);
+      pass.valueStorageMap.getStorage(guaranteedResult).markRewritten();
+    } else if (hasTrivialGuaranteedAddressResult(ApplySite(oldCall),
+                                                 pass.function) &&
+               !guaranteedResult->use_empty()) {
+      // A loadable result has no mapped storage, so its uses still expect an
+      // object. Reload it from the address the callee now returns.
+      auto reloadBuilder = pass.getBuilder(getResultInsertionPoint());
+      auto *load = reloadBuilder.createLoad(callLoc, newResult,
+                                           LoadOwnershipQualifier::Trivial);
+      guaranteedResult->replaceAllUsesWith(load);
+    }
   }
 }
 
@@ -4649,7 +4687,11 @@ static void rewriteIndirectApply(ApplySite anyApply,
   case FullApplySiteKind::TryApplyInst: {
     auto calleeFnTy = apply.getSubstCalleeType();
     if (!calleeFnTy->hasIndirectFormalResults() &&
-        !calleeFnTy->hasIndirectErrorResult()) {
+        !calleeFnTy->hasIndirectErrorResult() &&
+        // A @guaranteed_address result is a direct address return rather than
+        // an indirect formal result, but still needs the call rewritten so the
+        // result becomes the address the callee returns.
+        !hasTrivialGuaranteedAddressResult(apply, pass.function)) {
       return;
     }
     // If the call has indirect results and wasn't already rewritten, rewrite it
