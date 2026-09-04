@@ -1306,7 +1306,11 @@ public:
     return 0; // No single meaningful value here.
   }
 
-  bool matchesKey(const Key &key) const {
+  /// Does the given function type metadata describe exactly the type `key`
+  /// asks for? Split out from matchesKey so the same comparison can be applied
+  /// to prespecialized function metadata, which lives outside any cache entry.
+  static bool metadataMatchesKey(const FunctionTypeMetadata &Data,
+                                 const Key &key) {
     if (key.getFlags().getIntValue() != Data.Flags.getIntValue())
       return false;
     if (key.getDifferentiabilityKind().Value !=
@@ -1328,6 +1332,10 @@ public:
         return false;
     }
     return true;
+  }
+
+  bool matchesKey(const Key &key) const {
+    return metadataMatchesKey(Data, key);
   }
 
   friend llvm::hash_code hash_value(const FunctionCacheEntry &value) {
@@ -1365,6 +1373,26 @@ public:
 
 /// The uniquing structure for function type metadata.
 static SimpleGlobalCache<FunctionCacheEntry, FunctionTypesTag> FunctionTypes;
+
+/// Get the unique function type metadata for a key, preferring a
+/// prespecialized one from the prespecializations library. Prespecialized
+/// function types never go into the dynamic cache.
+static const FunctionTypeMetadata *
+getFunctionTypeMetadataForKey(const FunctionCacheEntry::Key &key) {
+  auto numParameters = key.getFlags().getNumParameters();
+  if (auto *candidates = getLibPrespecializedFunctionTypeMetadata(
+          key.getResult(), key.Parameters, numParameters)) {
+    // The table's key is only (result, parameters...), so several function
+    // types can share an entry. Find the one that matches the whole request.
+    for (size_t i = 0; i < candidates->count; i++) {
+      auto *metadata = cast<FunctionTypeMetadata>(candidates->metadata[i]);
+      if (FunctionCacheEntry::metadataMatchesKey(*metadata, key))
+        return metadata;
+    }
+  }
+
+  return &FunctionTypes.getOrInsert(key).first->Data;
+}
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata0(FunctionTypeFlags flags,
@@ -1426,7 +1454,7 @@ swift::swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
     reinterpret_cast<const ParameterFlags *>(parameterFlags), result, nullptr,
     ExtendedFunctionTypeFlags(), nullptr
   };
-  return &FunctionTypes.getOrInsert(key).first->Data;
+  return getFunctionTypeMetadataForKey(key);
 }
 
 const FunctionTypeMetadata *
@@ -1447,7 +1475,7 @@ swift::swift_getFunctionTypeMetadataDifferentiable(
     reinterpret_cast<const ParameterFlags *>(parameterFlags), result, nullptr,
     ExtendedFunctionTypeFlags(), nullptr
   };
-  return &FunctionTypes.getOrInsert(key).first->Data;
+  return getFunctionTypeMetadataForKey(key);
 }
 
 const FunctionTypeMetadata *
@@ -1463,7 +1491,7 @@ swift::swift_getFunctionTypeMetadataGlobalActor(
     reinterpret_cast<const ParameterFlags *>(parameterFlags), result,
     globalActor, ExtendedFunctionTypeFlags(), nullptr
   };
-  return &FunctionTypes.getOrInsert(key).first->Data;
+  return getFunctionTypeMetadataForKey(key);
 }
 
 extern "C" const EnumDescriptor NOMINAL_TYPE_DESCR_SYM(s5NeverO);
@@ -1537,7 +1565,7 @@ swift::swift_getExtendedFunctionTypeMetadata(
     reinterpret_cast<const ParameterFlags *>(parameterFlags), result,
     globalActor, extFlags, thrownError
   };
-  return &FunctionTypes.getOrInsert(key).first->Data;
+  return getFunctionTypeMetadataForKey(key);
 }
 
 FunctionCacheEntry::FunctionCacheEntry(const Key &key) {

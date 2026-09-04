@@ -43,11 +43,19 @@ struct LibPrespecializedData {
   /// conforming-type Metadata *). Values are the corresponding witness table.
   TargetPointer<Runtime, const void> pointerKeyedWitnessTableMap;
 
+  /// Function type metadata map. Keys are (result metadata, parameter metadata
+  /// ...). Values are a TargetPrespecializedMetadataCandidates listing every
+  /// prespecialized function type sharing that key. Candidates under one key
+  /// differ in data the key does not carry: function flags, parameter flags,
+  /// global actor, and thrown error. The caller must check each candidate
+  /// against those.
+  TargetPointer<Runtime, const void> functionMetadataMap;
+
   // Existing fields are above, add new fields below this point.
 
   // The major/minor version numbers for this version of the struct.
   static constexpr uint32_t currentMajorVersion = 1;
-  static constexpr uint32_t currentMinorVersion = 5;
+  static constexpr uint32_t currentMinorVersion = 6;
 
   // Version numbers where various fields were introduced.
   static constexpr uint32_t minorVersionWithDisabledProcessesTable = 2;
@@ -55,6 +63,7 @@ struct LibPrespecializedData {
   static constexpr uint32_t minorVersionWithOptionFlags = 3;
   static constexpr uint32_t minorVersionWithDescriptorMap = 4;
   static constexpr uint32_t minorVersionWithPointerKeyedWitnessTableMap = 5;
+  static constexpr uint32_t minorVersionWithFunctionMetadataMap = 6;
 
   // Option flags values.
   enum : typename Runtime::StoredSize {
@@ -115,7 +124,24 @@ struct LibPrespecializedData {
       return nullptr;
     return pointerKeyedWitnessTableMap;
   }
+
+  const void *getFunctionMetadataMap() const {
+    if (minorVersion < minorVersionWithFunctionMetadataMap)
+      return nullptr;
+    return functionMetadataMap;
+  }
 };
+
+/// The value of an entry in a prespecialized metadata table whose key does not
+/// fully determine the type. Every prespecialized metadata sharing the key is
+/// listed, and the caller picks the one matching the rest of the request.
+template <typename Runtime>
+struct TargetPrespecializedMetadataCandidates {
+  typename Runtime::StoredSize count;
+  ConstTargetMetadataPointer<Runtime, TargetMetadata> metadata[];
+};
+using PrespecializedMetadataCandidates =
+    TargetPrespecializedMetadataCandidates<InProcess>;
 
 enum class LibPrespecializedLookupResult {
   // We found something.
@@ -139,6 +165,15 @@ void libPrespecializedImageLoaded();
 /// nullptr on failure. Failure is never definitive.
 const WitnessTable *getLibPrespecializedWitnessTable(
     const ProtocolConformanceDescriptor *conformance, const Metadata *type);
+
+/// Look up the prespecialized function type metadata sharing the key
+/// (result, parameters...). The key does not capture function flags, parameter
+/// flags, the global actor, or the thrown error, so the caller must check the
+/// returned candidates against those. Returns nullptr when there are none.
+const PrespecializedMetadataCandidates *
+getLibPrespecializedFunctionTypeMetadata(const Metadata *result,
+                                         const Metadata *const *parameters,
+                                         unsigned numParameters);
 
 std::pair<LibPrespecializedLookupResult, const TypeContextDescriptor *>
 getLibPrespecializedTypeDescriptor(Demangle::NodePointer node);
