@@ -2481,8 +2481,7 @@ private:
       unsigned FwdDeclLine = 0;
 
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
-        if (EnumTy->isSpecialized() && !EnumTy->hasTypeParameter() &&
-            !EnumTy->hasPrimaryArchetype())
+        if (EnumTy->isSpecialized())
           return createSpecializedEnumType(EnumTy, Decl, MangledName,
                                            SizeInBits, AlignInBits, Scope, File,
                                            FwdDeclLine, Flags);
