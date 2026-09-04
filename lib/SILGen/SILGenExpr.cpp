@@ -24,6 +24,7 @@
 #include "SILGenDynamicCast.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "StorageRefResult.h"
 #include "SwitchEnumBuilder.h"
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
@@ -408,21 +409,45 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
                                   std::optional<SILLocation> L) {
   SILLocation loc = L ? *L : E;
+
+  // A borrow binding must not copy its initializer, so it is handled ahead of
+  // the lvalue copy below.
+  if (I->isBorrow()) {
+    // The initializer of an implicit binding in a desugared for-each loop is an
+    // opaque placeholder for an expression of the original loop; borrow the
+    // expression it stands for.
+    Expr *initExpr = E;
+    if (auto *opaque = dyn_cast<OpaqueValueExpr>(initExpr)) {
+      if (auto *underlying = OpaqueExprs.lookup(opaque))
+        initExpr = underlying;
+    }
+
+    FormalEvaluationScope writeback(*this);
+    if (StorageRefResult::findStorageReferenceExprForBorrow(SGM.M, initExpr)) {
+      auto lv = emitLValue(initExpr, SGFAccessKind::BorrowedObjectRead);
+      ManagedValue MV = emitBorrowedLValue(initExpr, std::move(lv));
+      I->copyOrInitValueInto(*this, loc, std::move(MV), /*isInit*/ true);
+    } else {
+      // The initializer doesn't refer to storage, so there is nothing to borrow
+      // in place; materialize the value and borrow that. There is no FullExpr
+      // scope here, so the temporary is destroyed along with the enclosing
+      // scope rather than at the end of this statement, keeping the borrow
+      // valid for the lifetime of the binding.
+      ManagedValue MV = emitRValueAsSingleValue(initExpr);
+      if (MV.hasCleanup())
+        MV = MV.formalAccessBorrow(*this, loc);
+      I->copyOrInitValueInto(*this, loc, std::move(MV), /*isInit*/ true);
+    }
+    std::move(writeback).deferPop();
+    return;
+  }
+
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope writeback(*this);
     auto lv = emitLValue(load->getSubExpr(),
                          SGFAccessKind::BorrowedAddressRead);
     emitCopyLValueInto(loc, std::move(lv), I);
-    return;
-  }
-
-  if (I->isBorrow()) {
-    FormalEvaluationScope writeback(*this);
-    auto lv = emitLValue(E, SGFAccessKind::BorrowedObjectRead);
-    ManagedValue MV = emitBorrowedLValue(E, std::move(lv));
-    I->copyOrInitValueInto(*this, loc, std::move(MV), /*isInit*/ true);
-    std::move(writeback).deferPop();
     return;
   }
 
