@@ -18,19 +18,23 @@
 #include "CodeSynthesis.h"
 #include "DerivedConformance.h"
 #include "TypeChecker.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/SynthesizedDeclBuilder.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -1904,6 +1908,202 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   return initDecl;
 }
 
+static void printCodedProperty(llvm::raw_ostream &out, VarDecl *varDecl,
+                               Type varType, EnumElementDecl *elt,
+                               bool useIfPresentVariant) {
+  out << "CodedProperty(keyName: "
+      << QuotedString(identifierEscapingIfNeeded(elt->getNameStr(),
+                                                 PrintNameContext::TypeMember))
+      << ", memberName: "
+      << QuotedString(identifierEscapingIfNeeded(varDecl->getNameStr(),
+                                                 PrintNameContext::TypeMember))
+      << ", typeName: " << QuotedString(varType.getString())
+      << ", useIfPresent: " << (useIfPresentVariant ? "true" : "false") << ")";
+}
+
+static void printCodableStructShape(llvm::raw_ostream &out,
+                                    DerivedConformance &derived,
+                                    NominalTypeDecl *targetDecl,
+                                    EnumDecl *codingKeysEnum, bool forDecode) {
+  auto &C = derived.Context;
+  auto *conformanceDC = derived.getConformanceContext();
+
+  out << "structLike([";
+  bool isFirst = true;
+  for (auto *elt : codingKeysEnum->getAllElements()) {
+    VarDecl *varDecl;
+    Type varType;
+    bool useIfPresentVariant;
+    std::tie(varDecl, varType, useIfPresentVariant) =
+        lookupVarDeclForCodingKeysCase(conformanceDC, elt, targetDecl);
+
+    if (forDecode &&
+        diagnoseIfNotDecoded(C, targetDecl, codingKeysEnum, varDecl))
+      continue;
+
+    if (!isFirst)
+      out << ", ";
+    isFirst = false;
+    printCodedProperty(out, varDecl, varType, elt, useIfPresentVariant);
+  }
+  out << "])";
+}
+
+static void printCodedPayload(llvm::raw_ostream &out, ParamDecl *paramDecl,
+                              Type varType, EnumElementDecl *caseCodingKey,
+                              bool useIfPresentVariant) {
+  out << "CodedPayload(label: ";
+  auto label = paramDecl->getArgumentName();
+  if (label.empty()) {
+    out << "nil";
+  } else {
+    out << QuotedString(identifierEscapingIfNeeded(
+        label.str(), PrintNameContext::FunctionParameterExternal));
+  }
+
+  out << ", keyName: ";
+  if (caseCodingKey) {
+    out << QuotedString(identifierEscapingIfNeeded(
+        caseCodingKey->getNameStr(), PrintNameContext::TypeMember));
+  } else {
+    out << "nil";
+  }
+
+  out << ", typeName: " << QuotedString(varType.getString())
+      << ", useIfPresent: " << (useIfPresentVariant ? "true" : "false") << ")";
+}
+
+static void printCodableEnumShape(llvm::raw_ostream &out,
+                                  DerivedConformance &derived,
+                                  EnumDecl *targetEnum,
+                                  EnumDecl *codingKeysEnum) {
+  auto &C = derived.Context;
+  auto *conformanceDC = derived.getConformanceContext();
+
+  out << "enumLike([";
+  llvm::interleaveComma(
+      targetEnum->getAllElements(), out, [&](EnumElementDecl *elt) {
+        auto *codingKeyCase =
+            lookupEnumCase(C, codingKeysEnum, elt->getBaseIdentifier());
+        auto caseIdentifier = caseCodingKeysIdentifier(C, elt);
+        auto *caseCodingKeys =
+            codingKeyCase
+                ? lookupEvaluatedCodingKeysEnum(C, targetEnum, caseIdentifier)
+                : nullptr;
+
+        out << "CodedCase(name: "
+            << QuotedString(identifierEscapingIfNeeded(
+                   elt->getNameStr(), PrintNameContext::TypeMember))
+            << ", caseCodingKeysName: ";
+        if (caseCodingKeys) {
+          out << QuotedString(identifierEscapingIfNeeded(
+              caseCodingKeys->getNameStr(), PrintNameContext::TypeMember));
+        } else {
+          out << "nil";
+        }
+
+        out << ", keyName: ";
+        if (codingKeyCase) {
+          out << QuotedString(identifierEscapingIfNeeded(
+              codingKeyCase->getNameStr(), PrintNameContext::TypeMember));
+        } else {
+          out << "nil";
+        }
+
+        out << ", isUnavailable: " << (elt->isUnavailable() ? "true" : "false")
+            << ", payload: [";
+
+        if (caseCodingKeys && elt->hasAssociatedValues()) {
+          bool isFirst = true;
+          for (auto entry : llvm::enumerate(*elt->getParameterList())) {
+            auto *paramDecl = entry.value();
+            auto identifier = getVarNameForCoding(paramDecl, entry.index());
+            auto *caseCodingKey = lookupEnumCase(C, caseCodingKeys, identifier);
+
+            auto varType = conformanceDC->mapTypeIntoEnvironment(
+                paramDecl->getValueInterfaceType());
+            bool useIfPresentVariant = false;
+            if (auto objType = varType->getOptionalObjectType()) {
+              varType = objType;
+              useIfPresentVariant = true;
+            }
+
+            if (!isFirst)
+              out << ", ";
+            isFirst = false;
+            printCodedPayload(out, paramDecl, varType, caseCodingKey,
+                              useIfPresentVariant);
+          }
+        }
+
+        out << "])";
+      });
+  out << "])";
+}
+
+static std::string getCodableTypeInfoString(DerivedConformance &derived,
+                                            bool forDecode) {
+  auto &C = derived.Context;
+  auto *targetDecl = derived.Nominal;
+  auto *codingKeysEnum = lookupEvaluatedCodingKeysEnum(C, targetDecl);
+  // We should have bailed already if the type does not have CodingKeys.
+  ASSERT(codingKeysEnum && "Missing CodingKeys decl.");
+
+  bool isUnsafe =
+      C.LangOpts.hasFeature(Feature::StrictMemorySafety,
+                            /*allowMigration=*/true) ||
+      derived.Conformance->getExplicitSafety() == ExplicitSafety::Unsafe ||
+      targetDecl->getExplicitSafety() == ExplicitSafety::Unsafe;
+
+  std::string res;
+  llvm::raw_string_ostream out(res);
+  out << "CodableTypeInfo(isUnsafe: " << (isUnsafe ? "true" : "false")
+      << ", hasCodingKeys: " << (codingKeysEnum->hasCases() ? "true" : "false")
+      << ", shape: ";
+
+  if (auto *targetEnum = dyn_cast<EnumDecl>(targetDecl)) {
+    printCodableEnumShape(out, derived, targetEnum, codingKeysEnum);
+  } else {
+    printCodableStructShape(out, derived, targetDecl, codingKeysEnum,
+                            forDecode);
+  }
+
+  out << ")";
+  return res;
+}
+
+static bool shouldDeriveCodableViaMacro(DerivedConformance &derived) {
+  if (isa<ClassDecl>(derived.Nominal))
+    return false;
+
+  return derived.Context.LangOpts.hasFeature(
+      Feature::DeriveConformancesViaMacros);
+}
+
+static ValueDecl *deriveEncodableViaMacro(DerivedConformance &derived,
+                                          ValueDecl *requirement) {
+  std::string macro;
+  auto os = llvm::raw_string_ostream(macro);
+  os << "#_deriveEncodable("
+     << QuotedString(getCodableTypeInfoString(derived, /*forDecode=*/false))
+     << ")";
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveEncodable);
+}
+
+static ValueDecl *deriveDecodableViaMacro(DerivedConformance &derived,
+                                          ValueDecl *requirement) {
+  std::string macro;
+  auto os = llvm::raw_string_ostream(macro);
+  os << "#_deriveDecodable("
+     << QuotedString(getCodableTypeInfoString(derived, /*forDecode=*/true))
+     << ")";
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveDecodable);
+}
+
 /// Returns whether the given type is valid for synthesizing {En,De}codable.
 ///
 /// Checks to see whether the given type has a valid \c CodingKeys enum, and if
@@ -2110,6 +2310,9 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
   }
   assert(delayedNotes.empty());
 
+  if (shouldDeriveCodableViaMacro(*this))
+    return deriveEncodableViaMacro(*this, requirement);
+
   return deriveEncodable_encode(*this);
 }
 
@@ -2141,6 +2344,9 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
     return nullptr;
   }
   assert(delayedNotes.empty());
+
+  if (shouldDeriveCodableViaMacro(*this))
+    return deriveDecodableViaMacro(*this, requirement);
 
   return deriveDecodable_init(*this);
 }
