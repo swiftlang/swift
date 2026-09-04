@@ -167,16 +167,17 @@ enum ConflictFlag : unsigned {
   Double = 1 << 9,
   Conformance = 1 << 10,
   TupleArity = 1 << 11,
-  TupleElement = 1 << 12,
-  Existential = 1 << 13,
-  FunctionResult = 1 << 14,
-  FunctionParamCount = 1 << 15,
-  FunctionParamFlags = 1 << 16,
-  FunctionParamType = 1 << 17,
-  FunctionNoEscape = 1 << 18,
-  FunctionAsync = 1 << 19,
-  FunctionThrows = 1 << 20,
-  FunctionSendable = 1 << 21
+  TupleLabel = 1 << 12,
+  TupleElement = 1 << 13,
+  Existential = 1 << 14,
+  FunctionResult = 1 << 15,
+  FunctionParamCount = 1 << 16,
+  FunctionParamFlags = 1 << 17,
+  FunctionParamType = 1 << 18,
+  FunctionNoEscape = 1 << 19,
+  FunctionAsync = 1 << 20,
+  FunctionThrows = 1 << 21,
+  FunctionSendable = 1 << 22
 };
 using ConflictReason = OptionSet<ConflictFlag>;
 

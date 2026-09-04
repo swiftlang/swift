@@ -48,6 +48,7 @@
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -3595,8 +3596,8 @@ bool ContextualFailure::tryTypeCoercionFixIt(
   // type, let's suggest a force unwrap "!". Otherwise fallback to potential
   // coercion or force cast.
   if (!bothOptional && fromType->getOptionalObjectType()) {
-    if (TypeChecker::isSubtypeOf(fromType->lookThroughAllOptionalTypes(),
-                                 toType, getDC())) {
+    ConformanceCache cache;
+    if (canConvertTo(cache, fromType->lookThroughAllOptionalTypes(), toType)) {
       diagnostic.fixItInsert(
           Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
                                      getSourceRange().End),

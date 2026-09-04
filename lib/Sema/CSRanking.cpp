@@ -22,6 +22,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -1350,9 +1351,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                 ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {
-              if (TypeChecker::isSubtypeOf(resType1, resType2, cs.DC)) {
+              if (canConvertTo(cs.CC, resType1, resType2)) {
                 score1 += weight;
-              } else if (TypeChecker::isSubtypeOf(resType2, resType1, cs.DC)) {
+              } else if (canConvertTo(cs.CC, resType2, resType1)) {
                 score2 += weight;
               }
             }
