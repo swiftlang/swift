@@ -3035,12 +3035,5 @@ bool DefaultActorImpl::isDistributedRemote() {
 // *****************************************************************************
 [[gnu::used, gnu::retain]]
 uint32_t swift::_swift_concurrency_debug_internal_layout_version =
-    (static_cast<uint32_t>(
-#if SWIFT_CONCURRENCY_EMBEDDED
-         _concurrency_current_task_storage_kind::platform_defined
-#else
-         SWIFT_THREAD_LOCAL_STORAGE_KIND
-#endif
-         )
-     << 24) |
+    (static_cast<uint32_t>(SWIFT_THREAD_LOCAL_STORAGE_KIND) << 24) |
     3;
