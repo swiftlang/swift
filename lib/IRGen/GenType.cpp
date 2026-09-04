@@ -406,25 +406,22 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF, Address destAddr,
 /// default implementation.
 void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                                           Address srcAddr, SILType T,
-                                          bool isOutlined) const {
+                                          bool suppressOutlinedValueOperationCalls) const {
   // Use memcpy if that's legal.
   if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
-    return initializeWithTake(IGF, destAddr, srcAddr, T, isOutlined,
+    return initializeWithTake(IGF, destAddr, srcAddr, T,
+                              suppressOutlinedValueOperationCalls,
                               /*zeroizeIfSensitive=*/ false);
   }
 
   // Otherwise explode and re-implode.
-  if (isOutlined) {
+  if (suppressOutlinedValueOperationCalls ||
+      !canUseOutlinedValueOperation(T)) {
     Explosion copy;
     loadAsCopy(IGF, srcAddr, copy);
     initialize(IGF, copy, destAddr, true);
   } else {
-    OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
-                                         DeinitIsNotNeeded);
-    // No need to collect anything because we assume loadable types can be
-    // loaded without enums.
-    collector.emitCallToOutlinedCopy(
-        destAddr, srcAddr, T, *this, IsInitialization, IsNotTake);
+    callOutlinedCopy(IGF, destAddr, srcAddr, T, IsInitialization, IsNotTake);
   }
 }
 
@@ -1552,7 +1549,7 @@ namespace {
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                             Address srcAddr, SILType T,
-                            bool isOutlined) const override {
+                            bool suppressOutlinedValueOperationCalls) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
 
@@ -1686,7 +1683,8 @@ namespace {
       IGF.emitMemCpy(dest, src, getFixedSize());
     }
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T,
+                            bool suppressOutlinedValueOperationCalls) const override {
       IGF.emitMemCpy(dest, src, getFixedSize());
     }
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
@@ -2904,7 +2902,7 @@ public:
 
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                                   Address srcAddr, SILType T,
-                                  bool isOutlined) const override {
+                                  bool suppressOutlinedValueOperationCalls) const override {
     llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
   }
 

@@ -542,7 +542,8 @@ namespace {
       IGF.unimplemented(SourceLoc(), "copying @block_storage");
     }
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T,
+                            bool suppressOutlinedValueOperationCalls) const override {
       IGF.unimplemented(SourceLoc(), "copying @block_storage");
     }
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
