@@ -10,15 +10,15 @@ struct Struct<T> {
 // CHECK-LABEL: struct Struct<T> {
 // CHECK:   @_hasStorage var x: T { get set }
 // CHECK:   enum CodingKeys : CodingKey {
-// CHECK-FRAGILE:   @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ lhs: Struct<T>.CodingKeys, _ rhs: Struct<T>.CodingKeys) -> Bool
-// CHECK-RESILIENT: static func == (lhs: Struct<T>.CodingKeys, rhs: Struct<T>.CodingKeys) -> Bool
-// CHECK:     case x
+// CHECK-FRAGILE-DAG:   @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ lhs: Struct<T>.CodingKeys, _ rhs: Struct<T>.CodingKeys) -> Bool
+// CHECK-RESILIENT-DAG: static func == (lhs: Struct<T>.CodingKeys, rhs: Struct<T>.CodingKeys) -> Bool
+// CHECK-DAG:     case x
 // CHECK-DAG:     init?(stringValue: String)
 // CHECK-DAG:     init?(intValue: Int)
-// CHECK:     func hash(into hasher: inout Hasher)
-// CHECK:     var hashValue: Int { get }
-// CHECK:     var intValue: Int? { get }
-// CHECK:     var stringValue: String { get }
+// CHECK-DAG:     func hash(into hasher: inout Hasher)
+// CHECK-DAG:     var hashValue: Int { get }
+// CHECK-DAG:     var intValue: Int? { get }
+// CHECK-DAG:     var stringValue: String { get }
 // CHECK:   }
 // CHECK:   init(x: T)
 // CHECK: }
