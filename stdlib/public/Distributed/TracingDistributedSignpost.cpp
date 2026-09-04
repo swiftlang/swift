@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,26 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Concurrency tracing implemented with the os_signpost API.
+// Tracing for Distributed module implemented with the os_signpost API.
 //
 //===----------------------------------------------------------------------===//
 
 #if SWIFT_STDLIB_TRACING
 
-#include "TracingSignpost.h"
-#include "swift/Runtime/EnvironmentVariables.h"
+#include "TracingDistributedSignpost.h"
 #include <stdio.h>
 
-#define SWIFT_LOG_CONCURRENCY_SUBSYSTEM "com.apple.swift.concurrency"
-#define SWIFT_LOG_ACTOR_CATEGORY "Actor"
-#define SWIFT_LOG_TASK_CATEGORY "Task"
+#define SWIFT_LOG_DISTRIBUTED_SUBSYSTEM "com.apple.swift.distributed"
+#define SWIFT_LOG_DISTRIBUTED_REMOTE_CALLS_CATEGORY "RemoteCalls"
 
 namespace swift {
-namespace concurrency {
+namespace distributed {
 namespace trace {
 
-os_log_t ActorLog;
-os_log_t TaskLog;
+os_log_t DistributedRemoteCallsLog;
 swift::once_t LogsToken;
 bool TracingEnabled;
 
@@ -40,19 +37,13 @@ void setupLogs(void *unused) {
   }
 
   TracingEnabled = true;
-
-  const char *subsystem = SWIFT_LOG_CONCURRENCY_SUBSYSTEM;
-  const char *envSubsystem =
-      runtime::environment::concurrencyTracingSubsystem();
-  if (envSubsystem && envSubsystem[0] != '\0')
-    subsystem = envSubsystem;
-
-  ActorLog = os_log_create(subsystem, SWIFT_LOG_ACTOR_CATEGORY);
-  TaskLog = os_log_create(subsystem, SWIFT_LOG_TASK_CATEGORY);
+  DistributedRemoteCallsLog =
+      os_log_create(SWIFT_LOG_DISTRIBUTED_SUBSYSTEM,
+                    SWIFT_LOG_DISTRIBUTED_REMOTE_CALLS_CATEGORY);
 }
 
 } // namespace trace
-} // namespace concurrency
+} // namespace distributed
 } // namespace swift
 
 #endif

@@ -35,6 +35,11 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   DistributedMetadata.swift
   LocalTestingDistributedActorSystem.swift
 
+  # Tracing
+  TracingDistributed.swift
+  TracingDistributed.cpp
+  TracingDistributedSignpost.cpp
+
   SWIFT_MODULE_DEPENDS_IOS ${swift_distributed_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_OSX ${swift_distributed_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_TVOS ${swift_distributed_darwin_dependencies}

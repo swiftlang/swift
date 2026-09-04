@@ -131,9 +131,9 @@ void task_switch_executor(AsyncTask *task, SerialExecutorRef serialExecutor,
 } // namespace swift
 
 #if SWIFT_STDLIB_TRACING
-#include "TracingSignpost.h"
+#include "TracingConcurrencySignpost.h"
 #else
-#include "TracingStubs.h"
+#include "TracingConcurrencyStubs.h"
 #endif
 
 #endif
