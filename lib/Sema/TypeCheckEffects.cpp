@@ -4746,7 +4746,7 @@ private:
   void diagnoseRedundantUnsafe(UnsafeExpr *E) const {
     // Ignore implicitly-generated "unsafe" expressions; they're allowed to be
     // overly conservative.
-    if (E->isImplicit())
+    if (E->isImplicit() || E->isFromSyntheticMacroExpansion(CurContext.getDeclContext()))
       return;
 
     SourceLoc loc = E->getUnsafeLoc();
