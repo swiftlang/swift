@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2018 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2018 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -698,6 +698,7 @@ where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
   }
 }
 
+/// A vector of Boolean values to select lanes of a SIMD vector.
 @frozen
 public struct SIMDMask<Storage>: SIMD
                   where Storage: SIMD,
@@ -709,21 +710,34 @@ public struct SIMDMask<Storage>: SIMD
   
   public typealias Scalar = Bool
 
+  /// Creates a mask with false in every lane.
   @_transparent
   public init() {
     _storage = Storage()
   }
 
+  /// The number of scalars, or elements, in the vector.
   @_transparent
   public var scalarCount: Int {
     return _storage.scalarCount
   }
 
+  /// Creates a mask from a vector of signed integers, taking each lane to be
+  /// true where the corresponding element is negative.
+  ///
+  /// Only the sign bit of the values is significant. Negative values are true,
+  /// and all other values are false.
+  ///
+  /// - Parameter storage: An integer vector to reinterpret as a mask.
   @_transparent
-  public init(_ _storage: Storage) {
-    self._storage = _storage
+  public init(_ storage: Storage) {
+    _storage = storage
   }
-  
+
+  /// Accesses the Boolean value in the lane at the specified index.
+  ///
+  /// - Parameter index: The index of the element to access. `index` must be in
+  ///   the range `0..<scalarCount`.
   public subscript(index: Int) -> Bool {
     @_transparent
     get {
