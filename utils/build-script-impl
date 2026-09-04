@@ -438,8 +438,7 @@ function wait_until_lldb_can_launch_processes() {
     local sandbox_bin="${sandbox_dir}/lldb_launch_check"
     printf 'int main() { return 0; }\n' > "${sandbox_src}"
 
-    if ! "${cc_binary}" -isysroot "$(xcrun --sdk macosx --show-sdk-path)" \
-            -o "${sandbox_bin}" "${sandbox_src}"; then
+    if ! "${cc_binary}" -o "${sandbox_bin}" "${sandbox_src}"; then
         echo "Failed to compile LLDB launch sanity-check program at ${sandbox_src}" 1>&2
         rm -rf "${sandbox_dir}"
         exit 1
