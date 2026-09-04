@@ -84,6 +84,31 @@ extension MutableRawSpan {
     self = unsafe _overrideLifetime(span, borrowing: bytes)
   }
 
+  /// Unsafely create a `MutableRawSpan` over the given bytes, based on the
+  /// mutating lifetime of `owner` rather than that of `bytes`.
+  ///
+  /// Use this initializer when the memory referenced by `bytes` is also referenced
+  /// by another longer-lived value.
+  ///
+  /// The memory referenced by `bytes` must remain valid for as long as this
+  /// span exists, and `owner` must be a value that keeps that memory alive.
+  /// This initializer cannot verify either condition, therefore, this is an unsafe operation.
+  ///
+  /// - Parameters:
+  ///   - bytes: An `UnsafeMutableRawBufferPointer` to initialized bytes.
+  ///   - owner: The value whose mutating lifetime the new span depends on.
+  @unsafe
+  @export(implementation)
+  @_transparent
+  @_lifetime(&owner)
+  public init<Owner: ~Copyable & ~Escapable>(
+    _unsafeBytes bytes: UnsafeMutableRawBufferPointer,
+    mutating owner: inout Owner
+  ) {
+    let span = unsafe MutableRawSpan(_unsafeBytes: bytes)
+    self = unsafe _overrideLifetime(span, mutating: &owner)
+  }
+
   @unsafe
   @export(implementation)
   @_lifetime(borrow pointer)
@@ -303,6 +328,55 @@ extension MutableRawSpan {
     _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
     try unsafe body(.init(start: _pointer, count: _count))
+  }
+
+  /// Consume this span and call a closure with a pointer to the viewed mutable
+  /// contiguous storage.
+  ///
+  /// Use this method to derive a new type with exclusive access to the memory
+  /// represented by this span. It is an alternative to `MutableRawSpan`'s
+  /// `extracting` methods for deriving types other than `MutableRawSpan`.
+  ///
+  /// The buffer pointer passed as an argument to `body` is valid only
+  /// during the execution of `consumingWithUnsafeMutableBytes(_:)`.
+  /// Do not store or return the pointer for later use. The pointer is passed as
+  /// `inout` so that `body` has something to anchor the lifetime of its
+  /// return value. On return, that dependency is replaced by this span's
+  /// dependency.
+  ///
+  /// On return from `body`, `bytes` must still address the same region it was
+  /// given. Changing its base address or count traps. Any pointer `body`
+  /// derives must also lie within that region, which this method cannot verify.
+  /// Therefore, this is an unsafe operation.
+  ///
+  /// - Parameter body: A closure with an `UnsafeMutableRawBufferPointer`
+  ///   parameter that points to the viewed contiguous storage. If `body`
+  ///   has a return value, that value is also used as the return value
+  ///   for the `consumingWithUnsafeMutableBytes(_:)` method.
+  ///   The closure's parameter is valid only for the duration of its execution.
+  /// - Returns: The return value of the `body` closure parameter.
+  @unsafe
+  @export(implementation)
+  @_transparent
+  @_lifetime(copy self)
+  public consuming func consumingWithUnsafeMutableBytes<
+    E: Error, R: ~Copyable & ~Escapable
+  >(
+    _ body: @_lifetime(&bytes) (
+      _ bytes: inout UnsafeMutableRawBufferPointer
+    ) throws(E) -> R
+  ) throws(E) -> R {
+    var bytes = unsafe UnsafeMutableRawBufferPointer(
+      start: _pointer, count: _count
+    )
+    let original = unsafe bytes
+    defer {
+      _precondition(
+        original.isTriviallyIdentical(to: bytes),
+        "bytes must address the same region on return from consumingWithUnsafeMutableBytes(_:)"
+      )
+    }
+    return unsafe _overrideLifetime(try unsafe body(&bytes), copying: self)
   }
 }
 
