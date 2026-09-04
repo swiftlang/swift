@@ -133,13 +133,27 @@ else()
   set(osx_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
 endif()
 
-# Generate BacktracingDT 6.2
-set(backtracing_availability)
-if(NOT SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY AND SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "26.0")
-  list(APPEND backtracing_availability "-Xfrontend" "-define-availability" "-Xfrontend" "BacktracingDT 6.2:macOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
+# Force the minimum iOS deployment target to 18.0
+if(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS VERSION_LESS "18.0")
+  set(ios_deployment_target "18.0")
 else()
-  list(APPEND backtracing_availability "-Xfrontend" "-define-availability" "-Xfrontend" "BacktracingDT 6.2:macOS 26.0")
+  set(ios_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}")
 endif()
+
+# Generate BacktracingDT 6.2
+set(backtracing_availability_osx "26.0")
+set(backtracing_availability_ios "26.0")
+if(NOT SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY)
+  if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "26.0")
+    set(backtracing_availability_osx "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
+  endif()
+  if(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS VERSION_LESS "26.0")
+    set(backtracing_availability_ios "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}")
+  endif()
+endif()
+
+set(backtracing_availability)
+list(APPEND backtracing_availability "-Xfrontend" "-define-availability" "-Xfrontend" "BacktracingDT 6.2:macOS ${backtracing_availability_osx}, iOS ${backtracing_availability_ios}")
 
 add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${runtime_sources}
@@ -158,6 +172,7 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   PRIVATE_LINK_LIBRARIES ${swift_runtime_link_libraries}
 
   DEPLOYMENT_VERSION_OSX ${osx_deployment_target}
+  DEPLOYMENT_VERSION_IOS ${ios_deployment_target}
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
@@ -171,7 +186,7 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   INSTALL_IN_COMPONENT stdlib
   MACCATALYST_BUILD_FLAVOR "zippered"
 
-  TARGET_SDKS OSX LINUX LINUX_STATIC WINDOWS
+  TARGET_SDKS OSX IOS IOS_SIMULATOR LINUX LINUX_STATIC WINDOWS
 )
 
 if(SWIFT_ENABLE_BACKTRACING)
