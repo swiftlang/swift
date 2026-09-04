@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 %s -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify-additional-prefix deployment- -verify-additional-prefix inlining-
-// RUN: %target-typecheck-verify-swift -swift-version 5 %s -strict-concurrency=complete -target %target-swift-6.1-abi-triple
-// RUN: %target-typecheck-verify-swift -swift-version 5 %s -strict-concurrency=complete -target %target-swift-6.1-abi-triple -target-min-inlining-version min -verify-additional-prefix inlining-
+// RUN: %target-typecheck-verify-swift -swift-version 5 -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify-additional-prefix deployment- -verify-additional-prefix inlining-
+// RUN: %target-typecheck-verify-swift -swift-version 5 -strict-concurrency=complete -target %target-swift-6.1-abi-triple
+// RUN: %target-typecheck-verify-swift -swift-version 5 -strict-concurrency=complete -target %target-swift-6.1-abi-triple -target-min-inlining-version min -verify-additional-prefix inlining-
 
 // Test -emit-module configurations.
 
@@ -69,6 +69,7 @@ public actor SomeGlobalActor {
 
 @available(SwiftStdlib 5.1, *)
 @SomeGlobalActor public class C6 {
+// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
   var x: Int = 0
 
   isolated deinit { // expected-deployment-error{{isolated deinit is only available in macOS 15.4.0 or newer}}
@@ -87,6 +88,7 @@ public actor SomeGlobalActor {
 
 @available(SwiftStdlib 5.1, *)
 @_fixed_layout @SomeGlobalActor public class C8 {
+// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
   @usableFromInline var x: Int = 0
 
   @inlinable isolated deinit { // expected-inlining-error{{isolated deinit is only available in macOS 15.4.0 or newer}}
@@ -114,6 +116,7 @@ actor A {
 
 @available(SwiftStdlib 5.1, *)
 public actor A1 {
+// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
   var x: Int = 0
 
   isolated deinit { // expected-deployment-error{{isolated deinit is only available in macOS 15.4.0 or newer}}
@@ -123,6 +126,7 @@ public actor A1 {
 
 @available(SwiftStdlib 5.1, *)
 public actor A2 {
+// expected-note@-1 * {{update '@available' attribute on enclosing.*}}
   @usableFromInline var x: Int = 0
 
   @inlinable isolated deinit { // expected-inlining-error{{isolated deinit is only available in macOS 15.4.0 or newer}}
