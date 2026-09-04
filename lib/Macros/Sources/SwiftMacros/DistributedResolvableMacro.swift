@@ -66,7 +66,119 @@ extension DistributedResolvableMacro {
         \(raw: requirementStubs)
       }
       """
-    return [extensionDecl.cast(ExtensionDeclSyntax.self)]
+
+    var extensions: [ExtensionDeclSyntax] = [
+      extensionDecl.cast(ExtensionDeclSyntax.self),
+    ]
+    if shouldEmitStubTypealias(node) {
+      extensions.append(stubTypealiasExtension(proto))
+    }
+    return extensions
+  }
+
+  /// Reads the `_emitStubTypealias:` argument from the `@Resolvable(...)` attribute.
+  /// Default value: true
+  static func shouldEmitStubTypealias(_ node: AttributeSyntax) -> Bool {
+    guard case let .argumentList(arguments)? = node.arguments else {
+      return true
+    }
+    for argument in arguments where argument.label?.text == "_emitStubTypealias" {
+      if let literal = argument.expression.as(BooleanLiteralExprSyntax.self) {
+        return literal.literal.tokenKind == .keyword(.true)
+      }
+    }
+    return true
+  }
+
+  static func stubTypealiasExtension(_ proto: ProtocolDeclSyntax) -> ExtensionDeclSyntax {
+    let attributes = proto.attributes.filter { attr in
+      Self.attributesToCopy.contains(
+        attr.as(AttributeSyntax.self)?.attributeName.trimmed.description ?? ""
+      )
+    }
+    let access = proto.accessControlModifiers
+    let stubConstraint = actorSystemConstraint(proto)
+    let stubReference = stubType(proto)
+    // The synthesized typealias is gated behind the 'DistributedProtocolStubTypealias' feature.
+    // The '#if' is evaluated in the client's build.
+    let decl: DeclSyntax =
+      """
+      \(attributes)
+      extension \(proto.name.trimmed) where \(raw: stubConstraint) {
+        #if $DistributedProtocolStubTypealias
+        \(access)typealias DistributedProtocolStub = \(raw: stubReference)
+        #endif
+      }
+      """
+    return decl.cast(ExtensionDeclSyntax.self)
+  }
+
+  static func actorSystemConstraint(_ proto: ProtocolDeclSyntax) -> String {
+    for req in proto.genericWhereClause?.requirements ?? [] {
+      switch req.requirement {
+      case .conformanceRequirement(let conformanceReq)
+           where conformanceReq.leftType.isActorSystem:
+        return "Self.ActorSystem: \(conformanceReq.rightType.trimmed)"
+      case .sameTypeRequirement(let sameTypeReq):
+        switch sameTypeReq.leftType {
+        case .type(let type) where type.isActorSystem:
+          if case .type(let rightType) = sameTypeReq.rightType.trimmed {
+            return "Self.ActorSystem == \(rightType)"
+          }
+          continue
+        default:
+          continue
+        }
+      default:
+        continue
+      }
+    }
+    return "Self.ActorSystem: DistributedActorSystem"
+  }
+
+  static func stubType(_ proto: ProtocolDeclSyntax) -> String {
+    let stubName = "$\(proto.name.trimmed.text)"
+    let typeParams = stubTypeParameters(proto)
+    if typeParams.isEmpty {
+      return stubName
+    }
+    let args = typeParams.map { "Self.\($0)" }.joined(separator: ", ")
+    return "\(stubName)<\(args)>"
+  }
+
+  static func stubTypeParameters(_ proto: ProtocolDeclSyntax) -> [String] {
+    var isGenericOverActorSystem = false
+    for req in proto.genericWhereClause?.requirements ?? [] {
+      switch req.requirement {
+      case .conformanceRequirement(let conformanceReq) where conformanceReq.leftType.isActorSystem:
+        isGenericOverActorSystem = true
+      case .sameTypeRequirement(let sameTypeReq):
+        switch sameTypeReq.leftType {
+        case .type(let type) where type.isActorSystem:
+          isGenericOverActorSystem = false
+        default:
+          continue
+        }
+      default:
+        continue
+      }
+    }
+
+    var primaryTypeParams: [String] = []
+    if let primaryTypes = proto.primaryAssociatedTypeClause?.primaryAssociatedTypes {
+      primaryTypeParams = primaryTypes.map { $0.name.trimmed.text }
+    }
+
+    let actorSystemTypeParam: [String]
+    if primaryTypeParams.contains("ActorSystem") {
+      actorSystemTypeParam = []
+    } else if isGenericOverActorSystem {
+      actorSystemTypeParam = ["ActorSystem"]
+    } else {
+      actorSystemTypeParam = []
+    }
+
+    return actorSystemTypeParam + primaryTypeParams
   }
 
   /// Returns rendered string with all stub declarations for given members.
