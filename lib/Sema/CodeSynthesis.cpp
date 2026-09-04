@@ -1286,17 +1286,27 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       continue;
 
     bool alreadyDeclared = false;
+    bool interfaceMarksInitUnavailable = false;
+    auto superSelector = superclassCtor->getObjCRuntimeName();
 
     auto results = decl->lookupDirect(DeclBaseName::createConstructor());
     for (auto *member : results) {
-      if (!isInMainBody(member, decl))
-        continue;
-
       auto *ctor = cast<ConstructorDecl>(member);
 
       // Skip any invalid constructors.
       if (ctor->isInvalid())
         continue;
+
+      // Detect an init from the imported Objective-C interface (not the
+      // extension's main body) that marks the superclass selector unavailable,
+      // e.g. 'NS_UNAVAILABLE'.
+      if (!isInMainBody(member, decl)) {
+        if (ctor->hasClangNode() && superSelector &&
+            ctor->getObjCRuntimeName() == superSelector &&
+            ctor->isUnavailable())
+          interfaceMarksInitUnavailable = true;
+        continue;
+      }
 
       auto type = swift::getMemberTypeForComparison(ctor, nullptr);
       if (isOverrideBasedOnType(ctor, type, superclassCtor)) {
@@ -1323,9 +1333,12 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       // reachable from Objective-C (e.g. '[Class new]') and traps at runtime if
       // it's invoked, so warn the author to implement it. (Non-required
       // designated inits; required ones are handled by
-      // diagnoseMissingRequiredInitializer above.)
+      // diagnoseMissingRequiredInitializer above.) Skip the warning when the
+      // interface marks that initializer unavailable (e.g. 'NS_UNAVAILABLE'):
+      // its stub is unreachable from Objective-C.
       if (kind == DesignatedInitKind::Stub &&
-          implCtx->getDecl()->isObjCImplementation())
+          implCtx->getDecl()->isObjCImplementation() &&
+          !interfaceMarksInitUnavailable)
         ctx.Diags.diagnose(implCtx->getDecl(),
                            diag::objc_implementation_missing_inherited_init,
                            superclassCtor);
