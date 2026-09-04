@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %swift-frontend -c %t/check.swift -parse-as-library -target wasm32-unknown-none-wasm \
+// RUN: %swift -c %t/check.swift -parse-as-library -target wasm32-unknown-none-wasm \
 // RUN:   -resource-dir %test-resource-dir \
 // RUN:   -enable-experimental-feature Embedded -Xcc -fdeclspec -disable-stack-protector \
 // RUN:   -o %t/check.o
