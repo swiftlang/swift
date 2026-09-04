@@ -24,9 +24,11 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include <array>
+#include <memory>
 #include <queue>
 #include <tuple>
 
@@ -55,7 +57,7 @@ protected:
   SmallVector<uint64_t, 64> ScratchRecord;
 
   /// The module currently being serialized.
-  const ModuleDecl *M = nullptr;
+  ModuleDecl *M = nullptr;
 
   /// The SourceFile currently being serialized, if any.
   ///
@@ -87,6 +89,8 @@ class Serializer : public SerializerBase {
   friend class TypeSerializer;
 
   const SerializationOptions &Options;
+
+  std::unique_ptr<IRABIDetailsProvider> LayoutProvider;
 
   /// A map from non-identifier uniqued strings to their serialized IDs.
   ///
@@ -219,7 +223,11 @@ class Serializer : public SerializerBase {
 
   /// Declarations whose layout must be serialized because they contribute to
   /// the ABI of a client-visible type but may not be available to clients.
-  llvm::SmallSetVector<const Decl *, 16> HiddenTypeLayoutsToSerialize;
+  ASTBlockRecordKeeper<const Decl *, DeclID,
+                       index_block::HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS>
+      HiddenTypeLayoutsToSerialize;
+
+  SmallVector<std::pair<DeclID, DeclID>, 16> HiddenTypeFallbackTable;
 
   ASTBlockRecordKeeper<Type, TypeID,
                        index_block::TYPE_OFFSETS>
@@ -361,9 +369,14 @@ private:
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
 
+  void writeHiddenTypeXRef(const HiddenTypeLayoutInfoDecl *hidden);
+
   /// Handle a hidden layout requirement discovered by AST analysis.
   void handleHiddenTypeLayoutRequirement(
       const HiddenTypeLayoutRequirement &requirement);
+
+  IRABIDetailsProvider &getLayoutProvider();
+  void writeHiddenTypeLayout(const Decl *decl);
 
   /// Writes the given decl.
   void writeASTBlockEntity(const Decl *D);

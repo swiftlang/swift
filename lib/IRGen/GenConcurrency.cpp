@@ -51,6 +51,12 @@ public:
                                   align, IsTriviallyDestroyable,
                                   IsCopyable, IsFixedSize, IsABIAccessible) {}
 
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
   }
@@ -1017,6 +1023,12 @@ public:
       : ScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
                            IsNotTriviallyDestroyable, IsCopyable, IsFixedSize,
                            IsABIAccessible) {}
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
                                         bool useStructLayouts) const override {

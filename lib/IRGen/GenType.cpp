@@ -46,6 +46,7 @@
 #include "GenMeta.h"
 #include "GenPoly.h"
 #include "GenProto.h"
+#include "GenStruct.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -281,6 +282,11 @@ TypeInfo::createSerializableHiddenTypeInfoRepresentation(
   return representation;
 }
 
+void TypeInfo::unsupportedSerializableHiddenTypeInfoRepresentation() const {
+  llvm::report_fatal_error(
+      "serializing this TypeInfo is not implemented yet");
+}
+
 void TypeInfo::populateSerializableHiddenTypeInfoRepresentation(
     IRGenModule &IGM,
     SerializableHiddenTypeInfoRepresentation &representation) const {
@@ -294,9 +300,12 @@ FixedTypeInfo::FixedTypeInfo(
     : TypeInfo(IGM, representation),
       SpareBits(representation.spareBits) {
   setSpecialTypeInfoKind(SpecialTypeInfoKind::Fixed);
-  assert(SpareBits.size() == representation.size * uint32_t(8));
+  if (SpareBits.size() != representation.size * uint32_t(8))
+    llvm::report_fatal_error(
+        "serialized FixedTypeInfo has an invalid spare-bit count");
   Bits.FixedTypeInfo.Size = representation.size;
-  assert(Bits.FixedTypeInfo.Size == representation.size && "truncation");
+  if (Bits.FixedTypeInfo.Size != representation.size)
+    llvm::report_fatal_error("serialized FixedTypeInfo size was truncated");
 }
 
 void FixedTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
@@ -322,12 +331,10 @@ LoadableTypeInfo::LoadableTypeInfo(
     const SerializableLoadableTypeInfoRepresentation &representation)
     : FixedTypeInfo(IGM, representation) {
   setSpecialTypeInfoKind(SpecialTypeInfoKind::Loadable);
-  // All currently implemented LoadableTypeInfo are bitwise loadable and takable,
-  // so assert we haven't introduced a method to create one which is not
-  // via deserialization.
-  assert(isBitwiseTakable(ResilienceExpansion::Maximal));
-  assert(isBitwiseBorrowable(ResilienceExpansion::Maximal));
-  assert(isLoadable());
+  if (!isBitwiseTakable(ResilienceExpansion::Maximal) ||
+      !isBitwiseBorrowable(ResilienceExpansion::Maximal))
+    llvm::report_fatal_error(
+        "serialized LoadableTypeInfo is not bitwise takable and borrowable");
 }
 
 void LoadableTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
@@ -335,6 +342,20 @@ void LoadableTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
     SerializableLoadableTypeInfoRepresentation &representation) const {
   FixedTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
       IGM, representation);
+  ExplosionSchema schema;
+  getSchema(schema);
+  representation.schema.clear();
+  for (const auto &element : schema) {
+    SerializableExplosionSchemaElement serializedElement;
+    if (element.isScalar()) {
+      serializedElement.type = serializeLLVMType(element.getScalarType());
+    } else {
+      serializedElement.type = serializeLLVMType(element.getAggregateType());
+      serializedElement.aggregateAlignment =
+          element.getAggregateAlignment().getValue();
+    }
+    representation.schema.push_back(std::move(serializedElement));
+  }
 }
 
 std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -1215,6 +1236,13 @@ namespace {
                        IsTriviallyDestroyable,
                        IsCopyable,
                        IsFixedSize, IsABIAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     unsigned getExplosionSize() const override { return 0; }
     void getSchema(ExplosionSchema &schema) const override {}
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -1259,6 +1287,27 @@ namespace {
                       SpareBitVector &&spareBits,
                       Alignment align)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align) {}
+
+    PrimitiveTypeInfo(
+        IRGenModule &IGM,
+        const SerializablePrimitiveTypeInfoRepresentation &representation)
+        : PODSingleScalarTypeInfo(IGM, representation) {
+      if (representation.schema.size() != 1 ||
+          representation.schema.front().aggregateAlignment != 0 ||
+          deserializeLLVMType(IGM, representation.schema.front().type) !=
+              getStorageType())
+        llvm::report_fatal_error(
+            "serialized PrimitiveTypeInfo has an invalid explosion schema");
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override {
+      auto representation =
+          std::make_unique<SerializablePrimitiveTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
+    }
   };
 
   /// A TypeInfo implementation for pointers that are:
@@ -1278,6 +1327,12 @@ namespace {
                               Alignment align, Alignment pointeeAlign)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align),
         PointeeAlign(pointeeAlign) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
@@ -1327,6 +1382,12 @@ namespace {
           storage, size,
           SpareBitVector::getConstant(size.getValueInBits(), false),
           align) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
@@ -1386,9 +1447,36 @@ namespace {
                        IsABIAccessible),
         ScalarTypes(std::move(scalarTypes))
     {}
+
+    OpaqueStorageTypeInfo(
+        IRGenModule &IGM,
+        const SerializableOpaqueStorageTypeInfoRepresentation &representation)
+        : ScalarTypeInfo(IGM, representation) {
+      ScalarTypes.reserve(representation.schema.size());
+      for (const auto &element : representation.schema) {
+        if (element.aggregateAlignment != 0)
+          llvm::report_fatal_error(
+              "cannot reconstruct an aggregate explosion element");
+        auto *scalarType = dyn_cast<llvm::IntegerType>(
+            deserializeLLVMType(IGM, element.type));
+        if (!scalarType)
+          llvm::report_fatal_error(
+              "opaque storage explosion element is not an integer");
+        ScalarTypes.push_back(scalarType);
+      }
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override {
+      auto representation =
+          std::make_unique<SerializableOpaqueStorageTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
+    }
     
-    llvm::ArrayType *getStorageType() const {
-      return cast<llvm::ArrayType>(ScalarTypeInfo::getStorageType());
+    llvm::Type *getStorageType() const {
+      return ScalarTypeInfo::getStorageType();
     }
 
     TypeLayoutEntry
@@ -1575,6 +1663,12 @@ namespace {
                               IsNotBitwiseTakable,
                               IsNotCopyable,
                               IsFixedSize, IsABIAccessible) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   /// A TypeInfo implementation for address-only types which can never
@@ -1589,6 +1683,12 @@ namespace {
                               IsNotFixedSize,
                               IsNotABIAccessible,
                               SpecialTypeInfoKind::None) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -1681,6 +1781,12 @@ namespace {
                          IsCopyable,
                          IsFixedSize, IsABIAccessible) {}
 
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
       IGF.emitMemCpy(dest, src, getFixedSize());
@@ -1711,6 +1817,20 @@ namespace {
     }
   };
 } // end anonymous namespace
+
+std::unique_ptr<TypeInfo>
+swift::irgen::createPrimitiveTypeInfoFromSerializedRepresentation(
+    IRGenModule &IGM,
+    const SerializablePrimitiveTypeInfoRepresentation &representation) {
+  return std::make_unique<PrimitiveTypeInfo>(IGM, representation);
+}
+
+std::unique_ptr<TypeInfo>
+swift::irgen::createOpaqueStorageTypeInfoFromSerializedRepresentation(
+    IRGenModule &IGM,
+    const SerializableOpaqueStorageTypeInfoRepresentation &representation) {
+  return std::make_unique<OpaqueStorageTypeInfo>(IGM, representation);
+}
 
 /// Constructs a type info which performs simple loads and stores of
 /// the given IR type.
@@ -2684,6 +2804,15 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for the type info an IntegerType");
   case TypeKind::Hidden: {
     auto hidden = cast<HiddenType>(ty);
+    if (auto *layoutInfo = hidden->getLayoutInfoDecl()) {
+      assert(layoutInfo->Layout &&
+             layoutInfo->Layout->typeInfoRepresentation &&
+             "hidden layout declaration has no TypeInfo representation");
+      return createTypeInfoFromSerializableRepresentation(
+                 IGM, *layoutInfo->Layout->typeInfoRepresentation)
+          .release();
+    }
+
     auto *defining = hidden->getDefiningModule();
     assert(defining &&
            "HiddenType must carry a defining module after deserialization");
@@ -2866,6 +2995,12 @@ public:
                     IsFixedSize /* irrelevant */,
                     IsABIAccessible),
       NumExtraInhabitants(node.NumExtraInhabitants) {}
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   TypeLayoutEntry
   *buildTypeLayoutEntry(IRGenModule &IGM,

@@ -47,6 +47,8 @@ namespace swift {
   class ProtocolDecl;
   class ProtocolType;
   class SILFunctionType;
+  class SerializableOpaqueStorageTypeInfoRepresentation;
+  class SerializablePrimitiveTypeInfoRepresentation;
   class StructDecl;
   class TupleType;
   class TypeBase;
@@ -64,6 +66,15 @@ namespace irgen {
   class FixedTypeInfo;
   class LoadableTypeInfo;
   class TypeInfo;
+
+std::unique_ptr<TypeInfo> createPrimitiveTypeInfoFromSerializedRepresentation(
+    IRGenModule &IGM,
+    const SerializablePrimitiveTypeInfoRepresentation &representation);
+
+std::unique_ptr<TypeInfo>
+createOpaqueStorageTypeInfoFromSerializedRepresentation(
+    IRGenModule &IGM,
+    const SerializableOpaqueStorageTypeInfoRepresentation &representation);
   
 /// The helper class for generating types.
 class TypeConverter {

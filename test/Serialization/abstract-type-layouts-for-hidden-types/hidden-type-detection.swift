@@ -45,6 +45,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/IndirectEnumIOIPayload.swiftmodule %t/IndirectEnumIOIPayload.swift -I %t/InternalModule -parse-as-library -module-name IndirectEnumIOIPayload -Rhidden-type-layout-serialization -verify
 
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -internal-import-bridging-header %t/HiddenTypes.h -emit-module -emit-module-path %t/PublicStructInternalBridgingHeaderField.swiftmodule %t/PublicStructInternalBridgingHeaderField.swift -parse-as-library -module-name PublicStructInternalBridgingHeaderField -Rhidden-type-layout-serialization -verify -verify-additional-prefix internal-bridging-header-
+// RUN: %llvm-bcanalyzer -dump %t/PublicStructInternalBridgingHeaderField.swiftmodule | %FileCheck %s --check-prefix HIDDEN-CLANG-RECORD
 
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -enable-library-evolution -emit-module -emit-module-path %t/LibraryEvolution.swiftmodule %t/PublicStructIOIField.swift -I %t/InternalModule -parse-as-library -module-name LibraryEvolution -Rhidden-type-layout-serialization -suppress-warnings -verify
 
@@ -60,6 +61,8 @@ public struct InternalType {
 typedef struct {
   int value;
 } HiddenCStruct;
+
+// HIDDEN-CLANG-RECORD: <HIDDEN_LOADABLE_CLANG_RECORD
 
 //--- PublicStructIOIField.swift
 @_implementationOnly import Internal

@@ -2640,6 +2640,8 @@ public:
       verifyCheckedBase(VD);
     }
 
+    void verifyChecked(HiddenTypeLayoutInfoDecl *) {}
+
     LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
       // We don't want to walk into lazy initializers because they should
       // have been reparented to their synthesized getter, which will
@@ -4030,4 +4032,3 @@ void swift::verify(Decl *D) {
   Verifier V = Verifier::forDecl(D);
   D->walk(V);
 }
-

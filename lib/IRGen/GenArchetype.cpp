@@ -134,6 +134,12 @@ public:
     return new OpaqueArchetypeTypeInfo(type, abiAccessible);
   }
 
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {
     // We'll need formal type metadata for this archetype.
@@ -175,6 +181,12 @@ public:
                                       refCount);
   }
 
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   ReferenceCounting getReferenceCounting() const {
     return RefCount;
   }
@@ -192,6 +204,12 @@ public:
   create(llvm::Type *type, Size size, Alignment align,
          const SpareBitVector &spareBits) {
     return new FixedSizeArchetypeTypeInfo(type, size, align, spareBits);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 };
 } // end anonymous namespace

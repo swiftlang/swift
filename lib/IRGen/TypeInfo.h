@@ -123,6 +123,8 @@ protected:
       IRGenModule &IGM,
       SerializableHiddenTypeInfoRepresentation &representation) const;
 
+  [[noreturn]] void unsupportedSerializableHiddenTypeInfoRepresentation() const;
+
   bool CreatedFromSerializableHiddenTypeInfoRepresentation;
 
   void assertNotDeserialized(const char *operation) const;
