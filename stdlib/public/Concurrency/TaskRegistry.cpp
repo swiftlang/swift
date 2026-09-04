@@ -31,6 +31,9 @@ TaskRegistryShard
 SWIFT_EXPORT_FROM(swift_Concurrency)
 bool _swift_concurrency_task_registry_enabled = true;
 
+SWIFT_EXPORT_FROM(swift_Concurrency)
+const size_t _swift_concurrency_task_registry_shard_size = sizeof(TaskRegistryShard);
+
 static inline bool isTaskRegistryEnabled() {
   static bool initialized = false;
   if (!initialized) {
