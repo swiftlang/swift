@@ -1358,3 +1358,7 @@ Added: _concurrencyEnableTaskRegistry
 
 // Privilege gating for environment variables
 Added: __swift_isRestrictedProcess
+
+// Non-consuming dynamic cast test, for `is` / `case is T` on a value that
+// cannot be copied. See CastConsumptionKind::TestOnly.
+Added: _swift_dynamicCastTest
