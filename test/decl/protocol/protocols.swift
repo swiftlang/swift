@@ -309,7 +309,7 @@ struct StaticAndInstanceS : InstanceP {
 }
 func StaticProtocolFunc() {
   let a: StaticP = StaticS1()
-  a.f() // expected-error{{static member 'f' cannot be used on instance of type 'any StaticP'}}
+  a.f() // expected-error{{static member 'f' cannot be used on instance of type 'any StaticP'}} {{3-3=type(of: }} {{4-4=)}}
 }
 func StaticProtocolGenericFunc<t : StaticP>(_: t) {
   t.f()
