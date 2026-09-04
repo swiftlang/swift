@@ -419,9 +419,6 @@ extension MyFooProviderInExtension: FooProvider {
 // CHECK-NEXT:                       ]
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   }
-// CHECK-NEXT:                 },
-// CHECK-NEXT:                 {
-// CHECK-NEXT:                   "element": {}
 // CHECK-NEXT:                 }
 // CHECK-NEXT:               ],
 // CHECK-NEXT:               "elseElements": [
@@ -442,9 +439,6 @@ extension MyFooProviderInExtension: FooProvider {
 // CHECK-NEXT:                           ]
 // CHECK-NEXT:                         }
 // CHECK-NEXT:                       }
-// CHECK-NEXT:                     },
-// CHECK-NEXT:                     {
-// CHECK-NEXT:                       "element": {}
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   ],
 // CHECK-NEXT:                   "elseElements": [
@@ -463,9 +457,6 @@ extension MyFooProviderInExtension: FooProvider {
 // CHECK-NEXT:                           ]
 // CHECK-NEXT:                         }
 // CHECK-NEXT:                       }
-// CHECK-NEXT:                     },
-// CHECK-NEXT:                     {
-// CHECK-NEXT:                       "element": {}
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   ]
 // CHECK-NEXT:                 }
@@ -524,9 +515,6 @@ extension MyFooProviderInExtension: FooProvider {
 // CHECK-NEXT:                       ]
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   }
-// CHECK-NEXT:                 },
-// CHECK-NEXT:                 {
-// CHECK-NEXT:                   "element": {}
 // CHECK-NEXT:                 }
 // CHECK-NEXT:               ],
 // CHECK-NEXT:               "elseElements": []
@@ -587,12 +575,6 @@ extension MyFooProviderInExtension: FooProvider {
 // CHECK-NEXT:                       ]
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   }
-// CHECK-NEXT:                 },
-// CHECK-NEXT:                 {
-// CHECK-NEXT:                   "element": {}
-// CHECK-NEXT:                 },
-// CHECK-NEXT:                 {
-// CHECK-NEXT:                   "element": {}
 // CHECK-NEXT:                 }
 // CHECK-NEXT:               ],
 // CHECK-NEXT:               "elseElements": [
@@ -611,9 +593,6 @@ extension MyFooProviderInExtension: FooProvider {
 // CHECK-NEXT:                       ]
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   }
-// CHECK-NEXT:                 },
-// CHECK-NEXT:                 {
-// CHECK-NEXT:                   "element": {}
 // CHECK-NEXT:                 }
 // CHECK-NEXT:               ]
 // CHECK-NEXT:             }
