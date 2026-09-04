@@ -125,6 +125,7 @@ private func registerSwiftPasses() {
   registerPass(loopInvariantCodeMotionPass, { loopInvariantCodeMotionPass.run($0) })
   registerPass(killInvalidDebugValuesPass, { killInvalidDebugValuesPass.run($0) })
   registerPass(deadDebugVariableEliminationPass, { deadDebugVariableEliminationPass.run($0) })
+  registerPass(debugValueSprinklerPass, { debugValueSprinklerPass.run($0) })
   registerPass(packSpecialization, { packSpecialization.run($0) })
 
   // Instruction passes
