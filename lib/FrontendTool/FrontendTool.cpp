@@ -43,6 +43,7 @@
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
@@ -89,6 +90,7 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/CommandLine.h"
@@ -97,6 +99,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
+#include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/VirtualOutputBackend.h"
@@ -1605,6 +1608,81 @@ static bool tryReplayCompilerResults(CompilerInstance &Instance) {
   return replayed;
 }
 
+/// Compute the location, relative to the reproducer directory, that is used to
+/// store \p path inside \p subDir. The original directory structure is
+/// preserved so files that share a base name don't collide. The root name, if
+/// any, becomes a directory of its own, e.g. `C:\dir\file` is stored as
+/// `<subDir>\C\dir\file`, since it cannot appear as-is inside a path.
+static std::string getReproducerRelativePath(StringRef subDir, StringRef path) {
+  llvm::SmallString<256> absolute(path);
+  llvm::sys::fs::make_absolute(absolute);
+  llvm::sys::path::remove_dots(absolute, /*remove_dot_dot=*/true);
+
+  llvm::SmallString<8> rootName;
+  for (char c : llvm::sys::path::root_name(absolute))
+    if (c != ':' && !llvm::sys::path::is_separator(c))
+      rootName.push_back(c);
+
+  llvm::SmallString<256> relative(subDir);
+  if (!rootName.empty())
+    llvm::sys::path::append(relative, StringRef(rootName));
+  llvm::sys::path::append(relative, llvm::sys::path::relative_path(absolute));
+  return std::string(relative);
+}
+
+/// Whether an input of \p type is a source file that is worth capturing as a
+/// regular file inside the reproducer, so it can be edited while reducing.
+static bool isCapturableReproducerInput(file_types::ID type) {
+  switch (type) {
+  case file_types::TY_Swift:
+  case file_types::TY_SIL:
+  case file_types::TY_SIB:
+  case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_PrivateSwiftModuleInterfaceFile:
+  case file_types::TY_PackageSwiftModuleInterfaceFile:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/// Whether \p opt names an output that the reproducer should redirect into its
+/// own directory, so running the reproducer doesn't overwrite the outputs of
+/// the original invocation.
+///
+/// Note this doesn't cover `-index-unit-output-path`, which names the output
+/// path recorded in the index data rather than a file that gets written.
+static bool isReproducerOutputOption(const llvm::opt::Option &opt) {
+  switch (opt.getID()) {
+  case options::OPT_o:
+  case options::OPT_index_store_path:
+  // The supplementary outputs that are only known to the frontend don't carry
+  // the `SupplementaryOutput` flag.
+  case options::OPT_dump_api_path:
+  case options::OPT_emit_abi_descriptor_path:
+  case options::OPT_emit_dependencies_path:
+  case options::OPT_emit_fixits_path:
+  case options::OPT_emit_module_doc_path:
+  case options::OPT_emit_module_semantic_info_path:
+  case options::OPT_emit_reference_dependencies_path:
+  case options::OPT_emit_variant_abi_descriptor_path:
+  case options::OPT_emit_variant_module_doc_path:
+    return true;
+  default:
+    return opt.hasFlag(options::SupplementaryOutput) &&
+           opt.hasFlag(options::ArgumentIsPath);
+  }
+}
+
+/// Whether the value of \p opt is a directory rather than a file.
+static bool isReproducerOutputDirOption(const llvm::opt::Option &opt) {
+  return opt.matches(options::OPT_index_store_path) ||
+         opt.matches(options::OPT_dump_api_path) ||
+         opt.matches(options::OPT_emit_symbol_graph_dir) ||
+         opt.matches(options::OPT_sil_output_dir) ||
+         opt.matches(options::OPT_ir_output_dir);
+}
+
 /// Generate reproducer.
 ///
 /// Return false if reproducer generation has error.
@@ -1654,13 +1732,122 @@ static bool generateReproducer(CompilerInstance &Instance,
   if (!db) {
     diags.diagnose(SourceLoc(), diag::error_cas_initialization,
                    toString(db.takeError()));
-    return false;
+    return true;
   }
 
-  llvm::StringMap<const char *> idsToUpdate;
+  llvm::StringMap<const char *> argsToUpdate;
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver argSaver(alloc);
   auto newArgs = Args.vec();
+  bool hadError = false;
+
+  // Everything the reproducer owns lives inside the reproducer directory and is
+  // addressed relative to it, so the directory as a whole can be relocated. The
+  // reproducer is meant to be run with that directory as working directory.
+  auto writeReproducerFile = [&](StringRef relativePath,
+                                 StringRef content) -> bool {
+    llvm::SmallString<256> destPath(reproDir);
+    llvm::sys::path::append(destPath, relativePath);
+    auto destDir = llvm::sys::path::parent_path(destPath);
+    if (auto errCode = llvm::sys::fs::create_directories(destDir)) {
+      diags.diagnose(SourceLoc(), diag::error_cannot_create_reproducer_dir,
+                     destDir, errCode.message());
+      hadError = true;
+      return true;
+    }
+    std::error_code errCode;
+    llvm::raw_fd_ostream os(destPath, errCode, llvm::sys::fs::OF_None);
+    if (errCode) {
+      diags.diagnose(SourceLoc(), diag::error_cannot_write_reproducer_file,
+                     destPath, errCode.message());
+      hadError = true;
+      return true;
+    }
+    os << content;
+    return false;
+  };
+
+  // Input files can be provided by the CAS file system, while file lists and
+  // output file maps are always read from disk.
+  auto readInputFile =
+      [&](StringRef path) -> std::unique_ptr<llvm::MemoryBuffer> {
+    if (auto buffer =
+            Instance.getSourceMgr().getFileSystem()->getBufferForFile(path))
+      return std::move(*buffer);
+    if (auto buffer = llvm::MemoryBuffer::getFile(path))
+      return std::move(*buffer);
+    return nullptr;
+  };
+
+  // Capture an input file as a regular file inside the reproducer directory so
+  // it can be edited when reducing the reproducer. Returns the new path, or
+  // nullptr if the file couldn't be captured.
+  llvm::StringMap<const char *> capturedInputs;
+  auto captureInput = [&](StringRef path) -> const char * {
+    if (path.empty() || path == "-")
+      return nullptr;
+
+    auto captured = capturedInputs.find(path);
+    if (captured != capturedInputs.end())
+      return captured->second;
+
+    auto buffer = readInputFile(path);
+    if (!buffer) {
+      diags.diagnose(SourceLoc(), diag::warn_cannot_capture_reproducer_file,
+                     path, "cannot read file");
+      return nullptr;
+    }
+    auto relativePath = getReproducerRelativePath("inputs", path);
+    if (writeReproducerFile(relativePath, buffer->getBuffer()))
+      return nullptr;
+
+    auto *newPath = argSaver.save(relativePath).data();
+    capturedInputs[path] = newPath;
+    return newPath;
+  };
+
+  // Compute a path inside the reproducer directory for an output file and
+  // create the directory it lives in.
+  llvm::StringMap<std::string> redirectedOutputs;
+  auto redirectOutput = [&](StringRef path, bool isDirectory) -> std::string {
+    if (path.empty() || path == "-")
+      return path.str();
+
+    auto redirected = redirectedOutputs.find(path);
+    if (redirected != redirectedOutputs.end())
+      return redirected->second;
+
+    auto relativePath = getReproducerRelativePath("outputs", path);
+    llvm::SmallString<256> outputDir(reproDir);
+    llvm::sys::path::append(
+        outputDir, isDirectory ? StringRef(relativePath)
+                               : llvm::sys::path::parent_path(relativePath));
+    if (auto errCode = llvm::sys::fs::create_directories(outputDir)) {
+      diags.diagnose(SourceLoc(), diag::error_cannot_create_reproducer_dir,
+                     outputDir, errCode.message());
+      hadError = true;
+      return path.str();
+    }
+    redirectedOutputs[path] = relativePath;
+    return relativePath;
+  };
+
+  // Capture all the source inputs on disk and rewrite the paths that refer to
+  // them. Note the file lists that carry input paths are rewritten below.
+  const auto &inputsAndOutputs =
+      Instance.getInvocation().getFrontendOptions().InputsAndOutputs;
+  bool capturedAllInputs = inputsAndOutputs.hasInputs();
+  for (const auto &input : inputsAndOutputs.getAllInputs()) {
+    const char *newPath = isCapturableReproducerInput(input.getType())
+                              ? captureInput(input.getFileName())
+                              : nullptr;
+    if (!newPath) {
+      capturedAllInputs = false;
+      continue;
+    }
+    argsToUpdate[input.getFileName()] = newPath;
+  }
+
   // Import all dependencies.
   auto importID = [&](StringRef str) {
     if (str.empty())
@@ -1687,7 +1874,7 @@ static bool generateReproducer(CompilerInstance &Instance,
 
     auto newID = db->first->getID(*imported).toString();
     if (newID != str)
-      idsToUpdate[str] = argSaver.save(newID).data();
+      argsToUpdate[str] = argSaver.save(newID).data();
 
     return false;
   };
@@ -1777,7 +1964,7 @@ static bool generateReproducer(CompilerInstance &Instance,
       return true;
 
     if (*imported != key)
-      idsToUpdate[key] = argSaver.save(*imported).data();
+      argsToUpdate[key] = argSaver.save(*imported).data();
 
     return false;
   };
@@ -1785,7 +1972,13 @@ static bool generateReproducer(CompilerInstance &Instance,
   importID(casOpts.ClangIncludeTree);
   importID(casOpts.ClangIncludeTreeFileList);
 
-  mapKey(casOpts.InputFileKey);
+  // The input file is captured on disk instead, so the cache key that carries
+  // its content is no longer needed. Only drop it when an include tree keeps
+  // providing a CAS file system, which caching requires.
+  bool dropInputFileKey = !casOpts.InputFileKey.empty() && capturedAllInputs &&
+                          casOpts.HasImmutableFileSystem;
+  if (!dropInputFileKey)
+    mapKey(casOpts.InputFileKey);
   mapKey(casOpts.BridgingHeaderPCHCacheKey);
 
   // Import module dependencies.
@@ -1861,35 +2054,160 @@ static bool generateReproducer(CompilerInstance &Instance,
     }
     auto newMapArg = db->first->getID(*newMapRef).toString();
     if (newMapArg != mapOpts)
-      idsToUpdate[mapOpts] = argSaver.save(newMapArg).data();
+      argsToUpdate[mapOpts] = argSaver.save(newMapArg).data();
+  }
+
+  // Parse the command-line so the options carrying a file list or an output
+  // path can be found and rewritten. This has to happen before any option is
+  // dropped below, since the rewriting is done by argument index.
+  unsigned missingIndex, missingCount;
+  std::unique_ptr<llvm::opt::OptTable> optTable = createSwiftOptTable();
+  llvm::opt::InputArgList parsedArgs = optTable->ParseArgs(
+      Args, missingIndex, missingCount, options::FrontendOption);
+
+  auto setArgValue = [&](const llvm::opt::Arg *arg, StringRef value) {
+    unsigned index = arg->getIndex();
+    if (StringRef(newArgs[index]) == arg->getSpelling()) {
+      // Separate spelling, e.g. `-o file`.
+      ASSERT(index + 1 < newArgs.size());
+      newArgs[index + 1] = argSaver.save(value).data();
+    } else {
+      // Joined spelling, e.g. `-ofile`.
+      newArgs[index] = argSaver.save(arg->getSpelling() + value).data();
+    }
+  };
+
+  // Copy a file list into the reproducer directory, remapping each of its
+  // entries, and point the command-line at the copy.
+  auto captureFileList =
+      [&](const llvm::opt::Arg *arg,
+          llvm::function_ref<std::string(StringRef)> remapEntry) {
+        StringRef path = arg->getValue();
+        auto buffer = llvm::MemoryBuffer::getFile(path);
+        if (!buffer) {
+          diags.diagnose(SourceLoc(), diag::warn_cannot_capture_reproducer_file,
+                         path, buffer.getError().message());
+          return;
+        }
+        std::string content;
+        llvm::raw_string_ostream contentOS(content);
+        for (StringRef entry :
+             llvm::make_range(llvm::line_iterator(**buffer), {}))
+          contentOS << remapEntry(entry) << "\n";
+
+        auto relativePath = getReproducerRelativePath("inputs", path);
+        if (!writeReproducerFile(relativePath, content))
+          setArgValue(arg, relativePath);
+      };
+
+  for (const auto *arg : parsedArgs.filtered(options::OPT_filelist,
+                                             options::OPT_primary_filelist))
+    captureFileList(arg, [&](StringRef entry) {
+      auto captured = capturedInputs.find(entry);
+      return captured == capturedInputs.end() ? entry.str()
+                                              : std::string(captured->second);
+    });
+
+  for (const auto *arg : parsedArgs.filtered(options::OPT_output_filelist))
+    captureFileList(arg, [&](StringRef entry) {
+      return redirectOutput(entry, /*isDirectory=*/false);
+    });
+
+  // The index unit output paths only name the outputs in the index data, so
+  // they are copied over as they are.
+  for (const auto *arg :
+       parsedArgs.filtered(options::OPT_index_unit_output_path_filelist))
+    captureFileList(arg, [](StringRef entry) { return entry.str(); });
+
+  // Redirect the outputs that are named directly on the command-line.
+  for (const auto *arg : parsedArgs) {
+    const auto &opt = arg->getOption();
+    if (!isReproducerOutputOption(opt) || arg->getNumValues() != 1)
+      continue;
+    setArgValue(
+        arg, redirectOutput(arg->getValue(), isReproducerOutputDirOption(opt)));
+  }
+
+  // The supplementary output file map is keyed by the input files and points at
+  // the outputs, so it needs both halves of the rewriting.
+  if (const auto *arg =
+          parsedArgs.getLastArg(options::OPT_supplementary_output_file_map)) {
+    StringRef path = arg->getValue();
+    auto outputFileMap =
+        OutputFileMap::loadFromPath(path, /*workingDirectory=*/"");
+    if (!outputFileMap) {
+      diags.diagnose(SourceLoc(), diag::warn_cannot_capture_reproducer_file,
+                     path, toString(outputFileMap.takeError()));
+    } else {
+      OutputFileMap newOutputFileMap;
+      std::vector<std::string> newInputs;
+      auto addEntry = [&](StringRef input) {
+        auto captured = capturedInputs.find(input);
+        newInputs.push_back(captured == capturedInputs.end()
+                                ? input.str()
+                                : std::string(captured->second));
+        const auto *outputs = outputFileMap->getOutputMapForInput(input);
+        // Leave inputs without any output out of the new map; they are written
+        // back as an empty entry.
+        if (!outputs || outputs->empty())
+          return;
+        auto &newOutputs =
+            newOutputFileMap.getOrCreateOutputMapForInput(newInputs.back());
+        for (const auto &output : *outputs)
+          newOutputs[output.first] =
+              redirectOutput(output.second, /*isDirectory=*/false);
+      };
+      for (const auto &input : inputsAndOutputs.getAllInputs())
+        addEntry(input.getFileName());
+      // A map can also carry a single entry for the entire compilation.
+      if (outputFileMap->getOutputMapForSingleOutput())
+        addEntry(StringRef());
+
+      std::vector<StringRef> newInputRefs(newInputs.begin(), newInputs.end());
+      std::string content;
+      llvm::raw_string_ostream contentOS(content);
+      newOutputFileMap.write(contentOS, newInputRefs);
+
+      auto relativePath = getReproducerRelativePath("inputs", path);
+      if (!writeReproducerFile(relativePath, content))
+        setArgValue(arg, relativePath);
+    }
   }
 
   // Drop all the options that no longer applies.
   auto dropArg = [&newArgs](StringRef arg, bool hasArg = true) {
-    auto found =
-        llvm::find_if(newArgs, [&](const char *a) { return arg == a; });
-    if (found != newArgs.end())
-      found = newArgs.erase(found);
-    if (hasArg && found != newArgs.end())
-      found = newArgs.erase(found);
+    for (auto it = newArgs.begin(); it != newArgs.end();) {
+      if (arg != *it) {
+        ++it;
+        continue;
+      }
+      it = newArgs.erase(it);
+      if (hasArg && it != newArgs.end())
+        it = newArgs.erase(it);
+    }
   };
   dropArg("-cas-path");
   dropArg("-cas-plugin-path");
   dropArg("-cas-plugin-option");
   dropArg("-gen-reproducer", false);
   dropArg("-gen-reproducer-dir");
+  if (dropInputFileKey)
+    dropArg("-input-file-key");
+  // The input files are read from disk, so their content no longer contributes
+  // to the cache key and the compilation can't be cached.
+  dropArg("-cache-compile-job", false);
 
   // Now upgrade the entire command-line.
   for (auto &arg : newArgs) {
-    if (idsToUpdate.count(arg))
-      arg = idsToUpdate[arg];
+    if (argsToUpdate.count(arg))
+      arg = argsToUpdate[arg];
   }
 
-  // Add the configuration for the new CAS options. Note those options and only
-  // these options will need to be adjusted if the reproducer is copied into a
-  // different location.
+  // Add the configuration for the new CAS options. The CAS lives inside the
+  // reproducer directory, like everything else the reproducer owns, so the
+  // reproducer needs to run with that directory as working directory.
   newArgs.push_back("-cas-path");
-  newArgs.push_back(casPath.c_str());
+  newArgs.push_back("cas");
   if (!newCAS.PluginPath.empty()) {
     newArgs.push_back("-cas-plugin-path");
     newArgs.push_back(newCAS.PluginPath.c_str());
@@ -1899,6 +2217,11 @@ static bool generateReproducer(CompilerInstance &Instance,
           argSaver.save(llvm::Twine(Opt.first) + "=" + Opt.second).data());
     }
   }
+  // The captured inputs are regular files on disk, which the CAS file system
+  // built from the include tree doesn't know about. The module dependencies
+  // are still loaded from the CAS, which caching used to take care of.
+  newArgs.push_back("-cas-fs-input-overlay");
+  newArgs.push_back("-module-import-from-cas");
 
   // Write shell script.
   llvm::SmallString<256> scriptPath(reproDir);
@@ -1909,7 +2232,7 @@ static bool generateReproducer(CompilerInstance &Instance,
                                 llvm::sys::fs::FA_Write,
                                 llvm::sys::fs::OF_Text);
   if (ec) {
-    diags.diagnose(SourceLoc(), diag::error_cannot_create_reproducer_dir,
+    diags.diagnose(SourceLoc(), diag::error_cannot_write_reproducer_file,
                    scriptPath, ec.message());
     return true;
   }
@@ -1918,7 +2241,7 @@ static bool generateReproducer(CompilerInstance &Instance,
     scriptOS << "\"" << arg << "\" ";
 
   diags.diagnose(SourceLoc(), diag::note_reproducer, reproDir);
-  return false;
+  return hadError;
 }
 
 /// Performs the compile requested by the user.
