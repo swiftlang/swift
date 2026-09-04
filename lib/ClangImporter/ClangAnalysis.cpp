@@ -233,15 +233,20 @@ struct RetainReleaseInfo {
   /// Emit "retain and release functions specified on / inherited from" note.
   void
   noteRetainReleaseOrigin(ClangImporter::Implementation &Impl,
-                          clang::SourceLocation loc,
+                          const clang::SwiftAttrAttr *attr,
                           std::optional<bool> isRelease = std::nullopt) const {
+    auto loc = attr->getLocation();
     if (loc.isValid()) {
       unsigned sel = 2 /* retain and release functions */;
       if (isRelease.has_value())
         sel = isRelease.value() ? 1 /* release function */
                                 : 0 /* retain function */;
-      Impl.diagnose(HeaderLoc(loc), diag::retain_release_function_origin, sel,
-                    /*isInherited=*/false, decl);
+      auto diagnostic = Impl.diagnose(HeaderLoc(loc),
+                                      diag::retain_release_function_origin, sel,
+                                      /*isInherited=*/false, decl);
+      auto range = attr->getRange();
+      if (range.isValid())
+        diagnostic.highlight(Impl.importSourceRange(range));
     }
     // Otherwise: no usable attribute location and not inherited -> omit.
   }
@@ -259,7 +264,7 @@ struct RetainReleaseInfo {
                          diag::reference_type_exactly_one_retain_release_attr,
                          isRelease, decl);
           for (auto *attr : attrs)
-            noteRetainReleaseOrigin(*Impl, attr->getLocation(), isRelease);
+            noteRetainReleaseOrigin(*Impl, attr, isRelease);
         }
         return false;
       }
@@ -267,7 +272,7 @@ struct RetainReleaseInfo {
         if (Impl) {
           Impl->diagnose(loc, diag::reference_type_empty_retain_release_name,
                          isRelease, decl);
-          noteRetainReleaseOrigin(*Impl, attrs[0]->getLocation(), isRelease);
+          noteRetainReleaseOrigin(*Impl, attrs[0], isRelease);
         }
         return false;
       }
@@ -281,7 +286,7 @@ struct RetainReleaseInfo {
     if (hasMixedImmortality()) {
       if (Impl) {
         Impl->diagnose(loc, diag::reference_type_mixed_immortal_marker, decl);
-        noteRetainReleaseOrigin(*Impl, retainAttrs[0]->getLocation());
+        noteRetainReleaseOrigin(*Impl, retainAttrs[0]);
       }
       return false;
     }
