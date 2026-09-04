@@ -37,7 +37,7 @@ class ObjCClass {
     let _ = #selector(setter: myConstant) // expected-error {{argument of '#selector(setter:)' refers to non-settable property 'myConstant'}}
     let _ = #selector(setter: myComputedReadOnlyProperty) // expected-error {{argument of '#selector(setter:)' refers to non-settable property 'myComputedReadOnlyProperty'}}
 
-    let _ = #selector(myClassFunc) // expected-error{{static member 'myClassFunc' cannot be used on instance of type 'ObjCClass'}}
+    let _ = #selector(myClassFunc) // expected-error{{static member 'myClassFunc' can only be used on the type 'ObjCClass', not on the instance self}}
   }
 
   class func classMethod() {
@@ -204,9 +204,9 @@ class InstanceStaticTestClass {
     let _ = #selector(getter: instanceProperty)
     let _ = #selector(instanceMethod)
 
-    let _ = #selector(getter: staticProperty) // expected-error{{static member 'staticProperty' cannot be used on instance of type 'InstanceStaticTestClass'}}
-    let _ = #selector(classMethod) // expected-error{{static member 'classMethod' cannot be used on instance of type 'InstanceStaticTestClass'}}
-    let _ = #selector(staticMethod) // expected-error{{static member 'staticMethod' cannot be used on instance of type 'InstanceStaticTestClass'}}
+    let _ = #selector(getter: staticProperty) // expected-error{{static member 'staticProperty' can only be used on the type 'InstanceStaticTestClass', not on the instance self}}
+    let _ = #selector(classMethod) // expected-error{{static member 'classMethod' can only be used on the type 'InstanceStaticTestClass', not on the instance self}}
+    let _ = #selector(staticMethod) // expected-error{{static member 'staticMethod' can only be used on the type 'InstanceStaticTestClass', not on the instance self}}
 
     let _ = #selector(instanceAndStaticMethod)
   }
