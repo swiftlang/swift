@@ -2448,22 +2448,6 @@ static void rewriteFunction(StructLoweringState &pass,
     }
   }
 
-  for (StoreInst *instr : pass.storeInstsToMod) {
-    SILValue src = instr->getSrc();
-    SILValue tgt = instr->getDest();
-    SILType srcType = src->getType();
-    SILType tgtType = tgt->getType();
-    assert(srcType && "Expected an address-type source");
-    assert(tgtType.isAddress() && "Expected an address-type target");
-    assert(srcType == tgtType && "Source and target type do not match");
-    (void)srcType;
-    (void)tgtType;
-
-    SILBuilderWithScope copyBuilder(instr);
-    createOutlinedCopyCall(copyBuilder, src, tgt, pass);
-    instr->getParent()->erase(instr);
-  }
-
   for (RetainValueInst *instr : pass.retainInstsToMod) {
     SILBuilderWithScope retainBuilder(instr);
     retainBuilder.createRetainValueAddr(
@@ -2571,6 +2555,24 @@ static void rewriteFunction(StructLoweringState &pass,
     }
     instr->replaceAllUsesWith(newInstr);
     instr->eraseFromParent();
+  }
+
+  // Rewrite stores of large-loadable types after the aggregate-projection
+  // instructions above have been recreated with their new SIL types.
+  for (StoreInst *instr : pass.storeInstsToMod) {
+    SILValue src = instr->getSrc();
+    SILValue tgt = instr->getDest();
+    SILType srcType = src->getType();
+    SILType tgtType = tgt->getType();
+    assert(srcType && "Expected an address-type source");
+    assert(tgtType.isAddress() && "Expected an address-type target");
+    assert(srcType == tgtType && "Source and target type do not match");
+    (void)srcType;
+    (void)tgtType;
+
+    SILBuilderWithScope copyBuilder(instr);
+    createOutlinedCopyCall(copyBuilder, src, tgt, pass);
+    instr->getParent()->erase(instr);
   }
 
   for (MethodInst *instr : pass.methodInstsToMod) {
