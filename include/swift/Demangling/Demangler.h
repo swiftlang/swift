@@ -534,8 +534,8 @@ protected:
 
   NodePointer demangleOperator();
 
-  long demangleNatural();
-  long demangleIndex();
+  int64_t demangleNatural();
+  int64_t demangleIndex();
   NodePointer demangleIndexAsNode();
   NodePointer demangleDependentConformanceIndex();
   NodePointer demangleIdentifier();
