@@ -241,4 +241,23 @@ StringBridgeTests.test("Equal UTF16 lengths but unequal UTF8") {
   expectFalse(nsutf8.isEqual(nsascii))
 }
 
+StringBridgeTests.test("NSString compatibility methods") {
+  // NSMutableString to force an actually-foreign NSString
+  let ascii = NSMutableString(string: "a long enough ascii nsstring")
+  expectEqual("a long enough ascii nsstring", ascii as String)
+  let unicode = NSMutableString(string: "a long enough ünicode nsstring")
+  expectEqual("a long enough ünicode nsstring", unicode as String)
+  expectEqual(31, (unicode as String).utf8.count)
+
+  for name in [
+    "_fastUTF8StringContents:utf8Length:",
+    "_isEqualToBytes:count:encoding:",
+  ] {
+    expectTrue(
+      NSString.instancesRespond(to: NSSelectorFromString(name)),
+      "NSString is missing \(name)"
+    )
+  }
+}
+
 runAllTests()
