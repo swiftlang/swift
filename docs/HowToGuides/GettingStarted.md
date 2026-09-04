@@ -159,11 +159,9 @@ versions for you that are verified to work, so installing different versions of 
 ### Linux
 
 1. The latest Linux dependencies are listed in the respective Dockerfiles:
-   * [Ubuntu 18.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/ubuntu/18.04/Dockerfile)
-   * [Ubuntu 20.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/ubuntu/20.04/Dockerfile)
    * [Ubuntu 22.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/ubuntu/22.04/Dockerfile)
    * [Ubuntu 24.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/ubuntu/24.04/Dockerfile)
-   * [CentOS 7](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/centos/7/Dockerfile)
+   * [Ubuntu 26.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/ubuntu/26.04/Dockerfile)
    * [Amazon Linux 2](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/amazon-linux/2/Dockerfile)
 
    Note that [a prebuilt Swift release toolchain](https://www.swift.org/install/)
