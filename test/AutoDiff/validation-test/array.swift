@@ -11,7 +11,7 @@ var ArrayAutoDiffTests = TestSuite("ArrayAutoDiff")
 
 typealias FloatArrayTan = Array<Float>.TangentVector
 
-extension Array.DifferentiableView {
+extension Array.ArrayTangentVector {
   /// A subscript that always fatal errors.
   ///
   /// The differentiation transform should never emit calls to this.
@@ -415,8 +415,8 @@ ArrayAutoDiffTests.test("Array.init(repeating:count:)") {
 
 ArrayAutoDiffTests.test("Array.DifferentiableView.init") {
   @differentiable(reverse)
-  func constructView(_ x: [Float]) -> Array<Float>.DifferentiableView {
-    return Array<Float>.DifferentiableView(x)
+  func constructView(_ x: [Float]) -> Array<Float>.ArrayTangentVector {
+    return Array<Float>.ArrayTangentVector(x)
   }
 
   let backprop = pullback(at: [5, 6, 7, 8], of: constructView)
@@ -427,12 +427,12 @@ ArrayAutoDiffTests.test("Array.DifferentiableView.init") {
 
 ArrayAutoDiffTests.test("Array.DifferentiableView.base") {
   @differentiable(reverse)
-  func accessBase(_ x: Array<Float>.DifferentiableView) -> [Float] {
-    return x.base
+  func accessBase(_ x: Array<Float>.ArrayTangentVector) -> [Float] {
+    return x.asArray()
   }
 
   let backprop = pullback(
-    at: Array<Float>.DifferentiableView([5, 6, 7, 8]),
+    at: Array<Float>.ArrayTangentVector([5, 6, 7, 8]),
     of: accessBase)
   expectEqual(
     FloatArrayTan([1, 2, 3, 4]),
@@ -450,7 +450,7 @@ ArrayAutoDiffTests.test("Array.DifferentiableView.move") {
 }
 
 ArrayAutoDiffTests.test("Array.DifferentiableView reflection") {
-  let tan = [Float].DifferentiableView([41, 42])
+  let tan = [Float].ArrayTangentVector([41, 42])
   let children = Array(Mirror(reflecting: tan).children)
   expectEqual(2, children.count)
   if let child1 = expectNotNil(children[0].value as? Float),

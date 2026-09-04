@@ -50,7 +50,7 @@ public extension Array where Element: Differentiable {
     (value: Void, pullback: (inout Self.TangentVector) -> Void)
     {
         let closurePullback = pullback(at: self[index], of: closure)
-        return (value: (), pullback: { closurePullback(&$0.base[index]) })
+        return (value: (), pullback: { closurePullback(&$0[index]) })
     }
 }
 
@@ -73,6 +73,6 @@ func testUpdateByCalling() throws {
     
     let array = [Double](repeating: 1.0, count: 3)
     let expectedGradientOfFOfArray = [1.0, 2.0, 3.0]
-    let obtainedGradientOfFOfArray = gradient(at: array, of: fOfArray).base
+    let obtainedGradientOfFOfArray = gradient(at: array, of: fOfArray).asArray()
 }
 
