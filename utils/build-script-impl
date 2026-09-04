@@ -419,51 +419,6 @@ function is_swift_lto_enabled() {
     fi
 }
 
-# Verifies that the just-built LLDB is actually able to launch a process
-# before we sink time into running the (much slower) LLDB test suite.
-# On some machines LLDB can be transiently unable to launch processes
-# right after being built (e.g. codesigning/entitlements not yet settled),
-# so this polls for up to 5 minutes before giving up.
-function wait_until_lldb_can_launch_processes() {
-    local lldb_binary=$1
-    local cc_binary=$2
-    local build_dir=$3
-
-    echo "--- Checking that LLDB (${lldb_binary}) can launch a process ---"
-
-    local sandbox_dir="${build_dir}/lldb-launch-check"
-    rm -rf "${sandbox_dir}"
-    mkdir -p "${sandbox_dir}"
-    local sandbox_src="${sandbox_dir}/lldb_launch_check.c"
-    local sandbox_bin="${sandbox_dir}/lldb_launch_check"
-    printf 'int main() { return 0; }\n' > "${sandbox_src}"
-
-    if ! "${cc_binary}" -isysroot "$(xcrun --sdk macosx --show-sdk-path)" \
-            -o "${sandbox_bin}" "${sandbox_src}"; then
-        echo "Failed to compile LLDB launch sanity-check program at ${sandbox_src}" 1>&2
-        rm -rf "${sandbox_dir}"
-        exit 1
-    fi
-
-    local deadline=$((SECONDS + 300))
-    while true; do
-        if "${lldb_binary}" -b -o "run" -o "quit" -- "${sandbox_bin}" >/dev/null 2>&1; then
-            echo "--- LLDB is able to launch processes ---"
-            rm -rf "${sandbox_dir}"
-            return
-        fi
-
-        if (( SECONDS >= deadline )); then
-            rm -rf "${sandbox_dir}"
-            echo "LLDB was unable to launch a simple test process after retrying for 5 minutes; aborting." 1>&2
-            exit 1
-        fi
-
-        echo "LLDB failed to launch the test process; retrying..."
-        sleep 5
-    done
-}
-
 # Support for performing isolated actions.
 #
 # This is part of refactoring more work to be done or controllable via
@@ -2817,12 +2772,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Running LLDB tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
-
-                if [[ ! ${DRY_RUN} ]] && [[ ${host} == macosx-* ]]; then
-                    wait_until_lldb_can_launch_processes \
-                        "${lldb_build_dir}/bin/lldb" "${CLANG_BIN}/clang" "${lldb_build_dir}"
-                fi
-
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
