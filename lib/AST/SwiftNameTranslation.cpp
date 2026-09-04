@@ -29,9 +29,13 @@
 #include "swift/Basic/StringExtras.h"
 
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/ConvertUTF.h"
+#include "llvm/Support/Format.h"
+#include "llvm/Support/raw_ostream.h"
 #include <optional>
 
 using namespace swift;
@@ -185,6 +189,59 @@ isVisibleToObjC(const ValueDecl *VD, AccessLevel minRequiredAccess,
   return false;
 }
 
+bool swift::cxx_translation::isValidCxxIdentifier(StringRef name) {
+  // Permit '$', which is accepted as an extension by the major C++ compilers.
+  // It occurs in the names of property wrapper projected values.
+  return clang::isValidAsciiIdentifier(name, /*AllowDollar=*/true);
+}
+
+std::string swift::cxx_translation::sanitizeNameForCxx(StringRef name) {
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  const llvm::UTF8 *next = reinterpret_cast<const llvm::UTF8 *>(name.begin());
+  const llvm::UTF8 *end = reinterpret_cast<const llvm::UTF8 *>(name.end());
+  while (next < end) {
+    llvm::UTF32 scalar;
+    if (llvm::convertUTF8Sequence(&next, end, &scalar,
+                                  llvm::strictConversion) !=
+        llvm::conversionOK) {
+      // Swift identifiers are always valid UTF-8, but treat each byte of an
+      // invalid sequence as an unknown character just in case.
+      scalar = *next++;
+    }
+    if (clang::isASCII(scalar) &&
+        clang::isAsciiIdentifierContinue(static_cast<unsigned char>(scalar),
+                                         /*AllowDollar=*/true)) {
+      // A digit is a valid identifier character, but not at the start of the
+      // name. Precede a leading digit with an underscore.
+      if (result.empty() && clang::isDigit(static_cast<unsigned char>(scalar)))
+        os << '_';
+      os << static_cast<char>(scalar);
+      continue;
+    }
+    // Replace a character that is not valid in a C++ identifier with its
+    // Unicode scalar value, spelled like a C++ universal-character-name. The
+    // number of hexadecimal digits is fixed so that the encoding cannot
+    // collide with a subsequent character that happens to be a hex digit.
+    if (scalar <= 0xFFFF)
+      os << "_u" << llvm::format_hex_no_prefix(scalar, 4, /*Upper=*/true);
+    else
+      os << "_U" << llvm::format_hex_no_prefix(scalar, 8, /*Upper=*/true);
+  }
+  return result;
+}
+
+/// Returns the given Swift name, sanitized if needed to form a valid C++
+/// identifier. The result is interned in the ASTContext to remain valid past
+/// the lifetime of the sanitized string.
+static StringRef getSanitizedNameForCxx(ASTContext &ctx, Identifier name) {
+  if (name.empty() || swift::cxx_translation::isValidCxxIdentifier(name.str()))
+    return name.str();
+  return ctx
+      .getIdentifier(swift::cxx_translation::sanitizeNameForCxx(name.str()))
+      .str();
+}
+
 StringRef
 swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
                                       CustomNamesOnly_t customNamesOnly) {
@@ -249,12 +306,11 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
         os << char(std::toupper(paramNameStr[0]));
         os << paramNameStr.drop_front(1);
       }
-      auto r = ctx.getIdentifier(os.str());
-      return r.str();
+      return getSanitizedNameForCxx(ctx, ctx.getIdentifier(os.str()));
     }
   }
 
-  return VD->getBaseIdentifier().str();
+  return getSanitizedNameForCxx(ctx, VD->getBaseIdentifier());
 }
 
 namespace {

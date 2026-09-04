@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -655,7 +656,8 @@ static void writeEpilogue(raw_ostream &os) {
 }
 
 static std::string computeMacroGuard(const ModuleDecl *M) {
-  return (llvm::Twine(M->getNameStr().upper()) + "_SWIFT_H").str();
+  std::string moduleName = cxx_translation::sanitizeNameForCxx(M->getNameStr());
+  return (llvm::Twine(llvm::StringRef(moduleName).upper()) + "_SWIFT_H").str();
 }
 
 bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
