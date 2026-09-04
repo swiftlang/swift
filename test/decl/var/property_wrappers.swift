@@ -2152,3 +2152,24 @@ struct TestInitError {
   // expected-error@+1 {{cannot convert value of type 'Int' to specified type 'WrapperWithFailableInit<Int>'}}
   @WrapperWithFailableInit var value: Int = 10
 }
+
+// https://github.com/swiftlang/swift/issues/87513
+@propertyWrapper
+struct WrapperWithNoProjectedValueInit {
+  var wrappedValue: Int
+  var projectedValue: String {
+    get {
+      String(self.wrappedValue)
+    }
+  }
+
+  init(wrappedValue: Int) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+struct TestWrapperWithNoProjectedValueInitOnClosureParameter {
+  let c: (Int) -> (Int, String, WrapperWithNoProjectedValueInit) = { (@WrapperWithNoProjectedValueInit x) in
+    (x, $x, _x)
+  }
+}
