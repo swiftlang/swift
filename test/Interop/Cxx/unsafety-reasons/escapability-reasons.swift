@@ -30,7 +30,7 @@ module Esc {
 #include <memory>
 
 // Not copyable and polymorphic, so escapability cannot be derived from members.
-// expected-note@+1 2 {{type 'Polymorphic' has unknown escapability because Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 4 {{type 'Polymorphic' has unknown escapability because Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
 struct Polymorphic {
   virtual ~Polymorphic() {}
   Polymorphic(const Polymorphic &) = delete;
@@ -38,6 +38,19 @@ struct Polymorphic {
 };
 
 inline std::shared_ptr<Polymorphic> makePolymorphic() { return nullptr; }
+
+// The chain is followed to its end, however deep: both links here are in the
+// C++ standard library, so only the note on 'Polymorphic' survives.
+inline std::shared_ptr<std::shared_ptr<Polymorphic>> makeNested() {
+  return nullptr;
+}
+
+// When a member is what makes escapability underivable, the note names it.
+// expected-note@+1 2 {{type 'HasPointerMember' has unknown escapability because its member 'numbers' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
+struct HasPointerMember {
+  int *numbers;
+};
+inline HasPointerMember makeHasPointerMember() { return {}; }
 
 // Annotating the argument settles it, and nothing here is unsafe.
 struct SWIFT_ESCAPABLE Annotated {
@@ -57,6 +70,20 @@ func unknownArgument() {
   // expected-note@-1 {{reference to global function 'makePolymorphic()' involves unsafe type}}
   _ = p // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
   // expected-note@-1 {{reference to let 'p' involves unsafe type}}
+}
+
+func nestedChain() {
+  let p = makeNested() // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to global function 'makeNested()' involves unsafe type}}
+  _ = p // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to let 'p' involves unsafe type}}
+}
+
+func pointerMember() {
+  let h = makeHasPointerMember() // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to global function 'makeHasPointerMember()' involves unsafe type}}
+  _ = h // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to let 'h' involves unsafe type}}
 }
 
 // An annotated argument needs no acknowledgement, which keeps this test honest

@@ -19,6 +19,7 @@
 
 namespace clang {
 class NamedDecl;
+class RecordDecl;
 } // end namespace clang
 
 namespace swift::importer {
@@ -75,6 +76,10 @@ struct CxxUnknownEscapability {
   CxxUnknownEscapabilityReason reason;
   /// The declaration to name, or null for reasons that have nothing to name.
   const clang::NamedDecl *culprit = nullptr;
+  /// The record \c culprit belongs to. The escapability traversal is flattened,
+  /// so a reason can be found below the type being explained; when this is a
+  /// different record, the explanation belongs to that one.
+  const clang::RecordDecl *owner = nullptr;
 };
 
 /// A phrase completing "'x' is unsafe because ...". No leading capital, no

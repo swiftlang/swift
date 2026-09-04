@@ -85,8 +85,16 @@ std::string importer::describe(CxxUnknownEscapabilityReason reason,
     return "Swift cannot infer it from the type's members; annotate the type "
            "with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE";
   case CxxUnknownEscapabilityReason::Pointer:
-    return "it is a pointer or reference, and Swift cannot tell whether it "
-           "owns what it points to";
+    // Named only when the member belongs to the type being explained; the
+    // traversal is flattened, so otherwise the caller follows the chain to the
+    // record that owns it.
+    return culprit ? (llvm::Twine("its member '") + culprit->getName() +
+                      "' is a pointer or reference, and Swift cannot tell "
+                      "whether it owns what it points to")
+                         .str()
+                   : std::string("it holds a pointer or reference, and Swift "
+                                 "cannot tell whether it owns what it points "
+                                 "to");
   }
   llvm_unreachable("covered switch");
 }

@@ -5747,10 +5747,11 @@ computeClangTypeEscapability(Evaluator &evaluator,
                              EscapabilityLookupDescriptor desc) {
   std::optional<importer::CxxUnknownEscapability> unknown;
   auto unknownBecause = [&](importer::CxxUnknownEscapabilityReason reason,
-                            const clang::NamedDecl *blame) {
+                            const clang::NamedDecl *blame,
+                            const clang::RecordDecl *blameOwner = nullptr) {
     // The first reason found wins: it is the one that made the answer Unknown.
     if (!unknown)
-      unknown = importer::CxxUnknownEscapability{reason, blame};
+      unknown = importer::CxxUnknownEscapability{reason, blame, blameOwner};
     return true;
   };
 
@@ -5776,10 +5777,27 @@ computeClangTypeEscapability(Evaluator &evaluator,
   // Keep track of Types we've seen to avoid cycles
   llvm::SmallDenseSet<const clang::Type *, 4> seen;
 
+  // Which member put a type on the stack, and which record that member belongs
+  // to. The traversal is flattened, so a reason may be found several levels below
+  // the type being explained; the owner is what lets the caller attribute the
+  // member to the right record instead of guessing.
+  struct Provenance {
+    const clang::NamedDecl *member;
+    const clang::RecordDecl *owner;
+  };
+  llvm::SmallDenseMap<const clang::Type *, Provenance, 4> pushedBy;
   auto maybePushToStack = [&](const clang::Type *type, bool unused=false) {
     auto desugared = type->getUnqualifiedDesugaredType();
     if (seen.insert(desugared).second)
       stack.push_back(desugared);
+  };
+  auto pushMember = [&](const clang::Type *type, const clang::NamedDecl *member,
+                        const clang::RecordDecl *owner) {
+    auto desugared = type->getUnqualifiedDesugaredType();
+    if (seen.insert(desugared).second) {
+      stack.push_back(desugared);
+      pushedBy[desugared] = {member, owner};
+    }
   };
 
   maybePushToStack(desc.type);
@@ -5817,7 +5835,7 @@ computeClangTypeEscapability(Evaluator &evaluator,
                 maybePushToStack))
           hasUnknown |= unknownBecause(
               importer::CxxUnknownEscapabilityReason::ConditionalArgument,
-              recordDecl);
+              recordDecl, recordDecl);
         continue;
       }
       // Only try to infer escapability if the record doesn't have any
@@ -5827,17 +5845,19 @@ computeClangTypeEscapability(Evaluator &evaluator,
           (!cxxRecordDecl || canDeriveEscapabilityFromMembers(cxxRecordDecl))) {
         if (cxxRecordDecl) {
           for (auto base : cxxRecordDecl->bases())
-            maybePushToStack(base.getType()->getUnqualifiedDesugaredType());
+            pushMember(base.getType()->getUnqualifiedDesugaredType(),
+                       base.getType()->getAsRecordDecl(), recordDecl);
         }
         for (auto field : recordDecl->fields())
-          maybePushToStack(field->getType()->getUnqualifiedDesugaredType());
+          pushMember(field->getType()->getUnqualifiedDesugaredType(), field,
+                     recordDecl);
       } else {
         // We only infer escapability for simple types, such as aggregates and
         // RecordDecls that are not CxxRecordDecls. For more complex
         // CxxRecordDecls, we rely solely on escapability annotations.
         hasUnknown = unknownBecause(
             importer::CxxUnknownEscapabilityReason::CannotDeriveFromMembers,
-            recordDecl);
+            recordDecl, recordDecl);
       }
     } else if (type->isArrayType()) {
       auto elemTy = cast<clang::ArrayType>(type)
@@ -5850,9 +5870,10 @@ computeClangTypeEscapability(Evaluator &evaluator,
                type->isMemberPointerType() || type->isReferenceType()) {
       // pointer and reference types are currently imported as unknown
       // (importing them as non-escapable broke backward compatibility)
+      auto provenance = pushedBy.lookup(type);
       hasUnknown =
           unknownBecause(importer::CxxUnknownEscapabilityReason::Pointer,
-                         nullptr);
+                         provenance.member, provenance.owner);
     }
   }
   if (!hasUnknown)
@@ -8156,36 +8177,49 @@ void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
   // user can act on. The safety walk falls through it to the fields, so without
   // this a conditionally-escapable type such as std::shared_ptr would be
   // explained by whichever raw pointer its implementation happens to hold.
-  if (auto unknown =
-          importer::explainUnknownEscapability(recordDecl, Impl.SwiftContext)) {
-    // The recorded reason belongs to whichever type in the traversal triggered
-    // it, which is not always the one being explained. When it is another type,
-    // say only that the dependency is unknown here and let the follow-up note
-    // explain that type on its own terms.
-    auto *blamed = dyn_cast_or_null<clang::RecordDecl>(unknown->culprit);
-    bool blameIsElsewhere = blamed && blamed != recordDecl;
-    if (!isInSystemHeader(recordDecl))
-      Impl.diagnose(
-          HeaderLoc(recordDecl->getLocation(), useLoc),
-          diag::cxx_unknown_escapability_reason, recordDecl->getNameAsString(),
-          blameIsElsewhere
-              ? importer::describe(
-                    importer::CxxUnknownEscapabilityReason::ConditionalArgument,
-                    blamed)
-              : importer::describe(unknown->reason, unknown->culprit));
+  //
+  // Follow the chain of blame to its end, so the last note lands on the type
+  // whose annotation would settle the question. The visited set both prevents
+  // cycles and bounds the walk.
+  llvm::SmallPtrSet<const clang::RecordDecl *, 4> visited;
+  bool explained = false;
+  for (const clang::RecordDecl *current = recordDecl;
+       current && visited.insert(current).second;) {
+    auto unknown =
+        importer::explainUnknownEscapability(current, Impl.SwiftContext);
+    if (!unknown)
+      break;
+    explained = true;
 
-    // If the blame lies with another type, say why that one is unknown too:
-    // that is where the annotation belongs.
-    if (blameIsElsewhere)
-      if (auto nested =
-              importer::explainUnknownEscapability(blamed, Impl.SwiftContext);
-          nested && !isInSystemHeader(blamed))
-        Impl.diagnose(HeaderLoc(blamed->getLocation(), useLoc),
-                      diag::cxx_unknown_escapability_reason,
-                      blamed->getNameAsString(),
-                      importer::describe(nested->reason, nested->culprit));
-    return;
+    // We can have a chain of reasons why a type is considered unsafe. Follow
+    // the chain to the record that owns the culprit and let it explain itself,
+    // rather than attributing its member here.
+    const clang::RecordDecl *next = nullptr;
+    if (unknown->owner &&
+        unknown->owner->getCanonicalDecl() != current->getCanonicalDecl())
+      next = unknown->owner;
+    else if (auto *asRecord =
+                 dyn_cast_or_null<clang::RecordDecl>(unknown->culprit);
+             asRecord && asRecord != current)
+      next = asRecord;
+
+    if (!isInSystemHeader(current)) {
+      // Naming the record the explanation moves to, not its member: the next
+      // note describes that record.
+      auto phrase =
+          next ? importer::describe(
+                     importer::CxxUnknownEscapabilityReason::ConditionalArgument,
+                     next)
+               : importer::describe(unknown->reason, unknown->culprit);
+      Impl.diagnose(HeaderLoc(current->getLocation(), useLoc),
+                    diag::cxx_unknown_escapability_reason,
+                    current->getNameAsString(), phrase);
+    }
+
+    current = next;
   }
+  if (explained)
+    return;
 
   if (isInSystemHeader(recordDecl))
     return;
