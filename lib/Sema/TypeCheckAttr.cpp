@@ -53,10 +53,12 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"  // for COM
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -426,6 +428,7 @@ public:
   void visitExternAttr(ExternAttr *attr);
   void visitUsedAttr(UsedAttr *attr);
   void visitSectionAttr(SectionAttr *attr);
+  void visitTargetAttr(TargetAttr *attr);
 
   void visitDynamicCallableAttr(DynamicCallableAttr *attr);
 
@@ -2833,6 +2836,63 @@ void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
   } else if (!VarD->hasStorageOrWrapsStorage()) {
     diagnose(attr->getLocation(), diag::attr_not_on_computed_properties, attr);
   }
+}
+
+void AttributeChecker::visitTargetAttr(TargetAttr *attr) {
+  if (attr->Value.empty()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_empty_string);
+    return;
+  }
+  if (attr->Value.contains("fpmath=")) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_unsupported_feature,
+                          "fpmath=");
+    return;
+  }
+  auto *clangImporter =
+      static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  // This can only be null in unit tests.
+  if (!clangImporter)
+    return;
+  auto *TI = &clangImporter->getTargetInfo();
+  clang::ParsedTargetAttr Parsed = TI->parseTargetAttr(attr->Value);
+  if (!Parsed.Duplicate.empty()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_duplicate_option,
+                          Parsed.Duplicate);
+    return;
+  }
+  if (!Parsed.CPU.empty() && !TI->isValidCPUName(Parsed.CPU)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_unsupported_cpu, Parsed.CPU);
+    return;
+  }
+  if (!Parsed.Tune.empty() && !TI->isValidCPUName(Parsed.Tune)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_unsupported_cpu, Parsed.Tune);
+    return;
+  }
+  for (StringRef feature : Parsed.Features) {
+    StringRef bare = feature.drop_front(); // remove leading + or -
+    if (!TI->isValidFeatureName(bare)) {
+      diagnoseAndRemoveAttr(attr, diag::attr_target_unsupported_feature, bare);
+      return;
+    }
+  }
+  if (!Parsed.BranchProtection.empty()) {
+    clang::TargetInfo::BranchProtectionInfo BPI;
+    StringRef DiagMsg;
+    auto &langOpts = clangImporter->getClangASTContext().getLangOpts();
+    if (!TI->validateBranchProtection(Parsed.BranchProtection, Parsed.CPU,
+                                      BPI, langOpts, DiagMsg)) {
+      diagnoseAndRemoveAttr(
+          attr, diag::attr_target_invalid_branch_protection,
+          DiagMsg.empty() ? Parsed.BranchProtection : DiagMsg);
+      return;
+    }
+  }
+
+  // Need to disallow @_transparent because it bypasses the ordinary
+  // performance-inliner feature compatibility guard.
+  if (auto *transparent = D->getAttrs().getAttribute<TransparentAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr,
+                          transparent);
 }
 
 void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(

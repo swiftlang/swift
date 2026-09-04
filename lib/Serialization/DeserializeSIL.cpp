@@ -1117,6 +1117,9 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       case ExtraStringFlavor::Section:
         fn->setSection(blobData);
         break;
+      case ExtraStringFlavor::TargetFeatures:
+        fn->setTargetFeatures(blobData);
+        break;
       case ExtraStringFlavor::WasmImportModule:
         WasmImportModule = blobData;
         break;
@@ -4537,6 +4540,9 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
         break;
       case ExtraStringFlavor::Section:
         v->setSection(blobData);
+        break;
+      case ExtraStringFlavor::TargetFeatures:
+        // @_target is OnAbstractFunction only; never written for globals.
         break;
       case ExtraStringFlavor::WasmImportModule:
       case ExtraStringFlavor::WasmImportName:

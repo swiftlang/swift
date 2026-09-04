@@ -6197,6 +6197,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Target_DECL_ATTR: {
+        bool isImplicit;
+        serialization::decls_block::TargetDeclAttrLayout::readRecord(
+            scratch, isImplicit);
+        Attr = new (ctx) TargetAttr(blobData, isImplicit);
+        break;
+      }
+
       case decls_block::Inline_DECL_ATTR: {
         unsigned kind;
         serialization::decls_block::InlineDeclAttrLayout::readRecord(

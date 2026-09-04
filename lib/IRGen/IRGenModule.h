@@ -1733,6 +1733,9 @@ public:
   llvm::AttributeList constructInitialAttributes();
   StackProtectorMode shouldEmitStackProtector(SILFunction *f);
 
+  void addTargetAttrFunctionAttributes(llvm::Function *fn,
+                                       StringRef targetString);
+
   llvm::ConstantInt *getMallocTypeId(llvm::Function *fn);
 
   void emitProtocolDecl(ProtocolDecl *D);

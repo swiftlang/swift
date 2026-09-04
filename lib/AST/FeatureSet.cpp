@@ -216,6 +216,10 @@ static bool usesFeatureCAttribute(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureTargetAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<TargetAttr>();
+}
+
 static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
   auto hasLifetimeAttr = [&](Decl *decl) {
     if (!decl->getAttrs().hasAttribute<LifetimeAttr>()) {
