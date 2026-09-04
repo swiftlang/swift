@@ -388,7 +388,7 @@ public:
   bool visitForwardedValues(function_ref<bool(SILValue)> visitor);
 };
 
-enum class FixedStorageSemanticsCallKind { None, CheckIndex, GetCount };
+enum class FixedStorageSemanticsCallKind { None, CheckIndex, CheckRange, GetCount };
 
 struct FixedStorageSemanticsCall {
   ApplyInst *apply = nullptr;
@@ -412,6 +412,10 @@ struct FixedStorageSemanticsCall {
         apply = applyInst;
         kind = FixedStorageSemanticsCallKind::GetCount;
         break;
+      } else if (attr == "fixed_storage.check_range") {
+        apply = applyInst;
+        kind = FixedStorageSemanticsCallKind::CheckRange;
+        break;
       }
     }
   }
@@ -423,6 +427,28 @@ struct FixedStorageSemanticsCall {
   SILValue getIndex() const { return apply->getArgument(0); }
 
   Operand &getIndexOperand() const { return apply->getArgumentRef(0); }
+
+  // For "fixed_storage.check_range" calls, the bounds are passed as the first
+  // two arguments: the lower bound followed by the upper bound.
+  SILValue getLowerBound() const {
+    assert(getKind() == FixedStorageSemanticsCallKind::CheckRange);
+    return apply->getArgument(0); 
+  }
+
+  SILValue getUpperBound() const { 
+    assert(getKind() == FixedStorageSemanticsCallKind::CheckRange);
+    return apply->getArgument(1); 
+  }
+
+  Operand &getLowerBoundOperand() const {
+    assert(getKind() == FixedStorageSemanticsCallKind::CheckRange);
+    return apply->getArgumentRef(0); 
+  }
+
+  Operand &getUpperBoundOperand() const {
+    assert(getKind() == FixedStorageSemanticsCallKind::CheckRange);
+    return apply->getArgumentRef(1);
+  }
 
   FixedStorageSemanticsCallKind getKind() const { return kind; }
   explicit operator bool() const { return apply != nullptr; }

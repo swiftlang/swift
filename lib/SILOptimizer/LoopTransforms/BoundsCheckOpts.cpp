@@ -1087,7 +1087,8 @@ private:
 
   bool removeRedundantFixedStorageBoundsChecksInLoop(
       SILLoop *loop, DominanceInfoNode *currentNode,
-      llvm::DenseSet<std::pair<SILValue, SILValue>> &dominatingSafeChecks,
+      llvm::DenseSet<std::pair<SILValue, std::pair<SILValue, SILValue>>>
+          &dominatingSafeChecks,
       int recursionDepth);
 
   /// Clone an index value and its operands, inserting them in correct order
@@ -1593,7 +1594,7 @@ bool BoundsCheckOpts::optimizeFixedStorageBoundsCheckInLoop(
   LLVM_DEBUG(llvm::dbgs() << "Attempting to eliminate redundant bounds checks "
                              "for Span and InlineArray in "
                           << *loop);
-  llvm::DenseSet<std::pair<SILValue, SILValue>>
+  llvm::DenseSet<std::pair<SILValue, std::pair<SILValue, SILValue>>>
       dominatingSafeFixedStorageChecks;
   bool changed = removeRedundantFixedStorageBoundsChecksInLoop(
       loop, DT->getNode(loop->getHeader()), dominatingSafeFixedStorageChecks,
@@ -1744,8 +1745,10 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInLoop(
 
     FixedStorageSemanticsCall fixedStorageSemantics(inst);
     if (!fixedStorageSemantics ||
-        fixedStorageSemantics.getKind() !=
-            FixedStorageSemanticsCallKind::CheckIndex) {
+        (fixedStorageSemantics.getKind() !=
+             FixedStorageSemanticsCallKind::CheckIndex &&
+         fixedStorageSemantics.getKind() !=
+             FixedStorageSemanticsCallKind::CheckRange)) {
       continue;
     }
     if (!canOptimize(fixedStorageSemantics)) {
@@ -1759,6 +1762,80 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInLoop(
       continue;
     }
 
+    // "check_range" takes a lower and an upper bound instead of a single
+    // index. Handle it by treating each bound as its own linear access
+    // function and hoisting a check for the extreme values of both bounds.
+    if (fixedStorageSemantics.getKind() ==
+        FixedStorageSemanticsCallKind::CheckRange) {
+      auto lowerBound = fixedStorageSemantics.getLowerBound();
+      auto upperBound = fixedStorageSemantics.getUpperBound();
+
+      // If both bounds are loop invariant, hoist the entire check.
+      if (blockAlwaysExecutes && dominates(DT, lowerBound, preheader) &&
+          dominates(DT, upperBound, preheader)) {
+        LLVM_DEBUG(llvm::dbgs() << "  Invariant range bounds check hoisted\n");
+        changed = true;
+        fixedStorageSemantics->moveBefore(preheader->getTerminator());
+        continue;
+      }
+
+      auto lowerAccess =
+          AccessFunction::getLinearFunction(lowerBound, indVars, DT, preheader);
+      auto upperAccess =
+          AccessFunction::getLinearFunction(upperBound, indVars, DT, preheader);
+      if (!lowerAccess || !upperAccess) {
+        LLVM_DEBUG(llvm::dbgs() << " not a linear range function " << *inst);
+        continue;
+      }
+
+      // If both bounds iterate 0 through count, they always stay within
+      // 0...count and the range check can never fail. Remove it. This is safe
+      // even if the block does not dominate the loop exit.
+      if (lowerAccess.isZeroToCount(selfValue) &&
+          upperAccess.isZeroToCount(selfValue)) {
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "  Redundant Span/InlineArray range bounds check removed\n");
+        changed = true;
+        fixedStorageSemantics->eraseFromParent();
+        continue;
+      }
+
+      // We can only hoist a check that is guaranteed to execute; otherwise the
+      // hoisted check could trap for an iteration the loop never reaches.
+      if (!blockAlwaysExecutes) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "  Range bounds check does not execute always\n");
+        continue;
+      }
+
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  Span/InlineArray range bounds check hoisted\n");
+      changed = true;
+
+      // Both bounds increase monotonically with the induction variable, so
+      // checking the range at the first (smallest) and last (largest)
+      // iterations covers every iteration in between.
+      auto firstLower = lowerAccess.getFirstValue(preheader->getTerminator());
+      auto firstUpper = upperAccess.getFirstValue(preheader->getTerminator());
+      auto newFirstCheck =
+          fixedStorageSemantics->clone(preheader->getTerminator());
+      newFirstCheck->setOperand(1, firstLower);
+      newFirstCheck->setOperand(2, firstUpper);
+
+      auto lastLower = lowerAccess.getLastValue(preheader->getTerminator());
+      auto lastUpper = upperAccess.getLastValue(preheader->getTerminator());
+      auto newLastCheck =
+          fixedStorageSemantics->clone(preheader->getTerminator());
+      newLastCheck->setOperand(1, lastLower);
+      newLastCheck->setOperand(2, lastUpper);
+
+      fixedStorageSemantics->eraseFromParent();
+      continue;
+    }
+
+    assert(fixedStorageSemantics.getKind() ==
+           FixedStorageSemanticsCallKind::CheckIndex);
     auto indexValue = fixedStorageSemantics->getArgument(0);
 
     // If the bounds check is loop invariant, hoist it.
@@ -1816,7 +1893,8 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInLoop(
 
 bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
     SILLoop *loop, DominanceInfoNode *currentNode,
-    llvm::DenseSet<std::pair<SILValue, SILValue>> &dominatingSafeChecks,
+    llvm::DenseSet<std::pair<SILValue, std::pair<SILValue, SILValue>>>
+        &dominatingSafeChecks,
     int recursionDepth) {
   auto *currentBlock = currentNode->getBlock();
   if (!loop->contains(currentBlock)) {
@@ -1831,7 +1909,8 @@ bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
 
   // When we come back from the dominator tree recursion we need to remove
   // checks that we have seen for the first time.
-  SmallVector<std::pair<SILValue, SILValue>, 8> safeChecksToPop;
+  SmallVector<std::pair<SILValue, std::pair<SILValue, SILValue>>, 8>
+      safeChecksToPop;
 
   for (auto iter = currentBlock->begin(); iter != currentBlock->end();) {
     auto inst = &*iter;
@@ -1839,8 +1918,10 @@ bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
 
     FixedStorageSemanticsCall fixedStorageSemantics(inst);
     if (!fixedStorageSemantics ||
-        fixedStorageSemantics.getKind() !=
-            FixedStorageSemanticsCallKind::CheckIndex) {
+        (fixedStorageSemantics.getKind() !=
+             FixedStorageSemanticsCallKind::CheckIndex &&
+         fixedStorageSemantics.getKind() !=
+             FixedStorageSemanticsCallKind::CheckRange)) {
       continue;
     }
 
@@ -1856,8 +1937,23 @@ bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
       continue;
     }
 
-    auto indexValue = fixedStorageSemantics->getArgument(0);
-    auto selfAndIndex = std::make_pair(selfValue, indexValue);
+    // Identify a check by its self value together with the bound(s) it checks.
+    // "check_index" has a single index; "check_range" has a lower and upper
+    // bound.
+    std::pair<SILValue, std::pair<SILValue, SILValue>> selfAndIndex;
+    if (fixedStorageSemantics.getKind() ==
+        FixedStorageSemanticsCallKind::CheckRange) {
+      auto lowerValue = fixedStorageSemantics.getLowerBound();
+      auto upperValue = fixedStorageSemantics.getUpperBound();
+      selfAndIndex =
+          std::make_pair(selfValue, std::make_pair(lowerValue, upperValue));
+    } else {
+      assert(fixedStorageSemantics.getKind() ==
+             FixedStorageSemanticsCallKind::CheckIndex);
+      selfAndIndex = std::make_pair(
+          selfValue,
+          std::make_pair(fixedStorageSemantics.getIndex(), SILValue()));
+    }
     if (!dominatingSafeChecks.count(selfAndIndex)) {
       LLVM_DEBUG(llvm::dbgs()
                  << " first time: " << *inst << "  with self: " << *selfValue);
@@ -1880,7 +1976,7 @@ bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
 
   // Remove checks we have seen for the first time.
   std::for_each(safeChecksToPop.begin(), safeChecksToPop.end(),
-                [&](std::pair<SILValue, SILValue> &value) {
+                [&](std::pair<SILValue, std::pair<SILValue, SILValue>> &value) {
                   dominatingSafeChecks.erase(value);
                 });
 
