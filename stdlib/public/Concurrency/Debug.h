@@ -20,7 +20,6 @@
 #include <cstdint>
 
 #include "swift/Runtime/Config.h"
-#include "swift/Runtime/ConcurrencyDebug.h"
 
 namespace swift {
 
@@ -73,31 +72,34 @@ bool _swift_concurrency_debug_supportsPriorityEscalation;
 enum class _concurrency_current_task_storage_kind : uint8_t {
   /// The task pointer lives in TLS at offset 0 of the runtime's exported
   /// current-task variable, `_swift_concurrency_currentTask`.
-  cxx_thread_local =
-      SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_CXX_THREAD_LOCAL,
+  cxx_thread_local = 1,
 
   /// The task pointer lives at offset 0 of the runtime's current-task variable,
   /// `_swift_concurrency_currentTask` (no TLS resolution). Used by
   /// single-threaded / SWIFT_THREADING_NONE builds where `SWIFT_THREAD_LOCAL`
   /// expands to nothing.
-  global = SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_GLOBAL,
+  global = 2,
 
   /// Pthread thread-specific data with a *reserved* (compile-time constant)
   /// key. Used on Darwin. The key value should be inferred by the debugger.
-  pthread_reserved_key =
-      SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_PTHREAD_RESERVED_KEY,
+  pthread_reserved_key = 3,
 
   /// Pthread thread-specific data with a *dynamically-allocated* key. Support
   /// for this may require writing the key value in a yet-to-be-defined global
   /// variable.
-  pthread_allocated_key =
-      SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_PTHREAD_ALLOCATED_KEY,
+  pthread_allocated_key = 4,
 
   /// The concrete storage kind is defined by the linked platform library in
   /// `_swift_concurrency_debug_current_task_storage_kind`.
-  platform_defined =
-      SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_PLATFORM_DEFINED,
+  platform_defined = 5,
 };
+
+/// The concrete current-task storage kind used by a platform library when the
+/// Concurrency runtime reports `platform_defined`.
+///
+/// The value must identify a concrete `_concurrency_current_task_storage_kind`;
+/// it cannot itself be `platform_defined`.
+extern "C" uint32_t _swift_concurrency_debug_current_task_storage_kind;
 
 /// The current version of internal data structures that lldb may decode.
 /// The version numbers used so far are:
