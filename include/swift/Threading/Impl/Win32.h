@@ -19,6 +19,8 @@
 
 #define SWIFT_THREADING_HAS_LAZY_MUTEX 1
 #define SWIFT_THREADING_HAS_CONDITION_VARIABLE 1
+#define SWIFT_THREAD_LOCAL_STORAGE_KIND                                        \
+  swift::_concurrency_current_task_storage_kind::cxx_thread_local
 
 #include "Win32/Win32Defs.h"
 

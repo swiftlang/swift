@@ -19,6 +19,7 @@
 #define SWIFT_THREADING_IMPL_H
 
 #include "TLSKeys.h"
+#include "swift/Runtime/ConcurrencyDebug.h"
 
 namespace swift {
 namespace threading_impl {
@@ -78,6 +79,10 @@ struct stack_bounds {
 
 #ifndef SWIFT_THREADING_HAS_CONDITION_VARIABLE
 #error Selected threading implementation must define SWIFT_THREADING_HAS_CONDITION_VARIABLE.
+#endif
+
+#ifndef SWIFT_THREAD_LOCAL_STORAGE_KIND
+#error Selected threading implementation must define SWIFT_THREAD_LOCAL_STORAGE_KIND.
 #endif
 
 #endif // SWIFT_THREADING_IMPL_H
