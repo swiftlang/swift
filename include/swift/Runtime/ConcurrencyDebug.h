@@ -38,7 +38,7 @@ enum swift_concurrency_current_task_storage_kind {
 /// Indicates that the concrete storage kind is published by the linked
 /// platform library in `_swift_concurrency_debug_current_task_storage_kind`.
 /// The remaining bits in the storage-kind byte must be zero.
-#define SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_DEFERRED_MASK 0x80u
+#define SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_DEFERRED_FLAG 0x80u
 
 #ifdef __cplusplus
 namespace swift {
@@ -58,7 +58,7 @@ extern "C" {
 
 /// The concrete current-task storage kind used by a platform library when the
 /// runtime storage-kind byte has
-/// `SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_DEFERRED_MASK` set.
+/// `SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_DEFERRED_FLAG` set.
 ///
 /// The value must identify a concrete
 /// `swift_concurrency_current_task_storage_kind`; it cannot itself be

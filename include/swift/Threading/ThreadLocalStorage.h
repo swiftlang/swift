@@ -19,6 +19,7 @@
 #include "Impl.h"
 #include "Once.h"
 #include "TLSKeys.h"
+#include "swift/Runtime/ConcurrencyDebug.h"
 
 namespace swift {
 
@@ -218,12 +219,29 @@ public:
 #ifdef SWIFT_THREAD_LOCAL
 #define SWIFT_THREAD_LOCAL_TYPE(TYPE, KEY)                                     \
   SWIFT_THREAD_LOCAL swift::ThreadLocal<TYPE>
+#if SWIFT_THREADING_NONE
+#define SWIFT_THREAD_LOCAL_STORAGE_KIND                                        \
+  _concurrency_current_task_storage_kind::global
+#else
+#define SWIFT_THREAD_LOCAL_STORAGE_KIND                                        \
+  _concurrency_current_task_storage_kind::cxx_thread_local
+#endif
 #elif SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 #define SWIFT_THREAD_LOCAL_TYPE(TYPE, KEY)                                     \
   swift::ThreadLocal<TYPE, swift::ConstantThreadLocalKey<KEY>>
+#if defined(SWIFT_THREADING_PLATFORM_DEFINED) &&                               \
+    SWIFT_THREADING_PLATFORM_DEFINED
+#define SWIFT_THREAD_LOCAL_STORAGE_KIND                                        \
+  SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_DEFERRED_FLAG
+#else
+#define SWIFT_THREAD_LOCAL_STORAGE_KIND                                        \
+  _concurrency_current_task_storage_kind::pthread_reserved_key
+#endif
 #else
 #define SWIFT_THREAD_LOCAL_TYPE(TYPE, KEY)                                     \
   swift::ThreadLocal<TYPE, swift::ThreadLocalKey>
+#define SWIFT_THREAD_LOCAL_STORAGE_KIND                                        \
+  _concurrency_current_task_storage_kind::pthread_allocated_key
 #endif
 
 #endif // SWIFT_THREADING_THREADLOCALSTORAGE_H
