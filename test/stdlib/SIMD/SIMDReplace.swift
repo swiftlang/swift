@@ -118,3 +118,53 @@ func replace_scalar_16xUInt8(
 // CHECK: [[V:%[0-9]+]] = shufflevector <16 x i8> [[S]], <16 x i8> zeroinitializer
 // CHECK: [[P:%[0-9]+]] = icmp slt <16 x i8> [[M]], zeroinitializer
 // CHECK: select <16 x i1> [[P]], <16 x i8> [[V]], <16 x i8> [[A]]
+
+func replacing_mask_16xInt8(
+  _ a: SIMDMask<SIMD16<Int8>>,
+  _ b: SIMDMask<SIMD16<Int8>>,
+  _ m: SIMDMask<SIMD16<Int8>>
+) -> SIMDMask<SIMD16<Int8>> {
+  a.replacing(with: b, where: m)
+}
+// CHECK-LABEL: define{{.*}}replacing_mask_16xInt8
+// CHECK-SAME: (<16 x i8> [[A:%[0-9]+]], <16 x i8> [[B:%[0-9]+]], <16 x i8> [[M:%[0-9]+]])
+// CHECK: [[P:%[0-9]+]] = icmp slt <16 x i8> [[M]], zeroinitializer
+// CHECK: select <16 x i1> [[P]], <16 x i8> [[B]], <16 x i8> [[A]]
+
+func replacing_mask_bool_16xInt8(
+  _ a: SIMDMask<SIMD16<Int8>>, _ b: Bool, _ m: SIMDMask<SIMD16<Int8>>
+) -> SIMDMask<SIMD16<Int8>> {
+  a.replacing(with: b, where: m)
+}
+// CHECK-LABEL: define{{.*}}replacing_mask_bool_16xInt8
+// CHECK-SAME: (<16 x i8> [[A:%[0-9]+]], i1 {{%[0-9]+}}, <16 x i8> [[M:%[0-9]+]])
+// CHECK: [[V:%[0-9]+]] = shufflevector <16 x i8> {{.*}}
+// CHECK: [[P:%[0-9]+]] = icmp slt <16 x i8> [[M]], zeroinitializer
+// CHECK: select <16 x i1> [[P]], <16 x i8> [[V]], <16 x i8> [[A]]
+
+func replace_mask_16xInt8(
+  _ a: SIMDMask<SIMD16<Int8>>,
+  _ b: SIMDMask<SIMD16<Int8>>,
+  _ m: SIMDMask<SIMD16<Int8>>
+) -> SIMDMask<SIMD16<Int8>> {
+  var result = a
+  result.replace(with: b, where: m)
+  return result
+}
+// CHECK-LABEL: define{{.*}}replace_mask_16xInt8
+// CHECK-SAME: (<16 x i8> [[A:%[0-9]+]], <16 x i8> [[B:%[0-9]+]], <16 x i8> [[M:%[0-9]+]])
+// CHECK: [[P:%[0-9]+]] = icmp slt <16 x i8> [[M]], zeroinitializer
+// CHECK: select <16 x i1> [[P]], <16 x i8> [[B]], <16 x i8> [[A]]
+
+func replace_mask_bool_16xInt8(
+  _ a: SIMDMask<SIMD16<Int8>>, _ b: Bool, _ m: SIMDMask<SIMD16<Int8>>
+) -> SIMDMask<SIMD16<Int8>> {
+  var result = a
+  result.replace(with: b, where: m)
+  return result
+}
+// CHECK-LABEL: define{{.*}}replace_mask_bool_16xInt8
+// CHECK-SAME: (<16 x i8> [[A:%[0-9]+]], i1 {{%[0-9]+}}, <16 x i8> [[M:%[0-9]+]])
+// CHECK: [[V:%[0-9]+]] = shufflevector <16 x i8> {{.*}}
+// CHECK: [[P:%[0-9]+]] = icmp slt <16 x i8> [[M]], zeroinitializer
+// CHECK: select <16 x i1> [[P]], <16 x i8> [[V]], <16 x i8> [[A]]
