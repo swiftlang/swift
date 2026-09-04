@@ -427,7 +427,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
   /// bridging of array elements.
   @objc
   internal override final var count: Int {
-    return _nativeStorage.countAndCapacity.count
+    return unsafe _nativeStorage.countAndCapacity.count
   }
 }
 
@@ -480,7 +480,7 @@ internal final class __SwiftDeferredStaticNSArray<Element>
     _internalInvariant(
       !_isBridgedVerbatimToObjectiveC(Element.self),
       "Verbatim bridging should be handled separately")
-    let count = _nativeStorage.countAndCapacity.count
+    let count = unsafe _nativeStorage.countAndCapacity.count
     let result = _BridgingBuffer(count)
     let resultPtr = unsafe result.baseAddress
     let p = unsafe UnsafeMutablePointer<Element>(Builtin.projectTailElems(_nativeStorage, Element.self))
@@ -520,6 +520,7 @@ internal class __ContiguousArrayStorageBase
   : __SwiftNativeNSArrayWithContiguousStorage {
 
   @usableFromInline
+  @exclusivity(unchecked)
   final var countAndCapacity: _ArrayBody
 
   @inlinable
