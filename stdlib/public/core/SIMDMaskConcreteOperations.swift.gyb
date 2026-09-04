@@ -30,6 +30,14 @@ extension SIMDMask where Storage == ${Vector} {
   internal init(_ _builtin: Builtin.${Builtin}) {
     _storage = ${Vector}(_builtin)
   }
+
+  // The lanes of this mask as one-bit values.
+  @export(implementation) @_transparent
+  internal func _predicate() -> Builtin.Vec${storageN}xInt1 {
+    Builtin.cmp_slt_${Builtin}(
+      _storage._storage._value, Builtin.zeroInitializer()
+    )
+  }
   
   @export(implementation) @_transparent
   public init(repeating scalar: Bool) {
