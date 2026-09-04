@@ -441,8 +441,7 @@ protocol ShouldntCrash {
   let fullName2: String  // expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}} {{3-6=var}} {{24-24= { get \}}}
 
   // <rdar://problem/16789886> Assert on protocol property requirement without a type
-  var propertyWithoutType { get } // expected-error {{type annotation missing in pattern}}
-  // expected-error@-1 {{computed property must have an explicit type}} {{26-26=: <# Type #>}}
+  var propertyWithoutType { get } // expected-error {{computed property must have an explicit type}} {{26-26=: <# Type #>}}
 }
 
 // rdar://problem/18168866
