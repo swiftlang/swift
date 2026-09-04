@@ -452,14 +452,28 @@ DebugValueInst::DebugValueInst(
     SILDebugVariable Var,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace,
     bool prependDeref)
-    : InstructionBaseWithTrailingOperands(Operands, DebugLoc),
+    : InstructionBase(DebugLoc),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
                                  Var.Scope),
-      VarInfo(Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
-              getTrailingObjects<SILLocation>(),
-              getTrailingObjects<const SILDebugScope *>(),
-              getTrailingObjects<SILDIExprElement>()) {
+      // Initialize VarInfo with a temporary raw value of 0. The real
+      // initialization can only be done after the operand counts are set
+      // (see below).
+      VarInfo(0) {
+  ASSERT(Operands.size() <= MaxOperands &&
+         "too many operands for a debug value");
+  // The operands start out in the tail allocation, which is sized for them.
+  sharedUInt32().DebugValueInst.tailCapacity = Operands.size();
+  sharedUInt32().DebugValueInst.numOperands = Operands.size();
+
+  // VarInfo must be initialized after tailCapacity.
+  VarInfo = TailAllocatedDebugVariable(
+      Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
+      getTrailingObjects<SILLocation>(),
+      getTrailingObjects<const SILDebugScope *>(),
+      getTrailingObjects<SILDIExprElement>());
+  TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
+                                         Operands);
   if (usesMoveableValueDebugInfo ||
       llvm::any_of(Operands, [](SILValue op) {
         return op->getType().isMoveOnly();
@@ -641,18 +655,57 @@ void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
     .cloneDebugReconstructionBlockContent(srcBB, newBB);
 }
 
-void DebugValueInst::eraseLastOperand() {
-  // The variable data is tail allocated after the operands, so shrinking the
-  // operand list moves it by one operand. It is all trivially copyable, so
-  // using memmove is safe. Nothing keeps pointers on the varinfo.
-  size_t varinfoSize = getDebugVarTrailingDataSize(
-      VarInfo.getName(getTrailingObjects<char>()).size(),
-      HasAuxDebugVariableType, hasAuxDebugLocation(), hasAuxDebugScope(),
-      NumDIExprOperands);
-  char *varinfoBegin = reinterpret_cast<char *>(getAllOperands().end());
+DebugValueInst::~DebugValueInst() {
+  for (Operand &operand : getAllOperands())
+    operand.~Operand();
+  if (sharedUInt8().DebugValueInst.outOfLineOperands)
+    AlignedFree(getOutOfLineOperands().operands);
+}
 
-  eraseLastOperandInPlace();
-  std::memmove(varinfoBegin - sizeof(Operand), varinfoBegin, varinfoSize);
+void DebugValueInst::reallocateOperands(unsigned capacity) {
+  auto operands = getAllOperands();
+  ASSERT(capacity >= operands.size() && "cannot lose operands");
+  ASSERT(sharedUInt32().DebugValueInst.tailCapacity > 0 &&
+         "a debug value with no tail capacity cannot grow");
+
+  auto *newOperands = static_cast<Operand *>(getModule().allocateInst(
+      sizeof(Operand) * capacity, alignof(Operand)));
+
+  // Operands are in a linked list, they cannot be moved trivially.
+  for (auto [idx, operand] : llvm::enumerate(operands)) {
+    SILValue value = operand.get();
+    operand.~Operand();
+    ::new (&newOperands[idx]) Operand(this, value);
+  }
+
+  if (sharedUInt8().DebugValueInst.outOfLineOperands)
+    AlignedFree(getOutOfLineOperands().operands);
+  sharedUInt8().DebugValueInst.outOfLineOperands = true;
+  getOutOfLineOperands() = {newOperands, capacity};
+}
+
+void DebugValueInst::appendOperand(SILValue value) {
+  unsigned numOperands = sharedUInt32().DebugValueInst.numOperands;
+  ASSERT(numOperands < MaxOperands && "too many operands for a debug value");
+  unsigned capacity = sharedUInt8().DebugValueInst.outOfLineOperands
+                          ? getOutOfLineOperands().capacity
+                          : sharedUInt32().DebugValueInst.tailCapacity;
+
+  // Grow to the next power of two: operands are appended one by one, and every
+  // reallocation has to move all of them.
+  if (numOperands == capacity)
+    reallocateOperands(
+        std::min<unsigned>(llvm::NextPowerOf2(capacity), MaxOperands));
+
+  sharedUInt32().DebugValueInst.numOperands = numOperands + 1;
+  ::new (&getAllOperands()[numOperands]) Operand(this, value);
+}
+
+void DebugValueInst::eraseLastOperand() {
+  auto operands = getAllOperands();
+  ASSERT(!operands.empty() && "no operand to erase");
+  operands.back().~Operand();
+  sharedUInt32().DebugValueInst.numOperands = operands.size() - 1;
 }
 
 void DebugValueInst::killOperand(unsigned operandIdx, SILType operandType) {
