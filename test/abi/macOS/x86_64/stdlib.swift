@@ -1353,3 +1353,6 @@ Added: _concurrencyEnableTaskRegistry
 
 // Privilege gating for environment variables
 Added: __swift_isRestrictedProcess
+
+// Setter for typed willThrow hook.
+Added: __swift_setWillThrowTypedHandler
