@@ -4050,6 +4050,13 @@ CONSTANT_TRANSLATION(DereferenceBorrowAddrInst, LookThrough)
 // the src value and tgt addr
 CONSTANT_TRANSLATION(CopyAddrInst, Store)
 CONSTANT_TRANSLATION(ExplicitCopyAddrInst, Store)
+// `assign` is ordinarily lowered away by DI before this pass but
+// non-escaping `@called(once)` and `async let` bodies require analysis
+// as part of the use (calls for `@called(once)` and `await` for
+// `async let`) to determine whether sends of captures have to be undone
+// and that can happen before DI run on the closure and so `assign` has
+// to be treated as a `store`.
+CONSTANT_TRANSLATION(AssignInst, Store)
 CONSTANT_TRANSLATION(StoreInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
 CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
@@ -4229,9 +4236,7 @@ CONSTANT_TRANSLATION(UnownedRetainInst, Asserting)
 CONSTANT_TRANSLATION(AllocPackMetadataInst, Asserting)
 CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
 
-// All of these instructions should be removed by DI which runs before us in the
-// pass pipeline.
-CONSTANT_TRANSLATION(AssignInst, Asserting)
+// This should be removed by DI which runs before us in the pass pipeline.
 CONSTANT_TRANSLATION(AssignOrInitInst, Asserting)
 
 // We should never hit this since it can only appear as a final instruction in a

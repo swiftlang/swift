@@ -162,3 +162,14 @@ func testNoncopyableRefAndUndo() {
 
   _ = v // expected-note {{used here}}
 }
+
+func testVarMutatedInClosure() {
+  var value = NS()
+
+  calledOnce {
+    value = NS()
+    useValue(value)
+  }
+
+  useValue(value) // Ok
+}
