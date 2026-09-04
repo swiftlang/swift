@@ -13,7 +13,7 @@ func blackHole<T>(_ t: T) { }
 // The `@42` literal in `giveMeANumber` is emitted as a constant NSNumber
 // object rather than a `+[NSNumber numberWithInt:]` message send.
 // CHECK-DAG: @"OBJC_CLASS_$_NSConstantIntegerNumber" = external global %struct._class_t
-// CHECK-DAG: @_unnamed_nsconstantintegernumber_ = private constant %struct.__builtin_NSConstantIntegerNumber { ptr @"OBJC_CLASS_$_NSConstantIntegerNumber", ptr @{{.*}}, i64 42 }, section "__DATA,__objc_intobj,regular,no_dead_strip"
+// CHECK-DAG: @_unnamed_nsconstantintegernumber_ = private constant %struct.__builtin_NSConstantIntegerNumber { ptr @"OBJC_CLASS_$_NSConstantIntegerNumber{{(\.ptrauth)?}}", ptr @{{.*}}, i64 42 }, section "__DATA,__objc_intobj,regular,no_dead_strip"
 // CHECK-DAG: @"OBJC_CLASS_$_NSString" = external global %struct._class_t
 // CHECK-DAG: @"OBJC_CLASSLIST_REFERENCES_$_{{.*}}" = internal global ptr @"OBJC_CLASS_$_NSString", section "__DATA,__objc_classrefs,regular,no_dead_strip"
 
