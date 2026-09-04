@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo %target-embedded-posix-shim) | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
@@ -49,11 +48,23 @@ func throwThemAll() {
   throwAndCatch(MyOtherError())
 }
 
-// CHECK: 0
-// CHECK: "My Error Domain"
+@main
+struct Main {
+  static func main() {
+    throwThemAll()
+  }
+}
+
+// Embedded Swift has no type metadata to look up an enum's tag with, so the
+// default `Error._code` is documented to always return 1 rather than the case
+// index it yields elsewhere (see `ErrorType.swift`). Both types above override
+// `_domain`, and `MyOtherError` overrides `_code` too, so those come through
+// unchanged.
 // CHECK: 1
-// CHECK: "My Error Domain"
-// CHECK: 2
-// CHECK: "My Error Domain"
-// CHECK: 12345
-// CHECK: "My Other Domain"
+// CHECK-NEXT: My Error Domain
+// CHECK-NEXT: 1
+// CHECK-NEXT: My Error Domain
+// CHECK-NEXT: 1
+// CHECK-NEXT: My Error Domain
+// CHECK-NEXT: 12345
+// CHECK-NEXT: My Other Domain
