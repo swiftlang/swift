@@ -9237,9 +9237,11 @@ static Expr *wrapAsyncLetInitializer(
 
   // Form the autoclosure type. It is always 'async', and will be 'throws'.
   Type initializerType = initializer->getType();
-  bool throws = TypeChecker::canThrow(ctx, initializer)
-                  .has_value();
   bool hasSendingeResult = isSendingInitializer(initializer);
+  auto canThrow = TypeChecker::canThrow(ctx, initializer);
+  bool throws = canThrow.has_value();
+  Type thrownError = throws ? std::move(*canThrow) : Type();
+
   bool isSendable =
       !ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation);
   assert((isSendable || ctx.LangOpts.hasFeature(
@@ -9247,7 +9249,7 @@ static Expr *wrapAsyncLetInitializer(
          "Region Isolation should imply SendingArgsAndResults");
   auto extInfo = ASTExtInfoBuilder()
                      .withAsync()
-                     .withThrows(throws, /*FIXME:*/ Type())
+                     .withThrows(throws, thrownError)
                      .withSendable(isSendable)
                      .withSendingResult(hasSendingeResult)
                      .build();
@@ -9263,11 +9265,9 @@ static Expr *wrapAsyncLetInitializer(
   // actual calls and translate them into a different mechanism.
   auto autoclosureCall = CallExpr::createImplicitEmpty(ctx, autoclosureExpr);
   autoclosureCall->setType(initializerType);
-  // FIXME: Use thrown type from above.
   if (throws) {
     autoclosureCall->setThrows(
-        ThrownErrorDestination::forMatchingContextType(
-          ctx.getErrorExistentialType()));
+        ThrownErrorDestination::forMatchingContextType(thrownError));
   } else {
     autoclosureCall->setThrows(nullptr);
   }

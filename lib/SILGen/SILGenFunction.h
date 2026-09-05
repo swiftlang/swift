@@ -626,7 +626,7 @@ public:
   struct AsyncLetChildTask {
     SILValue asyncLet; // RawPointer to the async let state
     SILValue resultBuf; // RawPointer to the result buffer
-    bool isThrowing; // true if task can throw
+    std::optional<CanType> thrownError; // Child task's thrown-error type
   };
   
   /// Mapping from each async let clause to the AsyncLet repr that contains the
@@ -3197,6 +3197,29 @@ public:
 
     ~ForceTryEmission() {
       if (Loc) finish();
+    }
+  };
+
+  class AsyncLetTypedErrorEmission {
+    SILGenFunction &SGF;
+    SILLocation Loc;
+    CanType ErrorType;
+    JumpDest OldThrowDest;
+    SILBasicBlock *ErasedErrorBB;
+
+  public:
+    AsyncLetTypedErrorEmission(SILGenFunction &SGF, SILLocation loc,
+                               CanType errorType);
+
+    AsyncLetTypedErrorEmission(const AsyncLetTypedErrorEmission &) = delete;
+    AsyncLetTypedErrorEmission &
+    operator=(const AsyncLetTypedErrorEmission &) = delete;
+
+    void finish();
+
+    ~AsyncLetTypedErrorEmission() {
+      if (ErasedErrorBB)
+        finish();
     }
   };
 
