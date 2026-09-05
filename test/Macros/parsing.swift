@@ -54,6 +54,36 @@ macro am1()
 macro am2()
 // expected-error@-1{{macro 'am2()' requires a definition}}
 
+@attached(
+  accessor,
+  initialization: ridiculous,
+  names: named(get), named(set)
+)
+macro am3()
+// expected-error@-1{{macro 'am3()' requires a definition}}
+// expected-error@-5:19{{unknown initialization context kind}}
+// expected-note@-6:19{{replace 'ridiculous' with 'selfAvailable'}}
+// expected-note@-7:19{{replace 'ridiculous' with 'selfUnavailable'}}
+// expected-note@-8:19{{remove 'initialization: ridiculous' for default 'selfUnavailable' behavior}}
+
+@attached(
+  accessor,
+  initialization: selfAvailable, selfUnavailable,
+  names: named(get), named(set)
+)
+macro am4()
+// expected-error@-1{{macro 'am4()' requires a definition}}
+// expected-error@-5:19{{'initialization' does not support multiple arguments}}
+// expected-note@-6:19{{keep 'selfAvailable'}}
+// expected-note@-7:19{{keep 'selfUnavailable'}}
+
+@attached(body, initialization: selfAvailable)
+macro am5()
+// expected-error@-1{{macro 'am5()' requires a definition}}
+// expected-error@-3:16{{'initialization' unsupported for body macros}}
+// expected-note@-4:10{{did you mean 'accessor' here?}}
+// expected-note@-5:16{{remove 'initialization: selfAvailable'}}
+
 #m1 + 1
 // expected-warning @-1 {{result of operator '+' is unused}}
 // expected-error @-2 {{external macro implementation type 'A.M1' could not be found for macro 'm1()'}}
