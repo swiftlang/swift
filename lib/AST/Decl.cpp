@@ -9656,6 +9656,7 @@ ParamDecl *ParamDecl::cloneAccessor(const ASTContext &Ctx,
       subscriptParam->getArgumentName(), subscriptParam->getNameLoc(),
       subscriptParam->getName(), /*declContext*/ Parent);
   param->setOptions(subscriptParam->getOptions());
+  param->setSpecifier(subscriptParam->getSpecifier());
 
   // The cloned parameter is implicit.
   param->setImplicit();

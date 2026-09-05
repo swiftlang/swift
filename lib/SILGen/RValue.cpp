@@ -748,6 +748,17 @@ RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
   return RValue(SGF, std::move(borrowedValues), type, elementsToBeAdded);
 }
 
+RValue RValue::formalAccessBorrow(SILGenFunction &SGF, SILLocation loc) const & {
+  assert((isComplete() || isInSpecialState()) &&
+         "can't borrow incomplete rvalue");
+  std::vector<ManagedValue> borrowedValues;
+  borrowedValues.reserve(values.size());
+  for (ManagedValue v : values) {
+    borrowedValues.emplace_back(v.formalAccessBorrow(SGF, loc));
+  }
+  return RValue(SGF, std::move(borrowedValues), type, elementsToBeAdded);
+}
+
 ManagedValue RValue::materialize(SILGenFunction &SGF, SILLocation loc) && {
   assert(isPlusOneOrTrivial(SGF) &&
          "Can not materialize a non-plus one RValue");
