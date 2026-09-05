@@ -36,6 +36,16 @@ typedef ptrdiff_t __swift_ptrdiff_t;
 #endif
 
 /**
+ * A signed 64-bit integer, the same type as `int64_t`.
+ */
+#if defined(__INT64_TYPE__)
+typedef __INT64_TYPE__ __swift_int64_t;
+#else
+#include <stdint.h>
+typedef int64_t __swift_int64_t;
+#endif
+
+/**
  * 64-bit type identifier information that is used for typed allocation and
  * deallocation.
  */
@@ -128,7 +138,7 @@ typedef void (*__swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
  * entrypoints might be optional, where the entrypoint is needed only when
  * certain Swift functionality is used.
  */
-#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 1
+#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 2
 
 #if defined(__cplusplus)
 extern "C" {
@@ -607,6 +617,132 @@ __swift_ptrdiff_t _swift_thread_isMain(void);
  * function.
  */
 void _swift_exit(int code);
+
+/*
+ * The runtime's clock entry points reference the five clock functions below
+ * in three groups: reading the time of either clock references both
+ * *_getTime functions, reading either clock's resolution references both
+ * *_getResolution functions, and the default cooperative global executor's
+ * wait loop references _swift_clock_sleep. A referenced function must
+ * resolve at link time even if it is never called. With function-level dead
+ * stripping, only the groups whose entry points survive the link are
+ * referenced; without it, linking the runtime references all five.
+ * Providing all five is therefore always safe: one that a platform cannot
+ * usefully implement can be a trap, or an alias of another clock, as
+ * described on each function.
+ */
+
+/**
+ * Reads the current time of the continuous clock.
+ *
+ * - Parameters:
+ *   - seconds: On return, the whole seconds of the current time.
+ *   - nanoseconds: On return, the remaining nanoseconds of the current time,
+ *     in the range [0, 999999999].
+ *
+ * The continuous clock increments monotonically and keeps incrementing while
+ * the system is asleep, matching the Swift `ContinuousClock`. Its time is
+ * measured from an arbitrary fixed point in the past, such as system boot,
+ * so only differences between two readings are meaningful.
+ *
+ * This function is called whenever the program reads the continuous clock's
+ * time: through `ContinuousClock.now`, through the `swift_time_now` C
+ * interface that executor implementations use, or through the default
+ * cooperative global executor when it re-reads a deadline expressed on this
+ * clock. A platform with no continuous time source can implement it as a
+ * trap, or use the same time source as the suspending clock.
+ *
+ * This function can be implemented as a call to `clock_gettime` with
+ * `CLOCK_BOOTTIME` on Linux, or `CLOCK_MONOTONIC_RAW` on Darwin.
+ */
+void _swift_clockContinuous_getTime(
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
+
+/**
+ * Reports the resolution of the continuous clock.
+ *
+ * - Parameters:
+ *   - seconds: On return, the whole seconds of the clock's resolution.
+ *   - nanoseconds: On return, the remaining nanoseconds of the clock's
+ *     resolution, in the range [0, 999999999].
+ *
+ * This is the value reported by `ContinuousClock.minimumResolution`, and by
+ * the `swift_time_getResolution` C interface that executor implementations
+ * can use.
+ *
+ * This function can be implemented as a call to `clock_getres`.
+ */
+void _swift_clockContinuous_getResolution(
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
+
+/**
+ * Reads the current time of the suspending clock.
+ *
+ * - Parameters:
+ *   - seconds: On return, the whole seconds of the current time.
+ *   - nanoseconds: On return, the remaining nanoseconds of the current time,
+ *     in the range [0, 999999999].
+ *
+ * The suspending clock increments monotonically but stops incrementing while
+ * the system is asleep, matching the Swift `SuspendingClock`. Its time is
+ * measured from an arbitrary fixed point in the past, such as system boot,
+ * so only differences between two readings are meaningful.
+ *
+ * A platform that never suspends, or that cannot tell how long it was
+ * suspended for, may use the same time source as the continuous clock.
+ *
+ * This function is called whenever the program reads the suspending clock's
+ * time, through `SuspendingClock.now` or the `swift_time_now` C interface.
+ * The default cooperative global executor also runs its timer queue on this
+ * clock, so under that executor every `Task.sleep` reads it, whichever
+ * clock the sleep is expressed in.
+ *
+ * This function can be implemented as a call to `clock_gettime` with
+ * `CLOCK_MONOTONIC` on Linux, or `CLOCK_UPTIME_RAW` on Darwin.
+ */
+void _swift_clockSuspending_getTime(
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
+
+/**
+ * Reports the resolution of the suspending clock.
+ *
+ * - Parameters:
+ *   - seconds: On return, the whole seconds of the clock's resolution.
+ *   - nanoseconds: On return, the remaining nanoseconds of the clock's
+ *     resolution, in the range [0, 999999999].
+ *
+ * This is the value reported by `SuspendingClock.minimumResolution`, and by
+ * the `swift_time_getResolution` C interface that executor implementations
+ * can use.
+ *
+ * This function can be implemented as a call to `clock_getres`.
+ */
+void _swift_clockSuspending_getResolution(
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
+
+/**
+ * Blocks the calling execution context for at least the given relative
+ * duration.
+ *
+ * - Parameters:
+ *   - seconds: The whole seconds of the duration.
+ *   - nanoseconds: The remaining nanoseconds of the duration, in the range
+ *     [0, 999999999].
+ *
+ * Only the default cooperative global executor calls this function; it uses
+ * it to wait until the next delayed job becomes ready to run. A platform that
+ * installs a custom global executor that schedules delayed jobs by other
+ * means, such as a hardware timer, may implement this function as a no-op or
+ * a trap.
+ *
+ * This function can be implemented as a call to `nanosleep`, retrying when
+ * the sleep is interrupted by a signal.
+ */
+void _swift_clock_sleep(__swift_int64_t seconds, __swift_int64_t nanoseconds);
 
 #if defined(__cplusplus)
 }
