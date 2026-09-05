@@ -2523,6 +2523,17 @@ FUNCTION(TaskSwitchFunc,
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
+
+// void swift_task_yieldToExecutor(AsyncContext *resumeContext,
+//                                 TaskContinuationFunction *resumeFunction);
+FUNCTION(TaskYieldToExecutorFunc,
+         _Concurrency, swift_task_yieldToExecutor, SwiftAsyncCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftContextPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
          
 // void swift_task_deinitOnExecutor(void *object,
 //                                  DeinitWorkFunction *work,

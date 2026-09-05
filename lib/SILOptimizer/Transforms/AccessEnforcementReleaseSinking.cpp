@@ -213,6 +213,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::BuildMainActorExecutorRef:
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
+    case BuiltinValueKind::YieldToCurrentExecutor:
     case BuiltinValueKind::ResumeThrowingContinuationThrowing:
     case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
     case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:

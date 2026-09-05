@@ -3162,3 +3162,78 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   Builder.CreateRetVoid();
   return suspendFn;
 }
+
+void IRGenFunction::emitYieldSuspensionPoint(llvm::Value *asyncResume) {
+  // Setup the suspend point.
+  SmallVector<llvm::Value *, 8> arguments;
+  unsigned swiftAsyncContextIndex = 0;
+  arguments.push_back(IGM.getInt32(swiftAsyncContextIndex)); // context index
+  arguments.push_back(asyncResume);
+  auto resumeProjFn = getOrCreateResumeFromSuspensionFn();
+  arguments.push_back(
+      Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
+  llvm::Function *suspendFn = createAsyncYieldSuspendFn();
+  arguments.push_back(
+      Builder.CreateBitOrPointerCast(suspendFn, IGM.Int8PtrTy));
+
+  // Extra arguments to pass to the suspension function.
+  arguments.push_back(asyncResume);
+  arguments.push_back(getAsyncContext());
+  auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy},
+                                        false /*packed*/);
+  emitSuspendAsyncCall(swiftAsyncContextIndex, resultTy, arguments);
+}
+
+llvm::Function *IRGenFunction::createAsyncYieldSuspendFn() {
+  llvm::SmallString<40> nameBuffer;
+  llvm::raw_svector_ostream(nameBuffer) << CurFn->getName() << ".2";
+  StringRef name(nameBuffer);
+  if (llvm::GlobalValue *F = IGM.Module.getNamedValue(name))
+    return cast<llvm::Function>(F);
+
+  // The parameters here match the extra arguments passed to
+  // @llvm.coro.suspend.async by emitYieldSuspensionPoint.
+  SmallVector<llvm::Type*, 8> argTys;
+  argTys.push_back(IGM.Int8PtrTy); // resume function
+  argTys.push_back(getAsyncContext()->getType()); // current context
+  auto *suspendFnTy =
+      llvm::FunctionType::get(IGM.VoidTy, argTys, false /*vaargs*/);
+
+  llvm::Function *suspendFn =
+      llvm::Function::Create(suspendFnTy, llvm::Function::InternalLinkage,
+                             name, &IGM.Module);
+  suspendFn->setCallingConv(IGM.SwiftAsyncCC);
+  suspendFn->setDoesNotThrow();
+  suspendFn->addFnAttr(llvm::Attribute::AlwaysInline);
+  IRGenFunction suspendIGF(IGM, suspendFn);
+  auto &Builder = suspendIGF.Builder;
+
+  llvm::Value *resumeFunction = suspendFn->getArg(0);
+  llvm::Value *context = suspendFn->getArg(1);
+  context = Builder.CreateBitCast(context, IGM.SwiftContextPtrTy);
+
+  // Sign the task resume function with the C function pointer schema.
+  if (auto schema = IGM.getOptions().PointerAuth.FunctionPointers) {
+    // Use the Clang type for TaskContinuationFunction*
+    // to make this work with type diversity.
+    if (schema.hasOtherDiscrimination())
+      schema = IGM.getOptions().PointerAuth.ClangTypeTaskContinuationFunction;
+    auto authInfo = PointerAuthInfo::emit(suspendIGF, schema, nullptr,
+                                          PointerAuthEntity());
+    resumeFunction = emitPointerAuthSign(suspendIGF, resumeFunction, authInfo);
+  }
+
+  auto *suspendCall = Builder.CreateCall(
+      IGM.getTaskYieldToExecutorFuncFunctionPointer(),
+      {context, resumeFunction});
+  suspendCall->setCallingConv(IGM.SwiftAsyncCC);
+  suspendCall->setDoesNotThrow();
+  suspendCall->setTailCallKind(IGM.AsyncTailCallKind);
+
+  llvm::AttributeList attrs = suspendCall->getAttributes();
+  IGM.addSwiftAsyncContextAttributes(attrs, /*context arg index*/ 0);
+  suspendCall->setAttributes(attrs);
+
+  Builder.CreateRetVoid();
+  return suspendFn;
+}

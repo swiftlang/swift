@@ -280,6 +280,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  // yieldToCurrentExecutor has no arguments and no result.
+  case BuiltinValueKind::YieldToCurrentExecutor: {
+    emitYieldToCurrentExecutor(IGF);
+    return;
+  }
+
   case BuiltinValueKind::StartAsyncLetWithLocalBuffer: {
     auto taskOptions = args.claimNext();
     auto taskFunction = args.claimNext();

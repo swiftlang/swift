@@ -246,6 +246,11 @@ public:
   llvm::Function *getOrCreateResumeFromSuspensionFn();
   llvm::Function *createAsyncSuspendFn();
 
+  /// Emit a suspension point that yields the current task to its current
+  /// executor via swift_task_yieldToExecutor.
+  void emitYieldSuspensionPoint(llvm::Value *asyncResume);
+  llvm::Function *createAsyncYieldSuspendFn();
+
 private:
   void emitPrologue();
   void emitEpilogue();

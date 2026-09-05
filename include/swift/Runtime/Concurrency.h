@@ -914,6 +914,27 @@ void swift_task_switch(SWIFT_ASYNC_CONTEXT AsyncContext *resumeToContext,
                        TaskContinuationFunction *resumeFunction,
                        SerialExecutorRef newExecutor);
 
+/// Yield the current task to the executor it is currently running on.
+///
+/// The task is parked with the given resumption function and context,
+/// enqueued on its current executor, and this function returns to the
+/// executor's run loop. Unlike swift_task_switch, the task is never
+/// continued synchronously.
+///
+/// This exists for targets on which async resumption is not a guaranteed
+/// tail call (for example WebAssembly without the tail-call feature): a
+/// loop of awaits that all resume synchronously would otherwise nest a
+/// native stack frame per iteration. The compiler inserts a call to this
+/// function on the back-edges of such loops so that the native stack is
+/// unwound to the run loop once per iteration.
+///
+/// If there is no current task, the resumption function is invoked
+/// directly.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_task_yieldToExecutor(
+    SWIFT_ASYNC_CONTEXT AsyncContext *resumeToContext,
+    TaskContinuationFunction *resumeFunction);
+
 /// Mark a task for enqueue on a new executor and then enqueue it.
 ///
 /// The resumption function pointer and continuation should be set
