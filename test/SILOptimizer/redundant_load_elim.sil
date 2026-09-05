@@ -177,6 +177,18 @@ bb0(%0 : $AB, %1 : $Int):
   return %6 : $Int
 }
 
+// The assume builtin does not access memory, so it must not block load forwarding.
+// CHECK-LABEL: sil hidden @load_forward_across_assume
+// CHECK-NOT: = load
+// CHECK: return %1
+sil hidden @load_forward_across_assume : $@convention(thin) (@inout Int, Int, Builtin.Int1) -> Int {
+bb0(%0 : $*Int, %1 : $Int, %2 : $Builtin.Int1):
+  store %1 to %0 : $*Int
+  %4 = builtin "assume_Int1"(%2 : $Builtin.Int1) : $Builtin.Int1
+  %5 = load %0 : $*Int
+  return %5 : $Int
+}
+
 // CHECK-LABEL: sil hidden @redundant_load_across_fixlifetime_inst
 // CHECK: = load
 // CHECK-NOT: = load
