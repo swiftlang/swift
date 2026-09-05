@@ -5634,7 +5634,9 @@ static bool checkConditionalParams(
         nonPackArgs.push_back(arg);
       for (auto nonPackArg : nonPackArgs) {
         if (nonPackArg.getKind() != clang::TemplateArgument::Type) {
-          if (impl)
+          if (impl && impl->DiagnosedConditionalAttrParams
+                          .insert({specDecl, argToCheck.first})
+                          .second)
             impl->diagnose(HeaderLoc(recordDecl->getLocation()),
                            diag::type_template_parameter_expected,
                            argToCheck.second);
