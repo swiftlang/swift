@@ -600,6 +600,17 @@ MetadataResponse
 swift_getBorrowTypeMetadata(MetadataRequest request,
                             const Metadata *referent);
 
+/// The standard sets of function witnesses a tuple's value witness table is
+/// built from, chosen by the tuple's POD-ness and inline-ness.
+///
+/// Exported for the prespecializations library builder to use for its tuple
+/// metadata.
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_pod_inline;
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_nonpod_inline;
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_pod_noninline;
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable
+    swift_tupleWitnesses_nonpod_noninline;
+
 /// Fetch a uniqued metadata for a tuple type.
 ///
 /// The labels argument is null if and only if there are no element
