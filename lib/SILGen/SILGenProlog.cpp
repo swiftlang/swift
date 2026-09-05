@@ -765,7 +765,26 @@ public:
 
     // The self parameter follows the formal parameters.
     if (selfParam) {
-      emitParam(selfParam);
+      // A `@cxx @implementation` function in an extension of a C++ namespace
+      // is emitted directly under its C++ entry point, and its lowered type
+      // drops the formal metatype self parameter. There is no SIL argument to
+      // claim, so materialize the metatype and bind it.
+      auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(SGF.FunctionDC);
+      if (afd && afd->getAttrs().hasAttribute<CxxDeclAttr>() &&
+          loweredParams.isFinished() &&
+          selfParam->getTypeInContext()->is<AnyMetatypeType>()) {
+        SILLocation loc(selfParam);
+        loc.markAsPrologue();
+        ++ArgNo;
+        auto ty = SGF.getLoweredType(selfParam->getTypeInContext());
+        SILValue metatype = SGF.B.createMetatype(loc, ty);
+        SILDebugVariable DebugVar(selfParam->isLet(), ArgNo);
+        SGF.B.emitDebugDescription(loc, metatype, DebugVar);
+        SGF.VarLocs[selfParam] =
+            SILGenFunction::VarLoc(metatype, SILAccessEnforcement::Unknown);
+      } else {
+        emitParam(selfParam);
+      }
     }
 
     if (FormalParamTypes) FormalParamTypes->finish();

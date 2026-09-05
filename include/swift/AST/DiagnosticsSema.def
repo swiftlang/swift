@@ -2250,6 +2250,9 @@ ERROR(cxx_incompatible_with_cdecl,none,
 ERROR(cxx_attr_requires_implementation,none,
       "'@cxx' must be combined with '@implementation'",
       ())
+ERROR(cxx_not_global_or_namespace_member,none,
+      "%0 can only be applied to global functions or functions in extensions "
+      "of C++ namespaces", (DeclAttribute))
 ERROR(cxx_func_defined,none,
       "%kind0 cannot implement C++ function '%1' because it "
       "%select{already has a definition|is declared 'inline'|is 'constexpr' (implicitly 'inline')}2",
