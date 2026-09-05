@@ -1,0 +1,26 @@
+// On WebAssembly (without the tail-call feature) async resumption is not a
+// guaranteed tail call, so the suspend function must call the runtime with a
+// plain call and return.
+// RUN: %swift -target wasm32-unknown-none -parse-stdlib %s -module-name main -emit-irgen -o - | %FileCheck %s
+
+// REQUIRES: concurrency, CODEGENERATOR=WebAssembly
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK-LABEL: define{{.*}} swiftcc void @test_yield(ptr swiftasync %0)
+// CHECK:         call { ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0s(i32 0, ptr {{%.*}}, ptr @__swift_async_resume_get_context, ptr @test_yield.2,
+// CHECK-NOT:     unreachable
+// CHECK:         ret void
+sil @test_yield : $@async () -> () {
+bb0:
+  %0 = builtin "yieldToCurrentExecutor"() : $()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: define internal swiftcc void @test_yield.2(ptr %0, ptr %1)
+// CHECK-NOT:     musttail
+// CHECK:         tail call swiftcc void @swift_task_yieldToExecutor(ptr swiftasync %1, ptr %0)
+// CHECK-NEXT:    ret void
