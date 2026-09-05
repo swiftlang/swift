@@ -118,6 +118,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::IsBitwiseTakable:
     case BuiltinValueKind::IsSameMetatype:
     case BuiltinValueKind::Alignof:
+    case BuiltinValueKind::TypedAllocationID:
     case BuiltinValueKind::OnFastPath:
     case BuiltinValueKind::ExtractElement:
     case BuiltinValueKind::InsertElement:

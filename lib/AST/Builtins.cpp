@@ -1131,6 +1131,14 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &ctx,
                             _word);
 }
 
+static ValueDecl *getTypedAllocationIDOperation(ASTContext &ctx,
+                                                Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted),
+                            _parameters(_metatype(_typeparam(0))),
+                            _int(64));
+}
+
 static ValueDecl *getIsPODOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted),
@@ -3360,6 +3368,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::DeallocErrorBoxTyped:
     return getDeallocErrorBoxTypedOperation(Context, Id);
+
+  case BuiltinValueKind::TypedAllocationID:
+    return getTypedAllocationIDOperation(Context, Id);
 
   case BuiltinValueKind::StackAlloc:
   case BuiltinValueKind::UnprotectedStackAlloc:
