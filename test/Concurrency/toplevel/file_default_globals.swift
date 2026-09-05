@@ -59,7 +59,7 @@ var storedVarGlobal = 0
 // expected-swift6-note@-6 {{convert 'storedVarGlobal' to a 'let' constant to make 'Sendable' shared state immutable}}
 // expected-swift6-note@-7 {{add '@MainActor' to make var 'storedVarGlobal' part of global actor 'MainActor'}}
 // expected-swift6-note@-8 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
-// expected-error@-9 {{'nonisolated' cannot be applied to mutable stored properties}}
+// expected-error@-9 {{'nonisolated' cannot be applied to mutable stored property 'storedVarGlobal'}}
 // expected-note@-10 {{convert 'storedVarGlobal' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
 
 // MAIN: @MainActor {{.*}}let storedLetGlobal: Int
