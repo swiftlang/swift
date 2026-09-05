@@ -6851,13 +6851,22 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
 
   ASTContext &ctx = func->getASTContext();
 
-  // When the explicit C++ name differs from the Swift base name, also look
-  // candidates up under that C++ base name.
-  DeclName foreignName;
-  if (auto cxxAttr = func->getAttrs().getAttribute<CxxDeclAttr>()) {
-    if (!cxxAttr->Name.empty() &&
-        cxxAttr->Name != swiftName.getBaseName().userFacingName())
-      foreignName = DeclName(ctx.getIdentifier(cxxAttr->Name));
+  // When the C++ name differs from the Swift base name, also look candidates
+  // up under the name(s) it imports as: the C++ name itself, or, for an
+  // operator, its Swift operator spelling (a free operator) and the importer's
+  // `__operatorX` (a member operator).
+  SmallVector<DeclName, 2> foreignNames;
+  std::optional<clang::OverloadedOperatorKind> opKind;
+  if (func->getAttrs().hasAttribute<CxxDeclAttr>()) {
+    StringRef cxxName = func->getCDeclName();
+    opKind = importer::getCxxOperatorKind(cxxName);
+    if (opKind) {
+      foreignNames.push_back(
+          DeclName(ctx.getIdentifier(clang::getOperatorSpelling(*opKind))));
+      foreignNames.push_back(DeclName(importer::getOperatorName(ctx, *opKind)));
+    } else if (cxxName != swiftName.getBaseName().userFacingName()) {
+      foreignNames.push_back(DeclName(ctx.getIdentifier(cxxName)));
+    }
   }
 
   if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
@@ -6867,11 +6876,47 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
       SmallVector<ValueDecl *, 4> found;
       ty->lookupQualified({ty}, DeclNameRef(name), func->getLoc(),
                           (NLFlags::QualifiedDefault) | options, found);
-      results.insert(found.begin(), found.end());
+      for (ValueDecl *vd : found) {
+        // Qualified lookup matches members by base name only, so a compound
+        // query like `foo(_:)` also returns `foo(_:_:)`. Enforce the full
+        // compound name here to support overloads of different arity.
+        if (name.isCompoundName() && isa<AbstractFunctionDecl>(vd) &&
+            vd->getName() != name)
+          continue;
+        // An operator name also finds top-level operator functions, which
+        // are unrelated to a member.
+        if (vd->getDeclContext()->getSelfNominalTypeDecl() != ty)
+          continue;
+        results.insert(vd);
+      }
     };
     doLookup(swiftName);
-    if (foreignName)
+    for (DeclName foreignName : foreignNames)
       doLookup(foreignName);
+
+    // The lookups above go by Swift name, which the importer may have renamed
+    // (the non-const overload of a const/non-const pair gets a `Mutating`
+    // suffix), so look the C++ name up in the Clang scope directly too.
+    if (const auto *clangDC =
+            dyn_cast_or_null<clang::DeclContext>(ty->getClangDecl())) {
+      auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+      auto &clangCtx = clangDC->getParentASTContext();
+      clang::DeclarationName clangName =
+          opKind ? clangCtx.DeclarationNames.getCXXOperatorName(*opKind)
+                 : clang::DeclarationName(
+                       &clangCtx.Idents.get(func->getCDeclName()));
+      for (const auto *member : clangDC->lookup(clangName))
+        if (auto *imported = dyn_cast_or_null<ValueDecl>(
+                importer->importDeclDirectly(member)))
+          results.insert(imported);
+    }
+
+    // Lookup in the imported type's context applies module shadowing, which
+    // can drop members that Swift extensions in the current module add. `func`
+    // is trivially related to itself, so add it to the candidate set.
+    if (importer::isClangNamespace(func->getDeclContext()) ||
+        importer::isClangCxxRecord(func->getDeclContext()))
+      results.insert(func);
   } else {
     UnqualifiedLookupOptions options =
         UnqualifiedLookupFlags::IgnoreAccessControl;
@@ -6881,13 +6926,86 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
           func->getLoc(), options);
       auto lookup = evaluateOrDefault(ctx.evaluator,
                                       UnqualifiedLookupRequest{descriptor}, {});
-      for (const auto &result : lookup)
+      for (const auto &result : lookup) {
+        // An operator name also finds operator functions declared in types,
+        // which are unrelated to a global function.
+        if (result.getValueDecl()->getDeclContext()->isTypeContext())
+          continue;
         results.insert(result.getValueDecl());
+      }
     };
     doLookup(swiftName);
-    if (foreignName)
+    for (DeclName foreignName : foreignNames)
       doLookup(foreignName);
   }
+}
+
+/// Whether \p a and \p b have the same parameter types, ignoring `self` and
+/// the result type. Overloads are distinguished by their parameter types, so
+/// this is what identifies which member of an imported overload set an
+/// `@implementation` function implements. An imported declaration's C++ lvalue
+/// reference parameters are compared in their implementation spelling, as
+/// pointers.
+static bool haveSameParameterTypes(const ValueDecl *a, const ValueDecl *b) {
+  auto paramTypesOf = [](const ValueDecl *decl,
+                         SmallVectorImpl<CanType> &out) {
+    Type type = decl->getInterfaceType();
+    if (const auto *fn = dyn_cast<AbstractFunctionDecl>(decl))
+      if (fn->hasImplicitSelfDecl())
+        type = fn->getMethodInterfaceType();
+    const auto *fnType = type->getAs<AnyFunctionType>();
+    if (!fnType)
+      return;
+    const auto *clangFD =
+        dyn_cast_or_null<clang::FunctionDecl>(decl->getClangDecl());
+    if (clangFD && clangFD->getNumParams() != fnType->getParams().size())
+      clangFD = nullptr;
+    for (auto i : indices(fnType->getParams())) {
+      Type ty = fnType->getParams()[i].getOldType();
+      if (clangFD)
+        ty = importer::getCxxReferenceImplType(
+            ty, clangFD->getParamDecl(i)->getType().getTypePtr());
+      out.push_back(ty->getCanonicalType());
+    }
+  };
+
+  SmallVector<CanType, 4> paramsA, paramsB;
+  paramTypesOf(a, paramsA);
+  paramTypesOf(b, paramsB);
+  return paramsA == paramsB;
+}
+
+/// Select, among the imported \p candidates sharing \p func's foreign name,
+/// the one(s) \p func implements. Parameter types pick the overload, except
+/// for a const/non-const pair, which shares them and imports as non-mutating
+/// and `mutating`; remaining ambiguity is left to the attribute checker.
+static TinyPtrVector<Decl *>
+selectImplementedOverloads(const AbstractFunctionDecl *func,
+                           const TinyPtrVector<Decl *> &candidates) {
+  if (candidates.size() <= 1)
+    return candidates;
+
+  TinyPtrVector<Decl *> selected;
+  for (Decl *candidate : candidates)
+    if (haveSameParameterTypes(func, cast<ValueDecl>(candidate)))
+      selected.push_back(candidate);
+
+  if (selected.size() > 1) {
+    auto isMutating = [](const Decl *decl) {
+      if (const auto *fd = dyn_cast<FuncDecl>(decl))
+        return fd->isMutating();
+      return false;
+    };
+    bool isFuncMutating = isMutating(func);
+    TinyPtrVector<Decl *> sameMutating;
+    for (Decl *candidate : selected)
+      if (isMutating(candidate) == isFuncMutating)
+        sameMutating.push_back(candidate);
+    if (!sameMutating.empty())
+      selected = sameMutating;
+  }
+
+  return selected;
 }
 
 static ObjCInterfaceAndImplementation
@@ -6911,44 +7029,64 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
   llvm::SmallSetVector<ValueDecl *, 4> results;
   lookupRelatedFuncs(func, results);
 
-  // Classify the `results` as either the interface or an implementation.
-  // (Multiple implementations are invalid but utterable.)
-  Decl *interface = nullptr;
+  // Classify the `results` as either interface candidates (imported
+  // declarations) or implementations. (Multiple implementations are invalid
+  // but utterable.)
+  TinyPtrVector<Decl *> candidates;
   TinyPtrVector<Decl *> impls;
 
-  for (ValueDecl *result : results) {
-    AbstractFunctionDecl *resultFunc = nullptr;
+  auto asFunc = [&](Decl *result) -> AbstractFunctionDecl * {
     if (accessorKind) {
       if (auto resultStorage = dyn_cast<AbstractStorageDecl>(result))
-        resultFunc = resultStorage->getAccessor(*accessorKind);
+        return resultStorage->getAccessor(*accessorKind);
+      return nullptr;
     }
-    else
-      resultFunc = dyn_cast<AbstractFunctionDecl>(result);
+    return dyn_cast<AbstractFunctionDecl>(result);
+  };
 
+  auto *clangLoader = func->getASTContext().getClangModuleLoader();
+  for (ValueDecl *result : results) {
+    AbstractFunctionDecl *resultFunc = asFunc(result);
     if (!resultFunc)
       continue;
 
-    if (resultFunc->getCDeclName() != clangName)
+    // A virtual method of a foreign reference type is imported as a
+    // synthesized `__synthesizedVirtualCall_` dynamic-dispatch thunk; it is
+    // known by the name of the virtual method it forwards to.
+    const ValueDecl *named = resultFunc;
+    if (auto *thunk = dyn_cast<FuncDecl>(resultFunc))
+      if (auto *original = clangLoader->getOriginalForVirtualThunk(thunk))
+        named = original;
+    if (named->getCDeclName() != clangName)
       continue;
 
-    if (resultFunc->hasClangNode()) {
-      if (interface) {
-        // This clang name is overloaded. That should only happen with C++
-        // functions/methods, which aren't currently supported.
-        return {};
-      }
-      interface = result;
-    } else if (resultFunc->isObjCImplementation()) {
+    if (resultFunc->hasClangNode())
+      candidates.push_back(result);
+    else if (resultFunc->isObjCImplementation())
       impls.push_back(result);
-    }
   }
+
+  // Pick the interface.
+  TinyPtrVector<Decl *> interfaces =
+      selectImplementedOverloads(func, candidates);
+  if (interfaces.empty())
+    return {};
+
+  // Implementations of other overloads are unrelated to this one; drop them so
+  // they are not reported as duplicate implementations.
+  llvm::erase_if(impls, [&](Decl *impl) {
+    return !llvm::equal(selectImplementedOverloads(asFunc(impl), candidates),
+                        interfaces);
+  });
 
   // If we found enough decls to construct a result, `func` should be among them
   // somewhere.
-  assert(interface == nullptr || impls.empty() ||
-         interface == func || llvm::is_contained(impls, func));
+  assert(interfaces.empty() || impls.empty() ||
+         llvm::is_contained(interfaces, func) ||
+         llvm::is_contained(impls, func));
 
-  return constructResult({ interface }, impls, interface,
+  return constructResult(interfaces, impls,
+                         interfaces.empty() ? nullptr : interfaces.front(),
                          /*categoryName=*/Identifier());
 }
 
@@ -9281,6 +9419,53 @@ bool importer::isClangNamespace(const DeclContext *dc) {
     return isa_and_nonnull<clang::NamespaceDecl>(ed->getClangDecl());
 
   return false;
+}
+
+bool importer::isClangCxxRecord(const DeclContext *dc) {
+  if (const auto *nominal = dc->getSelfNominalTypeDecl())
+    return isa_and_nonnull<clang::CXXRecordDecl>(nominal->getClangDecl());
+
+  return false;
+}
+
+std::string importer::getCxxOperatorName(clang::OverloadedOperatorKind op) {
+  StringRef spelling = clang::getOperatorSpelling(op);
+  // A spelling that is a word (`operator new`) needs a separating space.
+  return (Twine("operator") + (llvm::isAlpha(spelling.front()) ? " " : "") +
+          spelling)
+      .str();
+}
+
+std::optional<clang::OverloadedOperatorKind>
+importer::getCxxOperatorKind(StringRef name) {
+  for (unsigned i = clang::OO_None + 1; i < clang::NUM_OVERLOADED_OPERATORS;
+       ++i) {
+    auto op = static_cast<clang::OverloadedOperatorKind>(i);
+    if (name == getCxxOperatorName(op))
+      return op;
+  }
+  return std::nullopt;
+}
+
+Type importer::getCxxReferenceImplType(Type importedTy,
+                                       const clang::Type *clangTy) {
+  if (!clangTy->isLValueReferenceType())
+    return importedTy;
+
+  // A reference to a foreign reference type imports as the reference type
+  // itself, which already is the C++ pointer. A reference to a pointer to one
+  // is a pointer to that pointer.
+  Type object = importedTy->getInOutObjectType();
+  if (object->getClassOrBoundGenericClass() &&
+      clangTy->getPointeeType()->isRecordType())
+    return object;
+
+  auto kind = clangTy->getPointeeType().isConstQualified()
+                  ? PTK_UnsafePointer
+                  : PTK_UnsafeMutablePointer;
+  if (Type wrapped = object->wrapInPointer(kind))
+    return wrapped;
+  return importedTy;
 }
 
 bool importer::isSymbolicCircularBase(const clang::CXXRecordDecl *symbolicClass,

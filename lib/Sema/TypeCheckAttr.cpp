@@ -57,6 +57,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/MapVector.h"
@@ -1899,7 +1900,8 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
       attr->setCategoryNameInvalid();
     }
 
-    if (!AFD->getImplementedObjCDecl()) {
+    auto interfaces = AFD->getAllImplementedObjCDecls();
+    if (interfaces.size() != 1) {
       // A @cxx function whose signature is not representable in C++ cannot
       // match anything; the representability diagnostics explain the failure
       // better than "not found" would, so check them first and stand down if
@@ -1914,11 +1916,21 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
           return;
       }
 
-      StringRef name = AFD->getCDeclName();
-      if (name.empty())
-        name = AFD->getNameStr();
-      diagnose(attr->getLocation(),
-               diag::attr_objc_implementation_func_not_found, name, AFD);
+      if (interfaces.empty()) {
+        StringRef name = AFD->getCDeclName();
+        if (name.empty())
+          name = AFD->getNameStr();
+        diagnose(attr->getLocation(),
+                 diag::attr_objc_implementation_func_not_found, name, AFD);
+      } else {
+        // Several imported overloads have the same signature in Swift, so the
+        // function could implement any of them.
+        diagnose(attr->getLocation(),
+                 diag::attr_objc_implementation_func_ambiguous_overload, AFD,
+                 AFD->getCDeclName());
+        for (auto *interface : interfaces)
+          interface->diagnose(diag::found_candidate);
+      }
     }
   }
 }
@@ -2510,9 +2522,12 @@ void AttributeChecker::visitCxxDeclAttr(CxxDeclAttr *attr) {
     diagnose(attr->getLocation(), diag::cxx_attr_requires_cxx_interop,
              attr->getAttrName());
 
-  // Only top-level func decls are currently supported.
-  if (D->getDeclContext()->isTypeContext())
-    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level, attr);
+  // @cxx may appear on a global function or on a function declared in a Swift
+  // extension of an imported C++ namespace or C++ record.
+  auto *dc = D->getDeclContext();
+  if (dc->isTypeContext() && !importer::isClangNamespace(dc) &&
+      !importer::isClangCxxRecord(dc))
+    diagnose(attr->getLocation(), diag::cxx_invalid_context, attr);
 
   // Reject using both @cxx and @objc on the same decl.
   if (D->getAttrs().getAttribute<ObjCAttr>())

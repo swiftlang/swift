@@ -3472,6 +3472,10 @@ getForeignRepresentable(Type type, ForeignLanguage language,
         switch (classDecl->getForeignClassKind()) {
         case ClassDecl::ForeignKind::Normal:
         case ClassDecl::ForeignKind::RuntimeOnly:
+          // A C++ foreign reference type is a pointer to the C++ class.
+          if (language == ForeignLanguage::Cxx &&
+              classDecl->isForeignReferenceType())
+            break;
           // Imported classes cannot be represented in C or C++.
           return failure();
         case ClassDecl::ForeignKind::CFType:
@@ -3496,12 +3500,13 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
         // Non-trivial C++ classes and structures are not
         // supported by @objc attribute, even though they can
-        // be represented in Objective-C++.
+        // be represented in Objective-C++. They are representable in C++.
         if (auto *cxxRec = dyn_cast_or_null<clang::CXXRecordDecl>(
                 nominal->getClangDecl())) {
-          if (cxxRec->hasNonTrivialCopyConstructor() ||
-              cxxRec->hasNonTrivialMoveConstructor() ||
-              cxxRec->hasNonTrivialDestructor())
+          if (language != ForeignLanguage::Cxx &&
+              (cxxRec->hasNonTrivialCopyConstructor() ||
+               cxxRec->hasNonTrivialMoveConstructor() ||
+               cxxRec->hasNonTrivialDestructor()))
             return failure();
         }
 
