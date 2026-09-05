@@ -1241,6 +1241,11 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::PolyglotAST:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestPolyglotAST);
     break;
+
+  case SourceKitRequest::ObjCSelector:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGetObjCSelector);
+    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    break;
   }
 
   if (!Opts.SourceFile.empty()) {
@@ -1668,6 +1673,13 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
             sourcekitd_variant_dictionary_get_string(Info, KeyFilePath);
         if (value)
           llvm::outs() << value << '\n';
+        break;
+      }
+      case SourceKitRequest::ObjCSelector: {
+        const char *Text = sourcekitd_variant_dictionary_get_string(Info, KeyText);
+        if (Text) {
+          llvm::outs() << Text << "\n";
+        }
         break;
       }
     }
