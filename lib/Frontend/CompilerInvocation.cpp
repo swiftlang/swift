@@ -3682,6 +3682,26 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   return false;
 }
 
+/// Whether this target's backend produces DW_OP_entry_value locations, and so
+/// needs the call-site information that makes them resolvable. Mirrors
+/// DebugEntryValueArchs in clang's CompilerInvocation.cpp.
+static bool targetEmitsDebugEntryValues(const llvm::Triple &Triple) {
+  switch (Triple.getArch()) {
+  case llvm::Triple::x86:
+  case llvm::Triple::x86_64:
+  case llvm::Triple::aarch64:
+  case llvm::Triple::arm:
+  case llvm::Triple::armeb:
+  case llvm::Triple::mips:
+  case llvm::Triple::mipsel:
+  case llvm::Triple::mips64:
+  case llvm::Triple::mips64el:
+    return true;
+  default:
+    return false;
+  }
+}
+
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
@@ -4373,6 +4393,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.DebugCallsiteInfo |= Args.hasArg(OPT_debug_callsite_info);
+  // These are the conditions clang uses to emit call site info for optimized
+  // binaries.
+  if (Opts.shouldOptimize() &&
+      Opts.DebugInfoLevel >= IRGenDebugInfoLevel::ASTTypes &&
+      targetEmitsDebugEntryValues(Triple))
+    Opts.DebugCallsiteInfo = true;
 
   if (Args.hasArg(OPT_mergeable_symbols))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,

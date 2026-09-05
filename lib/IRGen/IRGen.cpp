@@ -153,6 +153,8 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
   // Explicitly request debugger tuning for LLDB which is the default
   // on Darwin platforms but not on others.
   TargetOpts.DebuggerTuning = llvm::DebuggerKind::LLDB;
+
+  TargetOpts.EmitCallSiteInfo = Opts.DebugCallsiteInfo;
   TargetOpts.FunctionSections = Opts.FunctionSections;
 
   // Set option to UseCASBackend if CAS was enabled on the command line.
