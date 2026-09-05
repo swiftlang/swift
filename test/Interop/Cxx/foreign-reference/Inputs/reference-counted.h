@@ -54,6 +54,15 @@ __attribute__((swift_attr("release:GCRelease"))) GlobalCount {
 inline void GCRetain(GlobalCount *x) { globalCount++; }
 inline void GCRelease(GlobalCount *x) { globalCount--; }
 
+// Calls a function pointer that returns a GlobalCount unretained and passes
+// the result on unretained.
+inline GlobalCount *callThroughGlobalCount(
+    GlobalCount *_Nonnull (*_Nonnull fn)(GlobalCount *_Nonnull),
+    GlobalCount *x)
+    __attribute__((swift_attr("returns_unretained"))) {
+  return fn(x);
+}
+
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:GCRetainNullableInit")))
 __attribute__((swift_attr("release:GCReleaseNullableInit")))
