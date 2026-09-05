@@ -8966,11 +8966,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     auto *loc = getConstraintLocator(locator);
 
     ArrayRef<LocatorPathElt> path = loc->getPath();
+    unsigned numInstanceTypes = 0;
     while (!path.empty()) {
       if (!path.back().is<LocatorPathElt::InstanceType>())
         break;
 
       path = path.drop_back();
+      ++numInstanceTypes;
     }
 
     if (path.size() != loc->getPath().size()) {
@@ -8981,7 +8983,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
       fix = AllowArgumentMismatch::create(*this, type, protocol, loc);
     } else if (loc->isLastElement<LocatorPathElt::ContextualType>()) {
-      fix = ContextualMismatch::create(*this, type, protocol, loc);
+      // Restore the metatypes that were stripped above, otherwise both sides
+      // of the message print identically.
+      Type fromType = type;
+      Type toType = protocol;
+      for (unsigned i = 0; i != numInstanceTypes; ++i) {
+        fromType = MetatypeType::get(fromType);
+        toType = ExistentialMetatypeType::get(toType);
+      }
+
+      fix = ContextualMismatch::create(*this, fromType, toType, loc);
     }
 
     if (fix) {
