@@ -3390,6 +3390,16 @@ namespace {
       }
 
       if (auto erasureExpr = dyn_cast<ErasureExpr>(expr)) {
+        // Erasure lets everything the conformance is built from escape, so
+        // look through specialized conformances into their substitutions.
+        for (auto conformance : erasureExpr->getConformances()) {
+          if (conformance.isConcrete()) {
+            checkIsolatedConformancesInContext(
+                conformance.getConcrete()->getSubstitutionMap(),
+                erasureExpr->getLoc(), getDeclContext(),
+                RefineConformances{*this});
+          }
+        }
         checkIsolatedConformancesInContext(
             erasureExpr->getConformances(), erasureExpr->getLoc(),
             getDeclContext(), RefineConformances{*this});
