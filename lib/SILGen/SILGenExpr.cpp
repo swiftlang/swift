@@ -6711,9 +6711,30 @@ void SILGenFunction::emitOpenExistentialExprImpl(
     return;
   }
 
-  auto existentialValue = emitRValueAsSingleValue(
-      E->getExistentialValue(),
-      SGFContext::AllowGuaranteedPlusZero);
+  ManagedValue existentialValue;
+
+  // If this is a noncopyable existential coming from a LoadExpr, then we can
+  // borrow the underlying storage under the enclosing formal access and open it
+  // in place, exactly as we already do for an existential that isn't behind an
+  // access. The move-only checker can then promote to a mutable access
+  // and consume the payload directly if necessary.
+  auto *existentialExpr = E->getExistentialValue();
+  auto existentialRepr = getLoweredType(existentialExpr->getType())
+                             .getPreferredExistentialRepresentation();
+  if (existentialExpr->getType()->isNoncopyable() &&
+      existentialRepr == ExistentialRepresentation::Opaque) {
+    if (auto *load = dyn_cast<LoadExpr>(existentialExpr)) {
+      LValue lv = emitLValue(load->getSubExpr(),
+                             SGFAccessKind::BorrowedAddressRead);
+      existentialValue = emitBorrowedLValue(load, std::move(lv));
+    }
+  }
+
+  if (!existentialValue) {
+    existentialValue = emitRValueAsSingleValue(
+        existentialExpr,
+        SGFContext::AllowGuaranteedPlusZero);
+  }
 
   Type opaqueValueType = E->getOpaqueValue()->getType()->getRValueType();
   auto payload = emitOpenExistential(
