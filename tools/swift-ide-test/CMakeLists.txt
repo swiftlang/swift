@@ -6,14 +6,20 @@ add_swift_host_tool(swift-ide-test
   THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
   HAS_SWIFT_MODULES
 )
-target_link_libraries(swift-ide-test
-                      PRIVATE
-                        swiftAST
-                        swiftDriver
-                        swiftFrontend
-                        swiftIDE
-                        swiftIDETool
-                        swiftCompilerModules)
+if(SWIFT_BUILD_COMPILER_DYLIB)
+  target_link_libraries(swift-ide-test
+                        PRIVATE
+                          SwiftCompilerShared)
+else()
+  target_link_libraries(swift-ide-test
+                        PRIVATE
+                          swiftAST
+                          swiftDriver
+                          swiftFrontend
+                          swiftIDE
+                          swiftIDETool
+                          swiftCompilerModules)
+endif()
 
 # If libxml2 is available, make it available for swift-ide-test.
 if(SWIFT_HAVE_LIBXML2)
