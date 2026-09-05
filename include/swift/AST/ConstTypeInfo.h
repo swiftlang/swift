@@ -46,6 +46,7 @@ public:
     InterpolatedString,
     NilLiteral,
     Runtime,
+    DefaultArgument,
     MemberFunctionCall
   };
 
@@ -533,6 +534,16 @@ public:
 
   static bool classof(const CompileTimeValue *T) {
     return T->getKind() == ValueKind::Runtime;
+  }
+};
+
+/// A representation of a defaulted argument value.
+class DefaultArgumentValue : public CompileTimeValue {
+public:
+  DefaultArgumentValue() : CompileTimeValue(ValueKind::DefaultArgument) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::DefaultArgument;
   }
 };
 
