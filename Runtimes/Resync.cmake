@@ -126,6 +126,9 @@ copy_files("" "Supplemental/Runtime" FILES "Info.plist.in")
 
 # Platform Overlays
 
+# Copy the shared static standard library linker argument template.
+copy_files(public/Resources Overlay FILES static-stdlib-args.lnk.in)
+
 # Copy magic linker symbols
 copy_library_sources("linker-support" "public/ClangOverlays" "Overlay")
 
@@ -175,7 +178,17 @@ copy_files(public/Platform Overlay/Linux/glibc
     TiocConstants.swift
     tgmath.swift.gyb)
 
+message(STATUS "Linux resources[${StdlibSources}/public/Resources/linux] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Linux/Resources")
+copy_files(public/Resources/linux Overlay/Linux/Resources
+  FILES
+    static-executable-args.lnk)
+
 # WASI Overlay
+message(STATUS "WASI resources[${StdlibSources}/public/Resources/wasi] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/WASI/Resources")
+copy_files(public/Resources/wasi Overlay/WASI/Resources
+  FILES
+    static-executable-args.lnk)
+
 message(STATUS "WASI[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/WASI/WASILibc")
 copy_files(public/Platform Overlay/WASI/WASILibc
   FILES
