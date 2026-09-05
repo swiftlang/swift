@@ -2884,27 +2884,19 @@ bool swift::diagnoseMissingOwnership(ParamSpecifier ownership,
   auto loc = repr->getLoc();
   repr->setInvalid();
 
-  // We don't yet support any ownership specifiers for parameters of subscript
-  // decls, give a tailored error message saying you simply can't use a
-  // noncopyable type here.
-  if (options.hasBase(TypeResolverContext::SubscriptDecl)) {
-    diags.diagnose(loc, diag::noncopyable_parameter_subscript_unsupported);
-  } else {
-    // general error diagnostic
-    diags.diagnose(loc, diag::noncopyable_parameter_requires_ownership, ty);
+  diags.diagnose(loc, diag::noncopyable_parameter_requires_ownership, ty);
 
-    diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
-                   "borrowing", "for an immutable reference")
-        .fixItInsert(repr->getStartLoc(), "borrowing ");
+  diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
+                 "borrowing", "for an immutable reference")
+      .fixItInsert(repr->getStartLoc(), "borrowing ");
 
-    diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
-                   "inout", "for a mutable reference")
-        .fixItInsert(repr->getStartLoc(), "inout ");
+  diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
+                 "inout", "for a mutable reference")
+      .fixItInsert(repr->getStartLoc(), "inout ");
 
-    diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
-                   "consuming", "to take the value from the caller")
-        .fixItInsert(repr->getStartLoc(), "consuming ");
-  }
+  diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
+                 "consuming", "to take the value from the caller")
+      .fixItInsert(repr->getStartLoc(), "consuming ");
 
   return true;
 }
@@ -5684,18 +5676,17 @@ NeverNullType
 TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
                                        TypeResolutionOptions options) {
   auto ownershipRepr = dyn_cast<OwnershipTypeRepr>(repr);
-  // ownership is only valid for (non-Subscript and non-EnumCaseDecl)
-  // function parameters.
+  // Ownership is valid on function, initializer, and subscript parameters,
+  // but not on enum case payloads.
   if (!options.is(TypeResolverContext::FunctionInput) ||
-      options.hasBase(TypeResolverContext::SubscriptDecl) ||
       options.hasBase(TypeResolverContext::EnumElementDecl)) {
 
     decltype(diag::attr_only_on_parameters) diagID;
-    if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
-        options.hasBase(TypeResolverContext::EnumElementDecl)) {
-      diagID = diag::attr_only_valid_on_func_or_init_params;
-    } else if (options.is(TypeResolverContext::VariadicFunctionInput)) {
+    if (options.is(TypeResolverContext::VariadicFunctionInput)) {
       diagID = diag::attr_not_on_variadic_parameters;
+    } else if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
+               options.hasBase(TypeResolverContext::EnumElementDecl)) {
+      diagID = diag::attr_only_valid_on_func_or_init_params;
     } else {
       diagID = diag::attr_only_on_parameters;
     }
@@ -5706,6 +5697,25 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
     }
     diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, name);
     return ErrorType::get(getASTContext());
+  }
+
+  // A subscript index may be `borrowing` or `inout`.
+  if (options.hasBase(TypeResolverContext::SubscriptDecl) && ownershipRepr) {
+    switch (ownershipRepr->getSpecifier()) {
+    case ParamSpecifier::Consuming:
+    case ParamSpecifier::ImplicitlyCopyableConsuming:
+    case ParamSpecifier::LegacyOwned:
+      diagnoseInvalid(repr, repr->getSpecifierLoc(),
+                      diag::subscript_consuming_parameter_unsupported,
+                      ownershipRepr->getSpecifierSpelling());
+      return ErrorType::get(getASTContext());
+
+    case ParamSpecifier::Default:
+    case ParamSpecifier::Borrowing:
+    case ParamSpecifier::LegacyShared:
+    case ParamSpecifier::InOut:
+      break;
+    }
   }
 
   if (ownershipRepr && ownershipRepr->getSpecifier() == ParamSpecifier::InOut

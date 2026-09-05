@@ -4463,6 +4463,23 @@ bool ConstraintSystem::isArgumentOfImportedDecl(
   return choice->hasClangNode();
 }
 
+bool ConstraintSystem::isArgumentOfSubscript(
+    ConstraintLocatorBuilder locator) {
+  SmallVector<LocatorPathElt, 4> path;
+  auto anchor = locator.getLocatorParts(path);
+
+  if (path.empty())
+    return false;
+
+  auto *application = getCalleeLocator(getConstraintLocator(anchor, path));
+
+  auto overload = findSelectedOverloadFor(application);
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  return isa<SubscriptDecl>(overload->choice.getDecl());
+}
+
 ConversionEphemeralness
 ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
                                         ConstraintLocatorBuilder locator) {

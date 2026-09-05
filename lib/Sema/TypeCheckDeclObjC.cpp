@@ -1315,8 +1315,20 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
     return false;
 
   auto IndexParam = SubscriptType->getParams()[0];
-  if (IndexParam.isInOut())
+
+  // Swift inout parameters are not representable in Objective-C.
+  if (IndexParam.isInOut()) {
+    auto *indexDecl = SD->getIndices()->get(0);
+    softenIfAccessNote(
+        SD, Reason.getAttr(),
+        SD->diagnose(diag::objc_invalid_on_func_inout, SD,
+                     getObjCDiagnosticAttrKind(Reason),
+                     ForeignLanguage::ObjectiveC)
+            .highlight(indexDecl->getSourceRange())
+            .limitBehavior(behavior));
+    Reason.describe(SD);
     return false;
+  }
 
   Type IndexType = SubscriptType->getParams()[0].getParameterType();
   if (IndexType->hasError())

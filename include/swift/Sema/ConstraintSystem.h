@@ -4077,6 +4077,10 @@ public:
   /// imported from C/ObjectiveC.
   bool isArgumentOfImportedDecl(ConstraintLocatorBuilder locator);
 
+  /// Determine whether the given locator represents an argument to a
+  /// subscript.
+  bool isArgumentOfSubscript(ConstraintLocatorBuilder locator);
+
   /// Visit each subexpression that will be part of the constraint system
   /// of the given expression, including those in closure bodies that will be
   /// part of the constraint system.
