@@ -1,8 +1,5 @@
 // REQUIRES: swift_feature_DeriveConformancesViaMacros
 
-// https://github.com/swiftlang/swift/issues/91958
-// UNSUPPORTED: OS=windows-msvc
-
 // RUN: %empty-directory(%t)
 
 // RUN: %refactor-check-compiles -expand-derived-conformance -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros) --dump-text -source-filename %s -pos=%(line+1):21 | %FileCheck -check-prefix=DIRECT %s
