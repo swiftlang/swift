@@ -80,6 +80,50 @@ public struct AvailabilityQuery {
   var constantResult: Bool?
 }
 
+extension AvailabilityQuery {
+  /// The `#available` or `#unavailable` condition that this query spells in
+  /// source.
+  var condition: String {
+    var spec = domain
+    if let primaryRange {
+      spec += " \(primaryRange)"
+    }
+
+    // Only domains supporting runtime queries reach here, and among those the
+    // versioned ones -- exactly those carrying a primary range -- are the ones
+    // that may be combined with the `*` wildcard. An `#unavailable` query never
+    // takes a wildcard.
+    var specs = [spec]
+    if !isUnavailability && primaryRange != nil {
+      specs.append("*")
+    }
+
+    let keyword = isUnavailability ? "#unavailable" : "#available"
+    return "\(keyword)(\(specs.joined(separator: ", ")))"
+  }
+}
+
+extension EnumCaseInfo {
+  /// The `guard` statements that must precede a reference constructing this
+  /// case, each returning `nil` when its condition fails, or `nil` if the case
+  /// can never be constructed and must be left out of the initializer.
+  func constructionGuards() -> [String]? {
+    guard isConstructible else { return nil }
+
+    var guards: [String] = []
+    for query in runtimeAvailabilityQueries {
+      if let constantResult = query.constantResult {
+        if !constantResult {
+          return nil
+        }
+        continue
+      }
+      guards.append("guard \(query.condition) else { return nil }")
+    }
+    return guards
+  }
+}
+
 public struct StructTypeInfo {
   /// Information on all the struct's properties
   var properties: [StoredProperty]
@@ -558,6 +602,15 @@ extension EnumCaseInfo: TypeInfoProtocol {
     """
     EnumCaseInfo(name: \(stringlit(name)), associatedValueLabels: \(arraySyntax(associatedValueLabels, {optionalSyntax($0, stringlit)})), isReachable: \(boollit(isReachable)), isConstructible: \(boollit(isConstructible)), runtimeAvailabilityQueries: \(arraySyntax(runtimeAvailabilityQueries, \.syntax)))
     """
+  }
+}
+
+extension EnumCaseInfo {
+  public var rawName: String {
+    if name.starts(with: "`") {
+        return String(name.dropFirst().dropLast(1))
+    }
+    return name
   }
 }
 
