@@ -29,6 +29,11 @@ public func lifetimeDependentBorrow(_ p: borrowing UnsafePointer<CInt>, _ len1: 
 // expected-error@+1{{missing return in global function expected to return 'UnsafePointer<CInt>' (aka 'UnsafePointer<Int32>')}}
 }
 
+@_SwiftifyImport(.countedBy(pointer: .return, count: "len2"), .countedBy(pointer: .param(1), count: "len1"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), consumingLifetimebound: true)
+public func lifetimeDependentCopyMut(_ p: UnsafeMutablePointer<CInt>, _ len1: CInt, _ len2: CInt) -> UnsafeMutablePointer<CInt> {
+// expected-error@+1{{missing return in global function expected to return 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
+}
+
 //--- expansions.expected
 @__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
 ------------------------------
@@ -68,5 +73,20 @@ public func lifetimeDependentCopy(_ p: Span<CInt>, _ len2: CInt) -> Span<CInt> {
 public func lifetimeDependentBorrow(_ p: borrowing UnsafeBufferPointer<CInt>, _ len2: CInt) -> Span<CInt> {
     let len1 = CInt(exactly: p.count)!
     return unsafe _swiftifyOverrideLifetime(Span<CInt> (_unsafeStart: unsafe lifetimeDependentBorrow(p.baseAddress!, len1, len2), count: Int(len2)), copying: ())
+}
+------------------------------
+@__swiftmacro_4test24lifetimeDependentCopyMut15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
+public func lifetimeDependentCopyMut(_ p: consuming MutableSpan<CInt>, _ len2: CInt) -> MutableSpan<CInt> {
+    let len1 = CInt(exactly: p.count)!
+    let _pPtr = p.withUnsafeMutableBufferPointer {
+        unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
+    }
+    return unsafe _swiftifyOverrideLifetime(MutableSpan<CInt> (_unsafeStart: unsafe lifetimeDependentCopyMut(_pPtr.baseAddress!, len1, len2), count: Int(len2)), copying: ())
 }
 ------------------------------
