@@ -4,6 +4,24 @@
 
 // CHECK-LABEL: internal enum Simple : Hashable
 enum Simple: Hashable {
+  // CHECK:        internal func hash(into hasher: inout Hasher) {
+  // CHECK-NEXT:     var discriminator: Int
+  // CHECK-EMPTY:
+  // CHECK-NEXT:     switch self {
+  // CHECK-NEXT:     case .a:
+  // CHECK-NEXT:       discriminator = 0
+  // CHECK-NEXT:     case .b:
+  // CHECK-NEXT:       discriminator = 1
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:     hasher.combine(discriminator)
+  // CHECK-NEXT:   }
+
+  // CHECK:        internal var hashValue: Int {
+  // CHECK-NEXT:     get {
+  // CHECK-NEXT:       return Swift::_hashValue(for: self)
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+
   // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
   // CHECK-NEXT:     var index_lhs: Int
   // CHECK-EMPTY:
@@ -28,23 +46,6 @@ enum Simple: Hashable {
   case a
   // CHECK:        case b
   case b
-
-  // CHECK:        internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:     var discriminator: Int
-  // CHECK-NEXT:     switch self {
-  // CHECK-NEXT:     case .a:
-  // CHECK-NEXT:       discriminator = 0
-  // CHECK-NEXT:     case .b:
-  // CHECK-NEXT:       discriminator = 1
-  // CHECK-NEXT:     }
-  // CHECK-NEXT:     hasher.combine(discriminator)
-  // CHECK-NEXT:   }
-
-  // CHECK:        internal var hashValue: Int {
-  // CHECK-NEXT:     get {
-  // CHECK-NEXT:       return _hashValue(for: self)
-  // CHECK-NEXT:     }
-  // CHECK-NEXT:   }
 }
 
 // CHECK-LABEL: internal enum HasAssociatedValues : Hashable
@@ -68,13 +69,6 @@ enum HasAssociatedValues: Hashable {
   // CHECK-NEXT:     }
   // CHECK-NEXT:   }
 
-  // CHECK:        case a(Int)
-  case a(Int)
-  // CHECK:        case b(String)
-  case b(String)
-  // CHECK:        case c
-  case c
-
   // CHECK:        internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:     switch self {
   // CHECK-NEXT:     case .a(let a0):
@@ -90,13 +84,38 @@ enum HasAssociatedValues: Hashable {
 
   // CHECK:        internal var hashValue: Int {
   // CHECK-NEXT:     get {
-  // CHECK-NEXT:       return _hashValue(for: self)
+  // CHECK-NEXT:       return Swift::_hashValue(for: self)
   // CHECK-NEXT:     }
   // CHECK-NEXT:   }
+
+  // CHECK:        case a(Int)
+  case a(Int)
+  // CHECK:        case b(String)
+  case b(String)
+  // CHECK:        case c
+  case c
 }
 
 // CHECK-LABEL: internal enum HasUnavailableElement : Hashable
 enum HasUnavailableElement: Hashable {
+  // CHECK:       internal func hash(into hasher: inout Hasher) {
+  // CHECK-NEXT:    var discriminator: Int
+  // CHECK-EMPTY:
+  // CHECK-NEXT:    switch self {
+  // CHECK-NEXT:    case .a:
+  // CHECK-NEXT:      discriminator = 0
+  // CHECK-NEXT:    case .b:
+  // CHECK-NEXT:      Swift::fatalError("Unavailable code reached")
+  // CHECK-NEXT:    }
+  // CHECK-NEXT:    hasher.combine(discriminator)
+  // CHECK-NEXT:  }
+
+  // CHECK:       internal var hashValue: Int {
+  // CHECK-NEXT:    get {
+  // CHECK-NEXT:      return Swift::_hashValue(for: self)
+  // CHECK-NEXT:    }
+  // CHECK-NEXT:  }
+
   // CHECK:       @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
   // CHECK-NEXT:    var index_lhs: Int
   // CHECK-EMPTY:
@@ -104,7 +123,7 @@ enum HasUnavailableElement: Hashable {
   // CHECK-NEXT:    case .a:
   // CHECK-NEXT:      index_lhs = 0
   // CHECK-NEXT:    case .b:
-  // CHECK-NEXT:      fatalError({{.*}})
+  // CHECK-NEXT:      Swift::fatalError("Unavailable code reached")
   // CHECK-NEXT:    }
   // CHECK-NEXT:    var index_rhs: Int
   // CHECK-EMPTY:
@@ -112,7 +131,7 @@ enum HasUnavailableElement: Hashable {
   // CHECK-NEXT:    case .a:
   // CHECK-NEXT:      index_rhs = 0
   // CHECK-NEXT:    case .b:
-  // CHECK-NEXT:      fatalError({{.*}})  
+  // CHECK-NEXT:      Swift::fatalError("Unavailable code reached")
   // CHECK-NEXT:    }
   // CHECK-NEXT:    return index_lhs == index_rhs
   // CHECK-NEXT:  }
@@ -124,22 +143,6 @@ enum HasUnavailableElement: Hashable {
   @available(*, unavailable)
   case b
 
-  // CHECK:       internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:    var discriminator: Int
-  // CHECK-NEXT:    switch self {
-  // CHECK-NEXT:    case .a:
-  // CHECK-NEXT:      discriminator = 0
-  // CHECK-NEXT:    case .b:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
-  // CHECK-NEXT:    }
-  // CHECK-NEXT:    hasher.combine(discriminator)
-  // CHECK-NEXT:  }
-
-  // CHECK:       internal var hashValue: Int {
-  // CHECK-NEXT:    get {
-  // CHECK-NEXT:      return _hashValue(for: self)
-  // CHECK-NEXT:    }
-  // CHECK-NEXT:  }
 }
 
 // CHECK-LABEL: internal enum HasAssociatedValuesAndUnavailableElement : Hashable
@@ -152,9 +155,25 @@ enum HasAssociatedValuesAndUnavailableElement: Hashable {
   // CHECK-NEXT:      }
   // CHECK-NEXT:      return true
   // CHECK-NEXT:    case (.b, .b):
-  // CHECK-NEXT:      fatalError({{.*}})
+  // CHECK-NEXT:      Swift::fatalError("Unavailable code reached")
   // CHECK-NEXT:    default:
   // CHECK-NEXT:      return false
+  // CHECK-NEXT:    }
+  // CHECK-NEXT:  }
+
+  // CHECK:       internal func hash(into hasher: inout Hasher) {
+  // CHECK-NEXT:    switch self {
+  // CHECK-NEXT:    case .a(let a0):
+  // CHECK-NEXT:      hasher.combine(0)
+  // CHECK-NEXT:      hasher.combine(a0)
+  // CHECK-NEXT:    case .b:
+  // CHECK-NEXT:      Swift::fatalError("Unavailable code reached")
+  // CHECK-NEXT:    }
+  // CHECK-NEXT:  }
+
+  // CHECK:       internal var hashValue: Int {
+  // CHECK-NEXT:    get {
+  // CHECK-NEXT:      return Swift::_hashValue(for: self)
   // CHECK-NEXT:    }
   // CHECK-NEXT:  }
 
@@ -164,27 +183,30 @@ enum HasAssociatedValuesAndUnavailableElement: Hashable {
   // CHECK-NEXT:  case b(String)
   @available(*, unavailable)
   case b(String)
-
-  // CHECK:       internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:    switch self {
-  // CHECK-NEXT:    case .a(let a0):
-  // CHECK-NEXT:      hasher.combine(0)
-  // CHECK-NEXT:      hasher.combine(a0)
-  // CHECK-NEXT:    case .b:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
-  // CHECK-NEXT:    }
-  // CHECK-NEXT:  }
-
-  // CHECK:       internal var hashValue: Int {
-  // CHECK-NEXT:    get {
-  // CHECK-NEXT:      return _hashValue(for: self)
-  // CHECK-NEXT:    }
-  // CHECK-NEXT:  }
 }
 
 // CHECK-LABEL: internal enum UnavailableEnum : Hashable
 @available(*, unavailable)
 enum UnavailableEnum: Hashable {
+
+  // CHECK:        internal func hash(into hasher: inout Hasher) {
+  // CHECK-NEXT:     var discriminator: Int
+  // CHECK-EMPTY:
+  // CHECK-NEXT:     switch self {
+  // CHECK-NEXT:     case .a:
+  // CHECK-NEXT:       discriminator = 0
+  // CHECK-NEXT:     case .b:
+  // CHECK-NEXT:       discriminator = 1
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:     hasher.combine(discriminator)
+  // CHECK-NEXT:   }
+
+  // CHECK:        internal var hashValue: Int {
+  // CHECK-NEXT:     get {
+  // CHECK-NEXT:       return Swift::_hashValue(for: self)
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+
   // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ lhs: `Self`, _ rhs: `Self`) -> Bool {
   // CHECK-NEXT:     var index_lhs: Int
   // CHECK-EMPTY:
@@ -209,24 +231,6 @@ enum UnavailableEnum: Hashable {
   case a
   // CHECK:        case b
   case b
-
-  // CHECK:        internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:     var discriminator: Int
-  // CHECK-NEXT:     switch self {
-  // CHECK-NEXT:     case .a:
-  // CHECK-NEXT:       discriminator = 0
-  // CHECK-NEXT:     case .b:
-  // CHECK-NEXT:       discriminator = 1
-  // CHECK-NEXT:     }
-  // CHECK-NEXT:     hasher.combine(discriminator)
-  // CHECK-NEXT:   }
-
-  // CHECK:        internal var hashValue: Int {
-  // CHECK-NEXT:     get {
-  // CHECK-NEXT:       return _hashValue(for: self)
-  // CHECK-NEXT:     }
-  // CHECK-NEXT:   }
-
 }
 
 // CHECK-LABEL: internal enum MultipleCasesInLine : Hashable
@@ -248,9 +252,6 @@ enum MultipleCasesInLine: Hashable {
   // CHECK-NEXT:     }
   // CHECK-NEXT:   }
 
-  // CHECK:        case a(Int), b(String)
-  case a(Int), b(String)
-
   // CHECK:        internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:     switch self {
   // CHECK-NEXT:     case .a(let a0):
@@ -264,9 +265,12 @@ enum MultipleCasesInLine: Hashable {
 
   // CHECK:        internal var hashValue: Int {
   // CHECK-NEXT:     get {
-  // CHECK-NEXT:       return _hashValue(for: self)
+  // CHECK-NEXT:       return Swift::_hashValue(for: self)
   // CHECK-NEXT:     }
   // CHECK-NEXT:   }
+
+  // CHECK:        case a(Int), b(String)
+  case a(Int), b(String)
 }
 
 // CHECK-LABEL: internal enum MultipleAssociatedValues : Hashable
@@ -297,11 +301,6 @@ enum MultipleAssociatedValues: Hashable {
   // CHECK-NEXT:     }
   // CHECK-NEXT:   }
 
-  // CHECK:        case a(Int, String)
-  case a(Int, String)
-  // CHECK:        case b(Int, String, Bool)
-  case b(Int, String, Bool)
-
   // CHECK:        internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:     switch self {
   // CHECK-NEXT:     case .a(let a0, let a1):
@@ -318,9 +317,14 @@ enum MultipleAssociatedValues: Hashable {
 
   // CHECK:        internal var hashValue: Int {
   // CHECK-NEXT:     get {
-  // CHECK-NEXT:       return _hashValue(for: self)
+  // CHECK-NEXT:       return Swift::_hashValue(for: self)
   // CHECK-NEXT:     }
   // CHECK-NEXT:   }
+
+  // CHECK:        case a(Int, String)
+  case a(Int, String)
+  // CHECK:        case b(Int, String, Bool)
+  case b(Int, String, Bool)
 }
 
 // CHECK-LABEL: internal enum WithArgumentLabels : Hashable
@@ -345,16 +349,16 @@ enum WithArgumentLabels: Hashable {
   // CHECK-NEXT:     }
   // CHECK-NEXT:   }
 
+  // CHECK:        internal var hashValue: Int {
+  // CHECK-NEXT:     get {
+  // CHECK-NEXT:       return Swift::_hashValue(for: self)
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+
   // CHECK:        case a(x: Int, y: String)
   case a(x: Int, y: String)
   // CHECK:        case b(value: Bool)
   case b(value: Bool)
-  
-  // CHECK:        internal var hashValue: Int {
-  // CHECK-NEXT:     get {
-  // CHECK-NEXT:       return _hashValue(for: self)
-  // CHECK-NEXT:     }
-  // CHECK-NEXT:   }
 }
 
 // CHECK-LABEL: internal enum WithRawIdentifiers : Hashable
@@ -378,13 +382,6 @@ enum WithRawIdentifiers: Hashable {
   // CHECK-NEXT:     }
   // CHECK-NEXT:   }
 
-  // CHECK:        case `foo bar`
-  case `foo bar`
-  // CHECK:        case `default`(Int)
-  case `default`(Int)
-  // CHECK:        case a(`foo bar`: String)
-  case a(`foo bar`: String)
-
   // CHECK:        internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:     switch self {
   // CHECK-NEXT:     case .foo bar:
@@ -392,7 +389,7 @@ enum WithRawIdentifiers: Hashable {
   // CHECK-NEXT:     case .default(let a0):
   // CHECK-NEXT:       hasher.combine(1)
   // CHECK-NEXT:       hasher.combine(a0)
-  // CHECK-NEXT:     case .a(let a0):
+  // CHECK-NEXT:     case .a(foo bar: let a0):
   // CHECK-NEXT:       hasher.combine(2)
   // CHECK-NEXT:       hasher.combine(a0)
   // CHECK-NEXT:     }
@@ -400,7 +397,14 @@ enum WithRawIdentifiers: Hashable {
 
   // CHECK:        internal var hashValue: Int {
   // CHECK-NEXT:     get {
-  // CHECK-NEXT:       return _hashValue(for: self)
+  // CHECK-NEXT:       return Swift::_hashValue(for: self)
   // CHECK-NEXT:     }
   // CHECK-NEXT:   }
+
+  // CHECK:        case `foo bar`
+  case `foo bar`
+  // CHECK:        case `default`(Int)
+  case `default`(Int)
+  // CHECK:        case a(`foo bar`: String)
+  case a(`foo bar`: String)
 }
