@@ -650,10 +650,11 @@ HeapLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM) const {
 
   for (auto elType : ElementTypes) {
     if (!elType) {
-      // FIXME: In partial function application, the bindings get stored as
-      //        opaque storage with SILType(). Can we find a way to get a proper
-      //        type mapping instead?
-      return std::nullopt;
+      // A null entry means this field's real type was erased (e.g.,
+      // PODBoxTypeInfo) to share destructors. Rather than give up,
+      // describe at least the fields collected so far (in practice,
+      // the header) while still allowing shared destructors.
+      break;
     }
     storageEntries.push_back(elType.getObjectType());
   }
@@ -1752,27 +1753,34 @@ public:
 };
 
 static HeapLayout getHeapLayoutForSingleTypeInfo(IRGenModule &IGM,
-                                                 const TypeInfo &ti) {
-  return HeapLayout(IGM, LayoutStrategy::Optimal, SILType(), &ti);
+                                                 const TypeInfo &ti,
+                                                 SILType fieldType) {
+  return HeapLayout(IGM, LayoutStrategy::Optimal, fieldType, &ti);
 }
 
 /// Common implementation for POD boxes of a known stride and alignment.
 class PODBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
   PODBoxTypeInfo(IRGenModule &IGM, Size stride, Alignment alignment)
-    : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
-                             IGM.getOpaqueStorageTypeInfo(stride, alignment))) {
-  }
+      : FixedBoxTypeInfoBase(
+            IGM, getHeapLayoutForSingleTypeInfo(
+                     IGM, IGM.getOpaqueStorageTypeInfo(stride, alignment),
+                     // Erase the payload type to share destructors
+                     SILType())) {}
 };
 
 /// Common implementation for single-refcounted boxes.
 class SingleRefcountedBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
   SingleRefcountedBoxTypeInfo(IRGenModule &IGM, ReferenceCounting refcounting)
-    : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
-                                   IGM.getReferenceObjectTypeInfo(refcounting)))
-  {
-  }
+      : FixedBoxTypeInfoBase(
+            IGM, getHeapLayoutForSingleTypeInfo(
+                     IGM, IGM.getReferenceObjectTypeInfo(refcounting),
+                     // We can share the destructor by describing the
+                     // payload as a pointer.
+                     refcounting == ReferenceCounting::Native
+                         ? SILType::getNativeObjectType(IGM.Context)
+                         : SILType())) {}
 };
 
 /// Implementation of a box for a specific type.
