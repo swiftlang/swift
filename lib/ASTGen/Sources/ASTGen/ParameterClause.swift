@@ -12,7 +12,7 @@
 
 import ASTBridging
 import BasicBridging
-import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
 // MARK: - ParamDecl
 
