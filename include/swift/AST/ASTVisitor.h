@@ -155,11 +155,16 @@ public:
   bool visit(ParameterList *PL) {
     return static_cast<ImplClass*>(this)->visitParameterList(PL);
   }
-  
+
+  bool visit(YieldList *YL) {
+    return static_cast<ImplClass *>(this)->visitYieldList(YL);
+  }
+
   bool visitParameterList(ParameterList *PL) { return false; }
+
+  bool visitYieldList(YieldList *YL) { return false; }
 };
-  
-  
+
 template<typename ImplClass, typename ExprRetTy = void, typename... Args>
 using ExprVisitor = ASTVisitor<ImplClass, ExprRetTy, void, void, void, void,
                                void, Args...>;

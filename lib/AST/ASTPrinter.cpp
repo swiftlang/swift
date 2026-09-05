@@ -4817,6 +4817,37 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         printFunctionParameters(decl);
       });
 
+    if (decl->isCoroutine()) {
+      SmallVector<AnyFunctionType::Yield, 1> yields;
+      decl->getYieldInterfaceTypes(yields);
+      auto *bodyYields = decl->getYields();
+
+      Printer.printStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+      SWIFT_DEFER {
+        Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
+      };
+      Printer << " " << tok::kw_yield << " (";
+
+      for (auto [idx, yield] : llvm::enumerate(yields)) {
+        if (idx > 0)
+          Printer << ", ";
+
+        Type interfaceTy = yield.getType();
+        TypeLoc TheTypeLoc;
+        if (bodyYields) {
+          TheTypeLoc = TypeLoc(bodyYields->get(idx).getTypeRepr(), interfaceTy);
+        } else {
+          TheTypeLoc = TypeLoc::withoutLoc(interfaceTy);
+        }
+
+        if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options))
+          printParameterFlags(Printer, Options, nullptr,
+                              yield.getFlags().asParamFlags(), false);
+
+        printTypeLoc(TheTypeLoc, getNonRecursiveOptions(decl));
+      }
+    }
+
     Type ResultTy = decl->getResultInterfaceType();
     if (ResultTy && !ResultTy->isVoid()) {
       Printer.printStructurePre(PrintStructureKind::DeclResultTypeClause);
@@ -7251,6 +7282,10 @@ public:
         }
       }
     }
+    
+    if (!Options.excludeAttrKind(TypeAttrKind::YieldOnce) && info.isCoroutine()) {
+      Printer.printSimpleAttr("@yield_once") << " ";
+    }
 
     SmallString<64> buf;
     switch (Options.PrintFunctionRepresentationAttrs) {
@@ -7523,6 +7558,22 @@ public:
     // explicit lifetimes use them to describe their sources and targets.
     return T->hasExplicitLifetimeDependencies();
   }
+  
+  void visitAnyFunctionTypeYields(ArrayRef<AnyFunctionType::Yield> yields) {
+    Printer << "(";
+    for (auto [index, yield] : llvm::enumerate(yields)) {
+      if (index)
+        Printer << ", ";
+      Printer.callPrintStructurePre(PrintStructureKind::CoroutineYield);
+      SWIFT_DEFER {
+        Printer.printStructurePost(PrintStructureKind::CoroutineYield);
+      };
+      if (yield.isInOut())
+        Printer << "inout ";
+      visit(yield.getType());
+    }
+    Printer << ")";
+  }
 
   void visitFunctionType(FunctionType *T,
                          NonRecursivePrintOptions nrOptions) {
@@ -7555,6 +7606,14 @@ public:
           Printer << ")";
         }
       }
+    }
+
+    if (T->hasExtInfo() && T->isCoroutine()) {
+      Printer.callPrintStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+      Printer << " ";
+      Printer.printKeyword("yields ", Options);
+      visitAnyFunctionTypeYields(T->getYields());
+      Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
     }
 
     Printer << " -> ";
@@ -7622,6 +7681,14 @@ public:
           Printer << ")";
         }
       }
+   }
+
+   if (T->hasExtInfo() && T->isCoroutine()) {
+     Printer.callPrintStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+     Printer << " ";
+     Printer.printKeyword("yields ", Options);
+     visitAnyFunctionTypeYields(T->getYields());
+     Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
    }
 
     Printer << " -> ";
