@@ -954,6 +954,17 @@ BUILTIN_MISC_OPERATION(PrepareInitialization, "prepareInitialization", "n", Spec
 // anywhere in particular.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentExecutor, "getCurrentExecutor", "", Special)
 
+// yieldToCurrentExecutor: () async -> ()
+//
+// Suspend the current task, re-enqueue it on the executor it is currently
+// running on, and resume once the executor gets back to it. Semantically
+// this is a no-op suspension point that preserves isolation.
+//
+// The AsyncLoopYieldInsertion pass inserts this on the back-edges of loops
+// containing suspension points on targets where async resumption is not a
+// guaranteed tail call, so that the native stack is unwound per iteration.
+BUILTIN_MISC_OPERATION(YieldToCurrentExecutor, "yieldToCurrentExecutor", "", Special)
+
 // getCurrentAsyncTask: () -> Builtin.NativeObject
 //
 // Retrieve the pointer to the task in which the current asynchronous

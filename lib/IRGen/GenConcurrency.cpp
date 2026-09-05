@@ -33,6 +33,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/Assertions.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 
 using namespace swift;
@@ -224,6 +225,12 @@ void irgen::emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out) {
   call->setCallingConv(IGF.IGM.SwiftCC);
 
   IGF.emitAllExtractValues(call, IGF.IGM.SwiftExecutorTy, out);
+}
+
+void irgen::emitYieldToCurrentExecutor(IRGenFunction &IGF) {
+  llvm::Value *resumeFn =
+      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
+  IGF.emitYieldSuspensionPoint(resumeFn);
 }
 
 llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,

@@ -70,6 +70,10 @@ void emitBuildComplexEqualitySerialExecutorRef(IRGenFunction &IGF,
 /// Emit the getCurrentExecutor builtin.
 void emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out);
 
+/// Emit the yieldToCurrentExecutor builtin: a suspension point that
+/// re-enqueues the current task on its current executor.
+void emitYieldToCurrentExecutor(IRGenFunction &IGF);
+
 /// Emit the createAsyncLet builtin.
 llvm::Value *emitBuiltinStartAsyncLet(IRGenFunction &IGF,
                                       llvm::Value *taskOptions,
