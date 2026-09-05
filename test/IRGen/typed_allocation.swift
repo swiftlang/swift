@@ -47,6 +47,124 @@ public class MyOtherClass {
   }
 }
 
+// Check that inherited properties are included in the type descriptor.
+public class MyThreeFieldClass {
+  let x: Int
+  let y: Int
+  let z: Int
+  init(x: Int, y: Int, z: Int) {
+    self.x = x
+    self.y = y
+    self.z = z
+  }
+}
+@inline(never)
+public func makeMyThreeFieldClass(x: Int, y: Int, z: Int) -> MyThreeFieldClass {
+  return MyThreeFieldClass(x: x, y: y, z: z)
+}
+// CHECK-LABEL: define swiftcc ptr @"$e16typed_allocation17MyThreeFieldClassC1x1y1zACSi_S2itcfC"(i64 %0, i64 %1, i64 %2, ptr swiftself %3) #0 {
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   {{.*}} = call noalias ptr @swift_allocObjectTyped(ptr {{.*}}, i64 40, i64 7, i64 [[MYSUBCLASS_TYPEID:[0-9]+]])
+public class MySubclass: MyClass {
+  let z: Int
+  init(x: Int, y: Int, z: Int) {
+    self.z = z
+    super.init(x: x, y: y)
+  }
+}
+@inline(never)
+public func makeMySubclass(x: Int, y: Int, z: Int) -> MySubclass {
+  return MySubclass(x: x, y: y, z: z)
+}
+// CHECK-LABEL: define swiftcc ptr @"$e16typed_allocation10MySubclassC1x1y1zACSi_S2itcfC"(i64 %0, i64 %1, i64 %2, ptr swiftself %3) #0 {
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   {{.*}} = call noalias ptr @swift_allocObjectTyped(ptr {{.*}}, i64 40, i64 7, i64 [[MYSUBCLASS_TYPEID]])
+
+// Same as above, include a generic class.
+public class ClassA {
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
+}
+public class ClassB<T>: ClassA {
+  let y: T
+  init(x: Int, y: T) {
+    self.y = y
+    super.init(x: x)
+  }
+}
+public class ClassC: ClassB<Int> {
+  let z: Int
+  init(x: Int, y: Int, z: Int) {
+    self.z = z
+    super.init(x: x, y: y)
+  }
+}
+@inline(never)
+public func makeClassC(x: Int, y: Int, z: Int) -> ClassC {
+  return ClassC(x: x, y: y, z: z)
+}
+// CHECK-LABEL: define swiftcc ptr @"$e16typed_allocation6ClassCC1x1y1zACSi_S2itcfC"(i64 %0, i64 %1, i64 %2, ptr swiftself %3) #0 {
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   {{.*}} = call noalias ptr @swift_allocObjectTyped(ptr {{.*}}, i64 40, i64 7, i64 [[MYSUBCLASS_TYPEID]])
+
+public class ClassD<T> {
+  let x: T
+  init(x: T) {
+    self.x = x
+  }
+}
+public class ClassE: ClassD<Int> {
+  let y: Int
+  init(x: Int, y: Int) {
+    self.y = y
+    super.init(x: x)
+  }
+}
+public class ClassF: ClassE {
+  let z: Int
+  init(x: Int, y: Int, z: Int) {
+    self.z = z
+    super.init(x: x, y: y)
+  }
+}
+@inline(never)
+public func makeClassF(x: Int, y: Int, z: Int) -> ClassF {
+  return ClassF(x: x, y: y, z: z)
+}
+// CHECK-LABEL: define swiftcc ptr @"$e16typed_allocation6ClassFC1x1y1zACSi_S2itcfC"(i64 %0, i64 %1, i64 %2, ptr swiftself %3) #0 {
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   {{.*}} = call noalias ptr @swift_allocObjectTyped(ptr {{.*}}, i64 40, i64 7, i64 [[MYSUBCLASS_TYPEID]])
+
+public class ClassG {
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
+}
+public class ClassH: ClassG {
+  let y: Int
+  init(x: Int, y: Int) {
+    self.y = y
+    super.init(x: x)
+  }
+}
+public class ClassI<T>: ClassH {
+  let z: T
+  init(x: Int, y: Int, z: T) {
+    self.z = z
+    super.init(x: x, y: y)
+  }
+}
+@inline(never)
+public func makeClassI(x: Int, y: Int, z: Int) -> ClassI<Int> {
+  return ClassI<Int>(x: x, y: y, z: z)
+}
+// CHECK-LABEL: define {{.*}}swiftcc ptr @"$e16typed_allocation6ClassIC1x1y1zACyxGSi_SixtcfCSi_Tt2g5"(i64 %0, i64 %1, i64 %2) #0 {
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   {{.*}} = call noalias ptr @swift_allocObjectTyped(ptr {{.*}}, i64 40, i64 7, i64 [[MYSUBCLASS_TYPEID]])
+
 // CHECK-LABEL: define swiftcc void @"$e16typed_allocation3runyyAA3RefCFyyXEfU0_"(ptr %0, ptr captures(none) dereferenceable(16) %1)
 // CHECK: %2 = call {{.*}} ptr @swift_allocObjectTyped(ptr {{.*}}, i64 {{.*}}, i64 {{.*}}, i64 [[P_CAPTURE_TYPEID:.*]])
 // CHECK: call void @swift_deallocUninitializedObjectTyped(ptr %2, i64 {{.*}}, i64 {{.*}}, i64 [[P_CAPTURE_TYPEID]])
