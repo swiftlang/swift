@@ -31,20 +31,42 @@ extension ASTGenVisitor {
     let stringLiteralKind = node.stringLiteralKind ?? .singleLine
     let delimiterLength = node.delimiterLength
 
-    var value: String = ""
+    // Segments are decoded to UTF-8 bytes (not a `String` directly) because
+    // a `\x{hh}` raw code unit escape isn't folded into the text itself --
+    // a U+FFFD placeholder is written in its place, and the escape's real
+    // value is recorded out-of-band as a splice, mirroring how the C++
+    // parser represents `StringLiteralExpr`. This is always valid UTF-8
+    // (real text plus U+FFFD placeholders), so decoding it as a `String`
+    // below is safe.
+    var bytes: [UInt8] = []
+    var splices: [BridgedRawCodeUnitSplice] = []
     for case .stringSegment(let seg) in node.segments where !seg.hasError {
-      seg.appendUnescapedLiteralValue(
+      var segmentEscapes: [StringSegmentSyntax.RawCodeUnitEscape] = []
+      seg.appendUnescapedUTF8Value(
         stringLiteralKind: stringLiteralKind,
         delimiterLength: delimiterLength,
-        to: &value
+        to: &bytes,
+        rawEscapes: &segmentEscapes
       )
+      for escape in segmentEscapes {
+        let loc = SourceLoc(
+          at: seg.content.positionAfterSkippingLeadingTrivia.advanced(by: escape.sourceOffset),
+          in: self.base
+        )
+        splices.append(BridgedRawCodeUnitSplice(loc: loc, offset: escape.offset, value: escape.value))
+      }
     }
-    return value.withBridgedString {
-      BridgedStringLiteralExpr.createParsed(
-        self.ctx,
-        value: $0,
-        loc: self.generateSourceLoc(node)
-      )
+
+    var value = String(decoding: bytes, as: UTF8.self)
+    return value.withBridgedString { bridgedValue in
+      splices.withUnsafeBufferPointer { splicesBuffer in
+        BridgedStringLiteralExpr.createParsed(
+          self.ctx,
+          value: bridgedValue,
+          loc: self.generateSourceLoc(node),
+          splices: BridgedArrayRef(data: UnsafeRawPointer(splicesBuffer.baseAddress), count: splicesBuffer.count)
+        )
+      }
     }
   }
 
@@ -94,22 +116,26 @@ extension ASTGenVisitor {
 
     // In multi-line string literals, each line has '.stringSegment' even without
     // interpolations. We need to join them into single string literal value in AST.
-    var currLiteral: (value: String, loc: SourceLoc)? = nil
+    var currLiteral: (bytes: [UInt8], splices: [BridgedRawCodeUnitSplice], loc: SourceLoc)? = nil
     var isFirst = true
     func consumeCurrentLiteralValue() {
-      guard var literal = currLiteral else {
+      guard let literal = currLiteral else {
         return
       }
       currLiteral = nil
 
       // Construct '$interpolation.appendLiteral(_:)(literalValue)'
-      let literalExpr: BridgedStringLiteralExpr = literal.value.withBridgedString { bridgedValue in
+      var value = String(decoding: literal.bytes, as: UTF8.self)
+      let literalExpr: BridgedStringLiteralExpr = value.withBridgedString { bridgedValue in
         literalCapacity += bridgedValue.count
-        return .createParsed(
-          self.ctx,
-          value: bridgedValue,
-          loc: isFirst ? startLoc : literal.loc
-        )
+        return literal.splices.withUnsafeBufferPointer { splicesBuffer in
+          .createParsed(
+            self.ctx,
+            value: bridgedValue,
+            loc: isFirst ? startLoc : literal.loc,
+            splices: BridgedArrayRef(data: UnsafeRawPointer(splicesBuffer.baseAddress), count: splicesBuffer.count)
+          )
+        }
       }
       let interpolationVarRef = BridgedDeclRefExpr.create(
         self.ctx,
@@ -145,18 +171,28 @@ extension ASTGenVisitor {
       case .stringSegment(let seg):
         if currLiteral == nil {
           currLiteral = (
-            value: "",
+            bytes: [],
+            splices: [],
             loc: self.generateSourceLoc(seg)
           )
         }
         if seg.hasError {
           continue
         }
-        seg.appendUnescapedLiteralValue(
+        var segmentEscapes: [StringSegmentSyntax.RawCodeUnitEscape] = []
+        seg.appendUnescapedUTF8Value(
           stringLiteralKind: stringLiteralKind,
           delimiterLength: delimiterLength,
-          to: &currLiteral!.value
+          to: &currLiteral!.bytes,
+          rawEscapes: &segmentEscapes
         )
+        for escape in segmentEscapes {
+          let loc = SourceLoc(
+            at: seg.content.positionAfterSkippingLeadingTrivia.advanced(by: escape.sourceOffset),
+            in: self.base
+          )
+          currLiteral!.splices.append(BridgedRawCodeUnitSplice(loc: loc, offset: escape.offset, value: escape.value))
+        }
       case .expressionSegment(let seg):
         // Consume literals before this interpolation.
         consumeCurrentLiteralValue()

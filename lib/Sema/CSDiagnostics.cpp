@@ -8371,6 +8371,9 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
     }
     break;
   }
+  case ConversionRestrictionKind::UncheckedStringToPointer:
+    // No specific alternative to suggest yet.
+    break;
   case ConversionRestrictionKind::InoutToPointer:
   case ConversionRestrictionKind::InoutToCPointer:
     // For an arbitrary inout-to-pointer, we can suggest

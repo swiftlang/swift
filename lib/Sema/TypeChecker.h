@@ -1028,6 +1028,7 @@ ProtocolDecl *getProtocol(ASTContext &ctx, SourceLoc loc,
 /// expression does not have an associated literal protocol.
 ProtocolDecl *getLiteralProtocol(ASTContext &ctx, Expr *expr);
 
+
 DeclName getObjectLiteralConstructorName(ASTContext &ctx,
                                          ObjectLiteralExpr *expr);
 

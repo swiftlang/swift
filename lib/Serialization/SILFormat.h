@@ -34,7 +34,9 @@ enum SILStringEncoding : uint8_t {
   SIL_UTF8,
   SIL_OBJC_SELECTOR,
   SIL_BYTES,
-  SIL_UTF8_OSLOG
+  SIL_UTF8_OSLOG,
+  SIL_BYTES16,
+  SIL_BYTES32
 };
 
 enum SILLinkageEncoding : uint8_t {

@@ -600,6 +600,8 @@ namespace {
     RValue visitInOutToPointerExpr(InOutToPointerExpr *E, SGFContext C);
     RValue visitArrayToPointerExpr(ArrayToPointerExpr *E, SGFContext C);
     RValue visitStringToPointerExpr(StringToPointerExpr *E, SGFContext C);
+    RValue visitUncheckedStringToPointerExpr(UncheckedStringToPointerExpr *E,
+                                             SGFContext C);
     RValue visitPointerToPointerExpr(PointerToPointerExpr *E, SGFContext C);
     RValue visitForeignObjectConversionExpr(ForeignObjectConversionExpr *E,
                                             SGFContext C);
@@ -7251,6 +7253,53 @@ SILGenFunction::emitStringToPointer(SILLocation loc, ManagedValue stringValue,
   
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
   auto subMap = pointerType->getContextSubstitutionMap(getPointerProtocol());
+  SmallVector<ManagedValue, 2> results;
+  emitApplyOfLibraryIntrinsic(loc, converter, subMap, stringValue, SGFContext())
+    .getAll(results);
+  assert(results.size() == 2);
+
+  // Mark the dependence of the pointer on the owner value.
+  auto owner = results[0];
+  auto pointer = results[1].forward(*this);
+  pointer = B.createMarkDependence(loc, pointer, owner.getValue(),
+                                   MarkDependenceKind::Escaping);
+
+  return {ManagedValue::forObjectRValueWithoutOwnership(pointer), owner};
+}
+
+RValue RValueEmitter::visitUncheckedStringToPointerExpr(
+    UncheckedStringToPointerExpr *E, SGFContext C) {
+  // Get the original value.
+  ManagedValue orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
+
+  // Perform the conversion.
+  auto results = SGF.emitUncheckedStringToPointer(
+      E, orig, E->getSubExpr()->getType(), E->getType());
+
+  // Implicitly leave the owner managed and return the pointer.
+  return RValue(SGF, E, results.first);
+}
+
+std::pair<ManagedValue, ManagedValue>
+SILGenFunction::emitUncheckedStringToPointer(SILLocation loc,
+                                             ManagedValue stringValue,
+                                             Type stringType,
+                                             Type pointerType) {
+  auto &Ctx = getASTContext();
+  FuncDecl *converter = Ctx.getConvertConstUncheckedStringToPointerArgument();
+
+  // Invoke the conversion intrinsic, which will produce an owner-pointer
+  // pair. Unlike `emitStringToPointer`, this intrinsic has two generic
+  // parameters (the string's `Element` and the destination `ToPointer`
+  // type), like `emitArrayToPointer`, not one.
+  SmallVector<Type, 2> replacementTypes;
+  replacementTypes.push_back(stringType->getUncheckedStringElementType());
+  replacementTypes.push_back(pointerType);
+
+  auto genericSig = converter->getGenericSignature();
+  auto subMap = SubstitutionMap::get(genericSig, replacementTypes,
+                                     LookUpConformanceInModule());
+
   SmallVector<ManagedValue, 2> results;
   emitApplyOfLibraryIntrinsic(loc, converter, subMap, stringValue, SGFContext())
     .getAll(results);

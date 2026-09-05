@@ -1598,7 +1598,8 @@ StringLiteralInst::StringLiteralInst(SILDebugLocation Loc, StringRef Text,
   // IntegerLiteralInsts before reaching IRGen, so this constructor is the best
   // chokepoint to validate *all* string literals that may eventually end up in
   // a binary.
-  assert((encoding == Encoding::Bytes || unicode::isWellFormedUTF8(Text))
+  assert((encoding == Encoding::Bytes || encoding == Encoding::Bytes16 ||
+          encoding == Encoding::Bytes32 || unicode::isWellFormedUTF8(Text))
             && "Created StringLiteralInst with ill-formed UTF-8");
 }
 
@@ -1628,7 +1629,19 @@ CondFailInst *CondFailInst::create(SILDebugLocation DebugLoc, SILValue Operand,
 }
 
 uint64_t StringLiteralInst::getCodeUnitCount() {
-  return sharedUInt32().StringLiteralInst.length;
+  auto length = sharedUInt32().StringLiteralInst.length;
+  switch (getEncoding()) {
+  case Encoding::Bytes16:
+    return length / 2;
+  case Encoding::Bytes32:
+    return length / 4;
+  case Encoding::Bytes:
+  case Encoding::UTF8:
+  case Encoding::ObjCSelector:
+  case Encoding::UTF8_OSLOG:
+    return length;
+  }
+  llvm_unreachable("bad string encoding");
 }
 
 StoreInst::StoreInst(

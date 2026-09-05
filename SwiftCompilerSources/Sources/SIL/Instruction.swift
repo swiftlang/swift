@@ -1250,6 +1250,12 @@ final public class StringLiteralInst : SingleValueInstruction {
     /// UTF-8 encoding of an Objective-C selector.
     case ObjCSelector
     case UTF8_OSLOG
+    /// Arbitrary 16-bit code units, stored little-endian; used by
+    /// `UncheckedString<UInt16>`'s literal initializer.
+    case Bytes16
+    /// Arbitrary 32-bit code units, stored little-endian; used by
+    /// `UncheckedString<UInt32>`'s literal initializer.
+    case Bytes32
   }
 
   public var value: StringRef { StringRef(bridged: bridged.StringLiteralInst_getValue()) }
@@ -1260,6 +1266,8 @@ final public class StringLiteralInst : SingleValueInstruction {
     case 1: return .UTF8
     case 2: return .ObjCSelector
     case 3: return .UTF8_OSLOG
+    case 4: return .Bytes16
+    case 5: return .Bytes32
     default: fatalError("invalid encoding in StringLiteralInst")
     }
   }

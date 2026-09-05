@@ -1010,6 +1010,18 @@ Type TypeBase::getArrayElementType() {
   return boundStruct->getGenericArgs()[0];
 }
 
+Type TypeBase::getUncheckedStringElementType() {
+  if (!isUncheckedString())
+    return Type();
+
+  if (!is<BoundGenericStructType>())
+    return Type();
+
+  // UncheckedString<T>
+  auto boundStruct = castTo<BoundGenericStructType>();
+  return boundStruct->getGenericArgs()[0];
+}
+
 Type TypeBase::getInlineArrayElementType() {
   if (!isInlineArray() && !is_InlineArray())
     return Type();
