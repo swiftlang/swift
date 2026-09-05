@@ -210,3 +210,13 @@ module BitFields {
   header "bit-fields.h"
   requires cplusplus
 }
+
+module StaticFactoryAsInit {
+  header "static-factory-as-init.h"
+  requires cplusplus
+}
+
+module StaticFactoryAsInitGeneric {
+  header "static-factory-as-init-generic.h"
+  requires cplusplus
+}

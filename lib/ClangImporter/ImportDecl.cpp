@@ -3592,7 +3592,9 @@ namespace {
     Decl *
     importGlobalAsInitializer(const clang::FunctionDecl *decl, DeclName name,
                               DeclContext *dc, CtorInitializerKind initKind,
-                              std::optional<ImportedName> correctSwiftName);
+                              std::optional<ImportedName> correctSwiftName,
+                              const clang::FunctionTemplateDecl *funcTemplate,
+                              ArrayRef<GenericTypeParamDecl *> templateParams);
 
     /// Create an implicit property given the imported name of one of
     /// the accessors.
@@ -3989,19 +3991,37 @@ namespace {
       DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
       auto selfIdx = importedName.getSelfIndex();
 
+      SmallVector<GenericTypeParamDecl *, 4> templateParams;
+      if (funcTemplate) {
+        unsigned i = 0;
+        for (auto *param : *funcTemplate->getTemplateParameters()) {
+          if (unusedTemplateParams.contains(param))
+            continue;
+          auto *typeParam = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
+              param, AccessLevel::Public, dc,
+              Impl.SwiftContext.getIdentifier(param->getName()),
+              /*nameLoc*/ Impl.importSourceLoc(param->getLocation()),
+              /*specifierLoc*/ SourceLoc(),
+              /*depth*/ 0, /*index*/ i, GenericTypeParamKind::Type);
+          templateParams.push_back(typeParam);
+          (void)++i;
+        }
+      }
+
       if (auto *method = dyn_cast<clang::CXXMethodDecl>(decl);
           method && method->isStatic() && name.getBaseName().isConstructor()) {
         return importGlobalAsInitializer(
-            decl, name, dc, importedName.getInitKind(), correctSwiftName);
+            decl, name, dc, importedName.getInitKind(), correctSwiftName,
+            funcTemplate, templateParams);
       }
 
       if (!dc->isModuleScopeContext() && !isClangNamespace(dc) &&
           !isa<clang::CXXMethodDecl>(decl)) {
         if (name.getBaseName().isConstructor()) {
           ASSERT(!accessorInfo && "accessor should not be constructor()");
-          return importGlobalAsInitializer(decl, name, dc,
-                                           importedName.getInitKind(),
-                                           correctSwiftName);
+          return importGlobalAsInitializer(
+              decl, name, dc, importedName.getInitKind(), correctSwiftName,
+              funcTemplate, templateParams);
         }
 
         if (dc->getSelfProtocolDecl() && !selfIdx) {
@@ -4019,29 +4039,12 @@ namespace {
         }
       }
 
-      SmallVector<GenericTypeParamDecl *, 4> templateParams;
-      if (funcTemplate) {
-        unsigned i = 0;
-        for (auto *param : *funcTemplate->getTemplateParameters()) {
-          if (unusedTemplateParams.contains(param))
-            continue;
-          auto *typeParam = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
-              param, AccessLevel::Public, dc,
-              Impl.SwiftContext.getIdentifier(param->getName()),
-              /*nameLoc*/ Impl.importSourceLoc(param->getLocation()),
-              /*specifierLoc*/ SourceLoc(),
-              /*depth*/ 0, /*index*/ i, GenericTypeParamKind::Type);
-          templateParams.push_back(typeParam);
-          (void)++i;
-        }
-      }
       auto getGenericParams = [&]() -> GenericParamList * {
         if (templateParams.empty())
           return nullptr;
         return GenericParamList::create(Impl.SwiftContext, SourceLoc(),
                                         templateParams, SourceLoc());
       };
-
       ImportedType resultType;
       bool selfIsInOut = false;
       bool selfIsConsuming = false;
@@ -7412,8 +7415,9 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
 
 Decl *SwiftDeclConverter::importGlobalAsInitializer(
     const clang::FunctionDecl *decl, DeclName name, DeclContext *dc,
-    CtorInitializerKind initKind,
-    std::optional<ImportedName> correctSwiftName) {
+    CtorInitializerKind initKind, std::optional<ImportedName> correctSwiftName,
+    const clang::FunctionTemplateDecl *funcTemplate,
+    ArrayRef<GenericTypeParamDecl *> templateParams) {
   // TODO: Should this be an error? How can this come up?
   assert(dc->isTypeContext() && "cannot import as member onto non-type");
 
@@ -7447,7 +7451,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   } else {
     parameterList = Impl.importFunctionParameterList(
         dc, decl, {decl->param_begin(), decl->param_end()}, decl->isVariadic(),
-        allowNSUIntegerAsInt, argNames, /*genericParams=*/{},
+        allowNSUIntegerAsInt, argNames, templateParams,
         /*resultType=*/nullptr);
 
     if (name && parameterList && argNames.size() != parameterList->size()) {
@@ -7491,13 +7495,25 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
     failable = true;
   }
 
+  // Use the FunctionTemplateDecl as the ClangNode rather than the templated
+  // FunctionDecl, matching what importFunctionDecl() does for other members.
+  ClangNode clangNode = decl;
+  if (funcTemplate)
+    clangNode = funcTemplate;
+
+  auto *genericParams =
+      templateParams.empty()
+          ? nullptr
+          : GenericParamList::create(Impl.SwiftContext, SourceLoc(),
+                                     templateParams, SourceLoc());
+
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-      decl, importer::convertClangAccess(decl->getAccess()), name,
+      clangNode, importer::convertClangAccess(decl->getAccess()), name,
       Impl.importSourceLoc(decl->getLocation()), failable,
       /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
-      parameterList, /*GenericParams=*/nullptr, dc);
+      parameterList, genericParams, dc);
   result->setImplicitlyUnwrappedOptional(isIUO);
   result->getASTContext().evaluator.cacheOutput(InitKindRequest{result},
                                                 std::move(initKind));
