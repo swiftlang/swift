@@ -4232,6 +4232,63 @@ namespace {
                            result);
       }
 
+      // Produce a throwing variant alongside the non-throwing import when an
+      // error convention applies.
+      //
+      // This covers C functions only. The variant builds its parameters from
+      // the full Clang parameter list and is imported at module scope, which
+      // does not account for 'self', generic parameters, or an enclosing
+      // context, so everything else keeps its error parameter instead.
+      bool isCFunction =
+          !decl->getASTContext().getLangOpts().CPlusPlus || decl->isExternC();
+      if (isCFunction && dc->isModuleScopeContext()) {
+        auto *funcResult = cast<FuncDecl>(result);
+        if (auto errorInfo =
+                Impl.getNameImporter().considerErrorImportForFunction(
+                    decl, decl->parameters())) {
+          ParameterList *throwingBodyParams = nullptr;
+          std::optional<ForeignErrorConvention> foreignErrorConvention;
+          auto throwingResultType = Impl.importFunctionParamsAndReturnType(
+              dc, decl, decl->parameters(), decl->isVariadic(),
+              isInSystemModule(dc), name, throwingBodyParams,
+              /*genericParams=*/{}, *errorInfo, &foreignErrorConvention);
+
+          if (throwingBodyParams && throwingResultType.getType()) {
+            DeclName throwingName(Impl.SwiftContext, name.getBaseName(),
+                                  throwingBodyParams);
+
+            auto *throwingFunc = createFuncOrAccessor(
+                Impl, loc, accessorInfo, throwingName, nameLoc,
+                getGenericParams(), throwingBodyParams,
+                throwingResultType.getType(),
+                /*async=*/false, /*throws=*/true, dc, clangNode);
+
+            throwingFunc->setAccess(
+                importer::convertClangAccess(decl->getAccess()));
+            throwingFunc->setIsObjC(false);
+            throwingFunc->setIsDynamic(false);
+
+            Impl.recordImplicitUnwrapForDecl(
+                throwingFunc, throwingResultType.isImplicitlyUnwrapped());
+
+            if (foreignErrorConvention)
+              throwingFunc->setForeignErrorConvention(*foreignErrorConvention);
+
+            if (dc->getSelfClassDecl())
+              throwingFunc->addAttribute(new (Impl.SwiftContext)
+                                             FinalAttr(/*IsImplicit=*/true));
+
+            finishFuncDecl(decl, throwingFunc);
+
+            // Disfavor the non-throwing variant.
+            funcResult->addAttribute(new (
+                Impl.SwiftContext) DisfavoredOverloadAttr(/*implicit=*/true));
+
+            Impl.addAlternateDecl(funcResult, throwingFunc);
+          }
+        }
+      }
+
       return result;
     }
 
@@ -4301,6 +4358,12 @@ namespace {
       if (!isClangNamespace(result->getDeclContext()) &&
           result->getImportAsMemberStatus().isImportAsMember() &&
           !isa<clang::CXXMethodDecl, clang::ObjCMethodDecl>(decl))
+        return;
+
+      // FIXME: support C functions imported as throwing. The indices below come
+      // from the Clang parameter list, but the vectors they index are sized
+      // from the Swift parameter list, which omits the error parameter.
+      if (result->getForeignErrorConvention())
         return;
 
       bool hasSkippedLifetimeAnnotation = false;
