@@ -26,6 +26,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Remarks/RemarkFormat.h"
 #include <climits>
+#include <optional>
 #include <string>
 
 namespace swift {
@@ -110,6 +111,15 @@ public:
 
   /// Controls whether to emit actor data-race checks.
   bool EnableActorDataRaceChecks = false;
+
+  /// Controls whether the AsyncLoopYieldInsertion pass inserts executor
+  /// yields on the back-edges of loops that contain suspension points.
+  ///
+  /// If unset, the pass is enabled exactly on targets where async
+  /// resumption is not a guaranteed tail call (e.g. WebAssembly without the
+  /// tail-call feature), since only there can such loops grow the native
+  /// stack without bound.
+  std::optional<bool> EnableAsyncLoopYield;
 
   /// Controls whether to run async demotion pass.
   bool EnableAsyncDemotion = false;

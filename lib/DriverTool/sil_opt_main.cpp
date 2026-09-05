@@ -295,6 +295,10 @@ struct SILOptOptions {
                     llvm::cl::desc("Enables an optimization pass to demote async functions."));
 
   llvm::cl::opt<bool>
+  EnableAsyncLoopYield = llvm::cl::opt<bool>("enable-async-loop-yield",
+                    llvm::cl::desc("Enables inserting executor yields on the back-edges of loops containing suspension points."));
+
+  llvm::cl::opt<bool>
   EnableThrowsPrediction = llvm::cl::opt<bool>("enable-throws-prediction",
                      llvm::cl::desc("Enables optimization assumption that functions rarely throw errors."));
 
@@ -900,6 +904,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EmitSortedSIL |= options.EmitSortedSIL;
 
   SILOpts.EnableAsyncDemotion = options.EnableAsyncDemotion;
+  if (options.EnableAsyncLoopYield)
+    SILOpts.EnableAsyncLoopYield = true;
   SILOpts.EnableThrowsPrediction = options.EnableThrowsPrediction;
   SILOpts.EnableNoReturnCold = options.EnableNoReturnCold;
   SILOpts.IgnoreAlwaysInline = options.IgnoreAlwaysInline;

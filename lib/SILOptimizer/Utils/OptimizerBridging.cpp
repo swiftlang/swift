@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/OptimizerBridging.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "../../IRGen/IRGenModule.h"
 #include "../../IRGen/GenClass.h"
 #include "swift/AST/SemanticAttrs.h"
@@ -29,6 +30,8 @@
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/Basic/TargetInfo.h"
 
 using namespace swift;
 
@@ -412,6 +415,26 @@ void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
       break;
   }
   invocation->setNeedFixStackNesting(false);
+}
+
+/// Whether the AsyncLoopYieldInsertion pass should run.
+///
+/// If not explicitly configured, yields are needed exactly when the target
+/// does not support the Swift async calling convention, which is what IRGen
+/// uses to decide between a `musttail` and a plain call for async resumption
+/// (see IRGenModule::AsyncTailCallKind).
+bool BridgedPassContext::enableAsyncLoopYield() const {
+  SILModule *mod = invocation->getPassManager()->getModule();
+  auto &opts = mod->getOptions();
+  if (opts.EnableAsyncLoopYield.has_value())
+    return *opts.EnableAsyncLoopYield;
+
+  auto *clangLoader = mod->getASTContext().getClangModuleLoader();
+  if (!clangLoader)
+    return false;
+  auto &targetInfo = clangLoader->getClangASTContext().getTargetInfo();
+  return targetInfo.checkCallingConvention(clang::CC_SwiftAsync) !=
+         clang::TargetInfo::CCCR_OK;
 }
 
 bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {
