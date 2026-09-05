@@ -6473,18 +6473,44 @@ public:
   }
   
   void checkAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *AACI) {
-    // The operand must be a GetAsyncContinuation* instruction.
+    // The operand may either be a GetAsyncContinuation* or a
+    // `getSplitContinuationAddr` builtin, which binds a continuation created
+    // elsewhere to this function. The latter form always delivers the value into a
+    // resume buffer, so it behaves as the address form, and its throwing-ness
+    // is carried by the presence of an error successor rather than by the
+    // instruction.
+    auto *splitGet = dyn_cast<BuiltinInst>(AACI->getOperand());
+    if (splitGet &&
+        splitGet->getBuiltinInfo().ID !=
+            BuiltinValueKind::GetSplitContinuationAddr)
+      splitGet = nullptr;
     auto cont = dyn_cast<GetAsyncContinuationInstBase>(AACI->getOperand());
-    require(cont, "can only await the result of a get_async_continuation instruction");
-    bool isAddressForm = isa<GetAsyncContinuationAddrInst>(cont);
+    require(cont || splitGet,
+            "can only await the result of a get_async_continuation instruction "
+            "or of a getSplitContinuationAddr builtin");
+    bool isAddressForm = splitGet || isa<GetAsyncContinuationAddrInst>(cont);
 
-    auto &C = cont->getType().getASTContext();
-    
+    auto &C = AACI->getFunction()->getASTContext();
+
+    if (splitGet) {
+      require(splitGet->getArguments().size() == 2,
+              "getSplitContinuationAddr takes two operands");
+      require(splitGet->getArguments()[0]->getType()
+                  .is<BuiltinRawUnsafeContinuationType>(),
+              "getSplitContinuationAddr's first operand must be a "
+              "Builtin.RawUnsafeContinuation");
+      require(splitGet->getArguments()[1]->getType().isAddress(),
+              "getSplitContinuationAddr's resume buffer must be an address");
+    }
+
     // The shape of the successors depends on the continuation instruction being
     // awaited.
-    require((bool)AACI->getErrorBB() == cont->throws(),
-            "must have an error successor if and only if the continuation is throwing");
-    if (cont->throws()) {
+    if (cont) {
+      require((bool)AACI->getErrorBB() == cont->throws(),
+              "must have an error successor if and only if the continuation is throwing");
+    }
+    bool throws = splitGet ? (bool)AACI->getErrorBB() : cont->throws();
+    if (throws) {
       require(AACI->getErrorBB()->getNumArguments() == 1,
               "error successor must take one argument");
       auto arg = AACI->getErrorBB()->getArgument(0);
@@ -6500,7 +6526,7 @@ public:
     }
     if (isAddressForm) {
       require(AACI->getResumeBB()->getNumArguments() == 0,
-              "resume successor must take no arguments for get_async_continuation_addr");
+              "resume successor must take no arguments for the address form");
     } else {
       require(AACI->getResumeBB()->getNumArguments() == 1,
               "resume successor must take one argument for get_async_continuation");
