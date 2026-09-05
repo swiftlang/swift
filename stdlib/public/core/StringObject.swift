@@ -987,7 +987,7 @@ extension _StringObject {
 
   @usableFromInline
   internal var sharedUTF8: UnsafeBufferPointer<UInt8> {
-    @_effects(releasenone) @inline(never) get {
+    @_effects(releasenone) @inline(__always) get {
       _internalInvariant(largeFastIsShared)
       let start = unsafe self.getSharedUTF8Start()
       return unsafe UnsafeBufferPointer(start: start, count: largeCount)
