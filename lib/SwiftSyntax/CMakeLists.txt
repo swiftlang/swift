@@ -50,6 +50,7 @@ set(SWIFT_SYNTAX_MODULES
   # Support for LSP
   SwiftIDEUtils
   SwiftRefactor
+  SwiftLexicalLookup
   # For swift-plugin-server
   SwiftLibraryPluginProvider
 )
