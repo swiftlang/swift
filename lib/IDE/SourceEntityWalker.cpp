@@ -899,7 +899,9 @@ bool SemaAnnotator::passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
 
 bool SemaAnnotator::
 passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
-  return passReference(D, Ty, Loc.getBaseNameLoc(), Loc.getSourceRange(), Data);
+  return passReference(D, Ty, Loc.getBaseNameLoc(),
+                       SourceRange(Loc.getBaseNameLoc(), Loc.getEndLoc()),
+                       Data);
 }
 
 bool SemaAnnotator::
