@@ -283,10 +283,6 @@ static void validateDependencyScanningArgs(DiagnosticEngine &diags,
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
                    "-import-prescan", "-scan-dependencies");
   }
-  if (Prescan && !ScanDependencies) {
-    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
-                   "-import-prescan", "-scan-dependencies");
-  }
   if (SerializeCache && !ScanDependencies) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
                    "-serialize-dependency-scan-cache", "-scan-dependencies");
@@ -302,7 +298,7 @@ static void validateDependencyScanningArgs(DiagnosticEngine &diags,
   }
   if (ReuseCache && !CacheSerializationPath) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
-                   "-serialize-dependency-scan-cache",
+                   "-load-dependency-scan-cache",
                    "-dependency-scan-cache-path");
   }
   if (ValidatePriorCache && !ReuseCache) {
