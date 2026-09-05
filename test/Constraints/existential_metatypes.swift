@@ -137,3 +137,13 @@ func testNestedMetatype() {
   foo2(bar(0)) // expected-error {{cannot convert value of type 'Int' to expected argument type 'any P.Type'}}
   foo2(metaBar(0)) // expected-error {{argument type 'Int' does not conform to expected type 'P'}}
 }
+
+// https://github.com/swiftlang/swift/issues/90076
+
+func testMetatypeOfExistentialFromGenericSubstitution() {
+  func generic<T>(_ x: T) -> T.Type { fatalError() }
+
+  func test(_ x: any P) {
+    let _: any P.Type = generic(x) // expected-error {{cannot convert value of type '(any P).Type' to specified type 'any P.Type'}}
+  }
+}
