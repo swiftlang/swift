@@ -60,6 +60,12 @@
 // 4. Delete the forEach calls that were unrolled and clean up dead code
 //    resulting due to that.
 //
+// 5. Once every forEach call on the array literal is unrolled, the array
+//    literal itself is typically dead, as the unrolled code uses the elements
+//    and not the array. In that case, delete the whole initialization pattern:
+//    the allocation, the stores of the elements, the finalize call and the
+//    destroys of the array.
+//
 // This transformation is illustrated below on a small example:
 //
 // Input:
@@ -78,15 +84,8 @@
 //
 // Output:
 //
-//      %initResult = apply %arrayUninitialized(...)
-//      (%array, %storage_ptr) = destructure_tuple %initResult
-//      %elem1copy = copy_value %elem1  <--
-//      store %elem1 at array index 1
-//      %elem2copy = copy_value %elem2  <--
-//      store %elem2 at array index 2
-//      ..
 //      alloc_stack %stack
-//      %elem1borrow = begin_borrow %elem1copy
+//      %elem1borrow = begin_borrow %elem1
 //      store_borrow %elem1borrow to %stack
 //      try_apply %body(%stack) normal normalbb1, error errbb1
 //
@@ -96,7 +95,7 @@
 //
 //    normalbb1(%res : $()):
 //      end_borrow %elem1borrow
-//      %elem2borrow = begin_borrow %elem2copy
+//      %elem2borrow = begin_borrow %elem2
 //      store_borrow %elem2borrow to %stack
 //      try_apply %body(%stack) normal bb1, error errbb2
 //
@@ -112,9 +111,12 @@
 //      ...
 //      dealloc_stack %stack
 //    bb3:
-//      destroy_value %elem1copy
-//      destroy_value %elem2copy
-//      destroy_value %array
+//      destroy_value %elem1
+//      destroy_value %elem2
+//
+// Note that the array literal is gone entirely here, and that the unrolled code
+// uses the elements directly: deleting the stores hands the ownership of the
+// elements over to it.
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
@@ -127,7 +129,9 @@
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
@@ -475,6 +479,135 @@ void ArrayInfo::getLastDestroys(
   }
 }
 
+/// Return true iff the array literal initialized by \c arrayAllocCall becomes
+/// dead once the forEach calls in \c forEachCalls are unrolled, i.e. nothing
+/// else reads the array and nothing depends on its lifetime.
+static bool
+isDeadArrayLiteralAfterUnrolling(ApplyInst *arrayAllocCall,
+                                 ArrayRef<TryApplyInst *> forEachCalls) {
+  SILFunction *fun = arrayAllocCall->getFunction();
+
+  // The pointer to the element storage, which the initialization pattern makes
+  // dependent on the array. Note that this is null if the storage is reached
+  // from the array value instead (through a ref_tail_addr).
+  SILValue storagePointer =
+      ArraySemanticsCall(arrayAllocCall, semantics::ARRAY_UNINITIALIZED_INTRINSIC)
+          .getArrayElementStoragePointer();
+
+  // Walk everything derived from the result of the initializer call: the array
+  // value as well as the addresses of its element storage.
+  ValueWorklist worklist(fun);
+  for (SILValue result : arrayAllocCall->getResults())
+    worklist.pushIfNotVisited(result);
+
+  while (SILValue value = worklist.pop()) {
+    for (Operand *use : value->getUses()) {
+      SILInstruction *user = use->getUser();
+
+      // Deleting the array literal drops the debug information of the array,
+      // which is not worth it in code that is not being optimized anyway.
+      if (fun->preserveDebugInfo() && user->isDebugInstruction())
+        return false;
+
+      // A fix_lifetime is a request to keep the array alive even though it is
+      // otherwise unused.
+      if (isa<FixLifetimeInst>(user))
+        return false;
+
+      // debug_value, end_borrow, end_lifetime, ...
+      if (isIncidentalUse(user) || isa<DestroyValueInst>(user))
+        continue;
+
+      // A forEach call that unrolling will remove.
+      if (llvm::is_contained(forEachCalls, user))
+        continue;
+
+      // The initialization pattern makes the pointer to the element storage
+      // depend on the array.
+      if (auto *markDependence = dyn_cast<MarkDependenceInst>(user)) {
+        if (!storagePointer || markDependence->getValue() != storagePointer)
+          return false;
+        worklist.pushIfNotVisited(markDependence);
+        continue;
+      }
+
+      // Instructions that forward the array or project out the storage of its
+      // elements: the array literal is dead only if what they produce is dead
+      // as well.
+      auto *singleValueUser = dyn_cast<SingleValueInstruction>(user);
+      if (getSingleValueCopyOrCast(user) ||
+          Projection::isAddressProjection(user) ||
+          (singleValueUser && Projection::isObjectProjection(singleValueUser)) ||
+          isa<DestructureTupleInst>(user) || isa<PointerToAddressInst>(user)) {
+        for (SILValue result : user->getResults())
+          worklist.pushIfNotVisited(result);
+        continue;
+      }
+
+      // A store of an element into the array's storage. (A store of the array
+      // itself into some other memory would let it escape.)
+      if (auto *store = dyn_cast<StoreInst>(user)) {
+        if (store->getDest() != value)
+          return false;
+        continue;
+      }
+
+      // A borrow of the array into a temporary, which is how the array is
+      // passed indirectly to a forEach call.
+      if (auto *storeBorrow = dyn_cast<StoreBorrowInst>(user)) {
+        if (storeBorrow->getSrc() != value)
+          return false;
+        for (Operand *storeBorrowUse : storeBorrow->getUses()) {
+          SILInstruction *storeBorrowUser = storeBorrowUse->getUser();
+          if (isa<EndBorrowInst>(storeBorrowUser) ||
+              storeBorrowUser->isDebugInstruction() ||
+              llvm::is_contained(forEachCalls, storeBorrowUser))
+            continue;
+          return false;
+        }
+        continue;
+      }
+
+      // The finalize call that completes the initialization is part of the
+      // idiom. Any other call could read the array.
+      if (isa<ApplyInst>(user) &&
+          ArraySemanticsCall(user).getKind() == ArrayCallKind::kArrayFinalizeIntrinsic) {
+        worklist.pushIfNotVisited(cast<ApplyInst>(user));
+        continue;
+      }
+
+      return false;
+    }
+  }
+  return true;
+}
+
+/// Delete the array literal initialized by \c arrayAllocCall along with
+/// everything that is derived from it: the allocation, the address projections
+/// that reach the element storage, the stores of the elements, the finalize
+/// call and the lifetime-ending uses of the array.
+///
+/// \param elementsConsumedByUnrolledCode when set, the unrolled code uses the
+/// elements of the array directly rather than copies of them, so this function
+/// hands the ownership of the elements over to it by deleting their stores
+/// without destroying what they store. Note that the unrolled code has already
+/// destroyed the elements at the point where the array's lifetime used to end.
+///
+/// \pre every forEach call over the array has been unrolled, and
+/// \c isDeadArrayLiteralAfterUnrolling held for \c arrayAllocCall.
+static void deleteDeadArrayLiteral(ApplyInst *arrayAllocCall,
+                                   ArrayInfo &arrayInfo,
+                                   bool elementsConsumedByUnrolledCode,
+                                   InstructionDeleter &deleter) {
+  assert(isDeadArrayLiteralAfterUnrolling(arrayAllocCall, {}) &&
+         "deleting an array literal that is still in use");
+  if (elementsConsumedByUnrolledCode) {
+    for (uint64_t i = 0; i < arrayInfo.getNumElements(); ++i)
+      deleter.forceDelete(arrayInfo.getElementStore(i));
+  }
+  deleter.recursivelyForceDeleteUsersAndFixLifetimes(arrayAllocCall);
+}
+
 /// Delete the forEach calls from the SIL that contains it. This function will
 /// not clean up any resulting dead instructions.
 static void removeForEachCall(TryApplyInst *forEachCall,
@@ -522,8 +655,13 @@ static void removeForEachCall(TryApplyInst *forEachCall,
 ///
 ///  - Destroy all the copies of the elements (if it is non-trivial) just
 ///   before the array's lifetime ends.
+///
+/// \param consumeElements when set, the unrolled code uses the elements of the
+/// array directly instead of copies of them, taking over the ownership that the
+/// element stores used to have. This is only correct if the caller deletes
+/// those stores afterwards, which \c deleteDeadArrayLiteral does.
 static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
-                          InstructionDeleter &deleter) {
+                          InstructionDeleter &deleter, bool consumeElements) {
   if (arrayInfo.getNumElements() == 0) {
     // If this is an empty array, delete the forEach entirely.
     removeForEachCall(forEachCall, deleter);
@@ -544,34 +682,31 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
          ParameterConvention::Indirect_In_Guaranteed &&
          "forEach body closure is expected to take @in_guaranteed argument");
 
-  // Copy the elements stored into the array. This is necessary as we need to
-  // extend the lifetime of the stored elements at least until the forEach call,
-  // which will now be unrolled. The following code inserts a copy_value of the
-  // elements just before the point where they are stored into the array, and
-  // a corresponding destroy_value at the end of the lifetime of the array. In
-  // other words, the lifetime of the element copies are made to match the
-  // lifetime of the array. Even though copies can be destroyed sooner after
-  // they are used by the unrolled code, doing so may introduce more destroys
-  // than needed as the unrolled code have many branches (due to try applies)
-  // all of which joins later into a single path eventually.
-  SmallVector<SILValue, 4> elementCopies;
+  // Make the values of the elements available to the unrolled code. Unless the
+  // unrolled code can consume the elements, this is done by copying them, as we
+  // need to extend the lifetime of the stored elements at least until the
+  // forEach call, which will now be unrolled.
+  SmallVector<SILValue, 4> elementValues;
   for (uint64_t i = 0; i < arrayInfo.getNumElements(); ++i) {
     StoreInst *elementStore = arrayInfo.getElementStore(i);
+    if (consumeElements) {
+      elementValues.push_back(elementStore->getSrc());
+      continue;
+    }
     // Insert the copy just before the store of the element into the array.
     SILValue copy = SILBuilderWithScope(elementStore)
                         .emitCopyValueOperation(elementStore->getLoc(),
                                                 elementStore->getSrc());
-    elementCopies.push_back(copy);
+    elementValues.push_back(copy);
   }
 
-  // Destroy the copy_value of the elements before the last destroys of the
-  // array. It is important that the copied elements are destroyed before the
-  // array is destroyed. This enables other optimizations.
+  // Destroy the elements used by the unrolled code before the last destroys of
+  // the array.
   SmallVector<DestroyValueInst *, 4> lastDestroys;
   arrayInfo.getLastDestroys(lastDestroys);
   for (DestroyValueInst *destroy : lastDestroys) {
     SILBuilderWithScope destroyBuilder(destroy);
-    for (SILValue element : elementCopies) {
+    for (SILValue element : elementValues) {
       destroyBuilder.emitDestroyValueOperation(destroy->getLoc(), element);
     }
   }
@@ -642,7 +777,7 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
   //     Jump to a new error block: err_i in the error case. Note that all
   //     error blocks jump to the error target of the original forEach call.
   for (uint64_t num = arrayInfo.getNumElements(); num > 0; --num) {
-    SILValue elementCopy = elementCopies[num - 1];
+    SILValue elementValue = elementValues[num - 1];
     // Creating the next normal block ends the borrow scope for borrowedElem
     // from the previous iteration.
     SILBasicBlock *currentBB = num > 1 ? normalTargetGenerator(nextNormalBB)
@@ -653,14 +788,13 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
     SILValue addr;
 
     if (arrayElementType.isTrivial(*fun)) {
-      unrollBuilder.createStore(forEachLoc, elementCopy, allocStack,
+      unrollBuilder.createStore(forEachLoc, elementValue, allocStack,
                                 StoreOwnershipQualifier::Trivial);
       addr = allocStack;
     } else {
-      // Borrow the elementCopy and store it in the allocStack. Note that the
-      // element's copy is guaranteed to be alive until the array is alive.
-      // Therefore it is okay to use a borrow here.
-      borrowedElem = unrollBuilder.createBeginBorrow(forEachLoc, elementCopy);
+      // Borrow the element and store it in the allocStack. Note that the
+      // element is guaranteed to be alive until the array is alive.
+      borrowedElem = unrollBuilder.createBeginBorrow(forEachLoc, elementValue);
       addr =
           unrollBuilder.createStoreBorrow(forEachLoc, borrowedElem, allocStack);
       normalBuilder.createEndBorrow(forEachLoc, addr);
@@ -723,8 +857,16 @@ static bool tryUnrollForEachCallsOverArrayLiteral(ApplyInst *apply,
   // If the array is too large to unroll, bail out.
   if (!canUnrollForEachOfArray(arrayInfo, apply->getParent()->getModule()))
     return false;
+  // Determine whether unrolling leaves the array literal itself dead, which is
+  // the common case: the unrolled code operates on the elements, not on the
+  // array.
+  bool deleteArrayLiteral =
+      isDeadArrayLiteralAfterUnrolling(apply, forEachCalls);
+  bool consumeElements = deleteArrayLiteral && forEachCalls.size() == 1;
   for (TryApplyInst *forEachCall : forEachCalls)
-    unrollForEach(arrayInfo, forEachCall, deleter);
+    unrollForEach(arrayInfo, forEachCall, deleter, consumeElements);
+  if (deleteArrayLiteral)
+    deleteDeadArrayLiteral(apply, arrayInfo, consumeElements, deleter);
   return true;
 }
 
@@ -740,20 +882,25 @@ class ForEachLoopUnroller : public SILFunctionTransform {
       return;
 
     InstructionDeleter deleter(/*assumeFixedLifetimes=*/ false);
+
+    // Collect the apply instructions before transforming any of them, as
+    // unrolling the forEach calls over an array literal can delete the
+    // literal's own initializer call, which makes it impossible to hold an
+    // instruction iterator across the transformation.
+    SmallVector<ApplyInst *, 8> applies;
     for (SILBasicBlock &bb : fun) {
-      for (auto instIter = bb.begin(); instIter != bb.end();) {
-        SILInstruction *inst = &*instIter;
-        ApplyInst *apply = dyn_cast<ApplyInst>(inst);
-        if (!apply) {
-          ++instIter;
-          continue;
-        }
-        // Note that the following operation may delete a forEach call but
-        // would not delete this apply instruction, which is an array
-        // initializer. Therefore, the iterator should be valid here.
-        changed |= tryUnrollForEachCallsOverArrayLiteral(apply, deleter);
-        ++instIter;
+      for (SILInstruction &inst : bb) {
+        if (ApplyInst *apply = dyn_cast<ApplyInst>(&inst))
+          applies.push_back(apply);
       }
+    }
+
+    for (ApplyInst *apply : applies) {
+      // An earlier iteration may have deleted this apply, e.g. when it is the
+      // call that finalizes an array literal that has been deleted.
+      if (apply->isDeleted())
+        continue;
+      changed |= tryUnrollForEachCallsOverArrayLiteral(apply, deleter);
     }
 
     if (changed) {
