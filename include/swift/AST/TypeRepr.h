@@ -178,7 +178,8 @@ public:
   ///
   /// \returns true if the predicate returns true for the given type or any of
   /// its children.
-  bool findIf(llvm::function_ref<bool(TypeRepr *)> pred);
+  bool findIf(llvm::function_ref<bool(TypeRepr *)> pred,
+              bool walkIntoGenericArgumentExprs = false);
 
   /// Check recursively whether this type repr or any of its descendants are
   /// opaque return type reprs.

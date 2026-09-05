@@ -514,6 +514,19 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     return makeParserResult(typeExpr);
   }
 
+  // 'some' followed by another identifier is an opaque type.
+  if (Tok.isContextualKeyword("some") &&
+      (peekToken().is(tok::identifier) ||
+       peekToken().isContextualPunctuator("~")) &&
+      !peekToken().isAtStartOfLine()) {
+    ParserResult<TypeRepr> ty = parseType();
+    if (ty.isNull())
+      return nullptr;
+
+    auto *typeExpr = new (Context) TypeExpr(ty.get());
+    return makeParserResult(typeExpr);
+  }
+
   // 'repeat' as an expression prefix is a pack expansion expression.
   if (Tok.is(tok::kw_repeat)) {
     SourceLoc repeatLoc = consumeToken();

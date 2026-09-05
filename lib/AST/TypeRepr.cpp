@@ -77,17 +77,25 @@ SourceRange TypeRepr::getSourceRange() const {
   llvm_unreachable("unknown kind!");
 }
 
-bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred) {
+bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred,
+                      bool walkIntoGenericArgumentExprs) {
   struct Walker : ASTWalker {
     llvm::function_ref<bool(TypeRepr *)> Pred;
+    bool WalkIntoGenericArgumentExprs;
     bool FoundIt;
 
-    explicit Walker(llvm::function_ref<bool(TypeRepr *)> pred)
-        : Pred(pred), FoundIt(false) {}
+    explicit Walker(llvm::function_ref<bool(TypeRepr *)> pred,
+                    bool walkIntoGenericArgumentExprs)
+        : Pred(pred), WalkIntoGenericArgumentExprs(walkIntoGenericArgumentExprs),
+          FoundIt(false) {}
 
     /// Walk everything in a macro
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::ArgumentsAndExpansion;
+    }
+
+    bool shouldWalkIntoGenericArgumentExprTypeRepr() const override {
+      return WalkIntoGenericArgumentExprs;
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *ty) override {
@@ -99,7 +107,7 @@ bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred) {
     }
   };
 
-  Walker walker(pred);
+  Walker walker(pred, walkIntoGenericArgumentExprs);
   walk(walker);
   return walker.FoundIt;
 }
@@ -108,7 +116,8 @@ bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred) {
 // `RecursiveProperties` to track this instead of computing it.
 bool TypeRepr::hasOpaque() {
   return isa<NamedOpaqueReturnTypeRepr>(this) ||
-    findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); });
+    findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); },
+           /*walkIntoGenericArgumentExprs=*/true);
 }
 
 bool TypeRepr::isParenType() const {
