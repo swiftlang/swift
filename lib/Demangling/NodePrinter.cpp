@@ -1266,6 +1266,19 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       print(Node->getChild(Idx++), depth + 1);
       Printer << "]";
       break;
+    case FunctionSigSpecializationParamKind::DifferentiableFunctionProp:
+      if (Idx + 4 > End)
+        return;
+      Printer << "[";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << ", Component Types : [";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << ", ";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << ", ";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << "]";
+      break;
     default:
       assert(
        ((V & unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) ||
@@ -2006,6 +2019,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       return nullptr;
     case FunctionSigSpecializationParamKind::EscapingClosureProp:
       Printer << "Escaping Closure Propagated";
+      return nullptr;
+    case FunctionSigSpecializationParamKind::DifferentiableFunctionProp:
+      Printer << "Differentiable Function Propagated";
       return nullptr;
     case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
       Printer << "Same As Argument";

@@ -158,6 +158,25 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
+  func mangle(withDifferentiableFunctionArguments args: [(argumentIndex: Int, argumentValue: ClosureArgumentMangling)], from applySiteCallee: Function) -> String {
+    let bridgedArgManglings = args.map {
+      switch $0.argumentValue {
+      case .closure(let closure):
+        return BridgedPassContext.ClosureArgMangling(argIdx: $0.argumentIndex,
+                                                     inst: Optional<Instruction>(closure).bridged,
+                                                     otherArgIdx: -1)
+      case .previousArgumentIndex(let idx):
+        return BridgedPassContext.ClosureArgMangling(argIdx: $0.argumentIndex,
+                                                     inst: OptionalBridgedInstruction(),
+                                                     otherArgIdx: idx)
+      }
+    }
+
+    return bridgedArgManglings.withBridgedArrayRef{ bridgedDifferentiableFunctionArgs in
+      String(taking: bridgedPassContext.mangleWithDifferentiableFunctionArgs(bridgedDifferentiableFunctionArgs, applySiteCallee.bridged))
+    }
+  }
+
   func mangle(withConstantCaptureArguments constArgs: [(argumentIndex: Int, argument: Value)],
               from applySiteCallee: Function
   ) -> String {
