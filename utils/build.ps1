@@ -3382,6 +3382,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     Build-CMakeProject @BuildCMakeArgs -BuildTargets @(
       "swift-frontend",
       "sourcekitd-test",
+      "swift-refactor",
       "swift-ide-test",
       "swift-plugin-server"
     )
@@ -3421,6 +3422,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
                                    "swift-synthesize-interface.exe",
                                    "sil-opt.exe",
                                    "sourcekitd-test.exe",
+                                   "swift-refactor.exe",
                                    "swift-ide-test.exe",
                                    "swift-plugin-server.exe",
                                    "swiftc-legacy-driver.exe",
