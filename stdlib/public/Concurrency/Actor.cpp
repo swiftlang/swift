@@ -2670,6 +2670,36 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   task->flagAsAndEnqueueOnExecutor(newExecutor);
 }
 
+SWIFT_CC(swiftasync)
+void swift::swift_task_yieldToExecutor(
+    SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
+    TaskContinuationFunction *resumeFunction) {
+  auto task = swift_task_getCurrent();
+  if (!task) {
+    // Nothing to enqueue; just keep going.
+    return resumeFunction(resumeContext); // 'return' forces tail call
+  }
+
+  auto trackingInfo = ExecutorTrackingInfo::current();
+  auto currentExecutor =
+    (trackingInfo ? trackingInfo->getActiveExecutor()
+                  : SerialExecutorRef::generic());
+
+  SWIFT_TASK_DEBUG_LOG("Task %p yielding to its current executor %p%s", task,
+                       currentExecutor.getIdentity(),
+                       safeGetIdentityDebugName(currentExecutor));
+
+  // Park the task and hand it back to the executor. We deliberately never
+  // take the synchronous fast path here: the whole point of this entry
+  // point is to return to the executor's run loop so that the native stack
+  // is unwound on targets where async resumption is not a tail call.
+  task->ResumeContext = resumeContext;
+  task->ResumeTask = resumeFunction;
+
+  _swift_task_clearCurrent();
+  task->flagAsAndEnqueueOnExecutor(currentExecutor);
+}
+
 SWIFT_CC(swift)
 static void
 swift_task_immediateImpl(AsyncTask *task,
