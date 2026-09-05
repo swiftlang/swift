@@ -1007,8 +1007,7 @@ RequirementMatch swift::matchWitness(
 
     Type reqThrownError = std::get<0>(thrownErrorTypes);
     Type witnessThrownError = std::get<1>(thrownErrorTypes);
-    switch (compareThrownErrorsForSubtyping(witnessThrownError, reqThrownError,
-                                            dc)) {
+    switch (compareThrownErrorsForSubtyping(witnessThrownError, reqThrownError)) {
     case ThrownErrorSubtyping::DropsThrows:
     case ThrownErrorSubtyping::Mismatch:
       return RequirementMatch(witness, MatchKind::ThrowsConflict);
