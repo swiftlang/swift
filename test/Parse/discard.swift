@@ -1,4 +1,4 @@
-// RUN: %swift-frontend -dump-parse -verify %s > /dev/null
+// RUN: %target-swift-frontend -dump-parse -verify %s > /dev/null
 
 func discard<T>(_ t: T) {}
 

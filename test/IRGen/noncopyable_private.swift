@@ -1,4 +1,4 @@
-// RUN: %swift-frontend -primary-file %s %S/Inputs/noncopyable_private_other.swift -emit-ir -o - | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s %S/Inputs/noncopyable_private_other.swift -emit-ir -o - | %FileCheck %s
 
 public struct SomeStruct : ~Copyable {
   // PublicType is a struct without a deinit but a non-copyable field with a

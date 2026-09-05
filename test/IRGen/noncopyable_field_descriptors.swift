@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %swift-frontend -emit-ir -o - %s -module-name test \
+// RUN: %swift -emit-ir -o - %s -module-name test \
 // RUN:   -parse-as-library \
 // RUN:   -enable-library-evolution \
 // RUN:   -target %target-cpu-apple-macosx15 \
 // RUN:   > %t/test_new.irgen
 
-// RUN: %swift-frontend -emit-ir -o - %s -module-name test \
+// RUN: %swift -emit-ir -o - %s -module-name test \
 // RUN:   -parse-as-library \
 // RUN:   -enable-library-evolution \
 // RUN:   -target %target-cpu-apple-macosx14 \
@@ -14,7 +14,7 @@
 // When targeting an OS new enough to ship the runtime with the noncopyable
 // Mirror guards, the accessor function is elided and the field's typeref is
 // referenced directly.
-// RUN: %swift-frontend -emit-ir -o - %s -module-name test \
+// RUN: %swift -emit-ir -o - %s -module-name test \
 // RUN:   -parse-as-library \
 // RUN:   -enable-library-evolution \
 // RUN:   -target %target-swift-6.4-abi-triple \

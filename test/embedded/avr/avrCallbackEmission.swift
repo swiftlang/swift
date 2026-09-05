@@ -1,4 +1,4 @@
-// RUN: %swift-frontend -S -O %s -target avr-none-none-elf \
+// RUN: %swift -S -O %s -target avr-none-none-elf \
 // RUN:   -wmo -enable-experimental-feature Embedded | %FileCheck %s
 // REQUIRES: embedded_stdlib_cross_compiling
 // REQUIRES: CODEGENERATOR=AVR
