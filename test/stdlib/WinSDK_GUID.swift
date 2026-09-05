@@ -4,8 +4,8 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=windows-msvc
 
-// Make sure that importing WinSDK brings in the GUID type, which is declared in
-// /shared and not in /um.
+// Make sure that importing WinSDK brings in the GUID type from the external
+// WinSDK.Shared component map.
 
 import WinSDK
 
