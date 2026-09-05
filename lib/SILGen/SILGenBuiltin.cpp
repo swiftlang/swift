@@ -1556,6 +1556,18 @@ static ManagedValue emitBuiltinAlignof(
       loc, BuiltinNames::Alignof, SILType::getBuiltinWordType(ctx), subs, {}));
 }
 
+// Emit SIL for typedAllocationID.
+// This formally takes a metatype argument that's never actually used,
+// so we ignore it.
+static ManagedValue emitBuiltinTypedAllocationID(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  return ManagedValue::forObjectRValueWithoutOwnership(SGF.B.createBuiltin(
+      loc, BuiltinNames::TypedAllocationID,
+      SILType::getBuiltinIntegerType(64, ctx), subs, {}));
+}
+
 /// Emit SIL for allocRawTyped/deallocRawTyped. These formally take a trailing
 /// T.Type argument that's only used at compile time, to recover the pointee
 /// type for the typed-malloc descriptor computed in IRGen.
