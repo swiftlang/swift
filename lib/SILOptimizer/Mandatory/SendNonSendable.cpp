@@ -4747,8 +4747,29 @@ public:
   ~AssignNeverSendableIntoSendingResultDiagnosticEmitter() {
     // If we were supposed to emit a diagnostic and didn't emit an unknown
     // pattern error.
-    if (!emittedErrorDiagnostic)
+    if (!emittedErrorDiagnostic) {
       emitUnknownPatternError();
+    } else if (auto proto = isolatedValueIsolationRegionInfo.getIsolationInfo()
+                                .getIsolatedConformance()) {
+      if (auto value = isolatedValueIsolationRegionInfo.getIsolationInfo()
+                           .maybeGetIsolatedValue()) {
+        if (auto loc = value.getLoc()) {
+          diagnoseNote(
+              loc, diag::regionbasedisolation_isolated_conformance_introduced,
+              proto);
+        } else if (srcOperand) {
+          diagnoseNote(
+              srcOperand->getUser()->getLoc(),
+              diag::regionbasedisolation_isolated_conformance_introduced,
+              proto);
+        }
+      } else if (srcOperand) {
+        diagnoseNote(
+            srcOperand->getUser()->getLoc(),
+            diag::regionbasedisolation_isolated_conformance_introduced,
+            proto);
+      }
+    }
   }
 
   SILFunction *getFunction() const { return srcOperand->getFunction(); }
