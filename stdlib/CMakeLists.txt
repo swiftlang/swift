@@ -208,6 +208,22 @@ if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded"
   message(SEND_ERROR "Cannot enable the single-threaded global executor without enabling SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
 endif()
 
+if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "wasi")
+  # The WASI thread-pool executor is only meaningful for the wasi-threads
+  # triple: it needs real threads (the pthreads threading package) and a
+  # runtime that is not compiled single-threaded, or every worker looks like
+  # the main thread to the actor runtime.
+  if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WASI")
+    message(SEND_ERROR "The wasi global executor is only supported when targeting WASI (CMAKE_SYSTEM_NAME is \"${CMAKE_SYSTEM_NAME}\")")
+  endif()
+  if(NOT "${SWIFT_THREADING_PACKAGE}" STREQUAL "pthreads")
+    message(SEND_ERROR "The wasi global executor requires SWIFT_THREADING_PACKAGE=pthreads (wasm32-unknown-wasip1-threads), not \"${SWIFT_THREADING_PACKAGE}\"")
+  endif()
+  if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+    message(SEND_ERROR "Cannot enable the wasi global executor with SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
+  endif()
+endif()
+
 if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
     message(SEND_ERROR "Cannot use the single-threaded concurrency with task-to-thread concurrency model")
