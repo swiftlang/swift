@@ -7817,6 +7817,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnoseKeyPathAsFunctionResultMismatch())
     return true;
 
+  if (diagnoseInOutToPointerInSubscript())
+    return true;
+
   auto argType = getFromType();
 
   // Unresolved key path argument requires a tailored diagnostic
@@ -8154,6 +8157,29 @@ bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
   // Suggest importing RegexBuilder.
   auto diag = emitDiagnostic(diag::must_import_regex_builder_module);
   fixItImport(diag, ctx.Id_RegexBuilder, getDC());
+  return true;
+}
+
+bool ArgumentMismatchFailure::diagnoseInOutToPointerInSubscript() const {
+  // Only for `&x` passed where a pointer is expected.
+  auto *argExpr = getAsExpr(getAnchor());
+  if (!argExpr || !argExpr->isSemanticallyInOutExpr())
+    return false;
+
+  PointerTypeKind pointerKind;
+  if (!getToType()->lookThroughAllOptionalTypes()->getAnyPointerElementType(
+          pointerKind))
+    return false;
+
+  // The implicit inout-to-pointer conversion deliberately does not apply to
+  // subscript arguments; `inout` there means the index takes the exclusive
+  // access itself. See `matchTypes` in CSSimplify.cpp.
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!overload || !overload->choice.isDecl() ||
+      !isa<SubscriptDecl>(overload->choice.getDecl()))
+    return false;
+
+  emitDiagnostic(diag::cannot_pass_inout_arg_to_subscript);
   return true;
 }
 

@@ -463,16 +463,17 @@ do {
 // https://github.com/apple/swift/issues/50425
 
 struct InOutSubscripts {
+  // An `inout` index is supported: it takes the exclusive access itself, which
+  // every accessor of one formal access on the subscript mutates through.
   subscript(x1: inout Int) -> Int { return 0 }
-  // expected-error@-1 {{'inout' may only be used on function or initializer parameters}}
 
   subscript(x2: inout Int, y2: inout Int) -> Int { return 0 }
-  // expected-error@-1 2{{'inout' may only be used on function or initializer parameters}}
 
   subscript(x3: (inout Int) -> ()) -> Int { return 0 } // ok
   subscript(x4: (inout Int, inout Int) -> ()) -> Int { return 0 } // ok
 
-  subscript(inout x5: Int) -> Int { return 0 }
+  // The specifier goes before the type, not before the name. (A distinct index
+  // type, so that recovering from this does not collide with `x1` above.)
+  subscript(inout x5: Double) -> Int { return 0 }
   // expected-error@-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}
-  // expected-error@-2 {{'inout' may only be used on function or initializer parameters}}
 }

@@ -2338,6 +2338,10 @@ public:
   /// result value.
   bool diagnoseKeyPathAsFunctionResultMismatch() const;
 
+  /// Tailored diagnostic for `&x` passed to a subscript parameter of pointer
+  /// type, where the implicit inout-to-pointer conversion does not apply.
+  bool diagnoseInOutToPointerInSubscript() const;
+
   /// Situations like this:
   ///
   /// func foo(_: Int, _: String) {}
