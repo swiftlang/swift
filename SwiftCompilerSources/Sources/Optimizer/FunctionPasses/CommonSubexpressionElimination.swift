@@ -23,6 +23,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 // -----------------------------------------------------------------------
@@ -265,7 +266,7 @@ private func isOptimizableLazyPropertyGetter(_ ai: ApplyInst) -> Bool {
     return false
   }
 
-  guard let someDest = sei.getUniqueSuccessor(forCaseIndex: Builder.optionalSomeCaseIndex) else {
+  guard let someDest = sei.getUniqueSuccessor(forCaseIndex: EnumDecl.optionalSomeCaseIndex) else {
     return false
   }
   return someDest.arguments.count == 1
@@ -295,7 +296,7 @@ private func processLazyPropertyGetters(
     // After inlining the getter, the call block's terminator is the
     // switch_enum from the getter's entry block.
     guard let sei = callBlock.terminator as? SwitchEnumInst,
-      let someDest = sei.getUniqueSuccessor(forCaseIndex: Builder.optionalSomeCaseIndex),
+      let someDest = sei.getUniqueSuccessor(forCaseIndex: EnumDecl.optionalSomeCaseIndex),
       someDest.arguments.count == 1
     else {
       continue
@@ -304,7 +305,7 @@ private func processLazyPropertyGetters(
     let builder = Builder(before: sei, context)
     let ued = builder.createUncheckedEnumData(
       enum: sei.enumOp,
-      caseIndex: Builder.optionalSomeCaseIndex,
+      caseIndex: EnumDecl.optionalSomeCaseIndex,
       resultType: someDest.arguments[0].type
     )
     _ = builder.createBranch(to: someDest, arguments: [ued])
