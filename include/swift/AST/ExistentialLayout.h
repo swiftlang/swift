@@ -42,9 +42,16 @@ struct COMExistentialInterfaceResolution {
   /// The first non-marker Swift protocol, retained for diagnostics.
   ProtocolDecl *firstNonMarkerProtocol = nullptr;
 
-  /// Whether the composition contains the compiler-managed \c COMInterface
-  /// protocol itself.
-  bool containsCOMInterfaceProtocol = false;
+  /// A compiler-managed COM identity protocol contained by the composition.
+  ProtocolDecl *identityProtocol = nullptr;
+
+  /// A resolution is invalid if there are incomparable interfaces, non-marker
+  /// Swift protocol conformances, or if there is an explicitly stated identity
+  /// protocol conformance.
+  bool isInvalid() const {
+    return firstIncomparableInterface || firstNonMarkerProtocol ||
+           identityProtocol;
+  }
 };
 
 struct ExistentialLayout {

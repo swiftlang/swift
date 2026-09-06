@@ -6937,7 +6937,11 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
     // Check and record normal conformances.
     if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
-      groupChecker.addConformance(normal);
+      auto *protocol = normal->getProtocol();
+      bool isCOMIdentity =
+          Context.LangOpts.EnableCOMInterop && protocol->isCOMIdentity();
+      if (!normal->isInvalid() || !isCOMIdentity)
+        groupChecker.addConformance(normal);
     }
 
     // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which

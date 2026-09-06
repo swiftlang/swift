@@ -2319,9 +2319,12 @@ ERROR(com_interface_refinement_requires_identity, none,
 ERROR(com_interface_repeated_iid, none,
       "COM interface %0 and inherited interface %1 use the same interface "
       "identifier '%2'", (DeclName, DeclName, StringRef))
-ERROR(com_cominterface_existential, none,
-      "'any COMInterface' is invalid because 'COMInterface' does not identify a COM interface",
-      ())
+ERROR(com_identity_existential, none,
+      "'any %0' is invalid because '%0' describes a COM metatype identity",
+      (StringRef))
+ERROR(com_identity_explicit_conformance, none,
+      "%0 conformance is compiler-managed and cannot be declared explicitly",
+      (DeclName))
 ERROR(com_identity_invalid_requirement, none,
       "expected '%0' to declare 'var %1: %2 { get }'",
       (StringRef, StringRef, StringRef))
