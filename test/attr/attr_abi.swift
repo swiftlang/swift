@@ -2373,6 +2373,13 @@ func func_with_nested_abi() {
 @abi(var x = 1) // expected-error {{initial value is not allowed here}} expected-error {{type annotation missing in pattern}}
 var x = 1
 
+@freestanding(expression) // expected-error {{'@freestanding' attribute cannot be applied to this declaration}}
+@abi(func unreachableInABIAttrOnDecl_abi())
+public func unreachableInABIAttrOnDecl() {}
+
+@abi(@freestanding(expression) func unreachableInABIAttrInABI_abi()) // expected-error {{unused 'freestanding' attribute in '@abi'}}
+public func unreachableInABIAttrInABI() {}
+
 //
 // Examples of expected use cases
 //
