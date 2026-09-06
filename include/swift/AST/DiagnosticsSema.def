@@ -2322,6 +2322,12 @@ ERROR(com_interface_repeated_iid, none,
 ERROR(com_cominterface_existential, none,
       "'any COMInterface' is invalid because 'COMInterface' does not identify a COM interface",
       ())
+ERROR(com_identity_invalid_requirement, none,
+      "expected '%0' to declare 'var %1: %2 { get }'",
+      (StringRef, StringRef, StringRef))
+ERROR(com_identity_unsupported_requirement, none,
+      "requirement %0 of %1 is not supported by this compiler",
+      (DeclName, DeclName))
 ERROR(com_existential_multiple_interfaces, none,
       "COM existential cannot contain interfaces %0 and %1 because neither refines the other",
       (DeclName, DeclName))

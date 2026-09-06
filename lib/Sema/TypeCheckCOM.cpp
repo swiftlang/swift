@@ -587,6 +587,52 @@ void com::validateConformance(ProtocolConformance *conformance) {
   }
 }
 
+void com::validateIdentityProtocol(ProtocolDecl *PD) {
+  if (!PD->isCOMIdentity())
+    return;
+
+  VarDecl *identity = nullptr;
+  for (auto *requirement : PD->getProtocolRequirements()) {
+    auto kind = classifyCOMIdentityRequirement(requirement);
+    if (!kind) {
+      requirement->diagnose(diag::com_identity_unsupported_requirement,
+                            requirement->getName(), PD->getName());
+      PD->setInvalid();
+      continue;
+    }
+
+    switch (*kind) {
+    case COMIdentityRequirementKind::InterfaceID:
+    case COMIdentityRequirementKind::ActivationID:
+      identity = dyn_cast<VarDecl>(requirement);
+      break;
+    }
+  }
+
+  auto &context = PD->getASTContext();
+  bool interface = PD->isSpecificProtocol(KnownProtocolKind::COMInterface);
+  Identifier ident = interface ? context.Id_IID : context.Id_CLSID;
+  auto *decl =
+      ::com::lookup(context, PD->getDeclContext(), ident, PD->getLoc());
+
+  if (!decl) {
+    PD->setInvalid();
+    return;
+  }
+
+  auto *getter = identity ? identity->getAccessor(AccessorKind::Get) : nullptr;
+  bool hasValidIdentity = identity && !identity->isStatic() &&
+                          !identity->isSettable(nullptr) && getter &&
+                          !getter->hasAsync() && !getter->hasThrows() &&
+                          identity->getValueInterfaceType()->isEqual(
+                              decl->getDeclaredInterfaceType());
+  if (!hasValidIdentity) {
+    PD->diagnose(diag::com_identity_invalid_requirement, PD->getName().str(),
+                 ident.str(), ident.str());
+    PD->setInvalid();
+  }
+}
+
 ProtocolConformance *
 com::deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP) {
   const auto *CD = dyn_cast<ClassDecl>(NTD);
