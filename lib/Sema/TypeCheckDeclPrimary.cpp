@@ -300,6 +300,28 @@ static void checkInheritanceClause(
         isa<AssociatedTypeDecl>(decl))
       continue;
 
+    // The COM identity protocols describe compiler-managed metatype
+    // conformances. Protocols cannot refine them in source, including through
+    // protocol compositions.
+    if (ctx.LangOpts.EnableCOMInterop && isa<ProtocolDecl>(decl) &&
+        inheritedTy->isConstraintType()) {
+      auto layout = inheritedTy->getExistentialLayout();
+      bool hasIdentity = false;
+      for (auto *protocol : layout.getProtocols()) {
+        if (!protocol->isCOMIdentity())
+          continue;
+        diags.diagnose(inherited.getLoc(),
+                       diag::com_identity_explicit_conformance,
+                       protocol->getName());
+        hasIdentity = true;
+      }
+      if (hasIdentity) {
+        if (auto *repr = inherited.getTypeRepr())
+          repr->setInvalid();
+        continue;
+      }
+    }
+
     if (inherited.isReparented())
       checkReparentedExtensionEntry(ext, inherited, inheritedTy);
 
@@ -3630,6 +3652,9 @@ public:
     for (auto Member : PD->getMembers())
       visit(Member);
 
+    if (Ctx.LangOpts.EnableCOMInterop)
+      com::validateIdentityProtocol(PD);
+
     checkDeclCommon(PD);
 
     checkProtocolRefinementRequirements(PD);
@@ -3878,7 +3903,12 @@ public:
   static void diagnoseExtensionOfMarkerProtocol(ExtensionDecl *ED) {
     auto *nominal = ED->getExtendedNominal();
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(nominal)) {
-      if (proto->getKnownProtocolKind() && proto->isMarkerProtocol()) {
+      bool isExternalCOMInterfaceExtension =
+          ED->getASTContext().LangOpts.EnableCOMInterop &&
+          proto->isSpecificProtocol(KnownProtocolKind::COMInterface) &&
+          ED->getModuleContext() != proto->getModuleContext();
+      if ((proto->getKnownProtocolKind() && proto->isMarkerProtocol()) ||
+          isExternalCOMInterfaceExtension) {
         ED->diagnose(diag::cannot_extend_nominal, nominal);
       }
     }

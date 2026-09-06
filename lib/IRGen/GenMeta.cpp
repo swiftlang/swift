@@ -7716,6 +7716,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
   case KnownProtocolKind::COMInterface:
+  case KnownProtocolKind::COMActivatable:
+  case KnownProtocolKind::COMAggregatable:
     return SpecialProtocol::None;
   }
 

@@ -5906,6 +5906,12 @@ public:
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
+  /// Whether this is a compiler-managed COM identity protocol.
+  bool isCOMIdentity() const {
+    return isSpecificProtocol(KnownProtocolKind::COMInterface) ||
+           isSpecificProtocol(KnownProtocolKind::COMActivatable);
+  }
+
   /// Whether this protocol declares a COM interface.
   bool isCOMInterface() const {
     return getCOMDeclInfo() != nullptr;
