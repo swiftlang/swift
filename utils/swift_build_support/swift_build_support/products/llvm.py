@@ -97,7 +97,7 @@ class LLVM(cmake_product.CMakeProduct):
         return [cmark.CMark]
 
     def llvm_c_flags(self, platform, arch):
-        result = self.common_cross_c_flags(platform, arch, include_arch=True)
+        result = self.common_cross_c_flags(platform, arch, include_arch=False)
         if self.is_debug_info():
             if self.args.lto_type:
                 result.append('-gline-tables-only')
@@ -284,6 +284,8 @@ class LLVM(cmake_product.CMakeProduct):
         llvm_c_flags = ' '.join(self.llvm_c_flags(platform, arch))
         llvm_cmake_options.define('CMAKE_C_FLAGS', llvm_c_flags)
         llvm_cmake_options.define('CMAKE_CXX_FLAGS', llvm_c_flags)
+        llvm_cmake_options.define('CMAKE_C_COMPILER_TARGET', self.target_for_platform(platform, arch, include_version=True))
+        llvm_cmake_options.define('CMAKE_CXX_COMPILER_TARGET', self.target_for_platform(platform, arch, include_version=True))
         llvm_cmake_options.define('CMAKE_C_FLAGS_RELWITHDEBINFO', '-O2 -DNDEBUG')
         llvm_cmake_options.define('CMAKE_CXX_FLAGS_RELWITHDEBINFO', '-O2 -DNDEBUG')
         llvm_cmake_options.define('CMAKE_BUILD_TYPE:STRING',
@@ -378,6 +380,18 @@ class LLVM(cmake_product.CMakeProduct):
                                   ';'.join(llvm_enable_projects))
         llvm_cmake_options.define('LLVM_ENABLE_RUNTIMES',
                                   ';'.join(llvm_enable_runtimes))
+        llvm_cmake_options.define('LLVM_EXTERNAL_SWIFT_SOURCE_DIR',
+                                  os.path.join(self.source_dir, '../../swift'))
+        # When Swift is embedded via LLVM_EXTERNAL_PROJECTS=swift, its unified
+        # build-config path doesn't set up cmark. Point Swift at the sibling
+        # cmark build produced earlier by the CMark product so swift's
+        # CMakeLists.txt can load the libcmark-gfm target from cmarkTargets.cmake.
+        cmark_build_dir = self.build_dir.replace('/llvm-', '/cmark-', 1)
+        llvm_cmake_options.define('SWIFT_PATH_TO_CMARK_BUILD', cmark_build_dir)
+        llvm_cmake_options.define('SWIFT_PATH_TO_CMARK_SOURCE',
+                                  os.path.join(self.source_dir, '../../cmark'))
+        llvm_cmake_options.define('SWIFT_PATH_TO_STRING_PROCESSING_SOURCE',
+                                  os.path.join(self.source_dir, '../../swift-experimental-string-processing'))
 
         # NOTE: This is not a dead option! It is relied upon for certain
         # bots/build-configs!

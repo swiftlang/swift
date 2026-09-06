@@ -952,6 +952,15 @@ if(SWIFT_PATH_TO_CMARK_BUILD)
     OUTPUT_VARIABLE _CMARK_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   message(STATUS "CMark Version: ${_CMARK_VERSION}")
+  # In unified builds (LLVM_EXTERNAL_PROJECTS=swift) `swift_common_unified_build_config`
+  # does not load the cmark exports, so pull in the libcmark-gfm target here.
+  if(NOT SWIFT_BUILT_STANDALONE AND EXISTS "${SWIFT_PATH_TO_CMARK_BUILD}/src/cmarkTargets.cmake")
+    include("${SWIFT_PATH_TO_CMARK_BUILD}/src/cmarkTargets.cmake")
+    include_directories(
+      "${SWIFT_PATH_TO_CMARK_SOURCE}/src/include"
+      "${SWIFT_PATH_TO_CMARK_BUILD}/src")
+    add_definitions(-DCMARK_STATIC_DEFINE)
+  endif()
 elseif(SWIFT_INCLUDE_TOOLS AND NOT "cmark" IN_LIST LLVM_EXTERNAL_PROJECTS)
   find_package(cmark-gfm CONFIG REQUIRED)
 endif()
