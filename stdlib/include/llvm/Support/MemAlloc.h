@@ -72,7 +72,7 @@ LLVM_ATTRIBUTE_RETURNS_NONNULL inline void *safe_realloc(void *Ptr, size_t Sz) {
 
 /// Allocate a buffer of memory with the given size and alignment.
 ///
-/// When the compiler supports aligned operator new, this will use it to to
+/// When the compiler supports aligned operator new, this will use it to
 /// handle even over-aligned allocations.
 ///
 /// However, this doesn't make any attempt to leverage the fancier techniques
