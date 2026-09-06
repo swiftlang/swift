@@ -64,6 +64,8 @@ fromStableStringEncoding(unsigned value) {
   case SIL_UTF8: return StringLiteralInst::Encoding::UTF8;
   case SIL_OBJC_SELECTOR: return StringLiteralInst::Encoding::ObjCSelector;
   case SIL_UTF8_OSLOG: return StringLiteralInst::Encoding::UTF8_OSLOG;
+  case SIL_BYTES16: return StringLiteralInst::Encoding::Bytes16;
+  case SIL_BYTES32: return StringLiteralInst::Encoding::Bytes32;
   default:
     return std::nullopt;
   }

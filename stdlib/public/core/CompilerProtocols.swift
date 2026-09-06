@@ -415,9 +415,24 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 /// Conforming to ExpressibleByUnicodeScalarLiteral
 /// ===============================================
 ///
+/// An umbrella protocol satisfied by any type expressible from a string
+/// literal containing a single Unicode scalar, whether checked
+/// (`ExpressibleByUnicodeScalarLiteral`) or unchecked
+/// (`ExpressibleByUncheckedStringLiteral`, which refines this transitively
+/// through `ExpressibleByPossiblyUncheckedExtendedGraphemeClusterLiteral`
+/// and `ExpressibleByPossiblyUncheckedStringLiteral`).
+///
+/// This has no requirements of its own. It exists purely so that a
+/// single-Unicode-scalar literal's constraint-system type variable can defer
+/// the choice of which literal protocol it needs until enough context is
+/// available, the same way plain multi-character literals already do via
+/// `ExpressibleByPossiblyUncheckedStringLiteral`.
+public protocol ExpressibleByPossiblyUncheckedUnicodeScalarLiteral {}
+
 /// To add `ExpressibleByUnicodeScalarLiteral` conformance to your custom type,
 /// implement the required initializer.
-public protocol ExpressibleByUnicodeScalarLiteral {
+public protocol ExpressibleByUnicodeScalarLiteral
+  : ExpressibleByPossiblyUncheckedUnicodeScalarLiteral {
   /// A type that represents a Unicode scalar literal.
   ///
   /// Valid types for `UnicodeScalarLiteralType` are `Unicode.Scalar`,
@@ -429,6 +444,13 @@ public protocol ExpressibleByUnicodeScalarLiteral {
   /// - Parameter value: The value of the new instance.
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
 }
+
+/// An umbrella protocol satisfied by any type expressible from a string
+/// literal containing a single extended grapheme cluster, whether checked
+/// or unchecked. See `ExpressibleByPossiblyUncheckedUnicodeScalarLiteral`,
+/// which this refines, for why it exists.
+public protocol ExpressibleByPossiblyUncheckedExtendedGraphemeClusterLiteral
+  : ExpressibleByPossiblyUncheckedUnicodeScalarLiteral {}
 
 public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
   : _ExpressibleByBuiltinUnicodeScalarLiteral {
@@ -463,7 +485,8 @@ public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
 /// To add `ExpressibleByExtendedGraphemeClusterLiteral` conformance to your
 /// custom type, implement the required initializer.
 public protocol ExpressibleByExtendedGraphemeClusterLiteral
-  : ExpressibleByUnicodeScalarLiteral {
+  : ExpressibleByUnicodeScalarLiteral,
+    ExpressibleByPossiblyUncheckedExtendedGraphemeClusterLiteral {
 
   /// A type that represents an extended grapheme cluster literal.
   ///
@@ -487,8 +510,19 @@ extension ExpressibleByExtendedGraphemeClusterLiteral
   }
 }
 
+/// An umbrella protocol satisfied by any builtin string-literal-representable
+/// type, whether checked (Unicode-validated) or unchecked (raw code units).
+///
+/// This has no requirements of its own. It exists purely so that generic
+/// machinery -- such as `StringInterpolationProtocol.StringLiteralType` --
+/// can accept either kind of literal representation without hardcoding which
+/// one, letting a literal's governing protocol be resolved by ordinary
+/// context-driven type inference instead of being chosen eagerly up front.
+public protocol _ExpressibleByBuiltinPossiblyUncheckedStringLiteral {}
+
 public protocol _ExpressibleByBuiltinStringLiteral
-  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
+  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
+    _ExpressibleByBuiltinPossiblyUncheckedStringLiteral {
 
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
@@ -510,13 +544,14 @@ public protocol _ExpressibleByBuiltinStringLiteral
 /// To add `ExpressibleByStringLiteral` conformance to your custom type,
 /// implement the required initializer.
 public protocol ExpressibleByStringLiteral
-  : ExpressibleByExtendedGraphemeClusterLiteral {
-  
+  : ExpressibleByExtendedGraphemeClusterLiteral,
+    ExpressibleByPossiblyUncheckedStringLiteral {
+
   /// A type that represents a string literal.
   ///
   /// Valid types for `StringLiteralType` are `String` and `StaticString`.
   associatedtype StringLiteralType: _ExpressibleByBuiltinStringLiteral
-  
+
   /// Creates an instance initialized to the given string value.
   ///
   /// - Parameter value: The value of the new instance.
@@ -530,6 +565,54 @@ extension ExpressibleByStringLiteral
   public init(extendedGraphemeClusterLiteral value: StringLiteralType) {
     self.init(stringLiteral: value)
   }
+}
+
+/// An umbrella protocol satisfied by any string-literal-representable type,
+/// whether checked (`ExpressibleByStringLiteral`) or unchecked
+/// (`ExpressibleByUncheckedStringLiteral`).
+///
+/// This has no requirements of its own. It exists purely so that a string
+/// literal's constraint-system type variable can defer the choice between
+/// the checked and unchecked literal protocols until enough context is
+/// available to resolve it, instead of committing to one eagerly at
+/// constraint-generation time.
+public protocol ExpressibleByPossiblyUncheckedStringLiteral
+  : ExpressibleByPossiblyUncheckedExtendedGraphemeClusterLiteral {}
+
+public protocol _ExpressibleByBuiltinUncheckedStringLiteral
+  : _ExpressibleByBuiltinPossiblyUncheckedStringLiteral {
+  init(
+    _builtinUncheckedStringLiteral start: Builtin.RawPointer,
+    unitCount: Builtin.Word)
+}
+
+/// A type that can be initialized with a string literal containing a
+/// `\x{hh}` raw code unit escape.
+///
+/// `\x{hh}` denotes a raw code unit value rather than a Unicode scalar, so
+/// a literal containing one cannot conform to `ExpressibleByStringLiteral`.
+/// `UncheckedString` conforms to `ExpressibleByUncheckedStringLiteral`
+/// instead; there is no supertype relationship to
+/// `ExpressibleByExtendedGraphemeClusterLiteral`/
+/// `ExpressibleByUnicodeScalarLiteral`, since a literal that may contain
+/// raw, possibly-invalid code units has no meaningful notion of "a single
+/// extended grapheme cluster" or "a single Unicode scalar".
+///
+/// Conforming to ExpressibleByUncheckedStringLiteral
+/// ==================================================
+///
+/// To add `ExpressibleByUncheckedStringLiteral` conformance to your custom
+/// type, implement the required initializer.
+public protocol ExpressibleByUncheckedStringLiteral
+  : ExpressibleByPossiblyUncheckedStringLiteral {
+
+  /// A type that represents an unchecked string literal.
+  associatedtype UncheckedStringLiteralType: _ExpressibleByBuiltinUncheckedStringLiteral
+
+  /// Creates an instance initialized to the given unchecked string value.
+  ///
+  /// - Parameter value: The value of the new instance.
+  init(uncheckedStringLiteral value: UncheckedStringLiteralType)
 }
 
 /// A type that can be initialized using an array literal.
@@ -764,9 +847,28 @@ public protocol ExpressibleByDictionaryLiteral {
 /// `StringInterpolationProtocol` and have a matching `StringLiteralType`.
 ///
 /// For more information, see the `StringInterpolationProtocol` documentation.
+/// An umbrella protocol satisfied by any string-interpolation-representable
+/// type, whether checked (`ExpressibleByStringInterpolation`) or unchecked
+/// (`ExpressibleByUncheckedStringInterpolation`).
+///
+/// `ExpressibleByStringInterpolation` refines `ExpressibleByStringLiteral`
+/// (and, transitively, the Unicode-scalar/grapheme-cluster literal
+/// protocols), so a type that deliberately doesn't conform to those --
+/// like `UncheckedString`, via `ExpressibleByUncheckedStringLiteral` -- can't
+/// conform to `ExpressibleByStringInterpolation` either. This umbrella lets
+/// an interpolated string literal's constraint-system type variable defer
+/// the choice between the two interpolation protocols until enough context
+/// is available, mirroring `ExpressibleByPossiblyUncheckedStringLiteral`'s
+/// role for plain (non-interpolated) literals.
+public protocol ExpressibleByPossiblyUncheckedStringInterpolation {
+  /// The type each segment of a string literal containing interpolations
+  /// should be appended to.
+  associatedtype StringInterpolation: StringInterpolationProtocol
+}
+
 public protocol ExpressibleByStringInterpolation
-  : ExpressibleByStringLiteral {
-  
+  : ExpressibleByStringLiteral, ExpressibleByPossiblyUncheckedStringInterpolation {
+
 #if !$Embedded
   /// The type each segment of a string literal containing interpolations
   /// should be appended to.
@@ -782,12 +884,41 @@ public protocol ExpressibleByStringInterpolation
 #endif
 
   /// Creates an instance from a string interpolation.
-  /// 
+  ///
   /// Most `StringInterpolation` types will store information about the
   /// literals and interpolations appended to them in one or more properties.
   /// `init(stringInterpolation:)` should use these properties to initialize
   /// the instance.
-  /// 
+  ///
+  /// - Parameter stringInterpolation: An instance of `StringInterpolation`
+  ///             which has had each segment of the string literal appended
+  ///             to it.
+  init(stringInterpolation: StringInterpolation)
+}
+
+/// A type that can be initialized with a string literal containing
+/// interpolations, where the literal segments may contain `\x{hh}` raw code
+/// unit escapes.
+///
+/// This is `ExpressibleByStringInterpolation`'s counterpart for
+/// `ExpressibleByUncheckedStringLiteral`-conforming types, for the same
+/// reason `ExpressibleByUncheckedStringLiteral` itself exists separately
+/// from `ExpressibleByStringLiteral`: raw code units have no meaningful
+/// Unicode interpretation, so a conforming type can't also satisfy
+/// `ExpressibleByStringLiteral`'s (transitive) requirements.
+public protocol ExpressibleByUncheckedStringInterpolation
+  : ExpressibleByUncheckedStringLiteral, ExpressibleByPossiblyUncheckedStringInterpolation {
+
+  /// The type each segment of a string literal containing interpolations
+  /// should be appended to.
+  ///
+  /// The `StringLiteralType` of an interpolation type must match the
+  /// `UncheckedStringLiteralType` of the conforming type.
+  associatedtype StringInterpolation: StringInterpolationProtocol
+    where StringInterpolation.StringLiteralType == UncheckedStringLiteralType
+
+  /// Creates an instance from a string interpolation.
+  ///
   /// - Parameter stringInterpolation: An instance of `StringInterpolation`
   ///             which has had each segment of the string literal appended
   ///             to it.
@@ -796,9 +927,9 @@ public protocol ExpressibleByStringInterpolation
 
 extension ExpressibleByStringInterpolation
   where StringInterpolation == DefaultStringInterpolation {
-  
+
   /// Creates a new instance from an interpolated string literal.
-  /// 
+  ///
   /// Don't call this initializer directly. It's used by the compiler when
   /// you create a string using string interpolation. Instead, use string
   /// interpolation to create a new string by including values, literals,
@@ -894,7 +1025,7 @@ extension ExpressibleByStringInterpolation
 /// `try` or one of its variants.
 public protocol StringInterpolationProtocol {
   /// The type that should be used for literal segments.
-  associatedtype StringLiteralType: _ExpressibleByBuiltinStringLiteral
+  associatedtype StringLiteralType: _ExpressibleByBuiltinPossiblyUncheckedStringLiteral
 
   /// Creates an empty instance ready to be filled with string literal content.
   /// 

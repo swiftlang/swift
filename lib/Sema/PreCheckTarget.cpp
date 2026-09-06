@@ -2794,10 +2794,6 @@ Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (!literal)
     return nullptr;
 
-  auto *protocol = TypeChecker::getLiteralProtocol(getASTContext(), literal);
-  if (!protocol)
-    return nullptr;
-
   Type castTy;
   if (auto precheckedTy = typeExpr->getInstanceType()) {
     castTy = precheckedTy;
@@ -2828,6 +2824,15 @@ Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
     if (castTy->isEqual(selectorTy))
       return nullptr;
   }
+
+  // `getLiteralProtocol` returns the `ExpressibleByPossiblyUncheckedStringLiteral`
+  // umbrella for an ordinary string literal, so this conformance check
+  // already recognizes `UncheckedString<UInt16>("...")` as valid
+  // literal-init sugar (via `ExpressibleByUncheckedStringLiteral` refining
+  // the umbrella) without needing to special-case the contextual type here.
+  auto *protocol = TypeChecker::getLiteralProtocol(getASTContext(), literal);
+  if (!protocol)
+    return nullptr;
 
   return lookupConformance(castTy, protocol)
              ? CoerceExpr::forLiteralInit(getASTContext(), literal,

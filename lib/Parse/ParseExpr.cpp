@@ -1945,13 +1945,22 @@ createStringLiteralExprFromSegment(ASTContext &Ctx,
   assert(Segment.Kind == Lexer::StringSegment::Literal);
   // FIXME: Consider lazily encoding the string when needed.
   llvm::SmallString<256> Buf;
-  StringRef EncodedStr = L->getEncodedStringSegment(Segment, Buf);
+  llvm::SmallVector<Lexer::RawCodeUnitEscape, 4> RawEscapes;
+  StringRef EncodedStr = L->getEncodedStringSegment(Segment, Buf, &RawEscapes);
   if (!Buf.empty()) {
     assert(EncodedStr.begin() == Buf.begin() &&
            "Returned string is not from buffer?");
     EncodedStr = Ctx.AllocateCopy(EncodedStr);
   }
-  return new (Ctx) StringLiteralExpr(EncodedStr, TokenLoc);
+
+  SmallVector<StringLiteralExpr::RawCodeUnitSplice, 4> Splices;
+  for (const auto &RawEscape : RawEscapes) {
+    Splices.push_back({Segment.Loc.getAdvancedLoc(RawEscape.SourceOffset),
+                       RawEscape.Offset, RawEscape.Value});
+  }
+
+  return new (Ctx) StringLiteralExpr(EncodedStr, TokenLoc, /*Implicit=*/false,
+                                     Ctx.AllocateCopy(Splices));
 }
 
 ParserStatus Parser::

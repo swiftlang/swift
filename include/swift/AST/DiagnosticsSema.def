@@ -5177,6 +5177,13 @@ ERROR(builtin_string_literal_broken_proto,none,
 ERROR(string_literal_broken_proto,none,
       "protocol 'ExpressibleByStringLiteral' is broken", ())
 
+ERROR(builtin_unchecked_string_literal_broken_proto,none,
+      "protocol '_ExpressibleByBuiltinUncheckedStringLiteral' is broken", ())
+ERROR(unchecked_string_literal_broken_proto,none,
+      "protocol 'ExpressibleByUncheckedStringLiteral' is broken", ())
+ERROR(unchecked_string_literal_raw_escape_overflow,none,
+      "raw code unit escape does not fit in %0 (%1-bit)", (Type, unsigned))
+
 // Array literals
 ERROR(should_use_dictionary_literal,none,
       "dictionary of type %0 cannot be %select{used|initialized}1 "

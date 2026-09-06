@@ -1,0 +1,291 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+/// A type that can provide a raw, native-width representation of itself for
+/// interpolation into an `UncheckedString`.
+///
+/// Unlike `String`'s `CustomStringConvertible`, which produces Unicode text,
+/// a `CustomUncheckedStringConvertible` type produces raw `Element` data
+/// directly -- no implicit encoding, transcoding, or textual description is
+/// involved. `UncheckedString` interpolation only accepts values that
+/// conform to this protocol (rather than any `CustomStringConvertible`
+/// value, the way `String` interpolation does), since nothing about
+/// `UncheckedString` implies a text encoding that an arbitrary describable
+/// value could be rendered through.
+///
+/// `UncheckedStringProtocol` (and therefore `UncheckedString` and
+/// `UncheckedSubString`) conforms to this protocol automatically, producing
+/// its own character data. Any other type can opt in by declaring the
+/// conformance and implementing `withUncheckedStringRepresentation`.
+@available(SwiftStdlib 9999, *)
+public protocol CustomUncheckedStringConvertible {
+  /// The element type of the raw representation this type provides.
+  associatedtype UncheckedStringElement: FixedWidthInteger
+
+  /// Calls the given closure with a buffer containing this value's raw
+  /// `UncheckedStringElement` representation.
+  ///
+  /// - Parameter body: A closure that takes a `Span` over this value's raw
+  ///                    representation.
+  ///
+  /// - Returns The value returned by `body`.
+  func withUncheckedStringRepresentation<R, Failure>(
+    _ body: (Span<UncheckedStringElement>) throws(Failure) -> R
+  ) throws(Failure) -> R
+}
+
+/// A type that can represent a string as a collection of characters.
+///
+/// Unlike `StringProtocol`, no assumptions are made about the encoding or
+/// type of the characters.
+@available(SwiftStdlib 9999, *)
+public protocol UncheckedStringProtocol
+  : BidirectionalCollection, Equatable, Hashable, Comparable,
+    CustomDebugStringConvertible, CustomUncheckedStringConvertible
+  where Iterator.Element: FixedWidthInteger,
+    Index == Int,
+    SubSequence: UncheckedStringProtocol,
+    UncheckedStringElement == Element
+{
+  /// The type of a contiguous subrange of this string's elements.
+  typealias SubSequence = UncheckedSubString<Element>
+
+  /// Calls the given closure with a buffer of `Element`s,
+  /// which are *not* necessarily NUL-terminated.
+  ///
+  /// - Parameter body: A closure that takes a `Span` over the string's
+  ///                    contents.
+  ///
+  /// - Returns The value returned by `body`.
+  func withCharacterData<R, E>(
+    _ body: (Span<Element>) throws(E) -> R
+  ) throws(E) -> R
+}
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedStringProtocol {
+  /// Calls the given closure with a buffer containing this value's raw
+  /// `UncheckedStringElement` representation.
+  ///
+  /// - Parameter body: A closure that takes a `Span` over this value's raw
+  ///                    representation.
+  ///
+  /// - Returns The value returned by `body`.
+  public func withUncheckedStringRepresentation<R, Failure>(
+    _ body: (Span<Element>) throws(Failure) -> R
+  ) throws(Failure) -> R {
+    try withCharacterData(body)
+  }
+}
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedStringProtocol {
+  /// Returns a Boolean value indicating whether two strings are equal.
+  ///
+  /// - Parameters:
+  ///   - lhs: A string to compare.
+  ///   - rhs: Another string to compare.
+  ///
+  /// - Returns `true` if `lhs` and `rhs` contain the same elements;
+  ///           otherwise, `false`.
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    if lhs.count != rhs.count {
+      return false
+    }
+
+    return lhs.withCharacterData { lhsData in
+      rhs.withCharacterData { rhsData in
+        return lhsData._elementsEqual(to: rhsData)
+      }
+    }
+  }
+}
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedStringProtocol {
+  /// Hashes the essential components of this string by feeding them into
+  /// the given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///                      of this string.
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(count)
+    withCharacterData {
+      $0._hashContents(into: &hasher)
+    }
+  }
+}
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedStringProtocol {
+  /// Returns a Boolean value indicating whether the first string is
+  /// ordered before the second, by elementwise comparison.
+  ///
+  /// - Parameters:
+  ///   - lhs: A string to compare.
+  ///   - rhs: Another string to compare.
+  ///
+  /// - Returns `true` if `lhs` is ordered before `rhs`; otherwise, `false`.
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    return lhs.withCharacterData { lhsData in
+      rhs.withCharacterData { rhsData in
+        let minCount = Swift.min(lhsData.count, rhsData.count)
+        var i = 0
+        while i < minCount {
+          let l = lhsData[i]
+          let r = rhsData[i]
+          if l != r {
+            return l < r
+          }
+          i += 1
+        }
+        return lhsData.count < rhsData.count
+      }
+    }
+  }
+}
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedStringProtocol {
+  /// A textual representation of this string, suitable for debugging.
+  ///
+  /// Non-printable and non-ASCII elements are rendered as `\x{hh}` escapes.
+  public var debugDescription: String {
+    return withCharacterData { data in
+      var result = "\""
+      var i = 0
+      while i < data.count {
+        let ch = data[i]
+        if ch == 92 {
+          result += "\\\\"
+        } else if ch == 34 {
+          result += "\\\""
+        } else if ch >= 32 && ch <= 127 {
+          result += String(Unicode.Scalar(UInt32(ch))!)
+        } else {
+          result += "\\x{"
+          result += String(ch, radix: 16)
+          result += "}"
+        }
+        i += 1
+      }
+      result += "\""
+      return result
+    }
+  }
+}
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedStringProtocol where Iterator == IndexingIterator<Self> {
+  /// Bulk-copies this string's elements into `buffer`.
+  ///
+  /// - Parameter buffer: The buffer to copy this string's elements into.
+  ///
+  /// - Returns An iterator positioned just after the copied elements, and
+  ///           the buffer index just after the last element written.
+  @inlinable
+  public __consuming func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (IndexingIterator<Self>, UnsafeMutableBufferPointer<Element>.Index) {
+    return unsafe _uncheckedStringCopyContents(self, initializing: buffer)
+  }
+}
+
+/// Provides bulk access to `str`'s contents as contiguous storage.
+///
+/// - Parameters:
+///   - str: The string whose contents should be provided.
+///   - body: A closure that takes a buffer over `str`'s contents.
+///
+/// - Returns The value returned by `body`, or `nil` if `str`'s contents
+///           are not available as contiguous storage.
+@available(SwiftStdlib 9999, *)
+@inlinable
+@inline(__always)
+internal func _uncheckedStringWithContiguousStorage<S: UncheckedStringProtocol, R>(
+  _ str: S,
+  _ body: (UnsafeBufferPointer<S.Element>) throws -> R
+) rethrows -> R? {
+  return try str.withCharacterData { data in
+    try data.withUnsafeBufferPointer(body)
+  }
+}
+
+/// Bulk-copies `str`'s elements into `buffer`.
+///
+/// - Parameters:
+///   - str: The string whose elements should be copied.
+///   - buffer: The buffer to copy `str`'s elements into.
+///
+/// - Returns An iterator positioned just after the copied elements, and
+///           the buffer index just after the last element written.
+@available(SwiftStdlib 9999, *)
+@inlinable
+internal func _uncheckedStringCopyContents<S: UncheckedStringProtocol>(
+  _ str: S,
+  initializing buffer: UnsafeMutableBufferPointer<S.Element>
+) -> (IndexingIterator<S>, UnsafeMutableBufferPointer<S.Element>.Index) {
+  let copied = str.withCharacterData { data in
+    data.withUnsafeBufferPointer { source -> Int in
+      let n = Swift.min(buffer.count, source.count)
+      if n > 0 {
+        unsafe buffer.baseAddress!.initialize(from: source.baseAddress!, count: n)
+      }
+      return n
+    }
+  }
+  let newPosition = str.index(str.startIndex, offsetBy: copied)
+  return (
+    IndexingIterator(_elements: str, _position: newPosition),
+    unsafe buffer.index(buffer.startIndex, offsetBy: copied)
+  )
+}
+
+@available(SwiftStdlib 9999, *)
+extension UncheckedStringProtocol {
+  /// Returns a Boolean value indicating whether this string begins with the
+  /// specified prefix.
+  ///
+  /// - Parameter prefix: The prefix to test for.
+  ///
+  /// - Returns `true` if this string begins with `prefix`; otherwise,
+  ///           `false`.
+  public func hasPrefix<Other: UncheckedStringProtocol>(
+    _ prefix: Other
+  ) -> Bool where Other.Element == Element {
+    guard prefix.count <= count else { return false }
+    return withCharacterData { selfData in
+      prefix.withCharacterData { prefixData in
+        selfData.extracting(first: prefixData.count)._elementsEqual(to: prefixData)
+      }
+    }
+  }
+
+  /// Returns a Boolean value indicating whether this string ends with the
+  /// specified suffix.
+  ///
+  /// - Parameter suffix: The suffix to test for.
+  ///
+  /// - Returns `true` if this string ends with `suffix`; otherwise,
+  ///           `false`.
+  public func hasSuffix<Other: UncheckedStringProtocol>(
+    _ suffix: Other
+  ) -> Bool where Other.Element == Element {
+    guard suffix.count <= count else { return false }
+    return withCharacterData { selfData in
+      suffix.withCharacterData { suffixData in
+        selfData.extracting(last: suffixData.count)._elementsEqual(to: suffixData)
+      }
+    }
+  }
+}
+

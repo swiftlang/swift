@@ -198,6 +198,8 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(SILInstruction *const
       case StringLiteralInst::Encoding::UTF8: ArgOpBuffer << 'b'; break;
       case StringLiteralInst::Encoding::UTF8_OSLOG: ArgOpBuffer << 'o'; break;
       case StringLiteralInst::Encoding::ObjCSelector: ArgOpBuffer << 'c'; break;
+      case StringLiteralInst::Encoding::Bytes16: ArgOpBuffer << 'H'; break;
+      case StringLiteralInst::Encoding::Bytes32: ArgOpBuffer << 'W'; break;
     }
     break;
   }

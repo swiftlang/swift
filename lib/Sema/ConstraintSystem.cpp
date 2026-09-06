@@ -4470,6 +4470,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::ArrayToPointer:
   case ConversionRestrictionKind::ArrayToCPointer:
   case ConversionRestrictionKind::StringToPointer:
+  case ConversionRestrictionKind::UncheckedStringToPointer:
     // Always ephemeral.
     return ConversionEphemeralness::Ephemeral;
   case ConversionRestrictionKind::InoutToPointer:

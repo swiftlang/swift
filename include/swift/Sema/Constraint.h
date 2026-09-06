@@ -263,6 +263,8 @@ enum class ConversionRestrictionKind {
   ArrayToCPointer,
   /// String-to-pointer conversion.
   StringToPointer,
+  /// UncheckedString-to-pointer conversion.
+  UncheckedStringToPointer,
   /// Pointer-to-pointer conversion.
   PointerToPointer,
   /// Value to existential value conversion, or existential erasure.
