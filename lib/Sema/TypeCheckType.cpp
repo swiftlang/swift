@@ -5705,10 +5705,9 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
     case ParamSpecifier::Consuming:
     case ParamSpecifier::ImplicitlyCopyableConsuming:
     case ParamSpecifier::LegacyOwned:
-      diagnoseInvalid(repr, repr->getSpecifierLoc(),
-                      diag::subscript_consuming_parameter_unsupported,
-                      ownershipRepr->getSpecifierSpelling());
-      return ErrorType::get(getASTContext());
+      // Whether a `consuming` index is legal depends on which accessors the
+      // subscript has, which is not known here.
+      break;
 
     case ParamSpecifier::Default:
     case ParamSpecifier::Borrowing:

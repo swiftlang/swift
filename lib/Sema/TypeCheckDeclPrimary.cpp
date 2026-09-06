@@ -3042,6 +3042,26 @@ public:
       }
     }
 
+    // A `consuming` index is consumed by whichever accessor runs, so it is only
+    // legal when a single accessor performs a whole access.
+    if (SD->getImplInfo().getReadWriteImpl() ==
+        ReadWriteImplKind::MaterializeToTemporary) {
+      for (auto *index : *SD->getIndices()) {
+        if (index->getValueOwnership() != ValueOwnership::Owned)
+          continue;
+
+        auto spelling = ParamDecl::getSpecifierSpelling(index->getSpecifier());
+        SD->diagnose(diag::subscript_consuming_parameter_separate_accessors,
+                     spelling);
+        if (auto *set = SD->getAccessor(AccessorKind::Set))
+          set->diagnose(diag::subscript_consuming_parameter_use_coroutine,
+                        "_modify");
+        index->setInvalid();
+        SD->setInvalid();
+        break;
+      }
+    }
+
     // Now check all the accessors.
     SD->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visit(accessor);

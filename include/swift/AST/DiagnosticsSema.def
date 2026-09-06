@@ -4452,9 +4452,13 @@ ERROR(attr_only_one_decl_kind,none,
       "%0 may only be used on '%1' declarations", (DeclAttribute,StringRef))
 ERROR(attr_only_valid_on_func_or_init_params,none,
       "'%0' may only be used on function or initializer parameters", (StringRef))
-ERROR(subscript_consuming_parameter_unsupported,none,
-      "'%0' may not be used on a subscript parameter; a read-modify-write "
-      "access would consume the argument more than once", (StringRef))
+ERROR(subscript_consuming_parameter_separate_accessors,none,
+      "'%0' may not be used on the parameter of a subscript whose read and "
+      "write go through separate accessors; a read-modify-write access would "
+      "consume the argument more than once", (StringRef))
+NOTE(subscript_consuming_parameter_use_coroutine,none,
+      "use a '%0' accessor instead, so that a single accessor performs the "
+      "whole access", (StringRef))
 ERROR(attr_not_on_variadic_parameters,none,
       "'%0' must not be used on variadic parameters", (StringRef))
 ERROR(attr_not_on_stored_properties,none,

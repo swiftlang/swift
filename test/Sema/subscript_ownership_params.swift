@@ -32,13 +32,89 @@ struct MissingOwnership {
   // expected-note@-4 {{add 'consuming' to take the value from the caller}}
 }
 
-// `consuming` is rejected: a read-modify-write access runs more than one
-// accessor, so the argument would be consumed more than once.
+// `consuming` is allowed exactly when a single accessor performs a whole
+// access, so that the index is consumed once. A subscript whose read and write
+// go through separate accessors would consume it twice.
 struct Consuming {
-  subscript(i: consuming Int) -> Int { return i }
-  // expected-error@-1 {{'consuming' may not be used on a subscript parameter; a read-modify-write access would consume the argument more than once}}
-  subscript(nc: consuming NC) -> Int { return nc.value }
-  // expected-error@-1 {{'consuming' may not be used on a subscript parameter; a read-modify-write access would consume the argument more than once}}
+  var slots: [Int] = [0]
+
+  // A single `_read`, so a read consumes the index once.
+  subscript(readOnly i: consuming Int) -> Int { _read { yield slots[i] } }
+  subscript(readOnlyNC nc: consuming NC) -> Int { _read { yield slots[nc.value] } }
+
+  // `_read` + `_modify`: every access runs exactly one of them.
+  subscript(coro nc: consuming NC) -> Int {
+    _read { yield slots[nc.value] }
+    _modify { yield &slots[nc.value] }
+  }
+
+  // A getter runs once per read, and a read-modify-write runs only the
+  // coroutine, so mixing them is fine too.
+  subscript(getModify nc: consuming NC) -> Int {
+    get { slots[nc.value] }
+    _modify { yield &slots[nc.value] }
+  }
+
+  // A plain getter, with no mutation at all.
+  subscript(getOnly nc: consuming NC) -> Int { get { slots[nc.value] } }
+}
+
+// A `get`/`set` pair is rejected: a read-modify-write runs both.
+struct ConsumingGetSet {
+  var slots: [Int] = [0]
+  subscript(i: consuming Int) -> Int {
+    // expected-error@-1 {{'consuming' may not be used on the parameter of a subscript whose read and write go through separate accessors; a read-modify-write access would consume the argument more than once}}
+    get { slots[i] }
+    set { slots[i] = newValue } // expected-note {{use a '_modify' accessor instead, so that a single accessor performs the whole access}}
+  }
+}
+
+// So is `_read` with a plain setter, for the same reason.
+struct ConsumingReadSet {
+  var slots: [Int] = [0]
+  subscript(nc: consuming NC) -> Int {
+    // expected-error@-1 {{'consuming' may not be used on the parameter of a subscript whose read and write go through separate accessors; a read-modify-write access would consume the argument more than once}}
+    _read { yield slots[nc.value] }
+    set { slots[nc.value] = newValue } // expected-note {{use a '_modify' accessor instead, so that a single accessor performs the whole access}}
+  }
+}
+
+// A protocol requirement is spelled with `get`/`set`, but the accessors that
+// implement it are the witness's, so the requirement itself is fine.
+protocol HasConsumingSubscript {
+  subscript(nc: consuming NC) -> Int { get set }
+}
+struct GoodConsumingWitness: HasConsumingSubscript {
+  var slots: [Int] = [0]
+  subscript(nc: consuming NC) -> Int {
+    get { slots[nc.value] }
+    _modify { yield &slots[nc.value] }
+  }
+}
+struct BadConsumingWitness: HasConsumingSubscript {
+  var slots: [Int] = [0]
+  subscript(nc: consuming NC) -> Int {
+    // expected-error@-1 {{'consuming' may not be used on the parameter of a subscript whose read and write go through separate accessors; a read-modify-write access would consume the argument more than once}}
+    get { slots[nc.value] }
+    set { slots[nc.value] = newValue } // expected-note {{use a '_modify' accessor instead, so that a single accessor performs the whole access}}
+  }
+}
+
+func useConsuming(c: inout Consuming, g: inout GoodConsumingWitness) {
+  _ = c[readOnly: 0]
+  _ = c[readOnlyNC: NC(value: 0)]
+  _ = c[coro: NC(value: 0)]
+  c[coro: NC(value: 0)] = 1
+  c[coro: NC(value: 0)] += 1
+  _ = c[getModify: NC(value: 0)]
+  c[getModify: NC(value: 0)] += 1
+  _ = c[getOnly: NC(value: 0)]
+  g[NC(value: 0)] += 1
+}
+
+func useConsumingGeneric<T: HasConsumingSubscript>(t: inout T) {
+  _ = t[NC(value: 0)]
+  t[NC(value: 0)] += 1
 }
 
 // `inout` is supported: the index takes the exclusive access itself.

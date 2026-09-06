@@ -170,3 +170,41 @@ struct NCTable {
 func inOutNCIndex(t: inout NCTable, i: inout NC) {
   t[&i] += 1
 }
+
+// A `consuming` index is handed to the accessor `@owned`: the accessor takes
+// ownership of it. That is only allowed where a single accessor performs a
+// whole access, so the index is consumed exactly once.
+
+struct Consuming {
+  var slots: [Int] = [0]
+  subscript(nc: consuming NC) -> Int {
+    _read { yield slots[nc.value] }
+    _modify { yield &slots[nc.value] }
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s26subscript_ownership_params9ConsumingVySiAA2NCVncir
+// CHECK-SAME:  $@yield_once @convention(method) (@owned NC, @guaranteed Consuming) -> @yields Int
+// CHECK-LABEL: sil hidden [ossa] @$s26subscript_ownership_params9ConsumingVySiAA2NCVnciM
+// CHECK-SAME:  $@yield_once @convention(method) (@owned NC, @inout Consuming) -> @yields @inout Int
+
+// The index is forwarded into the coroutine, not copied for it.
+// CHECK-LABEL: sil hidden [ossa] @$s26subscript_ownership_params14consumingIndex1c2ncSiAA9ConsumingV_AA2NCVntF
+// CHECK-NOT:     copy_value {{.*}} : $NC
+// CHECK:         [[READ:%[0-9]+]] = function_ref @$s26subscript_ownership_params9ConsumingVySiAA2NCVncir
+// CHECK:         begin_apply [[READ]]({{%[0-9]+}}, {{%[0-9]+}})
+// CHECK:       } // end sil function
+func consumingIndex(c: Consuming, nc: consuming NC) -> Int {
+  return c[nc]
+}
+
+// A read-modify-write runs only the `_modify` coroutine, so the index is still
+// consumed once.
+// CHECK-LABEL: sil hidden [ossa] @$s26subscript_ownership_params17consumingIndexRMW1c2ncyAA9ConsumingVz_AA2NCVntF
+// CHECK-NOT:     copy_value {{.*}} : $NC
+// CHECK:         [[MODIFY:%[0-9]+]] = function_ref @$s26subscript_ownership_params9ConsumingVySiAA2NCVnciM
+// CHECK:         begin_apply [[MODIFY]]({{%[0-9]+}}, {{%[0-9]+}})
+// CHECK:       } // end sil function
+func consumingIndexRMW(c: inout Consuming, nc: consuming NC) {
+  c[nc] += 1
+}

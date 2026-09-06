@@ -90,3 +90,65 @@ let borrowed = Counter(value: 1)
 bt[borrowed] += 1
 // CHECK-NEXT: borrowing [7, 9] 1
 print("borrowing", bt.slots, borrowed.value)
+
+// A `consuming` index is owned by the accessor, which may consume it. That is
+// allowed where a single accessor performs a whole access, so the index is
+// consumed exactly once even across a read-modify-write.
+var consumeLog: [String] = []
+
+struct Tracked: ~Copyable {
+  var value: Int
+  init(_ value: Int) { self.value = value }
+  deinit { consumeLog.append("deinit \(value)") }
+}
+
+// Really takes ownership: the index is destroyed inside this call.
+func consume(_ t: consuming Tracked) -> Int {
+  let v = t.value
+  return v
+}
+
+struct CTable {
+  var slots: [Int] = [100, 200]
+  subscript(t: consuming Tracked) -> Int {
+    _read { yield slots[consume(t)] }
+    _modify { yield &slots[consume(t)] }
+  }
+}
+
+var ct = CTable()
+
+consumeLog = []
+// CHECK-NEXT: consuming read 100 ["deinit 0"]
+print("consuming read", ct[Tracked(0)], consumeLog)
+
+consumeLog = []
+ct[Tracked(1)] = 250
+// CHECK-NEXT: consuming write [100, 250] ["deinit 1"]
+print("consuming write", ct.slots, consumeLog)
+
+// The read-modify-write runs only `_modify`, so the index is consumed once.
+consumeLog = []
+ct[Tracked(0)] += 5
+// CHECK-NEXT: consuming rmw [105, 250] ["deinit 0"]
+print("consuming rmw", ct.slots, consumeLog)
+
+// A getter and a coroutine may be mixed: the read runs the getter, the
+// read-modify-write runs the coroutine, so either way it is one accessor.
+struct MixedTable {
+  var slots: [Int] = [1, 2]
+  subscript(t: consuming Tracked) -> Int {
+    get { return slots[consume(t)] }
+    _modify { yield &slots[consume(t)] }
+  }
+}
+
+var mt = MixedTable()
+consumeLog = []
+// CHECK-NEXT: mixed get 1 ["deinit 0"]
+print("mixed get", mt[Tracked(0)], consumeLog)
+consumeLog = []
+mt[Tracked(1)] += 10
+// CHECK-NEXT: mixed rmw [1, 12] ["deinit 1"]
+print("mixed rmw", mt.slots, consumeLog)
+

@@ -299,6 +299,11 @@ PreparedArguments::copy(SILGenFunction &SGF, SILLocation loc) const {
       continue;
     }
 
+    // A `consuming` argument is consumed by whichever accessor runs, so it must
+    // never be shared between two of them.
+    assert(params[i].getValueOwnership() != ValueOwnership::Owned &&
+           "a consuming argument would be consumed more than once");
+
     result.add(elt.getKnownRValueLocation(),
                elt.asKnownRValue().copy(SGF, loc));
   }
