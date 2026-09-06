@@ -7,12 +7,10 @@
 //
 // Compare usability of function.h in Swift with swift-frontend
 // RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}function.h \
 // RUN:   -typo-correction-limit 0 \
 // RUN:   %t%{fs-sep}ok.swift -verify-additional-prefix ok-swift-
 // RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}function.h \
 // RUN:   -typo-correction-limit 0 \
 // RUN:   %t%{fs-sep}err.swift -verify-additional-prefix swift-
@@ -24,10 +22,7 @@
 // Check module interface of function.h
 // RUN: %target-swift-ide-test -print-module -source-filename=x \
 // RUN:   -cxx-interoperability-mode=default -I %t/Inputs \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -module-to-print=Function | %FileCheck %s
-//
-// REQUIRES: swift_feature_ImportCxxMembersLazily
 
 //--- Inputs/module.modulemap
 module Function {
@@ -42,6 +37,14 @@ module Function {
 
 template <typename K>
 struct Bro {
+  typename K::enough iAm; // cxx-error {{no type named 'enough'}}
+                          // expected-swift-error@-1 {{no type named 'enough'}}
+};
+
+// NOTE: like Bro, but only used as a parameter type, so that the instantiation
+// is requested while importing a parameter rather than a return type.
+template <typename K>
+struct Sis {
   typename K::enough iAm; // cxx-error {{no type named 'enough'}}
                           // expected-swift-error@-1 {{no type named 'enough'}}
 };
@@ -71,6 +74,16 @@ struct GoodStruct {
   // expected-swift-note@+1 {{unavailable (cannot import)}}
   void badArg(Bro<Ken>) const;
 
+  // Sis<Ken> is only ever named as a parameter type, so its instantiation is
+  // requested while importing a parameter rather than a return type.
+  void badParam(
+    Sis<Ken> // expected-swift-note {{requested here}}
+  ) const;
+
+  // Define this valid overload so that badParam(Sis<Ken>) so that we have
+  // something to legitimately look up.
+  void badParam(int ok) const;
+
   // expected-swift-note@+1 * {{explicitly marked unavailable here}}
   Bro<Ken> getBad() const;
 
@@ -91,8 +104,10 @@ struct GoodStruct {
   // FIXME: operators are imported eagerly, so having this member would make GoodStruct unusable
   // int operator+(Bro<Ken>) const;
 
-  Bro<Ken> begin() const;
-  Bro<Ken> end() const;
+  // FIXME: begin()/end() are imported eagerly to derive the CxxSequence
+  // conformance, so having these members would make GoodStruct unusable
+  // Bro<Ken> begin() const;
+  // Bro<Ken> end() const;
 
   // Return type templates are instantiated only if the function member is
   // actually imported, e.g., not if the function member is deleted.
@@ -103,10 +118,15 @@ struct GoodStruct {
 // CHECK:      struct GoodStruct {
 // CHECK-NEXT:   init()
 //
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func badReturn() -> Never
 //
 // NOTE-MISSING: func badArg(_: Never)
 //
+// CHECK-NEXT:   func badParam(_ ok: CInt)
+// NOTE-MISSING: func badParam(_: Never)
+//
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func getBad() -> Never
 //
 // NOTE-MISSING: func badStatic(_: Never) -> Never
@@ -118,9 +138,6 @@ struct GoodStruct {
 //
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
 // NOTE-MISSING: func overloadsDiffNumArgs(_: Never)
-//
-// CHECK-NEXT:   func __beginUnsafe() -> Never
-// CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
 
 
@@ -128,12 +145,11 @@ struct DerivedGoodStruct : GoodStruct {};
 // CHECK:      struct DerivedGoodStruct {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func badReturn() -> Never
+// CHECK-NEXT:   func badParam(_ ok: CInt)
 // CHECK-NEXT:   func getBad() -> Never
 // NOTE-MISSING: func badVirtual(_: Never) -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
-// CHECK-NEXT:   func __beginUnsafe() -> Never
-// CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
 
 struct UsingGoodStruct : GoodStruct {
@@ -146,11 +162,10 @@ struct UsingGoodStruct : GoodStruct {
 // CHECK:      struct UsingGoodStruct {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func badReturn() -> Never
+// CHECK-NEXT:   func badParam(_ ok: CInt)
 // CHECK-NEXT:   func getBad() -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
-// CHECK-NEXT:   func __beginUnsafe() -> Never
-// CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
 
 
@@ -191,6 +206,10 @@ void err(void) {
   gs.overloadsSameNumArgs(42); // cxx-note {{requested here}}
   // The Bro<Ken> type is instantiated while considering overloads candidates
   // for GoodStruct::overloadsSameNumArgs(_).
+
+  gs.badParam(42); // cxx-note {{requested here}}
+  // Likewise, Sis<Ken> is instantiated while considering overload candidates
+  // for GoodStruct::badParam(_).
 
   // It is only instantiated once and thus no longer triggers diagnostics in
   // its following uses:
@@ -256,6 +275,9 @@ func err() {
                             // expected-swift-warning@-1 {{an enum with no cases}}
                             // expected-swift-note@-2 {{add an explicit type annotation}}
   gs.badArg(inc)            // expected-swift-error {{has no member}}
+
+  // Importing this overload set instantiates Sis<Ken> for the other overloads.
+  gs.badParam(42)
 
   let inc2 = gs.getBad()     // expected-swift-error {{is unavailable}}
                              // expected-swift-warning@-1 {{an enum with no cases}}
