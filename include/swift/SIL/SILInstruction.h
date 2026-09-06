@@ -4478,6 +4478,13 @@ public:
   /// captures in.  See `needsRuntimeInstantiation`.
   SILType getStaticInstanceClassType() const;
 
+  /// Like `getStaticInstanceClassType`, but ignoring the conditions that
+  /// folding the instruction's substitutions into its pattern would resolve --
+  /// namely generic accessor thunks.  Answers "would this become statically
+  /// describable if it were specialized?", which is what the optimizer needs
+  /// to decide whether specializing a `keypath` is worth doing.
+  SILType getStaticInstanceClassTypeAfterSpecialization() const;
+
   /// Whether an Embedded Swift instance of this key path has to be allocated
   /// and populated at runtime rather than referenced as an immortal constant.
   /// True exactly when the key path captures values, i.e. when some component
