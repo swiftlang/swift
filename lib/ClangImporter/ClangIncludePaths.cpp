@@ -507,8 +507,7 @@ std::string GetPlatformAuxiliaryFile(StringRef Platform, StringRef File,
 
 void GetWindowsFileMappings(
     ClangInvocationFileMapping &fileMapping, const ASTContext &Context,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &driverVFS,
-    bool &requiresBuiltinHeadersInSystemModules) {
+    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &driverVFS) {
   const llvm::Triple &Triple = Context.LangOpts.Target;
   const SearchPathOptions &SearchPathOpts = Context.SearchPathOpts;
   std::string AuxiliaryFile;
@@ -538,32 +537,53 @@ void GetWindowsFileMappings(
                              WindowsSDK.LibraryVersion)) {
     assert(WindowsSDK.MajorVersion > 8);
     llvm::SmallString<261> WinSDKInjection{WindowsSDK.Path};
-    llvm::sys::path::append(WinSDKInjection, "Include");
-    llvm::sys::path::append(WinSDKInjection, WindowsSDK.IncludeVersion, "um");
-    llvm::sys::path::append(WinSDKInjection, "module.modulemap");
+    llvm::sys::path::append(WinSDKInjection, "Include",
+                            WindowsSDK.IncludeVersion);
+
+    llvm::SmallString<261> path{WinSDKInjection};
+
+    llvm::sys::path::append(path, "module.modulemap");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winsdk.modulemap",
+                                             VFS, SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
+
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "um", "module.modulemap");
 
     AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winsdk_um.modulemap",
                                              VFS, SearchPathOpts);
     if (!AuxiliaryFile.empty())
-      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
-                                               AuxiliaryFile);
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
 
-    llvm::sys::path::remove_filename(WinSDKInjection);
-    llvm::sys::path::append(WinSDKInjection, "WinSDK.apinotes");
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "WinSDK.apinotes");
     AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "WinSDK.apinotes",
                                              VFS, SearchPathOpts);
     if (!AuxiliaryFile.empty())
-      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
-                                               AuxiliaryFile);
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
 
-    llvm::sys::path::remove_filename(WinSDKInjection);
-    llvm::sys::path::remove_filename(WinSDKInjection);
-    llvm::sys::path::append(WinSDKInjection, "shared", "module.modulemap");
-    AuxiliaryFile = GetPlatformAuxiliaryFile(
-        "windows", "winsdk_shared.modulemap", VFS, SearchPathOpts);
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "shared", "module.modulemap");
+    AuxiliaryFile =
+        GetPlatformAuxiliaryFile("windows", "winsdk_shared.modulemap", VFS,
+                                 SearchPathOpts);
     if (!AuxiliaryFile.empty())
-      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
-                                               AuxiliaryFile);
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
+
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "winrt", "module.modulemap");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winrt.modulemap", VFS,
+                                             SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
+
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "winrt", "SwiftWinRT.h");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "SwiftWinRT.h", VFS,
+                                             SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
   }
 
   struct {
@@ -579,21 +599,33 @@ void GetWindowsFileMappings(
 
     AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "ucrt.modulemap", VFS,
                                              SearchPathOpts);
-    if (!AuxiliaryFile.empty()) {
-      // The ucrt module map has the C standard library headers all together.
-      // That leads to module cycles with the clang _Builtin_ modules. e.g.
-      // <fenv.h> on ucrt includes <float.h>. The clang builtin <float.h>
-      // include-nexts <float.h>. When both of those UCRT headers are in the
-      // ucrt module, there's a module cycle ucrt -> _Builtin_float -> ucrt
-      // (i.e. fenv.h (ucrt) -> float.h (builtin) -> float.h (ucrt)). Until the
-      // ucrt module map is updated, the builtin headers need to join the system
-      // modules. i.e. when the builtin float.h is in the ucrt module too, the
-      // cycle goes away. Note that -fbuiltin-headers-in-system-modules does
-      // nothing to fix the same problem with C++ headers, and is generally
-      // fragile.
+    if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(UCRTInjection),
                                                AuxiliaryFile);
-      requiresBuiltinHeadersInSystemModules = true;
+
+    llvm::SmallString<261> UCRTInclude{UCRTInjection};
+    llvm::sys::path::remove_filename(UCRTInclude);
+    llvm::SmallString<261> SwiftUCRT{UCRTInclude};
+    llvm::sys::path::append(SwiftUCRT, "SwiftUCRT.h");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "SwiftUCRT.h", VFS,
+                                             SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(std::string(SwiftUCRT),
+                                               AuxiliaryFile);
+
+    // stdalign.h and stdnoreturn.h were added to the UCRT in Windows SDK
+    // 10.0.20348. Older SDKs do not provide their definitions, but the files
+    // must exist for the common module map to remain available.
+    static constexpr StringLiteral CompatibilityHeaders[] = {
+        "stdalign.h", "stdnoreturn.h"};
+    for (StringRef Header : CompatibilityHeaders) {
+      llvm::SmallString<261> SDKHeader{UCRTInclude};
+      llvm::sys::path::append(SDKHeader, Header);
+      if (VFS.exists(SDKHeader))
+        continue;
+
+      fileMapping.overridenFiles.emplace_back(
+          llvm::MemoryBuffer::getMemBufferCopy("", SDKHeader));
     }
   }
 
@@ -747,8 +779,7 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   if (ctx.LangOpts.EnableCXXInterop)
     getLibStdCxxFileMapping(result, ctx, vfs, suppressDiagnostic);
 
-  GetWindowsFileMappings(result, ctx, vfs,
-                         result.requiresBuiltinHeadersInSystemModules);
+  GetWindowsFileMappings(result, ctx, vfs);
 
   // push the redirect files into a YAML vfs overlay file.
   if (!result.redirectedFiles.empty()) {

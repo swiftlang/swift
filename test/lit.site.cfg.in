@@ -63,6 +63,8 @@ config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_api_level = "@SWIFT_ANDROID_API_LEVEL@"
 
 # --- Windows ---
+config.windows_sdk_module_map = r'''@SWIFT_WINDOWS_MODULE_MAP@'''
+
 msvc_runtime_flags = {
   'MultiThreaded': 'MT',
   'MultiThreadedDebug': 'MTd',
