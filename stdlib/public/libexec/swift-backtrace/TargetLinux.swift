@@ -48,6 +48,7 @@ class Target {
 
   var pid: pid_t
   var name: String
+  var concurrencyTaskRegistryAddr: UInt64?
   var signal: UInt64
   var faultAddress: Address
   var crashingThread: TargetThread.ThreadID
@@ -132,6 +133,7 @@ class Target {
     crashingThread = TargetThread.ThreadID(crashInfo.crashing_thread)
     signal = crashInfo.signal
     faultAddress = crashInfo.fault_address
+    concurrencyTaskRegistryAddr = crashInfo.concurrency_task_registry_addr
 
     images = ImageMap.capture(using: reader, forProcess: Int(pid))
 

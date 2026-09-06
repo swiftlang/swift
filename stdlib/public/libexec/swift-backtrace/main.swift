@@ -1099,6 +1099,13 @@ Generate a backtrace for the parent process.
         writeln("\n\nImages:\n")
         writeln(formatter.format(images: target.images))
     }
+    
+    if let taskRegistryAddr = target.concurrencyTaskRegistryAddr,
+       taskRegistryAddr != 0 {
+      writeln("\n\nActive Tasks:\n")
+      writeln(theme.info("  Concurrency Task Registry located at 0x\(String(taskRegistryAddr, radix: 16, uppercase: true))"))
+      writeln(theme.info("  (Run `swift-inspect dump concurrency <pid>` in LLDB or terminal to dump tasks)"))
+    }
   }
 
   static func startDebugger() {

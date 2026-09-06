@@ -1102,6 +1102,7 @@ swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
 
     Result.RunJob = TaskInfo.RunJob;
     Result.AllocatorSlabPtr = TaskInfo.AllocatorSlabPtr;
+    Result.RegistryNext = TaskInfo.RegistryNext;
 
     auto *ChildTasks =
         ContextRef
@@ -1160,5 +1161,62 @@ swift_reflection_nextJob(SwiftReflectionContextRef ContextRef,
   return ContextRef->withContext([&](auto *Context) {
     return Context->nextJob(
         RemoteAddress(JobPtr, RemoteAddress::DefaultAddressSpace));
+  });
+}
+
+const char *swift_reflection_iterateTaskRegistry(
+    SwiftReflectionContextRef ContextRef,
+    swift_taskRegistryIterator Call, void *ContextPtr) {
+  return ContextRef->withContext([&](auto *Context) -> const char * {
+    auto &Reader = Context->getReader();
+
+    auto RegistryAddr = Reader.getSymbolAddress("_swift_concurrency_task_registry");
+    if (!RegistryAddr) {
+      return "could not find _swift_concurrency_task_registry symbol";
+    }
+
+    auto EnabledAddr = Reader.getSymbolAddress("_swift_concurrency_task_registry_enabled");
+    if (EnabledAddr) {
+      uint8_t Enabled = 0;
+      if (Reader.readInteger(EnabledAddr, 1, &Enabled) && !Enabled) {
+        return "task registry disabled by environment variable";
+      }
+    }
+
+    auto ShardSizeAddr = Reader.getSymbolAddress("_swift_concurrency_task_registry_shard_size");
+    if (!ShardSizeAddr) {
+      return "could not find _swift_concurrency_task_registry_shard_size symbol";
+    }
+    
+    uint8_t PointerSize = Reader.getPointerSize().value_or(sizeof(void*));
+    uint32_t ShardSize = 0;
+    if (!Reader.readInteger(ShardSizeAddr, PointerSize, &ShardSize)) {
+      return "could not read _swift_concurrency_task_registry_shard_size";
+    }
+
+    for (uint32_t i = 0; i < 64; ++i) {
+      // Each shard head is a pointer to the head of a linked list.
+      auto ShardAddr = RegistryAddr + (i * ShardSize);
+      
+      uint64_t TaskAddr = 0;
+      if (!Reader.readInteger(ShardAddr, PointerSize, &TaskAddr)) {
+         return "could not read TaskRegistryShard head";
+      }
+
+      while (TaskAddr) {
+        Call(TaskAddr, ContextPtr);
+        
+        // Find the next task using ReflectionContext's AsyncTaskObj out of process.
+        auto [Error, TaskInfo] = Context->asyncTaskInfo(RemoteAddress(TaskAddr, RegistryAddr.getAddressSpace()), 0, 0);
+        if (Error) {
+          // If we can't read the task info (e.g. memory is corrupted), stop traversing this shard.
+          break;
+        }
+        
+        TaskAddr = TaskInfo.RegistryNext;
+      }
+    }
+
+    return nullptr;
   });
 }
