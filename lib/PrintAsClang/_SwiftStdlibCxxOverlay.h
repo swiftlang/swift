@@ -153,7 +153,8 @@ SWIFT_INLINE_THUNK cxxOverlay::IterationEndSentinel end(const Array<T> &) {
   return {};
 }
 
-#ifdef SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
+#if defined(SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR) &&                     \
+    !defined(__EmbeddedSwift__)
 
 extern "C" void *_Nonnull swift_errorRetain(void *_Nonnull swiftError) noexcept;
 
@@ -203,32 +204,121 @@ SWIFT_INLINE_THUNK const void *_Nullable getErrorMetadata() {
 
 #ifndef SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR
 
-class Error {
+// Swift.String.init<A>(describing: A) -> Swift.String
+// The argument is passed indirectly and is consumed at +1; the trailing
+// parameter is the type metadata for A.
+extern "C" _impl::swift_interop_stub_Swift_String
+$sSS10describingSSx_tclufC(const void *_Nonnull value,
+                           const void *_Nonnull metadata) SWIFT_NOEXCEPT
+    SWIFT_CALL;
+
+#pragma clang diagnostic push
+// swift::Error defines all of its virtual methods inline, so it has no key
+// function and its vtable is emitted weakly in each translation unit.
+#pragma clang diagnostic ignored "-Wweak-vtables"
+
+class Error : public std::exception {
 public:
-  SWIFT_INLINE_THUNK Error() {}
-  SWIFT_INLINE_THUNK Error(void *_Nonnull swiftError) {
+  SWIFT_INLINE_THUNK Error() noexcept {}
+  SWIFT_INLINE_THUNK Error(void *_Nonnull swiftError) noexcept {
     opaqueValue = swiftError;
   }
-  SWIFT_INLINE_THUNK ~Error() {
+  ~Error() noexcept override {
     if (opaqueValue)
       swift_errorRelease(opaqueValue);
+    if (whatBuffer)
+      _impl::opaqueFree(static_cast<char *_Nonnull>(whatBuffer));
   }
-  SWIFT_INLINE_THUNK void *_Nonnull getPointerToOpaquePointer() {
+  SWIFT_INLINE_THUNK void *_Nonnull getPointerToOpaquePointer() noexcept {
     return opaqueValue;
   }
-  SWIFT_INLINE_THUNK Error(Error &&other) : opaqueValue(other.opaqueValue) {
+  SWIFT_INLINE_THUNK Error(Error &&other) noexcept
+      : opaqueValue(other.opaqueValue), whatBuffer(other.whatBuffer) {
     other.opaqueValue = nullptr;
+    other.whatBuffer = nullptr;
   }
-  SWIFT_INLINE_THUNK Error(const Error &other) {
+  SWIFT_INLINE_THUNK Error(const Error &other) noexcept
+      : std::exception(other) {
     if (other.opaqueValue)
       swift_errorRetain(other.opaqueValue);
     opaqueValue = other.opaqueValue;
+    // The cached `what()` buffer is intentionally not copied; the copy
+    // recomputes it on demand.
+  }
+  SWIFT_INLINE_THUNK Error &operator=(const Error &other) noexcept {
+    if (this == &other)
+      return *this;
+    std::exception::operator=(other);
+    if (other.opaqueValue)
+      swift_errorRetain(other.opaqueValue);
+    if (opaqueValue)
+      swift_errorRelease(opaqueValue);
+    opaqueValue = other.opaqueValue;
+    if (whatBuffer) {
+      _impl::opaqueFree(static_cast<char *_Nonnull>(whatBuffer));
+      whatBuffer = nullptr;
+    }
+    return *this;
+  }
+  SWIFT_INLINE_THUNK Error &operator=(Error &&other) noexcept {
+    void *otherOpaqueValue = other.opaqueValue;
+    other.opaqueValue = opaqueValue;
+    opaqueValue = otherOpaqueValue;
+    char *otherWhatBuffer = other.whatBuffer;
+    other.whatBuffer = whatBuffer;
+    whatBuffer = otherWhatBuffer;
+    return *this;
   }
 
-  template <class T> SWIFT_INLINE_THUNK swift::Optional<T> as() {
+  /// Returns the UTF-8 encoded result of `String(describing:)` for the
+  /// thrown Swift error value. The result is computed lazily and cached in
+  /// this object.
+  const char *_Nonnull what() const noexcept override {
+    char *cached = __atomic_load_n(&whatBuffer, __ATOMIC_ACQUIRE);
+    if (cached)
+      return cached;
+    if (!opaqueValue)
+      return "swift::Error: no error value";
+    const void *errorMetadata = getErrorMetadata();
+    if (!errorMetadata)
+      return "swift::Error: error metadata not available";
+    // `String.init(describing:)` consumes its argument at +1, so hand the
+    // callee its own retained reference to the error value.
+    swift_errorRetain(opaqueValue);
+    void *errorValue = opaqueValue;
+    auto stringStub = $sSS10describingSSx_tclufC(&errorValue, errorMetadata);
+    auto description = _impl::_impl_String::returnNewValue(
+        [&](char *_Nonnull dest) SWIFT_INLINE_THUNK_ATTRIBUTES {
+          memcpy(dest, &stringStub, sizeof(stringStub));
+        });
+    auto utf8 = description.getUtf8();
+    size_t length = static_cast<size_t>(utf8.getCount());
+    char *buffer =
+        static_cast<char *>(_impl::opaqueAlloc(length + 1, alignof(char)));
+    if (!buffer)
+      return "swift::Error: failed to allocate description buffer";
+    size_t i = 0;
+    auto endOffset = utf8.getEndIndex().getEncodedOffset();
+    for (auto index = utf8.getStartIndex();
+         index.getEncodedOffset() < endOffset && i < length;
+         index = utf8.indexAfter(index))
+      buffer[i++] = static_cast<char>(utf8[index]);
+    buffer[i] = '\0';
+    char *expected = nullptr;
+    if (!__atomic_compare_exchange_n(&whatBuffer, &expected, buffer,
+                                     /*weak=*/false, __ATOMIC_ACQ_REL,
+                                     __ATOMIC_ACQUIRE)) {
+      // Another thread cached its buffer first; use that one.
+      _impl::opaqueFree(buffer);
+      return expected;
+    }
+    return buffer;
+  }
+
+  template <class T> SWIFT_INLINE_THUNK swift::Optional<T> as() const {
     alignas(alignof(T)) char buffer[sizeof(T)];
     const void *em = getErrorMetadata();
-    void *ep = getPointerToOpaquePointer();
+    void *ep = opaqueValue;
     auto metadata = swift::TypeMetadataTrait<T>::getTypeMetadata();
 
     // Dynamic cast will release the error, so we need to retain it.
@@ -251,7 +341,10 @@ public:
 
 private:
   void *_Nonnull opaqueValue = nullptr;
+  mutable char *_Nullable whatBuffer = nullptr;
 };
+
+#pragma clang diagnostic pop
 
 namespace _impl {
 
@@ -372,10 +465,9 @@ private:
 template<>
 class Expected<void> {
 public:
-  /// Default
+  /// Default: a successful `void` result.
   Expected() noexcept {
-    new (&buffer) Error();
-    has_val = false;
+    has_val = true;
   }
 
   Expected(const swift::Error &error_val) noexcept {
@@ -385,9 +477,7 @@ public:
 
   /// Copy
   Expected(Expected const& other) noexcept {
-    if (other.has_value())
-      abort();
-    else
+    if (!other.has_value())
       new (&buffer) Error(other.error());
 
     has_val = other.has_value();
@@ -397,7 +487,10 @@ public:
   // FIXME: Implement move semantics when move swift values is possible
   [[noreturn]] Expected(Expected&&) noexcept { abort(); }
 
-  ~Expected() noexcept { reinterpret_cast<swift::Error *>(buffer)->~Error(); }
+  ~Expected() noexcept {
+    if (!has_value())
+      reinterpret_cast<swift::Error *>(buffer)->~Error();
+  }
 
   /// assignment
   constexpr auto operator=(Expected&& other) noexcept = delete;
@@ -443,6 +536,6 @@ template <class T> using ThrowingResult = swift::Expected<T>;
 #endif
 
 #endif // SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR
-#endif // SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
+#endif // SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR && !__EmbeddedSwift__
 
 #endif
