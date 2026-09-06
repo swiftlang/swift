@@ -7,3 +7,8 @@ module Matching {
   header "matching.h"
   requires cplusplus
 }
+
+module Namespaces {
+  header "namespaces.h"
+  requires cplusplus
+}

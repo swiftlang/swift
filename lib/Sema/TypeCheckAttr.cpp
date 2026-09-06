@@ -2510,9 +2510,12 @@ void AttributeChecker::visitCxxDeclAttr(CxxDeclAttr *attr) {
     diagnose(attr->getLocation(), diag::cxx_attr_requires_cxx_interop,
              attr->getAttrName());
 
-  // Only top-level func decls are currently supported.
-  if (D->getDeclContext()->isTypeContext())
-    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level, attr);
+  // @cxx may appear on a global function or on a function declared in a Swift
+  // extension of an imported C++ namespace.
+  auto *dc = D->getDeclContext();
+  if (dc->isTypeContext() && !importer::isClangNamespace(dc))
+    diagnose(attr->getLocation(), diag::cxx_not_global_or_namespace_member,
+             attr);
 
   // Reject using both @cxx and @objc on the same decl.
   if (D->getAttrs().getAttribute<ObjCAttr>())
