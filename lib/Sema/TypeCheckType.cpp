@@ -6574,8 +6574,9 @@ TypeResolver::validateCOMExistential(Type constraintType, TypeRepr *repr,
 
   auto layout = constraintType->getExistentialLayout();
   auto resolution = layout.resolveCOMInterface();
-  if (resolution.containsCOMInterfaceProtocol) {
-    diagnose(repr->getLoc(), diag::com_cominterface_existential);
+  if (resolution.identityProtocol) {
+    diagnose(repr->getLoc(), diag::com_identity_existential,
+             resolution.identityProtocol->getName().str());
     repr->setInvalid();
     return ErrorType::get(ctx);
   }
