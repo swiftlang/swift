@@ -194,7 +194,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
 void
 SROAMemoryUseAnalyzer::
 createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
-  SILBuilderWithScope B(AI);
+  SILBuilder B(AI, AI->getDebugScope());
   SILType Type = AI->getType().getObjectType();
   std::optional<SILDebugVariable> AIDebugVarInfo =
       SILDebugVariable::createFromAllocation(AI);
