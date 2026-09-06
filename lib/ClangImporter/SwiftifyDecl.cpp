@@ -889,8 +889,9 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     }
 
     if (!attachMacro && CAT == nullptr)
-      // The return type is not imported eagerly (unlike parameter types). Exit
-      // early to avoid unnecessarily importing types we might not need.
+      // FIXME: The return type used to be imported lazily, so this exited early
+      // to avoid over-eagerly importing return types. That behavior has now
+      // changed so this early exit should no longer be necessary.
       return false;
 
     Type swiftReturnTy;

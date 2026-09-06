@@ -974,7 +974,13 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl,
     return false;
   }
 
+  if (isa<clang::FunctionTemplateDecl>(decl))
+    return true;
+
   if (auto *fn = dyn_cast<clang::FunctionDecl>(decl)) {
+    if (fn->getDescribedFunctionTemplate())
+      return true;
+
     switch (fn->getDeclName().getNameKind()) {
     case clang::DeclarationName::CXXOperatorName:
     case clang::DeclarationName::CXXConversionFunctionName:
@@ -2652,9 +2658,7 @@ namespace {
         if (nd->getDeclName().isIdentifier())
           allMemberNames.insert(nd->getName());
 
-        if (Impl.SwiftContext.LangOpts.hasFeature(
-                Feature::ImportCxxMembersLazily) &&
-            !shouldEagerlyImportClangRecordMember(nd,
+        if (!shouldEagerlyImportClangRecordMember(nd,
                                                   Impl.SwiftContext.LangOpts))
           continue;
 
@@ -4102,9 +4106,8 @@ namespace {
         if (!bodyParams)
           return nullptr;
 
-        if (decl->getReturnType()->isScalarType())
-          resultType =
-              Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
+        resultType =
+            Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
       } else {
         // Import the function type. If we have parameters, make sure their
         // names get into the resulting function type.
@@ -4131,6 +4134,7 @@ namespace {
         }
       }
 
+      // No parameter list => do not import this function
       if (!bodyParams) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(diag::invoked_func_not_imported, decl),
@@ -4170,11 +4174,26 @@ namespace {
             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
             /*ThrownType=*/TypeLoc(), bodyParams, getGenericParams(), dc);
       } else {
+        // An empty result type + non-empty parameter type list means that we
+        // should import this function but mark it unavailable + map its result
+        // type to 'Never', so that it isn't diagnosed as a missing member.
+        //
+        // Accessors are excluded because they take their result type from their
+        // storage, not from the Clang return type.
+        bool resultTypeIsNotImportable = !accessorInfo && !resultType.getType();
+        if (resultTypeIsNotImportable)
+          resultType = {Impl.SwiftContext.getNeverType(),
+                        /*implicitlyUnwrapped=*/false};
+
         auto *func = createFuncOrAccessor(
             Impl, loc, accessorInfo, name, nameLoc, getGenericParams(),
             bodyParams, resultType.getType(),
             /*async=*/false, /*throws=*/false, dc, clangNode);
         result = func;
+
+        if (resultTypeIsNotImportable)
+          func->addAttribute(AvailableAttr::createUniversallyUnavailable(
+              Impl.SwiftContext, "return type is unavailable in Swift"));
 
         if (!dc->isModuleScopeContext()) {
           if (selfIsConsuming) {
@@ -4612,13 +4631,6 @@ namespace {
     /// name (it is marked '@unsafe(always)' by importAttributes instead), and
     /// the renamed spelling is imported a second time as a deprecated migration
     /// stub, which is only '@unsafe'.
-    ///
-    /// Instantiation is gated on ImportCxxMembersLazily; without that
-    /// feature ClangImporter eagerly instantiates typedef members, so the
-    /// return type is usually already instantiated by the time we get here.
-    ///
-    /// This is done post-import so we don't eagerly instantiate templates for
-    /// methods we may not import.
     void renameToUnsafeIfNeeded(
         const clang::CXXMethodDecl *clangDecl, ValueDecl *swiftDecl,
         const clang::FunctionTemplateDecl *funcTemplate = nullptr) {
@@ -4628,25 +4640,6 @@ namespace {
               clang::OverloadedOperatorKind::OO_None)
         // Does not apply to operators, ctors, dtors, conversions
         return;
-
-      if (Impl.SwiftContext.LangOpts.hasFeature(
-              Feature::ImportCxxMembersLazily)) {
-        using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
-
-        auto retTy = desugarIfElaborated(clangDecl->getReturnType());
-        auto *retTemplate =
-            dyn_cast_or_null<ClassTmplSpec>(retTy->getAsTagDecl());
-
-        if (retTemplate && !retTemplate->hasDefinition()) {
-          // N.B. InstantiateClassTemplateSpecialization() returns true if it
-          // encountered an error while instantiating the returned template.
-          (void)Impl.getClangSema().InstantiateClassTemplateSpecialization(
-              clangDecl->getLocation(),
-              const_cast<ClassTmplSpec *>(retTemplate),
-              clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
-              /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
-        }
-      }
 
       auto importedName = Impl.importFullName(clangDecl, Impl.CurrentVersion);
       if (!importedName || importedName.hasCustomName())
@@ -11063,10 +11056,20 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
         member->getClangDecl()->getFriendObjectKind() != clang::Decl::FOK_None)
       continue;
 
-    // FIXME: constructors are added eagerly, but shouldn't be
-    // FIXME: subscripts are added eagerly, but shouldn't be
-    if (isa<AccessorDecl, SubscriptDecl, ConstructorDecl>(member))
+    // AccessorDecls should not be directly added as members, so skip them here
+    // if they appear for whatever reason
+    if (isa<AccessorDecl>(member))
       continue;
+
+    // FIXME: subscripts and constructors are imported and added eagerly
+    //        (though they shouldn't be and won't be in the near future).
+    // Skip adding these here to avoid double-adding the same member.
+    if (isa<SubscriptDecl, ConstructorDecl>(member)) {
+      const auto &LangOpts = Impl.SwiftContext.LangOpts;
+      if (auto *nd = dyn_cast_or_null<clang::NamedDecl>(member->getClangDecl());
+          nd && shouldEagerlyImportClangRecordMember(nd, LangOpts))
+        continue;
+    }
 
     swiftDecl->addMember(member);
   }

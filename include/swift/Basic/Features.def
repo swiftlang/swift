@@ -535,7 +535,7 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
 /// Do not import non-field C++ record members until requested from Swift.
-EXPERIMENTAL_FEATURE(ImportCxxMembersLazily, true)
+LANGUAGE_FEATURE(ImportCxxMembersLazily, 0, "import C++ members lazily")
 
 /// Import a C++ foreign reference type's primary FRT base as a Swift
 /// superclass.
