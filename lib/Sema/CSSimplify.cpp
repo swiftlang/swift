@@ -179,6 +179,18 @@ bool constraints::containsPackExpansionType(TupleType *tuple) {
   });
 }
 
+static bool isInOutTypeOrPackElement(Type type) {
+  if (auto *expansion = type->getAs<PackExpansionType>())
+    return isInOutTypeOrPackElement(expansion->getPatternType());
+
+  if (auto *pack = type->getAs<PackType>()) {
+    return llvm::any_of(pack->getElementTypes(),
+                        isInOutTypeOrPackElement);
+  }
+
+  return type->is<InOutType>();
+}
+
 bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
                                                 const ValueDecl *decl) {
   assert(decl->getDeclContext()->isTypeContext() &&
@@ -3605,6 +3617,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return SolutionKind::Error;
 
     for (auto pair : matcher.pairs) {
+      // Inout-to-value conversions are not supported for parameter-pack
+      // function types. They produce invalid reabstraction SIL.
+      if (isInOutTypeOrPackElement(pair.lhs) !=
+          isInOutTypeOrPackElement(pair.rhs))
+        return SolutionKind::Error;
+
       // Compare the parameter types, taking contravariance into account.
       auto result = matchTypes(pair.rhs, pair.lhs, subKind, subflags,
                                (func1Params.size() == 1
