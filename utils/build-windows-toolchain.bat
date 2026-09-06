@@ -82,6 +82,22 @@ set "WindowsSDKArgs=-Windows"
 if "%INCLUDE_PACKAGING%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKLinkModes dynamic"
 if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKArchitectures %WINDOWS_SDKS%"
 
+:: Build the arguments related to Android SDK cross-compilation, disabled by default
+set "AndroidSDKArgs=-Android"
+if not "%ANDROID_SDKS%"=="" goto Android
+if not "%ANDROID_SDK_VERSIONS%"=="" goto Android
+if not "%ANDROID_LINK_MODES%"=="" goto Android
+
+goto :Android_end
+
+:Android
+set "AndroidSDKArgs=-Android"
+if not "%ANDROID_SDKS%"=="" set "AndroidSDKArgs=%AndroidSDKArgs% -AndroidSDKArchitectures %ANDROID_SDKS%"
+if not "%ANDROID_SDK_VERSIONS%"=="" set "AndroidSDKArgs=%AndroidSDKArgs% -AndroidSDKVersions %ANDROID_SDK_VERSIONS%"
+if not "%ANDROID_LINK_MODES%"=="" set "AndroidSDKArgs=%AndroidSDKArgs% -AndroidSDKLinkModes %ANDROID_LINK_MODES%"
+
+:Android_end
+
 :: Build the -HostArchName argument, if any.
 set "HostArchNameArg="
 if not "%HOST_ARCH_NAME%"=="" set "HostArchNameArg=-HostArchName %HOST_ARCH_NAME%"
@@ -111,6 +127,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -BuildRoot %BuildRoot% ^
   -ObjectStore %BuildRoot%\ObjectStore ^
   %WindowsSDKArgs% ^
+  %AndroidSDKArgs% ^
   %PackagingArg% ^
   %TestArg% ^
   -IncludeSBoM ^
