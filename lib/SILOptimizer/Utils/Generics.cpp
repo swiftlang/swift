@@ -3496,6 +3496,19 @@ static bool usePrespecialized(
   return false;
 }
 
+bool containsForeignCXXType(Type replacementType) {
+  return replacementType.findIf([](Type t) -> bool {
+    if (auto *nominal = t->getAnyNominal()) {
+      if (auto *clangDecl = nominal->getClangDecl()) {
+        if (isa<clang::CXXRecordDecl>(clangDecl)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  });
+}
+
 void swift::trySpecializeApplyOfGeneric(
     SILOptFunctionBuilder &FuncBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
@@ -3503,6 +3516,13 @@ void swift::trySpecializeApplyOfGeneric(
     OptRemark::Emitter &ORE,
     bool isMandatory) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
+
+  for (Type repTy : Apply.getSubstitutionMap().getReplacementTypes()) {
+    if (containsForeignCXXType(repTy)) {
+      return; 
+    }
+  }
+
   auto *F = Apply.getFunction();
   auto *RefF =
       cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
