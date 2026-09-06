@@ -1,4 +1,8 @@
 module cfuncs { header "cfuncs.h" }
+module swift_error_c_functions {
+  header "swift_error_c_functions.h"
+  export *
+}
 module ctypes {
   header "ctypes.h"
   explicit module bits {

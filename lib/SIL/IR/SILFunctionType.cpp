@@ -4427,7 +4427,8 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
         foreignInfo.self.isImportAsMember()
             ? AbstractionPattern::getCFunctionAsMethod(origType, clangType,
                                                        foreignInfo.self)
-            : AbstractionPattern(origType, clangType);
+            : AbstractionPattern::getCFunction(origType, clangType,
+                                               foreignInfo.error);
     return getSILFunctionType(
         TC, TypeExpansionContext::minimal(), origPattern, substInterfaceType,
         extInfoBuilder, CFunctionConventions(func, TC.Context), foreignInfo,
@@ -5357,7 +5358,9 @@ getAbstractionPatternForConstant(TypeConverter &converter, ASTContext &ctx,
   } else if (auto value = dyn_cast<clang::ValueDecl>(clangDecl)) {
     if (numParameterLists == 1) {
       // C function imported as a function.
-      return AbstractionPattern(fnType, value->getType().getTypePtr());
+      return AbstractionPattern::getCFunction(
+          fnType, value->getType().getTypePtr(),
+          bridgedFn->getForeignErrorConvention());
     } else {
       assert(numParameterLists == 2);
       if (isa<clang::CXXMethodDecl>(clangDecl)) {

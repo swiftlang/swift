@@ -180,6 +180,15 @@ AbstractionPattern AbstractionPattern::getCurriedObjCMethod(
   return getCurriedObjCMethod(origType, method, errorInfo);
 }
 
+AbstractionPattern AbstractionPattern::getCFunction(
+    CanType origType, const clang::Type *clangType,
+    const std::optional<ForeignErrorConvention> &foreignError) {
+  auto errorInfo = EncodedForeignInfo::encode(foreignError, std::nullopt);
+  AbstractionPattern pattern(origType, clangType);
+  pattern.OtherData = errorInfo.getOpaqueValue();
+  return pattern;
+}
+
 AbstractionPattern
 AbstractionPattern::getCurriedCFunctionAsMethod(CanType origType,
                                          const AbstractFunctionDecl *function) {
@@ -1709,10 +1718,23 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     LLVM_FALLTHROUGH;
   case Kind::ClangType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
-    return AbstractionPattern(getGenericSubstitutions(),
-                              getGenericSignatureForFunctionComponent(),
-                              params[index].getParameterType(),
-                          getClangFunctionParameterType(getClangType(), index));
+    auto paramType = params[index].getParameterType();
+
+    // Adjust the Clang parameter index for a foreign error convention,
+    // which removes the error parameter from the Swift function type.
+    unsigned clangIndex = index;
+    if (getKind() == Kind::ClangType && OtherData != 0) {
+      auto errorInfo = EncodedForeignInfo::fromOpaqueValue(OtherData);
+      if (errorInfo.hasValue() &&
+          !errorInfo.hasErrorParameterReplacedWithVoid()) {
+        if (clangIndex >= errorInfo.getForeignParamIndex())
+          ++clangIndex;
+      }
+    }
+
+    return AbstractionPattern(
+        getGenericSubstitutions(), getGenericSignatureForFunctionComponent(),
+        paramType, getClangFunctionParameterType(getClangType(), clangIndex));
   }
   case Kind::OpaqueFunction:
     return getOpaque();

@@ -1,0 +1,3 @@
+module SwiftErrorCFunctions {
+  header "SwiftErrorCFunctions.h"
+}
