@@ -95,6 +95,20 @@ static bool isStdSpanType(clang::QualType clangType) {
   return decl && decl->isInStdNamespace() && decl->getName() == "span";
 }
 
+// Whether this is a std::span whose element type is non-const, and which the
+// wrapper will therefore expose as a MutableSpan.
+static bool isMutableStdSpanType(clang::QualType clangType) {
+  if (!isStdSpanType(clangType))
+    return false;
+  const auto *decl = dyn_cast<clang::ClassTemplateSpecializationDecl>(
+      clangType->getAsTagDecl());
+  if (!decl || decl->getTemplateArgs().size() == 0)
+    return false;
+  const clang::TemplateArgument &elementArg = decl->getTemplateArgs()[0];
+  return elementArg.getKind() == clang::TemplateArgument::Type &&
+         !elementArg.getAsType().isConstQualified();
+}
+
 // Walks a clang `Expr` tree that appears as a `__counted_by` /
 // `__sized_by` count expression and emits an equivalent Swift expression.
 // `Visit(expr)` returns true on success and the result can be retrieved via
@@ -262,6 +276,19 @@ static Type ConcretePointeeType(Type swiftType) {
   return Type();
 }
 
+// Whether the generated wrapper will expose this parameter as a
+// Mutable[Raw]Span. Only those parameters carry an ownership specifier, so they
+// are the only ones `consumingLifetimebound` can affect.
+static bool willBeMutableSpan(Type swiftType, clang::QualType clangType) {
+  if (isStdSpanType(clangType))
+    return isMutableStdSpanType(clangType);
+  Type nonnullType = swiftType->lookThroughSingleOptionalType();
+  PointerTypeKind PTK;
+  if (!nonnullType->getAnyPointerElementType(PTK))
+    return false;
+  return PTK == PTK_UnsafeMutablePointer || PTK == PTK_UnsafeMutableRawPointer;
+}
+
 // Don't try to transform any Swift types that _SwiftifyImport doesn't know how
 // to handle.
 static bool
@@ -301,18 +328,23 @@ struct SwiftifyInfoPrinter {
   bool firstParam = true;
   llvm::StringMap<std::string> &typeMapping;
   bool &DiagnosedMissingNullableAsEmptySpanParam;
+  bool &DiagnosedMissingConsumingLifetimeboundParam;
   bool hasNullableCountedBy = false;
+  bool hasLifetimeboundMutableSpan = false;
 
 protected:
   SwiftifyInfoPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext,
                       llvm::raw_svector_ostream &out,
                       MacroDecl &SwiftifyImportDecl,
                       llvm::StringMap<std::string> &typeMapping,
-                      bool &DiagnosedMissingNullableAsEmptySpanParam)
+                      bool &DiagnosedMissingNullableAsEmptySpanParam,
+                      bool &DiagnosedMissingConsumingLifetimeboundParam)
       : ctx(ctx), SwiftContext(SwiftContext), out(out),
         SwiftifyImportDecl(SwiftifyImportDecl), typeMapping(typeMapping),
         DiagnosedMissingNullableAsEmptySpanParam(
-            DiagnosedMissingNullableAsEmptySpanParam) {}
+            DiagnosedMissingNullableAsEmptySpanParam),
+        DiagnosedMissingConsumingLifetimeboundParam(
+            DiagnosedMissingConsumingLifetimeboundParam) {}
 
 public:
   void printTypeMapping() {
@@ -375,10 +407,12 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
                               llvm::raw_svector_ostream &out,
                               MacroDecl &SwiftifyImportDecl,
                               llvm::StringMap<std::string> &typeMapping,
-                              bool &DiagnosedMissingNullableAsEmptySpanParam)
+                              bool &DiagnosedMissingNullableAsEmptySpanParam,
+                              bool &DiagnosedMissingConsumingLifetimeboundParam)
       : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl,
                             typeMapping,
-                            DiagnosedMissingNullableAsEmptySpanParam) {}
+                            DiagnosedMissingNullableAsEmptySpanParam,
+                            DiagnosedMissingConsumingLifetimeboundParam) {}
 
   bool printCountedBy(const clang::CountAttributedType *CAT, Type swiftType,
                       ssize_t pointerIndex, bool isImplicitlyUnwrapped) {
@@ -417,7 +451,10 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     out << ")";
   }
 
-  void printLifetimeboundReturn(int idx, bool borrow) {
+  void printLifetimeboundReturn(int idx, bool borrow,
+                                bool paramWillBeMutableSpan = false) {
+    if (!borrow && paramWillBeMutableSpan)
+      hasLifetimeboundMutableSpan = true;
     printSeparator();
     out << ".lifetimeDependence(dependsOn: ";
     printParamOrReturn(idx);
@@ -448,6 +485,21 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     }
     printSeparator();
     out << "nullableAsEmptySpan: true";
+  }
+
+  void printConsumingLifetimebound() {
+    if (!hasMacroParameter("consumingLifetimebound")) {
+      if (DiagnosedMissingConsumingLifetimeboundParam ||
+          // Don't warn when it has no impact on the result.
+          !hasLifetimeboundMutableSpan)
+        return;
+      DiagnosedMissingConsumingLifetimeboundParam = true;
+      SwiftContext.Diags.diagnose(
+          SourceLoc(), diag::swiftify_consuming_lifetimebound_param_missing);
+      return;
+    }
+    printSeparator();
+    out << "consumingLifetimebound: true";
   }
 
 private:
@@ -850,7 +902,10 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                   !isNonEscapable(clangParamTy) &&
                   (!paramHasBoundsInfo ||
                    mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
-              printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
+              printer.printLifetimeboundReturn(
+                  mappedIndex, willBeEscapable,
+                  paramHasBoundsInfo &&
+                      willBeMutableSpan(swiftParamTy, clangParamTy));
               paramHasLifetimeInfo = true;
               returnHasLifetimeInfo = true;
             } else {
@@ -1013,6 +1068,13 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       !SwiftContext.LangOpts.hasFeature(
           Feature::SafeInteropWrappersNullAsEmptySpan);
 
+  // Likewise, keep passing __lifetimebound Mutable[Raw]Span parameters 'inout'
+  // unless they opt-in to the 'consuming' convention.
+  const bool LegacyInoutRequested =
+      SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers) &&
+      !SwiftContext.LangOpts.hasFeature(
+          Feature::SafeInteropWrappersConsumingLifetimebound);
+
   llvm::SmallString<128> MacroString;
   {
     llvm::raw_svector_ostream out(MacroString);
@@ -1021,7 +1083,8 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     llvm::StringMap<std::string> typeMapping;
     SwiftifyInfoFunctionPrinter printer(
         getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl,
-        typeMapping, DiagnosedMissingNullableAsEmptySpanParam);
+        typeMapping, DiagnosedMissingNullableAsEmptySpanParam,
+        DiagnosedMissingConsumingLifetimeboundParam);
     bool foundInfo = ClangFuncDecl ?
       swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl) :
       swiftifyImpl(*this, printer, MappedDecl, ClangObjCMethodDecl);
@@ -1033,6 +1096,9 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     printer.printTypeMapping();
     if (!LegacyOptionalRequested) {
       printer.printNullableAsEmptySpan();
+    }
+    if (!LegacyInoutRequested) {
+      printer.printConsumingLifetimebound();
     }
     out << ")";
   }

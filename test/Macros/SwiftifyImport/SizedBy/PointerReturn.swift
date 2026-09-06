@@ -28,7 +28,7 @@ public func lifetimeDependentBorrow(_ p: borrowing UnsafeRawPointer, _ len1: CIn
 // expected-error@+1{{missing return in global function expected to return 'UnsafeRawPointer'}}
 }
 
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "len2"), .sizedBy(pointer: .param(1), size: "len1"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "len2"), .sizedBy(pointer: .param(1), size: "len1"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), consumingLifetimebound: true)
 public func lifetimeDependentCopyMut(_ p: UnsafeMutableRawPointer, _ len1: CInt, _ len2: CInt) -> UnsafeMutableRawPointer {
 // expected-error@+1{{missing return in global function expected to return 'UnsafeMutableRawPointer'}}
 }
@@ -82,8 +82,8 @@ public func lifetimeDependentBorrow(_ p: borrowing UnsafeRawBufferPointer, _ len
 @__swiftmacro_4test24lifetimeDependentCopyMut15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
-public func lifetimeDependentCopyMut(_ p: inout MutableRawSpan, _ len2: CInt) -> MutableRawSpan {
+@_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
+public func lifetimeDependentCopyMut(_ p: consuming MutableRawSpan, _ len2: CInt) -> MutableRawSpan {
     let len1 = CInt(exactly: p.byteCount)!
     let _pPtr = p.withUnsafeMutableBytes {
         unsafe $0
