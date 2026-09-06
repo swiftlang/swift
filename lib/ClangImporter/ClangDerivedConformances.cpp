@@ -1066,8 +1066,15 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   } else {
     // Check if begin() returns an iterator.
     auto *iterDecl = iterTy->getAsCXXRecordDecl();
-    if (!iterDecl || !iterDecl->hasDefinition())
+    if (!iterDecl)
       return;
+
+    // NOTE: isCompleteType eagerly instantiates the return type of begin(),
+    // which may lead to spurious template instantiation failures, but is needed
+    // for CxxIteratorInfoRequest and the collection protocol conformances.
+    if (!clangSema.isCompleteType(beginConst->getLocation(), iterTy))
+      return;
+
     auto iterInfo = evaluateOrDefault(
         ctx.evaluator, CxxIteratorInfoRequest({iterDecl, clangSema}), {});
     if (!iterInfo.has_value())
