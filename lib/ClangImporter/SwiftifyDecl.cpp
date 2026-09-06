@@ -888,12 +888,6 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       attachMacro = true;
     }
 
-    if (!attachMacro && CAT == nullptr)
-      // FIXME: The return type used to be imported lazily, so this exited early
-      // to avoid over-eagerly importing return types. That behavior has now
-      // changed so this early exit should no longer be necessary.
-      return false;
-
     Type swiftReturnTy;
     if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
       swiftReturnTy = funcDecl->getResultInterfaceType();
