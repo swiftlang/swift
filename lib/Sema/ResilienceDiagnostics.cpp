@@ -57,6 +57,11 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (fragileKind.kind == FragileFunctionKind::None)
     return false;
 
+  // Namespace qualifiers impose no access ceiling. Their selected members
+  // are checked independently, including in serialized function bodies.
+  if (isa<NamespaceDecl>(D))
+    return false;
+
   // Local declarations are OK.
   if (D->getDeclContext()->isLocalContext())
     return false;

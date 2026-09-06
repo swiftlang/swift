@@ -6042,6 +6042,10 @@ bool ValueDecl::isMoreVisibleThan(ValueDecl *other) const {
 bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
                                  bool forConformance,
                                  bool allowUsableFromInline) const {
+  // Namespace qualifiers impose no access ceiling. Lookup of the selected
+  // member performs the ordinary access check.
+  if (isa<NamespaceDecl>(this))
+    return true;
   return checkAccess(useDC, this, forConformance, allowUsableFromInline,
                      [&]() { return getFormalAccess(); });
 }

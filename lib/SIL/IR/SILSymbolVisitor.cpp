@@ -647,13 +647,19 @@ public:
     visitAbstractStorageDecl(SD);
   }
 
-  template<typename NominalOrExtension>
-  void visitMembers(NominalOrExtension *D) {
+  template<typename IterableContext>
+  void visitMembers(IterableContext *D) {
     if (!Ctx.getOpts().VisitMembers)
       return;
 
     for (auto member : D->getABIMembers())
       visit(member);
+  }
+
+  void visitNamespaceDecl(NamespaceDecl *ND) {
+    // Only the contained declarations contribute symbols. A namespace has no
+    // metadata, descriptor, or runtime value of its own in this prototype.
+    visitMembers(ND);
   }
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {

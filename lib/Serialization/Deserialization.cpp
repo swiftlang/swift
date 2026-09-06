@@ -2198,6 +2198,18 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   unsigned recordID = fatalIfUnexpected(
       DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
   switch (recordID) {
+  case XREF_NAMESPACE_PATH_PIECE: {
+    IdentifierID nameID;
+    XRefNamespacePathPieceLayout::readRecord(scratch, nameID);
+    auto name = getDeclBaseName(nameID);
+    pathTrace.addValue(name);
+    baseModule->lookupQualified(baseModule, DeclNameRef(name), SourceLoc(),
+                                NLFlags::RemoveOverridden, values);
+    llvm::erase_if(values, [](ValueDecl *decl) {
+      return !isa<NamespaceDecl>(decl);
+    });
+    break;
+  }
   case XREF_TYPE_PATH_PIECE:
   case XREF_VALUE_PATH_PIECE: {
     IdentifierID IID;
@@ -2672,6 +2684,18 @@ giveUpFastPath:
                                            getXRefDeclNameForError());
       }
 
+      if (auto *namespaceDecl = dyn_cast<NamespaceDecl>(values.front())) {
+        values.clear();
+        for (auto *member : namespaceDecl->getMembers()) {
+          auto *value = dyn_cast<ValueDecl>(member);
+          if (value && value->getBaseName() == memberName)
+            values.push_back(value);
+        }
+        filterValues(filterTy, M, genericSig, isType, inProtocolExt,
+                     importedFromClang, isStatic, ctorInit, values);
+        break;
+      }
+
       auto nominal = dyn_cast<NominalTypeDecl>(values.front());
       values.clear();
 
@@ -3111,6 +3135,8 @@ Expected<DeclContext *> ModuleFile::getDeclContextChecked(DeclContextID DCID) {
     return deserialized.takeError();
 
   auto D = deserialized.get();
+  if (auto ND = dyn_cast<NamespaceDecl>(D))
+    return ND;
   if (auto GTD = dyn_cast<GenericTypeDecl>(D))
     return GTD;
   if (auto ED = dyn_cast<ExtensionDecl>(D))
@@ -3828,6 +3854,25 @@ public:
     assocType->setOverriddenDecls(overriddenAssocTypes);
 
     return assocType;
+  }
+
+  Expected<Decl *> deserializeNamespace(ArrayRef<uint64_t> scratch,
+                                        StringRef blobData) {
+    IdentifierID nameID;
+    DeclContextID contextID;
+    decls_block::NamespaceLayout::readRecord(scratch, nameID, contextID);
+
+    DeclContext *DC;
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto *namespaceDecl = NamespaceDecl::create(
+        ctx, SourceLoc(), MF.getIdentifier(nameID), SourceLoc(), DC);
+    declOrOffset = namespaceDecl;
+    namespaceDecl->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
+    skipRecord(MF.DeclTypeCursor, decls_block::MEMBERS);
+    return namespaceDecl;
   }
 
   Expected<Decl *> deserializeStruct(ArrayRef<uint64_t> scratch,
@@ -6987,6 +7032,7 @@ DeclDeserializer::getDeclCheckedImpl(
   CASE(TypeAlias)
   CASE(GenericTypeParamDecl)
   CASE(AssociatedTypeDecl)
+  CASE(Namespace)
   CASE(Struct)
   CASE(Constructor)
   CASE(Var)
@@ -8804,11 +8850,7 @@ void ModuleFile::loadStorageMembers(Decl *container, uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", container);
   ++NumMemberListsLoaded;
 
-  IterableDeclContext *IDC;
-  if (auto *nominal = dyn_cast<NominalTypeDecl>(container))
-    IDC = nominal;
-  else
-    IDC = cast<ExtensionDecl>(container);
+  auto *IDC = cast<IterableDeclContext>(container);
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   if (diagnoseAndConsumeFatalIfNotSuccess(

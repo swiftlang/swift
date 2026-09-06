@@ -627,8 +627,6 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit: // Skip up to the module
     return DeclContextID();
-  case DeclContextKind::NamespaceDecl:
-    llvm_unreachable("namespace serialization is not implemented");
   default:
     break;
   }
@@ -2283,7 +2281,7 @@ static bool shouldSerializeMember(Decl *D) {
       return false;
     llvm_unreachable("decl should never be a member");
   case DeclKind::Namespace:
-    llvm_unreachable("namespace serialization is not implemented");
+    return true;
   case DeclKind::Missing:
     llvm_unreachable("attempting to serialize a missing decl");
 
@@ -2406,8 +2404,15 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::Module:
     llvm_unreachable("should only cross-reference something within a file");
 
-  case DeclContextKind::NamespaceDecl:
-    llvm_unreachable("namespace cross references are not implemented");
+  case DeclContextKind::NamespaceDecl: {
+    auto *namespaceDecl = cast<NamespaceDecl>(DC);
+    writeCrossReference(DC->getParent(), pathLen + 1);
+    abbrCode = DeclTypeAbbrCodes[XRefNamespacePathPieceLayout::Code];
+    XRefNamespacePathPieceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addDeclBaseNameRef(namespaceDecl->getName()));
+    break;
+  }
 
   case DeclContextKind::FileUnit:
     abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
@@ -2599,6 +2604,14 @@ void Serializer::writeCrossReference(const Decl *D) {
   }
 
   writeCrossReference(D->getDeclContext());
+
+  if (auto *namespaceDecl = dyn_cast<NamespaceDecl>(D)) {
+    abbrCode = DeclTypeAbbrCodes[XRefNamespacePathPieceLayout::Code];
+    XRefNamespacePathPieceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addDeclBaseNameRef(namespaceDecl->getName()));
+    return;
+  }
 
   if (auto opaque = dyn_cast<OpaqueTypeDecl>(D)) {
     abbrCode = DeclTypeAbbrCodes[XRefOpaqueReturnTypePathPieceLayout::Code];
@@ -5541,8 +5554,16 @@ public:
     llvm_unreachable("module decls are not serialized");
   }
 
-  void visitNamespaceDecl(const NamespaceDecl *) {
-    llvm_unreachable("namespace serialization is not implemented");
+  void visitNamespaceDecl(const NamespaceDecl *namespaceDecl) {
+    using namespace decls_block;
+    verifyAttrSerializable(namespaceDecl);
+    auto contextID = S.addDeclContextRef(namespaceDecl->getDeclContext());
+    unsigned abbrCode = S.DeclTypeAbbrCodes[NamespaceLayout::Code];
+    NamespaceLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addDeclBaseNameRef(namespaceDecl->getName()),
+        contextID.getOpaqueValue());
+    writeMembers(id, namespaceDecl->getAllMembers(), false);
   }
 
   void visitMissingDecl(const MissingDecl *) {
@@ -6689,6 +6710,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ClangTypeLayout>();
 
   registerDeclTypeAbbr<TypeAliasLayout>();
+  registerDeclTypeAbbr<NamespaceLayout>();
   registerDeclTypeAbbr<GenericTypeParamTypeLayout>();
   registerDeclTypeAbbr<DependentMemberTypeLayout>();
   registerDeclTypeAbbr<StructLayout>();
@@ -6741,6 +6763,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TopLevelCodeDeclContextLayout>();
 
   registerDeclTypeAbbr<XRefTypePathPieceLayout>();
+  registerDeclTypeAbbr<XRefNamespacePathPieceLayout>();
   registerDeclTypeAbbr<XRefOpaqueReturnTypePathPieceLayout>();
   registerDeclTypeAbbr<XRefValuePathPieceLayout>();
   registerDeclTypeAbbr<XRefExtensionPathPieceLayout>();

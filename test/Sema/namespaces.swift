@@ -9,7 +9,16 @@
 // REQUIRES: swift_feature_Namespaces
 
 namespace Values {
-  static func answer() -> Int { 42 }
+  static func answer() -> Int { 42 } // expected-note {{'answer()' is not '@usableFromInline' or public}}
+  public static func publicAnswer() -> Int { 42 }
+}
+
+@inlinable public func callPublicAnswer() -> Int {
+  Values.publicAnswer()
+}
+
+@inlinable public func rejectInternalAnswer() -> Int {
+  Values.answer() // expected-error {{'answer()' is internal and cannot be referenced from an '@inlinable' function}}
 }
 
 let unqualifiedAnswer = answer() // expected-error {{cannot find 'answer' in scope}}

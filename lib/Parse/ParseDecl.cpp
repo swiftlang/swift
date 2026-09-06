@@ -7579,6 +7579,13 @@ Parser::parseDeclNamespace(ParseDeclOptions Flags,
   }
   decl->setBraces({leftBraceLoc, rightBraceLoc});
 
+  // The namespace's direct members are part of the file interface. Unlike a
+  // nominal type, there is no nominal dependency node to carry this change.
+  if (CurrentTokenHash) {
+    if (auto fingerprint = decl->getBodyFingerprint())
+      CurrentTokenHash->combine(*fingerprint);
+  }
+
   return makeParserResult(status, decl);
 }
 
@@ -7687,7 +7694,10 @@ bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
   bool HasNestedClassDeclarations = false;
   bool HasDerivativeDeclarations = false;
 
-  if (canDelayMemberDeclParsing(HasOperatorDeclarations,
+  // Namespace members must be fingerprinted before the enclosing file's
+  // interface hash is finalized.
+  if (!Flags.contains(PD_InNamespace) &&
+      canDelayMemberDeclParsing(HasOperatorDeclarations,
                                 HasNestedClassDeclarations,
                                 HasDerivativeDeclarations,
                                 Flags)) {

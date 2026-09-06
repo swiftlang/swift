@@ -305,7 +305,7 @@ public:
         select<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct,
         DeclKind::Class, DeclKind::Protocol>(D, topNominals) ||
         select<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func,
-        DeclKind::Accessor>(D, topValues);
+        DeclKind::Accessor, DeclKind::Namespace>(D, topValues);
       }
     // clang-format on
     // The order is important because some of these use instance variables

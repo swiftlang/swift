@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_spi(RawSyntax)
+@_spi(ExperimentalLanguageFeatures)
 import SwiftSyntax
 import SwiftIfConfig
 import ASTBridging
@@ -60,6 +61,10 @@ final class FingerprintVisitor: SyntaxVisitor {
   }
 
   override func visit(_ node: MemberBlockSyntax) -> SyntaxVisitorContinueKind {
+    // Namespace members contribute to the file's interface just like globals.
+    if node.parent?.is(NamespaceDeclSyntax.self) == true {
+      return .visitChildren
+    }
     // Skip nominal decl / extension member blocks.
     return .skipChildren
   }

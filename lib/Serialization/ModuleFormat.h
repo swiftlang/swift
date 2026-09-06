@@ -1669,6 +1669,15 @@ namespace decls_block {
     BCArray<DeclIDField> // overridden associated types
   >;
 
+  // A namespace carries declaration identity and members, never a source type,
+  // access level, generic signature, or conformance.
+  using NamespaceLayout = BCRecordLayout<
+    NAMESPACE_DECL,
+    IdentifierIDField,  // name
+    DeclContextIDField  // parent context
+    // Trailed by the members record.
+  >;
+
   using StructLayout = BCRecordLayout<
     STRUCT_DECL,
     IdentifierIDField,      // name
@@ -2263,6 +2272,11 @@ namespace decls_block {
     BCVBR<4>        // xref path length (cannot be 0)
   >;
 
+  using XRefNamespacePathPieceLayout = BCRecordLayout<
+    XREF_NAMESPACE_PATH_PIECE,
+    IdentifierIDField // name
+  >;
+
   using XRefTypePathPieceLayout = BCRecordLayout<
     XREF_TYPE_PATH_PIECE,
     IdentifierIDField, // name
@@ -2769,6 +2783,8 @@ static inline decls_block::RecordKind getKindForTable(const Decl *D) {
     return decls_block::CONSTRUCTOR_DECL;
   case DeclKind::Destructor:
     return decls_block::DESTRUCTOR_DECL;
+  case DeclKind::Namespace:
+    return decls_block::NAMESPACE_DECL;
   case DeclKind::Macro:
     return decls_block::MACRO_DECL;
 

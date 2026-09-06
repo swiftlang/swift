@@ -22,14 +22,14 @@ namespace Empty {}
 // NAMESPACE: {{^  }}(namespace_decl{{.*}}"switch" interface_type="namespace<`switch`>"
 namespace `switch` {}
 
-// This body has no pound directives, so the legacy parser delays and reparses
-// it when the AST dump asks for members.
-// NAMESPACE: {{^  }}(namespace_decl{{.*}}"Delayed" interface_type="namespace<Delayed>"
+// Namespace members are parsed eagerly so their signatures contribute to the
+// source-file interface fingerprint. Written static functions are receiver-free.
+// NAMESPACE: {{^  }}(namespace_decl{{.*}}"HasMembers" interface_type="namespace<HasMembers>"
 // NAMESPACE: {{^    }}(namespace_decl{{.*}}"Nested" interface_type="namespace<Nested>"
 // NAMESPACE: {{^    }}(struct_decl{{.*}}"Payload"
 // NAMESPACE: {{^    }}(var_decl{{.*}}"answer" let static
-// NAMESPACE: {{^    }}(func_decl{{.*}}"ping()" static
-namespace Delayed {
+// NAMESPACE: {{^    }}(func_decl{{.*}}"ping()" thrown_type=
+namespace HasMembers {
   namespace Nested {}
   struct Payload {}
   static let answer = 42
@@ -44,7 +44,7 @@ namespace Delayed {
 // NAMESPACE: {{^      }}(typealias{{.*}}"StatusCode"
 // NAMESPACE: {{^      }}(var_decl{{.*}}"defaultPort" let static
 // NAMESPACE: {{^      }}(var_decl{{.*}}"computedPort" static
-// NAMESPACE: {{^      }}(func_decl{{.*}}"connect()" static
+// NAMESPACE: {{^      }}(func_decl{{.*}}"connect()" thrown_type=
 @available(*, deprecated)
 public namespace Network {
   namespace HTTP {
