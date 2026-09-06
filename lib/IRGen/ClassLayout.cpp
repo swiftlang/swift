@@ -19,6 +19,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 #include "ClassLayout.h"
+#include "ClassTypeInfo.h"
 #include "GenHeap.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -85,6 +86,31 @@ Size ClassLayout::getInstanceStart() const {
   return getSize();
 }
 
+void ClassLayout::collectAllStoredPropertyTypes(
+    IRGenModule &IGM, SILType classType, SmallVectorImpl<SILType> &fieldTypes) {
+  auto *classDecl = classType.getClassOrBoundGenericClass();
+  // ClassLayout::AllStoredProperties for a class is populated to
+  // include its ancestors' properties only when the class includes a
+  // generic parameter and fully specialized (which is the same
+  // condition as collectStoredProperties in
+  // addDirectFieldsFromClass()). We need to walk the superclass chain
+  // up to find the first class that meets that condition.
+  bool alreadyIncludesAncestors =
+      classDecl->isGenericContext() &&
+      !classType.getASTType()->getRecursiveProperties().hasUnboundGeneric();
+  if (!alreadyIncludesAncestors) {
+    if (SILType superclassType = classType.getSuperclass())
+      collectAllStoredPropertyTypes(IGM, superclassType, fieldTypes);
+  }
+  auto &classTI = IGM.getTypeInfo(classType).as<ClassTypeInfo>();
+  auto &classLayout = classTI.getClassLayout(IGM, classType,
+                                             /*forBackwardDeployment=*/false);
+  for (Field field : classLayout.AllStoredProperties) {
+    assert(field.isConcrete() && "Missing member on fixed size class");
+    fieldTypes.push_back(field.getType(IGM, classType).getObjectType());
+  }
+}
+
 std::optional<uint64_t>
 ClassLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM,
                                               SILType selfType) const {
@@ -105,12 +131,7 @@ ClassLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM,
     storageEntries.push_back(rawPointerType);
   }
 
-  // Add entries for each stored property
-  for (auto field : AllStoredProperties) {
-    assert(field.isConcrete() && "Missing member on fixed size class");
-    auto fieldType = field.getType(IGM, selfType).getObjectType();
-    storageEntries.push_back(fieldType);
-  }
+  collectAllStoredPropertyTypes(IGM, selfType, storageEntries);
 
   return irgen::computeTypedMallocTypeDescriptor(IGM, storageEntries);
 }
