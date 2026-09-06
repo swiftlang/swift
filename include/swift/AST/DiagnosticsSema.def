@@ -2004,6 +2004,10 @@ ERROR(attr_objc_implementation_func_not_found,none,
       "could not find imported function '%0' matching %kind1; make sure you "
       "import the module or header that declares it",
       (StringRef, ValueDecl*))
+ERROR(attr_objc_implementation_func_ambiguous_overload,none,
+      "%kind0 could implement any of several imported overloads of '%1' that "
+      "have the same signature in Swift",
+      (ValueDecl*, StringRef))
 NOTE(attr_objc_implementation_fixit_remove_category_name,none,
      "remove arguments to implement the main '@interface' for this class",
      ())
@@ -2250,14 +2254,52 @@ ERROR(cxx_incompatible_with_cdecl,none,
 ERROR(cxx_attr_requires_implementation,none,
       "'@cxx' must be combined with '@implementation'",
       ())
+ERROR(cxx_invalid_context,none,
+      "%0 can only be applied to global functions or functions in extensions "
+      "of C++ namespaces, structs, and classes", (DeclAttribute))
 ERROR(cxx_func_defined,none,
       "%kind0 cannot implement C++ function '%1' because it "
       "%select{already has a definition|is declared 'inline'|is 'constexpr' (implicitly 'inline')}2",
       (ValueDecl *, StringRef, unsigned))
-ERROR(cxx_references_unsupported,none,
-      "%kind0 cannot implement C++ function '%1' because reference "
+ERROR(cxx_pure_virtual_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because it is a pure virtual "
+      "method; a pure virtual method's vtable slot dispatches to an overriding "
+      "method, never to a definition of '%1' itself",
+      (ValueDecl *, StringRef))
+ERROR(cxx_virtual_key_function_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because it is its class's "
+      "key function, and Swift cannot yet emit the class's vtable, which C++ "
+      "emits in the translation unit that defines the key function; declare "
+      "another out-of-line virtual method earlier in the class to make that "
+      "method the key function",
+      (ValueDecl *, StringRef))
+ERROR(cxx_virtual_override_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because it overrides a "
+      "virtual method %select{in a class hierarchy that uses multiple "
+      "inheritance|in a class hierarchy that has a virtual base|and changes "
+      "its return type}2, so its vtable entries may need adjusting thunks, "
+      "which C++ emits only in the translation unit that defines the method; "
+      "this is not yet supported",
+      (ValueDecl *, StringRef, unsigned))
+ERROR(cxx_mutating_mismatch,none,
+      "%kind0 should%select{|| not}1 be 'mutating' to match "
+      "%select{non-'const' ||'const' }1%kindonly2 declared by the header",
+      (ValueDecl *, unsigned, const ValueDecl *))
+ERROR(cxx_param_ownership_unsupported,none,
+      "%kindonly0 cannot be marked '@cxx' because parameter %1 of non-trivial "
+      "C++ class type is '%select{borrowing|consuming}2'; C++ decides which "
+      "side destroys such an argument, so the implementation must take it "
+      "with default ownership",
+      (const AbstractFunctionDecl *, const ParamDecl *, unsigned))
+ERROR(cxx_rvalue_references_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because rvalue reference "
       "parameters and return types are not yet supported",
       (ValueDecl *, StringRef))
+ERROR(cxx_unretained_result_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because it returns a foreign "
+      "reference type %select{without a 'SWIFT_RETURNS_RETAINED' annotation|"
+      "unretained ('SWIFT_RETURNS_UNRETAINED')}2, which is not yet supported",
+      (ValueDecl *, StringRef, unsigned))
 
 // @used and @section
 ERROR(section_empty_name,none,

@@ -1745,7 +1745,8 @@ bool isFormallyThrownIndirectly(TypeConverter &TC,
 
 static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
                                                  const clang::Type *clangTy,
-                                                 CanType substTy) {
+                                                 CanType substTy,
+                                                 bool isCxxImplementation) {
   // A const pointer argument might have been imported as
   // UnsafePointer, COpaquePointer, or a CF foreign class.
   // (An ObjC class type wouldn't be const-qualified.)
@@ -1761,7 +1762,8 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
 
     if (auto eltTy = substTy->getAnyPointerElementType())
       return isClangTypeMoreIndirectThanSubstType(TC,
-                    clangTy->getPointeeType().getTypePtr(), CanType(eltTy));
+                    clangTy->getPointeeType().getTypePtr(), CanType(eltTy),
+                    isCxxImplementation);
 
     if (substTy->isOpaquePointer())
       // TODO: We could conceivably have an indirect opaque ** imported
@@ -1796,6 +1798,10 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
           clang::QualType(clangTy, 0))) {
     if (ref->kind == importer::CxxReferenceParameterKind::Mutating)
       return false;
+    // A `@cxx @implementation` parameter spells a const reference as an
+    // UnsafePointer, which already carries the indirection.
+    if (isCxxImplementation && substTy->getAnyPointerElementType())
+      return false;
     return !(clangTy->getPointeeType()->getAs<clang::RecordType>() &&
              substTy->isForeignReferenceType());
   }
@@ -1806,7 +1812,8 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
 static bool isFormallyPassedIndirectly(TypeConverter &TC,
                                        AbstractionPattern origType,
                                        CanType substType,
-                                       const TypeLowering &substTL) {
+                                       const TypeLowering &substTL,
+                                       bool isCxxImplementation) {
   // If this is a native Swift class that's passed directly to C/C++, treat it
   // as indirect.
   if (origType.isClangType()) {
@@ -1825,7 +1832,7 @@ static bool isFormallyPassedIndirectly(TypeConverter &TC,
   // isn't, treat it as indirect.
   if (origType.isClangType()
       && isClangTypeMoreIndirectThanSubstType(TC, origType.getClangType(),
-                                              substType)) {
+                                              substType, isCxxImplementation)) {
     return true;
   }
 
@@ -1919,7 +1926,11 @@ private:
   bool isFormallyPassedIndirectly(AbstractionPattern origType,
                                   CanType substType,
                                   const TypeLowering &substTL) {
-    return ::isFormallyPassedIndirectly(TC, origType, substType, substTL);
+    bool isCxxImplementation =
+        Constant && Constant->hasDecl() &&
+        Constant->getDecl()->getAttrs().hasAttribute<CxxDeclAttr>();
+    return ::isFormallyPassedIndirectly(TC, origType, substType, substTL,
+                                        isCxxImplementation);
   }
 
   /// Destructure the top-level parameters.  There are two things
@@ -2669,7 +2680,8 @@ static void destructureYieldsForReadAccessor(TypeConverter &TC,
   auto &tl =
       TC.getTypeLowering(origType, valueType, expansion);
   auto convention = [&] {
-    if (isFormallyPassedIndirectly(TC, origType, valueType, tlConv))
+    if (isFormallyPassedIndirectly(TC, origType, valueType, tlConv,
+                                   /*isCxxImplementation*/ false))
       return ParameterConvention::Indirect_In_Guaranteed;
     if (tlConv.isTrivial())
       return ParameterConvention::Direct_Unowned;
@@ -4476,6 +4488,25 @@ static CanSILFunctionType getSILFunctionTypeForAbstractCFunction(
                             constant, std::nullopt, ProtocolConformanceRef());
 }
 
+/// If \p decl is a `@cxx @implementation` function that implements a C++
+/// method, return that method.
+static const clang::CXXMethodDecl *
+getImplementedCXXMethod(const ValueDecl *decl) {
+  if (!decl->getAttrs().hasAttribute<CxxDeclAttr>())
+    return nullptr;
+  const Decl *interface = decl->getImplementedObjCDecl();
+  if (!interface)
+    return nullptr;
+  // A virtual method of a foreign reference type matches the importer's
+  // `__synthesizedVirtualCall_` dispatch thunk; lower the implementation
+  // against the underlying virtual method it provides the body of.
+  if (const auto *thunk = dyn_cast<FuncDecl>(interface))
+    if (const auto *original = decl->getASTContext().getClangModuleLoader()
+                                   ->getOriginalForVirtualThunk(thunk))
+      interface = original;
+  return dyn_cast_or_null<clang::CXXMethodDecl>(interface->getClangDecl());
+}
+
 /// Try to find a clang method declaration for the given function.
 static const clang::Decl *findClangMethod(ValueDecl *method) {
   if (auto *methodFn = dyn_cast<FuncDecl>(method)) {
@@ -4779,6 +4810,16 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
         foreignInfo.self.setSelfIndex(selfIndex);
       }
 
+      // A `@cxx @implementation` function is lowered to the entry point of the
+      // C++ declaration it implements, so its `self` (if any) must be lowered
+      // the way the importer lowers that declaration's `self`.
+      if (!foreignInfo.self.isImportAsMember() &&
+          decl->getAttrs().hasAttribute<CxxDeclAttr>()) {
+        if (auto *interface = dyn_cast_or_null<AbstractFunctionDecl>(
+                decl->getImplementedObjCDecl()))
+          foreignInfo.self = interface->getImportAsMemberStatus();
+      }
+
       return getSILFunctionTypeForClangDecl(
           TC, clangDecl, origLoweredInterfaceType, origLoweredInterfaceType,
           extInfoBuilder, foreignInfo, constant);
@@ -4837,6 +4878,12 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   if (c.isForeign) {
     if (!c.hasDecl())
       return SILFunctionTypeRepresentation::CFunctionPointer;
+
+    if (const auto *method = getImplementedCXXMethod(c.getDecl())) {
+      return method->isStatic()
+                 ? SILFunctionTypeRepresentation::CFunctionPointer
+                 : SILFunctionTypeRepresentation::CXXMethod;
+    }
 
     if (auto clangDecl = c.getDecl()->getClangDecl()) {
       if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
@@ -5334,6 +5381,15 @@ getAbstractionPatternForConstant(TypeConverter &converter, ASTContext &ctx,
 
   const clang::Decl *clangDecl = bridgedFn->getClangDecl();
   if (!clangDecl) {
+    // A `@cxx @implementation` of a C++ method is bridged like the method it
+    // implements.
+    if (const auto *cxxMethod = getImplementedCXXMethod(bridgedFn)) {
+      assert(numParameterLists == 2 &&
+             "C++ method implementation not curried?");
+      return AbstractionPattern::getCurriedCXXMethod(
+          fnType, cxxMethod, bridgedFn->getImportAsMemberStatus());
+    }
+
     // If this function only has a C entrypoint, create a Clang type to
     // use when referencing it.
     if (bridgedFn->hasOnlyCEntryPoint()) {

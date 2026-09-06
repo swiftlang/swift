@@ -37,15 +37,16 @@ func plainOperatorName(x: Int32) -> Int32 { return x }
 func plainCallOperatorName(x: Int32) -> Int32 { return x }
 
 
-// Only top-level func decls are currently supported.
+// Only top-level func decls and functions in extensions of C++ namespaces,
+// structs, and classes are supported.
 
 class Foo {
-  // expected-error@+2{{@cxx can only be applied to global functions}}
+  // expected-error@+2{{@cxx can only be applied to global functions or functions in extensions of C++ namespaces, structs, and classes}}
   // expected-error@+1{{'@cxx' must be combined with '@implementation'}}
   @cxx
   func foo(x: Int32) -> Int32 { return x }
 
-  // expected-error@+2{{@cxx can only be applied to global functions}}
+  // expected-error@+2{{@cxx can only be applied to global functions or functions in extensions of C++ namespaces, structs, and classes}}
   // expected-error@+1{{'@cxx' must be combined with '@implementation'}}
   @cxx
   static func bar(x: Int32) -> Int32 { return x }
