@@ -598,3 +598,17 @@ func testEnumElementPatternParentType(_ x: Any) {
     break
   }
 }
+
+// https://github.com/swiftlang/swift/issues/91755
+// Erasure must look through a specialized conformance to its substitutions.
+
+struct GenericP<T: P>: P {
+  func f() { }
+}
+
+func testErasureOfSpecializedConformance(_ g: GenericP<C>) {
+  _ = g as any P
+  // expected-warning@-1{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  _ = GenericP<C>.self as any P.Type
+  // expected-warning@-1{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+}
