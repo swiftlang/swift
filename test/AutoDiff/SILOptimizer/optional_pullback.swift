@@ -7,10 +7,9 @@ import _Differentiation
 // CHECK-SAME: (@in_guaranteed Optional<τ_0_0>.TangentVector) -> @out τ_0_0.TangentVector
 //
 // CHECK: bb0(%[[RET_TAN:.+]] : $*τ_0_0.TangentVector, %[[OPT_TAN:.+]] : $*Optional<τ_0_0>.TangentVector):
-// CHECK: %[[RET_TAN_BUF:.+]] = alloc_stack $τ_0_0.TangentVector, let, name "derivative of 'x'
 
 // CHECK: %[[ZERO1:.+]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
-// CHECK: apply %[[ZERO1]]<τ_0_0.TangentVector>(%[[RET_TAN_BUF]], %{{.*}})
+// CHECK: apply %[[ZERO1]]<τ_0_0.TangentVector>(%[[RET_TAN]], %{{.*}})
 // CHECK: %[[ADJ_IN_BB:.+]] = alloc_stack $τ_0_0.TangentVector
 //
 // CHECK: %[[TAN_VAL:.+]] = struct_element_addr %[[OPT_TAN]] : $*Optional<τ_0_0>.TangentVector, #Optional.TangentVector.value
@@ -20,11 +19,8 @@ import _Differentiation
 // CHECK: apply %[[PLUS_EQUAL]]<τ_0_0.TangentVector>(%[[ADJ_IN_BB]], %[[TAN_DATA]], %{{.*}})
 
 // CHECK: %[[PLUS_EQUAL:.+]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic."+="
-// CHECK: apply %[[PLUS_EQUAL]]<τ_0_0.TangentVector>(%[[RET_TAN_BUF]], %[[ADJ_IN_BB]], %{{.*}})
+// CHECK: apply %[[PLUS_EQUAL]]<τ_0_0.TangentVector>(%[[RET_TAN]], %[[ADJ_IN_BB]], %{{.*}})
 // CHECK: destroy_addr %[[ADJ_IN_BB]] : $*τ_0_0.TangentVector
-
-// CHECK: copy_addr [take] %[[RET_TAN_BUF:.+]] to [init] %[[RET_TAN:.+]]
-// CHECK: dealloc_stack %[[RET_TAN_BUF]] : $*τ_0_0.TangentVector
 
 @differentiable(reverse)
 func givesWrongTangentVector<Element>(x: Element) -> Element? where Element: Differentiable {

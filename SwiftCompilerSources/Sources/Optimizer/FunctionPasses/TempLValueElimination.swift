@@ -47,16 +47,24 @@ import SIL
 ///
 let tempLValueElimination = FunctionPass(name: "temp-lvalue-elimination") {
   (function: Function, context: FunctionPassContext) in
+  removeTempLValues(in: function, keepDebugInfo: false, context)
+}
 
+let mandatoryTempLValueElimination = FunctionPass(name: "mandatory-temp-lvalue-elimination") {
+  (function: Function, context: FunctionPassContext) in
+  removeTempLValues(in: function, keepDebugInfo: true, context)
+}
+
+private func removeTempLValues(in function: Function, keepDebugInfo: Bool, _ context: FunctionPassContext) {
   for inst in function.instructions {
     switch inst {
     case let copy as CopyAddrInst:
-      combineWithDestroy(copy: copy, context)
-      tryEliminate(copy: copy, context)
+      combineWithDestroy(copy: copy, keepDebugInfo: keepDebugInfo, context)
+      tryEliminate(copy: copy, keepDebugInfo: keepDebugInfo, context)
     case let store as StoreInst:
       // Also handle `load`-`store` pairs which are basically the same thing as a `copy_addr`.
       if let load = store.source as? LoadInst, load.uses.isSingleUse, load.parentBlock == store.parentBlock {
-        tryEliminate(copy: store, context)
+        tryEliminate(copy: store, keepDebugInfo: keepDebugInfo, context)
       }
     default:
       break
@@ -64,11 +72,15 @@ let tempLValueElimination = FunctionPass(name: "temp-lvalue-elimination") {
   }
 }
 
-private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassContext) {
+private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ context: FunctionPassContext) {
   guard let allocStack = copy.sourceAddress as? AllocStackInst,
         allocStack.isDeallocatedInSameBlock(as: copy),
         !allocStack.parentFunction.hasOwnership || !allocStack.hasDynamicLifetime
   else {
+    return
+  }
+
+  if keepDebugInfo, allocStack.isFromVarDecl || allocStack.isLexical {
     return
   }
   let isTrivial = allocStack.type.isTrivial(in: copy.parentFunction)
@@ -193,6 +205,10 @@ private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassCont
     }
   }
 
+  if keepDebugInfo {
+    Builder(before: copy, context).createDebugStep()
+  }
+
   // Salvage the debug variable attribute, if present.
   if let debugVariable = allocStack.debugVariable {
     let builder = Builder(before: firstUseOfAllocStack, location: allocStack.location, context)
@@ -240,7 +256,7 @@ private extension FullApplySite {
 ///   copy_addr %source to %destination    -->     copy_addr [take] %source to %destination
 ///   destroy_addr %source
 /// ```
-private func combineWithDestroy(copy: CopyAddrInst, _ context: FunctionPassContext) {
+private func combineWithDestroy(copy: CopyAddrInst, keepDebugInfo: Bool, _ context: FunctionPassContext) {
   guard !copy.isTakeOfSource else {
     return
   }
@@ -258,6 +274,10 @@ private func combineWithDestroy(copy: CopyAddrInst, _ context: FunctionPassConte
       context.erase(instructions: debugInsts)
       return
     case let debugInst as DebugValueInst where debugInst.operands.contains(where: { $0.value == copy.source }):
+      if keepDebugInfo {
+        // Bail to preserve debug info.
+        return
+      }
       debugInsts.append(debugInst)
     default:
       if inst.mayReadOrWriteMemory {
