@@ -523,6 +523,13 @@ importer::getUncachedForeignReferenceTypeInfo(const clang::RecordDecl *decl) {
 
 ForeignReferenceTypeInfo ForeignReferenceTypeInfoRequest::evaluate(
     Evaluator &evaluator, ForeignReferenceTypeInfoDescriptor desc) const {
+
+  // Decls belonging to a module-building Clang sub-instance are freed once that
+  // sub-instance goes away, so this request must not cache decls allocated from
+  // that sub-instance's clang::ASTContext.
+  ASSERT(!desc.decl->getASTContext().getLangOpts().isCompilingModule() &&
+         "caching FRT info for a decl from a transient Clang sub-instance");
+
   return importer::getUncachedForeignReferenceTypeInfo(desc.decl);
 }
 
