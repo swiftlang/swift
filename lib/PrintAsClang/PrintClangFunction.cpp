@@ -1353,7 +1353,23 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   }
   if (hasThrows) {
     os << "  void* opaqueError = nullptr;\n";
-    os << "  void* _ctx = nullptr;\n";
+    // The lowered signature only has a synthesized context parameter when
+    // there is no self parameter that already acts as the context (e.g. for
+    // free functions). Only emit the placeholder context variable when it's
+    // actually passed to the call, to avoid an unused variable in the thunk.
+    bool hasContextParam = false;
+    signature.visitParameterList(
+        [](const LoweredFunctionSignature::IndirectResultValue &) {},
+        [](const LoweredFunctionSignature::DirectParameter &) {},
+        [](const LoweredFunctionSignature::IndirectParameter &) {},
+        [](const LoweredFunctionSignature::GenericRequirementParameter &) {},
+        [](const LoweredFunctionSignature::MetadataSourceParameter &) {},
+        [&](const LoweredFunctionSignature::ContextParameter &) {
+          hasContextParam = true;
+        },
+        [](const LoweredFunctionSignature::ErrorResultValue &) {});
+    if (hasContextParam)
+      os << "  void* _ctx = nullptr;\n";
   }
   std::optional<StringRef> indirectFunctionVar;
   using DispatchKindTy = IRABIDetailsProvider::MethodDispatchInfo::Kind;
@@ -1691,8 +1707,14 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     if (resultTy->isVoid()) {
       os << "    return swift::Expected<void>(swift::Error(opaqueError));\n";
       os << "#endif\n";
-      if (FD->getInterfaceType()->castTo<FunctionType>()->getResult()->isUninhabited())
+      const auto *funcDecl = dyn_cast<FuncDecl>(FD);
+      if (funcDecl && funcDecl->getResultInterfaceType()->isUninhabited()) {
         os << "  abort();\n";
+      } else {
+        os << "#ifndef __cpp_exceptions\n";
+        os << "  return swift::Expected<void>();\n";
+        os << "#endif\n";
+      }
     } else {
       auto directResultType = signature.getDirectResultType();
       printDirectReturnOrParamCType(
