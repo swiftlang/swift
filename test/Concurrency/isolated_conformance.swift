@@ -156,6 +156,13 @@ protocol R: SendableMetatype {
   func f() { }
 }
 
+// An isolated conformance is spelled with the global actor attribute, as in
+// '@MainActor P' above. 'isolated' is not accepted in an inheritance clause.
+// https://github.com/swiftlang/swift/issues/83538
+struct SIsolatedSpelling: isolated P { // expected-error{{'isolated' may only be used on parameters}}
+  func f() { }
+}
+
 // ----------------------------------------------------------------------------
 // Use checking of isolated conformances.
 // ----------------------------------------------------------------------------
