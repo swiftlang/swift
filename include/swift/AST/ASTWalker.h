@@ -610,6 +610,15 @@ public:
     return false;
   }
 
+  /// Whether the walker should walk into the expression of a
+  /// \c GenericArgumentExprTypeRepr.
+  virtual bool shouldWalkIntoGenericArgumentExprTypeRepr() const {
+    // That expression is type-checked separately by
+    // `resolveGenericArgumentExprTypeRepr`, so it is hidden by default. Opt in
+    // to reach the TypeReprs the parser built inside it.
+    return false;
+  }
+
   virtual bool shouldWalkIntoForEachDesugaredStmt() { return true; }
 
   /// This method configures how the walker should walk the initializers of

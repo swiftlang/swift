@@ -58,13 +58,17 @@ bool SubstitutionEntry::identifierEquals(Node *lhs, Node *rhs) {
   return true;
 }
 
-bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
+bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs,
+                                   unsigned depth) const {
+  if (depth > MaxSubstitutionEntryDepth)
+    return false;
+
   if (!lhs->isSimilarTo(rhs))
     return false;
 
   for (auto li = lhs->begin(), ri = rhs->begin(), le = lhs->end();
        li != le; ++li, ++ri) {
-    if (!deepEquals(*li, *ri))
+    if (!deepEquals(*li, *ri, depth + 1))
       return false;
   }
 
@@ -76,8 +80,8 @@ static inline size_t combineHash(size_t currentHash, size_t newValue) {
 }
 
 /// Calculate the hash for a node.
-size_t RemanglerBase::hashForNode(Node *node,
-                                  bool treatAsIdentifier) {
+size_t RemanglerBase::hashForNode(Node *node, bool treatAsIdentifier,
+                                  unsigned depth) {
   size_t hash = 0;
 
   if (treatAsIdentifier) {
@@ -104,9 +108,12 @@ size_t RemanglerBase::hashForNode(Node *node,
       hash = combineHash(hash, (unsigned char) c);
     }
   }
-  for (Node *child : *node) {
-    SubstitutionEntry entry = entryForNode(child, treatAsIdentifier);
-    hash = combineHash(hash, entry.hash());
+  if (depth < MaxSubstitutionEntryDepth) {
+    for (Node *child : *node) {
+      SubstitutionEntry entry =
+          entryForNode(child, treatAsIdentifier, depth + 1);
+      hash = combineHash(hash, entry.hash());
+    }
   }
 
   return hash;
@@ -143,7 +150,8 @@ static inline size_t nodeHash(Node *node) {
 /// This will look in the HashHash to see if we already know the hash
 /// (which avoids recursive hashing on the Node tree).
 SubstitutionEntry RemanglerBase::entryForNode(Node *node,
-                                              bool treatAsIdentifier) {
+                                              bool treatAsIdentifier,
+                                              unsigned depth) {
   const size_t ident = treatAsIdentifier ? 4 : 0;
   const size_t hash = nodeHash(node) + ident;
 
@@ -153,7 +161,7 @@ SubstitutionEntry RemanglerBase::entryForNode(Node *node,
     SubstitutionEntry entry = HashHash[ndx];
 
     if (entry.isEmpty()) {
-      size_t entryHash = hashForNode(node, treatAsIdentifier);
+      size_t entryHash = hashForNode(node, treatAsIdentifier, depth);
       entry.setNode(node, treatAsIdentifier, entryHash);
       HashHash[ndx] = entry;
       return entry;
@@ -164,7 +172,7 @@ SubstitutionEntry RemanglerBase::entryForNode(Node *node,
 
   // Hash table is full at this hash value
   SubstitutionEntry entry;
-  size_t entryHash = hashForNode(node, treatAsIdentifier);
+  size_t entryHash = hashForNode(node, treatAsIdentifier, depth);
   entry.setNode(node, treatAsIdentifier, entryHash);
   return entry;
 }

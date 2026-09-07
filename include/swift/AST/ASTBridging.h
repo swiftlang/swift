@@ -1366,6 +1366,11 @@ BridgedSemanticsAttr BridgedSemanticsAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedStringRef cValue);
 
+SWIFT_NAME("BridgedTargetAttr.createParsed(_:atLoc:range:value:)")
+BridgedTargetAttr BridgedTargetAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range, BridgedStringRef cValue);
+
 SWIFT_NAME("BridgedSetterAccessAttr.createParsed(_:range:accessLevel:)")
 BridgedSetterAccessAttr
 BridgedSetterAccessAttr_createParsed(BridgedASTContext cContext,

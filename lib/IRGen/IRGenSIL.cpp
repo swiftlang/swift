@@ -1983,6 +1983,8 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f,
   if (f->hasSemanticsAttr(semantics::USE_FRAME_POINTER))
     CurFn->addFnAttr("frame-pointer", "all");
 
+  IGM.addTargetAttrFunctionAttributes(CurFn, f->targetFeatures());
+
   // Disable inlining of coroutine functions until we split.
   if (f->getLoweredFunctionType()->isCoroutine()) {
     CurFn->addFnAttr(llvm::Attribute::NoInline);

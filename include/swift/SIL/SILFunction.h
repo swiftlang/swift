@@ -333,6 +333,9 @@ private:
   /// Name of a section if @section attribute was used, otherwise empty.
   StringRef Section;
 
+  /// The target string from @_target.
+  StringRef TargetFeatures;
+
   /// Name of a Wasm export if @_expose(wasm) attribute was used, otherwise
   /// empty.
   StringRef WasmExportName;
@@ -1499,6 +1502,9 @@ public:
   /// Return custom section name if @section was used, otherwise empty
   StringRef section() const { return Section; }
   void setSection(StringRef value) { Section = value; }
+
+  StringRef targetFeatures() const { return TargetFeatures; }
+  void setTargetFeatures(StringRef value) { TargetFeatures = value; }
 
   /// Return Wasm export name if @_expose(wasm) was used, otherwise empty
   StringRef wasmExportName() const { return WasmExportName; }

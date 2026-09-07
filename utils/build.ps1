@@ -2055,10 +2055,29 @@ $Compilers.Host = @{
 }
 
 $Assemblers = @{
+  MSVC = @{
+    Executable        = { param([Hashtable] $Platform)
+      if ($Platform.Architecture.VSName -eq "x86") { "ml.exe" } else { "ml64.exe" }
+    }
+    Dialect           = "ASM_MASM"
+    Flags             = { param([Hashtable] $Platform)
+      @("/nologo", "/quiet")
+    }
+    DebugFlags        = { param([string] $Format)
+      @()
+    }
+    AssumeFunctional  = $true
+  }
+
   Pinned = @{
-    Executable        = Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang-cl.exe"
+    Executable        = { param([Hashtable] $Platform)
+      Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang-cl.exe"
+    }
+    Dialect           = "ASM"
     DriverStyle       = [DriverStyle]::ClangCL
-    Flags             = @()
+    Flags             = { param([Hashtable] $Platform)
+      @("--target=$($Platform.Triple)")
+    }
     DebugFlags        = { param([string] $Format)
       if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @("-clang:-gcodeview") }
     }
@@ -2066,15 +2085,22 @@ $Assemblers = @{
   }
 
   Stage1 = @{
-    Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage1Compilers), "clang-cl.exe")
+    Executable        = { param([Hashtable] $Platform)
+      [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage1Compilers), "clang-cl.exe")
+    }
+    Dialect           = "ASM"
     DriverStyle       = [DriverStyle]::ClangCL
-    Flags             = @()
+    Flags             = { param([Hashtable] $Platform)
+      @("--target=$($Platform.Triple)")
+    }
     DebugFlags        = { param([string] $Format)
       if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @("-clang:-gcodeview") }
     }
     AssumeFunctional  = $true
   }
 }
+
+$Assemblers.Host = if ($UseHostToolchain) { $Assemblers.MSVC } else { $Assemblers.Pinned }
 
 function Build-CMakeProject {
   [CmdletBinding(PositionalBinding = $false)]
@@ -2090,7 +2116,6 @@ function Build-CMakeProject {
     [Hashtable] $CCompiler = $null,
     [Hashtable] $CXXCompiler = $null,
     [Hashtable] $SwiftCompiler = $null,
-    [switch] $UseASMMASM = $false,
     [switch] $AddAndroidCMakeEnv = $false,
     [string] $SwiftSDK = $null,
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
@@ -2114,7 +2139,6 @@ function Build-CMakeProject {
     }
 
     $UseASM = $Assembler -ne $null
-    $UseASM_MASM = [bool]$UseASMMASM
     $UseC = $CCompiler -ne $null
     $UseCXX = $CXXCompiler -ne $null
     $UseSwift = $SwiftCompiler -ne $null
@@ -2162,29 +2186,33 @@ function Build-CMakeProject {
     switch ($Platform.OS) {
       Windows {
         if ($UseASM) {
-          Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILER $Assembler.Executable
-          Add-KeyValueIfNew $Defines CMAKE_ASM_FLAGS @("--target=$($Platform.Triple)")
-          Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
+          $ASMDialect = $Assembler.Dialect
 
-          if ($DebugInfo) {
-            # CMake's MSVC_DEBUG_INFORMATION_FORMAT support also applies to ASM
-            # targets, but clang-cl-as-ASM does not get a built-in mapping for
-            # the Embedded format. Provide the mapping before setting the global
-            # CMAKE_MSVC_DEBUG_INFORMATION_FORMAT below.
-            Add-FlagsDefine $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded `
-              $(& $Assembler.DebugFlags $PlatformDebugFormat)
+          Add-KeyValueIfNew $Defines "CMAKE_${ASMDialect}_COMPILER" (& $Assembler.Executable $Platform)
+          Add-KeyValueIfNew $Defines "CMAKE_${ASMDialect}_FLAGS" (& $Assembler.Flags $Platform)
+
+          # CMake's assembler detection computes the MSVC-like frontend
+          # correctly but does not cache CMAKE_<ASMDialect>_SIMULATE_ID and
+          # CMAKE_<ASMDialect>_COMPILER_FRONTEND_VARIANT. On every re-configure,
+          # the assembler is reloaded from the saved compiler file with both
+          # fields empty, the Ninja generator then misidentifies it as GCC on
+          # Windows and rewrites the include path with forward slashes,
+          # resulting in a full rebuild.
+          Add-KeyValueIfNew $Defines "CMAKE_${ASMDialect}_SIMULATE_ID" MSVC
+          Add-KeyValueIfNew $Defines "CMAKE_${ASMDialect}_COMPILER_FRONTEND_VARIANT" MSVC
+
+          if ($ASMDialect -eq "ASM") {
+            Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
+
+            if ($DebugInfo) {
+              # CMake's MSVC_DEBUG_INFORMATION_FORMAT support also applies to ASM
+              # targets, but clang-cl-as-ASM does not get a built-in mapping for
+              # the Embedded format. Provide the mapping before setting the global
+              # CMAKE_MSVC_DEBUG_INFORMATION_FORMAT below. MASM has no equivalent.
+              Add-FlagsDefine $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded `
+                $(& $Assembler.DebugFlags $PlatformDebugFormat)
+            }
           }
-        }
-
-        if ($UseASM_MASM) {
-          $ASM_MASM = if ($Platform.Architecture.VSName -eq "x86") {
-            "ml.exe"
-          } else {
-            "ml64.exe"
-          }
-
-          Add-KeyValueIfNew $Defines CMAKE_ASM_MASM_COMPILER $ASM_MASM
-          Add-KeyValueIfNew $Defines CMAKE_ASM_MASM_FLAGS @("/nologo" ,"/quiet")
         }
 
         if ($UseC) {
@@ -2337,7 +2365,7 @@ function Build-CMakeProject {
           } elseif ($UseCXX) {
             $CXXCompiler.Executable
           } elseif ($UseASM) {
-            $Assembler.Executable
+            (& $Assembler.Executable $Platform)
           }
           $ld = Join-Path -Path (Split-Path $Executable) -ChildPath "ld.lld"
           if ($UseSwift) {
@@ -2716,8 +2744,7 @@ function Build-BuildTools([Hashtable] $Platform) {
     -Src $SourceCache\llvm-project\llvm `
     -Bin (Get-ProjectBinaryCache $Platform BuildTools) `
     -Platform $Platform `
-    -Assembler $(if ($UseHostToolchain) { $null } else { $Assemblers.Pinned }) `
-    -UseASMMASM:$UseHostToolchain `
+    -Assembler $Assemblers.Host `
     -CCompiler $Compilers.Host.C `
     -CXXCompiler $Compilers.Host.CXX `
     -BuildTargets llvm-tblgen,clang-tblgen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
@@ -2950,6 +2977,7 @@ function Get-CompilersDefines([Hashtable] $Platform,
 function Build-Compilers([Hashtable] $Platform,
                          [string]    $Variant,
                          [Project]   $Project          = [Project]::Compilers,
+                         [Hashtable] $Assembler        = $Assemblers.Host,
                          [Hashtable] $CCompiler        = $Compilers.Host.C,
                          [Hashtable] $CXXCompiler      = $Compilers.Host.CXX,
                          [Hashtable] $SwiftCompiler    = $Compilers.Pinned.Swift,
@@ -2965,6 +2993,7 @@ function Build-Compilers([Hashtable] $Platform,
     -Bin (Get-ProjectBinaryCache $Platform $Project) `
     -InstallTo "$ToolchainRoot\usr" `
     -Platform $Platform `
+    -Assembler $Assembler `
     -CCompiler $CCompiler `
     -CXXCompiler $CXXCompiler `
     -SwiftCompiler $SwiftCompiler `
@@ -3382,6 +3411,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     Build-CMakeProject @BuildCMakeArgs -BuildTargets @(
       "swift-frontend",
       "sourcekitd-test",
+      "swift-refactor",
       "swift-ide-test",
       "swift-plugin-server"
     )
@@ -3408,6 +3438,11 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
 
     Invoke-IsolatingEnvVars {
       # Test-time tools execute on the build host.
+      # TODO(Steelskin): `repl_swift.exe` is explicitly excluded here because
+      # the test reconfigure here makes lldb compile expressions against the in-
+      # tree resilient stdlib, which breaks SwiftREPL tests if `repl_swift.exe`
+      # uses the shipped runtime instead.
+      # See https://github.com/swiftlang/swift/issues/91537 for details.
       Invoke-VsDevShell $BuildPlatform
       Set-WindowsSxSToolchainRuntime `
         -BinaryDir              $Stage2BinDir `
@@ -3421,11 +3456,11 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
                                    "swift-synthesize-interface.exe",
                                    "sil-opt.exe",
                                    "sourcekitd-test.exe",
+                                   "swift-refactor.exe",
                                    "swift-ide-test.exe",
                                    "swift-plugin-server.exe",
                                    "swiftc-legacy-driver.exe",
-                                   "lldb.exe",
-                                   "repl_swift.exe"
+                                   "lldb.exe"
                                  )
       # SxS only probes the EXE's own directory for the named assembly.
       if (Test-Path (Join-Path $Stage2LibexecSwiftDir "swift-backtrace.exe")) {
@@ -4142,11 +4177,12 @@ function Repair-SDKHeaders([string] $SDKRoot) {
   }
 }
 
-# Copies files installed by CMake from the arch-specific platform root,
-# where they follow the layout expected by the installer,
-# to the final platform root, following the installer layout.
+# Completes the SDK layout after all architecture slices have been installed.
+# This reshapes Swift modules and mirrors resources whose CMake install rules
+# do not distinguish between dynamic and static resource trees.
 function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [string] $Identifier = $OS.ToString()) {
-  Repair-SDKHeaders (Get-SwiftSDK -OS $OS -Identifier $Identifier)
+  $SDKRoot = Get-SwiftSDK -OS $OS -Identifier $Identifier
+  Repair-SDKHeaders $SDKRoot
 
   # Copy files from the arch subdirectory, including "*.swiftmodule" which need restructuring
   foreach ($Platform in $Platforms) {
@@ -4157,6 +4193,34 @@ function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [str
           Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not in a thick module layout"
           Copy-File $_.FullName "$PlatformResources\$($_.BaseName).swiftmodule\$(Get-ModuleTriple $Platform)$($_.Extension)"
         }
+      }
+    }
+  }
+
+  $StaticPlatforms = @($Platforms | Where-Object { $_.LinkModes.Contains("static") })
+  if ($OS -eq [OS]::Android -and $StaticPlatforms.Count -gt 0) {
+    $DynamicResources = "$SDKRoot\usr\lib\swift"
+    $StaticResources = "$SDKRoot\usr\lib\swift_static"
+
+    # SwiftBuild currently passes the NDK sysroot as both -sdk and -sysroot,
+    # while using Android.sdk only for the static -resource-dir. Unlike a direct
+    # swiftc invocation, it cannot keep Android.sdk as -sdk and the NDK as
+    # -sysroot, so these SDK resources must be copied into the static tree.
+    Copy-Directory "$DynamicResources\shims\*" "$StaticResources\shims"
+    foreach ($File in ("libcxxshim.h", "libcxxshim.modulemap", "libcxxstdlibshim.h")) {
+      Copy-File "$DynamicResources\android\$File" "$StaticResources\android\$File"
+    }
+
+    foreach ($Platform in $StaticPlatforms) {
+      $Architecture = $Platform.Architecture.LLVMName
+      $DynamicArchitectureResources = "$DynamicResources\android\$Architecture"
+      $StaticArchitectureResources = "$StaticResources\android\$Architecture"
+
+      # The Android Clang overlay also has a fixed dynamic-resource install
+      # destination. Keep the architecture-specific copies together until
+      # swiftlang/swift#80293 allows the overlay to be shared by all slices.
+      foreach ($File in ("android.modulemap", "SwiftAndroidNDK.h", "SwiftBionic.h")) {
+        Copy-File "$DynamicArchitectureResources\$File" "$StaticArchitectureResources\$File"
       }
     }
   }
@@ -5784,6 +5848,7 @@ if ($Toolchain) {
   Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Bootstrap"
   Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers @{
     CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage1-$($BuildPlatform.Architecture.LLVMName).cmake";
+    Assembler       = $Assemblers.Host;
     CCompiler       = $Compilers.Host.C;
     CXXCompiler     = $Compilers.Host.CXX;
     SwiftCompiler   = $Compilers.Pinned.Swift;
@@ -5817,6 +5882,7 @@ if ($Toolchain) {
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler"
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers @{
+    Assembler       = $Assemblers.Stage1;
     CCompiler       = $Compilers.Stage1.C;
     CXXCompiler     = $Compilers.Stage1.CXX;
     SwiftCompiler   = $Compilers.Stage1.Swift;
@@ -5937,6 +6003,7 @@ if ($Toolchain) {
   # ── Stage2 NoAsserts Compiler ─────────────────────────────────────────────
   if ($IncludeNoAsserts) {
     Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers @{
+      Assembler       = $Assemblers.Stage1;
       CCompiler       = $Compilers.Stage1.C;
       CXXCompiler     = $Compilers.Stage1.CXX;
       SwiftCompiler   = $Compilers.Stage1.Swift;

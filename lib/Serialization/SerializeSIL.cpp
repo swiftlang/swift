@@ -662,6 +662,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // record count above.
   writeExtraStringIfNonEmpty(ExtraStringFlavor::AsmName, F.asmName());
   writeExtraStringIfNonEmpty(ExtraStringFlavor::Section, F.section());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::TargetFeatures,
+                             F.targetFeatures());
   writeExtraStringIfNonEmpty(ExtraStringFlavor::WasmImportModule,
                              F.wasmImportModuleName());
   writeExtraStringIfNonEmpty(ExtraStringFlavor::WasmImportName,

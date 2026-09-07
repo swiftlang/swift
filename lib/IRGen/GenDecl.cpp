@@ -3752,6 +3752,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   if (!f->section().empty())
     fn->setSection(f->section());
 
+  addTargetAttrFunctionAttributes(fn, f->targetFeatures());
+
   llvm::AttrBuilder attrBuilder(getLLVMContext());
   if (!f->wasmExportName().empty()) {
     attrBuilder.addAttribute("wasm-export-name", f->wasmExportName());

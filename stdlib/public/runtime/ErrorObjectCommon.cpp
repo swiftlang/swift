@@ -26,8 +26,23 @@ using namespace swift;
 
 std::atomic<void (*)(SwiftError *error)> swift::_swift_willThrow;
 
-void swift::_swift_setWillThrowHandler(void (* handler)(SwiftError *error)) {
-  _swift_willThrow.store(handler, std::memory_order_release);
+/// Install \p handler in \p slot, handing the handler it replaces to \p
+/// saveOldHandler before making \p handler reachable.
+template <typename Handler, typename SaveOldHandler>
+static void setHandler(std::atomic<Handler> &slot, Handler handler,
+                       SaveOldHandler saveOldHandler) {
+  auto old = slot.load(std::memory_order_acquire);
+  do {
+    if (saveOldHandler)
+      saveOldHandler(old);
+  } while (!slot.compare_exchange_weak(old, handler,
+                                      std::memory_order_release,
+                                      std::memory_order_acquire));
+}
+
+void swift::_swift_setWillThrowHandler(
+    WillThrowHandler handler, WillThrowOldHandlerCallback saveOldHandler) {
+  setHandler(_swift_willThrow, handler, saveOldHandler);
 }
 
 /// Breakpoint hook for debuggers that is called for untyped throws, and
@@ -48,6 +63,12 @@ std::atomic<void (*)(
   const Metadata *type,
   const WitnessTable *errorConformance
 )> swift::_swift_willThrowTypedImpl;
+
+void swift::_swift_setWillThrowTypedHandler(
+    WillThrowTypedHandler handler,
+    WillThrowTypedOldHandlerCallback saveOldHandler) {
+  setHandler(_swift_willThrowTypedImpl, handler, saveOldHandler);
+}
 
 /// Breakpoint hook for debuggers that is called for typed throws, and calls
 /// _swift_willThrowTypedImpl if set. If not set and _swift_willThrow is set, this calls

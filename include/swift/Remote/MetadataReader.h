@@ -51,6 +51,10 @@ using TypeDecoder = swift::Demangle::TypeDecoder<BuilderType>;
 /// which can be malformed or cyclic.
 constexpr int defaultTypeRecursionLimit = 50;
 
+/// The limit on the length of a superclass chain walked in the inspected
+/// process, to protect against corrupt/cyclic data.
+constexpr unsigned maxSuperclassChainLength = 1024;
+
 /// The kind of mangled name to read.
 enum class MangledNameKind {
   Type,
@@ -675,7 +679,11 @@ public:
       size_t start = isaAndRetainCountSize;
 
       auto classMeta = cast<TargetClassMetadata>(meta);
+      unsigned i = 0;
       while (stripSignedPointer(classMeta->Superclass)) {
+        if (i++ >= maxSuperclassChainLength)
+          return std::nullopt;
+
         meta = readMetadata(stripSignedPointer(classMeta->Superclass));
         if (!meta || meta->getKind() != MetadataKind::Class)
           return std::nullopt;
@@ -683,7 +691,10 @@ public:
         classMeta = cast<TargetClassMetadata>(meta);
 
         // Subtract the size contribution of the isa and retain counts from
-        // the super class.
+        // the super class. A superclass claiming to be smaller than its own
+        // header is malformed, and subtracting would wrap.
+        if (classMeta->InstanceSize < isaAndRetainCountSize)
+          return std::nullopt;
         start += classMeta->InstanceSize - isaAndRetainCountSize;
       }
       return start;
@@ -2273,7 +2284,11 @@ protected:
     switch (metadata->getKind()) {
     case MetadataKind::Class: {
       auto classMeta = cast<TargetClassMetadata>(metadata);
+      unsigned i = 0;
       while (true) {
+        if (i++ >= maxSuperclassChainLength)
+          return RemoteAddress();
+
         if (!classMeta->isTypeMetadata())
           return RemoteAddress();
 

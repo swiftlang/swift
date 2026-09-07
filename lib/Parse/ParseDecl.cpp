@@ -3353,6 +3353,35 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Target: {
+    if (!consumeIfAttributeLParen()) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+      return makeParserSuccess();
+    }
+    auto Name = getStringLiteralIfNotInterpolated(
+        Loc, ("'" + AttrName + "'").str());
+    consumeToken(tok::string_literal);
+    if (Name.has_value())
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    else
+      DiscardAttribute = true;
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) TargetAttr(Name.value(), AtLoc,
+                                               AttrRange,
+                                               /*Implicit=*/false));
+    break;
+  }
+
   case DeclAttrKind::Diagnose: {
     // Record that this file carries a syntactic warning control.
     SF.setHasWarningControlAttr();

@@ -356,6 +356,7 @@ static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
         case BuiltinValueKind::IsPOD:
         case BuiltinValueKind::IsConcrete:
         case BuiltinValueKind::IsBitwiseTakable:
+        case BuiltinValueKind::TypedAllocationID:
           continue;
         default:
           break;
