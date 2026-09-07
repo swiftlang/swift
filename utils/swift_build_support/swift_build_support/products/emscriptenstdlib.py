@@ -80,6 +80,9 @@ class EmscriptenStdlib(cmake_product.CMakeProduct):
                              ' ' + ' '.join(test_driver_options))
 
         cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
+        # No threads: single-threaded Concurrency runtime (see wasistdlib.py).
+        cmake_options.define(
+            'SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL', 'TRUE')
         # Emscripten keeps compatibility headers (e.g. xlocale.h) in a
         # separate include/compat directory that emcc adds automatically.
         # Since we use raw clang, we need to add it ourselves.
