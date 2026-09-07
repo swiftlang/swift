@@ -157,10 +157,16 @@ public:
       raw_ostream &stream, Type ty, OptionalTypeKind optKind,
       ModuleDecl *moduleContext, OutputLanguageMode outputLang);
 
+  /// If \p errorCheckPrinter is non-null, the function being called can
+  /// throw, and the given callback is responsible for emitting the code that
+  /// checks `opaqueError` and propagates the error. It is invoked after the
+  /// call to the native Swift function, but before the returned value is
+  /// materialized in its C++ representation.
   static void printGenericReturnSequence(
       raw_ostream &os, const GenericTypeParamType *gtpt,
       llvm::function_ref<void(StringRef)> invocationPrinter,
-      std::optional<StringRef> initializeWithTakeFromValue = std::nullopt);
+      std::optional<StringRef> initializeWithTakeFromValue = std::nullopt,
+      llvm::function_ref<void()> errorCheckPrinter = nullptr);
 
   using PrinterTy =
       llvm::function_ref<void(llvm::MapVector<Type, std::string> &)>;
