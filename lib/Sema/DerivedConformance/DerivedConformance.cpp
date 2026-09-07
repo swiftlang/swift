@@ -1342,7 +1342,8 @@ static void printNominalTypeKind(llvm::raw_ostream &out,
 
 std::string swift::getNominalTypeInfoString(DerivedConformance &derived) {
   bool isUnsafe =
-      derived.Conformance->getExplicitSafety() == ExplicitSafety::Unsafe;
+      derived.Conformance->getExplicitSafety() == ExplicitSafety::Unsafe ||
+      derived.Nominal->getExplicitSafety() == ExplicitSafety::Unsafe;
 
   // A parameter of noncopyable type has to state its ownership explicitly.
   // The old synthesis built parameters without a TypeRepr, which is the only
