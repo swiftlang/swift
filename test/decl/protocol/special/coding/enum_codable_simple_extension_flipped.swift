@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -swift-version 4
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -swift-version 4 -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros)
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 // Simple enums where Codable conformance is added in extensions should derive
 // conformance, no matter which order the extension and type occur in.

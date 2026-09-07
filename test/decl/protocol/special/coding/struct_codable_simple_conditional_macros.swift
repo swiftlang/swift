@@ -1,26 +1,20 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -swift-version 4
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -swift-version 4 -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros)
 
 // REQUIRES: swift_feature_DeriveConformancesViaMacros
 
-enum Conditional<T> {
-  case a(x: T, y: T?)
-  case b(z: [T])
-
+struct Conditional<T> {
+  var x: T
+  var y: T?
   func foo() {
     // They should receive a synthesized CodingKeys enum.
     let _ = Conditional.CodingKeys.self
-    let _ = Conditional.ACodingKeys.self
 
-    // The enum should have a case for each of the cases.
-    let _ = Conditional.CodingKeys.a
-    let _ = Conditional.CodingKeys.b
+    // The enum should have a case for each of the vars.
+    let _ = Conditional.CodingKeys.x
+    let _ = Conditional.CodingKeys.y
 
-    // The enum should have a case for each of the parameters.
-    let _ = Conditional.ACodingKeys.x
-    let _ = Conditional.ACodingKeys.y
-
-    let _ = Conditional.BCodingKeys.z
+    // Static vars should not be part of the CodingKeys enum.
+    let _ = Conditional.CodingKeys.z // expected-error {{type 'Conditional<T>.CodingKeys' has no member 'z'}}
   }
 }
 
@@ -39,7 +33,5 @@ let _ = Conditional<Nonconforming>.encode(to:) // expected-error {{referencing i
 // expected-error@-1 {{referencing instance method 'encode(to:)' on 'Conditional' requires that 'Nonconforming' conform to 'Decodable'}}
 
 // The synthesized CodingKeys type should not be accessible from outside the
-// enum.
+// struct.
 let _ = Conditional<Int>.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
-let _ = Conditional<Int>.ACodingKeys.self // expected-error {{'ACodingKeys' is inaccessible due to 'private' protection level}}
-let _ = Conditional<Int>.BCodingKeys.self // expected-error {{'BCodingKeys' is inaccessible due to 'private' protection level}}
