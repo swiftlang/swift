@@ -111,24 +111,14 @@ public struct DeriveRawRepresentableMacro: DeclarationMacro {
   static func expandInitializer(_ enumInfo: EnumTypeInfo) -> DeclSyntax {
     let rawType = enumInfo.rawTypeName!
 
-    let cases: [String] = enumInfo.cases.compactMap { c in
-      switch c.runtimeAvailability {
-      case .unavailable:
-        return nil
-      case .always:
-        return
-          """
-          case \(c.rawValue!):
-            self = .\(c.name)
-          """
-      case .conditional(let platform, let version):
-        return
-          """
-          case \(c.rawValue!):
-            guard #available(\(platform) \(version), *) else { return nil }
-            self = .\(c.name)
-          """
-      }
+    let cases: [String] = enumInfo.cases.compactMap { c -> String? in
+      guard let guards = c.constructionGuards() else { return nil }
+      let body = (guards + ["self = .\(c.name)"]).joined(separator: "\n  ")
+      return
+        """
+        case \(c.rawValue!):
+          \(body)
+        """
     }
 
     return

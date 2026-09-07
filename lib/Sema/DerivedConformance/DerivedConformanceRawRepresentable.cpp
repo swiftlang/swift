@@ -26,7 +26,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
-#include "swift/AST/PluginLoader.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -498,31 +497,31 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
   if (!canDeriveRawRepresentable(cast<DeclContext>(ConformanceDecl), Nominal))
     return nullptr;
 
-  auto &pluginLoader = Context.getPluginLoader();
-  auto &entry = pluginLoader.lookupPluginByModuleName(
-      Context.getIdentifier("SwiftMacros"));
-  if (!entry.libraryPath.empty() && !::getenv("DONT_DERIVE_VIA_MACROS")) {
-    if (requirement->getBaseName() == Context.Id_rawValue) {
-      auto *witness = deriveRawRepresentableViaMacros(*this, requirement);
-      maybeMarkAsInlinable(*this,
-                           cast<VarDecl>(witness)->getAccessor(AccessorKind::Get));
-      return witness;
-    }
-    if (requirement->getBaseName().isConstructor()) {
-      auto *witness = deriveRawRepresentableViaMacros(*this, requirement);
-      maybeMarkAsInlinable(*this, cast<AbstractFunctionDecl>(witness));
-      return witness;
-    }
-    Context.Diags.diagnose(requirement->getLoc(),
-                           diag::broken_raw_representable_requirement);
-    return nullptr;
+  bool viaMacros =
+      Context.LangOpts.hasFeature(Feature::DeriveConformancesViaMacros);
+
+  if (requirement->getBaseName() == Context.Id_rawValue) {
+    if (!viaMacros)
+      return deriveRawRepresentable_raw(*this);
+
+    auto *witness = deriveRawRepresentableViaMacros(*this, requirement);
+    if (!witness)
+      return nullptr;
+    maybeMarkAsInlinable(
+        *this, cast<VarDecl>(witness)->getAccessor(AccessorKind::Get));
+    return witness;
   }
 
-  if (requirement->getBaseName() == Context.Id_rawValue)
-    return deriveRawRepresentable_raw(*this);
+  if (requirement->getBaseName().isConstructor()) {
+    if (!viaMacros)
+      return deriveRawRepresentable_init(*this);
 
-  if (requirement->getBaseName().isConstructor())
-    return deriveRawRepresentable_init(*this);
+    auto *witness = deriveRawRepresentableViaMacros(*this, requirement);
+    if (!witness)
+      return nullptr;
+    maybeMarkAsInlinable(*this, cast<AbstractFunctionDecl>(witness));
+    return witness;
+  }
 
   Context.Diags.diagnose(requirement->getLoc(),
                          diag::broken_raw_representable_requirement);

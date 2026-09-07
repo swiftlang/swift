@@ -1245,6 +1245,29 @@ static void printAvailabilityQuery(llvm::raw_ostream &out,
   out << ")";
 }
 
+/// Prints the Swift source text of an enum case's raw value literal
+/// expression \p raw to \p out.
+static void printRawValueLiteral(llvm::raw_ostream &out,
+                                 const LiteralExpr *raw) {
+  if (auto *intLit = dyn_cast<IntegerLiteralExpr>(raw)) {
+    if (intLit->isNegative())
+      out << "-";
+    out << intLit->getDigitsText();
+  } else if (isa<NilLiteralExpr>(raw)) {
+    out << "nil";
+  } else if (auto *stringLit = dyn_cast<StringLiteralExpr>(raw)) {
+    out << QuotedString(stringLit->getValue());
+  } else if (auto *floatLit = dyn_cast<FloatLiteralExpr>(raw)) {
+    if (floatLit->isNegative())
+      out << "-";
+    out << floatLit->getDigitsText();
+  } else if (auto *boolLit = dyn_cast<BooleanLiteralExpr>(raw)) {
+    out << (boolLit->getValue() ? "true" : "false");
+  } else {
+    llvm_unreachable("invalid raw literal expr");
+  }
+}
+
 /// Prints a string containing swift syntax describing the case \p  decl with
 /// relevant information to \p out.
 static void printEnumCaseInfo(llvm::raw_ostream &out,
@@ -1275,7 +1298,16 @@ static void printEnumCaseInfo(llvm::raw_ostream &out,
   bool isReachable = !decl->isUnreachableAtRuntime() ||
                      decl->getParentEnum()->isUnreachableAtRuntime();
 
-  out << "], isReachable: " << (isReachable ? "true" : "false")
+  out << "], rawValue: ";
+  if (auto *raw = decl->getRawValueExpr()) {
+    std::string literalText;
+    auto litOut = llvm::raw_string_ostream(literalText);
+    printRawValueLiteral(litOut, raw);
+    out << QuotedString(litOut.str());
+  } else {
+    out << "nil";
+  }
+  out << ", isReachable: " << (isReachable ? "true" : "false")
       << ", isConstructible: " << (isConstructible ? "true" : "false")
       << ", runtimeAvailabilityQueries: [";
   llvm::interleaveComma(availabilityQueries, out,
