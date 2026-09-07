@@ -376,10 +376,10 @@ swift::cxx_translation::getDeclRepresentation(
       return {Unsupported, UnrepresentableZeroSizedValueType};
   }
   if (const auto *storageDecl = dyn_cast<AbstractStorageDecl>(VD)) {
-    // Throwing accessors are not supported yet. Check subscripts as well as
-    // properties so typed throws cannot bypass the error ABI restriction.
+    // Check if any property or subscript accessor throws; do not expose it in
+    // that case, unless bindings for throwing functions are enabled.
     for (const auto *accessor : storageDecl->getAllAccessors()) {
-      if (accessor->hasThrows())
+      if (isUnrepresentableThrowingFunction(accessor))
         return {Unsupported, UnrepresentableThrows};
     }
   }
