@@ -570,3 +570,16 @@ struct TrivialSelfTest {
 }
 
 func consumeTrivialSelfTest(_ x: consuming TrivialSelfTest) {}
+
+// Reabstracting a borrowing closure parameter into a generic context used to
+// crash in SILGenConvert rather than diagnosing the escape. The reabstraction
+// thunk's partial_apply is an escaping closure capturing the parameter, so the
+// code is invalid and this is the diagnostic it should get.
+// https://github.com/swiftlang/swift/issues/92048
+
+func genericTakeBorrowed<T>(_ t: T) {}
+
+func passBorrowingClosureToGeneric(fn: borrowing @escaping () -> Void) {
+    // expected-error @-1 {{'fn' cannot be captured by an escaping closure since it is a borrowed parameter}}
+    genericTakeBorrowed(fn) // expected-note {{closure capturing 'fn' here}}
+}

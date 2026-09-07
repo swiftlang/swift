@@ -1340,6 +1340,17 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
                                         /*isResult*/ true);
 
   case Reabstract:
+    // A move-only wrapper isn't part of the Swift-level type system, so the
+    // reabstraction is described in terms of the bare type. Strip the wrapper
+    // off the value to match. This shows up for a 'borrowing' closure
+    // parameter reabstracted into a generic context.
+    if (value.getType().isMoveOnlyWrapped()) {
+      if (value.getOwnershipKind() == OwnershipKind::Guaranteed) {
+        value = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, value);
+      } else {
+        value = SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, value);
+      }
+    }
     assert(value.getType().getObjectType() ==
            getReabstractionInputLoweredType().getObjectType());
     return SGF.emitTransformedValue(loc, value,
