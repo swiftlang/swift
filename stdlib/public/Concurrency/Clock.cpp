@@ -13,6 +13,16 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Once.h"
 
+#include "Error.h"
+
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+
+// Under the Embedded Swift platform abstraction layer the clocks come from
+// the platform, so the runtime keeps no direct dependency on a libc clock.
+#include "swift/EmbeddedPlatform.h"
+
+#else
+
 #include <errno.h>
 #include <time.h>
 #if defined(_WIN32)
@@ -34,196 +44,216 @@
 #endif
 #endif // __has_include(<chrono>)
 
-#include "Error.h"
-
 #ifndef NSEC_PER_SEC
 #define NSEC_PER_SEC 1000000000ull
 #endif
 
+#endif // SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+
 using namespace swift;
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift)
-void swift_get_time(
-  long long *seconds,
-  long long *nanoseconds,
-  swift_clock_id clock_id) {
-  switch (clock_id) {
-    case swift_clock_id_continuous: {
-      struct timespec continuous;
-#if defined(__linux__)
-      clock_gettime(CLOCK_BOOTTIME, &continuous);
-#elif defined(__APPLE__)
-      clock_gettime(CLOCK_MONOTONIC_RAW, &continuous);
-#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__) || defined(__EMSCRIPTEN__))
-      clock_gettime(CLOCK_MONOTONIC, &continuous);
-#elif defined(_WIN32)
-      // This needs to match what swift-corelibs-libdispatch does
+// The individual clocks. The runtime entry points below are thin wrappers
+// that forward to these.
 
-      // QueryInterruptTimePrecise() outputs a value measured in 100ns
-      // units. We must divide the output by 10,000,000 to get a value in
-      // seconds and multiply the remainder by 100 to get nanoseconds.
-      ULONGLONG interruptTime;
-      (void)QueryInterruptTimePrecise(&interruptTime);
-      continuous.tv_sec = interruptTime / 10'000'000;
-      continuous.tv_nsec = (interruptTime % 10'000'000) * 100;
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+
+// The platform reports time as int64_t while the entry points hand out
+// long long. Those are the same width everywhere Swift runs, but not
+// necessarily the same type, so convert through a temporary.
+
+static void getContinuousTime(long long *seconds, long long *nanoseconds) {
+  __swift_int64_t s;
+  __swift_int64_t ns;
+  _swift_clockContinuous_getTime(&s, &ns);
+  *seconds = s;
+  *nanoseconds = ns;
+}
+
+static void getContinuousResolution(long long *seconds, long long *nanoseconds) {
+  __swift_int64_t s;
+  __swift_int64_t ns;
+  _swift_clockContinuous_getResolution(&s, &ns);
+  *seconds = s;
+  *nanoseconds = ns;
+}
+
+static void getSuspendingTime(long long *seconds, long long *nanoseconds) {
+  __swift_int64_t s;
+  __swift_int64_t ns;
+  _swift_clockSuspending_getTime(&s, &ns);
+  *seconds = s;
+  *nanoseconds = ns;
+}
+
+static void getSuspendingResolution(long long *seconds, long long *nanoseconds) {
+  __swift_int64_t s;
+  __swift_int64_t ns;
+  _swift_clockSuspending_getResolution(&s, &ns);
+  *seconds = s;
+  *nanoseconds = ns;
+}
+
+static void sleepFor(long long seconds, long long nanoseconds) {
+  _swift_clock_sleep(seconds, nanoseconds);
+}
+
+#else
+
+static void getContinuousTime(long long *seconds, long long *nanoseconds) {
+  struct timespec continuous;
+#if defined(__linux__)
+  clock_gettime(CLOCK_BOOTTIME, &continuous);
+#elif defined(__APPLE__)
+  clock_gettime(CLOCK_MONOTONIC_RAW, &continuous);
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__) || defined(__EMSCRIPTEN__))
+  clock_gettime(CLOCK_MONOTONIC, &continuous);
+#elif defined(_WIN32)
+  // This needs to match what swift-corelibs-libdispatch does
+
+  // QueryInterruptTimePrecise() outputs a value measured in 100ns
+  // units. We must divide the output by 10,000,000 to get a value in
+  // seconds and multiply the remainder by 100 to get nanoseconds.
+  ULONGLONG interruptTime;
+  (void)QueryInterruptTimePrecise(&interruptTime);
+  continuous.tv_sec = interruptTime / 10'000'000;
+  continuous.tv_nsec = (interruptTime % 10'000'000) * 100;
 #elif WE_HAVE_STD_CHRONO
-      auto now = std::chrono::steady_clock::now();
-      auto epoch = std::chrono::steady_clock::min();
-      auto timeSinceEpoch = now - epoch;
-      auto sec = std::chrono::duration_cast<std::chrono::seconds>(timeSinceEpoch);
-      auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(timeSinceEpoch - sec);
-      continuous.tv_sec = sec;
-      continuous.tv_nsec = ns;
+  auto now = std::chrono::steady_clock::now();
+  auto epoch = std::chrono::steady_clock::min();
+  auto timeSinceEpoch = now - epoch;
+  auto sec = std::chrono::duration_cast<std::chrono::seconds>(timeSinceEpoch);
+  auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(timeSinceEpoch - sec);
+  continuous.tv_sec = sec;
+  continuous.tv_nsec = ns;
 #else
 #error Missing platform continuous time definition
 #endif
-      *seconds = continuous.tv_sec;
-      *nanoseconds = continuous.tv_nsec;
-      return;
-    }
-    case swift_clock_id_suspending: {
-      struct timespec suspending;
-#if defined(__linux__)
-      clock_gettime(CLOCK_MONOTONIC, &suspending);
-#elif defined(__APPLE__)
-      clock_gettime(CLOCK_UPTIME_RAW, &suspending);
-#elif defined(__wasi__) || defined(__EMSCRIPTEN__)
-      clock_gettime(CLOCK_MONOTONIC, &suspending);
-#elif (defined(__OpenBSD__) || defined(__FreeBSD__))
-      clock_gettime(CLOCK_UPTIME, &suspending);
-#elif defined(_WIN32)
-      // This needs to match what swift-corelibs-libdispatch does
+  *seconds = continuous.tv_sec;
+  *nanoseconds = continuous.tv_nsec;
+}
 
-      // QueryUnbiasedInterruptTimePrecise() outputs a value measured in 100ns
-      // units. We must divide the output by 10,000,000 to get a value in
-      // seconds and multiply the remainder by 100 to get nanoseconds.
-      ULONGLONG unbiasedTime;
-      (void)QueryUnbiasedInterruptTimePrecise(&unbiasedTime);
-      suspending.tv_sec = unbiasedTime / 10'000'000;
-      suspending.tv_nsec = (unbiasedTime % 10'000'000) * 100;
+static void getContinuousResolution(long long *seconds, long long *nanoseconds) {
+  struct timespec continuous;
+#if defined(__linux__)
+  clock_getres(CLOCK_BOOTTIME, &continuous);
+#elif defined(__APPLE__)
+  clock_getres(CLOCK_MONOTONIC_RAW, &continuous);
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__) || defined(__EMSCRIPTEN__))
+  clock_getres(CLOCK_MONOTONIC, &continuous);
+#elif defined(_WIN32)
+  continuous.tv_sec = 0;
+  continuous.tv_nsec = 100;
 #elif WE_HAVE_STD_CHRONO
-      auto now = std::chrono::steady_clock::now();
-      auto epoch = std::chrono::steady_clock::min();
-      auto timeSinceEpoch = now - epoch;
-      auto sec = std::chrono::duration_cast<std::chrono::seconds>(timeSinceEpoch);
-      auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(timeSinceEpoch - sec);
-      suspending.tv_sec = sec;
-      suspending.tv_nsec = ns;
+  auto num = std::chrono::steady_clock::period::num;
+  auto den = std::chrono::steady_clock::period::den;
+  continuous.tv_sec = num / den;
+  continuous.tv_nsec = (num * 1000000000ll) % den;
+#else
+#error Missing platform continuous time definition
+#endif
+  *seconds = continuous.tv_sec;
+  *nanoseconds = continuous.tv_nsec;
+}
+
+static void getSuspendingTime(long long *seconds, long long *nanoseconds) {
+  struct timespec suspending;
+#if defined(__linux__)
+  clock_gettime(CLOCK_MONOTONIC, &suspending);
+#elif defined(__APPLE__)
+  clock_gettime(CLOCK_UPTIME_RAW, &suspending);
+#elif defined(__wasi__) || defined(__EMSCRIPTEN__)
+  clock_gettime(CLOCK_MONOTONIC, &suspending);
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__))
+  clock_gettime(CLOCK_UPTIME, &suspending);
+#elif defined(_WIN32)
+  // This needs to match what swift-corelibs-libdispatch does
+
+  // QueryUnbiasedInterruptTimePrecise() outputs a value measured in 100ns
+  // units. We must divide the output by 10,000,000 to get a value in
+  // seconds and multiply the remainder by 100 to get nanoseconds.
+  ULONGLONG unbiasedTime;
+  (void)QueryUnbiasedInterruptTimePrecise(&unbiasedTime);
+  suspending.tv_sec = unbiasedTime / 10'000'000;
+  suspending.tv_nsec = (unbiasedTime % 10'000'000) * 100;
+#elif WE_HAVE_STD_CHRONO
+  auto now = std::chrono::steady_clock::now();
+  auto epoch = std::chrono::steady_clock::min();
+  auto timeSinceEpoch = now - epoch;
+  auto sec = std::chrono::duration_cast<std::chrono::seconds>(timeSinceEpoch);
+  auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(timeSinceEpoch - sec);
+  suspending.tv_sec = sec;
+  suspending.tv_nsec = ns;
 #else
 #error Missing platform suspending time definition
 #endif
-      *seconds = suspending.tv_sec;
-      *nanoseconds = suspending.tv_nsec;
-      return;
-    case swift_clock_id_wall:
-      struct timespec wall;
+  *seconds = suspending.tv_sec;
+  *nanoseconds = suspending.tv_nsec;
+}
+
+static void getSuspendingResolution(long long *seconds, long long *nanoseconds) {
+  struct timespec suspending;
+#if defined(__linux__)
+  clock_getres(CLOCK_MONOTONIC_RAW, &suspending);
+#elif defined(__APPLE__)
+  clock_getres(CLOCK_UPTIME_RAW, &suspending);
+#elif defined(__wasi__) || defined(__EMSCRIPTEN__)
+  clock_getres(CLOCK_MONOTONIC, &suspending);
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__))
+  clock_getres(CLOCK_UPTIME, &suspending);
+#elif defined(_WIN32)
+  suspending.tv_sec = 0;
+  suspending.tv_nsec = 100;
+#elif WE_HAVE_STD_CHRONO
+  auto num = std::chrono::steady_clock::period::num;
+  auto den = std::chrono::steady_clock::period::den;
+  suspending.tv_sec = num / den;
+  suspending.tv_nsec = (num * 1'000'000'000ll) % den;
+#else
+#error Missing platform suspending time definition
+#endif
+  *seconds = suspending.tv_sec;
+  *nanoseconds = suspending.tv_nsec;
+}
+
+static void getWallTime(long long *seconds, long long *nanoseconds) {
+  struct timespec wall;
 #if defined(__linux__) || defined(__APPLE__) || defined(__wasi__) || defined(__EMSCRIPTEN__) || defined(__OpenBSD__) || defined(__FreeBSD__)
-      clock_gettime(CLOCK_REALTIME, &wall);
+  clock_gettime(CLOCK_REALTIME, &wall);
 #elif defined(_WIN32)
-      // This needs to match what swift-corelibs-libdispatch does
+  // This needs to match what swift-corelibs-libdispatch does
 
-      static const uint64_t kNTToUNIXBiasAdjustment = 11644473600 * NSEC_PER_SEC;
-      // FILETIME is 100-nanosecond intervals since January 1, 1601 (UTC).
-      FILETIME ft;
-      ULARGE_INTEGER li;
-      GetSystemTimePreciseAsFileTime(&ft);
-      li.LowPart = ft.dwLowDateTime;
-      li.HighPart = ft.dwHighDateTime;
-      ULONGLONG ns = li.QuadPart * 100ull - kNTToUNIXBiasAdjustment;
-      wall.tv_sec = ns / 1000000000ull;
-      wall.tv_nsec = ns % 1000000000ull;
+  static const uint64_t kNTToUNIXBiasAdjustment = 11644473600 * NSEC_PER_SEC;
+  // FILETIME is 100-nanosecond intervals since January 1, 1601 (UTC).
+  FILETIME ft;
+  ULARGE_INTEGER li;
+  GetSystemTimePreciseAsFileTime(&ft);
+  li.LowPart = ft.dwLowDateTime;
+  li.HighPart = ft.dwHighDateTime;
+  ULONGLONG ns = li.QuadPart * 100ull - kNTToUNIXBiasAdjustment;
+  wall.tv_sec = ns / 1000000000ull;
+  wall.tv_nsec = ns % 1000000000ull;
 #else
 #error Missing platform wall time definition
 #endif
-      *seconds = wall.tv_sec;
-      *nanoseconds = wall.tv_nsec;
-      return;
-    }
-  }
-  swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
-                               clock_id);
+  *seconds = wall.tv_sec;
+  *nanoseconds = wall.tv_nsec;
 }
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift)
-void swift_get_clock_res(
-  long long *seconds,
-  long long *nanoseconds,
-  swift_clock_id clock_id) {
-switch (clock_id) {
-    case swift_clock_id_continuous: {
-      struct timespec continuous;
-#if defined(__linux__)
-      clock_getres(CLOCK_BOOTTIME, &continuous);
-#elif defined(__APPLE__)
-      clock_getres(CLOCK_MONOTONIC_RAW, &continuous);
-#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__) || defined(__EMSCRIPTEN__))
-      clock_getres(CLOCK_MONOTONIC, &continuous);
-#elif defined(_WIN32)
-      continuous.tv_sec = 0;
-      continuous.tv_nsec = 100;
-#elif WE_HAVE_STD_CHRONO
-      auto num = std::chrono::steady_clock::period::num;
-      auto den = std::chrono::steady_clock::period::den;
-      continuous.tv_sec = num / den;
-      continuous.tv_nsec = (num * 1000000000ll) % den;
-#else
-#error Missing platform continuous time definition
-#endif
-      *seconds = continuous.tv_sec;
-      *nanoseconds = continuous.tv_nsec;
-      return;
-    }
-    case swift_clock_id_suspending: {
-      struct timespec suspending;
-#if defined(__linux__)
-      clock_getres(CLOCK_MONOTONIC_RAW, &suspending);
-#elif defined(__APPLE__)
-      clock_getres(CLOCK_UPTIME_RAW, &suspending);
-#elif defined(__wasi__) || defined(__EMSCRIPTEN__)
-      clock_getres(CLOCK_MONOTONIC, &suspending);
-#elif (defined(__OpenBSD__) || defined(__FreeBSD__))
-      clock_getres(CLOCK_UPTIME, &suspending);
-#elif defined(_WIN32)
-      suspending.tv_sec = 0;
-      suspending.tv_nsec = 100;
-#elif WE_HAVE_STD_CHRONO
-      auto num = std::chrono::steady_clock::period::num;
-      auto den = std::chrono::steady_clock::period::den;
-      suspending.tv_sec = num / den;
-      suspending.tv_nsec = (num * 1'000'000'000ll) % den;
-#else
-#error Missing platform suspending time definition
-#endif
-      *seconds = suspending.tv_sec;
-      *nanoseconds = suspending.tv_nsec;
-      return;
-    }
-    case swift_clock_id_wall: {
-      struct timespec wall;
+static void getWallResolution(long long *seconds, long long *nanoseconds) {
+  struct timespec wall;
 #if defined(__linux__) || defined(__APPLE__) || defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__) || defined(__EMSCRIPTEN__)
-      clock_getres(CLOCK_REALTIME, &wall);
+  clock_getres(CLOCK_REALTIME, &wall);
 #elif defined(_WIN32)
-      wall.tv_sec = 0;
-      wall.tv_nsec = 100;
+  wall.tv_sec = 0;
+  wall.tv_nsec = 100;
 #else
 #error Missing platform wall time definition
 #endif
-      *seconds = wall.tv_sec;
-      *nanoseconds = wall.tv_nsec;
-      return;
-    }
-  }
-  swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
-                               clock_id);
+  *seconds = wall.tv_sec;
+  *nanoseconds = wall.tv_nsec;
 }
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift)
-void swift_sleep(
-  long long seconds,
-  long long nanoseconds) {
+static void sleepFor(long long seconds, long long nanoseconds) {
 #if defined(_WIN32)
   ULONGLONG now;
   (void)QueryInterruptTimePrecise(&now);
@@ -257,4 +287,62 @@ void swift_sleep(
 #else
   #error Missing platform sleep definition
 #endif
+}
+
+#endif // SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_get_time(
+  long long *seconds,
+  long long *nanoseconds,
+  swift_clock_id clock_id) {
+  switch (clock_id) {
+    case swift_clock_id_continuous:
+      return getContinuousTime(seconds, nanoseconds);
+    case swift_clock_id_suspending:
+      return getSuspendingTime(seconds, nanoseconds);
+    case swift_clock_id_wall:
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+      // Embedded Swift has no producer for this clock ID.
+      // Treat it like any other invalid clock ID.
+      break;
+#else
+      return getWallTime(seconds, nanoseconds);
+#endif
+  }
+  swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
+                               clock_id);
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_get_clock_res(
+  long long *seconds,
+  long long *nanoseconds,
+  swift_clock_id clock_id) {
+  switch (clock_id) {
+    case swift_clock_id_continuous:
+      return getContinuousResolution(seconds, nanoseconds);
+    case swift_clock_id_suspending:
+      return getSuspendingResolution(seconds, nanoseconds);
+    case swift_clock_id_wall:
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+      // Embedded Swift has no producer for this clock ID.
+      // Treat it like any other invalid clock ID.
+      break;
+#else
+      return getWallResolution(seconds, nanoseconds);
+#endif
+  }
+  swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
+                               clock_id);
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_sleep(
+  long long seconds,
+  long long nanoseconds) {
+  sleepFor(seconds, nanoseconds);
 }
