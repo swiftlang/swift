@@ -41,6 +41,10 @@ public struct EnumTypeInfo {
 
   /// Information on all its cases
   var cases: [EnumCaseInfo]
+
+  /// The textual representation of the enum's raw type, `nil` if it does not
+  /// declare one.
+  var rawTypeName: String?
 }
 
 /// Represents information on a single case of an enumeration.
@@ -462,14 +466,16 @@ extension StructTypeInfo: TypeInfoProtocol {
 extension EnumTypeInfo: TypeInfoProtocol {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
-    //   EnumTypeInfo(isObjC: <Bool>, cases: <[EnumCaseInfo]>)
-    let (isObjC, cases) = try getNamedFuncallArgs(
+    //   EnumTypeInfo(isObjC: <Bool>, cases: <[EnumCaseInfo]>,
+    //                rawTypeName: <String?>)
+    let (isObjC, cases, rawTypeName) = try getNamedFuncallArgs(
       node: node,
       name: "EnumTypeInfo"
     )
     .expect(
       .boolArg("isObjC"),
-      .arrayArg("cases", parser: EnumCaseInfo.fromSyntax)
+      .arrayArg("cases", parser: EnumCaseInfo.fromSyntax),
+      .stringArg("rawTypeName").toOptional()
     )
 
     // Enum cases can be overloaded, letting several cases can share a name. Name lookup
@@ -477,12 +483,12 @@ extension EnumTypeInfo: TypeInfoProtocol {
     // case with a name we have already seen.
     var seen: Set<String> = Set()
     let uniqueCases = cases.reversed().filter { seen.insert($0.name).inserted }.reversed()
-    return Self(isObjC: isObjC, cases: Array(uniqueCases))
+    return Self(isObjC: isObjC, cases: Array(uniqueCases), rawTypeName: rawTypeName)
   }
 
   public var syntax: ExprSyntax {
     """
-    EnumTypeInfo(isObjC: \(boollit(isObjC)), cases: \(arraySyntax(cases)))
+    EnumTypeInfo(isObjC: \(boollit(isObjC)), cases: \(arraySyntax(cases)), rawTypeName: \(optionalSyntax(rawTypeName, stringlit)))
     """
   }
 }

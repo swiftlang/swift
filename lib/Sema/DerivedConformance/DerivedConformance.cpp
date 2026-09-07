@@ -1293,7 +1293,13 @@ static void printEnumTypeKind(llvm::raw_ostream &out, EnumDecl *decl) {
   llvm::interleaveComma(
       decl->getAllElements(), out,
       [&](const EnumElementDecl *elem) { printEnumCaseInfo(out, elem); });
-  out << "]))";
+  out << "], rawTypeName: ";
+  if (Type rawType = decl->getRawType()) {
+    out << QuotedString(rawType->getString());
+  } else {
+    out << "nil";
+  }
+  out << "))";
 }
 
 /// Prints a string containing swift syntax describing the stored property \p
