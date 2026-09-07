@@ -3616,25 +3616,35 @@ static ManagedValue emitKeyPathRValueBase(SILGenFunction &subSGF,
                                              AbstractionPattern::getOpaque(),
                                              baseType);
 
-  // If base is a metatype, it cannot be opened as an existential or upcasted
-  // from a class.
-  if (baseType->is<AnyMetatypeType>())
+  // If base is a concrete metatype, it cannot be opened as an existential or
+  // upcasted from a class.
+  if (baseType->is<MetatypeType>())
     return paramSubstValue;
   
   // Pop open an existential container base.
   if (baseType->isAnyExistentialType()) {
+    bool isMetatype = false;
+    CanType existentialType = baseType;
+    if (auto *metatype = baseType->getAs<ExistentialMetatypeType>()) {
+      isMetatype = true;
+      existentialType =
+          metatype->getExistentialInstanceType()->getCanonicalType();
+    }
+
     // Use the opened archetype from the AST for a protocol member, or make a
     // new one (which we'll upcast immediately below) for a class member.
     ExistentialArchetypeType *opened;
     if (storage->getDeclContext()->getSelfClassDecl()) {
-      opened = ExistentialArchetypeType::get(baseType);
+      opened = ExistentialArchetypeType::get(existentialType);
     } else {
       opened = subs.getReplacementTypes()[0]->castTo<ExistentialArchetypeType>();
     }
 
     FormalEvaluationScope scope(subSGF);
     
-    baseType = opened->getCanonicalType();
+    CanType openedType = opened->getCanonicalType();
+    baseType =
+        isMetatype ? CanType(CanMetatypeType::get(openedType)) : openedType;
     auto openedOpaqueValue = subSGF.emitOpenExistential(loc, paramSubstValue,
                                                         subSGF.getLoweredType(baseType),
                                                         AccessKind::Read);
@@ -3645,18 +3655,26 @@ static ManagedValue emitKeyPathRValueBase(SILGenFunction &subSGF,
   
   // Upcast a class instance to the property's declared type if necessary.
   if (auto propertyClass = storage->getDeclContext()->getSelfClassDecl()) {
-    if (auto selfType = baseType->getAs<DynamicSelfType>())
-      baseType = selfType->getSelfType()->getCanonicalType();
-    auto baseClass = baseType->getClassOrBoundGenericClass();
+    bool isMetatype = false;
+    CanType instanceType = baseType;
+    if (auto *metatype = baseType->getAs<MetatypeType>()) {
+      isMetatype = true;
+      instanceType = metatype->getInstanceType()->getCanonicalType();
+    }
+
+    if (auto selfType = instanceType->getAs<DynamicSelfType>())
+      instanceType = selfType->getSelfType()->getCanonicalType();
+    auto baseClass = instanceType->getClassOrBoundGenericClass();
 
     if (baseClass != propertyClass) {
-      baseType = baseType->getSuperclassForDecl(propertyClass)
-        ->getCanonicalType();
+      instanceType =
+          instanceType->getSuperclassForDecl(propertyClass)->getCanonicalType();
+      baseType = isMetatype ? CanType(CanMetatypeType::get(instanceType))
+                            : instanceType;
       paramSubstValue = subSGF.B.createUpcast(loc, paramSubstValue,
-                                     SILType::getPrimitiveObjectType(baseType));
+                                              subSGF.getLoweredType(baseType));
     }
   }
-  // …or pop open an existential container.
   return paramSubstValue;
 }
 
