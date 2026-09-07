@@ -1791,12 +1791,24 @@ public:
       auto BacktraceAddrPtr =
           BacktraceListNext +
           sizeof(MetadataAllocationBacktraceHeader<Runtime>);
-      auto BacktraceBytes = getReader().readBytes(
-          BacktraceAddrPtr, HeaderPtr->Count * sizeof(StoredPointer));
+
+      // Limit how many frames we'll read from one backtrace, to avoid an
+      // enormous read when the count is bad data.
+      uint32_t FrameLimit = 1024;
+
+      uint32_t Count = HeaderPtr->Count;
+      MemoryReader::ReadBytesResult BacktraceBytes;
+      if (Count > 0 && Count <= FrameLimit)
+        BacktraceBytes = getReader().readBytes(BacktraceAddrPtr,
+                                               Count * sizeof(StoredPointer));
       auto BacktracePtr =
           reinterpret_cast<const StoredPointer *>(BacktraceBytes.get());
 
-      Call(HeaderPtr->Allocation, HeaderPtr->Count, BacktracePtr);
+      // Don't hand the callback a count that the pointer doesn't back.
+      if (!BacktracePtr)
+        Count = 0;
+
+      Call(HeaderPtr->Allocation, Count, BacktracePtr);
 
       BacktraceListNext =
           RemoteAddress(HeaderPtr->Next, RemoteAddress::DefaultAddressSpace);

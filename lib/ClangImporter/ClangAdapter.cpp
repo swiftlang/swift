@@ -22,6 +22,7 @@
 #include "ImporterImpl.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
@@ -591,10 +592,17 @@ bool importer::isNSNotificationGlobal(const clang::NamedDecl *decl) {
 }
 
 bool importer::hasNativeSwiftDecl(const clang::Decl *decl) {
-  if (auto *attr = decl->getAttr<clang::ExternalSourceSymbolAttr>())
-    if (attr->getGeneratedDeclaration() && attr->getLanguage() == "Swift")
-      return true;
-  return false;
+  auto *attr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
+  if (!attr || !attr->getGeneratedDeclaration() || attr->getLanguage() != "Swift")
+    return false;
+  // external_source_symbol is inheritable, so Clang can merge this marker from a
+  // -Swift.h forward-declaration onto a Clang module's real decl that has no Swift
+  // counterpart. Only trust it when defined_in names the decl's own module.
+  if (auto *owning = decl->getOwningModule())
+    if (!attr->getDefinedIn().empty() &&
+        attr->getDefinedIn() != owning->getTopLevelModuleName())
+      return false;
+  return true;
 }
 
 /// Translate the "nullability" notion from API notes into an optional type

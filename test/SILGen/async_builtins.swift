@@ -316,6 +316,7 @@ public func resumeNonThrowingContinuation(_ cont: Builtin.RawUnsafeContinuation,
   // CHECK-NEXT: [[COPY:%.*]] = copy_value [[BORROW]] : $String
   // CHECK-NEXT: builtin "resumeNonThrowingContinuationReturning"<String>(%0 : $Builtin.RawUnsafeContinuation, [[COPY]] : $String)
   // CHECK-NEXT: end_borrow [[BORROW]] : $String
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_value %1 : $String
   Builtin.resumeNonThrowingContinuationReturning(cont, value)
 }
@@ -329,6 +330,7 @@ public func resumeThrowingContinuation(_ cont: Builtin.RawUnsafeContinuation,
   // CHECK-NEXT: [[COPY:%.*]] = copy_value [[BORROW]] : $String
   // CHECK-NEXT: builtin "resumeThrowingContinuationReturning"<String>(%0 : $Builtin.RawUnsafeContinuation, [[COPY]] : $String)
   // CHECK-NEXT: end_borrow [[BORROW]] : $String
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_value %1 : $String
   Builtin.resumeThrowingContinuationReturning(cont, value)
 }
@@ -342,6 +344,7 @@ public func resumeThrowingContinuationThrowing(_ cont: Builtin.RawUnsafeContinua
   // CHECK-NEXT: [[COPY:%.*]] = copy_value [[BORROW]] : $any Error
   // CHECK-NEXT: builtin "resumeThrowingContinuationThrowing"(%0 : $Builtin.RawUnsafeContinuation, [[COPY]] : $any Error)
   // CHECK-NEXT: end_borrow [[BORROW]] : $any Error
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_value %1 : $any Error
   Builtin.resumeThrowingContinuationThrowing(cont, error)
 }

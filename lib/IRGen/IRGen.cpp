@@ -54,6 +54,7 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/InlineCost.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
@@ -389,7 +390,25 @@ void swift::performLLVMOptimizations(
     PTO.MergeFunctions = !Opts.DisableLLVMMergeFunctions;
     // Splitting trades code size to enhance memory locality, avoid in -Osize.
     DoHotColdSplit = Opts.EnableHotColdSplit && !Opts.optimizeForSize();
-    level = llvm::OptimizationLevel::Os;
+    // LLVM is removing the Os pipeline and will instead rely
+    // on O2 with the appropriate function attributes
+    level = llvm::OptimizationLevel::O2;
+
+    // Swift always used the Os pipeline for optimized builds; a few of its
+    // tunings are keyed off the pipeline size level rather than the function
+    // optsize/minsize attribute, so reproduce them on O2 to preserve behavior.
+    // (Loop unrolling/vectorization and the per-caller inline clamps are
+    // attribute-driven and identical on Os and O2, so need no adjustment.)
+
+    // Os used the size-tuned inline threshold; O2 uses the larger speed default.
+    PTO.InlinerThreshold = llvm::InlineConstants::OptSizeThreshold;
+
+    // Os disabled IPSCCP function specialization. There is no PTO knob, so
+    // neutralize it through its cost option.
+    auto &RegisteredOpts = llvm::cl::getRegisteredOptions();
+    if (auto *MaxClones = static_cast<llvm::cl::opt<unsigned> *>(
+            RegisteredOpts.lookup("funcspec-max-clones")))
+      *MaxClones = 0;
   } else {
     level = llvm::OptimizationLevel::O0;
   }
@@ -736,6 +755,15 @@ namespace {
     SwiftDiagnosticHandler(const IRGenOptions &Opts) : IRGenOpts(Opts) {}
 
     bool handleDiagnostics(const llvm::DiagnosticInfo &DI) override {
+      // By default all backend diagnostics are swallowed here. When
+      // -print-llvm-backend-diagnostics is set, let LLVM's default handler
+      // print error-severity diagnostics (e.g. an unsupported relocation
+      // reported by MC object emission) so the underlying message is visible;
+      // performLLVM separately turns a recorded backend error into a frontend
+      // failure.
+      if (IRGenOpts.PrintLLVMBackendDiagnostics &&
+          DI.getSeverity() == llvm::DS_Error)
+        return false;
       return true;
     }
 
@@ -874,6 +902,18 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
   auto res = compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
                                  *OutputFile, DiagMutex,
                                  CASIDFile ? CASIDFile.get() : nullptr);
+
+  // The LLVM backend reports MC/codegen errors (e.g. an unsupported relocation)
+  // through the LLVMContext diagnostic handler, which records them but does not
+  // by itself fail this function. Without this check IRGen would keep the
+  // empty/partial object file and return success, turning a real compiler error
+  // into a confusing downstream link failure ("file is empty in '...'.o").
+  if (const auto *DiagHandler = Ctxt.getDiagHandlerPtr();
+      DiagHandler && DiagHandler->HasErrors) {
+    diagnoseSync(Diags, DiagMutex, SourceLoc(),
+                 diag::error_generating_object_file, OutputFilename);
+    res = true;
+  }
 
   Ctxt.setDiagnosticHandler(std::move(OldDiagnosticHandler));
 

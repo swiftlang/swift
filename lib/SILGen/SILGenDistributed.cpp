@@ -20,11 +20,15 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityQuery.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PlatformKindUtils.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
@@ -524,27 +528,98 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
 }
 
 // ==== ------------------------------------------------------------------------
-// MARK: system.resignID()
+// MARK: system.resignID() / system.resignRemoteID()
 
 void SILGenFunction::emitDistributedActorSystemResignIDCall(
-    SILLocation loc, ClassDecl *actorDecl, ManagedValue actorSelf) {
+    SILLocation loc, ClassDecl *actorDecl, ManagedValue actorSelf,
+    DistributedResignIDKind kind) {
   ASTContext &ctx = getASTContext();
-  
-  FormalEvaluationScope scope(*this);
 
-  // ==== locate: self.id
-  auto idRef = emitActorPropertyReference(
-      *this, loc, actorSelf.getValue(), actorDecl->getDistributedActorIDProperty());
+  Identifier methodName;
+  switch (kind) {
+  case DistributedResignIDKind::ResignID:
+    methodName = ctx.Id_resignID;
+    break;
+  case DistributedResignIDKind::ResignRemoteID:
+    methodName = ctx.Id_resignRemoteID;
+    break;
+  }
 
-  // ==== locate: self.actorSystem
-  auto systemRef = emitActorPropertyReference(
-      *this, loc, actorSelf.getValue(),
-      actorDecl->getDistributedActorSystemProperty());
+  if (kind == DistributedResignIDKind::ResignRemoteID &&
+      !ctx.LangOpts.hasFeature(Feature::DistributedActorResignRemoteID)) {
+    return;
+  }
 
-  // Perform the call.
-  emitDistributedActorSystemWitnessCall(
-      B, loc, ctx.Id_resignID,
-      systemRef,
-      SILType(),
-      { idRef });
+  ProtocolDecl *DAS = ctx.getDistributedActorSystemDecl();
+  if (DAS && !DAS->getSingleRequirement(methodName)) {
+    assert(kind == DistributedResignIDKind::ResignRemoteID &&
+      "Only resignRemoteID may be skipped since we may be compiling against SDK which doesn't have this decl yet.");
+    return;
+  }
+
+  // Actually emit `self.actorSystem.<methodName>(self.id)`.
+  auto emitCall = [&] {
+    FormalEvaluationScope scope(*this);
+
+    auto idRef = emitActorPropertyReference(
+        *this, loc, actorSelf.getValue(),
+        actorDecl->getDistributedActorIDProperty());
+
+    auto systemRef = emitActorPropertyReference(
+        *this, loc, actorSelf.getValue(),
+        actorDecl->getDistributedActorSystemProperty());
+
+    // Make the call to resign(Remote)ID
+    emitDistributedActorSystemWitnessCall(
+        B, loc, methodName,
+        systemRef,
+        SILType(),
+        { idRef });
+  };
+
+  // The `resignRemoteID` requirement was introduced in Swift 6.5.
+  if (kind == DistributedResignIDKind::ResignRemoteID) {
+    auto availabilityRange = ctx.getDistributedActorResignRemoteIDAvailability();
+    // If the deployment target already guarantees the availability,
+    // emit the call unconditionally.
+    auto deploymentRange = AvailabilityRange::forDeploymentTarget(ctx);
+    if (deploymentRange.isContainedIn(availabilityRange)) {
+      emitCall();
+      return;
+    }
+
+    // If the target triple does not correspond to a versioned platform there
+    // is no OS availability to query, so emit the call unconditionally
+    auto platform = targetPlatform(ctx.LangOpts);
+    if (!platform) {
+      emitCall();
+      return;
+    }
+
+    // --- Otherwise, emit:
+    //   if #available(...) {
+    //     self.actorSystem.resignRemoteID(self.id)
+    //   }
+    auto query = AvailabilityQuery::dynamic(AvailabilityDomain::forPlatform(*platform),
+                                            availabilityRange, std::nullopt);
+    SILValue isAvailable = emitAvailabilityQuery(loc, query);
+
+    auto *availBB = createBasicBlock("resignRemoteIDAvailableBB");
+    auto *unavailBB = createBasicBlock("resignRemoteIDUnavailableBB");
+    auto *contBB = createBasicBlock("resignRemoteIDContBB");
+    B.createCondBranch(loc, isAvailable, availBB, unavailBB);
+
+    B.emitBlock(availBB);
+    emitCall();
+    B.createBranch(loc, contBB);
+
+    // Not available at runtime: no fallback, we simply skip the call.
+    B.emitBlock(unavailBB);
+    B.createBranch(loc, contBB);
+
+    B.emitBlock(contBB);
+  } else {
+    assert(kind == DistributedResignIDKind::ResignID);
+    emitCall();
+  }
 }

@@ -65,15 +65,12 @@ namespace swift {
   /// general this means preferring a subtype over a supertype, but can also e.g
   /// prefer an optional over a non-optional. If the two types are incompatible,
   /// null is returned.
-  Type tryMergeBaseTypeForCompletionLookup(Type ty1, Type ty2, DeclContext *dc);
+  Type tryMergeBaseTypeForCompletionLookup(Type ty1, Type ty2);
 
   /// Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
   bool isConvertibleTo(Type T1, Type T2, bool openArchetypes, DeclContext &DC);
-
-  /// Check whether \p T1 is a subtype of \p T2.
-  bool isSubtypeOf(Type T1, Type T2, DeclContext *DC);
 
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);

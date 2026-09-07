@@ -1036,43 +1036,6 @@ addDistributedActorCodableConformance(
 /******************************************************************************/
 /******************************************************************************/
 
-void swift::assertRequiredSynthesizedPropertyOrder(ASTContext &Context,
-                                                   NominalTypeDecl *nominal) {
-#ifndef NDEBUG
-  if (nominal->getDistributedActorIDProperty()) {
-    if (nominal->getDistributedActorSystemProperty()) {
-      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-        if (classDecl->getUnownedExecutorProperty()) {
-          int idIdx, actorSystemIdx, unownedExecutorIdx = 0;
-          int idx = 0;
-          for (auto member : nominal->getMembers()) {
-            if (auto binding = dyn_cast<PatternBindingDecl>(member)) {
-              if (binding->getSingleVar()->getName() == Context.Id_id) {
-                idIdx = idx;
-              } else if (binding->getSingleVar()->getName() ==
-                         Context.Id_actorSystem) {
-                actorSystemIdx = idx;
-              } else if (binding->getSingleVar()->getName() ==
-                         Context.Id_unownedExecutor) {
-                unownedExecutorIdx = idx;
-              }
-              idx += 1;
-            }
-          }
-          if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
-            // we have found all the necessary fields, let's assert their order
-            // FIXME: This assertion was not asserting what it is designed to
-            // assert and more work is needed to make it pass.
-//            assert(idIdx < actorSystemIdx < unownedExecutorIdx &&
-//                   "order of fields MUST be exact.");
-          }
-        }
-      }
-    }
-  }
-#endif
-}
-
 static bool canSynthesizeDistributedThunk(AbstractFunctionDecl *distributedTarget) {
   // `distributed` protocol requirements are allowed without additional checks.
   if (isa<ProtocolDecl>(distributedTarget->getDeclContext()))
@@ -1364,10 +1327,16 @@ bool CanSynthesizeDistributedActorCodableConformanceRequest::evaluate(
   if (!systemTy)
     return false;
 
-  if (!systemTy->getAnyNominal())
+  auto *systemNominal = systemTy->getAnyNominal();
+  if (!systemNominal)
     return false;
 
-  auto idTy = getDistributedActorSystemActorIDType(systemTy->getAnyNominal());
+  // A 'distributed actor' cannot be its own actor system; this is diagnosed
+  // elsewhere, don't attempt to synthesize the Codable conformance for it
+  if (systemNominal->isDistributedActor())
+    return false;
+
+  auto idTy = getDistributedActorSystemActorIDType(systemNominal);
   if (!idTy)
     return false;
 

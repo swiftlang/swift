@@ -129,6 +129,26 @@ not track the number of debug variables: it counts the number of debug variables
 that were present, but aren't anymore. If a variable changes location or scope,
 which is not allowed, it will be counted as lost.
 
+### Subpass level counters
+Passes which transform one instruction or value at a time report each of those
+steps as a subpass, through `SILPassManager::continueWithNextSubpassRun`. The
+`-Xllvm -sil-stats-subpass` command-line option attributes the counters to the
+subpass which produced them, instead of to the whole pass. This makes it
+possible to tell which kind of instruction a monolithic pass such as SILCombine
+loses debug variables on, as it will be included in the pass name (e.g.:
+`SILCombine alloc_stack`).
+
+The option does not enable any counter by itself, it only changes what they are
+attributed to: `-Xllvm -sil-stats-lost-variables` is needed as well, as lost
+debug variables are the only counter attributed to subpasses so far. Passes
+which do not report subpasses are unaffected, and what a pass does outside of
+its subpasses is still attributed to the pass itself.
+
+
+Note that this is more expensive than the pass level counters: the debug
+variables of a function are recomputed after every subpass during which an
+instruction was created or removed.
+
 ## Configuring which counters changes should be recorded
 
 The user has a possibility to configure a number of thresholds, which control
@@ -202,11 +222,18 @@ And for counter stats it looks like this:
    kinds of SIL instructions.
 * `Symbol` is e.g. the name of a function
 * `StageName` is the name of the current optimizer pipeline stage
-* `TransformName` is the name of the current optimizer transformation/pass
+* `TransformName` is the name of the current optimizer transformation/pass. The
+   subpass name is appended, if applicable
 * `Duration` is the duration of the transformation
-* `TransformPassNumber` is the optimizer pass number. It is useful if you 
-   want to reproduce the result later using 
-   `-Xllvm -sil-opt-pass-count -Xllvm TransformPassNumber`
+* `TransformPassNumber` is the optimizer pass number, counted from 0. With
+   `-Xllvm -sil-stats-subpass`, the subpass number is appended to it as
+   `PassNumber.SubpassNumber`. It is useful if you want to reproduce the result
+   later using `-Xllvm -sil-opt-pass-count=N`, keeping in mind that this
+   option takes the number of passes and subpasses to run: use
+   `TransformPassNumber + 1` to run up to and including the pass which produced
+   the counter, and `TransformPassNumber` to stop right before it. The same
+   applies to the subpass number, so a counter recorded at `4390.7` is
+   reproduced with `-Xllvm -sil-opt-pass-count -Xllvm 4391.8`
 
 ## Extract Lost Variables per Pass
 

@@ -15,6 +15,7 @@ func foo(_ x: some P) {
 // CHECK-NEXT: // function_ref bar<A>(_:)
 // CHECK-NEXT: [[FN:%.*]] = function_ref @$s26opaque_parameter_roundtrip3baryyxAA1PRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
 // CHECK-NEXT: apply [[FN]]<τ_0_0>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()
 // CHECK-NEXT: } // end sil function '$s26opaque_parameter_roundtrip3fooyyxAA1PRzlF'

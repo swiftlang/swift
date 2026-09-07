@@ -204,6 +204,7 @@ class D {}
 // CHECK-NEXT:   debug_value
 // CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT:   [[OBJ:%.*]] = unchecked_ref_cast [[ARG_COPY]] : $C to $Builtin.NativeObject
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   return [[OBJ]]
 func class_to_native_object(_ c:C) -> Builtin.NativeObject {
   return Builtin.castToNativeObject(c)
@@ -225,6 +226,7 @@ func class_archetype_to_native_object<T : C>(_ t: T) -> Builtin.NativeObject {
 // CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT:   [[REF:%[0-9]+]] = open_existential_ref [[ARG_COPY]] : $any ClassProto
 // CHECK-NEXT:   [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}, any ClassProto) Self to $Builtin.NativeObject
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   return [[PTR]]
 func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject {
   return Builtin.unsafeCastToNativeObject(t as ClassProto)
@@ -579,6 +581,8 @@ func unreachable() {
 // CHECK-NEXT:    [[ARG2_FROM_WORD:%.*]] = unchecked_bitwise_cast [[ARG2]] : $Builtin.Word to $C
 // CHECK-NEXT:    [[ARG2_FROM_WORD_COPY:%.*]] = copy_value [[ARG2_FROM_WORD]]
 // CHECK-NEXT:    destroy_value [[ARG1_COPY1]]
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RESULT:%.*]] = tuple ([[ARG1_TRIVIAL]] : $Builtin.Word, [[ARG1_D]] : $D, [[ARG1_OPT]] : $Optional<C>, [[ARG2_FROM_WORD_COPY:%.*]] : $C)
 // CHECK:         return [[RESULT]]
 func reinterpretCast(_ c: C, x: Builtin.Word) -> (Builtin.Word, D, C?, C) {
@@ -658,6 +662,9 @@ func reinterpretAddrOnlyLoadable<T>(_ a: Int, _ b: T) -> (T, Int) {
 // CHECK-NEXT:    destroy_value [[ARG12_COPY2A]]
 // CHECK-NEXT:    destroy_value [[ARG12_COPY1A]]
 
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RESULT:%.*]] = tuple ([[ARG1_TRIVIAL]] : $Builtin.Word, [[ARG2_TRIVIAL]] : $Builtin.Word, [[ARG1_D]] : $D, [[ARG2_D]] : $D, [[ARG1_OPT]] : $Optional<C>, [[ARG2_OPT]] : $Optional<C>, [[ARG3_FROM_WORD_COPY]] : $C, [[ARG4_FROM_WORD_COPY]] : $C, [[ARG56_FUSED]] : $Int16)
 // CHECK:         return [[RESULT]]
 func reinterpretCastTuple(_ cs: (C, C), xs: (Builtin.Word, Builtin.Word), ys: (Int8, Int8)) -> ((Builtin.Word, Builtin.Word), (D, D), (C?, C?), (C, C), Int16) {

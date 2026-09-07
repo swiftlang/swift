@@ -49,7 +49,7 @@ EXPECTED_DEFAULTS = {
     'benchmark_num_onone_iterations': 3,
     'build_android': False,
     'build_args': [],
-    'build_benchmarks': True,
+    'build_benchmarks': False,
     'build_clang_tools_extra': True,
     'build_compiler_rt': True,
     'build_cygwin': True,
@@ -650,6 +650,7 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--reconfigure'),
 
     EnableOption('--android'),
+    EnableOption('--build-benchmarks'),
     EnableOption('--build-external-benchmarks'),
     EnableOption('--build-ninja'),
     EnableOption('--build-lld'),
@@ -759,7 +760,6 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-build-swift', dest='build_swift'),
 
     DisableOption('--skip-build-android', dest='build_android'),
-    DisableOption('--skip-build-benchmarks', dest='build_benchmarks'),
     DisableOption('--skip-build-cygwin', dest='build_cygwin'),
     DisableOption('--skip-build-freebsd', dest='build_freebsd'),
     DisableOption('--skip-build-ios', dest='build_ios'),
@@ -964,6 +964,7 @@ EXPECTED_OPTIONS = [
     IgnoreOption('--tvos-all'),
     IgnoreOption('--watchos-all'),
     IgnoreOption('--xros-all'),
+    IgnoreOption('--skip-build-benchmarks'),
 
     StrOption('--llvm-install-components'),
     ChoicesOption('--use-linker', dest='use_linker', choices=['gold', 'lld']),

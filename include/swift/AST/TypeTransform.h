@@ -117,7 +117,13 @@ case TypeKind::Id:
     case TypeKind::Module:
     case TypeKind::BuiltinTuple:
     case TypeKind::Integer:
+      return t;
+
+    // TODO: Transform the parent and rebuild the type to support hidden
+    // generic types.
     case TypeKind::Hidden:
+      return t;
+
     case TypeKind::Join:
     case TypeKind::Meet:
       return t;

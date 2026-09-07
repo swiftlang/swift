@@ -394,6 +394,8 @@ ERROR(unknown_template_parameter,none,
   "template parameter '%0' does not exist", (StringRef))
 ERROR(type_template_parameter_expected,none,
   "template parameter '%0' expected to be a type parameter", (StringRef))
+WARNING(empty_conditional_params, none,
+        "empty %0 annotations are ignored", (StringRef))
 
 NOTE(bridged_type_not_found_in_module,none,
      "could not find type '%0' for bridging; module '%1' may be broken",

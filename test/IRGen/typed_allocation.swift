@@ -2,6 +2,7 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=UNSAFEMUTABLEPOINTERALLOC
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=ERRORBOX
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=COROFRAME
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=MEMLAYOUTTYPEDALLOCID
 
 // REQUIRES: OS=macosx
 // REQUIRES: SWIFT_STDLIB_ARCH=arm64
@@ -373,3 +374,34 @@ public final class CoroFrameHolder {
 //
 // COROFRAME-DAG: define {{.*}} @"[[CORO_READ]].resume.0"
 // COROFRAME-DAG:   call void @swift_coroFrameDeallocTyped(ptr {{.*}}, i64 [[CORO_TYPEID]])
+
+
+// --- MemoryLayout<T>.typedAllocationID ---
+
+@inline(never)
+public func typedAllocationIDForMyClass() -> UInt64 {
+  _ = MyClass(x: 1, y: 2)
+  return MemoryLayout<MyClass>.typedAllocationID
+}
+@inline(never)
+public func typedAllocationIDForInt() -> UInt64 {
+  return MemoryLayout<Int>.typedAllocationID
+}
+public struct MyStruct {
+  var x: Int
+}
+@inline(never)
+public func typedAllocationIDForMyStruct() -> UInt64 {
+  return MemoryLayout<MyStruct>.typedAllocationID
+}
+// MEMLAYOUTTYPEDALLOCID: define swiftcc ptr @"$e16typed_allocation7MyClassC1x1yACSi_SitcfC"
+// MEMLAYOUTTYPEDALLOCID:   call noalias ptr @swift_allocObjectTyped(ptr {{.*}}, i64 {{.*}}, i64 {{.*}}, i64 [[MYCLASS_ALLOC_TYPEDALLOCID:[0-9]+]])
+//
+// MEMLAYOUTTYPEDALLOCID-LABEL: define swiftcc i64 @"$e16typed_allocation0A22AllocationIDForMyClasss6UInt64VyF"() #{{.*}} {
+// MEMLAYOUTTYPEDALLOCID:   ret i64 [[MYCLASS_ALLOC_TYPEDALLOCID]]
+//
+// MEMLAYOUTTYPEDALLOCID-LABEL: define swiftcc i64 @"$e16typed_allocation0A18AllocationIDForInts6UInt64VyF"() #{{.*}} {
+// MEMLAYOUTTYPEDALLOCID:   ret i64 [[INT_TYPEDALLOCID:[0-9]+]]
+//
+// MEMLAYOUTTYPEDALLOCID-LABEL: define swiftcc i64 @"$e16typed_allocation0A23AllocationIDForMyStructs6UInt64VyF"() #{{.*}} {
+// MEMLAYOUTTYPEDALLOCID:   ret i64 [[INT_TYPEDALLOCID]]

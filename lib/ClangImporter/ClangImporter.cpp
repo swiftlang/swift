@@ -5665,15 +5665,14 @@ static bool checkConditionalParams(
 static ConditionalAttrParams
 getConditionalAttrParams(clang::SwiftAttrAttr *swiftAttr, StringRef attrName) {
   ConditionalAttrParams result;
-  StringRef params = swiftAttr->getAttribute();
-  if (params.consume_front(attrName)) {
-    auto commaPos = params.find(',');
-    StringRef nextParam = params.take_front(commaPos);
-    while (!nextParam.empty() && commaPos != StringRef::npos) {
-      result.insert(nextParam.trim());
-      params = params.drop_front(nextParam.size() + 1);
-      commaPos = params.find(',');
-      nextParam = params.take_front(commaPos);
+  StringRef attribute = swiftAttr->getAttribute();
+  if (attribute.consume_front(attrName)) {
+    SmallVector<StringRef, 2> params;
+    attribute.split(params, ',');
+    for (auto param : params) {
+      param = param.trim();
+      if (!param.empty())
+        result.insert(param);
     }
   }
   return result;
@@ -6843,30 +6842,51 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
 }
 
 static void lookupRelatedFuncs(AbstractFunctionDecl *func,
-                               SmallVectorImpl<ValueDecl *> &results) {
+                               llvm::SmallSetVector<ValueDecl *, 4> &results) {
   DeclName swiftName;
   if (auto accessor = dyn_cast<AccessorDecl>(func))
     swiftName = accessor->getStorage()->getName();
   else
     swiftName = func->getName();
 
-  if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
-    NLOptions options = {NLFlags::IgnoreAccessControl, NLFlags::IgnoreMissingImports};
-    ty->lookupQualified({ ty }, DeclNameRef(swiftName), func->getLoc(),
-                        (NLFlags::QualifiedDefault) | options, results);
+  ASTContext &ctx = func->getASTContext();
+
+  // When the explicit C++ name differs from the Swift base name, also look
+  // candidates up under that C++ base name.
+  DeclName foreignName;
+  if (auto cxxAttr = func->getAttrs().getAttribute<CxxDeclAttr>()) {
+    if (!cxxAttr->Name.empty() &&
+        cxxAttr->Name != swiftName.getBaseName().userFacingName())
+      foreignName = DeclName(ctx.getIdentifier(cxxAttr->Name));
   }
-  else {
-    ASTContext &ctx = func->getASTContext();
+
+  if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
+    NLOptions options = {NLFlags::IgnoreAccessControl,
+                         NLFlags::IgnoreMissingImports};
+    auto doLookup = [&](DeclName name) {
+      SmallVector<ValueDecl *, 4> found;
+      ty->lookupQualified({ty}, DeclNameRef(name), func->getLoc(),
+                          (NLFlags::QualifiedDefault) | options, found);
+      results.insert(found.begin(), found.end());
+    };
+    doLookup(swiftName);
+    if (foreignName)
+      doLookup(foreignName);
+  } else {
     UnqualifiedLookupOptions options =
-      UnqualifiedLookupFlags::IgnoreAccessControl;
-    UnqualifiedLookupDescriptor descriptor(
-        DeclNameRef(ctx, Identifier(), swiftName), func->getDeclContext(),
-        func->getLoc(), options);
-    auto lookup = evaluateOrDefault(func->getASTContext().evaluator,
-                                    UnqualifiedLookupRequest{descriptor}, {});
-    for (const auto &result : lookup) {
-      results.push_back(result.getValueDecl());
-    }
+        UnqualifiedLookupFlags::IgnoreAccessControl;
+    auto doLookup = [&](DeclName name) {
+      UnqualifiedLookupDescriptor descriptor(
+          DeclNameRef(ctx, Identifier(), name), func->getDeclContext(),
+          func->getLoc(), options);
+      auto lookup = evaluateOrDefault(ctx.evaluator,
+                                      UnqualifiedLookupRequest{descriptor}, {});
+      for (const auto &result : lookup)
+        results.insert(result.getValueDecl());
+    };
+    doLookup(swiftName);
+    if (foreignName)
+      doLookup(foreignName);
   }
 }
 
@@ -6888,7 +6908,7 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
   if (clangName.empty())
     return {};
 
-  SmallVector<ValueDecl *, 4> results;
+  llvm::SmallSetVector<ValueDecl *, 4> results;
   lookupRelatedFuncs(func, results);
 
   // Classify the `results` as either the interface or an implementation.
@@ -9143,9 +9163,18 @@ importer::getCxxReferencePointeeTypeOrNone(const clang::Type *type) {
   return {};
 }
 
-bool importer::isCxxConstReferenceType(const clang::Type *type) {
-  auto pointeeType = getCxxReferencePointeeTypeOrNone(type);
-  return pointeeType && pointeeType->isConstQualified();
+std::optional<importer::CxxReferenceParameter>
+importer::classifyCxxReferenceParameter(clang::QualType type) {
+  auto pointeeType = getCxxReferencePointeeTypeOrNone(type.getTypePtr());
+  if (!pointeeType)
+    return std::nullopt;
+
+  auto kind = CxxReferenceParameterKind::Borrowed;
+  if (!pointeeType->isConstQualified())
+    kind = type->isRValueReferenceType()
+               ? CxxReferenceParameterKind::Consuming
+               : CxxReferenceParameterKind::Mutating;
+  return CxxReferenceParameter{*pointeeType, kind};
 }
 
 AccessLevel importer::convertClangAccess(clang::AccessSpecifier access) {
@@ -9315,6 +9344,11 @@ void ClangImporter::Implementation::validateSwiftAttributes(
             }
             auto conditionalParams =
                 getConditionalAttrParams(swiftAttr, attrName);
+
+            if (conditionalParams.empty())
+              diagnose(HeaderLoc{decl->getLocation()},
+                       diag::empty_conditional_params, annotationName);
+
             while (specDecl && !conditionalParams.empty()) {
               auto templateDecl = specDecl->getSpecializedTemplate();
               for (auto [idx, param] :

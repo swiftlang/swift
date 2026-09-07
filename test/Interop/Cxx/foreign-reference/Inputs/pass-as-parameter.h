@@ -10,6 +10,13 @@ __attribute__((swift_attr("release:immortal"))) IntBox {
 inline int extractValueFromPtr(IntBox *b) { return b->value; }
 inline int extractValueFromRef(IntBox &b) { return b.value; }
 inline int extractValueFromConstRef(const IntBox &b) { return b.value; }
+inline int extractValueFromRvalueRef(IntBox &&b) { return b.value; }
+inline int extractValueFromConstRvalueRef(const IntBox &&b) { return b.value; }
+
+// Both import as '(IntBox) -> CInt'; only the 'consuming' argument label tells
+// them apart.
+inline int overloadedOnRefKind(IntBox &b) { return b.value; }
+inline int overloadedOnRefKind(IntBox &&b) { return b.value + 1; }
 inline int extractValueFromRefToPtr(IntBox *&b) { return b->value; }
 inline int extractValueFromRefToConstPtr(IntBox const *&b) { return b->value; }
 inline int extractValueFromConstRefToPtr(IntBox *const &b) { return b->value; }

@@ -1,0 +1,4 @@
+module TypeOfActionBase {
+    header "TypeOfActionBase.h"
+    export *
+}

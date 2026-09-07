@@ -5615,9 +5615,43 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
       proto->getGenericSignature(),
       reqSig, QuerySubstitutionMap{substitutions});
   switch (result.getKind()) {
-  case CheckRequirementsResult::Success:
+  case CheckRequirementsResult::Success: {
+    // Ordinary requirement checking above does not catch isolated
+    // conformances that conflict with a `Sendable`/`SendableMetatype`
+    // requirement on the protocol's own 'Self' type (as opposed to a
+    // generic parameter substituted somewhere in a declaration's interface
+    // type, which is handled separately by
+    // TypeChecker::checkIsolatedConformancesInType). Check for that here,
+    // now that every witness has already been fully checked, so this can't
+    // reintroduce the circularity that isolated-conformance checking must
+    // avoid during ordinary interface type resolution.
+    const auto isolatedResult =
+        TypeChecker::checkIsolatedConformancesForDiagnostics(
+            proto->getGenericSignature(), reqSig,
+            QuerySubstitutionMap{substitutions});
+    if (isolatedResult.getKind() ==
+        CheckRequirementsResult::RequirementFailure) {
+      if (!conformance->isInvalid()) {
+        ctx.addDelayedConformanceDiag(
+            conformance, /*isError=*/true,
+            [isolatedResult, proto,
+             substitutions](NormalProtocolConformance *conformance) {
+              TypeChecker::diagnoseRequirementFailure(
+                  isolatedResult.getRequirementFailureInfo(),
+                  conformance->getLoc(), conformance->getLoc(),
+                  proto->getDeclaredInterfaceType(),
+                  {proto->getSelfInterfaceType()
+                       ->castTo<GenericTypeParamType>()},
+                  QuerySubstitutionMap{substitutions});
+            });
+        conformance->setInvalid();
+      }
+      return;
+    }
+
     // Go on to check exportability.
     break;
+  }
 
   case CheckRequirementsResult::RequirementFailure:
   case CheckRequirementsResult::SubstitutionFailure:

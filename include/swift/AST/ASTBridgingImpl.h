@@ -673,6 +673,10 @@ bool BridgedASTType::isBuiltinFixedArray() const {
   return unbridged()->is<swift::BuiltinFixedArrayType>();
 }
 
+bool BridgedASTType::isBuiltinBridgeObject() const {
+  return unbridged()->is<swift::BuiltinBridgeObjectType>();
+}
+
 bool BridgedASTType::isBox() const {
   return unbridged()->is<swift::SILBoxType>();
 }
@@ -713,6 +717,10 @@ bool BridgedASTType::isOptional() const {
 
 bool BridgedASTType::isUnownedStorageType() const {
   return unbridged()->is<swift::UnownedStorageType>();
+}
+
+bool BridgedASTType::isReferenceStorageType() const {
+  return unbridged()->is<swift::ReferenceStorageType>();
 }
 
 bool BridgedASTType::isBuiltinType() const {

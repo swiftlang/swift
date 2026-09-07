@@ -40,6 +40,7 @@ import resilient_enum
 // CHECK-NEXT:    unreachable
 // CHECK:       bb6:
 // CHECK-NOT:    destroy_addr %0
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RESULT]]
 

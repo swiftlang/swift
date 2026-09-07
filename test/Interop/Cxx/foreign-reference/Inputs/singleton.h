@@ -70,6 +70,8 @@ __attribute__((swift_attr("release:immortal"))) DeletedSpecialMembers {
 
 void mutateIt(DeletedSpecialMembers &x) { x.value = 32; }
 
+int readItConstRvalueRef(const DeletedSpecialMembers &&x) { return x.value; }
+
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:immortal")))
 __attribute__((swift_attr("release:immortal"))) PrivateSpecialMembers {

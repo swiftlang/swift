@@ -1,0 +1,365 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=begin_cow_mutation | %FileCheck %s
+
+import Builtin
+import Swift
+import SwiftShims
+
+class Buffer {}
+
+sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
+
+// CHECK-LABEL: sil [ossa] @remove_end_begin_cow_pair
+// CHECK-NOT: end_cow_mutation
+// CHECK-NOT: begin_cow_mutation
+// CHECK:     return %0
+// CHECK: } // end sil function 'remove_end_begin_cow_pair'
+sil [ossa] @remove_end_begin_cow_pair : $@convention(thin) (@owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer):
+  %e = end_cow_mutation %0
+  debug_value %e, var, name "x"
+  (%u, %b) = begin_cow_mutation %e
+  return %b
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_end_begin_cow_pair1
+// CHECK:   end_cow_mutation
+// CHECK:   begin_cow_mutation
+// CHECK: } // end sil function 'dont_remove_end_begin_cow_pair1'
+sil [ossa] @dont_remove_end_begin_cow_pair1 : $@convention(thin) (@owned Buffer) -> @owned (Buffer, Buffer) {
+bb0(%0 : @owned $Buffer):
+  %e = end_cow_mutation %0
+  %c = copy_value %e
+  (%u, %b) = begin_cow_mutation %e
+  %t = tuple (%c, %b)
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_end_begin_cow_pair2
+// CHECK:   end_cow_mutation
+// CHECK:   begin_cow_mutation
+// CHECK: } // end sil function 'dont_remove_end_begin_cow_pair2'
+sil [ossa] @dont_remove_end_begin_cow_pair2 : $@convention(thin) (@owned Buffer) -> @owned (Builtin.Int1, Buffer) {
+bb0(%0 : @owned $Buffer):
+  %e = end_cow_mutation %0
+  (%u, %b) = begin_cow_mutation %e
+  %t = tuple (%u, %b)
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_end_begin_cow_pair3
+// CHECK:   end_cow_mutation
+// CHECK:   begin_cow_mutation
+// CHECK: } // end sil function 'dont_remove_end_begin_cow_pair3'
+sil [ossa] @dont_remove_end_begin_cow_pair3 : $@convention(thin) (@owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer):
+  %e = end_cow_mutation [keep_unique] %0
+  (%u, %b) = begin_cow_mutation %e
+  return %b
+}
+
+// The def-use chain from the end_cow_mutations to the begin_cow_mutation can
+// contain phi arguments.
+//
+// CHECK-LABEL: sil [ossa] @remove_end_begin_cow_pair_phi
+// CHECK-NOT: end_cow_mutation
+// CHECK-NOT: begin_cow_mutation
+// CHECK:     bb3([[P:%[0-9]+]] : @owned $Buffer):
+// CHECK:       return [[P]]
+// CHECK: } // end sil function 'remove_end_begin_cow_pair_phi'
+sil [ossa] @remove_end_begin_cow_pair_phi : $@convention(thin) (@owned Buffer, @owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer, %1 : @owned $Buffer):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %e1 = end_cow_mutation %0
+  destroy_value %1
+  br bb3(%e1)
+
+bb2:
+  %e2 = end_cow_mutation %1
+  destroy_value %0
+  br bb3(%e2)
+
+bb3(%p : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %p
+  return %b
+}
+
+// Not all incoming values of the phi argument are end_cow_mutations.
+//
+// CHECK-LABEL: sil [ossa] @dont_remove_end_begin_cow_pair_phi1
+// CHECK:   end_cow_mutation
+// CHECK:   begin_cow_mutation
+// CHECK: } // end sil function 'dont_remove_end_begin_cow_pair_phi1'
+sil [ossa] @dont_remove_end_begin_cow_pair_phi1 : $@convention(thin) (@owned Buffer, @owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer, %1 : @owned $Buffer):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %e1 = end_cow_mutation %0
+  destroy_value %1
+  br bb3(%e1)
+
+bb2:
+  destroy_value %0
+  br bb3(%1)
+
+bb3(%p : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %p
+  return %b
+}
+
+// One of the end_cow_mutations must keep the buffer unique.
+//
+// CHECK-LABEL: sil [ossa] @dont_remove_end_begin_cow_pair_phi2
+// CHECK:   end_cow_mutation [keep_unique]
+// CHECK:   end_cow_mutation
+// CHECK:   begin_cow_mutation
+// CHECK: } // end sil function 'dont_remove_end_begin_cow_pair_phi2'
+sil [ossa] @dont_remove_end_begin_cow_pair_phi2 : $@convention(thin) (@owned Buffer, @owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer, %1 : @owned $Buffer):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %e1 = end_cow_mutation [keep_unique] %0
+  destroy_value %1
+  br bb3(%e1)
+
+bb2:
+  %e2 = end_cow_mutation %1
+  destroy_value %0
+  br bb3(%e2)
+
+bb3(%p : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %p
+  return %b
+}
+
+// One of the end_cow_mutations has a use beside the branch instruction.
+//
+// CHECK-LABEL: sil [ossa] @dont_remove_end_begin_cow_pair_phi3
+// CHECK:   end_cow_mutation
+// CHECK:   end_cow_mutation
+// CHECK:   begin_cow_mutation
+// CHECK: } // end sil function 'dont_remove_end_begin_cow_pair_phi3'
+sil [ossa] @dont_remove_end_begin_cow_pair_phi3 : $@convention(thin) (@owned Buffer, @owned Buffer) -> @owned (Buffer, Buffer) {
+bb0(%0 : @owned $Buffer, %1 : @owned $Buffer):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %e1 = end_cow_mutation %0
+  %c1 = copy_value %e1
+  destroy_value %1
+  br bb3(%e1, %c1)
+
+bb2:
+  %e2 = end_cow_mutation %1
+  destroy_value %0
+  %c2 = copy_value %e2
+  br bb3(%e2, %c2)
+
+bb3(%p : @owned $Buffer, %c : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %p
+  %t = tuple (%c, %b)
+  return %t
+}
+
+// The phi argument has a use beside the begin_cow_mutation.
+//
+// CHECK-LABEL: sil [ossa] @dont_remove_end_begin_cow_pair_phi4
+// CHECK:   end_cow_mutation
+// CHECK:   end_cow_mutation
+// CHECK:   begin_cow_mutation
+// CHECK: } // end sil function 'dont_remove_end_begin_cow_pair_phi4'
+sil [ossa] @dont_remove_end_begin_cow_pair_phi4 : $@convention(thin) (@owned Buffer, @owned Buffer) -> @owned (Buffer, Buffer) {
+bb0(%0 : @owned $Buffer, %1 : @owned $Buffer):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %e1 = end_cow_mutation %0
+  destroy_value %1
+  br bb3(%e1)
+
+bb2:
+  %e2 = end_cow_mutation %1
+  destroy_value %0
+  br bb3(%e2)
+
+bb3(%p : @owned $Buffer):
+  %c = copy_value %p
+  (%u, %b) = begin_cow_mutation %p
+  %t = tuple (%c, %b)
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @remove_begin_end_cow_pair
+// CHECK-NOT: end_cow_mutation
+// CHECK-NOT: begin_cow_mutation
+// CHECK:     return %0
+// CHECK: } // end sil function 'remove_begin_end_cow_pair'
+sil [ossa] @remove_begin_end_cow_pair : $@convention(thin) (@owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %0
+  debug_value %u, var, name "x"
+  debug_value %b, var, name "y"
+  %e = end_cow_mutation %b
+  return %e
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_begin_end_cow_pair1
+// CHECK:   begin_cow_mutation
+// CHECK:   end_cow_mutation
+// CHECK: } // end sil function 'dont_remove_begin_end_cow_pair1'
+sil [ossa] @dont_remove_begin_end_cow_pair1 : $@convention(thin) (@owned Buffer) -> @owned (Buffer, Buffer) {
+bb0(%0 : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %0
+  %c = copy_value %b
+  %e = end_cow_mutation %b
+  %t = tuple (%c, %e)
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_begin_end_cow_pair2
+// CHECK:   begin_cow_mutation
+// CHECK:   end_cow_mutation
+// CHECK: } // end sil function 'dont_remove_begin_end_cow_pair2'
+sil [ossa] @dont_remove_begin_end_cow_pair2 : $@convention(thin) (@owned Buffer) -> @owned (Builtin.Int1, Buffer) {
+bb0(%0 : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %0
+  %e = end_cow_mutation %b
+  %t = tuple (%u, %e)
+  return %t
+}
+
+// The keep_unique flag cannot be transferred to a preceding end_cow_mutation,
+// because the operand of the begin_cow_mutation is not an end_cow_mutation.
+//
+// CHECK-LABEL: sil [ossa] @dont_remove_begin_end_cow_pair3
+// CHECK:   begin_cow_mutation
+// CHECK:   end_cow_mutation
+// CHECK: } // end sil function 'dont_remove_begin_end_cow_pair3'
+sil [ossa] @dont_remove_begin_end_cow_pair3 : $@convention(thin) (@owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %0
+  %e = end_cow_mutation [keep_unique] %b
+  return %e
+}
+
+// The begin_cow_mutation/end_cow_mutation pair can be removed if the
+// keep_unique flag is transferred to the preceding end_cow_mutation.
+//
+// CHECK-LABEL: sil [ossa] @remove_begin_end_cow_pair_keep_unique
+// CHECK:       [[E:%[0-9]+]] = end_cow_mutation [keep_unique] %0
+// CHECK-NOT:   begin_cow_mutation
+// CHECK:       return [[E]]
+// CHECK: } // end sil function 'remove_begin_end_cow_pair_keep_unique'
+sil [ossa] @remove_begin_end_cow_pair_keep_unique : $@convention(thin) (@owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer):
+  %e1 = end_cow_mutation %0
+  (%u, %b) = begin_cow_mutation %e1
+  %e2 = end_cow_mutation [keep_unique] %b
+  return %e2
+}
+
+// The keep_unique flag must be transferred to all end_cow_mutations which
+// reach the begin_cow_mutation via phi arguments.
+//
+// CHECK-LABEL: sil [ossa] @remove_begin_end_cow_pair_keep_unique_phi
+// CHECK:       end_cow_mutation [keep_unique] %0
+// CHECK:       end_cow_mutation [keep_unique] %1
+// CHECK:     bb3([[P:%[0-9]+]] : @owned $Buffer):
+// CHECK-NOT:   begin_cow_mutation
+// CHECK-NOT:   end_cow_mutation
+// CHECK:       return [[P]]
+// CHECK: } // end sil function 'remove_begin_end_cow_pair_keep_unique_phi'
+sil [ossa] @remove_begin_end_cow_pair_keep_unique_phi : $@convention(thin) (@owned Buffer, @owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer, %1 : @owned $Buffer):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %e1 = end_cow_mutation %0
+  destroy_value %1
+  br bb3(%e1)
+
+bb2:
+  %e2 = end_cow_mutation %1
+  destroy_value %0
+  br bb3(%e2)
+
+bb3(%p : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %p
+  %e3 = end_cow_mutation [keep_unique] %b
+  return %e3
+}
+
+// The keep_unique flag cannot be transferred, because not all incoming values
+// of the phi argument are end_cow_mutations.
+//
+// CHECK-LABEL: sil [ossa] @dont_remove_begin_end_cow_pair_keep_unique_phi
+// CHECK:   begin_cow_mutation
+// CHECK:   end_cow_mutation [keep_unique]
+// CHECK: } // end sil function 'dont_remove_begin_end_cow_pair_keep_unique_phi'
+sil [ossa] @dont_remove_begin_end_cow_pair_keep_unique_phi : $@convention(thin) (@owned Buffer, @owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer, %1 : @owned $Buffer):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %e1 = end_cow_mutation %0
+  destroy_value %1
+  br bb3(%e1)
+
+bb2:
+  destroy_value %0
+  br bb3(%1)
+
+bb3(%p : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %p
+  %e3 = end_cow_mutation [keep_unique] %b
+  return %e3
+}
+
+// Multiple end_cow_mutations of the same begin_cow_mutation.
+//
+// CHECK-LABEL: sil [ossa] @remove_begin_end_cow_pair_multiple_ends
+// CHECK:       [[E:%[0-9]+]] = end_cow_mutation [keep_unique] %0
+// CHECK-NOT:   begin_cow_mutation
+// CHECK-NOT:   end_cow_mutation
+// CHECK:     bb1:
+// CHECK-NEXT:  br bb3([[E]]
+// CHECK:     bb2:
+// CHECK-NEXT:  br bb3([[E]]
+// CHECK: } // end sil function 'remove_begin_end_cow_pair_multiple_ends'
+sil [ossa] @remove_begin_end_cow_pair_multiple_ends : $@convention(thin) (@owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer):
+  %e1 = end_cow_mutation %0
+  (%u, %b) = begin_cow_mutation %e1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %e2 = end_cow_mutation %b
+  br bb3(%e2)
+
+bb2:
+  %e3 = end_cow_mutation [keep_unique] %b
+  br bb3(%e3)
+
+bb3(%r : @owned $Buffer):
+  return %r
+}
+
+// CHECK-LABEL: sil @optimize_empty_cow_singleton
+// CHECK:   [[I:%[0-9]+]] = integer_literal $Builtin.Int1, 0
+// CHECK:   begin_cow_mutation
+// CHECK:   [[T:%[0-9]+]] = tuple ([[I]]
+// CHECK:   return [[T]]
+// CHECK: } // end sil function 'optimize_empty_cow_singleton'
+sil @optimize_empty_cow_singleton : $@convention(thin) () -> (Builtin.Int1, @owned Builtin.BridgeObject) {
+bb0:
+  %3 = global_addr @_swiftEmptyArrayStorage : $*_SwiftEmptyArrayStorage
+  %4 = address_to_pointer %3 to $Builtin.RawPointer
+  %5 = raw_pointer_to_ref %4 to $__EmptyArrayStorage
+  %6 = unchecked_ref_cast %5 to $Builtin.BridgeObject
+  (%u, %b) = begin_cow_mutation %6
+  %t = tuple (%u, %b)
+  return %t
+}

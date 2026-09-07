@@ -47,6 +47,14 @@ using FunctionParam = swift::Demangle::FunctionParam<BuiltType>;
 template <typename BuilderType>
 using TypeDecoder = swift::Demangle::TypeDecoder<BuilderType>;
 
+/// The depth limit for recursive walks over metadata in the inspected process,
+/// which can be malformed or cyclic.
+constexpr int defaultTypeRecursionLimit = 50;
+
+/// The limit on the length of a superclass chain walked in the inspected
+/// process, to protect against corrupt/cyclic data.
+constexpr unsigned maxSuperclassChainLength = 1024;
+
 /// The kind of mangled name to read.
 enum class MangledNameKind {
   Type,
@@ -189,8 +197,6 @@ public:
   using StoredSignedPointer = typename Runtime::StoredSignedPointer;
   using StoredSize = typename Runtime::StoredSize;
   using TargetClassMetadata = TargetClassMetadataType<Runtime>;
-
-  static const int defaultTypeRecursionLimit = 50;
 
 private:
   /// The maximum number of bytes to read when reading metadata. Anything larger
@@ -673,7 +679,11 @@ public:
       size_t start = isaAndRetainCountSize;
 
       auto classMeta = cast<TargetClassMetadata>(meta);
+      unsigned i = 0;
       while (stripSignedPointer(classMeta->Superclass)) {
+        if (i++ >= maxSuperclassChainLength)
+          return std::nullopt;
+
         meta = readMetadata(stripSignedPointer(classMeta->Superclass));
         if (!meta || meta->getKind() != MetadataKind::Class)
           return std::nullopt;
@@ -681,7 +691,10 @@ public:
         classMeta = cast<TargetClassMetadata>(meta);
 
         // Subtract the size contribution of the isa and retain counts from
-        // the super class.
+        // the super class. A superclass claiming to be smaller than its own
+        // header is malformed, and subtracting would wrap.
+        if (classMeta->InstanceSize < isaAndRetainCountSize)
+          return std::nullopt;
         start += classMeta->InstanceSize - isaAndRetainCountSize;
       }
       return start;
@@ -1278,6 +1291,18 @@ public:
       TypeCache[TypeCacheKey] = BuiltFixedArray;
       return BuiltFixedArray;
     }
+    case MetadataKind::Borrow: {
+      auto borrow = cast<TargetBorrowTypeMetadata<Runtime>>(Meta);
+      auto referentAddress =
+          RemoteAddress(borrow->Referent, MetadataAddress.getAddressSpace());
+      auto Referent =
+          readTypeFromMetadata(referentAddress, false, recursion_limit);
+      if (!Referent) return BuiltType();
+
+      auto BuiltBorrow = Builder.createBuiltinBorrowType(Referent);
+      TypeCache[TypeCacheKey] = BuiltBorrow;
+      return BuiltBorrow;
+    }
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
@@ -1649,7 +1674,8 @@ public:
   Demangle::NodePointer
   buildContextMangling(ContextDescriptorRef descriptor,
                        Demangler &dem) {
-    auto demangling = buildContextDescriptorMangling(descriptor, dem, 50);
+    auto demangling = buildContextDescriptorMangling(
+        descriptor, dem, defaultTypeRecursionLimit);
     if (!demangling)
       return nullptr;
 
@@ -1857,7 +1883,8 @@ public:
 
   // This follows getMetadataBounds in ABI/Metadata.h.
   std::optional<ClassMetadataBounds>
-  getClassMetadataBounds(ContextDescriptorRef classRef) {
+  getClassMetadataBounds(ContextDescriptorRef classRef,
+                         int recursion_limit = defaultTypeRecursionLimit) {
     auto classDescriptor = cast<TargetClassDescriptor<Runtime>>(classRef);
 
     if (!classDescriptor->hasResilientSuperclass()) {
@@ -1875,12 +1902,17 @@ public:
       return bounds;
     }
 
-    return computeMetadataBoundsFromSuperclass(classRef);
+    return computeMetadataBoundsFromSuperclass(classRef, recursion_limit);
   }
 
   // This follows computeMetadataBoundsFromSuperclass in Metadata.cpp.
-  std::optional<ClassMetadataBounds>
-  computeMetadataBoundsFromSuperclass(ContextDescriptorRef subclassRef) {
+  std::optional<ClassMetadataBounds> computeMetadataBoundsFromSuperclass(
+      ContextDescriptorRef subclassRef,
+      int recursion_limit = defaultTypeRecursionLimit) {
+    if (recursion_limit <= 0) {
+      return std::nullopt;
+    }
+
     auto subclass = cast<TargetClassDescriptor<Runtime>>(subclassRef);
     std::optional<ClassMetadataBounds> bounds;
 
@@ -1899,7 +1931,7 @@ public:
               -> std::optional<ClassMetadataBounds> {
             if (!isa<TargetClassDescriptor<Runtime>>(superclass))
               return std::nullopt;
-            return getClassMetadataBounds(superclass);
+            return getClassMetadataBounds(superclass, recursion_limit - 1);
           },
           [&](MetadataRef metadata) -> std::optional<ClassMetadataBounds> {
             auto cls = dyn_cast<TargetClassMetadata>(metadata);
@@ -2252,7 +2284,11 @@ protected:
     switch (metadata->getKind()) {
     case MetadataKind::Class: {
       auto classMeta = cast<TargetClassMetadata>(metadata);
+      unsigned i = 0;
       while (true) {
+        if (i++ >= maxSuperclassChainLength)
+          return RemoteAddress();
+
         if (!classMeta->isTypeMetadata())
           return RemoteAddress();
 
@@ -2426,6 +2462,7 @@ private:
       importInfo.emplace();
       nameAddress += name.size() + 1;
 
+      uint64_t importInfoSize = 0;
       while (true) {
         // Read the next string.
         std::string temp;
@@ -2435,6 +2472,12 @@ private:
         // If we read an empty string, we're done.
         if (temp.empty())
           break;
+
+        // The remote process may never provide the empty string that ends
+        // the list, so stop once it grows implausibly large.
+        importInfoSize += temp.size() + 1;
+        if (importInfoSize > MaxMetadataSize)
+          return std::nullopt;
 
         // Advance past the string.
         nameAddress += temp.size() + 1;
@@ -2491,6 +2534,11 @@ private:
       // Move the address forward and add the next chunk.
       currentAddress = currentAddress + chunk.size() + 1;
       mangledName += std::move(chunk);
+
+      // The remote process may never terminate the name outside of a symbolic
+      // reference, so stop once it grows implausibly large.
+      if (mangledName.size() > MaxMetadataSize)
+        return nullptr;
 
       // Scan through the mangled name to skip over symbolic references.
       unsigned end = mangledName.size();
@@ -2697,6 +2745,29 @@ private:
     return buildContextDescriptorManglingForSymbol(descriptor.getSymbol(), dem);
   }
 
+  /// Given a demangled type, returns the unbound nominal a bound generic type
+  /// was formed from, or null if the type is not a bound generic type.
+  Demangle::NodePointer stripBoundGenericArgs(Demangle::NodePointer type) {
+    auto bound = type;
+    if (bound->getKind() == Node::Kind::Type && bound->getNumChildren() == 1)
+      bound = bound->getFirstChild();
+
+    switch (bound->getKind()) {
+    case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericStructure:
+    case Node::Kind::BoundGenericEnum:
+    case Node::Kind::BoundGenericOtherNominalType:
+    case Node::Kind::BoundGenericTypeAlias:
+      break;
+    default:
+      return nullptr;
+    }
+
+    if (bound->getNumChildren() < 1)
+      return nullptr;
+    return bound->getFirstChild();
+  }
+
   Demangle::NodePointer
   buildContextDescriptorMangling(ContextDescriptorRef descriptor,
                                  Demangler &dem, int recursion_limit) {
@@ -2801,6 +2872,13 @@ private:
           readMangledName(extendedContextAddress, MangledNameKind::Type, dem);
       if (!demangledExtendedContext)
         return nullptr;
+
+      // An extension of a constrained generic type records its extended
+      // context as a bound generic type, but an Extension node's extended
+      // context has to be an unbound nominal, with the arguments described by
+      // the generic signature below. Strip the arguments off.
+      if (auto unbound = stripBoundGenericArgs(demangledExtendedContext))
+        demangledExtendedContext = unbound;
 
       auto demangling = dem.createNode(Node::Kind::Extension);
       demangling->addChild(parentDemangling, dem);
@@ -3106,12 +3184,16 @@ private:
       return BuiltTypeDecl();
     std::vector<size_t> paramsPerLevel;
     size_t runningCount = 0;
-    std::function<void(ContextDescriptorRef current, size_t &)> countLevels =
-        [&](ContextDescriptorRef current, size_t &runningCount) {
+    std::function<void(ContextDescriptorRef current, size_t &, int)>
+        countLevels = [&](ContextDescriptorRef current, size_t &runningCount,
+                          int recursion_limit) {
+          if (recursion_limit <= 0)
+            return;
+
           if (auto parentContextRef = readParentContextDescriptor(current))
             if (parentContextRef->isResolved())
               if (auto parentContext = parentContextRef->getResolved())
-                countLevels(parentContext, runningCount);
+                countLevels(parentContext, runningCount, recursion_limit - 1);
 
           auto genericContext = current->getGenericContext();
           // Only consider generic contexts of type class, enum or struct.
@@ -3126,7 +3208,7 @@ private:
             runningCount += paramsPerLevel.back();
           }
         };
-    countLevels(descriptor, runningCount);
+    countLevels(descriptor, runningCount, defaultTypeRecursionLimit);
     BuiltTypeDecl decl = Builder.createTypeDecl(node, paramsPerLevel);
     return decl;
   }
@@ -3190,8 +3272,90 @@ private:
 
     unsigned packIndex = 0;
 
+    // Parameters concretized by a same-type constraint carry no key argument,
+    // so their substitution has to come from the constraint instead. Map each
+    // parameter's position in the flattened parameter list to its depth and
+    // index the same way buildNominalTypeDecl counts levels, since that is how
+    // a constraint's subject names it.
+    std::vector<size_t> paramsPerLevel;
+    {
+      size_t runningCount = 0;
+      std::function<void(ContextDescriptorRef)> countLevels =
+          [&](ContextDescriptorRef current) {
+            if (auto parentContextRef = readParentContextDescriptor(current))
+              if (parentContextRef->isResolved())
+                if (auto parentContext = parentContextRef->getResolved())
+                  countLevels(parentContext);
+
+            auto genericContext = current->getGenericContext();
+            if (genericContext &&
+                (current->getKind() == ContextDescriptorKind::Class ||
+                 current->getKind() == ContextDescriptorKind::Enum ||
+                 current->getKind() == ContextDescriptorKind::Struct)) {
+              auto contextHeader = genericContext->getGenericContextHeader();
+              paramsPerLevel.emplace_back(contextHeader.NumParams -
+                                          runningCount);
+              runningCount += paramsPerLevel.back();
+            }
+          };
+      countLevels(descriptor);
+    }
+
+    // Returns the substitution a same-type constraint fixes the parameter at
+    // the given flattened position to, or a null type if no constraint does.
+    auto substFromSameTypeConstraint = [&](unsigned flatIndex) -> BuiltType {
+      // Find the depth and index this flattened position corresponds to.
+      unsigned depth = 0;
+      unsigned index = flatIndex;
+      for (auto count : paramsPerLevel) {
+        if (index < count)
+          break;
+        index -= count;
+        ++depth;
+      }
+
+      for (auto &req : generics->getGenericRequirements()) {
+        if (req.Flags.getKind() != GenericRequirementKind::SameType) {
+          continue;
+        }
+
+        Demangler dem;
+        auto subjectAddress = resolveRelativeField(descriptor, req.Param);
+        auto subject =
+            readMangledName(subjectAddress, MangledNameKind::Type, dem);
+        if (!subject)
+          continue;
+        if (subject->getKind() == Node::Kind::Type &&
+            subject->getNumChildren() == 1)
+          subject = subject->getFirstChild();
+        if (subject->getKind() != Node::Kind::DependentGenericParamType ||
+            subject->getNumChildren() != 2)
+          continue;
+        auto subjectDepth = subject->getChild(0);
+        auto subjectIndex = subject->getChild(1);
+        if (!subjectDepth->hasIndex() || !subjectIndex->hasIndex())
+          continue;
+        if (subjectDepth->getIndex() != depth ||
+            subjectIndex->getIndex() != index)
+          continue;
+
+        auto typeAddress = resolveRelativeField(descriptor, req.Type);
+        auto type = readMangledName(typeAddress, MangledNameKind::Type, dem);
+        if (!type)
+          continue;
+        auto result = decodeMangledType(type);
+        if (result.isError()) {
+          continue;
+        }
+        return result.getType();
+      }
+      return BuiltType();
+    };
+
+    unsigned flatParamIndex = 0;
     std::vector<BuiltType> builtSubsts;
     for (auto param : generics->getGenericParams()) {
+      unsigned thisParamIndex = flatParamIndex++;
       switch (param.getKind()) {
       case GenericParamKind::Type:
         // The type should have a key argument unless it's been same-typed
@@ -3213,10 +3377,13 @@ private:
             return {};
           builtSubsts.push_back(builtArg);
         } else {
-          // TODO: If the key argument has been concretized by a same-type
-          // constraint, that should be reflected in the built nominal type
-          // decl's generic constraints. This isn't handled correctly yet.
-          return {};
+          // The parameter has been concretized by a same-type constraint, so
+          // the constraint holds the substitution.
+          auto builtArg = substFromSameTypeConstraint(thisParamIndex);
+          if (!builtArg) {
+            return {};
+          }
+          builtSubsts.push_back(builtArg);
         }
         break;
 

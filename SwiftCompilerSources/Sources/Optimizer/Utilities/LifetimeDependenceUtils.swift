@@ -229,6 +229,59 @@ extension LifetimeDependence {
   }
 }
 
+/// If `reference` is a copy or borrow of a value loaded out of memory,
+/// the address it was loaded from.
+///
+/// A loaded reference is a temporary whose  lifetime is typically narrower
+/// than that of the storage it came from: walking a chain like `a.b.c`
+/// destroys each intermediate reference as soon as the next one has been
+/// loaded. A dependence must therefore be rooted in the storage rather than
+/// in the temporary.
+private func loadedAddress(of reference: Value) -> Value? {
+  // `referenceRoot` skips ownership forwarding and transitions, so this sees through the copy_value/begin_borrow that a
+  // load of a class reference is typically wrapped in.
+  var value = reference.referenceRoot
+  while true {
+    switch value.definingInstruction {
+    case let load as LoadInstruction:
+      return load.address
+    // `referenceRoot` stops at the instructions that strengthen a weak or
+    // unowned reference, so look through those as well: the strengthened
+    // reference still originates in the weak or unowned storage, and reaching
+    // that storage is what lets the caller recognize the field as a
+    // non-strong one.
+    case let strengthen as StrongCopyUnownedValueInst:
+      value = strengthen.operand.value.referenceRoot
+    case let strengthen as StrongCopyUnmanagedValueInst:
+      value = strengthen.operand.value.referenceRoot
+    case let strengthen as StrongCopyWeakValueInst:
+      value = strengthen.operand.value.referenceRoot
+    default:
+      return nil
+    }
+  }
+}
+
+/// The guaranteed value that `reference` was forwarded from, if it has one.
+private func guaranteedReferenceRoot(of reference: Value) -> Value? {
+  let root = reference.referenceRoot
+  return root.ownership == .guaranteed ? root : nil
+}
+
+/// If `value` is the result of a call that returns `@guaranteed`, the argument
+/// that the result is a borrow of.
+private func guaranteedResultBase(of value: Value) -> Value? {
+  guard value.isGuaranteedApplyResult,
+        let apply = value.definingInstruction as? ApplyInst,
+        // A borrow accessor for a global has no `self`; its result borrows
+        // immortal storage. Let the caller handle that.
+        apply.functionConvention.hasSelfParameter,
+        let selfArgument = apply.arguments.last else {
+    return nil
+  }
+  return guaranteedReferenceRoot(of: selfArgument) ?? selfArgument
+}
+
 // Scope initialization.
 extension LifetimeDependence.Scope {
   /// Construct a lifetime dependence scope from the base value that other values depend on. This derives the kind of
@@ -275,7 +328,37 @@ extension LifetimeDependence.Scope {
     case let .box(projectBox):
       // Note: the box may be in a borrow scope.
       self.init(base: projectBox.operand.value, context)
-    case .class, .tail, .pointer, .index:
+    case let .class(refElementAddr):
+      // A class instance holds its stored properties at a stable address for
+      // as long as the instance is alive, so a borrow of one of them is valid
+      // for as long as the reference is. Attribute the dependence to that
+      // reference, which has a scope, rather than to the property's storage,
+      // which does not. This requires the field to be:
+      //
+      // - a `let`, so the storage can never be reassigned out from under the
+      //   borrow, and
+      // - a strong reference, so the parent actually keeps the referent alive.
+      //   `weak`, `unowned`, and `unowned(unsafe)` fields, whose types are
+      //   `ReferenceStorageType`s, do not.
+      guard refElementAddr.fieldIsLet, !refElementAddr.type.isReferenceStorageType else {
+        self = .unknown(accessBase.address!)
+        return
+      }
+      if let parentStorage = loadedAddress(of: refElementAddr.instance) {
+        // The reference was itself loaded out of memory, so recur to root the dependence in that storage. Each
+        // intermediate reference in a chain like `a.b.c` is destroyed as soon as the next one has been loaded, which
+        // would give a scope too narrow to contain the dependent value.
+        self.init(base: parentStorage, context)
+      } else if let guaranteedRoot =
+                    guaranteedReferenceRoot(of: refElementAddr.instance) {
+        // The reference was forwarded from a guaranteed value rather than
+        // loaded out of memory, as happens for a `struct_extract` of a
+        // borrowed struct.
+        self.init(base: guaranteedRoot, context)
+      } else {
+        self.init(base: refElementAddr.instance, context)
+      }
+    case .tail, .pointer, .index:
       self = .unknown(accessBase.address!)
     case .unidentified:
       self = .unknown(address)
@@ -330,6 +413,11 @@ extension LifetimeDependence.Scope {
   // LifetimeDependenceself.init(markDep) with a gatherDependenceScopes() utility used by both
   // LifetimeDependenceInsertion and LifetimeDependenceScopeFixup.
   private init(guaranteed base: Value, _ context: some Context) {
+    // Introduce a dependency on the base of a borrow accessor call.
+    if let accessorBase = guaranteedResultBase(of: base) {
+      self.init(base: accessorBase, context)
+      return
+    }
     var iter = base.getBorrowIntroducers(context).makeIterator()
     // If no borrow introducer was found, then this is a borrow of a trivial value. Since we can assume a single
     // introducer here, then this is the only condition under which we have a trivial introducer.
@@ -363,6 +451,9 @@ extension LifetimeDependence.Scope {
       self = .local(varScope)
     } else if let ga = GlobalAccessBase(address: value) {
       self = .global(ga)
+    } else if let accessorBase = guaranteedResultBase(of: value) {
+      // A trivial `borrow` accessor result, rooted on the base of the accessor.
+      self.init(base: accessorBase, context)
     } else {
       self = .unknown(value)
     }

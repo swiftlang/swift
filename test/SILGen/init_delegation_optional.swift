@@ -1,5 +1,5 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -swift-version 5 %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -swift-version 5 %s
+// RUN: %target-swift-emit-sil -sil-verify-all -o /dev/null -enable-sil-opaque-values -swift-version 5 %s
 
 // 'try?' on delegations to 'Optional' initializers should never flatten
 // optionals, or else we do not discern the difference between a failure and a
@@ -27,6 +27,8 @@ extension Optional {
     // CHECK-NEXT: copy_addr [take] [[RESULT_ADDR]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[RESULT_ADDR]]
     // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT]]
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[RET:%[0-9]+]] = tuple ()
@@ -50,6 +52,8 @@ extension Optional {
     // CHECK-NEXT: [[OUT_SOME_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT_SOME_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: br bb2
@@ -89,11 +93,15 @@ extension Optional {
     // CHECK-NEXT: [[OUT_SOME_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT_SOME_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: br bb4
     //
     // CHECK: bb3:
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.none!enumelt
@@ -142,11 +150,15 @@ extension Optional {
     // CHECK-NEXT: [[OUT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT_DATA_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: br bb6
     //
     // CHECK: bb5:
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.none!enumelt
@@ -156,13 +168,13 @@ extension Optional {
     // CHECK-NEXT: [[RET:%[0-9]+]] = tuple ()
     // CHECK-NEXT: return [[RET]] : $()
     //
-    // CHECK: bb7([[ERR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: destroy_value [[ERR]]
+    // CHECK: bb7:
     // CHECK-NEXT: inject_enum_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.none!enumelt
     // CHECK-NEXT: br bb2
     //
     // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: br bb7([[ERR]] : $any Error)
+    // CHECK-NEXT: destroy_value [[ERR]]
+    // CHECK-NEXT: br bb7
     // CHECK-NEXT: }
   }
 
@@ -219,11 +231,15 @@ extension Optional {
     // CHECK-NEXT: [[OUT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT_DATA_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: br bb9
     //
     // CHECK: bb8:
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.none!enumelt
@@ -233,13 +249,13 @@ extension Optional {
     // CHECK-NEXT: [[RET:%[0-9]+]] = tuple ()
     // CHECK-NEXT: return [[RET]] : $()
     //
-    // CHECK: bb10([[ERROR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: destroy_value [[ERROR]]
+    // CHECK: bb10:
     // CHECK-NEXT: inject_enum_addr [[OPT_OPT_RESULT_ADDR]] : {{.*}}, #Optional.none!enumelt
     // CHECK-NEXT: br bb2
     //
     // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: br bb10([[ERROR]] : $any Error)
+    // CHECK-NEXT: destroy_value [[ERROR]]
+    // CHECK-NEXT: br bb10
     // CHECK-NEXT: }
   }
 
@@ -286,11 +302,15 @@ extension Optional {
     // CHECK-NEXT: [[OUT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT_DATA_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: br bb8
     //
     // CHECK: bb7:
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.none!enumelt
@@ -300,14 +320,14 @@ extension Optional {
     // CHECK-NEXT: [[RET:%[0-9]+]] = tuple ()
     // CHECK-NEXT: return [[RET]] : $()
     //
-    // CHECK: bb9([[ERROR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: destroy_value [[ERROR]]
+    // CHECK: bb9:
     // CHECK-NEXT: inject_enum_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.none!enumelt
     // CHECK-NEXT: br bb4
     //
     // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $any Error):
+    // CHECK-NEXT: destroy_value [[ERROR]]
     // CHECK-NEXT: dealloc_stack [[TMP_OPT_RESULT_ADDR]]
-    // CHECK-NEXT: br bb9([[ERROR]] : $any Error)
+    // CHECK-NEXT: br bb9
     // CHECK-NEXT: }
   }
 
@@ -339,11 +359,15 @@ extension Optional {
     // CHECK-NEXT: [[OUT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT_DATA_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: br bb5
     //
     // CHECK: bb4:
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.none!enumelt
@@ -378,6 +402,8 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK-NEXT: dealloc_stack [[RESULT_ADDR]]
     // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [trivial] [[PB]]
     // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<Optional<Optional<Bool>>>, #Optional.some!enumelt, [[RESULT]]
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[MARKED_SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: br bb2([[INJECT_INTO_OPT]] : $Optional<Optional<Optional<Bool>>>)
@@ -411,11 +437,15 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK-NEXT: assign [[RESULT]] to [[PB]]
     // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [trivial] [[PB]]
     // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<Optional<Optional<Bool>>>, #Optional.some!enumelt, [[RESULT]]
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[MARKED_SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: br bb4([[INJECT_INTO_OPT]] : $Optional<Optional<Optional<Bool>>>)
     //
     // CHECK: bb3:
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[MARKED_SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<Optional<Bool>>>, #Optional.none!enumelt
@@ -467,11 +497,15 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK-NEXT: assign [[RESULT]] to [[PB]]
     // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [trivial] [[PB]]
     // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<Optional<Optional<Bool>>>, #Optional.some!enumelt, [[RESULT]]
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[MARKED_SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: br bb9([[INJECT_INTO_OPT]] : $Optional<Optional<Optional<Bool>>>)
     //
     // CHECK: bb8:
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[MARKED_SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<Optional<Bool>>>, #Optional.none!enumelt
@@ -480,13 +514,13 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK: bb9([[RET:%[0-9]+]] : $Optional<Optional<Optional<Bool>>>):
     // CHECK-NEXT: return [[RET]]
     //
-    // CHECK: bb10([[ERROR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: destroy_value [[ERROR]]
+    // CHECK: bb10:
     // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<Optional<Optional<Bool>>>>, #Optional.none!enumelt
     // CHECK-NEXT: br bb2([[NIL]] : $Optional<Optional<Optional<Optional<Bool>>>>)
     //
     // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : @owned $any Error):
-    // CHECK-NEXT: br bb10([[ERROR]] : $any Error)
+    // CHECK-NEXT: destroy_value [[ERROR]]
+    // CHECK-NEXT: br bb10
     // CHECK-NEXT: }
     try? self.init(SpecFailableAndThrows: ())
   }

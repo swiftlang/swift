@@ -953,8 +953,11 @@ static void appendMissingImportFixIt(llvm::SmallString<64> &importText,
     importText += " ";
   }
 
+  // onlyIfImported below matches how modules are printed in
+  // `formatDiagnosticArgument`.
+  auto *mod = fixItInfo.moduleToImport;
   importText += "import ";
-  importText += fixItInfo.moduleToImport->getName().str();
+  importText += mod->getPublicModuleName(/*onlyIfImported*/ true).str();
   importText += "\n";
 }
 

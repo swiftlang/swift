@@ -314,7 +314,7 @@ do {
 
   struct S2: ~Copyable {
     let operation: @called(once) () -> Void
-    
+
     init(operation: @escaping @called(once) () -> Void) {
       self.operation = operation
     }
@@ -326,4 +326,73 @@ do {
       operation() // expected-error {{cannot partially consume 'self' when it has a deinitializer}}
     }
   }
+}
+
+// A `defer` body is synthesized as a `@called(once)` function, so captures
+// it consumes are subject to the same "at most once" checking as any other
+// `@called(once)` closure.
+
+struct Resource: ~Copyable {
+  deinit {}
+  consuming func use() {}
+}
+
+func testDeferConsumesResource() {
+  let r = Resource()
+  defer {
+    r.use() // Ok
+  }
+
+  _ = 42
+}
+
+func testDeferDoubleConsume() {
+  let r = Resource() // expected-error 2 {{'r' consumed more than once}}
+  defer {
+    r.use() // expected-note 2 {{consumed here}}
+    r.use() // expected-note 2 {{consumed again here}}
+  }
+
+  _ = 42
+}
+
+func testDeferConsumesInLoop() {
+  let r = Resource() // expected-error 2 {{'r' consumed in a loop}}
+
+  defer {
+    for _ in 0..<3 {
+      r.use() // expected-note 2 {{consumed here}}
+    }
+  }
+
+  _ = 42
+}
+
+func testCallThenDeferCall(_ f: @escaping @called(once) () -> Void) { // expected-error {{'f' consumed more than once}}
+  defer { // expected-note {{consumed again here}}
+    f()
+  }
+  f() // expected-note {{consumed here}}
+}
+
+func testDeferMultipleIndependentCaptures(
+  _ f: @escaping @called(once) () -> Void,
+  _ g: @escaping @called(once) () -> Void
+) {
+  defer {
+    f()
+    g()
+  }
+
+  _ = 42
+}
+
+func testMultipleDefersIndependentCaptures(
+  _ f: @escaping @called(once) () -> Void,
+  _ g: @escaping @called(once) () -> Void
+) {
+  defer { f() }
+  defer { g() }
+
+  _ = 42
 }

@@ -44,6 +44,7 @@ swift_compiler_sources(Optimizer
   MergeCondFails.swift
   NamedReturnValueOptimization.swift
   RedundantLoadElimination.swift
+  RedundantOverflowCheckRemoval.swift
   ReleaseDevirtualizer.swift
   RemoveSILGenLifetimes.swift
   SimplificationPasses.swift

@@ -100,7 +100,8 @@ def backup_module_interface_path_EQ :
   Alias<backup_module_interface_path>;
 
 def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
-  HelpText<"Emit textual output in a parseable format">;
+  Flags<[HelpHidden]>,
+  HelpText<"Deprecated: Emit textual output in a parseable format">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, CacheInvariant]
 

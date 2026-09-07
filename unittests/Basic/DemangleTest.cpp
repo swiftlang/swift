@@ -159,3 +159,14 @@ TEST(Demangle, OldFunctionTypeManglingFlagSavedAcrossDemangle) {
       << "IsOldFunctionTypeMangling leaked across DemangleInitRAII";
 }
 
+// A LocalDeclName whose name child is itself a LocalDeclName carries children
+// rather than text, so reading text off it reads the children as a StringRef.
+TEST(Demangle, KeyPathSourceStringNestedLocalDeclName) {
+  static const char nested[] = "$s4main1SVySiAA3fooL_L_VcipACTK";
+  EXPECT_EQ("subscript(_: <unknown>)",
+            keyPathSourceString(nested, sizeof(nested) - 1));
+
+  static const char local[] = "$s4main1SVySiAA3fooL_VcipACTK";
+  EXPECT_EQ("subscript(_: foo #1)",
+            keyPathSourceString(local, sizeof(local) - 1));
+}

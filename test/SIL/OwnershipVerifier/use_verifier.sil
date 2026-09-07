@@ -63,6 +63,12 @@ protocol SwiftKlassP : AnyObject {
   func foo()
 }
 
+// Not class-constrained, so an existential of this type is address-only and
+// `existential_metatype` can read it in place.
+protocol SwiftOpaqueP {
+  func foo()
+}
+
 struct Val {
 }
 class Ref {
@@ -295,12 +301,12 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
-sil [ossa] @existential_metatype_test : $@convention(thin) (@owned SwiftKlassP, @in SwiftKlassP) -> () {
-bb0(%0 : @owned $SwiftKlassP, %1 : $*SwiftKlassP):
+sil [ossa] @existential_metatype_test : $@convention(thin) (@owned SwiftKlassP, @in SwiftOpaqueP) -> () {
+bb0(%0 : @owned $SwiftKlassP, %1 : $*SwiftOpaqueP):
   %2 = existential_metatype $@thick SwiftKlassP.Type, %0 : $SwiftKlassP
-  %3 = existential_metatype $@thick SwiftKlassP.Type, %1 : $*SwiftKlassP
+  %3 = existential_metatype $@thick SwiftOpaqueP.Type, %1 : $*SwiftOpaqueP
   destroy_value %0 : $SwiftKlassP
-  destroy_addr %1 : $*SwiftKlassP
+  destroy_addr %1 : $*SwiftOpaqueP
   %9999 = tuple()
   return %9999 : $()
 }

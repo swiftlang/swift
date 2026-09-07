@@ -487,6 +487,17 @@ createIndirectResultInit(SILGenFunction &SGF, SILValue addr,
   auto &resultTL = SGF.getTypeLowering(addr->getType());
   auto temporary = SGF.useBufferAsTemporary(addr, resultTL);
 
+  // A tuple result stored into an @out buffer must not be initialized
+  // element-by-element across a suspension point. This could result in
+  // a partial write happening before the suspension, and only the part of the write
+  // happening after the suspension point would survive, leaving the earlier part corrupt.
+  // Only a tuple with more than one element can be left partially written
+  if (SGF.F.isAsync()) {
+    if (auto tupleTy = addr->getType().getAs<TupleType>())
+      if (tupleTy->getNumElements() > 1)
+        temporary->setCanSplitIntoTupleElements(false);
+  }
+
   // Remember the cleanup that will be activated.
   auto cleanup = temporary->getInitializedCleanup();
   if (cleanup.isValid())
@@ -1845,9 +1856,9 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     args.push_back(exn);
   } else if (shouldDiscard) {
     if (exn->getType().isAddress())
-      B.createDestroyAddr(loc, exn);
+      B.emitDestroyAddrAndFold(loc, exn);
     else
-      B.createDestroyValue(loc, exn);
+      B.emitDestroyValueOperation(loc, exn);
   }
 
   // Emit clean-ups needed prior to entering throw block.

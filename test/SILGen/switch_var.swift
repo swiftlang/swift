@@ -295,6 +295,7 @@ func test_var_4(p p: P) {
     c(x: z.1)
 
   // CHECK: [[DFLT_NO_CASE3]]:
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   end_borrow [[ZLIFETIME]]
   // CHECK-NEXT:   destroy_value [[ZADDR]]
   // CHECK-NOT: destroy_addr

@@ -14,7 +14,7 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 // MARK: Distributed actor protocols
 
 protocol WrongDistFuncs {
-    distributed func notDistActor() // expected-error{{'distributed' method can only be declared within 'distributed actor'}}{{5-17=}} {{-1:25-25=: DistributedActor}}
+    distributed func notDistActor() // expected-error{{distributed method can only be declared in 'DistributedActor' type}}{{5-17=}} {{-1:25-25=: DistributedActor}}
 }
 
 protocol DistProtocol: DistributedActor {
@@ -272,7 +272,7 @@ extension DistributedTacoMaker {
 
 extension TacoPreparation {
   distributed func makeSalsa() -> Salsa {}
-  // expected-error@-1{{'distributed' method can only be declared within 'distributed actor'}}
+  // expected-error@-1{{distributed method can only be declared in 'DistributedActor' type}}
 }
 
 distributed actor TacoWorker: DistributedTacoMaker {} // implemented in extensions

@@ -22,6 +22,9 @@ enum IsTrivial_t : bool {
   IsTrivial = true
 };
 
+/// Is the type non-trivial because it is non-Escapable?
+enum IsEscapable_t : bool { IsNonEscapable = false, IsEscapable = true };
+
 /// Is a lowered SIL type the Builtin.RawPointer or a struct/tuple/enum which
 /// contains a Builtin.RawPointer?
 /// HasRawPointer is true only for types that are known to contain
@@ -154,7 +157,8 @@ class SILTypeProperties {
     CustomDeinitFlag                         = 1 << 11,
     IsVeryLargeTypeFlag                      = 1 << 12,
     DefinitelyAddressableForDependenciesFlag = 1 << 13,
-    DefinitelyHasRawLayoutFlag               = 1 << 14
+    DefinitelyHasRawLayoutFlag               = 1 << 14,
+    NonEscapableFlag                         = 1 << 15
   };
   // clang-format on
 
@@ -176,22 +180,24 @@ public:
       HasRawLayout_t hasRawLayout = DoesNotHaveRawLayout,
       MayHaveCustomDeinit_t customDeinit = HasOnlyDefaultDeinit,
       IsVeryLargeType_t largeType = IsNotVeryLargeType,
-      IsAddressableForDependencies_t definitelyIsAFD = IsNotAddressableForDependencies,
-      HasRawLayout_t definitelyHasRawLayout = DoesNotHaveRawLayout)
+      IsAddressableForDependencies_t definitelyIsAFD =
+          IsNotAddressableForDependencies,
+      HasRawLayout_t definitelyHasRawLayout = DoesNotHaveRawLayout,
+      IsEscapable_t isEscapable = IsEscapable)
       : Flags((isTrivial ? 0U : NonTrivialFlag) |
               (isFixedABI ? 0U : NonFixedABIFlag) |
               (isAddressOnly ? AddressOnlyFlag : 0U) |
               (isResilient ? ResilientFlag : 0U) |
               (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U) |
               (hasRawPointer ? HasRawPointerFlag : 0U) |
-              (isLexical ? LexicalFlag : 0U) |
-              (hasPack ? HasPackFlag : 0U) |
+              (isLexical ? LexicalFlag : 0U) | (hasPack ? HasPackFlag : 0U) |
               (isAFD ? AddressableForDependenciesFlag : 0U) |
               (hasRawLayout ? HasRawLayoutFlag : 0U) |
               (customDeinit ? CustomDeinitFlag : 0U) |
               (largeType ? IsVeryLargeTypeFlag : 0U) |
               (definitelyIsAFD ? AddressableForDependenciesFlag : 0U) |
-              (definitelyHasRawLayout ? HasRawLayoutFlag : 0U)) {}
+              (definitelyHasRawLayout ? HasRawLayoutFlag : 0U) |
+              (isEscapable ? 0U : NonEscapableFlag)) {}
 
   constexpr bool operator==(SILTypeProperties p) const {
     return Flags == p.Flags;
@@ -237,7 +243,16 @@ public:
   }
 
   IsTrivial_t isTrivial() const {
-    return IsTrivial_t((Flags & NonTrivialFlag) == 0);
+    // A non-Escapable type is also considered non-trivial.
+    return IsTrivial_t((Flags & (NonTrivialFlag | NonEscapableFlag)) == 0);
+  }
+  IsEscapable_t isEscapable() const {
+    return IsEscapable_t((Flags & NonEscapableFlag) == 0);
+  }
+  // Is the type non-Trivial, and is the only property of the type that makes it
+  // non-trivial the fact that it is non-Escapable?
+  bool isNonTrivialOnlyBecauseNonEscapable() const {
+    return (Flags & (NonTrivialFlag | NonEscapableFlag)) == NonEscapableFlag;
   }
   HasRawPointer_t isOrContainsRawPointer() const {
     return HasRawPointer_t((Flags & HasRawPointerFlag) != 0);
@@ -298,6 +313,7 @@ public:
   }
 
   void setNonTrivial() { Flags |= NonTrivialFlag; }
+  void setNonEscapable() { Flags |= NonEscapableFlag; }
   void setIsOrContainsRawPointer() { Flags |= HasRawPointerFlag; }
 
   void setNonFixedABI() { Flags |= NonFixedABIFlag; }

@@ -828,8 +828,27 @@ bool isCxxStdModule(StringRef moduleName, bool IsSystem);
 std::optional<clang::QualType>
 getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 
-/// Returns true if the given type is a C++ `const` reference type.
-bool isCxxConstReferenceType(const clang::Type *type);
+/// How a C++ reference parameter is represented in Swift.
+enum class CxxReferenceParameterKind {
+  /// `const T&` / `const T&&`: `borrowing T`.
+  Borrowed,
+  /// `T&`: `inout T`. Where `inout` is not expressible (inside
+  /// `@convention(c)`) it stays an `UnsafeMutablePointer`.
+  Mutating,
+  /// `T&&`: `consuming T`.
+  Consuming,
+};
+
+struct CxxReferenceParameter {
+  clang::QualType pointeeType;
+  CxxReferenceParameterKind kind;
+};
+
+/// Classifies a C++ reference parameter type, or `None` if \p type is not a
+/// C++ reference type. Every kind but `Mutating` is lowered indirectly, so
+/// those must be imported as the pointee rather than as a pointer.
+std::optional<CxxReferenceParameter>
+classifyCxxReferenceParameter(clang::QualType type);
 
 /// Determine whether the given Clang record declaration has an attribute that
 /// makes it import as a reference types. Does not check its bases, if any.

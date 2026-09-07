@@ -21,6 +21,7 @@ struct S {
     self.init(x: X())
     // CHECK-NEXT:   assign [[REPLACEMENT_SELF]] to [[PB]] : $*S
     // CHECK-NEXT:   [[SELF_BOX1:%[0-9]+]] = load [trivial] [[PB]] : $*S
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT:   end_borrow [[MARKED_SELF_LIFETIME]]
     // CHECK-NEXT:   destroy_value [[MARKED_SELF_BOX]] : ${ var S }
     // CHECK-NEXT:   return [[SELF_BOX1]] : $S

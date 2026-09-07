@@ -417,7 +417,7 @@ public:
   }
 
   bool visitHiddenType(CanHiddenType type1, CanHiddenType type2) {
-    return type1->getMangledName() != type2->getMangledName();
+    return !type1->isEqual(type2);
   }
 
   bool visitOptSubstitutionMap(CanType type1, CanType type2,

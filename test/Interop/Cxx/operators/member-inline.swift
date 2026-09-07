@@ -1,6 +1,5 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-5.9)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-6)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++23 -D CPP23)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default -Xcc -std=c++23 -D CPP23)
 //
 // REQUIRES: executable_test
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values

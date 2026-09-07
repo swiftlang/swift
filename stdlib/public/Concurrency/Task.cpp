@@ -2029,7 +2029,8 @@ extern "C" SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift)
 void swift_task_asyncMainDrainQueueImpl();
 
 SWIFT_CC(swift)
-void (*swift::swift_task_asyncMainDrainQueue_hook)(
+void (*__ptrauth_swift_concurrency_hook
+          swift::swift_task_asyncMainDrainQueue_hook)(
     swift_task_asyncMainDrainQueue_original original,
     swift_task_asyncMainDrainQueue_override compatOverride) = nullptr;
 

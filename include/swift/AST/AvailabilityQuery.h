@@ -19,12 +19,22 @@
 
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
 class ASTContext;
 class FuncDecl;
+
+/// Identifies the kinds of standard library entry points that evaluate a
+/// platform availability query at runtime. Every function that carries the
+/// `availability.osversion` semantics attribute should have a kind here.
+enum class OSVersionQueryKind : uint8_t {
+  IsOSVersionAtLeast,
+  IsVariantOSVersionAtLeast,
+  IsOSVersionAtLeastOrVariantVersionAtLeast,
+};
 
 /// Represents the information needed to evaluate an `#if available` query
 /// (either at runtime or compile-time).
@@ -87,6 +97,19 @@ public:
             const std::optional<AvailabilityRange> &primaryRange,
             const std::optional<AvailabilityRange> &variantRange);
 
+  /// Returns the `AvailabilityQuery` that a call to a query function of kind
+  /// `queryKind` evaluates, where `arguments` are the integer version
+  /// components that the call passes to the function. This is the inverse of
+  /// `getDynamicQueryDeclAndArguments()` for queries in platform domains.
+  ///
+  /// Returns `std::nullopt` if `arguments` has the wrong number of elements
+  /// for `queryKind`, or if the target triples in `ctx` have no platform
+  /// domain.
+  static std::optional<AvailabilityQuery>
+  forOSVersionQueryCall(OSVersionQueryKind queryKind,
+                        llvm::ArrayRef<unsigned> arguments,
+                        const ASTContext &ctx);
+
   /// Returns a copy of the `AvailabilityQuery` that has been modified to
   /// represent an `if #unavailable` query if `isUnavailability` is true, or an
   /// `if #available` query otherwise.
@@ -121,6 +144,12 @@ public:
       return std::nullopt;
     }
   }
+
+  /// Returns true if the query is guaranteed to evaluate to true at runtime
+  /// when the code is compiled for the target triples in `ctx`, because the
+  /// deployment version of every platform whose version the query tests is at
+  /// least the version that the query requires.
+  bool isAlwaysTrueForDeploymentTargets(const ASTContext &ctx) const;
 
   /// Returns the availability range that is the first argument to query
   /// function.

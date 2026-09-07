@@ -1,72 +1,88 @@
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos10.15 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_15 %s
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos10.14 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_14 %s
-// RUN: %target-swift-frontend -O -target %target-cpu-apple-macos10.15 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_15 --check-prefix=CHECK-macosx10_15_opt %s
-// RUN: %target-swift-frontend -O -target %target-cpu-apple-macos10.14 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_14 %s
+// Availability queries fold when the deployment target satisfies the queried
+// version.
 
-// RUN: %empty-directory(%t) 
-// RUN: %target-swift-frontend -O -target %target-cpu-apple-macos10.15 -module-name=Test -emit-module -emit-module-path %t/Test.swiftmodule %s
-// RUN: %sil-opt -target %target-cpu-apple-macos10.15 %t/Test.swiftmodule | %FileCheck --check-prefix=CHECK-inlinable %s
+// RUN: %empty-directory(%t)
 
-// REQUIRES: OS=macosx
+// The queries name the versions that shipped SwiftStdlib 6.0. The first target
+// deploys there, so every query folds. The second deploys to SwiftStdlib 5.10,
+// below it, so the queries stay.
 
-@available(macOS 10.15, *)
+// RUN: %target-swift-frontend -O -emit-sil -target %target-swift-6.0-abi-triple %s | %FileCheck %s --check-prefixes=CHECK,FOLDED,INLINABLE-FOLDED
+// RUN: %target-swift-frontend -O -emit-sil -target %target-swift-5.10-abi-triple %s | %FileCheck %s --check-prefixes=CHECK,KEPT,INLINABLE-KEPT
+
+// Folding a query in an ordinary function doesn't need `-O`. An inlinable
+// function is still serialized at that point, so its query only folds at `-O`.
+// RUN: %target-swift-frontend -emit-sil -target %target-swift-6.0-abi-triple %s | %FileCheck %s --check-prefixes=CHECK,FOLDED,INLINABLE-KEPT
+// RUN: %target-swift-frontend -emit-sil -target %target-swift-5.10-abi-triple %s | %FileCheck %s --check-prefixes=CHECK,KEPT,INLINABLE-KEPT
+
+// An inlinable function can be deserialized into a module with a lower
+// deployment target, so its query survives serialization even when the module
+// that defines it folds its own copy.
+
+// RUN: %target-swift-frontend -O -target %target-swift-6.0-abi-triple -module-name Test -emit-module -emit-module-path %t/Test.swiftmodule %s
+// RUN: %sil-opt -target %target-swift-6.0-abi-triple %t/Test.swiftmodule | %FileCheck %s --check-prefix=SERIALIZED
+
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=xros
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 @inline(never)
-public func newFunction() -> Int {
-  return 0
-}
+public func newFunction() {}
 
 @inline(never)
-public func oldFunction() -> Int {
-  return 1
-}
+public func oldFunction() {}
 
-public func testAvailabilityPropagation() -> Int {
-  if #available(macOS 10.15, *) {
-    return newFunction()
+// A folded query keeps no version check and no branch, and the branch that
+// survives is the one that runs when the query succeeds.
+
+// The checks below match `OSVersionAtLeast` instead of one entry point, because
+// the entry point differs by platform. On iOS `_stdlib_isOSVersionAtLeast()` is
+// `@_transparent`, so a query there calls `_stdlib_isOSVersionAtLeast_AEIC()`,
+// which `-O` inlines into the `targetOSVersionAtLeast` builtin.
+
+// CHECK-LABEL: sil{{.*}}@$s33constant_propagation_availability27testAvailabilityPropagationyyF :
+// FOLDED-NOT:    OSVersionAtLeast
+// FOLDED-NOT:    cond_br
+// KEPT:          OSVersionAtLeast
+// KEPT:          cond_br
+// CHECK:         function_ref @$s33constant_propagation_availability11newFunctionyyF
+// KEPT:          function_ref @$s33constant_propagation_availability11oldFunctionyyF
+// FOLDED-NOT:    OSVersionAtLeast
+// FOLDED-NOT:    cond_br
+// FOLDED-NOT:    function_ref @$s33constant_propagation_availability11oldFunctionyyF
+// CHECK:       } // end sil function '$s33constant_propagation_availability27testAvailabilityPropagationyyF'
+public func testAvailabilityPropagation() {
+  if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
+    newFunction()
   } else {
-    return oldFunction()
+    oldFunction()
   }
 }
 
+// The same query folds the same way in a function that is inlinable, but only
+// once the optimizer drops the serialized flag. Before that the body may still
+// be deserialized into a module with a lower deployment target.
+
+// CHECK-LABEL:            sil{{.*}}@$s33constant_propagation_availability13testInlinableyyF :
+// INLINABLE-FOLDED-NOT:     OSVersionAtLeast
+// INLINABLE-FOLDED-NOT:     cond_br
+// INLINABLE-KEPT:           OSVersionAtLeast
+// INLINABLE-KEPT:           cond_br
+// CHECK:                    function_ref @$s33constant_propagation_availability11newFunctionyyF
+// INLINABLE-FOLDED-NOT:     OSVersionAtLeast
+// INLINABLE-FOLDED-NOT:     cond_br
+// CHECK:                  } // end sil function '$s33constant_propagation_availability13testInlinableyyF'
 @inlinable
-public func testInlinable() -> Int {
-  if #available(macOS 10.15, *) {
-    return newFunction()
-  } else {
-    return 0
+public func testInlinable() {
+  if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
+    newFunction()
   }
 }
 
-// CHECK-macosx10_15-LABEL: sil @$s33constant_propagation_availability27testAvailabilityPropagationSiyF : $@convention(thin) () -> Int {
-// CHECK-macosx10_15-NOT: apply
-// CHECK-macosx10_15:  [[F:%.*]] = function_ref @$s33constant_propagation_availability11newFunctionSiyF
-// CHECK-macosx10_15:  apply [[F]]() : $@convention(thin) () -> Int
-// CHECK-macosx10_15-NOT: apply
-// CHECK-macosx10_15: } // end sil function '$s33constant_propagation_availability27testAvailabilityPropagationSiyF'
+// The serialized body of the inlinable function keeps its query, because a
+// module with a lower deployment target may deserialize it.
 
-// After serialization, availability checks can be constant folded.
-
-// CHECK-macosx10_15_opt-LABEL: sil @$s33constant_propagation_availability13testInlinableSiyF : $@convention(thin) () -> Int {
-// CHECK-macosx10_15_opt-NOT: apply
-// CHECK-macosx10_15_opt:  [[F:%.*]] = function_ref @$s33constant_propagation_availability11newFunctionSiyF
-// CHECK-macosx10_15_opt:  apply [[F]]() : $@convention(thin) () -> Int
-// CHECK-macosx10_15_opt-NOT: apply
-// CHECK-macosx10_15_opt: } // end sil function '$s33constant_propagation_availability13testInlinableSiyF'
-
-// CHECK-macosx10_14-LABEL: sil @$s33constant_propagation_availability27testAvailabilityPropagationSiyF : $@convention(thin) () -> Int {
-// CHECK-macosx10_14:  [[F:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF
-// CHECK-macosx10_14:  apply [[F]]
-// CHECK-macosx10_14:  [[F:%.*]] = function_ref @$s33constant_propagation_availability11newFunctionSiyF
-// CHECK-macosx10_14:  apply [[F]]() : $@convention(thin) () -> Int
-// CHECK-macosx10_14:  [[F:%.*]] = function_ref @$s33constant_propagation_availability11oldFunctionSiyF
-// CHECK-macosx10_14:  apply [[F]]
-// CHECK-macosx10_14: } // end sil function '$s33constant_propagation_availability27testAvailabilityPropagationSiyF'
-
-// CHECK-macosx10_14: sil [no_locks] [readnone] [_semantics "availability.osversion"] @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF
-
-// CHECK-inlinable-LABEL: sil {{.*}} @$s4Test13testInlinableSiyF  : $@convention(thin) () -> Int {
-// CHECK-inlinable:  [[F:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF
-// CHECK-inlinable:  apply [[F]]
-// CHECK-inlinable:  [[F:%.*]] = function_ref @$s4Test11newFunctionSiyF
-// CHECK-inlinable:  apply [[F]]() : $@convention(thin) () -> Int
-// CHECK-inlinable: } // end sil function '$s4Test13testInlinableSiyF'
+// SERIALIZED-LABEL: sil{{.*}}@$s4Test13testInlinableyyF :
+// SERIALIZED:         OSVersionAtLeast
+// SERIALIZED:         cond_br
+// SERIALIZED:         function_ref @$s4Test11newFunctionyyF
+// SERIALIZED:       } // end sil function '$s4Test13testInlinableyyF'

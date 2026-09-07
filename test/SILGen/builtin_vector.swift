@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -disable-experimental-parser-round-trip -disable-availability-checking -enable-experimental-feature BuiltinModule %s | %FileCheck %s
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -disable-experimental-parser-round-trip -disable-availability-checking -enable-experimental-feature BuiltinModule %s
 // REQUIRES: swift_feature_BuiltinModule
 
 import Builtin

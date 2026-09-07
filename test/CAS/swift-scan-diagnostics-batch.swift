@@ -35,25 +35,13 @@
 // RUN:   -primary-file %t/a.swift -primary-file %t/b.swift  %t/c.swift \
 // RUN:   -c -emit-dependencies -module-name Test -o %t/a2.o -o %t/b2.o -cas-path %t/cas \
 // RUN:   -serialize-diagnostics -serialize-diagnostics-path %t/a2.dia -serialize-diagnostics-path %t/b2.dia \
-// RUN:   @%t/MyApp.cmd -frontend-parseable-output 2>&1 | %FileCheck %s --check-prefix=PARSEABLE
+// RUN:   @%t/MyApp.cmd
 
 // RUN: c-index-test -read-diagnostics %t/a2.dia 2>&1 | %FileCheck %s --check-prefix=A-WARN
 // RUN: c-index-test -read-diagnostics %t/b2.dia 2>&1 | %FileCheck %s --check-prefix=B-WARN
 
 // A-WARN: warning: This is a warning
 // B-WARN: warning: This is also a warning
-
-// RUN: %swift-scan-test -action replay_result -cas-path %t/cas -id @%t/key1.casid -- \
-// RUN:   %target-swift-frontend-plain -cache-compile-job \
-// RUN:   -primary-file %t/a.swift -primary-file %t/b.swift  %t/c.swift \
-// RUN:   -c -emit-dependencies -module-name Test -o %t/a2.o -o %t/b2.o -cas-path %t/cas \
-// RUN:   -serialize-diagnostics -serialize-diagnostics-path %t/a2.dia -serialize-diagnostics-path %t/b2.dia \
-// RUN:   @%t/MyApp.cmd -frontend-parseable-output 2>&1 | %FileCheck %s --check-prefix=NO-OUTPUT --allow-empty
-
-// PARSEABLE-COUNT-1:   "kind": "began",
-// PARSEABLE-COUNT-1:   "kind": "finished",
-
-// NO-OUTPUT-NOT: "kind": "began",
 
 //--- a.swift
 #warning("This is a warning")

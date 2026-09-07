@@ -13,8 +13,6 @@
 #ifndef SILGEN_H
 #define SILGEN_H
 
-#define SWIFT_INCLUDED_IN_SILGEN_SOURCES
-
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "swift/AST/ASTContext.h"
@@ -272,6 +270,9 @@ public:
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
   void visitUsingDecl(UsingDecl *) {}
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden layout declarations do not produce SIL");
+  }
 
   // Emitted as part of its storage.
   void visitAccessorDecl(AccessorDecl *ad) {}

@@ -58,13 +58,17 @@ bool SubstitutionEntry::identifierEquals(Node *lhs, Node *rhs) {
   return true;
 }
 
-bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
+bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs,
+                                   unsigned depth) const {
+  if (depth > MaxSubstitutionEntryDepth)
+    return false;
+
   if (!lhs->isSimilarTo(rhs))
     return false;
 
   for (auto li = lhs->begin(), ri = rhs->begin(), le = lhs->end();
        li != le; ++li, ++ri) {
-    if (!deepEquals(*li, *ri))
+    if (!deepEquals(*li, *ri, depth + 1))
       return false;
   }
 
@@ -76,8 +80,8 @@ static inline size_t combineHash(size_t currentHash, size_t newValue) {
 }
 
 /// Calculate the hash for a node.
-size_t RemanglerBase::hashForNode(Node *node,
-                                  bool treatAsIdentifier) {
+size_t RemanglerBase::hashForNode(Node *node, bool treatAsIdentifier,
+                                  unsigned depth) {
   size_t hash = 0;
 
   if (treatAsIdentifier) {
@@ -104,9 +108,12 @@ size_t RemanglerBase::hashForNode(Node *node,
       hash = combineHash(hash, (unsigned char) c);
     }
   }
-  for (Node *child : *node) {
-    SubstitutionEntry entry = entryForNode(child, treatAsIdentifier);
-    hash = combineHash(hash, entry.hash());
+  if (depth < MaxSubstitutionEntryDepth) {
+    for (Node *child : *node) {
+      SubstitutionEntry entry =
+          entryForNode(child, treatAsIdentifier, depth + 1);
+      hash = combineHash(hash, entry.hash());
+    }
   }
 
   return hash;
@@ -143,7 +150,8 @@ static inline size_t nodeHash(Node *node) {
 /// This will look in the HashHash to see if we already know the hash
 /// (which avoids recursive hashing on the Node tree).
 SubstitutionEntry RemanglerBase::entryForNode(Node *node,
-                                              bool treatAsIdentifier) {
+                                              bool treatAsIdentifier,
+                                              unsigned depth) {
   const size_t ident = treatAsIdentifier ? 4 : 0;
   const size_t hash = nodeHash(node) + ident;
 
@@ -153,7 +161,7 @@ SubstitutionEntry RemanglerBase::entryForNode(Node *node,
     SubstitutionEntry entry = HashHash[ndx];
 
     if (entry.isEmpty()) {
-      size_t entryHash = hashForNode(node, treatAsIdentifier);
+      size_t entryHash = hashForNode(node, treatAsIdentifier, depth);
       entry.setNode(node, treatAsIdentifier, entryHash);
       HashHash[ndx] = entry;
       return entry;
@@ -164,7 +172,7 @@ SubstitutionEntry RemanglerBase::entryForNode(Node *node,
 
   // Hash table is full at this hash value
   SubstitutionEntry entry;
-  size_t entryHash = hashForNode(node, treatAsIdentifier);
+  size_t entryHash = hashForNode(node, treatAsIdentifier, depth);
   entry.setNode(node, treatAsIdentifier, entryHash);
   return entry;
 }
@@ -902,7 +910,16 @@ ManglingError Remangler::mangleBoundGenericFunction(Node *node,
   if (!unspec.isSuccess())
     return unspec.error();
   NodePointer unboundFunction = unspec.result();
-  RETURN_IF_ERROR(mangleFunction(unboundFunction, depth + 1));
+  switch (unboundFunction->getKind()) {
+  case Node::Kind::Function:
+    RETURN_IF_ERROR(mangleFunction(unboundFunction, depth + 1));
+    break;
+  case Node::Kind::Constructor:
+    RETURN_IF_ERROR(mangleConstructor(unboundFunction, depth + 1));
+    break;
+  default:
+    return MANGLING_ERROR(ManglingError::BadNodeKind, unboundFunction);
+  }
   char Separator = 'y';
   RETURN_IF_ERROR(mangleGenericArgs(node, Separator, depth + 1));
   Buffer << 'G';
@@ -1496,16 +1513,24 @@ ManglingError Remangler::mangleFullTypeMetadata(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleFunction(Node *node, unsigned depth) {
+  // The node should have a context, a name, an optional list of parameter
+  // labels, and a type.
+  DEMANGLER_ASSERT(node->getNumChildren() >= 3, node);
+
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1)); // context
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1)); // name
 
   bool hasLabels = node->getChild(2)->getKind() == Node::Kind::LabelList;
+  if (hasLabels)
+    DEMANGLER_ASSERT(node->getNumChildren() >= 4, node);
   Node *FuncType = getSingleChild(node->getChild(hasLabels ? 3 : 2));
+  DEMANGLER_ASSERT(FuncType, node);
 
   if (hasLabels)
     RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1)); // parameter labels
 
   if (FuncType->getKind() == Node::Kind::DependentGenericType) {
+    DEMANGLER_ASSERT(FuncType->getNumChildren() >= 2, FuncType);
     RETURN_IF_ERROR(mangleFunctionSignature(
         getSingleChild(FuncType->getChild(1)), depth + 1));
     RETURN_IF_ERROR(
@@ -1834,6 +1859,21 @@ ManglingError Remangler::mangleGetter(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
+  // An unmangled base name must not pick up a mangling prefix.
+  bool isAsyncMainEntryPoint = false;
+  for (Node *Child : *node)
+    isAsyncMainEntryPoint |=
+        Child->getKind() == Node::Kind::AsyncMainEntryPoint;
+
+  if (isAsyncMainEntryPoint) {
+    Buffer << ASYNC_MAIN_ENTRY_POINT_NAME;
+    for (Node *Child : *node) {
+      if (Child->getKind() != Node::Kind::AsyncMainEntryPoint)
+        RETURN_IF_ERROR(mangle(Child, depth + 1));
+    }
+    return ManglingError::Success;
+  }
+
   switch (Flavor) {
   case ManglingFlavor::Default:
     Buffer << MANGLING_PREFIX_STR;
@@ -2736,6 +2776,11 @@ ManglingError
 Remangler::mangleAsyncSuspendResumePartialFunction(Node *node, unsigned depth) {
   Buffer << "TY";
   return mangleChildNode(node, 0, depth + 1);
+}
+
+ManglingError Remangler::mangleAsyncMainEntryPoint(Node *node, unsigned depth) {
+  Buffer << ASYNC_MAIN_ENTRY_POINT_NAME;
+  return ManglingError::Success;
 }
 
 ManglingError Remangler::manglePostfixOperator(Node *node, unsigned depth) {

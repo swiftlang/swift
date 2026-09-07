@@ -5080,20 +5080,6 @@ bool ConstraintSystem::isArgumentGenericFunction(Type argType, Expr *argExpr) {
   return false;
 }
 
-ProtocolConformanceRef
-ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
-  auto cacheKey = std::make_pair(type.getPointer(), protocol);
-
-  auto cachedConformance = Conformances.find(cacheKey);
-  if (cachedConformance != Conformances.end())
-    return cachedConformance->second;
-
-  auto conformance =
-      swift::lookupConformance(type, protocol, /*allowMissing=*/true);
-  Conformances[cacheKey] = conformance;
-  return conformance;
-}
-
 std::pair<bool, std::optional<KeyPathCapability>>
 ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
   auto *typeLocator = keyPathType->getImpl().getLocator();

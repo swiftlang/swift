@@ -59,11 +59,14 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 // CHECK-NEXT: br bb2
 //   Continuation block.
 // CHECK:    bb2
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: end_borrow [[X_LIFETIME]]
 // CHECK-NEXT: destroy_value [[X]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: end_borrow [[F_LIFETIME]]
 // CHECK-NEXT: destroy_value [[F]]
 // CHECK-NOT: destroy_value %0
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: [[T0:%.*]] = tuple ()
 // CHECK-NEXT: return [[T0]] : $()
 

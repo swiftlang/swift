@@ -2444,7 +2444,7 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
     switch (source.getDescriptorKind()) {
     case LifetimeDescriptor::DescriptorKind::Ordered: {
       auto index = source.getIndex();
-      if (index > capacity) {
+      if (index >= capacity) {
         diags.diagnose(source.getLoc(),
                        diag::lifetime_dependence_invalid_param_index, index);
         return std::nullopt;

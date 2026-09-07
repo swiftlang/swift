@@ -739,7 +739,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
                          valueType, TypeExpansionContext::
                                         noOpaqueTypeArchetypesSubstitution(
                                             expansion.getResilienceExpansion()))
-                     .isAddressOnly() &&
+                     .getRecursiveProperties().isAddressOnly() &&
                  !entryValue->getType().isAddress()) {
 
         assert(!isPack);

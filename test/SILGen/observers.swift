@@ -110,8 +110,9 @@ public struct DidSetWillSetTests {
     // CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s9observers010DidSetWillC5TestsV1aSivg
     // CHECK: bb0(%0 : $DidSetWillSetTests):
     // CHECK-NEXT:   debug_value %0
-    // CHECK-NEXT:   %2 = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
-    // CHECK-NEXT:   return %2 : $Int{{.*}}                      // id: %3
+    // CHECK-NEXT:   [[FIELD:%.*]] = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
+    // CHECK-NEXT:   end_formal_scope
+    // CHECK-NEXT:   return [[FIELD]] : $Int{{.*}}
 
 
     // CHECK-LABEL: sil [ossa] @$s9observers010DidSetWillC5TestsV1aSivs : $@convention(method) (Int, @inout DidSetWillSetTests) -> () {
@@ -135,6 +136,8 @@ public struct DidSetWillSetTests {
     // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @$s9observers010DidSetWillC5TestsV1aSivW : $@convention(method) (@inout DidSetWillSetTests) -> ()
     // CHECK-NEXT: [[RESULT:%.*]] = apply [[DIDSETFN]]([[MODIFY_THREE]]) : $@convention(method) (@inout DidSetWillSetTests) -> ()
     // CHECK-NEXT: end_access [[MODIFY_THREE]] : $*DidSetWillSetTests
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: [[TUPLE:%.*]] = tuple ()
     // CHECK-NEXT: return [[TUPLE]] : $()
   }
@@ -144,6 +147,7 @@ public struct DidSetWillSetTests {
   // CHECK-NEXT:    [[PROP:%.*]] = struct_element_addr [[SELF]] : $*DidSetWillSetTests
   // CHECK-NEXT:    [[LOAD:%.*]] = load [trivial] [[PROP]] : $*Int
   // CHECK-NEXT:    end_access [[SELF]] : $*DidSetWillSetTests
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:    return [[LOAD]] : $Int
   mutating func testRead() -> Int {
     return a
@@ -155,6 +159,8 @@ public struct DidSetWillSetTests {
   // CHECK-NEXT:    [[SETTER:%.*]] = function_ref @$s9observers010DidSetWillC5TestsV1aSivs
   // CHECK-NEXT:    apply [[SETTER]](%0, [[SELF]])
   // CHECK-NEXT:    end_access [[SELF]] : $*DidSetWillSetTests
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:    [[RET:%.*]] = tuple ()
   // CHECK-NEXT:    return [[RET]] : $()
   mutating func testWrite(input: Int) {
@@ -174,6 +180,8 @@ public struct DidSetWillSetTests {
   // CHECK-NEXT:    apply [[SETTER]]([[RELOAD]], [[SELF]])
   // CHECK-NEXT:    end_access [[SELF]] : $*DidSetWillSetTests
   // CHECK-NEXT:    dealloc_stack [[TEMP]] : $*Int
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:    [[RET:%.*]] = tuple ()
   // CHECK-NEXT:    return [[RET]] : $()
   mutating func testReadWrite(input: Int) {
@@ -408,7 +416,10 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK-NEXT:  // function_ref
 // CHECK-NEXT:  [[FUNC:%.*]] = function_ref @$s9observers32propertyWithDidSetTakingOldValueyyF1pL_SivW : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
 // CHECK-NEXT:  %{{.*}} = apply [[FUNC]]([[MV_ARG2_PB_VAL]], [[ARG2]]) : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  extend_lifetime [[MV_ARG2_PB_VAL]] : $Int
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  %{{.*}} = tuple ()
 // CHECK-NEXT:  return %{{.*}} : $()
 // CHECK-NEXT:} // end sil function '$s9observers32propertyWithDidSetTakingOldValue{{[_0-9a-zA-Z]*}}'

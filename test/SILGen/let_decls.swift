@@ -208,6 +208,7 @@ func produceNMSubscriptableRValue() -> NonMutableSubscriptable {}
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
 // CHECK: [[GETFN:%[0-9]+]] = function_ref @$s9let_decls23NonMutableSubscriptableV{{[_0-9a-zA-Z]*}}ig
 // CHECK-NEXT: [[RES2:%[0-9]+]] = apply [[GETFN]](%0, [[RES]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RES2]]
 func test_nm_subscript_get(_ a : Int) -> Int {
   return produceNMSubscriptableRValue()[a]
@@ -303,6 +304,7 @@ func testLetProtocolBases(_ p : SimpleProtocol) {
   p.doSomethingGreat()
   
   // CHECK-NOT: destroy_addr %0
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
 }
@@ -319,6 +321,7 @@ func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
   p.doSomethingGreat()
 
   // CHECK-NOT: destroy_addr %0
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
 }
@@ -351,6 +354,7 @@ func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int
 // CHECK-NEXT:    [[TUPLE_1:%.*]] = tuple_element_addr [[TUPLE]] : $*(start: any SimpleProtocol, pastEnd: Int), 1
 // CHECK-NEXT:    copy_addr %0 to [init] [[TUPLE_0]] : $*any SimpleProtocol
 // CHECK-NEXT:    store %1 to [trivial] [[TUPLE_1]] : $*Int
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    destroy_addr [[TUPLE]] : $*(start: any SimpleProtocol, pastEnd: Int)
 // CHECK-NEXT:    dealloc_stack [[TUPLE]] : $*(start: any SimpleProtocol, pastEnd: Int)
 }
@@ -449,8 +453,9 @@ struct GenericStruct<T> {
   // CHECK-NEXT: debug_value %1 : $*GenericStruct<T>, let, name "self", {{.*}} expr op_deref
   // CHECK-NEXT: %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
   // CHECK-NEXT: copy_addr %3 to [init] %0 : $*T
-  // CHECK-NEXT: %5 = tuple ()
-  // CHECK-NEXT: return %5 : $()
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: [[VOID:%.*]] = tuple ()
+  // CHECK-NEXT: return [[VOID]] : $()
 
   func getB() -> Int {
     return b
@@ -461,6 +466,7 @@ struct GenericStruct<T> {
   // CHECK-NEXT: debug_value [[SELF_ADDR]] : $*GenericStruct<T>, let, name "self", {{.*}} expr op_deref
   // CHECK-NEXT: [[PROJ_ADDR:%.*]] = struct_element_addr [[SELF_ADDR]] : $*GenericStruct<T>, #GenericStruct.b
   // CHECK-NEXT: [[PROJ_VAL:%.*]] = load [trivial] [[PROJ_ADDR]] : $*Int
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: return [[PROJ_VAL]] : $Int
 }
 
@@ -518,6 +524,6 @@ func test_unassigned_let_constant() {
 }
 // CHECK: [[S:%[0-9]+]] = alloc_stack [var_decl] $String, let, name "string"
 // CHECK-NEXT:  [[MUI:%[0-9]+]] = mark_uninitialized [var] [[S]] : $*String
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  destroy_addr [[MUI]] : $*String
 // CHECK-NEXT:  dealloc_stack [[S]] : $*String
-

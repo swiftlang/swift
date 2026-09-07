@@ -5551,6 +5551,7 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::PostfixOperator:
     case DeclKind::MacroExpansion:
     case DeclKind::Using:
+    case DeclKind::HiddenTypeLayoutInfo:
       break;
     };
   }

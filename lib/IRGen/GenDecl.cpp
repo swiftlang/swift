@@ -158,6 +158,10 @@ public:
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
 
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden layout declarations do not produce IR");
+  }
+
   void visitFuncDecl(FuncDecl *method) {
     if (!requiresObjCMethodDescriptor(method)) return;
 
@@ -359,6 +363,10 @@ public:
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
+
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden layout declarations do not produce IR");
+  }
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *method) {
     if (isa<AccessorDecl>(method)) {
@@ -2740,6 +2748,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
   case DeclKind::Using:
     return;
+
+  case DeclKind::HiddenTypeLayoutInfo:
+    llvm_unreachable("hidden layout declarations do not produce IR");
   }
 
   llvm_unreachable("bad decl kind!");
@@ -3740,6 +3751,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
   if (!f->section().empty())
     fn->setSection(f->section());
+
+  addTargetAttrFunctionAttributes(fn, f->targetFeatures());
 
   llvm::AttrBuilder attrBuilder(getLLVMContext());
   if (!f->wasmExportName().empty()) {
@@ -5983,6 +5996,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 
     case DeclKind::Missing:
       llvm_unreachable("missing decl in IRGen");
+
+    case DeclKind::HiddenTypeLayoutInfo:
+      llvm_unreachable("hidden layout declarations are not nested types");
 
     case DeclKind::Macro:
       continue;

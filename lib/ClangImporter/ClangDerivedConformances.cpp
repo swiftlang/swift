@@ -96,7 +96,8 @@ lookupCxxTypeMember(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
     return nullptr; // Was not a clang::TypeDecl
 
   if (mustBeComplete &&
-      !Sema.isCompleteType({}, td->getASTContext().getTypeDeclType(td)))
+      !Sema.isCompleteType(td->getLocation(),
+                           td->getASTContext().getTypeDeclType(td)))
     return nullptr;
 
   return td;
@@ -905,6 +906,13 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   // constructor with the wrapped value type, and then import it into Swift.
 
   auto valueType = clangCtx.getTypeDeclType(value_type);
+
+  if (getCxxValueSemanticsKind(valueType.getTypePtr(), impl) !=
+      CxxValueSemanticsKind::Copyable) {
+    // CxxOptional doesn't support ~Copyable elements, so skip the constructor
+    // synthesis and the conformance, if the wrapped value is move-only.
+    return;
+  }
 
   auto constRefValueType =
       clangCtx.getLValueReferenceType(valueType.withConst());

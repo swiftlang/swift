@@ -1,13 +1,9 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default)
 
 // Also test this with a bridging header instead of the StdMap module.
 // RUN: %empty-directory(%t2)
 // RUN: cp %S/Inputs/std-map.h %t2/std-map-bridging-header.h
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -Xfrontend -enable-experimental-cxx-interop)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=swift-6)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=default)
 
 // REQUIRES: executable_test
 //

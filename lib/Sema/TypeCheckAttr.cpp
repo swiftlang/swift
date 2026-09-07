@@ -53,10 +53,12 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"  // for COM
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -426,6 +428,7 @@ public:
   void visitExternAttr(ExternAttr *attr);
   void visitUsedAttr(UsedAttr *attr);
   void visitSectionAttr(SectionAttr *attr);
+  void visitTargetAttr(TargetAttr *attr);
 
   void visitDynamicCallableAttr(DynamicCallableAttr *attr);
 
@@ -1772,6 +1775,8 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     D->getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
   if (!langAttr)
     langAttr = D->getAttrs().getAttribute<CDeclAttr>(/*AllowInvalid=*/true);
+  if (!langAttr)
+    langAttr = D->getAttrs().getAttribute<CxxDeclAttr>(/*AllowInvalid=*/true);
 
   if (!langAttr) {
     diagnose(attr->getLocation(), diag::attr_implementation_requires_language);
@@ -1894,12 +1899,26 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
       attr->setCategoryNameInvalid();
     }
 
-    // FIXME: if (AFD->getCDeclName().empty())
-
     if (!AFD->getImplementedObjCDecl()) {
+      // A @cxx function whose signature is not representable in C++ cannot
+      // match anything; the representability diagnostics explain the failure
+      // better than "not found" would, so check them first and stand down if
+      // they fire.
+      if (auto *cxxAttr = AFD->getAttrs().getAttribute<CxxDeclAttr>(
+              /*AllowInvalid=*/true)) {
+        auto *FD = dyn_cast<FuncDecl>(AFD);
+        if (FD && !cxxAttr->isInvalid())
+          evaluateOrDefault(Ctx.evaluator,
+                            TypeCheckForeignFunctionRequest{FD, cxxAttr}, {});
+        if (cxxAttr->isInvalid())
+          return;
+      }
+
+      StringRef name = AFD->getCDeclName();
+      if (name.empty())
+        name = AFD->getNameStr();
       diagnose(attr->getLocation(),
-               diag::attr_objc_implementation_func_not_found,
-               AFD->getCDeclName(), AFD);
+               diag::attr_objc_implementation_func_not_found, name, AFD);
     }
   }
 }
@@ -2411,7 +2430,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
   }
 }
 
-static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
+bool swift::canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // The Swift standard library needs to be able to define reserved symbols.
   if (fromModule->isStdlibModule()
       || fromModule->getName() == fromModule->getASTContext().Id_Concurrency
@@ -2817,6 +2836,63 @@ void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
   } else if (!VarD->hasStorageOrWrapsStorage()) {
     diagnose(attr->getLocation(), diag::attr_not_on_computed_properties, attr);
   }
+}
+
+void AttributeChecker::visitTargetAttr(TargetAttr *attr) {
+  if (attr->Value.empty()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_empty_string);
+    return;
+  }
+  if (attr->Value.contains("fpmath=")) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_unsupported_feature,
+                          "fpmath=");
+    return;
+  }
+  auto *clangImporter =
+      static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  // This can only be null in unit tests.
+  if (!clangImporter)
+    return;
+  auto *TI = &clangImporter->getTargetInfo();
+  clang::ParsedTargetAttr Parsed = TI->parseTargetAttr(attr->Value);
+  if (!Parsed.Duplicate.empty()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_duplicate_option,
+                          Parsed.Duplicate);
+    return;
+  }
+  if (!Parsed.CPU.empty() && !TI->isValidCPUName(Parsed.CPU)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_unsupported_cpu, Parsed.CPU);
+    return;
+  }
+  if (!Parsed.Tune.empty() && !TI->isValidCPUName(Parsed.Tune)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_unsupported_cpu, Parsed.Tune);
+    return;
+  }
+  for (StringRef feature : Parsed.Features) {
+    StringRef bare = feature.drop_front(); // remove leading + or -
+    if (!TI->isValidFeatureName(bare)) {
+      diagnoseAndRemoveAttr(attr, diag::attr_target_unsupported_feature, bare);
+      return;
+    }
+  }
+  if (!Parsed.BranchProtection.empty()) {
+    clang::TargetInfo::BranchProtectionInfo BPI;
+    StringRef DiagMsg;
+    auto &langOpts = clangImporter->getClangASTContext().getLangOpts();
+    if (!TI->validateBranchProtection(Parsed.BranchProtection, Parsed.CPU,
+                                      BPI, langOpts, DiagMsg)) {
+      diagnoseAndRemoveAttr(
+          attr, diag::attr_target_invalid_branch_protection,
+          DiagMsg.empty() ? Parsed.BranchProtection : DiagMsg);
+      return;
+    }
+  }
+
+  // Need to disallow @_transparent because it bypasses the ordinary
+  // performance-inliner feature compatibility guard.
+  if (auto *transparent = D->getAttrs().getAttribute<TransparentAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr,
+                          transparent);
 }
 
 void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
@@ -8287,13 +8363,27 @@ void AttributeChecker::visitActorAttr(ActorAttr *attr) {
 void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
   auto dc = D->getDeclContext();
 
-  // distributed can be applied to actor definitions and their methods
+  // distributed can be applied to actor definitions and their funcs or vars
   if (auto varDecl = dyn_cast<VarDecl>(D)) {
     if (varDecl->isDistributed()) {
+      // distributed var must be declared inside a distributed actor
+      auto selfTy = dc->isTypeContext() ? dc->getSelfTypeInContext() : Type();
+      if (!selfTy || !selfTy->isDistributedActor()) {
+        auto diagnostic = diagnoseAndRemoveAttr(
+            attr, diag::distributed_actor_func_not_in_distributed_actor,
+            /*isComputedProperty=*/true);
+
+        if (auto *protoDecl = dc->getSelfProtocolDecl()) {
+          diagnoseDistributedFunctionInNonDistributedActorProtocol(protoDecl,
+                                                                   diagnostic);
+        }
+        return;
+      }
+
       if (checkDistributedActorProperty(varDecl, /*diagnose=*/true))
         return;
     } else {
-      // distributed can not be applied to stored properties
+      // distributed can not be applied to local properties
       diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
       return;
     }
@@ -8308,9 +8398,10 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       // good: `distributed actor`
       return;
     }
-  } else if (dyn_cast<StructDecl>(D) || dyn_cast<EnumDecl>(D)) {
+  } else if (isa<StructDecl>(D) || isa<EnumDecl>(D)) {
     diagnoseAndRemoveAttr(
-        attr, diag::distributed_actor_func_not_in_distributed_actor);
+        attr, diag::distributed_actor_func_not_in_distributed_actor,
+        /*isComputedProperty=*/false);
     return;
   }
 
@@ -8331,10 +8422,20 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
     }
 
     // distributed func must be declared inside an distributed actor
+    // A 'distributed func' at file scope, or in any other non-type context,
+    // has no 'Self' type to inspect, so reject it before asking for one
+    if (!dc->isTypeContext()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::distributed_actor_func_not_in_distributed_actor,
+          /*isComputedProperty=*/false);
+      return;
+    }
+
     auto selfTy = dc->getSelfTypeInContext();
-    if (!selfTy->isDistributedActor()) {
+    if (!selfTy || !selfTy->isDistributedActor()) {
       auto diagnostic = diagnoseAndRemoveAttr(
-        attr, diag::distributed_actor_func_not_in_distributed_actor);
+        attr, diag::distributed_actor_func_not_in_distributed_actor,
+        /*isComputedProperty=*/false);
 
       if (auto *protoDecl = dc->getSelfProtocolDecl()) {
         diagnoseDistributedFunctionInNonDistributedActorProtocol(protoDecl,

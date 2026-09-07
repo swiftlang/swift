@@ -348,6 +348,7 @@ struct LibPrespecializedState {
     LOG("  descriptorMap=%p", data->getDescriptorMap());
     LOG("  pointerKeyedWitnessTableMap=%p",
         data->getPointerKeyedWitnessTableMap());
+    LOG("  functionMetadataMap=%p", data->getFunctionMetadataMap());
 
     return data;
   }
@@ -615,6 +616,40 @@ swift::getLibPrespecializedWitnessTable(
         (const void *)conformance, (const void *)type, result);
     return reinterpret_cast<const WitnessTable *>(
         const_cast<void *>(result));
+  }
+#endif
+  return nullptr;
+}
+
+const PrespecializedMetadataCandidates *
+swift::getLibPrespecializedFunctionTypeMetadata(
+    const Metadata *result, const Metadata *const *parameters,
+    unsigned numParameters) {
+#if DYLD_FIND_POINTER_HASH_TABLE_ENTRY_DEFINED
+  auto &state = LibPrespecialized.get();
+
+  auto *data = state.data;
+  if (!data)
+    return nullptr;
+
+  if (state.mapConfiguration ==
+      LibPrespecializedState::MapConfiguration::Disabled)
+    return nullptr;
+
+  auto *map = data->getFunctionMetadataMap();
+  if (!map)
+    return nullptr;
+
+  if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_find_pointer_hash_table_entry)) {
+    // The dyld call takes the first pointer of the key separately from the
+    // rest. Our keys are the result type followed by the parameter types.
+    auto value = SWIFT_RUNTIME_WEAK_USE(_dyld_find_pointer_hash_table_entry(
+        map, result, numParameters,
+        const_cast<const void **>(
+            reinterpret_cast<const void *const *>(parameters))));
+    LOG("Function type lookup (result=%p, %u parameters) -> %p.",
+        (const void *)result, numParameters, value);
+    return reinterpret_cast<const PrespecializedMetadataCandidates *>(value);
   }
 #endif
   return nullptr;

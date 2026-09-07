@@ -13,12 +13,21 @@ Mangling
   mangled-name ::= '_T0' global // Swift 4.0
   mangled-name ::= '$S' global  // Swift 4.2
   mangled-name ::= '$e' global  // Embedded Swift (unstable)
+  mangled-name ::= async-main-entry-point
 
 All Swift-mangled names begin with a common prefix. Since Swift 4.0, the
 compiler has used variations of the mangling described in this document, though
 pre-stable versions may not exactly conform to this description. By using
 distinct prefixes, tools can attempt to accommodate bugs and version variations
 in pre-stable versions of Swift.
+
+The one exception is the async entry point that runs a program's top-level
+code, which carries no prefix at all::
+
+  async-main-entry-point ::= 'async_Main'
+
+It is still a Swift async function, so its funclets take the usual mangled
+suffixes (``async_MainTY1_``, ``async_MainTQ0_``, ``async_MainTu``, ...).
 
 The basic mangling scheme is a list of 'operators' where the operators are
 structured in a post-fix order. For example the mangling may start with an
@@ -897,6 +906,7 @@ mangled in to disambiguate.
   FUNC-REPRESENTATION ::= 'M'                // Swift method
   FUNC-REPRESENTATION ::= 'J'                // ObjC method
   FUNC-REPRESENTATION ::= 'K'                // closure
+  FUNC-REPRESENTATION ::= 'V'                // COM method
   FUNC-REPRESENTATION ::= 'W'                // protocol witness
 
   COROUTINE-KIND ::= 'A'                     // yield-once coroutine

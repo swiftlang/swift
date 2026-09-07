@@ -6197,6 +6197,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Target_DECL_ATTR: {
+        bool isImplicit;
+        serialization::decls_block::TargetDeclAttrLayout::readRecord(
+            scratch, isImplicit);
+        Attr = new (ctx) TargetAttr(blobData, isImplicit);
+        break;
+      }
+
       case decls_block::Inline_DECL_ATTR: {
         unsigned kind;
         serialization::decls_block::InlineDeclAttrLayout::readRecord(
@@ -8485,7 +8493,8 @@ Expected<Type> DESERIALIZE_TYPE(HIDDEN_TYPE)(ModuleFile &MF,
 
   decls_block::HiddenTypeLayout::readRecord(scratch);
 
-  return HiddenType::get(ctx, blobData, MF.getAssociatedModule());
+  return HiddenType::get(ctx, blobData, MF.getAssociatedModule(), nullptr,
+                         CanType());
 }
 } // namespace decls_block
 } // namespace serialization

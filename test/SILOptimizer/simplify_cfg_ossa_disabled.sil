@@ -210,34 +210,6 @@ bb4:
   return %41 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @unpack_enum_arg_non_trivial_owned :
-// CHECK: bb1:
-// CHECK:   [[COPY1:%.*]] = copy_value %0
-// CHECK:   br bb3([[COPY1]] : $Klass)
-// CHECK: bb2:
-// CHECK:   [[COPY2:%.*]] = copy_value %1
-// CHECK:   br bb3([[COPY2]] : $Klass)
-// CHECK: bb3([[A:%[0-9]+]] : @owned $Klass):
-// CHECK:   return [[A]]
-sil [ossa] @unpack_enum_arg_non_trivial_owned : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> @owned Klass {
-bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
-  cond_br undef, bb1, bb2
-
-bb1:
-  %0a = copy_value %0 : $Klass
-  %2 = enum $Optional<Klass>, #Optional.some!enumelt, %0a : $Klass
-  br bb3(%2 : $Optional<Klass>)
-
-bb2:
-  %1a = copy_value %1 : $Klass
-  %3 = enum $Optional<Klass>, #Optional.some!enumelt, %1a : $Klass
-  br bb3(%3 : $Optional<Klass>)
-
-bb3(%4 : @owned $Optional<Klass>):
-  %5 = unchecked_enum_data %4 : $Optional<Klass>, #Optional.some!enumelt
-  return %5 : $Klass
-}
-
 // CHECK-LABEL: sil [ossa] @unpack_enum_arg_non_trivial_guaranteed :
 // CHECK: bb1:
 // CHECK:   [[E1:%.*]] = enum $Optional<Klass>, #Optional.some!enumelt, %0 : $Klass

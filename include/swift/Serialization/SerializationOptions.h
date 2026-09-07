@@ -170,6 +170,7 @@ public:
   bool SkipImplementationOnlyDecls = false;
   bool ExplicitModuleBuild = false;
   bool EnableSerializationRemarks = false;
+  bool EnableHiddenTypeLayoutSerializationRemarks = false;
   bool IsInterfaceSDKRelative = false;
 };
 

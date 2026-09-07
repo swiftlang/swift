@@ -898,6 +898,24 @@ REMARK(serialization_skipped_invalid_type,none,
 REMARK(serialization_skipped_invalid_type_unknown_name,none,
        "serialization skipped for invalid type",
        ())
+REMARK(serialization_scheduled_implementation_only_hidden_type_layout,none,
+       "serializing abstract layout for hidden type %0 because its defining "
+       "module was imported with '@_implementationOnly' and it contributes "
+       "to the ABI-exposed layout of %kind1 through %kind2",
+       (Type, const ValueDecl *, const ValueDecl *))
+REMARK(serialization_scheduled_internal_bridging_header_hidden_type_layout,none,
+       "serializing abstract layout for hidden type %0 because it was "
+       "imported through '-internal-import-bridging-header' and contributes "
+       "to the ABI-exposed layout of %kind1 through %kind2",
+       (Type, const ValueDecl *, const ValueDecl *))
+REMARK(serialization_scheduled_recovered_hidden_type_layout,none,
+       "serializing abstract layout for hidden type %0 because it was "
+       "recovered from a hidden type representation and contributes to the "
+       "ABI-exposed layout of %kind1 through %kind2",
+       (Type, const ValueDecl *, const ValueDecl *))
+NOTE(serialization_hidden_type_layout_abi_exposure,none,
+     "layout of %kind0 is ABI-exposed through %kind1",
+     (const ValueDecl *, const ValueDecl *))
 ERROR(serialization_failed,none,
       "serialization of module %0 failed due to the errors above",
       (const ModuleDecl *))
@@ -2232,6 +2250,14 @@ ERROR(cxx_incompatible_with_cdecl,none,
 ERROR(cxx_attr_requires_implementation,none,
       "'@cxx' must be combined with '@implementation'",
       ())
+ERROR(cxx_func_defined,none,
+      "%kind0 cannot implement C++ function '%1' because it "
+      "%select{already has a definition|is declared 'inline'|is 'constexpr' (implicitly 'inline')}2",
+      (ValueDecl *, StringRef, unsigned))
+ERROR(cxx_references_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because reference "
+      "parameters and return types are not yet supported",
+      (ValueDecl *, StringRef))
 
 // @used and @section
 ERROR(section_empty_name,none,
@@ -4476,6 +4502,22 @@ ERROR(attr_incompatible_with_attr,none,
       "'%0' cannot be used with '%1'",
       (DeclAttribute, DeclAttribute))
 
+ERROR(attr_target_empty_string,none,
+      "'@_target' requires a non-empty target string", ())
+
+ERROR(attr_target_unsupported_feature,none,
+      "unsupported target feature '%0' in '@_target'", (StringRef))
+
+ERROR(attr_target_unsupported_cpu,none,
+      "unsupported CPU '%0' in '@_target'", (StringRef))
+
+ERROR(attr_target_duplicate_option,none,
+      "duplicate '%0' option in '@_target'", (StringRef))
+
+ERROR(attr_target_invalid_branch_protection,none,
+      "invalid branch protection specification '%0' in '@_target'",
+      (StringRef))
+
 ERROR(attr_incompatible_with_non_final,none,
       "'%0' cannot be applied to a non-final %kindonly1",
       (DeclAttribute, const ValueDecl *))
@@ -5992,7 +6034,7 @@ ERROR(main_function_must_be_mainActor,none,
       "main() must be '@MainActor'", ())
 
 // Keep aligned with enum ForeignLanguage
-#define FOREIGN_LANG_SELECT "select{C|Objective-C}"
+#define FOREIGN_LANG_SELECT "select{C|C++|Objective-C}"
 
 ERROR(not_objc_function_async,none,
       "'async' %kindonly0 cannot be represented in Objective-C",
@@ -6067,6 +6109,10 @@ ERROR(actor_cannot_inherit_distributed_actor_protocol,none,
       "actor type %0 cannot conform to the 'DistributedActor' protocol. "
       "Isolation rules of these actor types are not interchangeable.",
       (DeclName))
+ERROR(distributed_actor_cannot_be_actor_system,none,
+      "distributed actor cannot conform to the "
+      "'DistributedActorSystem' protocol",
+      ())
 ERROR(broken_distributed_actor_requirement,none,
       "DistributedActor protocol is broken: unexpected requirement", ())
 ERROR(broken_distributed_actor_system_requirement,none,
@@ -6265,6 +6311,18 @@ ERROR(distributed_actor_target_result_not_codable,none,
 ERROR(distributed_actor_system_serialization_req_must_be_protocol,none,
       "'SerializationRequirement' type witness %0 must be a protocol type",
       (Type))
+ERROR(distributed_actor_target_serialization_req_not_concrete,none,
+      "%kind0 cannot be checked because actor system %1 does not specify a "
+      "concrete 'SerializationRequirement'",
+      (const ValueDecl *, Type))
+NOTE(distributed_actor_target_serialization_req_not_concrete_note,none,
+     "constrain %0 with concrete actor system or 'SerializationRequirement', "
+     "e.g. 'DistributedActorSystem<any Codable>'",
+     (Type))
+NOTE(distributed_actor_target_serialization_req_not_concrete_extension_note,none,
+     "constrain this extension with concrete actor system or "
+     "'SerializationRequirement', e.g. 'DistributedActorSystem<any Codable>'",
+     ())
 ERROR(nonisolated_distributed_actor_storage,none,
       "'nonisolated' can not be applied to distributed actor stored properties",
       ())
@@ -6548,8 +6606,9 @@ ERROR(distributed_actor_func_static,none,
       "'distributed' method cannot be 'static'",
       ())
 ERROR(distributed_actor_func_not_in_distributed_actor,none,
-      "'distributed' method can only be declared within 'distributed actor'",
-      ())
+      "distributed %select{method|computed property}0 can only be declared "
+      "in 'DistributedActor' type",
+      (bool))
 ERROR(distributed_actor_user_defined_special_property,none,
       "property %0 cannot be defined explicitly, as it conflicts with "
       "distributed actor synthesized stored property",
@@ -7104,7 +7163,7 @@ ERROR(objc_cannot_infer_name_raw_identifier,none,
       (const ValueDecl *))
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked '@c'|marked '@_cdecl'|marked dynamic|marked '@objc'|marked '@objcMembers'|marked '@IBOutlet'|marked '@IBAction'|marked '@IBSegueAction'|marked '@NSManaged'|a member of an '@objc' protocol|implicitly '@objc'|an '@objc' override|an implementation of an '@objc' requirement|marked '@IBInspectable'|marked '@GKInspectable'|in an '@objc' extension of a class (without '@nonobjc')|in an '@objc @implementation' extension of a class (without final or '@nonobjc')|marked '@objc' by an access note}"
+#define OBJC_ATTR_SELECT "select{marked '@c'|marked '@cxx'|marked '@_cdecl'|marked dynamic|marked '@objc'|marked '@objcMembers'|marked '@IBOutlet'|marked '@IBAction'|marked '@IBSegueAction'|marked '@NSManaged'|a member of an '@objc' protocol|implicitly '@objc'|an '@objc' override|an implementation of an '@objc' requirement|marked '@IBInspectable'|marked '@GKInspectable'|in an '@objc' extension of a class (without '@nonobjc')|in an '@objc @implementation' extension of a class (without final or '@nonobjc')|marked '@objc' by an access note}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -7156,7 +7215,7 @@ NOTE(not_objc_swift_struct,none,
       "Swift structs cannot be represented in %" FOREIGN_LANG_SELECT "0",
      (ForeignLanguage))
 NOTE(not_cdecl_or_objc_swift_enum,none,
-     "Swift enums not marked '@c'%select{| or '@objc'}0 cannot be "
+     "Swift enums not marked '@c'%select{|| or '@objc'}0 cannot be "
      "represented in %" FOREIGN_LANG_SELECT "0",
      (ForeignLanguage))
 NOTE(not_objc_generic_type_param,none,
@@ -9193,10 +9252,10 @@ GROUPED_WARNING(use_generic_member_of_existential_in_embedded_swift,
                 EmbeddedRestrictions, none,
                 "cannot use generic %kind0 on a value of type %1 in Embedded Swift",
                 (const Decl *, Type))
-GROUPED_WARNING(dynamic_cast_involving_protocol_in_embedded_swift,
-                EmbeddedRestrictions, none,
-                "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
-                (const Decl *))
+GROUPED_ERROR(dynamic_cast_involving_protocol_in_embedded_swift,
+              EmbeddedRestrictions, none,
+              "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
+              (const Decl *))
 
 GROUPED_WARNING(open_existential_in_embedded_swift,
                 EmbeddedRestrictions, none,

@@ -17,6 +17,11 @@ module CFAndObjC {
   export *
 }
 
+module CFRedeclaredTag {
+  header "CFRedeclaredTag.h"
+  export *
+}
+
 module CInsideObjC {
   header "CInsideObjC.h"
   export *

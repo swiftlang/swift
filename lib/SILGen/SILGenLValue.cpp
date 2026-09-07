@@ -478,8 +478,7 @@ void LogicalPathComponent::writeback(SILGenFunction &SGF, SILLocation loc,
 
   assert(temporary.getType().isAddress());
   auto &tempTL = SGF.getTypeLowering(temporary.getType());
-  if (!tempTL.isAddressOnly() || !isFinal ||
-      !SGF.silConv.useLoweredAddresses()) {
+  if (tempTL.isLoadableOrOpaque(SGF.F) || !isFinal) {
     if (isFinal) temporary.forward(SGF);
     temporary = SGF.emitLoad(loc, temporary.getValue(), tempTL,
                              SGFContext(), IsTake_t(isFinal));
@@ -1049,6 +1048,8 @@ namespace {
 
       auto rep = base.getType().getPreferredExistentialRepresentation();
       switch (rep) {
+      case ExistentialRepresentation::COM:
+        llvm_unreachable("opening a COM existential is not implemented");
       case ExistentialRepresentation::Opaque:
         if (!base.getValue()->getType().isAddress()) {
           assert(!SGF.useLoweredAddresses());
@@ -5127,7 +5128,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                        (isAddrGuaranteed ? C.isGuaranteedPlusZeroOk()
                                           : C.isImmediatePlusZeroOk()));
 
-  if (rvalueTL.isAddressOnly() && silConv.useLoweredAddresses()) {
+  if (!rvalueTL.isLoadableOrOpaque(F)) {
     // If the client is cool with a +0 rvalue, the decl has an address-only
     // type, and there are no conversions, then we can return this as a +0
     // address RValue.
@@ -5194,7 +5195,7 @@ ManagedValue SILGenFunction::emitFormalAccessLoad(SILLocation loc,
       (isTake == IsNotTake && (isAddressGuaranteed ? C.isGuaranteedPlusZeroOk()
                                                  : C.isImmediatePlusZeroOk()));
 
-  if (rvalueTL.isAddressOnly() && silConv.useLoweredAddresses()) {
+  if (!rvalueTL.isLoadableOrOpaque(F)) {
     // If the client is cool with a +0 rvalue, the decl has an address-only
     // type, and there are no conversions, then we can return this as a +0
     // address RValue.
@@ -5438,7 +5439,7 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
                                           const TypeLowering &rvalueTL,
                                           IsTake_t isTake) {
   assert(srcTL.getLoweredType().getAddressType() == src->getType());
-  assert(rvalueTL.isLoadable() || !silConv.useLoweredAddresses());
+  assert(rvalueTL.isLoadableOrOpaque(F));
 
   SILType srcType = srcTL.getLoweredType();
   SILType rvalueType = rvalueTL.getLoweredType();
@@ -6043,6 +6044,8 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
   auto rep = lv.getTypeOfRValue()
     .getPreferredExistentialRepresentation();
   switch (rep) {
+  case ExistentialRepresentation::COM:
+    llvm_unreachable("opening a COM existential is not implemented");
   case ExistentialRepresentation::Opaque:
   case ExistentialRepresentation::Boxed: {
     lv.add<OpenOpaqueExistentialComponent>(openedArchetype, typeData);

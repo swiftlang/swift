@@ -24,6 +24,9 @@ import lit.Test
 # Like FLAKYPASS, but this one is a failure.
 FLAKYFAIL = lit.Test.ResultCode("FLAKYFAIL", "Flaky", True)
 
+# How many times to run a retry-eligible test before giving up on it.
+MAX_ATTEMPTS = 6
+
 class SwiftTest(lit.formats.ShTest, object):
     def __init__(self, coverage_mode=None, execute_external=True):
         super(SwiftTest, self).__init__(execute_external=execute_external)
@@ -57,9 +60,14 @@ class SwiftTest(lit.formats.ShTest, object):
                                  "swift-%4m.profraw")
 
         # If long tests are not run, and this is not a test known to be quite
-        # slow, tell Lit to re-run it at most 5 times upon failure to increase
-        # our odds detecting non-determinism early. If a test turns out to
-        # be flaky, it will fail and be reported as a FLAKYFAIL.
+        # slow, re-run it up to MAX_ATTEMPTS times upon failure to increase our
+        # odds of detecting non-determinism early. If a test turns out to be
+        # flaky, it will fail and be reported as a FLAKYFAIL.
+        #
+        # `execute` drives the retries rather than Lit's own retry loop, which
+        # reports the output of the last attempt. For a flake that is the
+        # attempt that passed, leaving "Exit Code: 0" and clean output as the
+        # only evidence of the non-determinism this mechanism exists to catch.
         #
         # NB: Unfortunately, we cannot base this condition on whether a
         # particular test is a long test without hacks because the test is not
@@ -72,12 +80,19 @@ class SwiftTest(lit.formats.ShTest, object):
             # TODO: remove once the number of XFAILs under opaque values is close to zero.
             and not ("swift_test_mode_optimize_none_with_opaque_values" in test.config.available_features)
         ):
-            test.allowed_retries = 5
+            test.swift_max_attempts = MAX_ATTEMPTS
 
     def after_test(self, test, litConfig, result):
         # Intercept FLAKYPASS results and rewrite them into flaky failures. The
         # goal here is to catch non-determinism and complain about it rather
         # than to give a test more chances to succeed.
+        #
+        # execute_with_retries never returns FLAKYPASS, so this only fires for a
+        # test that reached Lit's own retry loop via ALLOW_RETRIES. FLAKYPASS
+        # counts as a pass even though the test failed, and we'd prefer to
+        # expose those as test failures. Such a test keeps the output of the
+        # attempt that passed, so it does not get the reporting improvement
+        # above, so Swift tests should avoid ALLOW_RETRIES.
         if result.code == lit.Test.FLAKYPASS:
             result.code = FLAKYFAIL
 
@@ -87,5 +102,35 @@ class SwiftTest(lit.formats.ShTest, object):
 
     def execute(self, test, litConfig):
         self.before_test(test, litConfig)
-        result = super(SwiftTest, self).execute(test, litConfig)
+        result = self.execute_with_retries(test, litConfig)
         return self.after_test(test, litConfig, result)
+
+    def execute_with_retries(self, test, litConfig):
+        max_attempts = getattr(test, "swift_max_attempts", 1)
+        first_failure = None
+        elapsed = 0.0
+
+        for attempt in range(1, max_attempts + 1):
+            result = super(SwiftTest, self).execute(test, litConfig)
+            elapsed += result.elapsed or 0.0
+            if result.code != lit.Test.FAIL:
+                break
+            if first_failure is None:
+                first_failure = result
+
+        if first_failure is None:
+            return result
+
+        # The test failed and then passed, so what went wrong is in the output
+        # of the attempt that failed. Report that, not the passing run.
+        if result.code != lit.Test.FAIL:
+            output = (
+                "Test failed on attempt 1 of %d and passed on attempt %d. "
+                "Output of the failing attempt follows.\n\n%s"
+                % (max_attempts, attempt, first_failure.output)
+            )
+            result = lit.Test.Result(FLAKYFAIL, output, elapsed)
+
+        result.attempts = attempt
+        result.max_allowed_attempts = max_attempts
+        return result

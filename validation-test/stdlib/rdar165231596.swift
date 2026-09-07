@@ -1,6 +1,10 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-feature -Xfrontend Lifetimes -disable-availability-checking) | %FileCheck %s
 
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: executable_test
+// UNSUPPORTED: back_deployment_runtime || use_os_stdlib
+
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Ensure we don't crash
 

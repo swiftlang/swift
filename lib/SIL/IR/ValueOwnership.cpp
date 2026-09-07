@@ -402,6 +402,15 @@ static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
   if (isTrivial)
     return OwnershipKind::None;
 
+  // If the result type is an address, avoid consulting SILFunctionConventions
+  // to determine its ownership; we know it's None.
+  //
+  // This short-cut is needed _during_ AddressLowering for a @guaranteed_address
+  // result, as a new ApplyInst it creates with an address result happens before
+  // the global lowered-addresses flag is changed to influence getOwnershipKind.
+  if (ResultType.isAddress())
+    return OwnershipKind::None;
+
   // Per-function conventions (via getSubstCalleeConv): an already-lowered
   // function's apply has its formally-indirect results as address arguments
   // with no direct result, even while the module stage is still Raw.
@@ -590,6 +599,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, OnFastPath)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsOptionalType)
 CONSTANT_OWNERSHIP_BUILTIN(None, Sizeof)
 CONSTANT_OWNERSHIP_BUILTIN(None, Strideof)
+CONSTANT_OWNERSHIP_BUILTIN(None, TypedAllocationID)
 CONSTANT_OWNERSHIP_BUILTIN(None, StringObjectOr)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsPOD)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsConcrete)

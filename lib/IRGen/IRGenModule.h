@@ -1708,6 +1708,9 @@ public:
 public:
   llvm::LLVMContext &getLLVMContext() const { return *LLVMContext; }
 
+  /// Form the target-native bytes for a COM identity.
+  llvm::Constant *getCOMIdentityConstant(llvm::StringRef identity);
+
   void emitSourceFile(SourceFile &SF);
   void emitSynthesizedFileUnit(SynthesizedFileUnit &SFU);
 
@@ -1729,6 +1732,9 @@ public:
   void setMustHaveFramePointer(llvm::Function *F);
   llvm::AttributeList constructInitialAttributes();
   StackProtectorMode shouldEmitStackProtector(SILFunction *f);
+
+  void addTargetAttrFunctionAttributes(llvm::Function *fn,
+                                       StringRef targetString);
 
   llvm::ConstantInt *getMallocTypeId(llvm::Function *fn);
 

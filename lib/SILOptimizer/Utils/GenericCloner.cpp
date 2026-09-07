@@ -90,6 +90,7 @@ SILFunction *GenericCloner::createDeclaration(
   // A specialization of a function goes into the same section as the original
   // function.
   NewF->setSection(Orig->section());
+  NewF->setTargetFeatures(Orig->targetFeatures());
   NewF->copyEffects(Orig);
   return NewF;
 }

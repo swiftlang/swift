@@ -221,7 +221,7 @@ void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,
       actor->getType(), { actor });
 }
 
-void emitResignIdentityCall(SILBuilder &B, SILLocation loc,
+void emitResignIDCall(SILBuilder &B, SILLocation loc,
                             ClassDecl* actorDecl,
                             SILValue actor, SILValue idRef) {
   auto &F = B.getFunction();

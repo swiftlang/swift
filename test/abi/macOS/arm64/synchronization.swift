@@ -701,3 +701,18 @@ Added: _$s15Synchronization20AtomicUpdateOrderingV9releasingACvpZMV
 
 // WordPair to Comparable conformance
 Added: _$s15Synchronization8WordPairVSLAAMc
+
+// type metadata accessor for Synchronization.Disconnected
+Added: _$s15Synchronization12DisconnectedVMa
+
+// nominal type descriptor for Synchronization.Disconnected
+Added: _$s15Synchronization12DisconnectedVMn
+
+// (extension in Synchronization):Synchronization.Disconnected< where A: ~Swift.Copyable>._value.read : A
+Added: _$s15Synchronization12DisconnectedVAARi_zrlE6_valuexvr
+
+// (extension in Synchronization):Synchronization.Disconnected< where A: ~Swift.Copyable>._value.modify : A
+Added: _$s15Synchronization12DisconnectedVAARi_zrlE6_valuexvM
+
+// (extension in Synchronization):Synchronization.Disconnected< where A: ~Swift.Copyable>._value.setter : A
+Added: _$s15Synchronization12DisconnectedVAARi_zrlE6_valuexvs

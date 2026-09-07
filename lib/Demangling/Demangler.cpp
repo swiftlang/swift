@@ -199,8 +199,26 @@ int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
   return 0;
 }
 
+bool swift::Demangle::isAsyncMainEntryPointSymbol(llvm::StringRef mangledName) {
+  return getAsyncMainEntryPointNameLength(mangledName) != 0;
+}
+
+int swift::Demangle::getAsyncMainEntryPointNameLength(
+    llvm::StringRef mangledName) {
+  llvm::StringRef name = ASYNC_MAIN_ENTRY_POINT_NAME;
+  if (mangledName.starts_with(name))
+    return name.size();
+  // Mach-O prefixes symbols with an underscore, just like for "_$s" names.
+  if (mangledName.consume_front("_") && mangledName.starts_with(name))
+    return name.size() + 1;
+  return 0;
+}
+
 bool swift::Demangle::isSwiftSymbol(llvm::StringRef mangledName) {
   if (isOldFunctionTypeMangling(mangledName))
+    return true;
+
+  if (isAsyncMainEntryPointSymbol(mangledName))
     return true;
 
   return getManglingPrefixLength(mangledName) != 0;
@@ -804,14 +822,21 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
 #endif
 
   unsigned PrefixLength = getManglingPrefixLength(MangledName);
-  if (PrefixLength == 0)
-    return nullptr;
+  if (PrefixLength == 0) {
+    // Stand a node in for the unmangled base name so the mangled funclet
+    // suffixes that follow it can be parsed.
+    int NameLength = getAsyncMainEntryPointNameLength(MangledName);
+    if (NameLength == 0)
+      return nullptr;
+    Pos += NameLength;
+    pushNode(createNode(Node::Kind::AsyncMainEntryPoint));
+  } else {
+    if (MangledName.starts_with(MANGLING_PREFIX_EMBEDDED_STR))
+      Flavor = ManglingFlavor::Embedded;
 
-  if (MangledName.starts_with(MANGLING_PREFIX_EMBEDDED_STR))
-    Flavor = ManglingFlavor::Embedded;
-
-  IsOldFunctionTypeMangling = isOldFunctionTypeMangling(MangledName);
-  Pos += PrefixLength;
+    IsOldFunctionTypeMangling = isOldFunctionTypeMangling(MangledName);
+    Pos += PrefixLength;
+  }
 
   // If any other prefixes are accepted, please update Mangler::verify.
 

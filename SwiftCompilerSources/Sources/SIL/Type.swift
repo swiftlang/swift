@@ -46,6 +46,11 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return bridged.isTrivial(function.bridged)
   }
 
+  /// Returns true if the type is non-trivial only because it is non-Escapable.
+  public func isNonTrivialOnlyBecauseNonEscapable(in function: Function) -> Bool {
+    return bridged.isNonTrivialOnlyBecauseNonEscapable(function.bridged)
+  }
+
   /// Returns true if the type is a trivial type and is and does not contain a Builtin.RawPointer.
   public func isTrivialNonPointer(in function: Function) -> Bool {
     return !bridged.isNonTrivialOrContainsRawPointer(function.bridged)

@@ -427,6 +427,7 @@ func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) ->
 // CHECK:           [[FN:%.*]] = copy_value [[ARG]]
 // CHECK:           [[THUNK_FN:%.*]] = function_ref @$sS3iIegydd_S2i_SitSgIegyd_TR
 // CHECK-NEXT:      [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]([[FN]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:      return [[THUNK]]
 // CHECK-NEXT: } // end sil function '$s19function_conversion25convTupleToOptionalDirectySi_SitSgSicSi_SitSicF'
 
@@ -450,6 +451,7 @@ func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (
 // CHECK:          [[THUNK_FN:%.*]] = function_ref @$sxxxIegnrr_xx_xtSgIegnr_lTR
 // CHECK-NEXT:     [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<T>([[FN_CONV]])
 // CHECK-NEXT:     [[THUNK_CONV:%.*]] = convert_function [[THUNK]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:     return [[THUNK_CONV]]
 // CHECK-NEXT: } // end sil function '$s19function_conversion27convTupleToOptionalIndirectyx_xtSgxcx_xtxclF'
 

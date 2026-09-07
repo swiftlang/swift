@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 
+#include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/SemanticAttrs.h"
@@ -1553,6 +1554,43 @@ static bool isApplyOfBuiltin(SILInstruction &I, BuiltinValueKind kind) {
   return false;
 }
 
+/// Returns the kind of OS version query function that `callee` is, or
+/// `std::nullopt` if `callee` is not one of those functions.
+///
+/// Every OS version query function that the standard library declares carries
+/// the `availability.osversion` semantics attribute, and every one of them is
+/// matched here. A function that carries the attribute and matches none of
+/// them is a query function that this list is missing, so this aborts rather
+/// than silently treat it as one of the functions it does know.
+static std::optional<OSVersionQueryKind>
+getOSVersionQueryKind(SILFunction *callee) {
+  if (!callee->hasSemanticsAttr(semantics::AVAILABILITY_OSVERSION))
+    return std::nullopt;
+
+  auto &module = callee->getModule();
+  auto &ctx = module.getASTContext();
+  auto isCallee = [&module, callee](FuncDecl *decl) {
+    return decl && module.lookUpFunction(SILDeclRef(decl)) == callee;
+  };
+
+  // On iOS `_stdlib_isOSVersionAtLeast()` is `@_transparent` and does not carry
+  // the semantics attribute, so a query there reaches this pass as a call to
+  // `_stdlib_isOSVersionAtLeast_AEIC()` instead.
+  if (isCallee(ctx.getIsOSVersionAtLeastDecl()) ||
+      isCallee(ctx.getIsOSVersionAtLeastAEICDecl()))
+    return OSVersionQueryKind::IsOSVersionAtLeast;
+
+  if (isCallee(ctx.getIsVariantOSVersionAtLeastDecl()))
+    return OSVersionQueryKind::IsVariantOSVersionAtLeast;
+
+  if (isCallee(ctx.getIsOSVersionAtLeastOrVariantVersionAtLeast()))
+    return OSVersionQueryKind::IsOSVersionAtLeastOrVariantVersionAtLeast;
+
+  ABORT([callee](auto &out) {
+    out << "unrecognized OS version query function: " << callee->getName();
+  });
+}
+
 static bool isApplyOfKnownAvailability(SILInstruction &I) {
   // Inlinable functions can be deserialized in other modules which can be
   // compiled with a different deployment target.
@@ -1565,28 +1603,28 @@ static bool isApplyOfKnownAvailability(SILInstruction &I) {
   auto callee = apply.getReferencedFunctionOrNull();
   if (!callee)
     return false;
-  if (!callee->hasSemanticsAttr("availability.osversion"))
-    return false;
-  auto &context = I.getFunction()->getASTContext();
-  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(context);
-  if (apply.getNumArguments() != 3)
-    return false;
-  auto arg0 = dyn_cast<IntegerLiteralInst>(apply.getArgument(0));
-  if (!arg0)
-    return false;
-  auto arg1 = dyn_cast<IntegerLiteralInst>(apply.getArgument(1));
-  if (!arg1)
-    return false;
-  auto arg2 = dyn_cast<IntegerLiteralInst>(apply.getArgument(2));
-  if (!arg2)
+
+  auto queryKind = getOSVersionQueryKind(callee);
+  if (!queryKind)
     return false;
 
-  auto version = VersionRange::allGTE(llvm::VersionTuple(
-      arg0->getValue().getLimitedValue(), arg1->getValue().getLimitedValue(),
-      arg2->getValue().getLimitedValue()));
+  // Give up unless the arguments are all integer literals. Each argument is one
+  // component of one of the versions that the query tests.
+  SmallVector<unsigned, 6> arguments;
+  for (auto argument : apply.getArguments()) {
+    auto *literal = dyn_cast<IntegerLiteralInst>(argument);
+    if (!literal)
+      return false;
+    arguments.push_back(literal->getValue().getLimitedValue());
+  }
 
-  auto callAvailability = AvailabilityRange(version);
-  return deploymentAvailability.isContainedIn(callAvailability);
+  auto &ctx = I.getFunction()->getASTContext();
+  auto query =
+      AvailabilityQuery::forOSVersionQueryCall(*queryKind, arguments, ctx);
+  if (!query)
+    return false;
+
+  return query->isAlwaysTrueForDeploymentTargets(ctx);
 }
 
 static bool isApplyOfStringConcat(SILInstruction &I) {

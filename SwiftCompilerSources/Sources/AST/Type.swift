@@ -153,6 +153,7 @@ extension TypeProperties {
   public var isBuiltinFloat: Bool { rawType.bridged.isBuiltinFloat() }
   public var isBuiltinVector: Bool { rawType.bridged.isBuiltinVector() }
   public var isBuiltinFixedArray: Bool { rawType.bridged.isBuiltinFixedArray() }
+  public var isBuiltinBridgeObject: Bool { rawType.bridged.isBuiltinBridgeObject() }
 
   public var isClass: Bool {
     if let nominal = nominal, nominal is ClassDecl {
@@ -186,6 +187,7 @@ extension TypeProperties {
   public var isClassExistential: Bool { rawType.bridged.isClassExistential() }
   public var isGenericTypeParameter: Bool { rawType.bridged.isGenericTypeParam() }
   public var isUnownedStorageType: Bool { return rawType.bridged.isUnownedStorageType() }
+  public var isReferenceStorageType: Bool { rawType.bridged.isReferenceStorageType() }
   public var isMetatype: Bool { rawType.bridged.isMetatypeType() }
   public var isExistentialMetatype: Bool { rawType.bridged.isExistentialMetatypeType() }
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}

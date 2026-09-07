@@ -13,7 +13,10 @@
 #ifndef SWIFT_OPTIMIZER_STATS_UTILS_H
 #define SWIFT_OPTIMIZER_STATS_UTILS_H
 
+#include "swift/Basic/LLVM.h"
+
 namespace swift {
+class SILFunction;
 class SILModule;
 class SILTransform;
 class SILPassManager;
@@ -35,6 +38,21 @@ void updateSILModuleStatsBeforeTransform(SILModule &M, SILTransform *Transform,
 void updateSILModuleStatsAfterTransform(SILModule &M, SILTransform *Transform,
                                         SILPassManager &PM, int PassNumber,
                                         int Duration);
+
+/// Updates SILModule stats before executing a new subpass of \p Transform.
+/// Only called when -sil-stats-subpass is enabled.
+///
+/// \param F the function the subpass is running on
+/// \param Label identifies the subpass within the transform, typically the
+///              name of the instruction being transformed
+/// \param Transform the SIL transformation the subpass belongs to
+/// \param PM the PassManager being used
+/// \param PassNumber the pass number of the transformation
+/// \param SubpassNumber the number of subpasses the transform already ran
+void updateSILModuleStatsBeforeSubpass(SILFunction *F, StringRef Label,
+                                       SILTransform *Transform,
+                                       SILPassManager &PM, int PassNumber,
+                                       unsigned SubpassNumber);
 
 } // end namespace swift
 

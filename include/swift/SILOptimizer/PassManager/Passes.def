@@ -97,6 +97,8 @@ PASS(EarlyRedundantLoadElimination, "early-redundant-load-elimination",
      "Early Redundant Load Elimination")
 PASS(RedundantLoadElimination, "redundant-load-elimination",
      "Redundant Load Elimination")
+PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
+     "Redundant Overflow Check Removal")
 PASS(DeadAccessScopeElimination, "dead-access-scope-elimination",
      "Removes dead, non-conflicting access scopes")
 PASS(DeadStoreElimination, "dead-store-elimination",
@@ -272,8 +274,6 @@ LEGACY_PASS(EpilogueARCMatcherDumper, "sil-epilogue-arc-dumper",
      "Print Epilogue retains of Returned Values and Argument releases")
 LEGACY_PASS(EpilogueRetainReleaseMatcherDumper, "sil-epilogue-retain-release-dumper",
      "Print Epilogue retains of Returned Values and Argument releases")
-LEGACY_PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
-     "Redundant Overflow Check Removal")
 LEGACY_PASS(DCE, "dce",
      "Dead Code Elimination")
 LEGACY_PASS(DeadArgSignatureOpt, "dead-arg-signature-opt",

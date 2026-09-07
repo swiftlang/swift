@@ -15,6 +15,9 @@
 #include "swift/Demangling/Demangler.h"
 #include "gtest/gtest.h"
 
+#include <sys/mman.h>
+#include <unistd.h>
+
 using namespace swift;
 using namespace reflection;
 
@@ -1096,4 +1099,49 @@ TEST(TypeRefTest, ReflectionSectionUndersizedRecord) {
     (void)record;
     ADD_FAILURE() << "undersized field section should yield no records";
   }
+}
+
+// A __swift5_typeref section reaching the top of the address space makes the
+// mangled-name scan's remote address wrap around, and the scan must stop rather
+// than walk the local section buffer past its end. The section buffer here ends
+// against a guard page, so the unfixed scan faults. rdar://185733734
+TEST(TypeRefTest, ReadTypeRefRemoteAddressWraparound) {
+  size_t pageSize = sysconf(_SC_PAGESIZE);
+  char *pages = (char *)mmap(nullptr, pageSize * 2, PROT_READ | PROT_WRITE,
+                             MAP_PRIVATE | MAP_ANON, -1, 0);
+  ASSERT_NE(pages, MAP_FAILED);
+  ASSERT_EQ(mprotect(pages + pageSize, pageSize, PROT_NONE), 0);
+
+  // Place the section so its last byte is the last byte before the guard page,
+  // and make that byte a symbolic reference, whose 5-byte stride carries the
+  // scan onto the guard page.
+  const uint64_t sectionSize = 0xFF;
+  char *buffer = pages + pageSize - sectionSize;
+  memset(buffer, 'A', sectionSize);
+  buffer[sectionSize - 1] = '\1';
+
+  const uint64_t sectionStart = 0xFFFFFFFFFFFFFFFFULL - sectionSize;
+  remote::RemoteAddress startAddr(sectionStart,
+                                  remote::RemoteAddress::DefaultAddressSpace);
+
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
+  RemoteRef<void> sectionRef(startAddr, buffer);
+  RemoteRef<void> emptyRef(remote::RemoteAddress(), nullptr);
+  ReflectionInfo info{
+      FieldSection(emptyRef, 0),
+      AssociatedTypeSection(emptyRef, 0),
+      BuiltinTypeSection(emptyRef, 0),
+      CaptureSection(emptyRef, 0),
+      GenericSection(emptyRef, 0),
+      GenericSection(sectionRef, sectionSize),
+      GenericSection(emptyRef, 0),
+      MultiPayloadEnumSection(emptyRef, 0),
+      {}};
+  Builder.addReflectionInfo(info);
+
+  remote::RemoteAddress scanStart(sectionStart + sectionSize - 1,
+                                  remote::RemoteAddress::DefaultAddressSpace);
+  EXPECT_EQ(Builder.readTypeRef(scanStart), nullptr);
+
+  munmap(pages, pageSize * 2);
 }

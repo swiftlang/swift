@@ -354,6 +354,7 @@ struct G<each T> {
 // CHECK-NEXT: [[ELT_STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element({{.*}}) each T
 // CHECK-NEXT: [[ELT_TUPLE:%.*]] = tuple_pack_element_addr [[PACK_IDX]] of [[STACK]] : $*(repeat each T) as $*@pack_element({{.*}}) each T
 // CHECK-NEXT: copy_addr [[ELT_TUPLE]] to [init] [[ELT_STACK]] : $*@pack_element({{.*}}) each T
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: destroy_addr [[ELT_STACK]] : $*@pack_element({{.*}}) each T
 // CHECK-NEXT: dealloc_stack [[ELT_STACK]] : $*@pack_element({{.*}}) each T
 
@@ -403,6 +404,7 @@ func iterationBreakCleanup<each T>(_ xs: G<repeat each T>) {
 // CHECK-NEXT: [[ELT_STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element({{.*}}) each T
 // CHECK-NEXT: [[ELT_TUPLE:%.*]] = tuple_pack_element_addr [[PACK_IDX]] of [[STACK]] : $*(repeat each T) as $*@pack_element({{.*}}) each T
 // CHECK-NEXT: copy_addr [[ELT_TUPLE]] to [init] [[ELT_STACK]] : $*@pack_element({{.*}}) each T
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: destroy_addr [[ELT_STACK]] : $*@pack_element({{.*}}) each T
 // CHECK-NEXT: dealloc_stack [[ELT_STACK]] : $*@pack_element({{.*}}) each T
 // CHECK-NEXT: [[NEXT:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word

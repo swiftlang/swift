@@ -194,6 +194,9 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(MacroExpansion);
   TRIVIAL_KIND(Using);
 
+  case DeclKind::HiddenTypeLayoutInfo:
+    llvm_unreachable("hidden layout declarations are not diagnostic entities");
+
   case DeclKind::TypeAlias:
     return cast<TypeAliasDecl>(this)->getGenericParams()
              ? DescriptiveDeclKind::GenericTypeAlias
@@ -1839,6 +1842,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
   case DeclKind::Using:
+  case DeclKind::HiddenTypeLayoutInfo:
     llvm_unreachable("not a ValueDecl");
 
   case DeclKind::AssociatedType:
@@ -2396,6 +2400,9 @@ bool Decl::hasOnlyCEntryPoint() const {
     if (!cdeclAttr->Underscored)
       return true;
   }
+
+  if (getAttrs().hasAttribute<CxxDeclAttr>())
+    return true;
 
   return false;
 }
@@ -3068,10 +3075,35 @@ VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
   return getPatternList()[i].getAnchoringVarDecl();
 }
 
+/// Whether the downstream compile-time-values evaluator owns validation and
+/// static initialization of every '@const'/'@section' initializer.
+static bool constValuesSILEvaluatorFoldsInitializers(const ASTContext &ctx) {
+  return ctx.LangOpts.hasFeature(Feature::CompileTimeValues) ||
+         ctx.LangOpts.hasFeature(Feature::CompileTimeValuesPreview);
+}
+
 bool PatternBindingDecl::hasSingleVarConstantFoldedInit() const {
+  auto &ctx = getASTContext();
   auto *singleVar = getSingleVar();
-  return singleVar && singleVar->isConstValue() &&
-         getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
+  if (!singleVar || !singleVar->isConstValue() ||
+      !ctx.LangOpts.hasFeature(Feature::LiteralExpressions))
+    return false;
+  // When the downstream compile-time evaluator is in play, the
+  // literal-expression folder must be disabled. The two accept overlapping but
+  // different grammars: the evaluator takes 'Int(17.0 / 3.5)', which the folder
+  // rejects, and the folder takes a Clang-imported constant, which the
+  // evaluator rejects. So folding here can reject a valid compile-time value,
+  // and that error sets 'ASTContext::hadError()', which makes
+  // 'DiagnoseUnknownConstValues' bail before emitting its own diagnostic,
+  // hiding the real error behind a spurious one.
+  if (constValuesSILEvaluatorFoldsInitializers(ctx))
+    return false;
+
+  // Only stdlib integer constants participate in literal-expression folding.
+  // Other constant initializers (tuples, arrays, strings, etc) are left as
+  // written.
+  Type type = singleVar->getInterfaceType();
+  return type && type->isStdlibInteger();
 }
 
 Expr *PatternBindingDecl::getExecutableInit(unsigned i) const {
@@ -4184,6 +4216,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
   case DeclKind::Using:
+  case DeclKind::HiddenTypeLayoutInfo:
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:
@@ -5064,9 +5097,10 @@ void ValueDecl::setInterfaceType(Type type) {
 }
 
 StringRef ValueDecl::getCDeclName() const {
-  // Treat imported C functions as implicitly @_cdecl.
+  // Treat imported C and C++ functions as implicitly @_cdecl / @cxx.
   if (auto clangDecl = dyn_cast_or_null<clang::FunctionDecl>(getClangDecl())) {
-    if (clangDecl->getLanguageLinkage() == clang::CLanguageLinkage
+    if ((clangDecl->getLanguageLinkage() == clang::CLanguageLinkage ||
+         clangDecl->getLanguageLinkage() == clang::CXXLanguageLinkage)
           && clangDecl->getIdentifier())
       return clangDecl->getName();
   }
@@ -5278,6 +5312,7 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   case DeclKind::MacroExpansion:
   case DeclKind::BuiltinTuple:
   case DeclKind::Using:
+  case DeclKind::HiddenTypeLayoutInfo:
     // These don't take attributes.
     return SourceLoc();
 
@@ -11347,6 +11382,9 @@ bool AbstractFunctionDecl::isObjCInstanceMethod() const {
 }
 
 std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
+  if (getAttrs().hasAttribute<CxxDeclAttr>())
+    return ForeignLanguage::Cxx;
+
   auto attr = getAttrs().getAttribute<CDeclAttr>();
   if (!attr)
     return std::nullopt;
@@ -14073,4 +14111,9 @@ void ExplicitCaughtTypeRequest::cacheResult(Type type) const {
   }
 
   llvm_unreachable("Unhandled catch node");
+}
+
+HiddenTypeLayoutInfoDecl *HiddenTypeLayoutInfoDecl::create(ASTContext &ctx,
+                                                           DeclContext *DC) {
+  return new (ctx) HiddenTypeLayoutInfoDecl(DC);
 }

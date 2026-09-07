@@ -421,12 +421,8 @@ bool isSubtypeOf(Type t1, Type t2, DeclContext *dc);
 ///
 /// \param dc The context of the conversion.
 ///
-/// \param unwrappedIUO If non-null, will be set to indicate whether the
-/// conversion force-unwrapped an implicitly-unwrapped optional.
-///
 /// \returns true if \c t1 can be implicitly converted to \c t2.
-bool isConvertibleTo(Type t1, Type t2, DeclContext *dc,
-                     bool *unwrappedIUO = nullptr);
+bool isConvertibleTo(Type t1, Type t2, DeclContext *dc);
 
 /// Determine whether one type is explicitly convertible to another,
 /// i.e. using an 'as' expression.
@@ -448,12 +444,8 @@ bool isExplicitlyConvertibleTo(Type t1, Type t2, DeclContext *dc);
 ///
 /// \param dc The context of the conversion.
 ///
-/// \param unwrappedIUO If non-null, will be set to indicate whether the
-/// conversion force-unwrapped an implicitly-unwrapped optional.
-///
 /// \returns true if \c t1 can be explicitly converted to \c t2.
-bool isObjCBridgedTo(Type t1, Type t2, DeclContext *dc,
-                     bool *unwrappedIUO = nullptr);
+bool isObjCBridgedTo(Type t1, Type t2, DeclContext *dc);
 
 /// Return true if performing a checked cast from one type to another
 /// with the "as!" operator could possibly succeed.
@@ -481,13 +473,9 @@ bool checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc);
 ///
 /// \param dc The context of the conversion.
 ///
-/// \param unwrappedIUO   If non-null, will be set to \c true if the coercion
-/// or bridge operation force-unwraps an implicitly-unwrapped optional.
-///
 /// \returns true if \c t1 and \c t2 satisfy the constraint.
 bool typesSatisfyConstraint(Type t1, Type t2, bool openArchetypes,
-                            constraints::ConstraintKind kind, DeclContext *dc,
-                            bool *unwrappedIUO = nullptr);
+                            constraints::ConstraintKind kind, DeclContext *dc);
 
 /// If the inputs to an apply expression use a consistent "sugar" type
 /// (that is, a typealias or shorthand syntax) equivalent to the result type
@@ -594,6 +582,27 @@ CheckGenericArgumentsResult
 checkGenericArgumentsForDiagnostics(GenericSignature signature,
                                     TypeSubstitutionFn substitutions);
 
+/// Check \p requirements (from \p signature, substituted via
+/// \p substitutions) specifically for isolated conformances that conflict
+/// with a `Sendable`/`SendableMetatype` requirement on the corresponding
+/// generic parameter, and report on any failures in detail for diagnostic
+/// needs.
+CheckGenericArgumentsResult
+checkIsolatedConformancesForDiagnostics(GenericSignature signature,
+                                        ArrayRef<Requirement> requirements,
+                                        TypeSubstitutionFn substitutions);
+
+/// Search \p type for bound generic types whose generic arguments were
+/// substituted using an isolated conformance where the corresponding
+/// generic parameter carries a `Sendable` or `SendableMetatype` requirement
+/// that prohibits it, and diagnose each violation at \p loc.
+void checkIsolatedConformancesInType(Type type, SourceLoc loc);
+
+/// Search \p D's interface type for bound generic types whose generic arguments
+/// were substituted using an isolated conformance where the corresponding
+/// generic parameter carries a `Sendable` or `SendableMetatype` requirement
+/// that prohibits it.
+void checkIsolatedConfromancesInDecl(Decl *D);
 
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
@@ -1510,6 +1519,11 @@ void diagnoseMissingImports(SourceFile &sf);
 // sequence type.
 bool shouldUseIterable(ASTContext &ctx, Type seqTy, bool isAsync,
                                 SourceLoc loc, DeclContext *dc);
+
+/// Returns true if \p fromModule may define \p symbol. The Swift runtime
+/// reserves a set of symbol names (swift_retain etc.) that only the standard
+/// library and runtime-adjacent modules may implement.
+bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule);
 
 } // end namespace swift
 

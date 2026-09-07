@@ -63,4 +63,25 @@ inline unsigned firstByteOfArrayRefTypealias(const ByteArray16Typealias &a) {
   return a[0];
 }
 
+inline void callWithIntRef(void (*callback)(int &)) {
+  int value = 42;
+  callback(value);
+  setStaticInt(value);
+}
+
+inline void callWithConstIntRef(void (*callback)(const int &)) {
+  int value = 43;
+  callback(value);
+}
+
+inline void callWithIntRvalueRef(void (*callback)(int &&)) {
+  int value = 44;
+  callback(static_cast<int &&>(value));
+}
+
+inline void callWithConstIntRvalueRef(void (*callback)(const int &&)) {
+  int value = 45;
+  callback(static_cast<const int &&>(value));
+}
+
 #endif // TEST_INTEROP_CXX_REFERENCE_INPUTS_REFERENCE_H

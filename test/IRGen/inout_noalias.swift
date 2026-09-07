@@ -6,7 +6,7 @@
 @_silgen_name("swapPointers")
 public func swapPointers<T>(_ lhs: inout UnsafePointer<T>, _ rhs: inout UnsafePointer<T>) {}
 
-// CHECK-OPT-LABEL: define{{.*}}swiftcc void @"$s13inout_noalias6rotateyys11InlineArrayVy$63_SdGz_AEzS2dtF"(ptr noalias captures(none) dereferenceable(512) %0, ptr noalias captures(none) dereferenceable(512) %1, double %2, double %3) {{.*}} {
+// CHECK-OPT-LABEL: define{{.*}}swiftcc void @"$s13inout_noalias6rotateyys11InlineArrayVy$63_SdGz_AEzS2dtF"(ptr noalias {{(nofree )?}}captures(none) dereferenceable(512) %0, ptr noalias {{(nofree )?}}captures(none) dereferenceable(512) %1, double %2, double %3) {{.*}} {
 // CHECK-OPT-NOT:     %found.conflict
 // CHECK-OPT-NOT:     scalar.ph
 // CHECK-OPT:         vector.body

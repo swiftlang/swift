@@ -26,6 +26,7 @@ func copyOrThrow<T>(value: T) throws -> T { return value }
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
 // CHECK:       bb3:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func copyIntoTuple<each T>(_ args: repeat each T) -> (repeat each T) {
@@ -60,6 +61,7 @@ func copyIntoTuple<each T>(_ args: repeat each T) -> (repeat each T) {
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
 // CHECK:       bb4:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 // CHECK:       bb5([[ERROR:%.*]] : @owned $any Error):
@@ -80,6 +82,7 @@ func copyIntoTuple<each T>(_ args: repeat each T) -> (repeat each T) {
 // CHECK-NEXT:    destroy_addr [[DESTROY_ELT_ADDR]] : $*@pack_element([[DESTROY_UUID]]) each T
 // CHECK-NEXT:    br bb6([[DESTROY_IDX]] : $Builtin.Word)
 // CHECK:       bb8:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    throw [[ERROR]] : $any Error
 func copyOrThrowIntoTuple<each T>(_ args: repeat each T) throws -> (repeat each T) {
   return (repeat try copyOrThrow(value: each args))
@@ -144,8 +147,13 @@ func copyOrThrowIntoTuple<each T>(_ args: repeat each T) throws -> (repeat each 
 // CHECK-NEXT:    [[SEQUENCE_FN:%.*]] = function_ref @$s4main8sequenceyyF
 // CHECK-NEXT:    apply [[SEQUENCE_FN]]()
 //   Leave the function.
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    destroy_value [[C_LIFETIME]] : $String
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    extend_lifetime [[MV]] : $Int
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func callCopyAndDestructure(a: Int, b: String, c: String) {
@@ -207,8 +215,10 @@ func callCopyAndDestructure(a: Int, b: String, c: String) {
 // CHECK-NEXT:    [[SEQUENCE_FN:%.*]] = function_ref @$s4main8sequenceyyF
 // CHECK-NEXT:    apply [[SEQUENCE_FN]]()
 //   Leave the function.
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    destroy_addr [[TUPLE]] : $*(repeat each T)
 // CHECK-NEXT:    dealloc_stack [[TUPLE]] : $*(repeat each T)
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func callCopyAndBind<each T>(args: repeat each T) {
@@ -267,8 +277,10 @@ func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T
 // CHECK-NEXT:    br bb4([[NEXT_IDX]] : $Builtin.Word)
 // CHECK:       bb6:
 // CHECK-NEXT:    dealloc_stack [[VALUES_COPY]] :
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    destroy_addr [[VALUES]] :
 // CHECK-NEXT:    dealloc_stack [[VALUES]] :
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
   return values
@@ -311,6 +323,8 @@ func makePairs<each First, each Second>(
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
 // CHECK:       bb3:
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
   return (repeat Pair(each first, each second))

@@ -287,6 +287,8 @@ struct BridgedType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getAddressType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getObjectType() const;
   BRIDGED_INLINE bool isTrivial(BridgedFunction f) const;
+  BRIDGED_INLINE bool
+  isNonTrivialOnlyBecauseNonEscapable(BridgedFunction f) const;
   BRIDGED_INLINE bool isNonTrivialOrContainsRawPointer(BridgedFunction f) const;
   BRIDGED_INLINE bool isLoadable(BridgedFunction f) const;
   BRIDGED_INLINE bool isReferenceCounted(BridgedFunction f) const;
@@ -872,6 +874,7 @@ struct BridgedInstruction {
 
   BRIDGED_INLINE SwiftInt ProjectBoxInst_fieldIndex() const;
   BRIDGED_INLINE bool EndCOWMutationInst_doKeepUnique() const;
+  BRIDGED_INLINE void EndCOWMutationInst_setKeepUnique(bool keepUnique) const;
   BRIDGED_INLINE bool DestroyValueInst_isDeadEnd() const;
   BRIDGED_INLINE SwiftInt EnumInst_caseIndex() const;
   BRIDGED_INLINE SwiftInt UncheckedEnumDataInst_caseIndex() const;
@@ -1519,6 +1522,7 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutation(BridgedValue instance,
                                                                              bool keepUnique) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutationAddr(BridgedValue instance) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndFormalScope(BridgedValue instance) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkDependence(
     BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind dependenceKind) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkDependence(

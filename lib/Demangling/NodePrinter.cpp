@@ -313,6 +313,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::AssociatedTypeDescriptor:
   case Node::Kind::AssociatedTypeMetadataAccessor:
   case Node::Kind::AssociatedTypeWitnessTableAccessor:
+  case Node::Kind::AsyncMainEntryPoint:
   case Node::Kind::AsyncRemoved:
   case Node::Kind::AutoClosureType:
   case Node::Kind::BaseConformanceDescriptor:
@@ -2304,6 +2305,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   }
   case Node::Kind::AutoDiffSubsetParametersThunk: {
+    // The four trailing children are the kind and three index subsets, and at
+    // least one child ahead of them names the thing being thunked.
+    if (Node->getNumChildren() < 5) {
+      setInvalid();
+      return nullptr;
+    }
     Printer << "autodiff subset parameters thunk for ";
     auto currentIndex = Node->getNumChildren() - 1;
     auto toParamIndices = Node->getChild(currentIndex--);
@@ -3461,6 +3468,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::AsyncFunctionPointer:
     Printer << "async function pointer to ";
     return nullptr;
+  case Node::Kind::AsyncMainEntryPoint:
+    Printer << "async main entry point";
+    return nullptr;
   case Node::Kind::AsyncAwaitResumePartialFunction:
     if (Options.ShowAsyncResumePartial) {
       Printer << "(";
@@ -3793,10 +3803,17 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
           if (node->getKind() == Node::Kind::Identifier) {
             return std::string(node->getText());
           }
-          if (node->getKind() == Node::Kind::LocalDeclName) {
-            auto text = node->getChild(1)->getText();
-            auto index = node->getChild(0)->getIndex() + 1;
-            return std::string(text) + " #" + std::to_string(index);
+          if (node->getKind() == Node::Kind::LocalDeclName &&
+              node->getNumChildren() >= 2) {
+            // Only attempt to generate a string if the child nodes are an index
+            // (discriminator) followed by text (name).
+            NodePointer discriminator = node->getChild(0);
+            NodePointer name = node->getChild(1);
+            if (name->hasText() && discriminator->hasIndex()) {
+              auto index = discriminator->getIndex() + 1;
+              return std::string(name->getText()) + " #" +
+                     std::to_string(index);
+            }
           }
           return std::string("<unknown>");
         };

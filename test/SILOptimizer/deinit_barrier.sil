@@ -110,6 +110,28 @@ sil [ossa] @test_hop_to_executor : $@convention(thin) () -> () {
   return %retval : $()
 }
 
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_yield: is_deinit_barrier
+// CHECK:  yield
+// CHECK:  true
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on test_yield: is_deinit_barrier
+sil [ossa] @test_yield : $@yield_once @convention(thin) (@owned A) -> @yields @guaranteed A {
+bb0(%0 : @owned $A):
+  %borrow = begin_borrow %0 : $A
+  specify_test "is_deinit_barrier @instruction"
+  yield %borrow : $A, resume bb1, unwind bb2
+
+bb1:
+  end_borrow %borrow : $A
+  destroy_value %0 : $A
+  %retval = tuple ()
+  return %retval : $()
+
+bb2:
+  end_borrow %borrow : $A
+  destroy_value %0 : $A
+  unwind
+}
+
 // CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_instructions_1: is_deinit_barrier
 // CHECK:  debug_step
 // CHECK:  false

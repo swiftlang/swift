@@ -737,8 +737,102 @@ module std [system] {
       export *
     }
 
+    explicit module __msvc_chrono {
+      header "__msvc_chrono.hpp"
+      export *
+    }
+
+    explicit module __msvc_cxx_stdatomic {
+      header "__msvc_cxx_stdatomic.hpp"
+      export *
+    }
+
+    explicit module __msvc_filebuf {
+      header "__msvc_filebuf.hpp"
+      export *
+    }
+
+    explicit module __msvc_format_ucd_tables {
+      header "__msvc_format_ucd_tables.hpp"
+      export *
+    }
+
+    explicit module __msvc_formatter {
+      header "__msvc_formatter.hpp"
+      requires cplusplus20
+      export *
+    }
+
+    explicit module __msvc_heap_algorithms {
+      header "__msvc_heap_algorithms.hpp"
+      export *
+    }
+
+    explicit module __msvc_int128 {
+      header "__msvc_int128.hpp"
+      export *
+    }
+
+    explicit module __msvc_iter_core {
+      header "__msvc_iter_core.hpp"
+      export *
+    }
+
+    explicit module __msvc_minmax {
+      header "__msvc_minmax.hpp"
+      export *
+    }
+
+    explicit module __msvc_ostream {
+      header "__msvc_ostream.hpp"
+      export *
+    }
+
+    explicit module __msvc_print {
+      header "__msvc_print.hpp"
+      requires cplusplus20
+      export *
+    }
+
+    explicit module __msvc_ranges_to {
+      header "__msvc_ranges_to.hpp"
+      requires cplusplus20
+      export *
+    }
+
+    explicit module __msvc_ranges_tuple_formatter {
+      header "__msvc_ranges_tuple_formatter.hpp"
+      requires cplusplus20
+      export *
+    }
+
+    explicit module __msvc_sanitizer_annotate_container {
+      header "__msvc_sanitizer_annotate_container.hpp"
+      export *
+    }
+
     explicit module __msvc_string_view {
       header "__msvc_string_view.hpp"
+      export *
+    }
+
+    explicit module __msvc_system_error_abi {
+      header "__msvc_system_error_abi.hpp"
+      export *
+    }
+
+    explicit module __msvc_threads_core {
+      header "__msvc_threads_core.hpp"
+      export *
+    }
+
+    explicit module __msvc_tzdb {
+      header "__msvc_tzdb.hpp"
+      export *
+    }
+
+    explicit module __msvc_xlocinfo_types {
+      header "__msvc_xlocinfo_types.hpp"
       export *
     }
 

@@ -331,6 +331,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::EndCOWMutationAddrInst:
+  case SILInstructionKind::EndFormalScopeInst:
   case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::GetAsyncContinuationInst:
   case SILInstructionKind::GetAsyncContinuationAddrInst:
@@ -452,7 +453,7 @@ void updateOpaqueArchetypes(SILFunction &F) {
 /// A utility pass to serialize a SILModule at any place inside the optimization
 /// pipeline.
 class SerializeSILPass : public SILModuleTransform {
-    
+
   /// Removes [serialized] from all functions. This allows for more
   /// optimizations and for a better dead function elimination.
   void removeSerializedFlagFromAllFunctions(SILModule &M) {
@@ -504,13 +505,13 @@ class SerializeSILPass : public SILModuleTransform {
 
 public:
   SerializeSILPass() {}
-  
+
   void run() override {
     auto &M = *getModule();
     // Nothing to do if the module was serialized already.
     if (M.isSerialized())
       return;
-    
+
     LLVM_DEBUG(llvm::dbgs() << "Serializing SILModule in SerializeSILPass\n");
     M.serialize();
 

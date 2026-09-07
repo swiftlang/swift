@@ -296,7 +296,7 @@ static ManagedValue implodeTupleValues(ArrayRef<ManagedValue> values,
 
   // To implode an address-only tuple, we need to create a buffer to hold the
   // result tuple.
-  if (TL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
+  if (!TL.isLoadableOrOpaque(SGF.F)) {
     assert(KIND != ImplodeKind::Unmanaged &&
            "address-only values are always managed!");
     auto buffer = SGF.emitTemporary(l, TL);

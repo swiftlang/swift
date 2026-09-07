@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -Wwarning EmbeddedRestrictions -verify-additional-prefix nonembedded-
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Embedded -verify-additional-prefix embedded-
-// RUN: %target-swift-frontend -typecheck %s -suppress-warnings -enable-experimental-feature Embedded -DSUPPRESS_WEAK
+// RUN: %target-swift-frontend -typecheck %s -suppress-warnings -enable-experimental-feature Embedded -DSUPPRESS_WEAK -DSUPPRESS_CASTS
 // REQUIRES: swift_feature_Embedded
 
 // ---------------------------------------------------------------------------
@@ -117,20 +117,25 @@ class ConformsToQ: Q {
   func okay() { }
 }
 
+#if !SUPPRESS_CASTS
 func dynamicCasting(object: AnyObject, cq: ConformsToQ) {
-  // expected-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-nonembedded-warning@+2{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-embedded-error@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
   if let q = object as? any AnyObject & Q {
     _ = q
   }
 
-  // expected-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-nonembedded-warning@+2{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-embedded-error@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
   if object is any AnyObject & Q { }
 
-  // expected-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-nonembedded-warning@+2{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-embedded-error@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
   _ = object as! AnyObject & Q
 
   _ = cq as AnyObject & Q
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // #if handling to suppress diagnostics for non-Embedded-only code
@@ -138,12 +143,14 @@ func dynamicCasting(object: AnyObject, cq: ConformsToQ) {
 
 #if $Embedded
 
+#if !SUPPRESS_CASTS
 func stillProblematic(object: AnyObject) {
-  // expected-embedded-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-embedded-error@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
   if let q = object as? any AnyObject & Q {
     _ = q
   }
 }
+#endif
 
 #else
 

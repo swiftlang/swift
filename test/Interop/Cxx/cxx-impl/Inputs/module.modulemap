@@ -1,0 +1,9 @@
+module Functions {
+  header "functions.h"
+  requires cplusplus
+}
+
+module Matching {
+  header "matching.h"
+  requires cplusplus
+}

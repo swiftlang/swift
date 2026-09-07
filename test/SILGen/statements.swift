@@ -574,6 +574,7 @@ func testRequireExprPattern(_ a : Int) {
   // CHECK-NEXT: br bb3
 
   // CHECK: bb3:
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: return
 }
@@ -588,7 +589,9 @@ func testRequireOptional1(_ a : Int?) -> Int {
   // CHECK: [[SOME]]([[PAYLOAD:%.*]] : $Int):
   // CHECK-NEXT:   [[MV_PAYLOAD:%.*]] = move_value [var_decl] [[PAYLOAD]] : $Int
   // CHECK-NEXT:   debug_value [[MV_PAYLOAD]] : $Int, let, name "t"
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   extend_lifetime [[MV_PAYLOAD]] : $Int
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   return [[MV_PAYLOAD]] : $Int
   guard let t = a else { abort() }
 
@@ -615,7 +618,9 @@ func testRequireOptional2(_ a : String?) -> String {
   // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [[STRMOVE]]
   // CHECK-NEXT:   [[RETURN:%.*]] = copy_value [[BORROWED_STR]]
   // CHECK-NEXT:   end_borrow [[BORROWED_STR]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   destroy_value [[STRMOVE]] : $String
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   return [[RETURN]] : $String
 
   // CHECK: [[NONE_BB]]:
@@ -661,7 +666,9 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
   // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [[MOVED_PTR]]
   // CHECK-NEXT: [[RESULT:%.*]] = copy_value [[BORROWED_PTR]]
   // CHECK-NEXT: end_borrow [[BORROWED_PTR]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_value [[MOVED_PTR]] : $DerivedClass
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: return [[RESULT]] : $DerivedClass
   return result
 }
@@ -780,8 +787,11 @@ func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
   // CHECK-NEXT:   [[MV_2:%.*]] = move_value [var_decl] [[PAYLOAD_2]] : $Int
   // CHECK-NEXT:   debug_value [[MV_2]] : $Int, let, name "y"
   // CHECK-NEXT:   ignored_use
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   extend_lifetime [[MV_2]] : $Int
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   extend_lifetime [[MV_1]] : $Int
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   return [[MV_1]] : $Int
 }
 

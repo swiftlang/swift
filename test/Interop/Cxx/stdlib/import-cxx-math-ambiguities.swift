@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend %s -typecheck -enable-experimental-cxx-interop
-// RUN: %target-swift-frontend %s -typecheck -cxx-interoperability-mode=swift-6
-// RUN: %target-swift-frontend %s -typecheck -cxx-interoperability-mode=upcoming-swift
+// RUN: %target-swift-frontend %s -typecheck -cxx-interoperability-mode=default
 
 #if canImport(Foundation)
 // Foundation depends on C++ standard library

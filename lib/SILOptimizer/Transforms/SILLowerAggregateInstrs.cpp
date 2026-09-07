@@ -216,9 +216,8 @@ static bool expandReleaseValue(ReleaseValueInst *rvi) {
 
   // If we have an address only type, do nothing.
   SILType type = value->getType();
-  assert(!fn->hasLoweredAddresses() ||
-         type.isLoadable(*fn) &&
-             "release_value should never be called on a non-loadable type.");
+  assert(type.isLoadableOrOpaque(*fn) &&
+          "release_value should never be called on a non-loadable type.");
 
   if (!shouldExpandShim(fn, type.getObjectType()))
     return false;
@@ -243,9 +242,8 @@ static bool expandRetainValue(RetainValueInst *rvi) {
 
   // If we have an address only type, do nothing.
   SILType type = value->getType();
-  assert(!fn->hasLoweredAddresses() ||
-         type.isLoadable(*fn) &&
-             "Copy Value can only be called on loadable types.");
+  assert(type.isLoadableOrOpaque(*fn) &&
+          "Copy Value can only be called on loadable types.");
 
   if (!shouldExpandShim(fn, type.getObjectType()))
     return false;

@@ -3549,6 +3549,43 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow(SILModule &M) && {
   return lvExpr;
 }
 
+/// Whether every reference `expr` goes through is strong, so that a dependence
+/// on storage interior to the referent can be rooted in something that outlives
+/// it.
+///
+/// Weak and unowned references don't keep an instance alive, so they break
+/// the strong chain.
+static bool hasStrongReferenceChain(Expr *expr) {
+  auto isStrong = [](ConcreteDeclRef declRef) -> VarDecl * {
+    auto *vd = dyn_cast_or_null<VarDecl>(declRef.getDecl());
+    if (!vd)
+      return nullptr;
+    if (auto *attr = vd->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+      if (attr->get() != ReferenceOwnership::Strong)
+        return nullptr;
+    }
+    return vd;
+  };
+
+  expr = expr->getSemanticsProvidingExpr();
+  if (auto *load = dyn_cast<LoadExpr>(expr))
+    return hasStrongReferenceChain(load->getSubExpr());
+  if (auto *force = dyn_cast<ForceValueExpr>(expr))
+    return hasStrongReferenceChain(force->getSubExpr());
+  if (auto *bind = dyn_cast<BindOptionalExpr>(expr))
+    return hasStrongReferenceChain(bind->getSubExpr());
+  if (auto *optEval = dyn_cast<OptionalEvaluationExpr>(expr))
+    return hasStrongReferenceChain(optEval->getSubExpr());
+  if (auto *dre = dyn_cast<DeclRefExpr>(expr))
+    return isStrong(dre->getDeclRef()) != nullptr;
+  if (auto *mre = dyn_cast<MemberRefExpr>(expr)) {
+    if (!isStrong(mre->getMember()))
+      return false;
+    return hasStrongReferenceChain(mre->getBase());
+  }
+  return false;
+}
+
 ManagedValue
 SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
                                                      ValueOwnership ownership) {
@@ -3655,13 +3692,14 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
   switch (strategy.getKind()) {
   case AccessStrategy::Storage: {
     auto vd = cast<VarDecl>(memberStorage);
-    // TODO: Is it possible and/or useful for class storage to be
-    // addressable?
-    if (!vd->isInstanceMember()
-        || !isa<StructDecl>(vd->getDeclContext())) {
+    if (!vd->isInstanceMember()) {
       return notAddressable();
     }
-  
+    auto *declContext = vd->getDeclContext();
+    if (!isa<StructDecl>(declContext) && !isa<ClassDecl>(declContext)) {
+      return notAddressable();
+    }
+
     // If the storage holds the fully-abstracted representation of the
     // type, then we can use its address.
     auto absBaseTy = getLoweredType(AbstractionPattern::getOpaque(),
@@ -3669,23 +3707,42 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     auto memberTy = absBaseTy.getFieldType(vd, &F);
     auto absMemberTy = getLoweredType(AbstractionPattern::getOpaque(),
                             lookupExpr->getType()->getWithoutSpecifierType());
-    
+
     if (memberTy.getAddressType() != absMemberTy.getAddressType()) {
       // The storage is not fully abstracted, so it can't serve as a
       // stable address.
       return notAddressable();
     }
-    
+
+    if (isa<ClassDecl>(declContext)) {
+      // A class instance holds its stored properties at a stable address for as
+      // long as the instance is alive, so unlike a struct the base does not
+      // itself have to be addressable. We only need to make sure that the
+      // instance stays alive.
+      //
+      // This only makes sense for a 'let' field, because it cannot be modified.
+      if (!vd->isLet() || accessKind != AccessKind::Read
+          || !hasStrongReferenceChain(lookupExpr->getBase())) {
+        return notAddressable();
+      }
+      // Project the field as an l-value: RefElementComponent borrows the
+      // instance using formal access, so that borrow outlives the call this
+      // address is passed to.
+      LValue lv = emitLValue(lookupExpr, SGFAccessKind::BorrowedAddressRead);
+      auto fieldAddr = emitAddressOfLValue(lookupExpr, std::move(lv));
+      return ManagedValue::forBorrowedAddressRValue(fieldAddr.getValue());
+    }
+
     // Otherwise, we can project the field address from the stable address
     // of the base, if it has one. Try to get the stable address for the
     // base.
     auto baseAddr = tryEmitAddressableParameterAsAddress(
       ArgumentSource(lookupExpr->getBase()), ownership);
-      
+
     if (!baseAddr) {
       return notAddressable();
     }
-    
+
     // Project the field's address.
     auto fieldAddr = B.createStructElementAddr(lookupExpr,
                                                baseAddr.getValue(), vd);
@@ -5619,8 +5676,32 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
   // begin_borrow instructions added for move-only self argument.
   if (selfArgMV.getValue()->getType().isMoveOnly() &&
       selfArgMV.getValue()->getType().isObject()) {
-    uncurriedArgs.back() = ManagedValue::forBorrowedObjectRValue(
+    selfArgMV = ManagedValue::forBorrowedObjectRValue(
         lookThroughMoveOnlyCheckerPattern(selfArgMV.getValue()));
+  }
+
+  // Under opaque values, a borrow accessor's @in_guaranteed self is lowered to a
+  // by-value object, but the base here can still be an address, e.g. the
+  // begin_access of an inout base. Load it so the argument matches the callee's
+  // self convention.
+  //
+  // This keys off the callee's lowered self type rather than the accessor kind.
+  // A mutating mutate accessor takes @inout self, and Indirect_Inout is an
+  // address in every mode: isIndirectSILParam returns true for it without
+  // consulting loweredAddresses. Such a base is passed through untouched and
+  // stays mutable at the call site. Self is loaded only when it is genuinely
+  // by-value: a borrow accessor, or a mutate accessor whose self isn't inout
+  // (on a class, or an explicit 'nonmutating mutate').
+  if (!SGF.silConv.useLoweredAddresses() && selfArgMV.getType().isAddress()) {
+    SILFunctionConventions substConv(calleeTypeInfo.substFnType,
+                                     SILAddressConventions::forFunction(SGF.F));
+    auto selfParamTy = substConv.getSILType(
+        calleeTypeInfo.substFnType->getSelfParameter(),
+        SGF.getTypeExpansionContext());
+    if (selfParamTy.isObject()) {
+      selfArgMV =
+          SGF.emitManagedLoadBorrow(uncurriedLoc.value(), selfArgMV.getValue());
+    }
   }
 
   if (fnValue.getFunction()->getConventions().hasGuaranteedResult()) {
@@ -5628,12 +5709,15 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
       // unchecked_ownership is used to silence the ownership verifier for
       // returning a value produced within a load_borrow scope. SILGenCleanup
       // eliminates it and introduces return_borrow appropriately.
-      uncurriedArgs.back() =
+      selfArgMV =
           ManagedValue::forForwardedRValue(
               SGF, SGF.B.createUncheckedOwnership(uncurriedLoc.value(),
                                                   selfArgMV.getValue()));
     }
   }
+
+  // Write-back the self arg.
+  uncurriedArgs.back() = selfArgMV;
 
   auto value = SGF.applyBorrowMutateAccessor(
       uncurriedLoc.value(), fnValue, callee.getSubstitutions(),
@@ -6919,7 +7003,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   // Easy case -- no payload
   if (!element->hasAssociatedValues()) {
     assert(payloads.empty());
-    if (enumTy.isLoadable(F) || !silConv.useLoweredAddresses()) {
+    if (enumTy.isLoadableOrOpaque(F)) {
       return emitManagedRValueWithCleanup(
           B.createEnum(loc, SILValue(), element, enumTy.getObjectType()));
     }
@@ -6971,7 +7055,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   }
 
   // Loadable with payload
-  if (enumTy.isLoadable(F) || !silConv.useLoweredAddresses()) {
+  if (enumTy.isLoadableOrOpaque(F)) {
     ManagedValue payloadMV;
     if (boxMV) {
       payloadMV = boxMV;
@@ -7044,6 +7128,16 @@ RValue SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                                    SubstitutionMap subMap,
                                                    ArrayRef<ManagedValue> args,
                                                    SGFContext ctx) {
+  for (auto conf : subMap.getConformances()) {
+    if (conf.isInvalid()) {
+      ABORT([&](llvm::raw_ostream &out) {
+        out << "Invalid conformance in substitution map for call to ";
+        out << declRef << ":\n";
+        subMap.dump(out);
+      });
+    }
+  }
+
   // Calls into library intrinsics are implicitly generated by the compiler.
   // Marking them as explicit creates a backtrace pointing back to the user code
   // that the intrinsic call was generated from.
@@ -7764,7 +7858,7 @@ static void collectFakeIndexParameters(SILGenFunction &SGF,
   // Use conventions that will produce a +1 value.
   auto &tl = SGF.getTypeLowering(substType);
   ParameterConvention convention;
-  if (tl.isAddressOnly()) {
+  if (tl.getRecursiveProperties().isAddressOnly()) {
     convention = ParameterConvention::Indirect_In;
   } else if (tl.isTrivial()) {
     convention = ParameterConvention::Direct_Unowned;

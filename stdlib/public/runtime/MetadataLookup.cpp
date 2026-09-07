@@ -2932,36 +2932,55 @@ static NodePointer extractFunctionTypeFromMethod(Demangler &demangler,
   if (!node)
     return nullptr;
 
-  node = node->findByKind(Node::Kind::Type, /*maxDepth=*/2);
-  if (!node)
+  // The signature is the Function node's last child. Searching the subtree for
+  // a Type node instead would find the one belonging to the enclosing context,
+  // which is the Function's first child and can be an entity with a type of its
+  // own, such as a variable.
+  node = node->getLastChild();
+  if (!node || node->getKind() != Node::Kind::Type)
     return nullptr;
 
-  // If this is a generic function, it requires special handling.
-  if (auto genericType =
-          node->findByKind(Node::Kind::DependentGenericType, /*maxDepth=*/1)) {
-    node = genericType->findByKind(Node::Kind::Type, /*maxDepth=*/1);
-    return node->findByKind(Node::Kind::FunctionType, /*maxDepth=*/1);
+  auto funcType = node->getFirstChild();
+  if (!funcType)
+    return nullptr;
+
+  // A generic function wraps its signature in a DependentGenericType.
+  if (funcType->getKind() == Node::Kind::DependentGenericType) {
+    node = funcType->getLastChild();
+    if (!node || node->getKind() != Node::Kind::Type)
+      return nullptr;
+
+    funcType = node->getFirstChild();
+    if (!funcType)
+      return nullptr;
   }
 
-  auto funcType = node->getFirstChild();
-  assert(funcType->getKind() == Node::Kind::FunctionType);
+  if (funcType->getKind() != Node::Kind::FunctionType)
+    return nullptr;
+
   return funcType;
 }
 
 /// For a single unlabeled parameter this function returns whole
-/// `ArgumentTuple`, for everything else a `Tuple` element inside it.
+/// `ArgumentTuple`, for everything else a `Tuple` element inside it. Returns
+/// null if the function type doesn't have a well-formed parameter list.
 static NodePointer getParameterList(NodePointer funcType) {
   assert(funcType->getKind() == Node::Kind::FunctionType);
 
   auto parameterContainer =
       funcType->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/1);
-  assert(parameterContainer->getNumChildren() > 0);
+  if (!parameterContainer)
+    return nullptr;
 
   // This is a type that covers entire parameter list.
   auto parameterList = parameterContainer->getFirstChild();
-  assert(parameterList->getKind() == Node::Kind::Type);
+  if (!parameterList || parameterList->getKind() != Node::Kind::Type)
+    return nullptr;
 
   auto parameters = parameterList->getFirstChild();
+  if (!parameters)
+    return nullptr;
+
   if (parameters->getKind() == Node::Kind::Tuple)
     return parameters;
 
@@ -2999,6 +3018,9 @@ unsigned swift_func_getParameterCount(const char *typeNameStart,
     return -1;
 
   auto parameterList = getParameterList(funcType);
+  if (!parameterList)
+    return -1;
+
   return parameterList->getNumChildren();
 }
 
@@ -3015,16 +3037,17 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
     return nullptr;
 
   auto resultType = funcType->getLastChild();
-  if (!resultType)
+  if (!resultType || resultType->getKind() != Node::Kind::ReturnType)
     return nullptr;
-
-  assert(resultType->getKind() == Node::Kind::ReturnType);
 
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
   auto request = MetadataRequest(MetadataState::Complete);
 
   NodePointer nodePointer = resultType->getFirstChild();
+  if (!nodePointer)
+    return nullptr;
+
   auto typeInfoOrErr = swift_getTypeByMangledNode(
       request, demangler, nodePointer,
       /*arguments=*/genericArguments,
@@ -3075,10 +3098,13 @@ swift_func_getParameterTypeInfo(
     auto nodePointer = parameterList->getChild(index);
 
     if (nodePointer->getKind() == Node::Kind::TupleElement) {
-      assert(nodePointer->getNumChildren() == 1);
-      nodePointer = nodePointer->getFirstChild();
+      nodePointer = nodePointer->getLastChild();
+      if (!nodePointer)
+        return -3;
     }
-    assert(nodePointer->getKind() == Node::Kind::Type);
+
+    if (nodePointer->getKind() != Node::Kind::Type)
+      return -3;
 
     auto request = MetadataRequest(MetadataState::Complete);
 

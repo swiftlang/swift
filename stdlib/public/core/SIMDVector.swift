@@ -1316,7 +1316,7 @@ extension SIMD where Scalar: FloatingPoint {
   
   @_transparent
   public static prefix func -(a: Self) -> Self {
-    return 0 - a
+    return -1 * a
   }
   
   @_transparent

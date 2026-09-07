@@ -20,6 +20,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/QuotedString.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -70,6 +71,17 @@ static ArraySliceType *computeAllCasesType(NominalTypeDecl *enumDecl) {
   return ArraySliceType::get(enumType);
 }
 
+static ValueDecl *deriveCaseIterableViaMacros(DerivedConformance &derived,
+                                              ValueDecl *requirement) {
+  std::string macro;
+  auto os = llvm::raw_string_ostream(macro);
+  os << "#_deriveCaseIterable("
+     << QuotedString(getNominalTypeInfoString(derived)) << ")";
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveCaseIterable);
+}
+
 static Type deriveCaseIterable_AllCases(DerivedConformance &derived) {
   // enum SomeEnum : CaseIterable {
   //   @derived
@@ -95,6 +107,9 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
     requirement->diagnose(diag::broken_case_iterable_requirement);
     return nullptr;
   }
+
+  if (Context.LangOpts.hasFeature(Feature::DeriveConformancesViaMacros))
+    return deriveCaseIterableViaMacros(*this, requirement);
 
   // Define the property.
   auto *returnTy = computeAllCasesType(Nominal);
@@ -130,4 +145,3 @@ Type DerivedConformance::deriveCaseIterable(AssociatedTypeDecl *assocType) {
                          diag::broken_case_iterable_requirement);
   return nullptr;
 }
-

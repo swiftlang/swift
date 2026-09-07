@@ -21,15 +21,14 @@ using namespace swift;
 using namespace swift::constraints;
 using namespace swift::ide;
 
-bool PostfixCompletionCallback::Result::tryMerge(const Result &Other,
-                                                 DeclContext *DC) {
+bool PostfixCompletionCallback::Result::tryMerge(const Result &Other) {
   if (BaseDecl != Other.BaseDecl)
     return false;
 
   // This should match if we are talking about the same BaseDecl.
   assert(BaseIsStaticMetaType == Other.BaseIsStaticMetaType);
 
-  auto baseTy = tryMergeBaseTypeForCompletionLookup(BaseTy, Other.BaseTy, DC);
+  auto baseTy = tryMergeBaseTypeForCompletionLookup(BaseTy, Other.BaseTy);
   if (!baseTy)
     return false;
 
@@ -65,7 +64,7 @@ bool PostfixCompletionCallback::Result::tryMerge(const Result &Other,
 
 void PostfixCompletionCallback::addResult(const Result &Res) {
   for (auto idx : indices(Results)) {
-    if (Results[idx].tryMerge(Res, DC))
+    if (Results[idx].tryMerge(Res))
       return;
   }
   Results.push_back(Res);

@@ -352,6 +352,25 @@ func test_scope_outer_cancel_cascades_to_inner() async {
 }
 
 @available(StdlibDeploymentTarget 6.5, *)
+struct Signal: Sendable {
+  private let stream: AsyncStream<Void>
+  private let continuation: AsyncStream<Void>.Continuation
+
+  init() {
+    (stream, continuation) = AsyncStream<Void>.makeStream()
+  }
+
+  func signal() {
+    continuation.yield(())
+  }
+
+  func wait() async {
+    var iterator = stream.makeAsyncIterator()
+    _ = await iterator.next()
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
 func test_scope_structured_children_are_cascaded() async {
   print("--- test_scope_structured_children_are_cascaded")
   // CHECK: --- test_scope_structured_children_are_cascaded
@@ -362,15 +381,21 @@ func test_scope_structured_children_are_cascaded() async {
   // parent has a cancelled scope on its chain.
   await __withTaskCancellationScope { scope in
     await withTaskGroup(of: Bool.self) { group in
+      let childStarted = Signal()
+      let scopeCancelled = Signal()
+
       // Child spawned BEFORE cancel: still executing when the cascade
       // fires; observes as cancelled.
       group.addTask {
-        // Yield so the parent's cancel walk happens first.
-        for _ in 0..<10 { await Task.yield() }
+        childStarted.signal()
+        await scopeCancelled.wait()
         return Task.isCancelled
       }
 
+      await childStarted.wait()
+
       scope.cancel()
+      scopeCancelled.signal()
 
       group.addTask {
         Task.isCancelled
@@ -387,15 +412,6 @@ func test_scope_structured_children_are_cascaded() async {
 }
 
 @available(StdlibDeploymentTarget 6.5, *)
-@inline(never)
-func yieldThenCheckCancelled() async -> Bool {
-  // Yield so the enclosing scope's cancel() (and its record-chain cascade)
-  // runs first, before this child checks its own cancellation state.
-  for _ in 0..<10 { await Task.yield() }
-  return Task.isCancelled
-}
-
-@available(StdlibDeploymentTarget 6.5, *)
 func test_scope_async_let_child_is_cancelled() async {
   print("--- test_scope_async_let_child_is_cancelled")
   // CHECK: --- test_scope_async_let_child_is_cancelled
@@ -408,9 +424,19 @@ func test_scope_async_let_child_is_cancelled() async {
   // and ones spawned after cancel (cancelled at creation, since their parent
   // already has a cancelled scope on its chain).
   await __withTaskCancellationScope { scope in
-    async let before = yieldThenCheckCancelled()
+    let childStarted = Signal()
+    let scopeCancelled = Signal()
+
+    async let before: Bool = {
+      childStarted.signal()
+      await scopeCancelled.wait()
+      return Task.isCancelled
+    }()
+
+    await childStarted.wait()
 
     scope.cancel()
+    scopeCancelled.signal()
 
     async let after: Bool = Task.isCancelled
 

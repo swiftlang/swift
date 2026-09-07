@@ -89,6 +89,9 @@ bb7(%19 : $Int64):
   return %19 : $Int64
 }
 
+// The condition is passed as a `Builtin.Int1` and not wrapped in a `Bool` struct, because
+// "unwrapping" a phi argument is not done by this pass anymore, but by `simplification` -
+// see `Phi.unwrapAggregate` in SimplifyPhiArgument.swift.
 // CHECK-LABEL: sil [ossa] @redundant_switchenum_guaranteed : $@convention(thin) (@guaranteed Optional<C>) -> Int32 {
 // CHECK: switch_enum
 // CHECK-NOT: switch_enum
@@ -99,17 +102,14 @@ bb0(%0 : @guaranteed $Optional<C>):
 
 bb1(%0b : @guaranteed $C):
   %9 = integer_literal $Builtin.Int1, -1
-  %10 = struct $Bool (%9 : $Builtin.Int1)
-  br bb3(%10 : $Bool)
+  br bb3(%9 : $Builtin.Int1)
 
 bb2:
   %17 = integer_literal $Builtin.Int1, 0
-  %18 = struct $Bool (%17 : $Builtin.Int1)
-  br bb3(%18 : $Bool)
+  br bb3(%17 : $Builtin.Int1)
 
-bb3(%12 : $Bool):
-  %15 = struct_extract %12 : $Bool, #Bool._value
-  cond_br %15, bb4, bb7
+bb3(%12 : $Builtin.Int1):
+  cond_br %12, bb4, bb7
 
 bb4:
   %21 = alloc_stack $Optional<C>
@@ -658,18 +658,20 @@ sil [ossa] @f_use : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:  [[EXT:%.*]] = tuple_extract [[INVADD]]
 // CHECK:  switch_enum {{.*}} case #Optional.some!enumelt: bb2
 
-// CHECK: bb2{{.*}}
-// CHECK:  br bb4(%2 : $Builtin.Int32, [[EXT]]
+// CHECK: bb2([[PAYLOAD:%.*]] : $Builtin.Int32):
+// CHECK:  br bb4([[PAYLOAD]] : $Builtin.Int32, %2 : $Builtin.Int32, [[EXT]]
 
-// CHECK: bb4([[CUR:%.*]] : $Builtin.Int32, [[NEXT:%.*]] : $Builtin.Int32
+// CHECK: bb4([[NEXTPAYLOAD:%.*]] : $Builtin.Int32, [[CUR:%.*]] : $Builtin.Int32, [[NEXT:%.*]] : $Builtin.Int32
 // CHECK:  [[F:%.*]] = function_ref @f
 // CHECK:  apply [[F]]([[CUR]])
 // CHECK:  cond_br {{.*}}, bb5, bb7
 
 // CHECK: bb5:
+// CHECK:   [[E:%.*]] = enum $Optional<Builtin.Int32>, #Optional.some!enumelt, [[NEXTPAYLOAD]]
 // CHECK:   [[VARADD:%.*]] = builtin "sadd_with_overflow_Int32"([[NEXT]] : $Builtin.Int32
 // CHECK:   [[NEXT2:%.*]] = tuple_extract [[VARADD]]
-// CHECK:   br bb4([[NEXT]] : $Builtin.Int32, [[NEXT2]]
+// CHECK:   [[D:%.*]] = unchecked_enum_data [[E]]
+// CHECK:   br bb4([[D]] : $Builtin.Int32, [[NEXT]] : $Builtin.Int32, [[NEXT2]]
 sil [ossa] @switch_enum_jumpthreading_bug : $@convention(thin) (Optional<Builtin.Int32>, Builtin.Int1, Builtin.Int32, Builtin.Int1) -> Builtin.Int32 {
 bb0(%0 : $Optional<Builtin.Int32>, %1 : $Builtin.Int1, %2: $Builtin.Int32, %3 : $Builtin.Int1):
   cond_br %1, bb2, bb10a

@@ -147,6 +147,12 @@ bool SILType::isTrivial(const SILFunction &F) const {
   return F.getTypeProperties(contextType).isTrivial();
 }
 
+bool SILType::isNonTrivialOnlyBecauseNonEscapable(const SILFunction &F) const {
+  auto contextType =
+      hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
+  return F.getTypeProperties(contextType).isNonTrivialOnlyBecauseNonEscapable();
+}
+
 bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
   return F.getTypeProperties(contextType).isOrContainsRawPointer();
@@ -576,6 +582,11 @@ SILType::getPreferredExistentialRepresentation(Type containedType) const {
     }
   }
 
+  // A COM interface existential is already its foreign object-model projection.
+  // It is neither a Swift class reference nor an opaque existential constraint.
+  if (layout.getCOMInterface())
+    return ExistentialRepresentation::COM;
+
   // A class-constrained protocol composition can adopt the conforming
   // class reference directly.
   if (layout.requiresClass())
@@ -590,6 +601,9 @@ bool
 SILType::canUseExistentialRepresentation(ExistentialRepresentation repr,
                                          Type containedType) const {
   switch (repr) {
+  case ExistentialRepresentation::COM:
+    return isExistentialType() &&
+      getASTType().getExistentialLayout().getCOMInterface();
   case ExistentialRepresentation::None:
     return !isAnyExistentialType();
   case ExistentialRepresentation::Opaque:
@@ -684,8 +698,7 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
       return OwnershipKind::None;
     return OwnershipKind::Unowned;
   case ResultConvention::GuaranteedAddress:
-    return isAddressResult(
-               SILAddressConventions::forFunction(F).useLoweredAddresses())
+    return SILAddressConventions::forFunction(F).isAddressResult(*this)
                ? OwnershipKind::None
                : OwnershipKind::Guaranteed;
   case ResultConvention::Inout:

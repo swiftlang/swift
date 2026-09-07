@@ -39,6 +39,7 @@ func callAsync(fn: @isolated(any) @Sendable () async -> ()) async {
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sIeghH_IeAghH_TR : $@convention(thin) @Sendable @async (@guaranteed Optional<any Actor>, @guaranteed @Sendable @async @callee_guaranteed () -> ()) -> ()
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[THUNK]]([[ISOLATION]], [[FN_COPY]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> ()
 func convertFromNonIsolated(fn: @escaping @Sendable () async -> ())
     -> @isolated(any) @Sendable () async -> () {
@@ -70,6 +71,7 @@ func convertFromNonIsolated(fn: @escaping @Sendable () async -> ())
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sIeghH_IeAghH_TR : $@convention(thin) @Sendable @async (@guaranteed Optional<any Actor>, @guaranteed @Sendable @async @callee_guaranteed () -> ()) -> ()
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[THUNK]]([[ISOLATION]], [[FN_COPY]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> ()
 func convertFromMainActor(fn: @escaping @Sendable @MainActor () async -> ())
     -> @isolated(any) @Sendable () async -> () {
@@ -89,6 +91,7 @@ func convertFromMainActor(fn: @escaping @Sendable @MainActor () async -> ())
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sSiIeghHd_SiSgIeAghHd_TR : 
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[THUNK]]([[ISOLATION]], [[FN_COPY]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> Optional<Int>
 func convertFromMainActorWithOtherChanges(fn: @escaping @Sendable @MainActor () async -> Int)
     -> @isolated(any) @Sendable () async -> Int? {
@@ -107,6 +110,7 @@ func convertFromMainActorWithOtherChanges(fn: @escaping @Sendable @MainActor () 
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[FN_COPY:%.*]] = copy_value %0 :
 // CHECK-NEXT:    [[FN_CONVERTED:%.*]] = convert_function [[FN_COPY]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> () to $@Sendable @async @callee_guaranteed () -> ()
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[FN_CONVERTED]] :
 func convertToNonIsolated(fn: @escaping @isolated(any) @Sendable () async -> ())
     -> @Sendable () async -> () {
@@ -122,6 +126,7 @@ func convertToNonIsolated(fn: @escaping @isolated(any) @Sendable () async -> ())
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sSiIeAghHd_SiSgIeghHd_TR : 
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FN_COPY]])
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@Sendable @async @callee_guaranteed () -> Optional<Int>
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSiIeAghHd_SiSgIeghHd_TR
@@ -538,6 +543,7 @@ func testEraseAsyncActorIsolatedPartialApplication(a: MyActor) {
 // CHECK-NEXT: [[RESULT:%.*]] = copy_value [[ISOLATION]] : $Optional<any Actor>
 // CHECK-NEXT: end_borrow [[FN_BORROW]] : $@isolated(any) @Sendable @callee_guaranteed () -> ()
 // CHECK-NEXT: destroy_value [[FN]] : $@isolated(any) @Sendable @callee_guaranteed () -> ()
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RESULT]] : $Optional<any Actor>
 func extractIsolation(fn: @escaping @isolated(any) @Sendable () -> Void) -> (any Actor)? {
   fn.isolation

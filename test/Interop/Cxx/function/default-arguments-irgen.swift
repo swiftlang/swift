@@ -1,6 +1,4 @@
-// RUN: %target-swift-emit-irgen -I %S/Inputs -cxx-interoperability-mode=swift-5.9 %s | %FileCheck %s
-// RUN: %target-swift-emit-irgen -I %S/Inputs -cxx-interoperability-mode=swift-6 %s | %FileCheck %s
-// RUN: %target-swift-emit-irgen -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %s | %FileCheck %s
+// RUN: %target-swift-emit-irgen -I %S/Inputs -cxx-interoperability-mode=default %s | %FileCheck %s
 
 import DefaultArguments
 

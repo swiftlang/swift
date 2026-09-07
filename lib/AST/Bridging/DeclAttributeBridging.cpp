@@ -762,6 +762,14 @@ BridgedSemanticsAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
                     /*Implicit=*/false);
 }
 
+BridgedTargetAttr
+BridgedTargetAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                               SourceRange range, BridgedStringRef cValue) {
+  return new (cContext.unbridged())
+      TargetAttr(cValue.unbridged(), atLoc, range,
+                /*Implicit=*/false);
+}
+
 BridgedSetterAccessAttr
 BridgedSetterAccessAttr_createParsed(BridgedASTContext cContext,
                                      SourceRange range,

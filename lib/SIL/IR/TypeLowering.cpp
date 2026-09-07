@@ -819,6 +819,18 @@ namespace {
                                IsTypeExpansionSensitive_t isSensitive) {
       switch (SILType::getPrimitiveObjectType(type)
                 .getPreferredExistentialRepresentation()) {
+      case ExistentialRepresentation::COM:
+        // COM existentials are fixed-size, loadable values with custom
+        // copy/destroy operations. They must not be classified as Swift
+        // reference-counted values: their sole pointer is an interface address,
+        // not a Swift heap-object address point.
+        return asImpl().handleNonTrivialAggregate(type, {IsNotTrivial,
+                                                         IsFixedABI,
+                                                         IsNotAddressOnly,
+                                                         IsNotResilient,
+                                                         isSensitive,
+                                                         DoesNotHaveRawPointer,
+                                                         IsLexical});
       case ExistentialRepresentation::None:
         llvm_unreachable("not an existential type?!");
       // Opaque existentials are address-only.
@@ -2300,6 +2312,111 @@ namespace {
     }
   };
 
+  class TrivialOpaqueValueTypeLowering : public LoadableTypeLowering {
+  public:
+    TrivialOpaqueValueTypeLowering(SILType type, SILTypeProperties properties,
+                                   TypeExpansionContext forExpansion)
+        : LoadableTypeLowering(type, properties, IsNotReferenceCounted,
+                               forExpansion) {
+      assert(properties.isTrivial());
+      assert(properties.isAddressOnly());
+    }
+
+    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
+                            IsTake_t isTake) const override {
+      return emitLoad(B, loc, addr, LoadOwnershipQualifier::Trivial);
+    }
+
+    void emitStoreOfCopy(SILBuilder &B, SILLocation loc, SILValue value,
+                         SILValue addr,
+                         IsInitialization_t isInit) const override {
+      emitStore(B, loc, value, addr, StoreOwnershipQualifier::Trivial);
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      if (B.getFunction().hasOwnership()) {
+        B.createStore(loc, value, addr, StoreOwnershipQualifier::Trivial);
+        return;
+      }
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      if (B.getFunction().hasOwnership())
+        return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
+      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+    }
+
+    void emitLoweredStore(SILBuilder &B, SILLocation loc, SILValue value,
+                          SILValue addr, StoreOwnershipQualifier qual,
+                          Lowering::TypeLowering::TypeExpansionKind
+                              expansionKind) const override {
+      if (B.getFunction().hasOwnership()) {
+        B.createStore(loc, value, addr, StoreOwnershipQualifier::Trivial);
+        return;
+      }
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+    }
+
+    SILValue emitLoweredLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                             LoadOwnershipQualifier qual,
+                             TypeExpansionKind) const override {
+      if (B.getFunction().hasOwnership())
+        return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
+      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+    }
+
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+      // Trivial
+    }
+
+    void
+    emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
+                            TypeExpansionKind loweringStyle) const override {
+      // Trivial
+    }
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  TypeExpansionKind style) const override {
+      // Trivial
+      return value;
+    }
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      // Trivial
+      return value;
+    }
+
+    void emitCopyInto(SILBuilder &B, SILLocation loc, SILValue src,
+                      SILValue dest, IsTake_t isTake,
+                      IsInitialization_t isInit) const override {
+      if (B.getFunction().hasLoweredAddresses()) {
+        B.createCopyAddr(loc, src, dest, isTake, isInit);
+      } else {
+        SILValue value = emitLoad(B, loc, src, LoadOwnershipQualifier::Trivial);
+        emitStore(B, loc, value, dest, StoreOwnershipQualifier::Trivial);
+      }
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      if (B.getFunction().hasOwnership() &&
+          B.getModule().getStage() == SILStage::Raw && value->isFromVarDecl()) {
+        // Do not use destroy_value for trivial values. The lifetime introducer
+        // may be implicitly copied and used outside of its original scope,
+        // which violates the invariants of destroy_value.
+        B.createExtendLifetime(loc, value);
+        return;
+      }
+      // Trivial
+    }
+  };
+
   /// Build the appropriate TypeLowering subclass for the given type,
   /// which is assumed to already have been lowered.
   class LowerType
@@ -2374,9 +2491,20 @@ namespace {
       // derived per query by TypeLowering::getLoweredType(bool) from the
       // caller's lowered-addresses state, rather than baked in here.
       auto silType = SILType::getPrimitiveObjectType(type);
+      if (properties.isTrivial()) {
+        return new (TC)
+            TrivialOpaqueValueTypeLowering(silType, properties, Expansion);
+      }
       return new (TC) OpaqueValueTypeLowering(silType, properties, Expansion);
     }
-    
+
+    TypeLowering *handleNonTrivialAggregate(CanType T,
+                                            SILTypeProperties properties) {
+      properties = mergeHasPack(HasPack_t(T->hasAnyPack()), properties);
+      auto type = SILType::getPrimitiveObjectType(T);
+      return new (TC) MiscNontrivialTypeLowering(type, properties, Expansion);
+    }
+
     TypeLowering *handleInfinite(CanType type,
                                  SILTypeProperties properties) {
       properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
@@ -2722,7 +2850,7 @@ namespace {
       // Regardless of their member types, Nonescapable values have ownership
       // for lifetime diagnostics.
       if (!origType.isEscapable(structType)) {
-        properties.setNonTrivial();
+        properties.setNonEscapable();
       }
       // Merge the CustomDeinit properties of the type parameters.
       if (hasConditionalDefaultDeinit(structType, D)) {
@@ -2835,7 +2963,7 @@ namespace {
       // Regardless of their member types, Nonescapable values have ownership
       // for lifetime diagnostics.
       if (!origType.isEscapable(enumType)) {
-        properties.setNonTrivial();
+        properties.setNonEscapable();
       }
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);
@@ -5649,6 +5777,10 @@ uint16_t FunctionType::getPointerAuthDiscriminator(
                                 TypeExpansionContext::minimal());
   auto functionType = typeLowering.getLoweredType().getAs<SILFunctionType>();
   return functionType->getPointerAuthDiscriminator(nullptr);
+}
+
+bool TypeLowering::isLoadableOrOpaque(const SILFunction &F) const {
+  return isLoadable() || !F.hasLoweredAddresses();
 }
 
 void TypeLowering::print(llvm::raw_ostream &os) const {

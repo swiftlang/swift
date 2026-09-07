@@ -16,7 +16,6 @@
 // REQUIRES: executable_test
 // REQUIRES: stdlib_5_8_runtime
 // REQUIRES: swift_feature_Lifetimes
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 

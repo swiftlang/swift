@@ -288,11 +288,6 @@ public:
   /// entity.
   bool ProfileEntities = false;
 
-  /// Emit parseable-output directly from the frontend, instead of relying
-  /// the driver to emit it. This is used in context where frontend jobs are executed by
-  /// clients other than the driver.
-  bool FrontendParseableOutput = false;
-
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
   bool EnableSourceImport = false;
@@ -544,10 +539,14 @@ public:
   /// loaded before it is run.
   static bool doesActionRequireSwiftStandardLibrary(ActionType);
 
+  /// \return true if the given action runs full semantic analysis over the
+  /// whole module, providing a fully typechecked main module.
+  static bool doesActionTypeCheckWholeModule(ActionType);
+
   /// \return true if the given action requires input files to be provided.
   static bool doesActionRequireInputs(ActionType action);
 
-  /// \return true if the given action requires input files to be provided.
+  /// \return true if the given action performs end of pipeline actions.
   static bool doesActionPerformEndOfPipelineActions(ActionType action);
 
   /// \return true if the given action supports caching.

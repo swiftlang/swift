@@ -409,8 +409,9 @@ SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
   if (lowering.isTrivial())
     return originalValue;
 
-  assert(!lowering.isAddressOnly() && "cannot perform a copy value of an "
-                                      "address only type");
+  assert(lowering.isLoadableOrOpaque(SGF.F) &&
+         "cannot perform a copy value of an "
+         "address only type");
 
   if (ty.isObject() &&
       originalValue.getOwnershipKind() == OwnershipKind::None) {
@@ -553,7 +554,7 @@ ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
       lowering.emitLoadOfCopy(*this, loc, v.forward(SGF), IsTake);
   if (lowering.isTrivial())
     return ManagedValue::forObjectRValueWithoutOwnership(result);
-  assert((!lowering.isAddressOnly() || !SGF.silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(SGF.F) &&
          "cannot retain an unloadable type");
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
@@ -584,8 +585,7 @@ ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v,
       lowering.emitLoadOfCopy(*this, loc, v.getValue(), IsNotTake);
   if (lowering.isTrivial())
     return ManagedValue::forObjectRValueWithoutOwnership(result);
-  assert((!lowering.isAddressOnly()
-          || !SGF.silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(SGF.F) &&
          "cannot retain an unloadable type");
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }

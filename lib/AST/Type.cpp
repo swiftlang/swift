@@ -221,6 +221,11 @@ Type TypeBase::findUnsafeType(
         return Action::SkipNode;
       }
 
+      // Do not recurse into metatypes. The metatype itself is safe independent
+      // of whether its underlying type is safe.
+      if (isa<AnyMetatypeType>(type.getPointer()))
+        return Action::SkipNode;
+
       return Action::Continue;
     }
 
@@ -255,6 +260,20 @@ Type TypeBase::findAlwaysUnsafeType() const {
   // declaration is to blame, not how it was spelled.
   return getCanonicalType()->findUnsafeType(
       [](NominalTypeDecl *typeDecl) { return typeDecl->isAlwaysUnsafe(); });
+}
+
+
+static std::optional<ReferenceCounting>
+getHiddenTypeReferenceCounting(CanHiddenType type) {
+  auto *layoutInfoDecl = type->getLayoutInfoDecl();
+  // TODO: Remove this legacy fallback once every HiddenType carries an
+  // abstract layout.
+  if (!layoutInfoDecl)
+    return std::nullopt;
+
+  assert(layoutInfoDecl->Layout &&
+         "HiddenTypeLayoutInfoDecl should have abstract layout");
+  return layoutInfoDecl->Layout->referenceCountingSystem;
 }
 
 bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
@@ -309,6 +328,9 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::SILFunction:
     return functionsCount;
 
+  case TypeKind::Hidden:
+    return getHiddenTypeReferenceCounting(cast<HiddenType>(type)).has_value();
+
   // Nothing else is statically just a class reference.
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
@@ -344,7 +366,6 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
-  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:
@@ -3446,14 +3467,16 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   if (nominal->hasClangNode() || nominal->isObjC()) {
     switch (language) {
     case ForeignLanguage::C:
+    case ForeignLanguage::Cxx:
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
         switch (classDecl->getForeignClassKind()) {
         case ClassDecl::ForeignKind::Normal:
         case ClassDecl::ForeignKind::RuntimeOnly:
-          // Imported classes cannot be represented in C.
+          // Imported classes cannot be represented in C or C++.
           return failure();
         case ClassDecl::ForeignKind::CFType:
-          // Imported CF types can be represented as trivial pointer types in C.
+          // Imported CF types can be represented as trivial pointer types in C
+          // or C++.
           break;
         }
       }
@@ -3462,8 +3485,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       if (isa<ProtocolDecl>(nominal))
         return failure();
 
-      // @objc enums are not representable in C, @c ones and imported ones
-      // are ok.
+      // @objc enums are not representable in C or C++; @c ones and types
+      // imported from Clang are ok.
       if (!nominal->hasClangNode())
         return failure();
 
@@ -4898,6 +4921,14 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     return cast<ExistentialType>(type)->getConstraintType()
         ->getReferenceCounting();
 
+  case TypeKind::Hidden: {
+    auto referenceCounting =
+        getHiddenTypeReferenceCounting(cast<HiddenType>(type));
+    assert(referenceCounting &&
+           "non-reference HiddenType does not have a reference-counting system");
+    return *referenceCounting;
+  }
+
   case TypeKind::Function:
   case TypeKind::GenericFunction:
   case TypeKind::SILFunction:
@@ -4937,7 +4968,6 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
-  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:

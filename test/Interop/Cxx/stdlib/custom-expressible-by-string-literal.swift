@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -verify -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -verify -I %S/Inputs -cxx-interoperability-mode=default %s | %FileCheck %s
 
 import CxxStdlib
 import StdString

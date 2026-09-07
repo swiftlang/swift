@@ -37,9 +37,27 @@ defaultEmbeddedLimitationForError(const DeclContext *dc, SourceLoc loc) {
   return DiagnosticBehavior::Warning;
 }
 
+/// Determine whether the code in this declaration context will never be
+/// emitted when compiling for Embedded Swift, in which case there is no point
+/// in diagnosing Embedded Swift limitations within it.
+static bool isNeverEmittedForEmbedded(const DeclContext *dc) {
+  auto decl = dc->getInnermostDeclarationDeclContext();
+  if (!decl)
+    return false;
+
+  // A declaration that is not available during lowering never reaches SILGen,
+  // so its restrictions can never be hit.
+  return !decl->isAvailableDuringLowering();
+}
+
 std::optional<DiagnosticBehavior>
 swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
                                          bool wasAlwaysEmbeddedError) {
+  // Code that is never emitted for Embedded Swift is free to use constructs
+  // Embedded Swift cannot support.
+  if (isNeverEmittedForEmbedded(dc))
+    return std::nullopt;
+
   // In Embedded Swift, things that were always errors will still be emitted
   // as errors. Use "unspecified" so we don't change anything.
   if (dc->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
@@ -148,8 +166,12 @@ void swift::diagnoseGenericMemberOfExistentialInEmbedded(
 
 void swift::diagnoseDynamicCastInEmbedded(
     const DeclContext *dc, const CheckedCastExpr *cast) {
-  // If we are not supposed to diagnose Embedded Swift limitations, do nothing.
-  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, cast->getLoc());
+  // A cast to a type involving a protocol needs a runtime conformance lookup,
+  // which the embedded runtime cannot do. This has always been unsupported --
+  // for the address-only forms SILGen produces, the optimizer rejects it
+  // outright -- so it is an error in Embedded Swift rather than a warning.
+  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, cast->getLoc(),
+                                                   /*wasAlwaysEmbeddedError=*/true);
   if (!behavior)
     return;
 

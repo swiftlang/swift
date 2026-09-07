@@ -11,12 +11,11 @@ final class Final<T> {
 // CHECK:   @_hasStorage final var x: T { get set }
 // CHECK:   init(x: T)
 // CHECK:   enum CodingKeys : CodingKey {
-// CHECK:     @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ lhs: Final<T>.CodingKeys, _ rhs: Final<T>.CodingKeys) -> Bool
-// CHECK:     case x
-// CHECK:     init?(stringValue: String)
-// CHECK:     init?(intValue: Int)
 // CHECK:     func hash(into hasher: inout Hasher)
 // CHECK:     var hashValue: Int { get }
+// CHECK:     @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ lhs: Final<T>.CodingKeys, _ rhs: Final<T>.CodingKeys) -> Bool
+// CHECK:     init?(stringValue: String)
+// CHECK:     init?(intValue: Int)
 // CHECK:     var intValue: Int? { get }
 // CHECK:     var stringValue: String { get }
 // CHECK:   }
@@ -31,12 +30,12 @@ class Nonfinal<T> {
 // CHECK:   @_hasStorage var x: T { get set }
 // CHECK:   init(x: T)
 // CHECK:   enum CodingKeys : CodingKey {
-// CHECK:     @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ lhs: Nonfinal<T>.CodingKeys, _ rhs: Nonfinal<T>.CodingKeys) -> Bool
-// CHECK:     case x
-// CHECK-DAG:     init?(stringValue: String)
-// CHECK-DAG:     init?(intValue: Int)
 // CHECK:     func hash(into hasher: inout Hasher)
 // CHECK:     var hashValue: Int { get }
+// CHECK:     @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ lhs: Nonfinal<T>.CodingKeys, _ rhs: Nonfinal<T>.CodingKeys) -> Bool
+// CHECK:     case x
+// CHECK-DAG: init?(stringValue: String)
+// CHECK-DAG: init?(intValue: Int)
 // CHECK:     var intValue: Int? { get }
 // CHECK:     var stringValue: String { get }
 // CHECK:   }
@@ -58,6 +57,7 @@ class Nonfinal<T> {
 // CHECK: bb0(%0 : @guaranteed $FinalHashableClass):
 // CHECK:   [[FN:%.*]] = function_ref @$s36synthesized_conformance_class_macros18FinalHashableClassC9hashValueSivg : $@convention(method) (@guaranteed FinalHashableClass) -> Int
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]](%0) : $@convention(method) (@guaranteed FinalHashableClass) -> Int
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RESULT]] : $Int
 
 

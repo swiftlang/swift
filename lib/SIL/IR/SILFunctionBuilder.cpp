@@ -173,7 +173,8 @@ void SILFunctionBuilder::addFunctionAttributes(
   }
 
   // @_silgen_name and @_cdecl functions may be called from C code somewhere.
-  if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
+  if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>() ||
+      Attrs.hasAttribute<CxxDeclAttr>())
     F->setHasCReferences(true);
 
   for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {
@@ -257,6 +258,9 @@ void SILFunctionBuilder::addFunctionAttributes(
     if (auto sectionName = decl->getSection())
       F->setSection(*sectionName);
   }
+
+  if (auto *TA = decl->getAttrs().getAttribute<TargetAttr>())
+    F->setTargetFeatures(TA->Value);
 
   // Only emit replacements for the objc entry point of objc methods.
   // There is one exception: @_dynamicReplacement(for:) of @objc methods in

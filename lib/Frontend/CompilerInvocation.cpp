@@ -413,8 +413,8 @@ void CompilerInvocation::computeCXXStdlibOptions() {
         ClangImporter::createClangDriver(LangOpts, ClangImporterOpts);
     auto clangDriverArgs = ClangImporter::createClangArgs(
         ClangImporterOpts, SearchPathOpts, clangDriver);
-    auto &clangToolchain =
-        clangDriver.getToolChain(clangDriverArgs, LangOpts.Target);
+    auto &clangToolchain = clangDriver.getToolChain(
+        clangDriverArgs, llvm::Triple(LangOpts.Target.normalize()));
     auto cxxStdlibKind = clangToolchain.GetCXXStdlibType(clangDriverArgs);
     auto cxxDefaultStdlibKind = clangToolchain.GetDefaultCXXStdlibType();
 
@@ -1608,6 +1608,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableModuleRecoveryRemarks = Args.hasArg(OPT_remark_module_recovery);
   Opts.EnableModuleSerializationRemarks =
       Args.hasArg(OPT_remark_module_serialization);
+  Opts.EnableHiddenTypeLayoutSerializationRemarks =
+      Args.hasArg(OPT_remark_hidden_type_layout_serialization);
   Opts.EnableModuleApiImportRemarks = Args.hasArg(OPT_remark_module_api_import);
   Opts.EnableMacroLoadingRemarks = Args.hasArg(OPT_remark_macro_loading);
   Opts.EnableIndexingSystemModuleRemarks = Args.hasArg(OPT_remark_indexing_system_module);
@@ -1989,6 +1991,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
     if (Opts.EnableObjCInterop) {
       Diags.diagnose(SourceLoc(), diag::objc_with_embedded);
+      HadError = true;
+    }
+
+    if (Opts.hasFeature(Feature::TypedAllocation) && !Target.isArch64Bit()) {
+      Diags.diagnose(SourceLoc(), diag::typed_allocation_requires_64_bit);
       HadError = true;
     }
   }
@@ -4351,6 +4358,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.UseCASBackend |= Args.hasArg(OPT_cas_backend);
   Opts.EmitCASIDFile |= Args.hasArg(OPT_cas_emit_casid_file);
+  Opts.PrintLLVMBackendDiagnostics |=
+      Args.hasArg(OPT_print_llvm_backend_diagnostics);
 
   if (CASOpts.WriteOutputHashXAttr && Opts.UseCASBackend) {
     Diags.diagnose(SourceLoc(), diag::error_option_incompatible,

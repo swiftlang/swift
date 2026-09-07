@@ -133,4 +133,13 @@ ReferenceTestSuite.test("const reference to array typealias") {
   expectEqual(7, firstByteOfArrayRefTypealias(bytes))
 }
 
+ReferenceTestSuite.test("reference parameter of a C function pointer") {
+  callWithIntRef { $0.pointee = 99 }
+  expectEqual(99, getStaticInt())
+
+  callWithConstIntRef { expectEqual(43, $0) }
+  callWithIntRvalueRef { expectEqual(44, $0) }
+  callWithConstIntRvalueRef { expectEqual(45, $0) }
+}
+
 runAllTests()

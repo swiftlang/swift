@@ -22,6 +22,7 @@
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
@@ -1250,8 +1251,9 @@ bool SILDeclRef::hasNonUniqueDefinition() const {
 }
 
 bool SILDeclRef::declExposedToForeignLanguage(const ValueDecl *decl) {
-  // @c / @_cdecl / @objc.
+  // @c / @_cdecl / @cxx / @objc.
   if (decl->getAttrs().hasAttribute<CDeclAttr>() ||
+      decl->getAttrs().hasAttribute<CxxDeclAttr>() ||
       (decl->getAttrs().hasAttribute<ObjCAttr>() &&
        decl->getDeclContext()->isModuleScopeContext())) {
     return true;
@@ -1550,7 +1552,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
                                                       SKind);
 
   case SILDeclRef::Kind::AsyncEntryPoint: {
-    return "async_Main";
+    return ASYNC_MAIN_ENTRY_POINT_NAME;
   }
   case SILDeclRef::Kind::EntryPoint: {
     return getASTContext().getEntryPointFunctionName();
@@ -1584,8 +1586,9 @@ std::optional<std::string> SILDeclRef::getAsmName() const {
       if (auto VD = dyn_cast<ValueDecl>(decl))
         return std::string(EA->getCName(VD));
 
-    // @c/@_cdecl
-    if (decl->getAttrs().hasAttribute<CDeclAttr>())
+    // @c/@_cdecl/@cxx.
+    if (decl->getAttrs().hasAttribute<CDeclAttr>() ||
+        decl->getAttrs().hasAttribute<CxxDeclAttr>())
       return std::string(decl->getCDeclName());
   }
 

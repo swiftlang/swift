@@ -142,6 +142,25 @@ func specializeDeinits(forType type: Type,
     return
   }
 
+  // A `Builtin.FixedArray` (`InlineArray`) is destroyed element by element, and
+  // a tuple has no deinit of its own but its elements may. Neither is nominal,
+  // so handle them before looking for a deinit. This mirrors the aggregates
+  // `devirtualize(destroy:)` decomposes.
+  if type.isBuiltinFixedArray {
+    specializeDeinits(forType: type.builtinFixedArrayElementType(in: function),
+                      in: function, handled: &handled, context,
+                      notifyNewFunction: notifyNewFunction)
+    return
+  }
+
+  if type.isTuple {
+    for element in type.tupleElements {
+      specializeDeinits(forType: element, in: function, handled: &handled, context,
+                        notifyNewFunction: notifyNewFunction)
+    }
+    return
+  }
+
   if let nominal = type.nominal, nominal.valueTypeDestructor != nil {
     specializeDeinit(forType: type, nominal: nominal, context, notifyNewFunction)
   }

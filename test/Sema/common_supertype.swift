@@ -139,6 +139,21 @@ func testFunction6(x: @escaping () -> Int, y: @escaping @Sendable () -> Int) -> 
   return result
 }
 
+func testFunction7(x: @escaping () async -> Int, y: @escaping () throws -> Any) -> Exactly<() async throws -> Any> {
+  let result = test(x, y)
+  return result
+}
+
+func testFunction8(x: @escaping () throws -> Int, y: @escaping () async -> Any) -> Exactly<() async throws -> Any> {
+  let result = test(x, y)
+  return result
+}
+
+func testFunction9(x: @escaping (Int...) throws -> (), y: @escaping (Int...) async -> ()) -> Exactly<(Int...) async throws -> ()> {
+  let result = test(x, y)
+  return result
+}
+
 func testExistential1(x: any Q, y: any R) -> Exactly<any P> {
   let result = test(x, y)
   return result

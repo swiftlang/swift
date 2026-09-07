@@ -1307,6 +1307,14 @@ $1_SiBV
 // CHECK-32-NEXT:     (field name=_value offset=0
 // CHECK-32-NEXT:       (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
 
+// A count that overflows the 32-bit size and stride fields is rejected rather
+// than silently wrapping. rdar://185733582
+$2147483646_SiBV
+// CHECK:      (builtin_fixed_array
+// CHECK-NEXT:   (integer value=2147483647)
+// CHECK-NEXT:   (struct Swift.Int))
+// CHECK-NEXT: Invalid lowering
+
 SiBW
 // CHECK-64:      (builtin_borrow
 // CHECK-64-NEXT:   (struct Swift.Int))

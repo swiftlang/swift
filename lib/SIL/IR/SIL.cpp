@@ -123,7 +123,12 @@ swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
                                 typeDecl->getEffectiveAccess());
 
   // Aggressive CMO "makes" all types "public".
-  if (typeDecl->getModuleContext()->isAggressiveCMOEnabled()) {
+  // Note that this has to be the module which _defines_ the conformance (i.e.
+  // which emits the witness table), and not the module of the conforming type:
+  // the conforming type can be imported from a module which was not built with
+  // aggressive CMO, while the conformance itself still needs public linkage so
+  // that it can be referenced from a serialized function.
+  if (C->getDeclContext()->getParentModule()->isAggressiveCMOEnabled()) {
     access = AccessLevel::Public;
   }
 

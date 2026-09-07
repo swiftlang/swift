@@ -196,6 +196,18 @@ public:
   /// Whether the storage owns what's stored or merely borrows it.
   virtual bool isBorrow() { return false; }
 
+  /// Attempt to initialize directly out of the storage referenced by \p
+  /// initializer, rather than having the caller evaluate \p initializer as an
+  /// rvalue (which, for a noncopyable value, would consume it via a copy).
+  ///
+  /// Returns true if this initialization handled the emission itself, in which
+  /// case the caller must not evaluate \p initializer again.
+  virtual bool tryInitializeFromStorageReference(SILGenFunction &SGF,
+                                                 Expr *initializer,
+                                                 SILLocation loc) {
+    return false;
+  }
+
   /// Whether to emit a debug value during initialization.
   void setEmitDebugValueOnInit(bool emit) { EmitDebugValueOnInit = emit; }
 
@@ -223,9 +235,13 @@ private:
 /// initializations that have an addressable memory object to be stored into.
 class SingleBufferInitialization : virtual public Initialization {
   llvm::TinyPtrVector<CleanupHandle::AsPointer> SplitCleanups;
+
+  /// Whether this buffer may be initialized element-by-element via splitIntoTupleElements().
+  bool CanSplitIntoTupleElements = true;
+
 public:
   SingleBufferInitialization() {}
-  
+
   bool canPerformInPlaceInitialization() const override {
     return true;
   }
@@ -235,9 +251,13 @@ public:
                                               SILLocation loc) override = 0;
 
   bool isInPlaceInitializationOfGlobal() const override = 0;
-  
+
   bool canSplitIntoTupleElements() const override {
-    return true;
+    return CanSplitIntoTupleElements;
+  }
+
+  void setCanSplitIntoTupleElements(bool canSplit) {
+    CanSplitIntoTupleElements = canSplit;
   }
   
   MutableArrayRef<InitializationPtr>

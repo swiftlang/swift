@@ -3080,6 +3080,12 @@ namespace {
       printRec(MED->getArgs(), Label::optional("args"));
       printFoot();
     }
+
+    void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *D,
+                                       Label label) {
+      printCommon(D, "hidden_type_layout_info_decl", label);
+      printFoot();
+    }
   };
 } // end anonymous namespace
 
@@ -5594,6 +5600,11 @@ public:
   }
   void visitSemanticsAttr(SemanticsAttr *Attr, Label label) {
     printCommon(Attr, "semantics_attr", label);
+    printFieldQuoted(Attr->Value, Label::always("value"));
+    printFoot();
+  }
+  void visitTargetAttr(TargetAttr *Attr, Label label) {
+    printCommon(Attr, "target_attr", label);
     printFieldQuoted(Attr->Value, Label::always("value"));
     printFoot();
   }

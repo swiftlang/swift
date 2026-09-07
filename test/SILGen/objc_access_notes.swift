@@ -162,6 +162,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = load [copy] [[READ]] {{.*}}
   // CHECK-NEXT:   end_access [[READ]] : $*Gizmo
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter
@@ -175,7 +176,7 @@ class Hoozit : Gizmo {
   // CHECK:   [[RES:%.*]] = apply [[FR]]([[VALUE_COPY]], [[BORROWED_THIS_COPY]])
   // CHECK:   end_borrow [[BORROWED_THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
-  // CHECK:   return [[RES]] : $(), loc {{.*}}, scope {{.*}} // id: {{.*}} line:[[@LINE-34]]:7:auto_gen
+  // CHECK:   return [[RES]] : $(), loc {{.*}}, scope {{.*}} // id: {{.*}} line:[[@LINE-35]]:7:auto_gen
   // CHECK: } // end sil function '$s11objc_thunks6HoozitC15typicalPropertySo5GizmoCvsTo'
 
   // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks6HoozitC15typicalPropertySo5GizmoCvs
@@ -213,6 +214,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = load [copy] [[READ]]
   // CHECK-NEXT:   end_access [[READ]] : $*Gizmo
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter is normal

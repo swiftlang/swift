@@ -43,6 +43,8 @@ public:
   enum Kind {
     /// Has the '@c' attribute.
     ExplicitlyCDecl,
+    /// Has the '@cxx' attribute.
+    ExplicitlyCxxDecl,
     /// Has the '@_cdecl' attribute.
     ExplicitlyUnderscoreCDecl,
     /// Has the 'dynamic' modifier.
@@ -103,6 +105,7 @@ private:
   static bool requiresAttr(Kind kind) {
     switch (kind) {
     case ExplicitlyCDecl:
+    case ExplicitlyCxxDecl:
     case ExplicitlyUnderscoreCDecl:
     case ExplicitlyDynamic:
     case ExplicitlyObjC:
@@ -169,6 +172,8 @@ public:
   ForeignLanguage getForeignLanguage() const {
     if (kind == ExplicitlyCDecl)
       return ForeignLanguage::C;
+    if (kind == ExplicitlyCxxDecl)
+      return ForeignLanguage::Cxx;
     return ForeignLanguage::ObjectiveC;
   }
 

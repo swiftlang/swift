@@ -1021,6 +1021,19 @@ void LargeValueVisitor::visitReleaseInst(ReleaseValueInst *instr) {
 }
 
 void LargeValueVisitor::visitDebugValueInst(DebugValueInst *instr) {
+  // Kill any operand about to be retyped if the variable cannot follow.
+  // Plain debug values are retyped. Debug reconstruction block cannot have
+  // an operand of a different type than its argument.
+  if (instr->getDebugReconstructionBlock() || instr->getVarInfo()->Type) {
+    auto funcType = pass.F->getLoweredFunctionType();
+    for (Operand &operand : llvm::reverse(instr->getAllOperands())) {
+      // Only a changed function signature is unfollowable.
+      if (pass.containsDifferentFunctionSignature(funcType,
+                                                 operand.get()->getType()))
+        instr->killOperand(operand.getOperandNumber());
+    }
+  }
+
   for (Operand &operand : instr->getAllOperands()) {
     if (std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
                   operand.get()) != pass.largeLoadableArgs.end()) {
@@ -2435,22 +2448,6 @@ static void rewriteFunction(StructLoweringState &pass,
     }
   }
 
-  for (StoreInst *instr : pass.storeInstsToMod) {
-    SILValue src = instr->getSrc();
-    SILValue tgt = instr->getDest();
-    SILType srcType = src->getType();
-    SILType tgtType = tgt->getType();
-    assert(srcType && "Expected an address-type source");
-    assert(tgtType.isAddress() && "Expected an address-type target");
-    assert(srcType == tgtType && "Source and target type do not match");
-    (void)srcType;
-    (void)tgtType;
-
-    SILBuilderWithScope copyBuilder(instr);
-    createOutlinedCopyCall(copyBuilder, src, tgt, pass);
-    instr->getParent()->erase(instr);
-  }
-
   for (RetainValueInst *instr : pass.retainInstsToMod) {
     SILBuilderWithScope retainBuilder(instr);
     retainBuilder.createRetainValueAddr(
@@ -2558,6 +2555,24 @@ static void rewriteFunction(StructLoweringState &pass,
     }
     instr->replaceAllUsesWith(newInstr);
     instr->eraseFromParent();
+  }
+
+  // Rewrite stores of large-loadable types after the aggregate-projection
+  // instructions above have been recreated with their new SIL types.
+  for (StoreInst *instr : pass.storeInstsToMod) {
+    SILValue src = instr->getSrc();
+    SILValue tgt = instr->getDest();
+    SILType srcType = src->getType();
+    SILType tgtType = tgt->getType();
+    assert(srcType && "Expected an address-type source");
+    assert(tgtType.isAddress() && "Expected an address-type target");
+    assert(srcType == tgtType && "Source and target type do not match");
+    (void)srcType;
+    (void)tgtType;
+
+    SILBuilderWithScope copyBuilder(instr);
+    createOutlinedCopyCall(copyBuilder, src, tgt, pass);
+    instr->getParent()->erase(instr);
   }
 
   for (MethodInst *instr : pass.methodInstsToMod) {
@@ -2841,7 +2856,7 @@ void LoadableByAddress::recreateSingleApply(
   if ((isa<ApplyInst>(applyInst) || isa<TryApplyInst>(applyInst)) &&
       modNonFuncTypeResultType(genEnv, origSILFunctionType, *currIRMod) &&
       modifiableApply(applySite, *getIRGenModule()) &&
-      !origSILFunctionType->hasGuaranteedResult(true)) {
+      !origSILFunctionType->hasGuaranteedResult()) {
     assert(allApplyRetToAllocMap.find(applyInst) !=
            allApplyRetToAllocMap.end());
     auto newAlloc = allApplyRetToAllocMap.find(applyInst)->second;
@@ -3022,11 +3037,19 @@ bool LoadableByAddress::recreateUncheckedEnumDataInstr(
     newType = newType.getObjectType();
   }
   if (caseTy != newType) {
-    auto *takeEnum = enumBuilder.createUncheckedEnumData(
-        enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
-        caseTy);
-    newInstr = enumBuilder.createUncheckedReinterpretCast(enumInstr->getLoc(),
-                                                          takeEnum, newType);
+    // If the payload is a rewritten function type, extract the payload directly
+    // with the rewritten type instead of casting.
+    if (isFuncOrOptionalFuncType(newType)) {
+      newInstr = enumBuilder.createUncheckedEnumData(
+          enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
+          newType);
+    } else {
+      auto *takeEnum = enumBuilder.createUncheckedEnumData(
+          enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
+          caseTy);
+      newInstr = enumBuilder.createUncheckedReinterpretCast(enumInstr->getLoc(),
+                                                            takeEnum, newType);
+    }
   } else {
     newInstr = enumBuilder.createUncheckedEnumData(
         enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),

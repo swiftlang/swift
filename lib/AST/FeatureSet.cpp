@@ -181,6 +181,7 @@ UNINTERESTING_FEATURE(NoExplicitNonIsolated)
 UNINTERESTING_FEATURE(EmbeddedDynamicExclusivity)
 UNINTERESTING_FEATURE(TypedAllocation)
 UNINTERESTING_FEATURE(BuiltinAllocRawTyped)
+UNINTERESTING_FEATURE(BuiltinTypedAllocationID)
 UNINTERESTING_FEATURE(MutateAndConsumeInDeinit)
 
 static bool usesFeatureUnderscoreOwned(Decl *D) {
@@ -214,6 +215,10 @@ static bool usesFeatureCAttribute(Decl *decl) {
   }
 
   return false;
+}
+
+static bool usesFeatureTargetAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<TargetAttr>();
 }
 
 static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
@@ -493,6 +498,7 @@ UNINTERESTING_FEATURE(ForeignReferenceTypeInheritance)
 UNINTERESTING_FEATURE(CxxImplementation)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
+UNINTERESTING_FEATURE(DistributedActorResignRemoteID)
 
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {

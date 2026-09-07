@@ -51,6 +51,8 @@ class SomeDerivedClass : Parent {
 // CHECK-NEXT: [[SELFAGAIN:%.*]] = unchecked_ref_cast [[PARENT]]
 // CHECK-NEXT: store [[SELFAGAIN]] to [init] [[SELF]]
 // CHECK-NEXT: [[SELFLOAD:%.*]] = load [copy] [[SELF]]
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: end_borrow
 // CHECK-NEXT: destroy_value
 // CHECK-NEXT: return [[SELFLOAD]]
