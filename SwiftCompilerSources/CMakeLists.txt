@@ -220,6 +220,12 @@ function(add_swift_compiler_modules_library name)
     # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
     list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fmodule-format=raw")
 
+    # FIXME: MergeFunctions privatizes the aliasee of clang's weak '??_E' vector
+    # deleting destructor alias, which COFF lowers to a per-object weak extern
+    # default, and lib.exe rejects the mismatch with LNK1227. Remove this once
+    # LLVM stops leaving weak aliases on private symbols.
+    list(APPEND swift_compile_options "-Xfrontend" "-disable-llvm-merge-functions-pass")
+
   elseif(swift_exec_bin_dir MATCHES ".*/swiftly/bin")
     # Detect and handle swiftly-managed hosts.
     execute_process(COMMAND swiftly use --print-location
