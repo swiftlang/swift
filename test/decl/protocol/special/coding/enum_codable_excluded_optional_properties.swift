@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros)
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 enum EnumWithNonExcludedOptionalParameters : Codable { // expected-error {{type 'EnumWithNonExcludedOptionalParameters' does not conform to protocol 'Decodable'}}
     // expected-error@-1 {{type 'EnumWithNonExcludedOptionalParameters' does not conform to protocol 'Encodable'}}
