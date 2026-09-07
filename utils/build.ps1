@@ -3382,6 +3382,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     Build-CMakeProject @BuildCMakeArgs -BuildTargets @(
       "swift-frontend",
       "sourcekitd-test",
+      "swift-refactor",
       "swift-ide-test",
       "swift-plugin-server"
     )
@@ -3408,6 +3409,11 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
 
     Invoke-IsolatingEnvVars {
       # Test-time tools execute on the build host.
+      # TODO(Steelskin): `repl_swift.exe` is explicitly excluded here because
+      # the test reconfigure here makes lldb compile expressions against the in-
+      # tree resilient stdlib, which breaks SwiftREPL tests if `repl_swift.exe`
+      # uses the shipped runtime instead.
+      # See https://github.com/swiftlang/swift/issues/91537 for details.
       Invoke-VsDevShell $BuildPlatform
       Set-WindowsSxSToolchainRuntime `
         -BinaryDir              $Stage2BinDir `
@@ -3421,11 +3427,11 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
                                    "swift-synthesize-interface.exe",
                                    "sil-opt.exe",
                                    "sourcekitd-test.exe",
+                                   "swift-refactor.exe",
                                    "swift-ide-test.exe",
                                    "swift-plugin-server.exe",
                                    "swiftc-legacy-driver.exe",
-                                   "lldb.exe",
-                                   "repl_swift.exe"
+                                   "lldb.exe"
                                  )
       # SxS only probes the EXE's own directory for the named assembly.
       if (Test-Path (Join-Path $Stage2LibexecSwiftDir "swift-backtrace.exe")) {
@@ -4142,11 +4148,12 @@ function Repair-SDKHeaders([string] $SDKRoot) {
   }
 }
 
-# Copies files installed by CMake from the arch-specific platform root,
-# where they follow the layout expected by the installer,
-# to the final platform root, following the installer layout.
+# Completes the SDK layout after all architecture slices have been installed.
+# This reshapes Swift modules and mirrors resources whose CMake install rules
+# do not distinguish between dynamic and static resource trees.
 function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [string] $Identifier = $OS.ToString()) {
-  Repair-SDKHeaders (Get-SwiftSDK -OS $OS -Identifier $Identifier)
+  $SDKRoot = Get-SwiftSDK -OS $OS -Identifier $Identifier
+  Repair-SDKHeaders $SDKRoot
 
   # Copy files from the arch subdirectory, including "*.swiftmodule" which need restructuring
   foreach ($Platform in $Platforms) {
@@ -4157,6 +4164,34 @@ function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [str
           Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not in a thick module layout"
           Copy-File $_.FullName "$PlatformResources\$($_.BaseName).swiftmodule\$(Get-ModuleTriple $Platform)$($_.Extension)"
         }
+      }
+    }
+  }
+
+  $StaticPlatforms = @($Platforms | Where-Object { $_.LinkModes.Contains("static") })
+  if ($OS -eq [OS]::Android -and $StaticPlatforms.Count -gt 0) {
+    $DynamicResources = "$SDKRoot\usr\lib\swift"
+    $StaticResources = "$SDKRoot\usr\lib\swift_static"
+
+    # SwiftBuild currently passes the NDK sysroot as both -sdk and -sysroot,
+    # while using Android.sdk only for the static -resource-dir. Unlike a direct
+    # swiftc invocation, it cannot keep Android.sdk as -sdk and the NDK as
+    # -sysroot, so these SDK resources must be copied into the static tree.
+    Copy-Directory "$DynamicResources\shims\*" "$StaticResources\shims"
+    foreach ($File in ("libcxxshim.h", "libcxxshim.modulemap", "libcxxstdlibshim.h")) {
+      Copy-File "$DynamicResources\android\$File" "$StaticResources\android\$File"
+    }
+
+    foreach ($Platform in $StaticPlatforms) {
+      $Architecture = $Platform.Architecture.LLVMName
+      $DynamicArchitectureResources = "$DynamicResources\android\$Architecture"
+      $StaticArchitectureResources = "$StaticResources\android\$Architecture"
+
+      # The Android Clang overlay also has a fixed dynamic-resource install
+      # destination. Keep the architecture-specific copies together until
+      # swiftlang/swift#80293 allows the overlay to be shared by all slices.
+      foreach ($File in ("android.modulemap", "SwiftAndroidNDK.h", "SwiftBionic.h")) {
+        Copy-File "$DynamicArchitectureResources\$File" "$StaticArchitectureResources\$File"
       }
     }
   }

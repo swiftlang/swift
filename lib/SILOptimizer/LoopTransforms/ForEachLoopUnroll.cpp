@@ -264,18 +264,56 @@ static FixLifetimeInst *isFixLifetimeUseOfArray(SILInstruction *user,
   return result;
 }
 
+/// Return true iff \c apply invokes a function annotated with the
+/// "sequence.forEach" semantics attribute.
+static bool isForEachCallee(TryApplyInst *apply) {
+  SILFunction *callee = apply->getCalleeFunction();
+  return callee && callee->hasSemanticsAttr(semantics::SEQUENCE_FOR_EACH);
+}
+
 /// Given an array-typed SIL value \c array and an instruction \c user that uses
 /// the array, check whether this use actually represents a call to the
-/// Sequence.forEach function. This would be case if \c user is a store_borrow
-/// instruction that stores into an alloc_stack which is passed to a try-apply
-/// of the Sequence.forEach function. That is, if the following pattern holds:
+/// Sequence.forEach function. There are two shapes to match, depending on how
+/// the callee's `self` parameter is passed.
+///
+/// (1) `self` is passed indirectly, which is the case when the callee is the
+///     unspecialized generic Sequence.forEach. Here \c user is a store_borrow
+///     into an alloc_stack that is passed to the try-apply:
 ///
 ///            %stack = alloc_stack
 ///      user: store_borrow %array to %stack
-///            try_apply %forEachCall(%closure, %array)
+///            try_apply %forEachCall(%closure, %stack)
+///
+/// (2) `self` is passed directly. This is the case when the callee is a
+///     specialization of Sequence.forEach in which `Self` has been substituted
+///     with a concrete, loadable Array type, so the parameter is lowered to
+///     @guaranteed. In embedded Swift, MandatoryPerformanceOptimizations
+///     produces exactly such specializations before this pass runs. Here
+///     \c user is the try-apply itself:
+///
+///      user: try_apply %forEachCall(%closure, %array)
+///
 /// \returns the try-apply instruction invoking the forEach function if this is
 /// a forEach use of the array, nullptr otherwise.
 static TryApplyInst *isForEachUseOfArray(SILInstruction *user, SILValue array) {
+  // Case (2): the array is passed directly as the `self` argument.
+  if (TryApplyInst *apply = dyn_cast<TryApplyInst>(user)) {
+    if (!isForEachCallee(apply))
+      return nullptr;
+    // forEach takes the body closure followed by `self`.
+    if (apply->getNumArguments() != 2)
+      return nullptr;
+    Operand &selfOperand = apply->getArgumentOperands()[1];
+    if (selfOperand.get() != array)
+      return nullptr;
+    // Unrolling deletes this call, so it must not consume the array.
+    if (ApplySite(apply).getArgumentConvention(selfOperand) !=
+        SILArgumentConvention::Direct_Guaranteed)
+      return nullptr;
+    return apply;
+  }
+
+  // Case (1): the array is passed indirectly through an alloc_stack.
   StoreBorrowInst *storeUser = dyn_cast<StoreBorrowInst>(user);
   if (!storeUser || storeUser->getSrc() != array)
     return nullptr;
@@ -290,10 +328,33 @@ static TryApplyInst *isForEachUseOfArray(SILInstruction *user, SILValue array) {
   // We need to have a unique result.
   if (++firstUser != applyUsers.end())
     return nullptr;
-  SILFunction *callee = apply->getCalleeFunction();
-  if (!callee || !callee->hasSemanticsAttr(semantics::SEQUENCE_FOR_EACH))
+  if (!isForEachCallee(apply))
     return nullptr;
   return apply;
+}
+
+/// Check whether \c user is a store_borrow of \c array into an alloc_stack
+/// that nothing reads, i.e. whose only uses end the borrow.
+///
+/// SILGen emits such a temporary in order to pass the array indirectly. When
+/// the callee is subsequently specialized to take the array directly (see case
+/// (2) of \c isForEachUseOfArray), the temporary is left behind with no
+/// remaining readers. Borrowing the array cannot modify it, so this leftover
+/// must not inhibit unrolling.
+static bool isDeadTemporaryStoreBorrowOfArray(SILInstruction *user,
+                                              SILValue array) {
+  StoreBorrowInst *storeUser = dyn_cast<StoreBorrowInst>(user);
+  if (!storeUser || storeUser->getSrc() != array)
+    return false;
+  if (!isa<AllocStackInst>(storeUser->getDest()))
+    return false;
+  for (Operand *use : storeUser->getUses()) {
+    SILInstruction *storeBorrowUser = use->getUser();
+    if (isIncidentalUse(storeBorrowUser) || isa<EndBorrowInst>(storeBorrowUser))
+      continue;
+    return false;
+  }
+  return true;
 }
 
 void ArrayInfo::classifyUsesOfArray(SILValue arrayValue, bool isInInitSection) {
@@ -315,6 +376,9 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue, bool isInInitSection) {
       forEachCalls.insert(forEachCall);
       continue;
     }
+    // Ignore a borrow of the array into a temporary that nothing reads.
+    if (isDeadTemporaryStoreBorrowOfArray(user, arrayValue))
+      continue;
     // Recursively classify begin_borrow, copy_value, and move_value uses.
     if (BeginBorrowInst *beginBorrow = dyn_cast<BeginBorrowInst>(user)) {
       if (isInInitSection) {
@@ -415,11 +479,18 @@ void ArrayInfo::getLastDestroys(
 /// not clean up any resulting dead instructions.
 static void removeForEachCall(TryApplyInst *forEachCall,
                               InstructionDeleter &deleter) {
-  auto *sbi = cast<StoreBorrowInst>(forEachCall->getArgument(1));
-  auto *asi = cast<AllocStackInst>(sbi->getDest());
-  // The allocStack will be used in the forEach call and also in a store
-  // instruction and a dealloc_stack instruction. Force delete all of them.
-  deleter.recursivelyForceDeleteUsersAndFixLifetimes(asi);
+  if (auto *sbi = dyn_cast<StoreBorrowInst>(forEachCall->getArgument(1))) {
+    auto *asi = cast<AllocStackInst>(sbi->getDest());
+    // The allocStack will be used in the forEach call and also in a store
+    // instruction and a dealloc_stack instruction. Force delete all of them.
+    deleter.recursivelyForceDeleteUsersAndFixLifetimes(asi);
+    return;
+  }
+  // The array is passed directly to the call (see case (2) of
+  // `isForEachUseOfArray`), so there is no temporary alloc_stack to clean up.
+  // The array is passed @guaranteed, so dropping the call does not require
+  // fixing up its lifetime.
+  deleter.forceDelete(forEachCall);
 }
 
 /// Unroll the \c forEachCall on an array, using the information in
