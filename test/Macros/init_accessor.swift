@@ -12,6 +12,10 @@
 macro Wrapped() = #externalMacro(module: "MacroDefinition",
                                  type: "InitWithProjectedValueWrapperMacro")
 
+@attached(peer, names: arbitrary)
+macro DollarWrapped() = #externalMacro(module: "MacroDefinition",
+                                       type: "InitWithDollarProjectedValueWrapperMacro")
+
 @propertyWrapper
 struct Wrapper {
   var wrappedValue: Int {
@@ -29,4 +33,13 @@ struct Test {
 
 let test = Test(_$value: Wrapper())
 print(test.value)
+
+struct TestDollar {
+  @DollarWrapped
+  var value: Int { 1 }
+}
+
+let testDollar = TestDollar($value: Wrapper())
+print(testDollar.value)
 // CHECK: 1
+// CHECK-NEXT: 1
