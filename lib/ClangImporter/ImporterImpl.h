@@ -2444,6 +2444,16 @@ getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
   return nullptr;
 }
 
+/// Compute the foreign reference type info for \p decl without consulting or
+/// populating the \c ForeignReferenceTypeInfoRequest cache.
+///
+/// Prefer \c ForeignReferenceTypeInfoRequest in almost all cases. This function
+/// should only be used when the result must not be cached, with a Clang decl
+/// that belongs to a short-lived clang::ASTContext (caching that pointer can
+/// lead to spurious false cache hits).
+ForeignReferenceTypeInfo
+getUncachedForeignReferenceTypeInfo(const clang::RecordDecl *decl);
+
 /// Emit diagnostics related to foreign reference types for \a decl.
 bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
                                   ClangImporter::Implementation &Impl);
