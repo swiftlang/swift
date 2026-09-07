@@ -10,4 +10,4 @@ public class FileUtilities {
   public let field = 42;
 }
 
-// CHECK: SWIFT_INLINE_THUNK FileUtilities FileUtilities::getShared() {
+// CHECK: SWIFT_INLINE_THUNK FileUtilities FileUtilities::getShared() noexcept {

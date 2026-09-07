@@ -12,7 +12,7 @@ public struct FirstSmallStruct {
 // CHECK: public:
 // CHECK:   SWIFT_INLINE_THUNK FirstSmallStruct &operator =(const FirstSmallStruct &other) noexcept {
 // CHECK: }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK uint32_t getX() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:   SWIFT_INLINE_THUNK uint32_t getX() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:   private:
 
 public struct LargeStruct {
@@ -39,16 +39,16 @@ public struct LargeStruct {
 // CHECK: public:
 // CHECK: SWIFT_INLINE_THUNK LargeStruct &operator =(const LargeStruct &other) noexcept {
 // CHECK: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX1() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX2() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX3() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX4() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX5() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX6() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct getAnotherLargeStruct() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct getFirstSmallStruct() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: static SWIFT_INLINE_THUNK swift::Int getStaticX() SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: static SWIFT_INLINE_THUNK FirstSmallStruct getStaticSmallStruct() SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX1() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX2() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX3() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX4() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX5() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX6() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct getAnotherLargeStruct() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct getFirstSmallStruct() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: static SWIFT_INLINE_THUNK swift::Int getStaticX() noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: static SWIFT_INLINE_THUNK FirstSmallStruct getStaticSmallStruct() noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: private:
 
 public final class PropertiesInClass {
@@ -69,9 +69,9 @@ public final class PropertiesInClass {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) PropertiesInClass final : public swift::_impl::RefCountedClass {
 // CHECK: using RefCountedClass::operator=;
-// CHECK-NEXT: SWIFT_INLINE_THUNK int32_t getStoredInt() SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getComputedInt() SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct getSmallStruct() SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK int32_t getStoredInt() noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getComputedInt() noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct getSmallStruct() noexcept SWIFT_SYMBOL({{.*}});
 
 public func createPropsInClass(_ x: Int32) -> PropertiesInClass {
     return PropertiesInClass(x)
@@ -96,10 +96,10 @@ public struct SmallStructWithGetters {
 // CHECK: public:
 // CHECK: SWIFT_INLINE_THUNK SmallStructWithGetters &operator =(const SmallStructWithGetters &other) noexcept {
 // CHECK: }
-// CHECK-NEXT:  SWIFT_INLINE_THUNK uint32_t getStoredInt() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT:  SWIFT_INLINE_THUNK swift::Int getComputedInt() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT:  SWIFT_INLINE_THUNK LargeStruct getLargeStruct() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT:  SWIFT_INLINE_THUNK SmallStructWithGetters getSmallStruct() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:  SWIFT_INLINE_THUNK uint32_t getStoredInt() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:  SWIFT_INLINE_THUNK swift::Int getComputedInt() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:  SWIFT_INLINE_THUNK LargeStruct getLargeStruct() const noexcept SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:  SWIFT_INLINE_THUNK SmallStructWithGetters getSmallStruct() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: private:
 
 public func createSmallStructWithGetter() -> SmallStructWithGetters {
@@ -134,71 +134,71 @@ public func createStructWithRefCountStoredProp() -> StructWithRefCountStoredProp
     return StructWithRefCountStoredProp(x: 0)
 }
 
-// CHECK: SWIFT_INLINE_THUNK uint32_t FirstSmallStruct::getX() const {
+// CHECK: SWIFT_INLINE_THUNK uint32_t FirstSmallStruct::getX() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties16FirstSmallStructV1xs6UInt32Vvg(Properties::_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_INLINE_THUNK swift::Int LargeStruct::getX1() const {
+// CHECK:      SWIFT_INLINE_THUNK swift::Int LargeStruct::getX1() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV2x1Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX2() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX2() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV2x2Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX3() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX3() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV2x3Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX4() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX4() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV2x4Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX5() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX5() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV2x5Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX6() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX6() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV2x6Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::getAnotherLargeStruct() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::getAnotherLargeStruct() const noexcept {
 // CHECK-NEXT: return Properties::_impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   Properties::_impl::$s10Properties11LargeStructV07anotherbC0ACvg(result, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct LargeStruct::getFirstSmallStruct() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct LargeStruct::getFirstSmallStruct() const noexcept {
 // CHECK-NEXT: return Properties::_impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   Properties::_impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, Properties::_impl::$s10Properties11LargeStructV010firstSmallC0AA05FirsteC0Vvg(_getOpaquePointer()));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getStaticX() {
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getStaticX() noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV7staticXSivgZ();
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct LargeStruct::getStaticSmallStruct() {
+// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct LargeStruct::getStaticSmallStruct() noexcept {
 // CHECK-NEXT: return Properties::_impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   Properties::_impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, Properties::_impl::$s10Properties11LargeStructV011staticSmallC0AA05FirsteC0VvgZ());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
-// CHECK: SWIFT_INLINE_THUNK int32_t PropertiesInClass::getStoredInt() {
+// CHECK: SWIFT_INLINE_THUNK int32_t PropertiesInClass::getStoredInt() noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties0A7InClassC9storedInts5Int32Vvg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int PropertiesInClass::getComputedInt() {
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int PropertiesInClass::getComputedInt() noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties0A7InClassC11computedIntSivg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct PropertiesInClass::getSmallStruct() {
+// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct PropertiesInClass::getSmallStruct() noexcept {
 // CHECK-NEXT: return Properties::_impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   Properties::_impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, Properties::_impl::$s10Properties0A7InClassC11smallStructAA010FirstSmallE0Vvg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_INLINE_THUNK uint32_t SmallStructWithGetters::getStoredInt() const {
+// CHECK:      SWIFT_INLINE_THUNK uint32_t SmallStructWithGetters::getStoredInt() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties22SmallStructWithGettersV9storedInts6UInt32Vvg(Properties::_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int SmallStructWithGetters::getComputedInt() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int SmallStructWithGetters::getComputedInt() const noexcept {
 // CHECK-NEXT: return Properties::_impl::$s10Properties22SmallStructWithGettersV11computedIntSivg(Properties::_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct SmallStructWithGetters::getLargeStruct() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct SmallStructWithGetters::getLargeStruct() const noexcept {
 // CHECK-NEXT: return Properties::_impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   Properties::_impl::$s10Properties22SmallStructWithGettersV05largeC0AA05LargeC0Vvg(result, Properties::_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK SmallStructWithGetters SmallStructWithGetters::getSmallStruct() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK SmallStructWithGetters SmallStructWithGetters::getSmallStruct() const noexcept {
 // CHECK-NEXT: return Properties::_impl::_impl_SmallStructWithGetters::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   Properties::_impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, Properties::_impl::$s10Properties22SmallStructWithGettersV05smallC0ACvg(Properties::_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer())));
 // CHECK-NEXT: });

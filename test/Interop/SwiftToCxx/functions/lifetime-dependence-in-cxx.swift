@@ -61,9 +61,9 @@ extension Owner {
     }
 }
 
-// CHECK: SWIFT_INLINE_THUNK View borrowSelf() const SWIFT_SELF_LIFETIMEBOUND SWIFT_SYMBOL({{.*}});
-// CHECK: SWIFT_INLINE_THUNK View borrowSelfMutating() SWIFT_SELF_LIFETIMEBOUND SWIFT_SYMBOL({{.*}});
-// CHECK: SWIFT_INLINE_THUNK View getViewProperty() const SWIFT_SELF_LIFETIMEBOUND SWIFT_SYMBOL({{.*}});
+// CHECK: SWIFT_INLINE_THUNK View borrowSelf() const noexcept SWIFT_SELF_LIFETIMEBOUND SWIFT_SYMBOL({{.*}});
+// CHECK: SWIFT_INLINE_THUNK View borrowSelfMutating() noexcept SWIFT_SELF_LIFETIMEBOUND SWIFT_SYMBOL({{.*}});
+// CHECK: SWIFT_INLINE_THUNK View getViewProperty() const noexcept SWIFT_SELF_LIFETIMEBOUND SWIFT_SYMBOL({{.*}});
 
 // CHECK: SWIFT_INLINE_THUNK View borrowBorrowingParam(const Owner& o SWIFT_LIFETIMEBOUND) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK: SWIFT_INLINE_THUNK View borrowDefaultParam(const Owner& o SWIFT_LIFETIMEBOUND) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
@@ -74,6 +74,6 @@ extension Owner {
 // CHECK: SWIFT_INLINE_THUNK View copyDefaultParam(const View& v) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 
 // The attribute is repeated on the out-of-line definitions of the members.
-// CHECK: SWIFT_INLINE_THUNK View Owner::borrowSelf() const SWIFT_SELF_LIFETIMEBOUND {
-// CHECK: SWIFT_INLINE_THUNK View Owner::borrowSelfMutating() SWIFT_SELF_LIFETIMEBOUND {
-// CHECK: SWIFT_INLINE_THUNK View Owner::getViewProperty() const SWIFT_SELF_LIFETIMEBOUND {
+// CHECK: SWIFT_INLINE_THUNK View Owner::borrowSelf() const noexcept SWIFT_SELF_LIFETIMEBOUND {
+// CHECK: SWIFT_INLINE_THUNK View Owner::borrowSelfMutating() noexcept SWIFT_SELF_LIFETIMEBOUND {
+// CHECK: SWIFT_INLINE_THUNK View Owner::getViewProperty() const noexcept SWIFT_SELF_LIFETIMEBOUND {
