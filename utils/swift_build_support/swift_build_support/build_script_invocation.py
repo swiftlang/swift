@@ -41,6 +41,21 @@ from swift_build_support.swift_build_support.utils import fatal_error
 from swift_build_support.swift_build_support.utils import log_time_in_scope
 
 
+def _extract_impl_arg_value(impl_args, flag_name):
+    """Pull the value of a `--flag=value` (or `--flag value`) entry out of a
+    list of build-script-impl passthrough args. Later occurrences win, matching
+    build-script-impl's own last-wins parsing. Returns '' when not present."""
+    value = ''
+    prefix = flag_name + '='
+    it = iter(impl_args or [])
+    for arg in it:
+        if arg == flag_name:
+            value = next(it, '')
+        elif arg.startswith(prefix):
+            value = arg[len(prefix):]
+    return value
+
+
 class BuildScriptInvocation(object):
     """Represent a single build script invocation.
     """
@@ -301,6 +316,54 @@ class BuildScriptInvocation(object):
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
         # them.
+        # Under the unified LLVM+Swift+LLDB layout the LLVM ninja graph
+        # already builds swift-frontend and LLDB as external/enabled projects,
+        # so the standalone build-script-impl swift/lldb passes would just
+        # repeat the work. Short-circuit both, and fold the swift install
+        # components into the LLVM install component list so `install-llvm`
+        # picks up swiftc/stdlib/etc. out of the unified build tree.
+        # Note: LLDB standalone build also pulls in Swift_DIR from
+        # swift-<host>/lib/cmake/swift, which no longer exists once the swift
+        # standalone build is skipped, so skipping lldb here also prevents a
+        # CMake configure failure looking for SwiftConfig.cmake.
+        if products.swift.Swift.is_unified_llvm_build(args):
+            args.build_swift = False
+            args.build_lldb = False
+            swift_components = _extract_impl_arg_value(
+                args.build_script_impl_args, '--swift-install-components')
+            # swift/cmake/modules/SwiftComponents.cmake auto-adds
+            # `compiler-swift-syntax-lib` and `swift-syntax-lib` whenever
+            # `compiler` is installed (the compiler dylibs live under
+            # lib/swift/host/compiler and lib/swift/host/plugins). That
+            # side-effect only runs when swift's CMake configure runs; since
+            # we're driving install from LLVM's ninja graph instead, we have
+            # to name those components explicitly so their install targets
+            # (install-compiler-swift-syntax-lib, install-swift-syntax-lib)
+            # run and populate the toolchain. Without them swift-frontend
+            # can't dlopen lib_CompilerSwiftIDEUtils.dylib etc. at first use.
+            extra_components = []
+            if swift_components and 'compiler' in swift_components.split(';'):
+                for comp in ('compiler-swift-syntax-lib', 'swift-syntax-lib'):
+                    if comp not in swift_components.split(';'):
+                        extra_components.append(comp)
+            merged_swift_components = swift_components
+            if swift_components:
+                merged_swift_components = ';'.join(
+                    [swift_components] + extra_components)
+            if merged_swift_components and args.llvm_install_components \
+                    and args.llvm_install_components != 'all':
+                args.llvm_install_components = ';'.join(
+                    [args.llvm_install_components, merged_swift_components])
+            # Also tell the swift subproject inside LLVM's cmake which
+            # components are installable. Without this, SWIFT_INSTALL_COMPONENTS
+            # falls back to a cached default that omits entries like
+            # clang-resource-dir-symlink, and their install() actions become
+            # no-ops (swift_is_installing_component() returns FALSE), so
+            # `install-<component>` runs but installs nothing.
+            if merged_swift_components:
+                args.extra_llvm_cmake_options.append(
+                    '-DSWIFT_INSTALL_COMPONENTS={}'.format(
+                        merged_swift_components))
         conditional_subproject_configs = [
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
