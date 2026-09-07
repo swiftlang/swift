@@ -49,6 +49,7 @@
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
@@ -415,8 +416,9 @@ void CompilerInstance::setupStatsReporter() {
   };
 
   auto getClangSourceManager = [](ASTContext &Ctx) -> clang::SourceManager * {
-    if (auto *clangImporter = static_cast<ClangImporter *>(
-            Ctx.getClangModuleLoader())) {
+    if (auto *clangImporter =
+            static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+        clangImporter && clangImporter->getClangInstance().hasASTContext()) {
       return &clangImporter->getClangASTContext().getSourceManager();
     }
     return nullptr;
