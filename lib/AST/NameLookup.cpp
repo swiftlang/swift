@@ -3961,6 +3961,12 @@ CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
       return MacroWalking::ArgumentsAndExpansion;
     }
 
+    /// An opaque type can sit inside a generic argument that was parsed as a
+    /// value expression, such as 'G<(Int, some P)>'.
+    bool shouldWalkIntoGenericArgumentExprTypeRepr() const override {
+      return true;
+    }
+
     PreWalkAction walkToTypeReprPre(TypeRepr *repr) override {
 
       // Don't allow variadic opaque parameter or return types.

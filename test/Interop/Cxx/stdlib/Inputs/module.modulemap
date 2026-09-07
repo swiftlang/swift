@@ -152,3 +152,9 @@ module StdCoroutine {
   requires cplusplus
   export *
 }
+
+module DerivedConformanceUninstantiatedMemberType {
+  header "derived-conformance-uninstantiated-member-type.h"
+  requires cplusplus
+  export *
+}
