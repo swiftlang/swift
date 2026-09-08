@@ -429,7 +429,7 @@ public:
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
                clang::Sema &cSema, ClangImporter::Implementation *importerImpl)
       : swiftCtx(ctx), availability(avail), clangSema(cSema),
-        enumInfos(clangSema.getPreprocessor()),
+        enumInfos(clangSema.getPreprocessor(), ctx.Stats),
         importerImpl(importerImpl) {}
 
   /// Determine the Swift name for a Clang decl
