@@ -2323,8 +2323,18 @@ static void publishBuiltPCH(clang::CompilerInstance &instance,
   if (!buffer)
     return;
 
+  // The VFS buffer may be a (read-only, private) mapping of the file on disk;
+  // such buffers alias the page cache and would silently change if the file is
+  // later replaced. Copy it into memory, mirroring what
+  // clang::CompilerInstance does when publishing a built module. The cache must
+  // hold the PCH as written by this process even if it is replaced on disk.
+  llvm::MemoryBuffer &MB = *(*buffer);
+  std::unique_ptr<llvm::MemoryBuffer> Copy =
+      llvm::MemoryBuffer::getMemBufferCopy(MB.getBuffer(),
+                                          MB.getBufferIdentifier());
+
   instance.getModuleCache().getInMemoryModuleCache().addBuiltPCM(
-      pchPath, std::move(*buffer), status->getSize(),
+      pchPath, std::move(Copy), status->getSize(),
       llvm::sys::toTimeT(status->getLastModificationTime()));
 }
 
