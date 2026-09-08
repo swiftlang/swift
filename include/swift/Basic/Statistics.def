@@ -145,6 +145,27 @@ FRONTEND_STATISTIC(ClangImporter, LookupTableResolvePasses)
 /// Distinct base names keyed in a written Swift lookup table.
 FRONTEND_STATISTIC(ClangImporter, LookupTableDistinctBaseNames)
 
+/// Clang declarations first materialized from a lookup table during lookup.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeclResolved)
+
+/// Lookup-table hits for declarations already materialized.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeclCached)
+
+/// Declarations considered as candidate members during qualified record lookup.
+FRONTEND_STATISTIC(ClangImporter, ClangRecordMemberLookupCandidates)
+
+/// Candidate members that actually belong to the record being looked up in.
+FRONTEND_STATISTIC(ClangImporter, ClangRecordMemberLookupMatched)
+
+/// Members whose names were imported to search a class template specialization.
+FRONTEND_STATISTIC(ClangImporter, ClangRecordMemberLookupTemplateMembersScanned)
+
+/// Declarations considered as candidate members during namespace lookup.
+FRONTEND_STATISTIC(ClangImporter, ClangNamespaceMemberLookupCandidates)
+
+/// Candidate members that actually belong to the namespace being looked up in.
+FRONTEND_STATISTIC(ClangImporter, ClangNamespaceMemberLookupMatched)
+
 /// Number of source buffers visible in the source manager.
 FRONTEND_STATISTIC(AST, NumSourceBuffers)
 
