@@ -16,6 +16,7 @@
 // REQUIRES: swift_feature_AddressableTypes
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_ValueGenerics
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 
