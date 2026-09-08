@@ -86,7 +86,9 @@ PluginLoader::getPluginMap() {
   // Helper function to try inserting an entry if there's no existing entry
   // associated with the module name.
   auto try_emplace = [&](StringRef moduleName, StringRef libPath,
-                         StringRef execPath, bool overwrite = false) {
+                         StringRef execPath, bool overwrite = false,
+                         StringRef prefixMappedLibPath = "",
+                         StringRef prefixMappedExecPath = "") {
     auto moduleNameIdentifier = Ctx.getIdentifier(moduleName);
     if (map.find(moduleNameIdentifier) != map.end() && !overwrite) {
       // Specified module name is already in the map and no need to overwrite
@@ -94,9 +96,12 @@ PluginLoader::getPluginMap() {
       return;
     }
 
-    libPath = libPath.empty() ? "" : Ctx.AllocateCopy(libPath);
-    execPath = execPath.empty() ? "" : Ctx.AllocateCopy(execPath);
-    map[moduleNameIdentifier] = {libPath, execPath};
+    auto copy = [&](StringRef path) -> StringRef {
+      return path.empty() ? "" : Ctx.AllocateCopy(path);
+    };
+    map[moduleNameIdentifier] = {copy(libPath), copy(execPath),
+                                 copy(prefixMappedLibPath),
+                                 copy(prefixMappedExecPath)};
   };
 
   std::optional<llvm::PrefixMapper> mapper;
@@ -210,7 +215,7 @@ PluginLoader::getPluginMap() {
           continue;
         }
         try_emplace(moduleName, *libPath, remapPath(val.ExecutablePath),
-                    /*overwrite*/ true);
+                    /*overwrite*/ true, val.LibraryPath, val.ExecutablePath);
       }
       continue;
     }
@@ -285,15 +290,29 @@ void PluginLoader::recordDependency(const PluginEntry &plugin,
   // libraryPath: non-nil, executablePath: nil: in-process library plugin.
   // libraryPath: non-nil, executablePath: non-nil: external library plugin.
   // libraryPath: nil, executablePath: non-nil: executable plugin.
-  StringRef path =
-      !plugin.libraryPath.empty() ? plugin.libraryPath : plugin.executablePath;
+  bool useLibraryPath = !plugin.libraryPath.empty();
+  StringRef path = useLibraryPath ? plugin.libraryPath : plugin.executablePath;
+  StringRef prefixMappedPath = useLibraryPath
+                                   ? plugin.prefixMappedLibraryPath
+                                   : plugin.prefixMappedExecutablePath;
 
   // NOTE: We don't track plugin-server path as a dependency because it doesn't
   // provide much value.
 
   assert(!path.empty());
+
+  // Record the path as it was passed to the frontend. The dependency file
+  // emitter applies the same prefix map, like it does for every other
+  // dependency.
+  if (!prefixMappedPath.empty() && prefixMappedPath != path) {
+    DepTracker->addMacroPluginDependency(prefixMappedPath, moduleName);
+    return;
+  }
+
   SmallString<128> resolvedPath;
-  auto fs = Ctx.SourceMgr.getFileSystem();
+  // The plugin is not in the CAS file system, so resolve it against the file
+  // system it is actually loaded from.
+  auto fs = getPluginLoadingFS(Ctx);
   if (auto err = fs->getRealPath(path, resolvedPath)) {
     return;
   }
