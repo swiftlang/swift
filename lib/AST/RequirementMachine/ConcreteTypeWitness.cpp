@@ -181,6 +181,15 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
       continue;
     }
 
+    if (conformance.isConcrete() && conformance.getConcrete()->isInvalid()) {
+      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
+        llvm::dbgs() << "^^ " << concreteType << " has an invalid conformance "
+                     << "to " << proto->getName() << "\n";
+      }
+
+      continue;
+    }
+
     auto concreteConformanceSymbol = Symbol::forConcreteConformance(
         concreteType, substitutions, proto, Context);
 
@@ -242,7 +251,7 @@ void PropertyMap::concretizeTypeWitnessInConformance(
                      << " of " << concreteType << " could not be inferred\n";
       }
 
-      t = ErrorType::get(concreteType);
+      return;
     }
 
     typeWitness = t->getCanonicalType();
@@ -260,7 +269,16 @@ void PropertyMap::concretizeTypeWitnessInConformance(
 
     typeWitness = archetype->getNestedType(assocType)->getCanonicalType();
   } else if (conformance.isInvalid()) {
-    typeWitness = CanType(ErrorType::get(Context.getASTContext()));
+    return;
+  }
+
+  if (typeWitness->hasError()) {
+    if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
+      llvm::dbgs() << "^^ " << "Type witness for " << assocType->getName()
+                   << " of " << concreteType << " is invalid\n";
+    }
+
+    return;
   }
 
   if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
