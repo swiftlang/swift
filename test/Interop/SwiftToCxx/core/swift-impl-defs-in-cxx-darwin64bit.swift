@@ -44,6 +44,9 @@
 // CHECK-NEXT: // type metadata address for Float16.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss7Float16VN;
 // CHECK-EMPTY:
+// CHECK-NEXT: // protocol descriptor for Hashable.
+// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $sSHMp;
+// CHECK-EMPTY:
 // CHECK-NEXT: #ifdef __cplusplus
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif

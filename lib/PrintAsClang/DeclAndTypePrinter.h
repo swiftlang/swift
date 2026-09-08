@@ -22,6 +22,7 @@
 // for OptionalTypeKind
 #include "swift/AST/TypeRepr.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSet.h"
 
@@ -148,6 +149,11 @@ public:
   void printTypeName(raw_ostream &os, Type ty, const ModuleDecl *moduleContext);
 
   void printAvailability(raw_ostream &os, const Decl *D);
+
+  /// Orders potential C++ overload collisions so declarations with fewer
+  /// generic requirements are attempted first. Final collision detection still
+  /// happens after ABI validation while printing.
+  void orderCxxOverloadsForEmission(MutableArrayRef<const Decl *> declarations);
 
   /// Is \p ED empty of members and protocol conformances to include?
   bool isEmptyExtensionDecl(const ExtensionDecl *ED);
