@@ -693,7 +693,7 @@ public:
   UNREACHABLE(Operator, "cannot appear in a type context")
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
-  UNREACHABLE(Using, "cannot appear in a type context")
+  UNREACHABLE(FileDefault, "cannot appear in a type context")
 
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
@@ -1459,7 +1459,7 @@ public:
   UNREACHABLE(Operator, "cannot appear in a type context")
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
-  UNREACHABLE(Using, "cannot appear in a type context")
+  UNREACHABLE(FileDefault, "cannot appear in a type context")
 
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")

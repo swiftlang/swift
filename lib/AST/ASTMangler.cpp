@@ -5550,7 +5550,7 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
     case DeclKind::MacroExpansion:
-    case DeclKind::Using:
+    case DeclKind::FileDefault:
     case DeclKind::HiddenTypeLayoutInfo:
       break;
     };

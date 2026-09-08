@@ -2221,13 +2221,13 @@ namespace {
       printFoot();
     }
 
-    void visitUsingDecl(UsingDecl *UD, Label label) {
-      printCommon(UD, "using_decl", label);
+    void visitFileDefaultDecl(FileDefaultDecl *FDD, Label label) {
+      printCommon(FDD, "file_default_decl", label);
 
-      ASTContext *Ctx = &UD->getASTContext();
-      DeclContext *DC = UD->getDeclContext();
+      ASTContext *Ctx = &FDD->getASTContext();
+      DeclContext *DC = FDD->getDeclContext();
       printList(
-          UD->getSpecifiedAttributes(),
+          FDD->getSpecifiedAttributes(),
           [&](auto *attr, Label label) { printRec(attr, Ctx, DC, label); },
           Label::optional("specified_attrs"));
       printFoot();

@@ -269,7 +269,7 @@ public:
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
-  void visitUsingDecl(UsingDecl *) {}
+  void visitFileDefaultDecl(FileDefaultDecl *) {}
   void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
     llvm_unreachable("hidden layout declarations do not produce SIL");
   }

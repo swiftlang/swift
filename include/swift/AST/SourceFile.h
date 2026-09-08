@@ -32,7 +32,7 @@ class GeneratedSourceInfo;
 class PersistentParserState;
 struct SourceFileExtras;
 class Token;
-class UsingDecl;
+class FileDefaultDecl;
 class AvailableAttr;
 enum class DefaultIsolation : uint8_t;
 
@@ -40,7 +40,7 @@ enum class DefaultIsolation : uint8_t;
 struct FileDefaults {
   struct Isolation {
     DefaultIsolation kind;
-    UsingDecl *source;
+    FileDefaultDecl *source;
   };
   /// `std::nullopt` when there is no file-level default isolation.
   std::optional<Isolation> isolation;

@@ -202,7 +202,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
-  bool visitUsingDecl(UsingDecl *UD) {
+  bool visitFileDefaultDecl(FileDefaultDecl *FDD) {
     return false;
   }
 

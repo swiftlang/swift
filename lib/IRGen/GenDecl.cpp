@@ -2746,7 +2746,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     // Expansion already visited as auxiliary decls.
     return;
 
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
     return;
 
   case DeclKind::HiddenTypeLayoutInfo:
@@ -5988,7 +5988,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Param:
     case DeclKind::Module:
     case DeclKind::PrecedenceGroup:
-    case DeclKind::Using:
+    case DeclKind::FileDefault:
       llvm_unreachable("decl not allowed in type context");
 
     case DeclKind::BuiltinTuple:

@@ -1141,7 +1141,7 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  func generate(usingDecl node: UsingDeclSyntax) -> BridgedUsingDecl? {
+  func generate(usingDecl node: UsingDeclSyntax) -> BridgedFileDefaultDecl? {
     var attrs = BridgedDeclAttributes()
     var addedAny = false
 
@@ -1170,10 +1170,10 @@ extension ASTGenVisitor {
       return nil
     }
 
-    return BridgedUsingDecl.createParsed(
+    return BridgedFileDefaultDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
-      usingKeywordLoc: self.generateSourceLoc(node.usingKeyword),
+      defaultKeywordLoc: self.generateSourceLoc(node.usingKeyword),
       specifiedAttributes: attrs
     )
   }

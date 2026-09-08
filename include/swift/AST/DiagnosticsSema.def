@@ -9590,10 +9590,10 @@ ERROR(invalid_actor_for_file_isolation,none,
      (Type))
 NOTE(invalid_actor_for_file_isolation_note,none,
      "file-level default isolation must be '@MainActor' or 'nonisolated'", ())
-ERROR(using_decl_invalid_attribute,none,
+ERROR(file_default_invalid_attribute,none,
      "'%0' is not valid in a 'using' declaration",
      (DeclAttribute))
-NOTE(using_decl_invalid_attribute_note,none,
+NOTE(file_default_invalid_attribute_note,none,
      "'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'", ())
 
 //===----------------------------------------------------------------------===//

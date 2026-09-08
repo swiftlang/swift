@@ -458,7 +458,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
 
       // The `using` declarations are private to the file at the moment
       // and shouldn't appear in swift interfaces.
-      if (isa<UsingDecl>(D))
+      if (isa<FileDefaultDecl>(D))
         return false;
 
       return ShouldPrintChecker::shouldPrint(D, options);
@@ -3487,7 +3487,7 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                    [&] { Printer << "."; });
 }
 
-void PrintAST::visitUsingDecl(UsingDecl *decl) {
+void PrintAST::visitFileDefaultDecl(FileDefaultDecl *decl) {
   Printer.printIntroducerKeyword("using", Options, " ");
   for (auto attr : decl->getSpecifiedAttributes()) {
     attr->print(Printer, Options, decl);

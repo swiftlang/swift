@@ -310,7 +310,7 @@ final public class TopLevelCodeDecl: Decl, DeclContext {
 
 final public class ImportDecl: Decl {}
 
-final public class UsingDecl: Decl {}
+final public class FileDefaultDecl: Decl {}
 
 final public class PrecedenceGroupDecl: Decl {}
 

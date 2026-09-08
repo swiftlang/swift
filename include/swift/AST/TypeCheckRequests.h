@@ -74,7 +74,7 @@ class PreInverseGenericsAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
 class TypeLoc;
-class UsingDecl;
+class FileDefaultDecl;
 class Witness;
 class TypeResolution;
 struct TypeWitnessAndDecl;
@@ -5738,7 +5738,7 @@ public:
 
 /// Gathers the file-level defaults declared by `using ...` at the top of a
 /// source file, and diagnoses any issues that would affect results. Other
-/// validation in `visitUsingDecl` instead.
+/// validation in `visitFileDefaultDecl` instead.
 class FileDefaultsRequest
     : public SimpleRequest<FileDefaultsRequest,
                            FileDefaults(const SourceFile *),

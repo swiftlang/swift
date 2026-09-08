@@ -2451,10 +2451,10 @@ public:
     }
   }
 
-  void visitUsingDecl(UsingDecl *UD) {
-    if (!UD->getDeclContext()->isModuleScopeContext()) {
+  void visitFileDefaultDecl(FileDefaultDecl *FDD) {
+    if (!FDD->getDeclContext()->isModuleScopeContext()) {
       // 'using' is only valid at file scope.
-      UD->diagnose(diag::decl_inner_scope);
+      FDD->diagnose(diag::decl_inner_scope);
     }
   }
 

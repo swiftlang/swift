@@ -138,7 +138,7 @@ public:
   UNREACHABLE(TopLevelCode, "not applicable")
   UNREACHABLE(Module, "not applicable")
   UNREACHABLE(Missing, "not applicable")
-  UNREACHABLE(Using, "not applicable")
+  UNREACHABLE(FileDefault, "not applicable")
 
   UNREACHABLE(Param, "handled by the enclosing declaration")
   UNREACHABLE(GenericTypeParam, "handled by the enclosing declaration")

@@ -6792,7 +6792,7 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
       if (!nextToken.isAtStartOfLine() &&
           (nextToken.is(tok::at_sign) || nextToken.is(tok::identifier) ||
            nextToken.is(tok::code_complete))) {
-        DeclResult = parseDeclUsing(Flags, Attributes);
+        DeclResult = parseDeclFileDefault(Flags, Attributes);
         break;
       }
     }
@@ -7177,26 +7177,27 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 ///   decl-using:
 ///     'using' (@<attribute> | <modifier>)
 /// \endverbatim
-ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
-                                               DeclAttributes &Attributes) {
+ParserResult<FileDefaultDecl>
+Parser::parseDeclFileDefault(ParseDeclOptions Flags,
+                             DeclAttributes &Attributes) {
   assert(Tok.isContextualKeyword("using"));
   DebuggerContextChange DCC(*this);
   ParserStatus Status;
 
   if (!Context.LangOpts.hasFeature(Feature::DefaultIsolationPerFile)) {
-    diagnose(Tok, diag::experimental_using_decl_disabled);
+    diagnose(Tok, diag::experimental_file_default_disabled);
   }
 
   if (!Attributes.isEmpty()) {
     diagnose((*Attributes.begin())->getStartLoc(),
-             diag::using_decl_rejects_attributes);
+             diag::file_default_rejects_attributes);
   }
 
-  SourceLoc UsingLoc = consumeToken();
+  SourceLoc DefaultLoc = consumeToken();
 
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletionCallbacks) {
-      CodeCompletionCallbacks->completeUsingDecl();
+      CodeCompletionCallbacks->completeFileDefaultDecl();
     }
     return makeParserCodeCompletionStatus();
   }
@@ -7214,7 +7215,7 @@ ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
     Status |= parseNewDeclAttribute(specifiedAttributes, /*AtLoc=*/{},
                                     DeclAttrKind::Nonisolated);
   } else {
-    diagnose(Tok, diag::using_decl_invalid_specifier);
+    diagnose(Tok, diag::file_default_invalid_specifier);
     Status.setIsParseError();
     return Status;
   }
@@ -7229,9 +7230,9 @@ ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
     return Status;
   }
 
-  auto *UD =
-      UsingDecl::create(Context, UsingLoc, specifiedAttributes, CurDeclContext);
-  return DCC.fixupParserResult(Status, UD);
+  auto *FDD = FileDefaultDecl::create(Context, DefaultLoc, specifiedAttributes,
+                                      CurDeclContext);
+  return DCC.fixupParserResult(Status, FDD);
 }
 
 /// Parse an inheritance clause.

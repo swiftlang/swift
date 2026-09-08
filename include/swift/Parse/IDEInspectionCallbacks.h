@@ -257,8 +257,7 @@ public:
   completeImportDecl(ImportPath::Builder &Path) {};
 
   /// Complete the 'using' decl with supported specifiers.
-  virtual void
-  completeUsingDecl() {};
+  virtual void completeFileDefaultDecl() {};
 
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,
