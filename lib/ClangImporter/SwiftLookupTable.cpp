@@ -1588,10 +1588,12 @@ clang::NamedDecl *SwiftLookupTable::mapStoredDecl(StoredSingleEntry &entry) {
 
   // If we have an AST node here, just cast it.
   if (entry.isASTNodeEntry()) {
+    bumpCounter(SwiftCtx, &Counters::LookupTableDeclCached);
     return static_cast<clang::NamedDecl *>(entry.getASTNode());
   }
 
   // Otherwise, resolve the declaration.
+  bumpCounter(SwiftCtx, &Counters::LookupTableDeclResolved);
   assert(Reader && "Cannot resolve the declaration without a reader");
   auto declID = entry.getSerializationID();
   auto localID = clang::LocalDeclID::get(Reader->getASTReader(),
@@ -2313,8 +2315,13 @@ SwiftNameLookupExtension::createExtensionReader(
   }
 
   // Create the reader.
-  auto tableReader = SwiftLookupTableReader::create(this, reader, mod, onRemove,
-                                                    stream);
+  std::unique_ptr<SwiftLookupTableReader> tableReader;
+  {
+    FrontendStatsTracer tracer(swiftCtx.Stats,
+                               "deserialize-swift-lookup-table");
+    tableReader =
+        SwiftLookupTableReader::create(this, reader, mod, onRemove, stream);
+  }
   if (!tableReader) return nullptr;
 
   // Create the lookup table.
