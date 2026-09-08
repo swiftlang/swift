@@ -224,15 +224,15 @@ private func specializeDeinit(forType type: Type,
 
 /// Specializes a witness table of `conformance` for the concrete type of the conformance.
 func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassContext) {
-  if let existingSpecialization = context.lookupWitnessTable(for: conformance),
-         existingSpecialization.isSpecialized
-  {
-    return
-  }
-
   guard conformance.isConcrete else {
     // If the conformance is abstract the witness table is specialized elsewhere - at the
     // place where the concrete conformance is referenced.
+    return
+  }
+
+  if let existingSpecialization = context.lookupWitnessTable(for: conformance),
+         existingSpecialization.isSpecialized
+  {
     return
   }
 
