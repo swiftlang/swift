@@ -87,6 +87,9 @@ SILFunction *GenericCloner::createDeclaration(
   if (!Orig->hasOwnership()) {
     NewF->setOwnershipEliminated();
   }
+
+  NewF->setHasLoweredAddresses(Orig->hasLoweredAddresses());
+
   // A specialization of a function goes into the same section as the original
   // function.
   NewF->setSection(Orig->section());

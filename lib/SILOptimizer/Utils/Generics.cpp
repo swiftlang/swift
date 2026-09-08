@@ -2977,6 +2977,8 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
     Thunk->setOwnershipEliminated();
   }
 
+  Thunk->setHasLoweredAddresses(SpecializedFunc->hasLoweredAddresses());
+
   if (!Thunk->hasLoweredAddresses()) {
     for (auto SpecArg : SpecializedFunc->getArguments()) {
       auto *NewArg = EntryBB->createFunctionArgument(SpecArg->getType(),
