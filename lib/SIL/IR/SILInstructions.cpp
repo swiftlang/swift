@@ -843,6 +843,13 @@ BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
                                  SubstitutionMap Substitutions,
                                  ArrayRef<SILValue> Args,
                                  SILInstructionContext context) {
+  // A builtin must name either a registered Builtins.def builtin or an LLVM
+  // intrinsic.
+  ASSERT((context.getModule().getBuiltinInfo(Name).ID !=
+              BuiltinValueKind::None ||
+          context.getModule().getIntrinsicInfo(Name).ID !=
+              llvm::Intrinsic::not_intrinsic) &&
+         "BuiltinInst created with unregistered builtin or intrinsic name");
   SmallVector<SILValue, 32> allOperands;
   copy(Args, std::back_inserter(allOperands));
   collectTypeDependentOperands(allOperands, context, Substitutions);
