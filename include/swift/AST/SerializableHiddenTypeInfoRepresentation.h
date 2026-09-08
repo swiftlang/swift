@@ -50,7 +50,13 @@ struct SerializableLLVMTypeRepresentation {
 class SerializableHiddenTypeInfoRepresentation {
 public:
   std::unique_ptr<SerializableLLVMTypeRepresentation> storageType;
-  irgen::TypeInfoBitfields bits = {0};
+  uint64_t alignment = 1;
+  bool triviallyDestroyable = false;
+  bool bitwiseTakable = false;
+  bool bitwiseBorrowable = false;
+  bool copyable = false;
+  bool alwaysFixedSize = false;
+  bool abiAccessible = false;
 
   virtual ~SerializableHiddenTypeInfoRepresentation() = default;
 };

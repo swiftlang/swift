@@ -262,7 +262,23 @@ TypeInfo::TypeInfo(
     const SerializableHiddenTypeInfoRepresentation &representation)
     : CreatedFromSerializableHiddenTypeInfoRepresentation(true),
       StorageType(deserializeLLVMType(IGM, representation.storageType)) {
-  Bits = representation.bits;
+  if (representation.alignment == 0 ||
+      !llvm::isPowerOf2_64(representation.alignment))
+    llvm::report_fatal_error("serialized TypeInfo has an invalid alignment");
+  if (representation.bitwiseBorrowable && !representation.bitwiseTakable)
+    llvm::report_fatal_error(
+        "serialized TypeInfo is bitwise borrowable but not bitwise takable");
+
+  Bits.OpaqueBits = 0;
+  Bits.TypeInfo.Kind = unsigned(SpecialTypeInfoKind::None);
+  Bits.TypeInfo.AlignmentShift = llvm::Log2_64(representation.alignment);
+  Bits.TypeInfo.TriviallyDestroyable = representation.triviallyDestroyable;
+  Bits.TypeInfo.BitwiseTakable = representation.bitwiseTakable;
+  Bits.TypeInfo.BitwiseBorrowable = representation.bitwiseBorrowable;
+  Bits.TypeInfo.Copyable = representation.copyable;
+  Bits.TypeInfo.SubclassKind = InvalidSubclassKind;
+  Bits.TypeInfo.AlwaysFixedSize = representation.alwaysFixedSize;
+  Bits.TypeInfo.ABIAccessible = representation.abiAccessible;
 }
 
 void TypeInfo::assertNotDeserialized(const char *operation) const {
@@ -281,7 +297,16 @@ void TypeInfo::populateSerializableHiddenTypeInfoRepresentation(
     IRGenModule &IGM,
     SerializableHiddenTypeInfoRepresentation &representation) const {
   representation.storageType = serializeLLVMType(getStorageType());
-  representation.bits = Bits;
+  representation.alignment = getBestKnownAlignment().getValue();
+  representation.triviallyDestroyable =
+      isTriviallyDestroyable(ResilienceExpansion::Maximal);
+  representation.bitwiseTakable =
+      isBitwiseTakable(ResilienceExpansion::Maximal);
+  representation.bitwiseBorrowable =
+      isBitwiseBorrowable(ResilienceExpansion::Maximal);
+  representation.copyable = isCopyable(ResilienceExpansion::Maximal);
+  representation.alwaysFixedSize = isFixedSize(ResilienceExpansion::Minimal);
+  representation.abiAccessible = isABIAccessible();
 }
 
 FixedTypeInfo::FixedTypeInfo(
