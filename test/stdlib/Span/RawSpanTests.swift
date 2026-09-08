@@ -342,6 +342,40 @@ suite.test("withUnsafeBytes()")
   }
 }
 
+suite.test("RawSpan.borrowWithUnsafeBytes to a Ref")
+.require(.stdlib_6_5)
+.skip(.custom({
+  if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+}, reason: "Ref requires Swift stdlib 6.4"))
+.code {
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
+
+  let array = ContiguousArray<UInt8>(0..<4)
+  array.withUnsafeBytes { ub in
+    let span = unsafe RawSpan(_unsafeBytes: ub)
+
+    let ref = unsafe span.borrowWithUnsafeBytes { bytes in
+      unsafe Ref(
+        unsafeAddress: (bytes.baseAddress! + 1)
+          .assumingMemoryBound(to: UInt8.self),
+        borrowing: bytes
+      )
+    }
+    expectEqual(ref.value, 1)
+    expectEqual(span.byteCount, 4)
+
+    let contemporaryRef = unsafe span.borrowWithUnsafeBytes { bytes in
+      unsafe Ref(
+        unsafeAddress: (bytes.baseAddress! + 2)
+          .assumingMemoryBound(to: UInt8.self),
+        borrowing: bytes
+      )
+    }
+    expectEqual(contemporaryRef.value, 2)
+    expectEqual(ref.value + contemporaryRef.value, 3)
+  }
+}
+
 suite.test("byteOffsets(of:)")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },

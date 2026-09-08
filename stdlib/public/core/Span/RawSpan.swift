@@ -593,6 +593,42 @@ extension RawSpan {
   ) throws(E) -> Result {
     try unsafe body(.init(start: _pointer, count: byteCount))
   }
+
+  /// Calls the given closure with a pointer to the underlying bytes of
+  /// the viewed contiguous storage.
+  ///
+  /// Use this method to derive a new non-escapable value with shared access to
+  /// the memory represented by this span. It is an alternative to `RawSpan`'s
+  /// `extracting` methods for deriving values of types other than `RawSpan`.
+  ///
+  /// Unlike `withUnsafeBytes(_:)`, a non-escapable result of `body` may outlive
+  /// the call; its lifetime is tied to the source of this span and its dependence
+  /// is a read access. An escapable result has no dependency; hence, return an
+  /// escapable value only if it does not store the pointer. Also, any pointer
+  /// `body` derives must lie within the region it was given. This method can
+  /// verify none of these requirements; therefore, it is an unsafe operation.
+  ///
+  /// - Parameter body: A closure with an `UnsafeRawBufferPointer`
+  ///   parameter that points to the viewed contiguous storage.
+  ///   If `body` has a return value, that value is also used as the return value
+  ///   for the `borrowWithUnsafeBytes(_:)` method.
+  /// - Returns: The return value of the `body` closure parameter.
+  @unsafe
+  @export(implementation)
+  @_transparent
+  @_lifetime(copy self)
+  public func borrowWithUnsafeBytes<
+    E: Error, Result: ~Copyable & ~Escapable
+  >(
+    _ body: @_lifetime(borrow bytes) (
+      _ bytes: UnsafeRawBufferPointer
+    ) throws(E) -> Result
+  ) throws(E) -> Result {
+    let bytes = unsafe UnsafeRawBufferPointer(
+      start: _pointer, count: byteCount
+    )
+    return unsafe _overrideLifetime(try unsafe body(bytes), copying: self)
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
