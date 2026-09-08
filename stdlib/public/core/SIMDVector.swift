@@ -273,9 +273,17 @@ extension SIMD {
   public subscript<Index>(index: SIMD2<Index>) -> SIMD2<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD2<Scalar>()
+    let n = scalarCount
+    if n.nonzeroBitCount == 1 {
+      let mask = n &- 1
+      for i in result.indices {
+        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
+      }
+      return result
+    }
     for i in result.indices {
-      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
-      if position < 0 { position &+= scalarCount }
+      var position = Int(truncatingIfNeeded: index[i]) % n
+      if position < 0 { position &+= n }
       result[i] = self[position]
     }
     return result
@@ -290,9 +298,17 @@ extension SIMD {
   public subscript<Index>(index: SIMD3<Index>) -> SIMD3<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD3<Scalar>()
+    let n = scalarCount
+    if n.nonzeroBitCount == 1 {
+      let mask = n &- 1
+      for i in result.indices {
+        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
+      }
+      return result
+    }
     for i in result.indices {
-      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
-      if position < 0 { position &+= scalarCount }
+      var position = Int(truncatingIfNeeded: index[i]) % n
+      if position < 0 { position &+= n }
       result[i] = self[position]
     }
     return result
@@ -307,9 +323,17 @@ extension SIMD {
   public subscript<Index>(index: SIMD4<Index>) -> SIMD4<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD4<Scalar>()
+    let n = scalarCount
+    if n.nonzeroBitCount == 1 {
+      let mask = n &- 1
+      for i in result.indices {
+        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
+      }
+      return result
+    }
     for i in result.indices {
-      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
-      if position < 0 { position &+= scalarCount }
+      var position = Int(truncatingIfNeeded: index[i]) % n
+      if position < 0 { position &+= n }
       result[i] = self[position]
     }
     return result
@@ -324,9 +348,17 @@ extension SIMD {
   public subscript<Index>(index: SIMD8<Index>) -> SIMD8<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD8<Scalar>()
+    let n = scalarCount
+    if n.nonzeroBitCount == 1 {
+      let mask = n &- 1
+      for i in result.indices {
+        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
+      }
+      return result
+    }
     for i in result.indices {
-      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
-      if position < 0 { position &+= scalarCount }
+      var position = Int(truncatingIfNeeded: index[i]) % n
+      if position < 0 { position &+= n }
       result[i] = self[position]
     }
     return result
@@ -341,9 +373,17 @@ extension SIMD {
   public subscript<Index>(index: SIMD16<Index>) -> SIMD16<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD16<Scalar>()
+    let n = scalarCount
+    if n.nonzeroBitCount == 1 {
+      let mask = n &- 1
+      for i in result.indices {
+        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
+      }
+      return result
+    }
     for i in result.indices {
-      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
-      if position < 0 { position &+= scalarCount }
+      var position = Int(truncatingIfNeeded: index[i]) % n
+      if position < 0 { position &+= n }
       result[i] = self[position]
     }
     return result
@@ -358,9 +398,17 @@ extension SIMD {
   public subscript<Index>(index: SIMD32<Index>) -> SIMD32<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD32<Scalar>()
+    let n = scalarCount
+    if n.nonzeroBitCount == 1 {
+      let mask = n &- 1
+      for i in result.indices {
+        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
+      }
+      return result
+    }
     for i in result.indices {
-      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
-      if position < 0 { position &+= scalarCount }
+      var position = Int(truncatingIfNeeded: index[i]) % n
+      if position < 0 { position &+= n }
       result[i] = self[position]
     }
     return result
@@ -375,9 +423,17 @@ extension SIMD {
   public subscript<Index>(index: SIMD64<Index>) -> SIMD64<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD64<Scalar>()
+    let n = scalarCount
+    if n.nonzeroBitCount == 1 {
+      let mask = n &- 1
+      for i in result.indices {
+        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
+      }
+      return result
+    }
     for i in result.indices {
-      var position = Int(truncatingIfNeeded: index[i]) % scalarCount
-      if position < 0 { position &+= scalarCount }
+      var position = Int(truncatingIfNeeded: index[i]) % n
+      if position < 0 { position &+= n }
       result[i] = self[position]
     }
     return result
