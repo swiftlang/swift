@@ -519,6 +519,10 @@ class RegionAnalysisFunctionInfo {
 
   SendingOperandToStateMap sendingOperandToStateMap;
 
+  // This is a cache for \c wasValueEverSent(SILValue), memoizing both
+  // positive and negative results.
+  llvm::DenseMap<SILValue, bool> sentValuesCache;
+
   // We make this optional to prevent an issue that we have seen on windows when
   // capturing a field in a closure that is used to initialize a different
   // field.
@@ -629,6 +633,16 @@ public:
   }
 
   bool isClosureCaptured(SILValue value, Operand *op);
+
+  /// Returns true if \p value's underlying tracked value is ever the target
+  /// of a `send` operation anywhere in this function's body.
+  ///
+  /// This replays the partition-op evaluation over every live block,
+  /// so "sent" here matches what SendNonSendable would report, as
+  /// opposed to a purely syntactic search for `Send` operation,
+  /// which would not account for elision (e.g. `nonisolated(unsafe)`,
+  /// same-actor sends). The result is cached in \c sentValuesCache.
+  bool wasValueEverSent(SILValue value);
 
   SILValue getUnderlyingTrackedValue(SILValue value) {
     return getValueMap().getRepresentative(value);
