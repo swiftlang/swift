@@ -534,6 +534,66 @@ suite.test("withUnsafeBytes()")
   }
 }
 
+suite.test("borrowWithUnsafeBufferPointer to a Ref")
+.require(.stdlib_6_5)
+.skip(.custom({
+  if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+}, reason: "Ref requires Swift stdlib 6.4"))
+.code {
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
+
+  let array = ContiguousArray(0..<4)
+  array.withUnsafeBufferPointer { ub in
+    let span = unsafe Span(_unsafeElements: ub)
+
+    let ref = unsafe span.borrowWithUnsafeBufferPointer { buffer in
+      unsafe Ref(unsafeAddress: buffer.baseAddress! + 1, borrowing: buffer)
+    }
+    expectEqual(ref.value, 1)
+    expectEqual(span.count, 4)
+
+    let contemporaryRef = unsafe span.borrowWithUnsafeBufferPointer { buffer in
+      unsafe Ref(unsafeAddress: buffer.baseAddress! + 2, borrowing: buffer)
+    }
+    expectEqual(contemporaryRef.value, 2)
+    expectEqual(ref.value + contemporaryRef.value, 3)
+  }
+}
+
+suite.test("borrowWithUnsafeBytes to a Ref")
+.require(.stdlib_6_5)
+.skip(.custom({
+  if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+}, reason: "Ref requires Swift stdlib 6.4"))
+.code {
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
+
+  let array = ContiguousArray<UInt8>(0..<4)
+  array.withUnsafeBufferPointer { ub in
+    let span = unsafe Span(_unsafeElements: ub)
+
+    let ref = unsafe span.borrowWithUnsafeBytes { bytes in
+      unsafe Ref(
+        unsafeAddress: (bytes.baseAddress! + 1)
+          .assumingMemoryBound(to: UInt8.self),
+        borrowing: bytes
+      )
+    }
+    expectEqual(ref.value, 1)
+    expectEqual(span.count, 4)
+
+    let contemporaryRef = unsafe span.borrowWithUnsafeBytes { bytes in
+      unsafe Ref(
+        unsafeAddress: (bytes.baseAddress! + 2)
+          .assumingMemoryBound(to: UInt8.self),
+        borrowing: bytes
+      )
+    }
+    expectEqual(contemporaryRef.value, 2)
+    expectEqual(ref.value + contemporaryRef.value, 3)
+  }
+}
+
 suite.test("isTriviallyIdentical(to:)")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
