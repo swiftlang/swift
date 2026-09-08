@@ -104,7 +104,6 @@
 
 #define DEBUG_TYPE "Clang module importer"
 
-STATISTIC(NumTotalImportedEntities, "# of imported clang entities");
 STATISTIC(NumFactoryMethodsAsInitializers,
           "# of factory methods mapped to initializers");
 STATISTIC(
@@ -10241,8 +10240,6 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
 }
 
 void ClangImporter::Implementation::startedImportingEntity() {
-  ++NumTotalImportedEntities;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
   if (auto *Stats = SwiftContext.Stats)
     ++Stats->getFrontendCounters().NumTotalClangImportedEntities;
 }
