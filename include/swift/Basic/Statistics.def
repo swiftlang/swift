@@ -166,6 +166,18 @@ FRONTEND_STATISTIC(ClangImporter, ClangNamespaceMemberLookupCandidates)
 /// Candidate members that actually belong to the namespace being looked up in.
 FRONTEND_STATISTIC(ClangImporter, ClangNamespaceMemberLookupMatched)
 
+/// Reuses of a previously computed Swift name for a Clang declaration.
+FRONTEND_STATISTIC(ClangImporter, ClangNameImportCacheHit)
+
+/// Swift names computed for a Clang declaration for the first time.
+FRONTEND_STATISTIC(ClangImporter, ClangNameImportCacheMiss)
+
+/// Reuses of a previously computed enum classification.
+FRONTEND_STATISTIC(ClangImporter, ClangEnumInfoCacheHit)
+
+/// Enum classifications computed for the first time.
+FRONTEND_STATISTIC(ClangImporter, ClangEnumInfoCacheMiss)
+
 /// Number of source buffers visible in the source manager.
 FRONTEND_STATISTIC(AST, NumSourceBuffers)
 
