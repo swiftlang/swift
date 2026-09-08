@@ -1,27 +1,17 @@
+// clang-format off
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/throwing-getter-in-cxx.swift -module-name
-// Properties -clang-header-expose-decls=all-public -enable-experimental-feature
-// GenerateBindingsForThrowingFunctionsInCXX -typecheck -verify
-// -emit-clang-header-path %t/properties.h
+// RUN: %target-swift-frontend %S/throwing-getter-in-cxx.swift -module-name Properties -clang-header-expose-decls=all-public -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX -typecheck -verify -emit-clang-header-path %t/properties.h
 
-// RUN: %target-interop-build-clangxx -c %s -I %t -o
-// %t/swift-properties-errors-execution.o
-// -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR RUN: %target-interop-build-swift
-// %S/throwing-getter-in-cxx.swift -o %t/swift-properties-errors-execution
-// -Xlinker %t/swift-properties-errors-execution.o -module-name Properties
-// -Xfrontend -entry-point-function-name -Xfrontend swiftMain
-// -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX
-
+// RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-properties-errors-execution.o -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
+// RUN: %target-interop-build-swift %S/throwing-getter-in-cxx.swift -o %t/swift-properties-errors-execution -Xlinker %t/swift-properties-errors-execution.o -module-name Properties -Xfrontend -entry-point-function-name -Xfrontend swiftMain -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX
 // RUN: %target-codesign %t/swift-properties-errors-execution
 // RUN: %target-run %t/swift-properties-errors-execution | %FileCheck %s
 
-// RUN: %target-interop-build-clangxx -std=c++17 -fno-exceptions -c %s -I %t -o
-// %t/no-exceptions.o -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR RUN:
-// %target-interop-build-swift %S/throwing-getter-in-cxx.swift -o
-// %t/no-exceptions -Xlinker %t/no-exceptions.o -module-name Properties
-// -Xfrontend -entry-point-function-name -Xfrontend swiftMain RUN:
-// %target-codesign %t/no-exceptions RUN: %target-run %t/no-exceptions
+// RUN: %target-interop-build-clangxx -std=c++17 -fno-exceptions -c %s -I %t -o %t/no-exceptions.o -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
+// RUN: %target-interop-build-swift %S/throwing-getter-in-cxx.swift -o %t/no-exceptions -Xlinker %t/no-exceptions.o -module-name Properties -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+// RUN: %target-codesign %t/no-exceptions
+// RUN: %target-run %t/no-exceptions
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_GenerateBindingsForThrowingFunctionsInCXX
@@ -29,6 +19,7 @@
 
 // rdar://102167469
 // UNSUPPORTED: CPU=arm64e
+// clang-format on
 
 #include "properties.h"
 #include <cassert>
