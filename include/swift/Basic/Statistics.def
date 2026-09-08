@@ -121,6 +121,50 @@ FRONTEND_STATISTIC(ClangImporter, NumLoadedClangModules)
 /// (clang-module-memory.json / -print-clang-stats).
 FRONTEND_STATISTIC(ClangImporter, NumMaterializedClangDecls)
 
+/// Top-level Clang declarations examined while building a Clang module's Swift
+/// lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableTopLevelDeclsVisited)
+
+/// Top-level Clang declarations that are skipped without contributing any
+/// lookup table entry.
+FRONTEND_STATISTIC(ClangImporter, LookupTableTopLevelDeclsSkipped)
+
+/// Declarations examined while building a Clang module's Swift lookup table,
+/// including transitive members of certain decls (e.g., record members).
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeclsVisited)
+
+/// Examined Clang declarations that are suppressed without contributing any
+/// lookup table entry.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeclsSuppressed)
+
+/// Distinct Swift name variants of Clang declarations that are recorded in the
+/// Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeclNameVariantsAdded)
+
+/// Distinct Swift name variants of Clang declarations that have been renamed
+/// by a SWIFT_NAME attribute.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeclCustomNamesAdded)
+
+/// C++ class template specializations recorded in the lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableTemplateSpecializationsAdded)
+
+/// Macros recorded in a module's Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableMacrosAdded)
+
+/// Import-as-member entries that must be added to the Swift lookup table later
+/// because their contexts were forward-referenced.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeferredEntries)
+
+/// Lookup table resolution passes to finalize import-as-member entries whose
+/// contexts were forward-referenced.
+FRONTEND_STATISTIC(ClangImporter, LookupTableResolvePasses)
+
+/// Name-to-declaration records inserted into a module's Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableEntriesAdded)
+
+/// Distinct base names keyed in a written Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDistinctBaseNames)
+
 /// Number of source buffers visible in the source manager.
 FRONTEND_STATISTIC(AST, NumSourceBuffers)
 
