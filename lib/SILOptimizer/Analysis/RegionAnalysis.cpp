@@ -605,6 +605,85 @@ static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
   return *kind == BuiltinValueKind::StartAsyncLetWithLocalBuffer;
 }
 
+// The different kinds of instructions that use a closure value without
+// changing which closure it represents, e.g. as part of converting an
+// escaping closure to a non-escaping one, or adjusting its abstraction
+// level.
+enum class ClosureUseKind {
+  /// Not a closure use instruction that we look through.
+  Unsupported,
+  /// A thunk partial_apply that just forwards its single captured
+  /// argument.
+  Thunk,
+  /// A `convert_function`.
+  FunctionConversion,
+  /// A `convert_escape_to_noescape`.
+  EscapeToNoEscape,
+};
+
+static ClosureUseKind classifyClosureWrapper(SILInstruction *inst) {
+  if (!inst)
+    return ClosureUseKind::Unsupported;
+
+  if (auto *pai = dyn_cast<PartialApplyInst>(inst)) {
+    auto *calleeFn = pai->getCalleeFunction();
+    if (calleeFn && calleeFn->isThunk())
+      return ClosureUseKind::Thunk;
+    return ClosureUseKind::Unsupported;
+  }
+
+  if (isa<ConvertFunctionInst>(inst))
+    return ClosureUseKind::FunctionConversion;
+
+  if (isa<ConvertEscapeToNoEscapeInst>(inst))
+    return ClosureUseKind::EscapeToNoEscape;
+
+  return ClosureUseKind::Unsupported;
+}
+
+// Determine whether this partial application is only used as a non-escaping
+// value i.e. a closure that is passed to a non-escaping parameter.
+static bool isNoEscapePartialApply(PartialApplyInst *pai) {
+  SILValue value = pai;
+  while (auto *use = value->getSingleUse()) {
+    auto *user = use->getUser();
+    switch (classifyClosureWrapper(user)) {
+    case ClosureUseKind::Thunk:
+    case ClosureUseKind::FunctionConversion:
+      value = cast<SingleValueInstruction>(user);
+      continue;
+    case ClosureUseKind::EscapeToNoEscape:
+      return true;
+    case ClosureUseKind::Unsupported:
+      return false;
+    }
+  }
+
+  return false;
+}
+
+/// Given a value that could be a closure, attempt to walk up through its
+/// uses and get a `partial_apply` that forms it.
+static PartialApplyInst *getUnderlyingPartialApply(SILValue closure) {
+  auto tryLookthroughClosureUse = [](SILValue value) {
+    auto *inst = value->getDefiningInstruction();
+    switch (classifyClosureWrapper(inst)) {
+    case ClosureUseKind::Thunk:
+      return cast<PartialApplyInst>(inst)->getArgument(0);
+    case ClosureUseKind::FunctionConversion:
+    case ClosureUseKind::EscapeToNoEscape:
+      return cast<SingleValueInstruction>(inst)->getOperand(0);
+    case ClosureUseKind::Unsupported:
+      return SILValue();
+    }
+  };
+
+  while (SILValue unwrapped = tryLookthroughClosureUse(closure))
+    closure = unwrapped;
+
+  return dyn_cast<PartialApplyInst>(closure);
+}
+
 /// Returns true if this is a function argument that is able to be sent in the
 /// body of our function.
 ///
@@ -616,12 +695,21 @@ static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
 
   // If we have a closure capture...
   if (arg->isClosureCapture()) {
-    // And that closure capture is from an async let, treat it as sending. This
-    // is because we allow for disconnected values to be sent into async let
-    // closures.
-    if (auto declRef = arg->getFunction()->getDeclRef();
-        declRef && declRef.isAsyncLetClosure) {
-      return true;
+    if (auto declRef = arg->getFunction()->getDeclRef()) {
+      // And that closure capture is from an async let, treat it as sending.
+      // This is because we allow for disconnected values to be sent into async
+      // let closures.
+      if (declRef.isAsyncLetClosure)
+        return true;
+
+      // All of the non-Sendable captures of non-escaping @called(once) closures
+      // that aren't explicitly `sending` can be sent.
+      if (auto *closure = declRef.getClosureExpr();
+          closure && closure->isCalledOnce()) {
+        auto *closureTy = closure->getType()->castTo<FunctionType>();
+        if (closureTy->getExtInfo().isNoEscape())
+          return true;
+      }
     }
   }
 
@@ -2270,6 +2358,46 @@ class PartitionOpTranslator {
     partialApplyReachabilityDataflow.propagateReachability();
   }
 
+  /// The argument is a non-escaping `@called(once)` value,
+  /// if it's a closure, attempt to undo send of it's implicitly
+  /// sending captures if the values weren't actually sent in the
+  /// body of the closure.
+  void tryUndoSendOfValuesCapturedByNonescapingCalledOnceClosure(
+      Operand *calledOnceArgument) {
+    // Dig up partial_apply that represents the closure.
+    auto *pai = getUnderlyingPartialApply(calledOnceArgument->get());
+    if (!pai || !pai->isCalledOnce())
+      return;
+
+    auto *calleeFn = pai->getCalleeFunction();
+    if (!calleeFn)
+      return;
+
+    PostOrderFunctionInfo calleePOFI(calleeFn);
+    RegionAnalysisFunctionInfo calleeInfo(calleeFn, &calleePOFI);
+
+    if (!calleeInfo.isSupportedFunction())
+      return;
+
+    ApplySite callSite(pai);
+    for (auto &op : pai->getArgumentOperands()) {
+      auto trackedValue = tryToTrackValue(op.get());
+      if (!trackedValue)
+        continue;
+
+      // Skip explicitly `sending` captures.
+      if (callSite.getParamInfoForOperand(op).hasOption(
+              SILParameterInfo::Sending))
+        continue;
+
+      unsigned argIndex = callSite.getSubstCalleeArgIndex(op);
+      assert(argIndex < calleeFn->getArguments().size());
+
+      if (!calleeInfo.wasValueEverSent(calleeFn->getArgument(argIndex)))
+        builder.addUndoSend(trackedValue->value, calledOnceArgument->getUser());
+    }
+  }
+
 public:
   PartitionOpTranslator(SILFunction *function, PostOrderFunctionInfo *pofi,
                         RegionAnalysisValueMap &valueMap,
@@ -2688,6 +2816,26 @@ public:
       builder.addAssignFresh(lookupResult->value);
   }
 
+  void translateSILNoEscapeCalledOncePartialApply(PartialApplyInst *pai) {
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs()
+        << "Translating non-escaping `@called(once)` Partial Apply!\n");
+
+    for (auto &op : ApplySite(pai).getArgumentOperands()) {
+      // All of the non-Sendable captures are sent by default. This would
+      // be undone after the call if the value is not actually sent in the
+      // body.
+      if (auto lookupResult = tryToTrackValue(op.get())) {
+        builder.addRequire(*lookupResult);
+        builder.addSend(lookupResult->value, &op);
+      }
+    }
+
+    // Mark our partial_apply result as being returned fresh.
+    if (auto lookupResult = tryToTrackValue(pai))
+      builder.addAssignFresh(lookupResult->value);
+  }
+
   void translateSILCalledOncePartialApply(PartialApplyInst *pai) {
     ApplySite applySite(pai);
     REGIONBASEDISOLATION_LOG(llvm::dbgs()
@@ -2795,6 +2943,13 @@ public:
     // `@called(once)` closures are allowed to have `sending` captures which
     // need special handling.
     if (pai->isCalledOnce()) {
+      // no-escaping closures treat non-Sendable captures that aren't explicitly
+      // `sending` as individually sent and undo if the values were never
+      // actually sent in the body.
+      if (isNoEscapePartialApply(pai)) {
+        return translateSILNoEscapeCalledOncePartialApply(pai);
+      }
+
       return translateSILCalledOncePartialApply(pai);
     }
 
@@ -2841,6 +2996,9 @@ public:
     // For non-self parameters, gather all of the sending parameters and
     // gather our non-sending parameters.
     SmallVector<Operand *, 8> nonSendingParameters;
+    // Non-escaping `@called(once)` closures require a post-call undo
+    // of their un-sent captures.
+    SmallVector<Operand *, 2> nonescapingCalledOnceArguments;
     SmallVector<Operand *, 8> sendingIndirectResults;
 
     // NOTE: We want to process indirect parameters as if they are
@@ -2860,6 +3018,16 @@ public:
       // If our parameter is not sending, just add it to the non-sending
       // parameters array and continue.
       if (!fas.isSending(op)) {
+        auto argumentType = op.get()->getType();
+
+        // Non-escaping @called(once) closures require special
+        // handling to undo send of non-Sendable captures that
+        // weren't sent in the body.
+        if (argumentType.isCalledOnce() &&
+            argumentType.containsNoEscapeFunction()) {
+          nonescapingCalledOnceArguments.push_back(&op);
+        }
+
         nonSendingParameters.push_back(&op);
         continue;
       }
@@ -2886,6 +3054,12 @@ public:
         if (auto lookupResult = tryToTrackValue(op.get())) {
           builder.addUndoSend(lookupResult->value, op.getUser());
         }
+      }
+
+      // Attempt to undo send of captures that weren't sent in the body of
+      // a non-escaping `@called(once)` closure.
+      for (Operand *op : nonescapingCalledOnceArguments) {
+        tryUndoSendOfValuesCapturedByNonescapingCalledOnceClosure(op);
       }
     };
 
@@ -3903,6 +4077,13 @@ CONSTANT_TRANSLATION(DereferenceBorrowAddrInst, LookThrough)
 // the src value and tgt addr
 CONSTANT_TRANSLATION(CopyAddrInst, Store)
 CONSTANT_TRANSLATION(ExplicitCopyAddrInst, Store)
+// `assign` is ordinarily lowered away by DI before this pass but
+// non-escaping `@called(once)` and `async let` bodies require analysis
+// as part of the use (calls for `@called(once)` and `await` for
+// `async let`) to determine whether sends of captures have to be undone
+// and that can happen before DI run on the closure and so `assign` has
+// to be treated as a `store`.
+CONSTANT_TRANSLATION(AssignInst, Store)
 CONSTANT_TRANSLATION(StoreInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
 CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
@@ -4082,9 +4263,7 @@ CONSTANT_TRANSLATION(UnownedRetainInst, Asserting)
 CONSTANT_TRANSLATION(AllocPackMetadataInst, Asserting)
 CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
 
-// All of these instructions should be removed by DI which runs before us in the
-// pass pipeline.
-CONSTANT_TRANSLATION(AssignInst, Asserting)
+// This should be removed by DI which runs before us in the pass pipeline.
 CONSTANT_TRANSLATION(AssignOrInitInst, Asserting)
 
 // We should never hit this since it can only appear as a final instruction in a
@@ -4854,6 +5033,98 @@ bool RegionAnalysisFunctionInfo::isClosureCaptured(SILValue value,
                                                    Operand *op) {
   assert(supportedFunction && "Unsupported Function?!");
   return translator->isClosureCaptured(value, op->getUser());
+}
+
+namespace {
+
+/// A minimal evaluator used only to answer whole-function summary queries
+/// like RegionAnalysisFunctionInfo::wasValueEverSent. It mirrors the real
+/// isolation/closure-capture callbacks used by SendNonSendable's
+/// DiagnosticEvaluator (so "sent" here matches what diagnostics would
+/// report, including elision), but never emits errors.
+struct SendQueryEvaluator final
+    : PartitionOpEvaluatorBaseImpl<SendQueryEvaluator> {
+  RegionAnalysisFunctionInfo *info;
+
+  SendQueryEvaluator(Partition &workingPartition,
+                     RegionAnalysisFunctionInfo *info,
+                     SendingOperandToStateMap &operandToStateMap)
+      : PartitionOpEvaluatorBaseImpl(
+            workingPartition, info->getOperandSetFactory(), operandToStateMap),
+        info(info) {}
+
+  void handleError(PartitionOpError &&error) const {}
+
+  bool isActorDerived(Element element) const {
+    return info->getValueMap().getIsolationRegion(element).isActorIsolated();
+  }
+
+  bool isTaskIsolatedDerived(Element element) const {
+    return info->getValueMap().getIsolationRegion(element).isTaskIsolated();
+  }
+
+  SILIsolationInfo getIsolationRegionInfo(Element element) const {
+    return info->getValueMap().getIsolationRegion(element);
+  }
+
+  std::optional<Element> getElement(SILValue value) const {
+    auto trackableValue = info->getValueMap().getTrackableValue(value);
+    if (trackableValue.value.isSendable())
+      return {};
+    return trackableValue.value.getID();
+  }
+
+  SILValue getRepresentative(SILValue value) const {
+    return info->getValueMap()
+        .getTrackableValue(value)
+        .value.getRepresentative()
+        .maybeGetValue();
+  }
+
+  RepresentativeValue getRepresentativeValue(Element element) const {
+    return info->getValueMap().getRepresentativeValue(element);
+  }
+
+  bool isClosureCaptured(Element element, Operand *op) const {
+    auto value = info->getValueMap().maybeGetRepresentative(element);
+    if (!value)
+      return false;
+    return info->isClosureCaptured(value, op);
+  }
+};
+
+} // end anonymous namespace
+
+bool RegionAnalysisFunctionInfo::wasValueEverSent(SILValue value) {
+  assert(supportedFunction && "Unsupported Function?!");
+
+  // First, check if the answer is already known for this value.
+  if (auto iter = sentValuesCache.find(value); iter != sentValuesCache.end())
+    return iter->second;
+
+  auto trackableValue = getValueMap().getTrackableValue(value);
+  if (trackableValue.value.isSendable())
+    return false;
+
+  Element elt = trackableValue.value.getID();
+
+  for (const auto &[block, blockState] : getRange()) {
+    if (!blockState.getLiveness())
+      continue;
+
+    Partition workingPartition = blockState.getEntryPartition();
+    SendQueryEvaluator eval(workingPartition, this,
+                            getSendingOperandToStateMap());
+
+    for (auto &partitionOp : blockState.getPartitionOps()) {
+      eval.apply(partitionOp);
+      if (workingPartition.isSent(elt)) {
+        return sentValuesCache[value] = true;
+      }
+    }
+  }
+
+  return sentValuesCache[value] = false;
 }
 
 void RegionAnalysisFunctionInfo::runDataflow() {

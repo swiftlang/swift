@@ -3212,6 +3212,11 @@ public:
       if (deadEndBlocks && deadEndBlocks->isDeadEnd(user->getParent())) {
         continue;
       }
+      // A debug use does not require its operand to be alive, so it is allowed
+      // to be outside of the scope.
+      if (use->getOperandOwnership() == OperandOwnership::DebugUse) {
+        continue;
+      }
       if (scopedAddress.isScopeEndingUse(use)) {
         continue;
       }
