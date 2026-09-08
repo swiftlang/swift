@@ -22,6 +22,7 @@
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/MacroDefinition.h"
@@ -2083,6 +2084,29 @@ ConstraintSystem::getTypeOfMemberReferencePre(
       openedType =
           FunctionType::get(fullFunctionType->getParams(), functionType,
                             fullFunctionType->getExtInfo());
+    }
+  }
+
+  // Member type could be `@called(once)` if the method is consuming and base is
+  // non-Copyable.
+  if (Context.LangOpts.hasFeature(Feature::CalledAttribute)) {
+    if (auto *method = dyn_cast<FuncDecl>(value);
+        method && method->isInstanceMethod() && method->getSelfAccessKind() == SelfAccessKind::Consuming) {
+      auto *fullTy = openedType->castTo<FunctionType>();
+      auto *methodTy = fullTy->getResult()->castTo<FunctionType>();
+
+      std::optional<AnyFunctionType::ExtInfo> newExtInfo;
+      if (baseObjTy->hasTypeVariable())
+        newExtInfo =
+            methodTy->getExtInfo().withCalledOnceDependentType(baseObjTy);
+      else if (baseObjTy->isNoncopyable())
+        newExtInfo = methodTy->getExtInfo().withCalledOnce();
+
+      if (newExtInfo) {
+        auto *newMethodTy = methodTy->withExtInfo(*newExtInfo);
+        openedType = FunctionType::get(fullTy->getParams(), newMethodTy,
+                                       fullTy->getExtInfo());
+      }
     }
   }
 
