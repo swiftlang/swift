@@ -910,6 +910,21 @@ case TypeKind::Id:
             isUnchanged = false;
           }
         }
+
+        // Transform the @called(once) dependent type if present.
+        if (auto calledOnceDep = origExtInfo.getCalledOnceDependentType()) {
+          auto [newCalledOnceDep, isCalledOnce] =
+              asDerived().transformCalledOnceDependentType(calledOnceDep);
+          if (!newCalledOnceDep) {
+            // If we're no longer @called(once) dependent, update the @called(once) bit.
+            extInfo = extInfo->withCalledOnceDependentType(Type());
+            extInfo = extInfo->withCalledOnce(isCalledOnce);
+            isUnchanged = false;
+          } else if (newCalledOnceDep.getPointer() != calledOnceDep.getPointer()) {
+            extInfo = extInfo->withCalledOnceDependentType(newCalledOnceDep);
+            isUnchanged = false;
+          }
+        }
       }
 
       if (auto genericFnType = dyn_cast<GenericFunctionType>(base)) {
@@ -1167,6 +1182,10 @@ case TypeKind::Id:
   bool shouldDesugarTypeAliases() const { return false; }
 
   std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+    return std::make_pair(ty, false);
+  }
+
+  std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
     return std::make_pair(ty, false);
   }
 

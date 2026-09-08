@@ -1774,6 +1774,17 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
     // Otherwise we've flattened the dependence, evaluate Sendable.
     return std::make_pair(Type(), isSendableCapture(ty));
   }
+
+  std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
+    ty = simplify(ty);
+
+    // If we still have type variables, we keep the dependence.
+    if (ty->hasTypeVariable())
+      return std::pair(ty, false);
+
+    // Otherwise we've flattened the dependence, evaluate @called(once).
+    return std::make_pair(Type(), ty->isNoncopyable());
+  }
 };
 
 } // end anonymous namespace
@@ -3703,7 +3714,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::GlobalActorType:
     case ConstraintLocator::ContextualType:
-    case ConstraintLocator::FunctionSendability: {
+    case ConstraintLocator::FunctionSendability:
+    case ConstraintLocator::FunctionExecutionSemantics: {
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
