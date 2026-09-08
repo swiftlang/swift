@@ -42,6 +42,11 @@
 namespace swift {
 
 class ClangModuleDependenciesCacheImpl;
+#if LLVM_VERSION_MAJOR >= 23
+// Defined in ClangImporter.h; only passed by value here (complete type is
+// required at the call/definition site, not in this declaration).
+struct ClangImporterVFSRecipe;
+#endif
 class SourceFile;
 class ASTContext;
 class Identifier;
@@ -1089,6 +1094,16 @@ public:
 
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);
+
+#if LLVM_VERSION_MAJOR >= 23
+  /// Replace the MakeVFS callback used by non-caching scans with one that builds
+  /// each worker's VFS from a snapshot of the ClangImporter file mapping. Needed
+  /// because the scan invocation references the in-memory clang system VFS overlay
+  /// (see ClangImporter::getClangSystemOverlayFile), which a plain physical FS
+  /// cannot serve. Mirrors setupCachingDependencyScanningService for the caching
+  /// path. Must be called before any scanning workers run.
+  void setNonCachingClangVFSFactory(ClangImporterVFSRecipe &&recipe);
+#endif
 
   /// Allocate string inside ScanningService.
   StringRef save(StringRef str);

@@ -22,6 +22,9 @@
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Frontend/Frontend.h"
+#if LLVM_VERSION_MAJOR >= 23
+#include "swift/ClangImporter/ClangImporter.h"
+#endif
 #include "swift/Strings.h"
 #include "clang/Lex/HeaderSearchOptions.h"
 #include "llvm/Config/config.h"
@@ -550,6 +553,22 @@ SwiftDependencyScanningService::SwiftDependencyScanningService()
       // already so it is safe to turn on all optimizations.
       clang::dependencies::ScanningOptimizations::All);
 }
+
+#if LLVM_VERSION_MAJOR >= 23
+void SwiftDependencyScanningService::setNonCachingClangVFSFactory(
+    ClangImporterVFSRecipe &&recipe) {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
+  clang::dependencies::DependencyScanningServiceOptions opts =
+      ClangScanningService->getOpts();
+  auto r = std::move(recipe);
+  // Dependency scanner needs to create its own file system per worker.
+  opts.MakeVFS = [r = std::move(r)]() mutable {
+    return ClangImporter::computeClangImporterFileSystem(
+        r, llvm::vfs::createPhysicalFileSystem());
+  };
+  ClangScanningService.emplace(std::move(opts));
+}
+#endif
 
 bool
 swift::dependencies::checkImportNotTautological(const ImportPath::Module modulePath,

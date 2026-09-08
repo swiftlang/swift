@@ -632,6 +632,26 @@ ModuleDependencyScanner::ModuleDependencyScanner(
         llvm::cas::createCASProvidingFileSystem(
             CAS, ScanASTContext.SourceMgr.getFileSystem()));
 
+#if LLVM_VERSION_MAJOR >= 23
+  if (!CAS) {
+    // The non-caching MakeVFS default on this LLVM is a plain physical FS,
+    // which cannot serve the in-memory clang system VFS overlay that
+    // -ivfsoverlay in the scan invocation references (ClangImporter adds it
+    // when libc headers are redirected, e.g. glibc on Linux). Snapshot the
+    // importer file mapping into a recipe and build each worker's VFS from it,
+    // mirroring the caching path (setupCachingDependencyScanningService; see
+    // 94a4cd860ec). Older LLVMs build worker VFSes via getClangScanningFS,
+    // which already serves the overlay, so this is only needed here.
+    auto *importer = static_cast<ClangImporter *>(
+        ScanASTContext.getClangModuleLoader());
+    ClangImporterVFSRecipe recipe =
+        ClangImporter::computeClangImporterVFSRecipe(
+            ScanASTContext, importer->getClangFileMapping(),
+            [&](StringRef str) { return ScanningService.save(str); });
+    ScanningService.setNonCachingClangVFSFactory(std::move(recipe));
+  }
+#endif
+
   // TODO: Make num threads configurable
   for (size_t i = 0; i < NumThreads; ++i)
     Workers.emplace_front(std::make_unique<ModuleDependencyScanningWorker>(
