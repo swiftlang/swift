@@ -37,6 +37,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Strings.h"
@@ -1861,6 +1862,9 @@ ImportedType ClangImporter::Implementation::importType(
     std::optional<unsigned> completionHandlerErrorParamIndex) {
   if (type.isNull())
     return {Type(), false};
+
+  if (auto *Stats = SwiftContext.Stats)
+    ++Stats->getFrontendCounters().ClangImportType;
 
   // The "built-in" Objective-C types id, Class, and SEL can actually be (and
   // are) defined within the library. Clang tracks the redefinition types

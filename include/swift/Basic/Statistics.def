@@ -178,6 +178,21 @@ FRONTEND_STATISTIC(ClangImporter, ClangEnumInfoCacheHit)
 /// Enum classifications computed for the first time.
 FRONTEND_STATISTIC(ClangImporter, ClangEnumInfoCacheMiss)
 
+/// Reuses of an already-imported Clang declaration (import-decl cache hit).
+FRONTEND_STATISTIC(ClangImporter, ClangImportDeclCacheHit)
+
+/// Clang declarations imported for the first time (import-decl cache miss).
+FRONTEND_STATISTIC(ClangImporter, ClangImportDeclCacheMiss)
+
+/// Clang types imported.
+FRONTEND_STATISTIC(ClangImporter, ClangImportType)
+
+/// Reuses of an already-imported Clang macro (macro cache hit).
+FRONTEND_STATISTIC(ClangImporter, ClangImportMacroCacheHit)
+
+/// Clang macros imported for the first time (macro cache miss).
+FRONTEND_STATISTIC(ClangImporter, ClangImportMacroCacheMiss)
+
 /// Number of source buffers visible in the source manager.
 FRONTEND_STATISTIC(AST, NumSourceBuffers)
 

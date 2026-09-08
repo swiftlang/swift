@@ -10381,11 +10381,16 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
 
   auto Known = importDeclCached(Canon, version, UseCanonicalDecl);
   if (Known.has_value()) {
+    if (auto *Stats = SwiftContext.Stats)
+      ++Stats->getFrontendCounters().ClangImportDeclCacheHit;
     if (!SuperfluousTypedefsAreTransparent &&
         SuperfluousTypedefs.count(Canon))
       return nullptr;
     return Known.value();
   }
+
+  if (auto *Stats = SwiftContext.Stats)
+    ++Stats->getFrontendCounters().ClangImportDeclCacheMiss;
 
   bool TypedefIsSuperfluous = false;
   bool HadForwardDeclaration = false;
