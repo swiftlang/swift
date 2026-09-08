@@ -1,21 +1,19 @@
+// clang-format off
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/throwing-results.swift -module-name Results
-// -clang-header-expose-decls=all-public -enable-experimental-feature
-// GenerateBindingsForThrowingFunctionsInCXX -typecheck -emit-clang-header-path
-// %t/results.h RUN: %target-interop-build-clangxx -std=c++17 -c %s -I %t -o
-// %t/test.o -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR RUN:
-// %target-interop-build-swift %S/throwing-results.swift -o %t/test -Xlinker
-// %t/test.o -module-name Results -Xfrontend -entry-point-function-name
-// -Xfrontend swiftMain RUN: %target-codesign %t/test RUN: %target-run %t/test
-// RUN: %target-interop-build-clangxx -std=c++17 -fno-exceptions -c %s -I %t -o
-// %t/no-exceptions.o -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR RUN:
-// %target-interop-build-swift %S/throwing-results.swift -o %t/no-exceptions
-// -Xlinker %t/no-exceptions.o -module-name Results -Xfrontend
-// -entry-point-function-name -Xfrontend swiftMain RUN: %target-codesign
-// %t/no-exceptions RUN: %target-run %t/no-exceptions REQUIRES: executable_test
+// RUN: %target-swift-frontend %S/throwing-results.swift -module-name Results -clang-header-expose-decls=all-public -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX -typecheck -emit-clang-header-path %t/results.h
+// RUN: %target-interop-build-clangxx -std=c++17 -c %s -I %t -o %t/test.o -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
+// RUN: %target-interop-build-swift %S/throwing-results.swift -o %t/test -Xlinker %t/test.o -module-name Results -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+// RUN: %target-codesign %t/test
+// RUN: %target-run %t/test
+// RUN: %target-interop-build-clangxx -std=c++17 -fno-exceptions -c %s -I %t -o %t/no-exceptions.o -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
+// RUN: %target-interop-build-swift %S/throwing-results.swift -o %t/no-exceptions -Xlinker %t/no-exceptions.o -module-name Results -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+// RUN: %target-codesign %t/no-exceptions
+// RUN: %target-run %t/no-exceptions
+// REQUIRES: executable_test
 // REQUIRES: swift_feature_GenerateBindingsForThrowingFunctionsInCXX
 // UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: CPU=arm64e
+// clang-format on
 
 #include "results.h"
 #include <cassert>
