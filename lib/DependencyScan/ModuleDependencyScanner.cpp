@@ -181,6 +181,19 @@ std::string ModuleDependencyScanner::clangModuleOutputPathLookup(
   return outputPath.str().str();
 }
 
+/// The Clang dependency scanner reports every -ivfsoverlay file as a file
+/// dependency. The clang system VFS overlay created by ClangImporter (see
+/// ClangImporter::getClangSystemOverlayFile) is a virtual in-memory file that
+/// does not exist on disk, so exclude it from the reported header source
+/// files: build systems cannot track or validate it.
+static void filterClangSystemVFSOverlay(std::vector<std::string> &files,
+                                        const SearchPathOptions &Opts) {
+  std::string overlay = ClangImporter::getClangSystemOverlayFile(Opts);
+  llvm::erase_if(files, [&overlay](const std::string &file) {
+    return file == overlay;
+  });
+}
+
 static std::vector<std::string> inputSpecificClangScannerCommand(
     const std::vector<std::string> &baseCommandLineArgs,
     std::optional<StringRef> sourceFileName) {
@@ -1642,6 +1655,8 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
               });
           llvm::copy(headerScanResult->FileDeps,
                      std::back_inserter(headerFileInputs));
+          filterClangSystemVFSOverlay(headerFileInputs,
+                                      ScanASTContext.SearchPathOpts);
           auto bridgedDependencyIDs = llvm::map_range(
               headerScanResult->ClangModuleDeps, [](auto &input) {
                 return ModuleDependencyID{input.ModuleName,
@@ -2054,6 +2069,8 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
             });
         llvm::copy(headerScanResult->FileDeps,
                    std::back_inserter(headerFileInputs));
+        filterClangSystemVFSOverlay(headerFileInputs,
+                                    ScanASTContext.SearchPathOpts);
         auto bridgedDependencyIDs =
             llvm::map_range(headerScanResult->ClangModuleDeps, [](auto &input) {
               return ModuleDependencyID{input.ModuleName,
