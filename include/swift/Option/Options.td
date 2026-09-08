@@ -522,6 +522,13 @@ def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Serialize diagnostics in a binary format">;
+def serialize_diagnostics_EQ
+    : Joined<["-"], "serialize-diagnostics=">,
+      Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput,
+             CacheInvariant]>,
+      HelpText<"Serialize diagnostics in a specific format: 'dia', a binary "
+               "format (the default), or 'sarif'">,
+      MetaVarName<"<format>">;
 def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
   Flags<[FrontendOption, SwiftAPIDigesterOption, NoBatchOption,
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
