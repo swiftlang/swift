@@ -182,6 +182,10 @@ class BuildScriptInvocation(object):
         # and the second is the non-build-script-impl-products. It guarantees
         # that when we concatenate these two lists together we get a valid
         # dependency graph.
+        # Also stash the swift product's cmake options so we can forward them
+        # to the LLVM cmake under the unified layout, where the standalone
+        # swift build is skipped and never sees `--swift-cmake-options`.
+        swift_product_cmake_options = []
         for product_class in sum(list(self.compute_product_pipelines()[0]), []):
             if not product_class.is_build_script_impl_product():
                 continue
@@ -216,6 +220,10 @@ class BuildScriptInvocation(object):
                     "--{}-cmake-options={}".format(
                         product_name, ' '.join(cmake_opts))
                 ]
+
+            if product_name == products.swift.Swift.product_name():
+                swift_product_cmake_options = list(cmake_opts)
+
 
         if args.build_toolchain_only:
             impl_args += [
@@ -379,6 +387,29 @@ class BuildScriptInvocation(object):
                 args.extra_llvm_cmake_options.append(
                     '-DSWIFT_INSTALL_COMPONENTS={}'.format(
                         merged_swift_components))
+            # Forward the swift product's cmake options to the unified LLVM
+            # cmake. Under the standalone build these went into
+            # `--swift-cmake-options` and reached swift's cmake through
+            # build-script-impl; under unified layout swift's cmake runs
+            # inside LLVM's cmake, so they need to be applied at the LLVM
+            # level instead. Without this the `LLVM_EXTERNAL_PROJECTS=swift`
+            # build silently defaults SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY,
+            # SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING, etc. to OFF, so
+            # the built stdlib omits the autolink/link-library metadata that
+            # the driver's ExplicitModuleBuildTests expect (missing
+            # `-possible-lswift_Concurrency`, `-possible-lswift_StringProcessing`).
+            for opt in swift_product_cmake_options:
+                if opt not in args.extra_llvm_cmake_options:
+                    args.extra_llvm_cmake_options.append(opt)
+            # STRING_PROCESSING isn't in swift.py's cmake_options (that flag
+            # is set only by build-script-impl's shell code when swift's own
+            # cmake configure runs, which is skipped under unified). Forward
+            # it explicitly to match the driver-test expectations for
+            # `-possible-lswift_StringProcessing`.
+            if getattr(args, 'enable_experimental_string_processing', True):
+                sp_opt = '-DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=TRUE'
+                if sp_opt not in args.extra_llvm_cmake_options:
+                    args.extra_llvm_cmake_options.append(sp_opt)
         conditional_subproject_configs = [
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
