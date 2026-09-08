@@ -469,6 +469,7 @@ function verify_host_is_supported() {
     case ${host} in
       freebsd-aarch64           \
       | freebsd-x86_64          \
+      | freebsd-powerpc64le     \
       | openbsd-x86_64          \
       | openbsd-aarch64         \
       | cygwin-x86_64           \
