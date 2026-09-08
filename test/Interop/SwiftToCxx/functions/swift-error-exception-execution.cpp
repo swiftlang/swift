@@ -1,18 +1,15 @@
+// clang-format off
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/swift-error-exception.swift -module-name
-// ErrorException -clang-header-expose-decls=all-public
-// -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX
-// -typecheck -emit-clang-header-path %t/error.h RUN:
-// %target-interop-build-clangxx -c %s -I %t -o %t/test.o
-// -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR RUN: %target-interop-build-swift
-// %S/swift-error-exception.swift -o %t/test -Xlinker %t/test.o -module-name
-// ErrorException -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+// RUN: %target-swift-frontend %S/swift-error-exception.swift -module-name ErrorException -clang-header-expose-decls=all-public -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX -typecheck -emit-clang-header-path %t/error.h
+// RUN: %target-interop-build-clangxx -c %s -I %t -o %t/test.o -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
+// RUN: %target-interop-build-swift %S/swift-error-exception.swift -o %t/test -Xlinker %t/test.o -module-name ErrorException -Xfrontend -entry-point-function-name -Xfrontend swiftMain
 // RUN: %target-codesign %t/test
 // RUN: %target-run %t/test
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_GenerateBindingsForThrowingFunctionsInCXX
 // UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: CPU=arm64e
+// clang-format on
 
 #include "error.h"
 #include <cassert>
