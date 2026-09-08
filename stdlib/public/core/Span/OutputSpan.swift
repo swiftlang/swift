@@ -144,7 +144,7 @@ extension OutputSpan where Element: ~Copyable  {
       )
     }
     _precondition(
-      0 <= initializedCount && initializedCount <= buffer.count,
+      UInt(bitPattern: initializedCount) <= UInt(bitPattern: buffer.count),
       "OutputSpan count is not within capacity"
     )
     unsafe self.init(
@@ -448,7 +448,7 @@ extension OutputSpan where Element: ~Copyable {
     var initializedCount = _count
     defer {
       _precondition(
-        0 <= initializedCount && initializedCount <= capacity,
+        UInt(bitPattern: initializedCount) <= UInt(bitPattern: capacity),
         "OutputSpan capacity overflow"
       )
       self._count = initializedCount

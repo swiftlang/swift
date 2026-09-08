@@ -139,7 +139,7 @@ extension OutputRawSpan {
       )
     }
     _precondition(
-      0 <= initializedCount && initializedCount <= buffer.count,
+      UInt(bitPattern: initializedCount) <= UInt(bitPattern: buffer.count),
       "OutputRawSpan count is not within capacity"
     )
     unsafe self.init(
@@ -500,7 +500,7 @@ extension OutputRawSpan {
     var initializedCount = _count
     defer {
       _precondition(
-        0 <= initializedCount && initializedCount <= capacity,
+        UInt(bitPattern: initializedCount) <= UInt(bitPattern: capacity),
         "OutputRawSpan capacity overflow"
       )
       _count = initializedCount
