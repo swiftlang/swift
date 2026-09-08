@@ -2647,11 +2647,12 @@ public:
 /// ```
 class MultiArgFuncKeyPathFailure final : public FailureDiagnostic {
   Type functionType;
+  Type expectedType;
 public:
   MultiArgFuncKeyPathFailure(const Solution &solution, Type functionType,
-                             ConstraintLocator *locator)
+                             Type expectedType, ConstraintLocator *locator)
   : FailureDiagnostic(solution, locator),
-  functionType(functionType) {}
+  functionType(functionType), expectedType(expectedType) {}
 
   bool diagnoseAsError() override;
 };

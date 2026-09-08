@@ -13302,8 +13302,10 @@ ConstraintSystem::simplifyKeyPathConstraint(
       recordAnyTypeVarAsPotentialHole(rootTy);
       recordAnyTypeVarAsPotentialHole(valueTy);
 
+      auto *expectedTy = FunctionType::get(
+          AnyFunctionType::Param(rootTy), valueTy, AnyFunctionType::ExtInfo());
       auto *fix = AllowMultiArgFuncKeyPathMismatch::create(
-          *this, fnTy, getConstraintLocator(locator));
+          *this, fnTy, expectedTy, getConstraintLocator(locator));
       // Pretend the keypath type got resolved and move on.
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
