@@ -329,6 +329,21 @@ class BuildScriptInvocation(object):
         if products.swift.Swift.is_unified_llvm_build(args):
             args.build_swift = False
             args.build_lldb = False
+            # Under unified layout, `swift-<host>/bin/swiftc` doesn't exist
+            # because the standalone swift build is skipped. Point downstream
+            # products at the swiftc we install into the built toolchain (the
+            # same one downstream tools would normally use). The raw LLVM
+            # build tree `llvm-<host>/bin` is *not* a valid target here even
+            # though swiftc is present: swiftpm's Toolchain.toolchainDir
+            # walks up from swiftCompilerPath looking for a `usr/bin` (or
+            # `usr/local/bin`) component and throws UnknownToolchainLayout
+            # if neither is found. `<install_destdir>/…/usr/bin` has that
+            # shape by construction.
+            if not args.native_swift_tools_path:
+                args.native_swift_tools_path = os.path.join(
+                    targets.toolchain_path(args.install_destdir,
+                                           args.install_prefix),
+                    'bin')
             swift_components = _extract_impl_arg_value(
                 args.build_script_impl_args, '--swift-install-components')
             # swift/cmake/modules/SwiftComponents.cmake auto-adds
