@@ -117,8 +117,15 @@ class SwiftTestingMacrosCMakeShim(cmake_product.CMakeProduct):
         self.cmake_options.define('CMAKE_BUILD_TYPE', self.args.build_variant)
 
         build_root = os.path.dirname(self.build_dir)
+        # Under the unified LLVM+Swift+LLDB layout the standalone swift build
+        # dir doesn't exist (build-script skips it); SwiftSyntaxConfig.cmake
+        # lives under the LLVM build tree instead.
+        if swift.Swift.is_unified_llvm_build(self.args):
+            swift_cmake_source = 'llvm'
+        else:
+            swift_cmake_source = 'swift'
         swift_build_dir = os.path.join(
-            '..', build_root, '%s-%s' % ('swift', host_target))
+            '..', build_root, '%s-%s' % (swift_cmake_source, host_target))
         swift_cmake_dir = os.path.join(swift_build_dir, 'cmake', 'modules')
         self.cmake_options.define('SwiftSyntax_DIR:PATH', swift_cmake_dir)
 
