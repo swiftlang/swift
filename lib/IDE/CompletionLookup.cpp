@@ -2945,6 +2945,14 @@ void CompletionLookup::getAttributeDeclParamCompletions(
       }
       break;
     case 1:
+        // TODO: support `initialization:`
+        /// * it's only valid for `accessor` macros
+        /// * it's optional, so index 1 can be either `initialization:` or `names:`
+        ///
+        /// This would be so much easier if the parameter is positional and the optional
+        /// `initialization:` parameter is at index 2! But what if the macro does not
+        /// introduce names? Is that even legal? The `initialization:` param would
+        /// be at index 1 again...
       if (HasLabel) {
         for (auto kind : getAllMacroIntroducedDeclNameKinds()) {
           auto name = getMacroIntroducedDeclNameString(kind);
