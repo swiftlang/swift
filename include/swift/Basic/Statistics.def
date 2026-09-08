@@ -121,6 +121,30 @@ FRONTEND_STATISTIC(ClangImporter, NumLoadedClangModules)
 /// (clang-module-memory.json / -print-clang-stats).
 FRONTEND_STATISTIC(ClangImporter, NumMaterializedClangDecls)
 
+/// Clang declarations examined while building a module's Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeclsVisited)
+
+/// Examined declarations dropped without contributing any lookup table entry.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeclsSkipped)
+
+/// Name-to-declaration records inserted into a module's Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableEntriesAdded)
+
+/// Distinct Swift name variants produced for the declarations being tabulated.
+FRONTEND_STATISTIC(ClangImporter, LookupTableNameVariants)
+
+/// C++ class template specializations recorded in the lookup table by mangled name.
+FRONTEND_STATISTIC(ClangImporter, LookupTableTemplateSpecs)
+
+/// Macros recorded in a module's Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableMacrosAdded)
+
+/// Passes over import-as-member entries whose contexts were forward-referenced.
+FRONTEND_STATISTIC(ClangImporter, LookupTableResolvePasses)
+
+/// Distinct base names keyed in a written Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDistinctBaseNames)
+
 /// Number of source buffers visible in the source manager.
 FRONTEND_STATISTIC(AST, NumSourceBuffers)
 
