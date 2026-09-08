@@ -66,12 +66,30 @@ void ClangSyntaxPrinter::printIdentifier(StringRef name) const {
 }
 
 void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) const {
-  assert(decl->getName().isSimpleName());
+  // An enum element can have a compound name when it has a payload, but it is
+  // still exposed to C++ under its base name.
+  assert(decl->getName().isSimpleName() || isa<EnumElementDecl>(decl));
   printIdentifier(cxx_translation::getNameForCxx(decl));
 }
 
+void ClangSyntaxPrinter::printSwiftNameCommentIfNeeded(const ValueDecl *decl,
+                                                       StringRef indent) const {
+  // An operator either keeps its Swift spelling, when that is also a valid
+  // C++ operator, or is not exposed at all.
+  if (decl->isOperator())
+    return;
+  auto baseName = decl->getName().getBaseName();
+  if (baseName.isSpecial() || baseName.getIdentifier().empty() ||
+      cxx_translation::isValidCxxIdentifier(baseName.getIdentifier().str()))
+    return;
+  os << indent << "/// Swift name: '";
+  decl->getName().print(os, /*skipEmptyArgumentNames=*/false,
+                        /*escapeIfNeeded=*/true);
+  os << "'\n";
+}
+
 void ClangSyntaxPrinter::printModuleNameCPrefix(const ModuleDecl &mod) {
-  os << mod.getName().str() << '_';
+  os << cxx_translation::sanitizeNameForCxx(mod.getName().str()) << '_';
 }
 
 void ClangSyntaxPrinter::printModuleNamespaceQualifiersIfNeeded(

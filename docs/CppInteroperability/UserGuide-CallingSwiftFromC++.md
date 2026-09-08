@@ -66,6 +66,53 @@ int main() {
 }
 ```
 
+## Name Translation
+
+Most Swift declarations keep their name when they are exposed to C++. There are
+two exceptions:
+
+- A Swift name that is a C++ keyword, like `register`, gets an underscore
+  suffix: `register_`.
+- A Swift name that is not a valid C++ identifier is sanitized. This applies to
+  [raw identifiers](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0451-escaped-identifiers.md)
+  like `` `hello world` `` as well as names with non-ASCII characters. Every
+  character that is not valid in a C++ identifier is replaced with its Unicode
+  scalar value, spelled like a C++ universal-character-name: `_uXXXX` (exactly
+  four uppercase hexadecimal digits) for scalars up to U+FFFF, or `_UXXXXXXXX`
+  (exactly eight uppercase hexadecimal digits) for larger scalars. A name that
+  starts with a digit is preceded by an underscore.
+
+For example, the following Swift declarations:
+
+```swift
+public func `hello world`() { ... }
+
+public enum Direction {
+  case `1`
+  case `2`
+  case über
+}
+```
+
+are exposed to C++ as:
+
+```c++
+/// Swift name: '`hello world`()'
+void hello_u0020world();
+
+class Direction {
+  // enum class cases { _1, _2, _u00FCber };
+  ...
+};
+```
+
+A C++ declaration whose name was sanitized carries a doc comment that states
+the original Swift name.
+
+Swift operator functions whose spelling is also a valid C++ operator, like
+`==`, are exposed as that C++ operator. Operator functions that have no C++
+equivalent, like `~=` or custom operators, are not exposed to C++.
+
 ## Calling Swift Functions
 
 Swift functions that are callable from C++ are available in their corresponding module namespace. Their return and parameter types are transcribed to C++ primitive types and class types that represents the underlying Swift return and parameter types.

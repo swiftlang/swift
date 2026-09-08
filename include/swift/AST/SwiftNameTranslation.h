@@ -66,6 +66,23 @@ namespace cxx_translation {
 
 using objc_translation::CustomNamesOnly_t;
 
+/// Returns true if the given name is a valid identifier in C++. Only ASCII
+/// identifiers are considered valid, with an exception for '$', which is
+/// accepted as an extension by the major C++ compilers.
+bool isValidCxxIdentifier(StringRef name);
+
+/// Returns a copy of the given Swift name that is a valid C++ identifier.
+///
+/// Swift raw identifiers can contain characters that are not valid in a C++
+/// identifier, such as whitespace, punctuation, and non-ASCII characters.
+/// Each such character is replaced with an encoding of its Unicode scalar
+/// value spelled like a C++ universal-character-name: `_uXXXX` (exactly four
+/// uppercase hexadecimal digits) for scalars up to U+FFFF, and `_UXXXXXXXX`
+/// (exactly eight uppercase hexadecimal digits) for larger scalars. A name
+/// that starts with an ASCII digit is prefixed with an underscore, e.g. a
+/// Swift enum case named `1` is exposed to C++ as `_1`.
+std::string sanitizeNameForCxx(StringRef name);
+
 StringRef
 getNameForCxx(const ValueDecl *VD,
               CustomNamesOnly_t customNamesOnly = objc_translation::Normal);
