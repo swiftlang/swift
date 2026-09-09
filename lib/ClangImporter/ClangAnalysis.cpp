@@ -29,11 +29,9 @@ bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
 
 std::string importer::describe(CxxUnsafetyReason reason,
                                const clang::NamedDecl *culprit) {
-  // Reasons that name something fall back to wording without a name, so no
-  // caller has to check whether there is one.
-  auto named = [&](StringRef withName, StringRef withoutName) {
+  auto named = [&](StringRef withName, StringRef withoutName = StringRef()) {
     if (!culprit)
-      return withoutName.str();
+      return withoutName.empty() ? withName.str() : withoutName.str();
     return (withName + " '" + culprit->getName() + "'").str();
   };
 
@@ -63,12 +61,9 @@ std::string importer::describe(CxxUnsafetyReason reason,
     return "it returns a view into a type that owns its storage";
 
   case CxxUnsafetyReason::UnsafeField:
-    return named("it has an unsafe field", "it has an unsafe field");
-  case CxxUnsafetyReason::UnsafeBase:
-    return named("it has an unsafe base class", "it has an unsafe base class");
+    return named("it has an unsafe field");
   case CxxUnsafetyReason::UnsafeTemplateArgument:
-    return named("it has an unsafe template argument",
-                 "it has an unsafe template argument");
+    return named("it has an unsafe template argument");
   case CxxUnsafetyReason::ExplicitAnnotation:
     return culprit ? (llvm::Twine("'") + culprit->getName() +
                       "' is annotated unsafe in C++")

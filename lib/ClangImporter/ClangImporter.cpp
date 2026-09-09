@@ -5890,9 +5890,13 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
 std::optional<importer::CxxUnknownEscapability>
 importer::explainUnknownEscapability(const clang::RecordDecl *recordDecl,
                                      ASTContext &ctx) {
-  return computeClangTypeEscapability(ctx.evaluator,
-                                      {recordDecl->getTypeForDecl(), nullptr})
-      .unknown;
+  EscapabilityLookupDescriptor desc{recordDecl->getTypeForDecl(), nullptr};
+  // The request caches the verdict but not the reason behind it, so ask it for
+  // the verdict and repeat the walk only when there is something to explain.
+  if (evaluateOrDefault(ctx.evaluator, ClangTypeEscapability(desc),
+                        CxxEscapability::Unknown) != CxxEscapability::Unknown)
+    return std::nullopt;
+  return computeClangTypeEscapability(ctx.evaluator, desc).unknown;
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -8139,9 +8143,18 @@ static bool isInSystemHeader(const clang::Decl *decl) {
 
 void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
                                               SourceLoc useLoc) {
+  if (decl)
+    if (auto *original = Impl.getOriginalForClonedMember(decl))
+      decl = original;
+
   // A declaration: explain which rule made this method unsafe.
   if (decl && decl->hasClangNode()) {
     auto *clangDecl = decl->getClangNode().getAsDecl();
+
+    // As for types below, a note in a system header names something the user
+    // cannot annotate -- 'begin' on std::vector, say -- so it is dropped.
+    if (isInSystemHeader(clangDecl))
+      return;
 
     // An annotation written in the header speaks for itself, whatever kind of
     // declaration carries it.
@@ -9138,11 +9151,8 @@ computeClangDeclExplicitSafety(Evaluator &evaluator,
     }
 
     if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
-      for (auto base : cxxRecordDecl->bases()) {
-        if (isUnsafe(base.getType()))
-          return unsafeBecause(importer::CxxUnsafetyReason::UnsafeBase,
-                               base.getType()->getAsRecordDecl());
-      }
+      for (auto base : cxxRecordDecl->bases())
+        (void)isUnsafe(base.getType());
     }
 
     for (auto *field : recordDecl->fields()) {
@@ -9166,10 +9176,13 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
 std::optional<importer::CxxUnsafetyExplanation>
 importer::explainRecordUnsafety(const clang::RecordDecl *recordDecl,
                                 ASTContext &ctx) {
-  return computeClangDeclExplicitSafety(
-             ctx.evaluator,
-             ClangDeclExplicitSafetyDescriptor(recordDecl, /*isClass=*/false))
-      .unsafe;
+  ClangDeclExplicitSafetyDescriptor desc(recordDecl, /*isClass=*/false);
+  // As in explainUnknownEscapability: the cached request answers whether there
+  // is anything to explain, and only then is the walk repeated for the reason.
+  if (evaluateOrDefault(ctx.evaluator, ClangDeclExplicitSafety(desc),
+                        ExplicitSafety::Unspecified) != ExplicitSafety::Unsafe)
+    return std::nullopt;
+  return computeClangDeclExplicitSafety(ctx.evaluator, desc).unsafe;
 }
 
 bool ClangDeclExplicitSafety::isCached() const {

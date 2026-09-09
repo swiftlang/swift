@@ -41,8 +41,6 @@ enum class CxxUnsafetyReason {
 
   /// A field of the record is unsafe.
   UnsafeField,
-  /// A base class of the record is unsafe.
-  UnsafeBase,
   /// A template argument of the record is unsafe.
   UnsafeTemplateArgument,
   /// The record carries an explicit unsafe annotation.
