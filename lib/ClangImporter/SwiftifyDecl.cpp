@@ -488,7 +488,9 @@ struct UnaliasedInstantiationVisitor
     : clang::RecursiveASTVisitor<UnaliasedInstantiationVisitor> {
   bool hasUnaliasedInstantiation = false;
 
-  bool TraverseTypedefType(const clang::TypedefType *) { return true; }
+  bool TraverseTypedefType(const clang::TypedefType *, bool TraverseQualifier) {
+    return true;
+  }
 
   bool
   VisitTemplateSpecializationType(const clang::TemplateSpecializationType *) {

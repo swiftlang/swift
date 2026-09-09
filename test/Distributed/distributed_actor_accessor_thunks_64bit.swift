@@ -143,7 +143,7 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { ptr, ptr } [[THUNK_RESULT]], 0
 // CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
 // CHECK-NEXT: store ptr [[CALLER_ASYNC_CTXT]], ptr
-// CHECK: {{.*}} = call i1 (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
+// CHECK: call void (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
 
 /// ---> Thunk and distributed method accessor for `simple2`
 
@@ -187,7 +187,7 @@ public distributed actor MyOtherActor {
 // CHECK: store i64 [[STR_SIZE]], ptr %._guts._object._countAndFlagsBits._value
 // CHECK: store ptr [[STR_VAL]], ptr %._guts._object._object
 
-// CHECK: {{.*}} = call i1 (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
+// CHECK: call void (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
 
 /// ---> Thunk and distributed method accessor for `simple3`
 
@@ -229,7 +229,7 @@ public distributed actor MyOtherActor {
 // CHECK: [[INT_RES:%.*]] = extractvalue { ptr, i64, ptr } [[THUNK_RESULT]], 1
 // CHECK: %._value = getelementptr inbounds{{.*}} %TSi, ptr [[RESULT_BUFF]], i32 0, i32 0
 // CHECK: store i64 [[INT_RES]], ptr %._value
-// CHECK: {{.*}} = call i1 (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
+// CHECK: call void (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
 
 /// --> Thunk and distributed method accessor for `single_case_enum`
 
@@ -240,7 +240,7 @@ public distributed actor MyOtherActor {
 /// Let's check that the call doesn't have any arguments and returns nothing.
 
 // SKIP: {{.*}} = call { ptr, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0p0s({{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}})
-// SKIP: {{.*}} = call i1 (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}})
+// SKIP: call void (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}})
 
 /// --> Thunk and distributed method accessor for `with_indirect_enums`
 
@@ -270,7 +270,7 @@ public distributed actor MyOtherActor {
 // CHECK: [[ENUM_RESULT:%.*]] = extractvalue { ptr, ptr, ptr } [[THUNK_RESULT]], 1
 // CHECK: store ptr [[ENUM_RESULT]], ptr [[RESULT_BUFF]]
 
-// CHECK: {{.*}} = call i1 (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
+// CHECK: call void (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
 
 /// ---> Thunk and distributed method for `complex`
 
@@ -319,7 +319,7 @@ public distributed actor MyOtherActor {
 
 /// RESULT is returned indirectly so there is nothing to pass to `end`
 
-// CHECK: {{.*}} = call i1 (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
+// CHECK: call void (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
 
 /// ---> Accessor for `genericArgs`
 

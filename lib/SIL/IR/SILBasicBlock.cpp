@@ -351,6 +351,9 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
   for (; First != Last; ++First) {
     First->Parent = Parent;
     First->index = -1;
+    // The block is entering a new function; give it a fresh block number in
+    // that function so SILBasicBlock::getNumber() stays valid.
+    Parent->assignFreshBlockNumber(*First);
     First->lastInitializedBitfieldID = 0;
     for (auto &II : *First) {
       for (SILValue result : II.getResults()) {

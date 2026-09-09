@@ -11,7 +11,7 @@
 
 /// Test binary module key: binary module key is the CASID of itself.
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json swiftPrebuiltExternal:A moduleCacheKey > %t/A.key.casid
-// RUN: llvm-cas --cas %t/cas --cat-blob @%t/A.key.casid > %t/Loaded.swiftmodule
+// RUN: llvm-cas --cas %t/cas --cat-node-data @%t/A.key.casid > %t/Loaded.swiftmodule
 // RUN: diff %t/A.swiftmodule %t/Loaded.swiftmodule
 
 import A
