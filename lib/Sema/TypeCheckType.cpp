@@ -5749,10 +5749,9 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
 NeverNullType
 TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
                                       TypeResolutionOptions options) {
-  // isolated is only value for non-EnumCaseDecl parameters.
-  if ((!options.is(TypeResolverContext::FunctionInput) ||
-       options.hasBase(TypeResolverContext::EnumElementDecl)) &&
-      !options.is(TypeResolverContext::Inherited)) {
+  // isolated is only valid for non-EnumCaseDecl parameters.
+  if (!options.is(TypeResolverContext::FunctionInput) ||
+      options.hasBase(TypeResolverContext::EnumElementDecl)) {
     diagnoseInvalid(
         repr, repr->getSpecifierLoc(), diag::attr_only_on_parameters,
         "isolated");
