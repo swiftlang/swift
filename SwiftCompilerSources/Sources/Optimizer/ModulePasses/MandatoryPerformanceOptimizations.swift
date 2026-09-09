@@ -706,6 +706,10 @@ extension FunctionWorklist {
                                                      visited: inout Set<Conformance>,
                                                      _ context: ModulePassContext)
   {
+    // If an associated type is an opaque result type the conformance is abstract. The witness
+    // methods of the underlying type's conformance still need to be optimized, because IRGen
+    // looks through the opaque type when it emits the witness table entry.
+    let conformance = conformance.lookingThroughOpaqueTypes(context)
     guard conformance.isConcrete,
           visited.insert(conformance).inserted
     else {
