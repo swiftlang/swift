@@ -10,8 +10,9 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift() %}
-// RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift() %}
+// Embedded's arc4random_buf dependency is unavailable in some Linux environments.
+// RUN: %if embedded_cooperative_executor && !OS_FAMILY=linux %{ %target-run-embedded-cooperative-swift() %}
+// RUN: %if embedded_dispatch_executor && !OS_FAMILY=linux %{ %target-run-embedded-dispatch-swift() %}
 
 import _Concurrency
 
