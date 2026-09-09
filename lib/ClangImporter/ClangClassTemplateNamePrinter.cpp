@@ -15,7 +15,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "clang/AST/TemplateArgumentVisitor.h"
-#include "clang/AST/Type.h"
 #include "clang/AST/TypeVisitor.h"
 
 using namespace swift;
@@ -23,18 +22,12 @@ using namespace swift::importer;
 
 struct TemplateInstantiationNamePrinter
     : clang::TypeVisitor<TemplateInstantiationNamePrinter, std::string> {
-  ASTContext &swiftCtx;
   NameImporter *nameImporter;
   ImportNameVersion version;
 
-  ClangImporter::Implementation *importerImpl;
-
-  TemplateInstantiationNamePrinter(ASTContext &swiftCtx,
-                                   NameImporter *nameImporter,
-                                   ImportNameVersion version,
-                                   ClangImporter::Implementation *importerImpl)
-      : swiftCtx(swiftCtx), nameImporter(nameImporter), version(version),
-        importerImpl(importerImpl) {}
+  TemplateInstantiationNamePrinter(NameImporter *nameImporter,
+                                   ImportNameVersion version)
+      : nameImporter(nameImporter), version(version) {}
 
   std::string VisitType(const clang::Type *type) {
     // Print "_" as a fallback if we couldn't emit a more meaningful type name.
@@ -133,12 +126,14 @@ struct TemplateInstantiationNamePrinter
     // If this is a pointer to foreign reference type, we should not wrap
     // it in Unsafe(Mutable)?Pointer, since it will be imported as a class
     // in Swift.
+    //
+    // Use the uncached FRT info API here, because NamePrinter is used during
+    // PCM building (via NameImporter), which means pointee->getAsRecordDecl()
+    // might live in a transient clang::ASTContext (from a module-building
+    // Clang sub-instance). Caching that pointer can lead to faulty cache hits.
     bool isReferenceType = false;
     if (auto *rd = pointee->getAsRecordDecl())
-      isReferenceType =
-          evaluateOrDefault(swiftCtx.evaluator,
-                            ForeignReferenceTypeInfoRequest({rd}), {})
-              .isReference();
+      isReferenceType = getUncachedForeignReferenceTypeInfo(rd).isReference();
 
     llvm::SmallString<128> storage;
     llvm::raw_svector_ostream buffer(storage);
@@ -213,10 +208,8 @@ struct TemplateArgumentPrinter
                                           llvm::raw_svector_ostream &> {
   TemplateInstantiationNamePrinter typePrinter;
 
-  TemplateArgumentPrinter(ASTContext &swiftCtx, NameImporter *nameImporter,
-                          ImportNameVersion version,
-                          ClangImporter::Implementation *importerImpl)
-      : typePrinter(swiftCtx, nameImporter, version, importerImpl) {}
+  TemplateArgumentPrinter(NameImporter *nameImporter, ImportNameVersion version)
+      : typePrinter(nameImporter, version) {}
 
   void VisitTemplateArgument(const clang::TemplateArgument &arg,
                              llvm::raw_svector_ostream &buffer) {
@@ -278,10 +271,9 @@ struct TemplateArgumentPrinter
 };
 
 std::string swift::importer::printClassTemplateSpecializationName(
-    const clang::ClassTemplateSpecializationDecl *decl, ASTContext &swiftCtx,
+    const clang::ClassTemplateSpecializationDecl *decl,
     NameImporter *nameImporter, ImportNameVersion version) {
-  TemplateArgumentPrinter templateArgPrinter(swiftCtx, nameImporter, version,
-                                             nameImporter->getImporterImpl());
+  TemplateArgumentPrinter templateArgPrinter(nameImporter, version);
 
   llvm::SmallString<128> storage;
   llvm::raw_svector_ostream buffer(storage);
