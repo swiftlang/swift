@@ -24,6 +24,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Strings.h"
 #include "clang/Lex/HeaderSearchOptions.h"
+#include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Path.h"
@@ -543,12 +544,20 @@ SwiftDependencyScanningService::SwiftDependencyScanningService()
   // optimization. Clang needs to communicate with the build system to handle
   // the optimization safely. Swift can handle the working directory
   // optimizaiton already so it is safe to turn on all optimizations.
-  opts.OptimizeArgs = clang::dependencies::ScanningOptimizations::All;
+  // Not VFS: MakeVFS below substitutes the scanner's filesystem, so clang's VFS
+  // usage tracking no longer matches the invocation's -ivfsoverlay list.
+  opts.OptimizeArgs = static_cast<clang::dependencies::ScanningOptimizations>(
+      llvm::to_underlying(clang::dependencies::ScanningOptimizations::All) &
+      ~llvm::to_underlying(clang::dependencies::ScanningOptimizations::VFS));
   // The Swift scanner relies on the set of Clang modules visible from each
   // by-name module lookup to resolve Swift overlay and cross-import overlay
   // dependencies, so opt into having Clang report them.
   opts.ReportVisibleModules = true;
-  opts.MakeVFS = [] { return llvm::vfs::createPhysicalFileSystem(); };
+  opts.MakeVFS = [this]() -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
+    if (MakeScannerFileSystem)
+      return MakeScannerFileSystem();
+    return llvm::vfs::createPhysicalFileSystem();
+  };
 
   ClangScanningService.emplace(std::move(opts));
 }
