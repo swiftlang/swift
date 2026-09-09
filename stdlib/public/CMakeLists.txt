@@ -281,6 +281,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
     if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
       list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
         "aarch64  aarch64-none-none-elf     aarch64-none-none-elf"
+        # UEFI firmware target (COFF/PE object format).
+        "aarch64  aarch64-unknown-uefi      aarch64-unknown-uefi"
       )
     endif()
     if("RISCV" IN_LIST LLVM_TARGETS_TO_BUILD)
