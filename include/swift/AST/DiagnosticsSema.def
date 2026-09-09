@@ -2319,6 +2319,15 @@ ERROR(com_interface_refinement_requires_identity, none,
 ERROR(com_interface_repeated_iid, none,
       "COM interface %0 and inherited interface %1 use the same interface "
       "identifier '%2'", (DeclName, DeclName, StringRef))
+ERROR(com_interface_unsupported_requirement, none,
+      "requirement %1 cannot be %select{used|static|generic|async|throwing}0 in a COM interface",
+      (int, DeclName))
+ERROR(com_interface_unsupported_parameter, none,
+      "parameter %0 of COM interface requirement %1 cannot be represented in C",
+      (DeclName, DeclName))
+ERROR(com_interface_unsupported_type, none,
+      "type %0 of COM interface requirement %1 cannot be represented in C",
+      (Type, DeclName))
 ERROR(com_identity_existential, none,
       "'any %0' is invalid because '%0' describes a COM metatype identity",
       (StringRef))

@@ -3653,7 +3653,7 @@ public:
       visit(Member);
 
     if (Ctx.LangOpts.EnableCOMInterop)
-      com::validateIdentityProtocol(PD);
+      com::validateProtocol(PD);
 
     checkDeclCommon(PD);
 

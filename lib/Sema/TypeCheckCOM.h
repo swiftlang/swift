@@ -31,8 +31,8 @@ deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP);
 /// Diagnose declaration-level restrictions on a native COM implementation.
 void validateImplementation(ClassDecl *CD);
 
-/// Validate the compiler-managed requirements of a COM identity protocol.
-void validateIdentityProtocol(ProtocolDecl *PD);
+/// Validate COM-specific rules for a protocol declaration.
+void validateProtocol(ProtocolDecl *PD);
 
 /// Diagnose restrictions on an explicitly declared COM conformance.
 void validateConformance(ProtocolConformance *conformance);
