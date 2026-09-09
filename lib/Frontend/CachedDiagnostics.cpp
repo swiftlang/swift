@@ -719,18 +719,29 @@ llvm::Error DiagnosticSerializer::doEmitFromCached(llvm::StringRef Buffer,
       return E;
   }
 
+  llvm::Error Result = llvm::Error::success();
   for (auto &Info : DiagInfos) {
     DiagnosticStorage Storage;
-    auto E = deserializeDiagnosticInfo(Info, Storage,
+    Result = deserializeDiagnosticInfo(Info, Storage,
                                        [&](const DiagnosticInfo &Info) {
                                          for (auto *Diag : Diags.getConsumers())
                                            Diag->handleDiagnostic(SrcMgr, Info);
                                          return llvm::Error::success();
                                        });
-    if (E)
-      return E;
+    if (Result)
+      break;
   }
-  return llvm::Error::success();
+
+  // A consumer can enqueue a diagnostic for deferred rendering instead of
+  // emitting it immediately, keeping a reference into this function's
+  // SrcMgr. SrcMgr is destroyed with the enclosing DiagnosticSerializer once
+  // this function returns, so flush every consumer here, while SrcMgr is
+  // still alive. Without this, a later, unrelated diagnostic can trigger the
+  // deferred flush and read freed memory.
+  for (auto *Diag : Diags.getConsumers())
+    Diag->flush();
+
+  return Result;
 }
 
 class CachingDiagnosticsProcessor::Implementation
