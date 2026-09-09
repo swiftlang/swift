@@ -660,6 +660,7 @@ struct BridgedFunction {
   typedef SwiftInt (* _Nonnull CopyEffectsFn)(BridgedFunction, BridgedFunction);
   typedef EffectInfo (* _Nonnull GetEffectInfoFn)(BridgedFunction, SwiftInt);
   typedef BridgedMemoryBehavior (* _Nonnull GetMemBehaviorFn)(BridgedFunction, bool);
+  typedef bool (* _Nonnull HasComputedSideEffectsFn)(BridgedFunction);
   typedef bool (* _Nonnull ArgumentMayReadFn)(BridgedFunction, BridgedOperand, BridgedValue);
   typedef bool (*_Nonnull ArgumentMayWriteFn)(BridgedFunction, BridgedOperand,
                                               BridgedValue);
@@ -670,6 +671,7 @@ struct BridgedFunction {
                                ParseFn parseFn, CopyEffectsFn copyEffectsFn,
                                GetEffectInfoFn effectInfoFn,
                                GetMemBehaviorFn memBehaviorFn,
+                               HasComputedSideEffectsFn hasComputedSideEffectsFn,
                                ArgumentMayReadFn argumentMayReadFn,
                                ArgumentMayWriteFn argumentMayWriteFn,
                                IsDeinitBarrierFn isDeinitBarrierFn);
