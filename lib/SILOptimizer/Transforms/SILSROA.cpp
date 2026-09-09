@@ -194,7 +194,10 @@ bool SROAMemoryUseAnalyzer::analyze() {
 void
 SROAMemoryUseAnalyzer::
 createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
-  SILBuilderWithScope B(AI);
+  // As alloc_stack is a meta instruction, SILBuilderWithScope would inherit
+  // the wrong scope. The new alloc_stack instructions must reuse the original
+  // instruction's scope.
+  SILBuilder B(AI, AI->getDebugScope());
   SILType Type = AI->getType().getObjectType();
   std::optional<SILDebugVariable> AIDebugVarInfo =
       SILDebugVariable::createFromAllocation(AI);

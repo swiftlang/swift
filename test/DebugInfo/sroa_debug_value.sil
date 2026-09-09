@@ -11,6 +11,8 @@ struct MyStruct {
   init(x: Int64, y: Int64)
 }
 
+struct Empty {}
+
 sil_scope 1 { loc "sroa.swift":2:8 parent @MyStructInit : $@convention(method) (Int64, Int64, @thin MyStruct.Type) -> MyStruct }
 
 // MyStruct.init(x:y:)
@@ -93,3 +95,47 @@ bb0(%0 : $Int64, %1 : $Int64):
   dealloc_stack %4 : $*MyStruct, loc "sroa.swift":21:9, scope 3
   return %10 : $Int64, loc "sroa.swift":26:5, scope 3
 }
+
+sil_scope 4 { loc "sroa.swift":30:6 parent @sroa_keeps_alloc_stack_scope : $@convention(thin) (Int64, Int64) -> Int64 }
+sil_scope 5 { loc "sroa.swift":32:3 parent 4 }
+
+// CHECK-SROA-LABEL: sil {{.+}} @sroa_keeps_alloc_stack_scope
+// The new allocations must keep the scope of the original alloc_stack, not the
+// scope of the next instruction.
+// CHECK-SROA: alloc_stack $Int64
+// CHECK-SROA-SAME: scope 4
+// CHECK-SROA: alloc_stack $Int64
+// CHECK-SROA-SAME: scope 4
+sil hidden @sroa_keeps_alloc_stack_scope : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %2 = alloc_stack $MyStruct, var, name "my_struct", loc "sroa.swift":31:9, scope 4
+  %3 = struct_element_addr %2 : $*MyStruct, #MyStruct.x, loc "sroa.swift":32:17, scope 5
+  store %0 to %3 : $*Int64, loc "sroa.swift":32:17, scope 5
+  %5 = struct_element_addr %2 : $*MyStruct, #MyStruct.y, loc "sroa.swift":33:17, scope 5
+  store %1 to %5 : $*Int64, loc "sroa.swift":33:17, scope 5
+  %7 = struct_element_addr %2 : $*MyStruct, #MyStruct.x, loc "sroa.swift":34:10, scope 5
+  %8 = load %7 : $*Int64, loc "sroa.swift":34:10, scope 5
+  dealloc_stack %2 : $*MyStruct, loc "sroa.swift":31:9, scope 4
+  return %8 : $Int64, loc "sroa.swift":35:5, scope 4
+}
+
+sil_scope 6 { loc "sroa.swift":40:6 parent @sroa_keeps_empty_struct : $@convention(thin) (Int64, Int64) -> Int64 }
+
+// CHECK-SROA-LABEL: sil {{.+}} @sroa_keeps_empty_struct
+// Undef debug_values are created for empty structs, to avoid losing the variable.
+sil hidden @sroa_keeps_empty_struct : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %4 = alloc_stack $Empty, var, name "my_struct", loc "sroa.swift":41:9, scope 6
+  debug_value %4 : $*Empty, let, name "my_copy", expr op_deref, loc "sroa.swift":40:10, scope 6
+  // Make sure SROA keeps the debug info
+  // CHECK-SROA: debug_value undef : $*Empty, var
+  // CHECK-SROA-SAME:        name "my_struct",
+  // CHECK-SROA-SAME:        loc "sroa.swift":41:9
+  // CHECK-SROA: debug_value undef : $*Empty, let
+  // CHECK-SROA-SAME:        name "my_copy",
+  // CHECK-SROA-SAME:        loc "sroa.swift":40:10
+  %6 = struct $Empty (), loc "sroa.swift":42:8, scope 6
+  store %6 to %4 : $*Empty, loc "sroa.swift":43:8, scope 6
+  dealloc_stack %4 : $*Empty, loc "sroa.swift":41:9, scope 6
+  return %0 : $Int64, loc "sroa.swift":44:5, scope 6
+} // end sil function 'bar'
