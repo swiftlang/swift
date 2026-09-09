@@ -631,7 +631,7 @@ extension DistributedActorSystem {
       try unsafe await _executeDistributedTarget(
         on: actor,
         /*targetNameData:*/targetName,
-        /*targetNameLength:*/UInt(targetName.count),
+        /*targetNameLength:*/UInt(targetName.utf8.count),
         argumentDecoder: &invocationDecoder,
         argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
         resultBuffer: resultBuffer._rawValue,
