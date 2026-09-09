@@ -9564,10 +9564,6 @@ ERROR(using_decl_invalid_attribute,none,
      (DeclAttribute))
 NOTE(using_decl_invalid_attribute_note,none,
      "'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'", ())
-ERROR(using_decl_must_precede_other_decls,none,
-     "'using' must appear before any non-import declaration", ())
-NOTE(using_decl_must_precede_other_decls_previous,none,
-     "first non-import declaration here", ())
 
 //===----------------------------------------------------------------------===//
 // MARK: `@inline(always)` attribute
