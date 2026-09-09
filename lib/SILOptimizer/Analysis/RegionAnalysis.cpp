@@ -4827,6 +4827,13 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
     CheckedCastAddrBranchInst *ccabi) {
   assert(ccabi->getSuccessBB()->getNumArguments() <= 1);
 
+  // A test_only cast has no destination operand.
+  // Only the source takes part, exactly as for checked_cast_br below.
+  if (!ccabi->hasDest()) {
+    translateSILRequire(ccabi->getSrc());
+    return TranslationSemantics::Special;
+  }
+
   // checked_cast_addr_br does not have any arguments in its resulting
   // block. We should just use a multi-assign on its operands.
   //

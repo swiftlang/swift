@@ -13,9 +13,12 @@
 #include "SILGenDynamicCast.h"
 
 #include "Initialization.h"
+#include "LValue.h"
 #include "RValue.h"
 #include "Scope.h"
 #include "ExitableFullExpr.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -52,6 +55,49 @@ CastStrategy Lowering::computeCastStrategy(SILGenFunction &SGF,
           SGF.SGM.M, SGF.F.hasLoweredAddresses(), sourceType, targetType))
     return CastStrategy::Scalar;
   return CastStrategy::Address;
+}
+
+/// Whether a cast to \p targetType may use isolated conformances.
+///
+/// This is a property of the target type alone, so every way of emitting a
+/// checked cast has to reach the same answer -- including the type-test form,
+/// which does not go through CheckedCastEmitter.
+static CastingIsolatedConformances
+computeIsolatedConformances(CanType targetType) {
+  // Non-existential types don't carry conformances, so we always allow
+  // isolated conformances.
+  if (!targetType->isAnyExistentialType())
+    return CastingIsolatedConformances::Allow;
+
+  // If there is a conformance to SendableMetatype, then this existential
+  // can leave the current isolation domain.
+  ASTContext &ctx = targetType->getASTContext();
+  Type checkType;
+  if (auto existentialMetatype = targetType->getAs<ExistentialMetatypeType>())
+    checkType = existentialMetatype->getInstanceType();
+  else
+    checkType = targetType;
+
+  // If there are no non-marker protocols in the existential, there's no
+  // need to prohibit isolated conformances.
+  auto layout = checkType->getExistentialLayout();
+  if (!layout.containsNonMarkerProtocols())
+    return CastingIsolatedConformances::Allow;
+
+  // If the type conforms to SendableMetatype, prohibit isolated
+  // conformances.
+  auto proto = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+  if (proto && lookupConformance(checkType, proto, /*allowMissing=*/false))
+    return CastingIsolatedConformances::Prohibit;
+
+  return CastingIsolatedConformances::Allow;
+}
+
+/// The CheckedCastInstOptions for a cast to \p targetType.
+static CheckedCastInstOptions
+computeCheckedCastOptions(CanType targetType) {
+  return CheckedCastInstOptions()
+      .withIsolatedConformances(computeIsolatedConformances(targetType));
 }
 
 namespace {
@@ -368,38 +414,7 @@ namespace {
 
   private:
     CheckedCastInstOptions computedOptions() const {
-      return CheckedCastInstOptions()
-        .withIsolatedConformances(computedIsolatedConformances());
-    }
-    
-    CastingIsolatedConformances computedIsolatedConformances() const {
-      // Non-existential types don't carry conformances, so we always allow
-      // isolated conformances.
-      if (!TargetType->isAnyExistentialType())
-        return CastingIsolatedConformances::Allow;
-
-      // If there is a conformance to SendableMetatype, then this existential
-      // can leave the current isolation domain.
-      ASTContext &ctx = TargetType->getASTContext();
-      Type checkType;
-      if (auto existentialMetatype = TargetType->getAs<ExistentialMetatypeType>())
-        checkType = existentialMetatype->getInstanceType();
-      else
-        checkType = TargetType;
-
-      // If there are no non-marker protocols in the existential, there's no
-      // need to prohibit isolated conformances.
-      auto layout = checkType->getExistentialLayout();
-      if (!layout.containsNonMarkerProtocols())
-        return CastingIsolatedConformances::Allow;
-
-      // If the type conforms to SendableMetatype, prohibit isolated
-      // conformances.
-      auto proto = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
-      if (proto && lookupConformance(checkType, proto, /*allowMissing=*/false))
-        return CastingIsolatedConformances::Prohibit;
-
-      return CastingIsolatedConformances::Allow;
+      return computeCheckedCastOptions(TargetType);
     }
   };
 } // end anonymous namespace
@@ -634,9 +649,103 @@ RValue Lowering::emitConditionalCheckedCast(
   return RValue(SGF, loc, optTargetType->getCanonicalType(), result);
 }
 
+/// True if a cast from \p sourceType to \p targetType can be answered by a
+/// non-consuming type test rather than going through the full dynamic
+/// cast machinery used by `as?`
+/// Note: This is deliberately limited to a subset of `is` cast operations.
+///       This will be expanded later to cover most `is` operations.
+///
+/// The test reads the source through swift_dynamicCastTest, which needs the
+/// source in memory and needs the cast to be the plain value cast -- collection
+/// downcasts carry element-wise conversions that no type test can stand in for.
+bool Lowering::canUseNoncopyableTypeTest(CanType sourceType,
+                                         CanType targetType,
+                                         CheckedCastKind castKind) {
+  if (castKind != CheckedCastKind::ValueCast)
+    return false;
+
+  // Only *necessary* for values that cannot be copied.
+  return sourceType->isNoncopyable() && sourceType->isExistentialType();
+}
+
+void Lowering::emitNoncopyableTypeTest(SILGenFunction &SGF, SILLocation loc,
+                                       ManagedValue existentialAddr,
+                                       CanType sourceType, CanType targetType,
+                                       SILBasicBlock *trueBB,
+                                       SILBasicBlock *falseBB,
+                                       ProfileCounter trueCount,
+                                       ProfileCounter falseCount) {
+  assert(existentialAddr.getType().isAddress() &&
+         "type test needs the existential in memory");
+
+  // Emit `checked_cast_addr_br test_only` with no destination
+  SGF.B.createCheckedCastAddrBranch(
+      loc, computeCheckedCastOptions(targetType),
+      CastConsumptionKind::TestOnly,
+      existentialAddr.getValue(), sourceType, SILValue(), targetType, trueBB,
+      falseBB, trueCount, falseCount);
+}
+
+/// Borrow the storage \p operand names so a type test can read it without
+/// copying or consuming it.
+///
+/// Anything that names storage -- a local, a global, a stored property, a
+/// parameter, mutable or not -- is borrowed in place. Only an operand that
+/// produces a temporary of its own falls through to ordinary rvalue emission,
+/// and that temporary is ours to read anyway.
+///
+/// The caller must have established a FormalEvaluationScope covering the use of
+/// the returned value.
+ManagedValue Lowering::emitTypeTestOperand(SILGenFunction &SGF,
+                                           Expr *operand) {
+  if (Expr *storage = SGF.findStorageReferenceExprForMoveOnly(
+          operand, StorageReferenceOperationKind::Borrow)) {
+    LValue lv = SGF.emitLValue(storage, SGFAccessKind::BorrowedAddressRead);
+    return SGF.emitBorrowedLValue(operand, std::move(lv));
+  }
+
+  return SGF.emitRValueAsSingleValue(operand,
+                                     SGFContext::AllowImmediatePlusZero);
+}
+
 SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
                            Expr *operand, Type targetType,
                            CheckedCastKind castKind) {
+  // A noncopyable existential can answer this without giving up its payload.
+  // Do that before anything below materializes the operand: the ordinary path
+  // extracts the payload only to destroy it, which for a noncopyable source
+  // means the query consumes what it was asked about.
+  {
+    auto sourceType =
+        operand->getType()->getWithoutSpecifierType()->getCanonicalType();
+    auto targetCanType = targetType->getCanonicalType();
+    if (canUseNoncopyableTypeTest(sourceType, targetCanType, castKind)) {
+      auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+
+      // The borrow of the subject has to outlive the terminator, so this scope
+      // is closed in the continuation block, after both edges have merged.
+      FormalEvaluationScope borrowScope(SGF);
+      ManagedValue addr = emitTypeTestOperand(SGF, operand);
+
+      ExitableFullExpr scope(SGF, CleanupLocation(loc));
+      SILBasicBlock *trueBB = SGF.createBasicBlock();
+      SILBasicBlock *falseBB = SGF.createBasicBlock();
+      emitNoncopyableTypeTest(SGF, loc, addr, sourceType, targetCanType, trueBB,
+                              falseBB);
+
+      SGF.B.emitBlock(trueBB);
+      SILValue yes = SGF.B.createIntegerLiteral(loc, i1Ty, 1);
+      SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc, yes);
+
+      SGF.B.emitBlock(falseBB);
+      SILValue no = SGF.B.createIntegerLiteral(loc, i1Ty, 0);
+      SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc, no);
+
+      SILBasicBlock *contBB = scope.exit();
+      return contBB->createPhiArgument(i1Ty, OwnershipKind::None);
+    }
+  }
+
   // Handle collection downcasts separately.
   if (castKind == CheckedCastKind::ArrayDowncast ||
       castKind == CheckedCastKind::DictionaryDowncast ||

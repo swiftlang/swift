@@ -2736,6 +2736,28 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       }
       return true;
     }
+
+    // A test_only cast only reads Src -- it neither takes nor copies it, and
+    // writes nothing (it has no dest). That makes it a plain liveness use.  It
+    // can't fall through to the generic liveness path below, because other
+    // checked_cast_addr_br forms do write and that path asserts against any
+    // user whose memory behavior admits a write.
+    if (ccabi->getSrc() == op->get() &&
+        ccabi->getConsumptionKind() == CastConsumptionKind::TestOnly) {
+      LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br test_only Src: "
+                              << *user);
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+        return false;
+      }
+
+      for (auto leafRange : leafRanges) {
+        useState.recordLivenessUse(user, leafRange);
+      }
+      return true;
+    }
   }
 
   // Now that we have handled or loadTakeOrCopy, we need to now track our
