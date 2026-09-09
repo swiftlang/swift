@@ -409,6 +409,39 @@ class BuildScriptInvocation(object):
                 sp_opt = '-DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=TRUE'
                 if sp_opt not in args.extra_llvm_cmake_options:
                     args.extra_llvm_cmake_options.append(sp_opt)
+            # build-script-impl injects a large fan-out of `-DSWIFT_*` flags
+            # into swift's cmake configure line based on CLI args. Under
+            # unified layout that swift cmake configure step is skipped, so
+            # add-subdirectory(libexec) / add-subdirectory(swift-backtrace)
+            # etc. degrade to the CMake default (falsy) and skip the build.
+            # Forward the flags whose absence causes test breakage:
+            # SWIFT_BUILD_LIBEXEC (swift-backtrace binary — Backtracing/*
+            # tests fail with "unable to locate swift-backtrace"),
+            # SWIFT_BUILD_DYNAMIC_STDLIB / SWIFT_BUILD_STATIC_STDLIB,
+            # SWIFT_BUILD_CLANG_OVERLAYS, SWIFT_BUILD_REMOTE_MIRROR,
+            # SWIFT_BUILD_DYNAMIC_SDK_OVERLAY / SWIFT_BUILD_STATIC_SDK_OVERLAY.
+            _swift_extra_flags = [
+                ('SWIFT_BUILD_LIBEXEC',
+                 getattr(args, 'build_swift_libexec', True)),
+                ('SWIFT_BUILD_DYNAMIC_STDLIB',
+                 getattr(args, 'build_swift_dynamic_stdlib', True)),
+                ('SWIFT_BUILD_STATIC_STDLIB',
+                 getattr(args, 'build_swift_static_stdlib', False)),
+                ('SWIFT_BUILD_DYNAMIC_SDK_OVERLAY',
+                 getattr(args, 'build_swift_dynamic_sdk_overlay', True)),
+                ('SWIFT_BUILD_STATIC_SDK_OVERLAY',
+                 getattr(args, 'build_swift_static_sdk_overlay', False)),
+                ('SWIFT_BUILD_CLANG_OVERLAYS',
+                 getattr(args, 'build_swift_clang_overlays', True)),
+                ('SWIFT_BUILD_REMOTE_MIRROR',
+                 getattr(args, 'build_swift_remote_mirror', True)),
+            ]
+            for _flag, _val in _swift_extra_flags:
+                _opt = '-D{}:BOOL={}'.format(
+                    _flag, 'TRUE' if _val else 'FALSE')
+                if not any(o.startswith('-D{}'.format(_flag))
+                           for o in args.extra_llvm_cmake_options):
+                    args.extra_llvm_cmake_options.append(_opt)
         conditional_subproject_configs = [
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
