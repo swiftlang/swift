@@ -1,30 +1,25 @@
 // RUN: %empty-directory(%t)
-// Opened-existential archetypes carry a UUID that changes across compiles,
-// so each pipeline normalizes them before diffing.
-//
 // File-level `using @MainActor` should produce the same SIL as writing
 // `@MainActor` explicitly on every top-level declaration (including
 // extensions, which is where it diverges from module-level `-default-isolation
 // MainActor` since SE-0466 carve-outs do not apply at file scope).
 
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -disable-availability-checking -module-name equivalence -DFILE_DEFAULT %s | %{python} %S/Inputs/normalize_sil_uuids.py > %t/file-5.sil
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -disable-availability-checking -module-name equivalence -DEXPLICIT %s | %{python} %S/Inputs/normalize_sil_uuids.py > %t/explicit-5.sil
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -disable-availability-checking -module-name equivalence -DFILE_DEFAULT %s > %t/file-5.sil
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -disable-availability-checking -module-name equivalence -DEXPLICIT %s > %t/explicit-5.sil
 // RUN: diff %t/file-5.sil %t/explicit-5.sil
 
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -strict-concurrency=complete -disable-availability-checking -module-name equivalence -DFILE_DEFAULT %s | %{python} %S/Inputs/normalize_sil_uuids.py > %t/file-5c.sil
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -strict-concurrency=complete -disable-availability-checking -module-name equivalence -DEXPLICIT %s | %{python} %S/Inputs/normalize_sil_uuids.py > %t/explicit-5c.sil
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -strict-concurrency=complete -disable-availability-checking -module-name equivalence -DFILE_DEFAULT %s > %t/file-5c.sil
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -strict-concurrency=complete -disable-availability-checking -module-name equivalence -DEXPLICIT %s > %t/explicit-5c.sil
 // RUN: diff %t/file-5c.sil %t/explicit-5c.sil
 
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -disable-availability-checking -module-name equivalence -DFILE_DEFAULT %s | %{python} %S/Inputs/normalize_sil_uuids.py > %t/file-6.sil
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -disable-availability-checking -module-name equivalence -DEXPLICIT %s | %{python} %S/Inputs/normalize_sil_uuids.py > %t/explicit-6.sil
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -disable-availability-checking -module-name equivalence -DFILE_DEFAULT %s > %t/file-6.sil
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -disable-availability-checking -module-name equivalence -DEXPLICIT %s > %t/explicit-6.sil
 // RUN: diff %t/file-6.sil %t/explicit-6.sil
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_DefaultIsolationPerFile
 
-#if FILE_DEFAULT
-using @MainActor
-#endif
+// The using decl is lower in the file to ensure it applies to preceding decls.
 
 #if EXPLICIT
 @MainActor
@@ -65,6 +60,10 @@ class C {
   // Synthetic deinit inherits default isolation but not decl isolation, explicit does not, via SE-0371.
   deinit {}
 }
+
+#if FILE_DEFAULT
+using @MainActor
+#endif
 
 #if EXPLICIT
 @MainActor
