@@ -481,10 +481,8 @@ swift::extractNearestSourceLoc(const ForeignReferenceTypeInfoDescriptor &desc) {
   return SourceLoc();
 }
 
-ForeignReferenceTypeInfo ForeignReferenceTypeInfoRequest::evaluate(
-    Evaluator &evaluator, ForeignReferenceTypeInfoDescriptor desc) const {
-  auto *decl = desc.decl;
-
+ForeignReferenceTypeInfo
+importer::getUncachedForeignReferenceTypeInfo(const clang::RecordDecl *decl) {
   // A swift_attr propagates to later redeclarations only, so an earlier
   // declaration does not see the annotation, and the retain/release parameters
   // of SWIFT_SHARED_REFERENCE declare the type before the annotated declaration
@@ -503,7 +501,6 @@ ForeignReferenceTypeInfo ForeignReferenceTypeInfoRequest::evaluate(
       }
     }
   }
-
   if (auto *cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl))
     return ForeignReferenceTypeChecker(cxxDecl).check();
 
@@ -523,6 +520,18 @@ ForeignReferenceTypeInfo ForeignReferenceTypeInfoRequest::evaluate(
   }
 
   return ForeignReferenceTypeInfo::Value();
+}
+
+ForeignReferenceTypeInfo ForeignReferenceTypeInfoRequest::evaluate(
+    Evaluator &evaluator, ForeignReferenceTypeInfoDescriptor desc) const {
+
+  // Decls belonging to a module-building Clang sub-instance are freed once that
+  // sub-instance goes away, so this request must not cache decls allocated from
+  // that sub-instance's clang::ASTContext.
+  ASSERT(!desc.decl->getASTContext().getLangOpts().isCompilingModule() &&
+         "caching FRT info for a decl from a transient Clang sub-instance");
+
+  return importer::getUncachedForeignReferenceTypeInfo(desc.decl);
 }
 
 bool importer::diagnoseForeignReferenceType(
