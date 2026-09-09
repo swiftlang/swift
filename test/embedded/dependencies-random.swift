@@ -10,14 +10,18 @@
 // RUN: %if OS=wasip1 %{ comm -13 %t/allowed-dependencies_wasi.txt %t/actual-dependencies.txt > %t/extra.txt %}
 // RUN: test ! -s %t/extra.txt
 
+// Runtime error reporting still uses the standard library's print.
 // Expects the POSIX-based dependencies, not the Embedded Swift platform ones.
 // XFAIL: swift_embedded_platform
 
 //--- allowed-dependencies_macos.txt
 ___stack_chk_fail
 ___stack_chk_guard
+___stdoutp
 _arc4random_buf
+_flockfile
 _free
+_funlockfile
 _memmove
 _memset
 _posix_memalign
@@ -27,11 +31,14 @@ _putchar
 __stack_chk_fail
 __stack_chk_guard
 arc4random_buf
+flockfile
 free
+funlockfile
 memmove
 memset
 posix_memalign
 putchar
+stdout
 //--- allowed-dependencies_wasi.txt
 __indirect_function_table
 __memory_base
