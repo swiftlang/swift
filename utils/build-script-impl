@@ -147,6 +147,7 @@ KNOWN_SETTINGS=(
     skip-build-clang-tools-extra                  ""                "set to skip building clang-tools-extra as part of llvm"
     skip-build-compiler-rt                        ""                "set to skip building Compiler-RT"
     skip-build-lld                                ""                "set to skip building lld as part of llvm (linux only)"
+    unified-llvm-swift-lldb                       ""                "set when the LLVM cmake was configured with LLVM_EXTERNAL_PROJECTS=swift and LLVM_ENABLE_PROJECTS=lldb; skips swift/lldb standalone build+install and routes their test phase through the LLVM ninja graph"
 
     ## Skip Test ...
     skip-test-benchmarks                          ""                "set to skip running Swift Benchmark Suite"
@@ -1665,6 +1666,19 @@ for host in "${ALL_HOSTS[@]}"; do
     for product in "${PRODUCTS[@]}"; do
         [[ $(should_execute_action "${host}-${product%%_*}-build") ]] || continue
 
+        # Under the unified LLVM+Swift+LLDB layout, swift and lldb are built as
+        # part of the LLVM ninja graph (LLVM_EXTERNAL_PROJECTS=swift,
+        # LLVM_ENABLE_PROJECTS=lldb). Their standalone build dirs don't exist,
+        # so skip the standalone build step here.
+        if [[ "${UNIFIED_LLVM_SWIFT_LLDB}" ]]; then
+            case ${product} in
+                swift|lldb)
+                    echo "--- Skipping ${product} build: covered by the unified LLVM ninja graph ---"
+                    continue
+                    ;;
+            esac
+        fi
+
         source_dir_var="$(toupper ${product})_SOURCE_DIR"
         source_dir=${!source_dir_var}
         build_dir=$(build_directory ${host} ${product})
@@ -2749,8 +2763,17 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 llvm_build_dir=$(build_directory ${host} llvm)
-                lldb_build_dir=$(build_directory ${host} lldb)
-                results_dir="${lldb_build_dir}/test-results"
+                if [[ "${UNIFIED_LLVM_SWIFT_LLDB}" ]]; then
+                    # LLDB is a subproject of the unified LLVM build; its
+                    # ninja targets and test config live inside the LLVM tree.
+                    lldb_build_dir="${llvm_build_dir}"
+                    lldb_test_dir="${llvm_build_dir}/tools/lldb/test"
+                    results_dir="${llvm_build_dir}/tools/lldb/test-results"
+                else
+                    lldb_build_dir=$(build_directory ${host} lldb)
+                    lldb_test_dir="${lldb_build_dir}/test"
+                    results_dir="${lldb_build_dir}/test-results"
+                fi
 
                 call mkdir -p "${results_dir}"
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --xunit-xml-output=${results_dir}/results.xml"
@@ -2766,15 +2789,27 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
                 fi
 
-                echo "--- Running LLDB unit tests ---"
-                with_pushd ${lldb_build_dir} \
-                    call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
-                echo "--- Running LLDB tests ---"
-                with_pushd ${lldb_build_dir} \
-                    call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
+                if [[ "${UNIFIED_LLVM_SWIFT_LLDB}" ]]; then
+                    # Ninja target names are unique across the LLVM ninja
+                    # graph, so `LLDBUnitTests` and `lldb-test-deps` resolve
+                    # to the subproject-scoped targets automatically.
+                    echo "--- Running LLDB unit tests ---"
+                    with_pushd ${llvm_build_dir} \
+                        call ${NINJA_BIN} -j ${BUILD_JOBS} LLDBUnitTests
+                    echo "--- Running LLDB tests ---"
+                    with_pushd ${llvm_build_dir} \
+                        call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
+                else
+                    echo "--- Running LLDB unit tests ---"
+                    with_pushd ${lldb_build_dir} \
+                        call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
+                    echo "--- Running LLDB tests ---"
+                    with_pushd ${lldb_build_dir} \
+                        call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
+                fi
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
-                         "${lldb_build_dir}/test" \
+                         "${lldb_test_dir}" \
                          ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
@@ -2783,7 +2818,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_ARGS="-G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\""
                     with_pushd ${results_dir} \
                        call "${llvm_build_dir}/bin/llvm-lit" \
-                            "${lldb_build_dir}/test" \
+                            "${lldb_test_dir}" \
                             ${LLVM_LIT_ARGS} \
                             --param dotest-args="${DOTEST_ARGS}" \
                             --filter=compat
@@ -2872,6 +2907,12 @@ for host in "${ALL_HOSTS[@]}"; do
 
         trap "tests_busted ${product} ''" ERR
         build_dir=$(build_directory ${host} ${product})
+        # Under the unified LLVM+Swift+LLDB layout, swift's targets
+        # (SwiftUnitTests, check-swift-validation-*, etc.) live in the LLVM
+        # ninja graph rather than a standalone swift-<host> build directory.
+        if [[ "${UNIFIED_LLVM_SWIFT_LLDB}" ]] && [[ "${product}" == "swift" ]]; then
+            build_dir=$(build_directory ${host} llvm)
+        fi
         build_cmd=("${CMAKE_BUILD[@]}" "${build_dir}" -- "${BUILD_ARGS[@]}")
 
         if [[ "${executable_target}" != "" ]]; then
@@ -2975,6 +3016,20 @@ for host in "${ALL_HOSTS[@]}"; do
         if [[ -z "${INSTALL_DESTDIR}" ]] ; then
             echo "--install-destdir is required to install products."
             exit 1
+        fi
+
+        # Under the unified LLVM+Swift+LLDB layout, swift/lldb install rules
+        # are folded into LLVM's install target list via LLVM_INSTALL_COMPONENTS
+        # (build_script_invocation.py merges SWIFT_INSTALL_COMPONENTS in), so
+        # the standalone swift/lldb install passes here would either fail
+        # (no standalone build dir) or duplicate work.
+        if [[ "${UNIFIED_LLVM_SWIFT_LLDB}" ]]; then
+            case ${product} in
+                swift|lldb)
+                    echo "--- Skipping ${product} install: covered by install-llvm under unified layout ---"
+                    continue
+                    ;;
+            esac
         fi
 
         INSTALL_TARGETS="install"

@@ -324,19 +324,18 @@ class BuildScriptInvocation(object):
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
         # them.
-        # Under the unified LLVM+Swift+LLDB layout the LLVM ninja graph
-        # already builds swift-frontend and LLDB as external/enabled projects,
-        # so the standalone build-script-impl swift/lldb passes would just
-        # repeat the work. Short-circuit both, and fold the swift install
-        # components into the LLVM install component list so `install-llvm`
-        # picks up swiftc/stdlib/etc. out of the unified build tree.
-        # Note: LLDB standalone build also pulls in Swift_DIR from
-        # swift-<host>/lib/cmake/swift, which no longer exists once the swift
-        # standalone build is skipped, so skipping lldb here also prevents a
-        # CMake configure failure looking for SwiftConfig.cmake.
+        # Under the unified LLVM+Swift+LLDB layout, swift and lldb are built
+        # as subprojects of LLVM's ninja graph (via LLVM_EXTERNAL_PROJECTS=
+        # swift and LLVM_ENABLE_PROJECTS=lldb). Their standalone build dirs
+        # don't exist and would fail cmake configure (LLDB's standalone build
+        # pulls in Swift_DIR from swift-<host>/lib/cmake/swift, which no
+        # longer exists). Keep both products in PRODUCTS so build-script-impl
+        # still runs their *test* phase (routed through llvm_build_dir by
+        # --unified-llvm-swift-lldb), but skip their standalone build+install
+        # inside build-script-impl. Swift+LLDB install is folded into the
+        # LLVM install target list via LLVM_INSTALL_COMPONENTS below.
         if products.swift.Swift.is_unified_llvm_build(args):
-            args.build_swift = False
-            args.build_lldb = False
+            args.build_script_impl_args.append('--unified-llvm-swift-lldb')
             # Under unified layout, `swift-<host>/bin/swiftc` doesn't exist
             # because the standalone swift build is skipped. Point downstream
             # products at the swiftc we install into the built toolchain (the
