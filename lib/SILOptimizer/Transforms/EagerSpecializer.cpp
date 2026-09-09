@@ -566,7 +566,9 @@ void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
                                          WordTy, SubMap, { GenericMT });
   auto LayoutSize =
       Builder.createIntegerLiteral(Loc, WordTy, Layout->getTrivialSizeInBytes());
-  const char *CmpOpName = Layout->isFixedSizeTrivial() ? "cmp_eq" : "cmp_le";
+  // Use cmp_ule for non LayoutConstraintKind::TrivialOfExactSize constraints,
+  // since the operands are non-negative Word sizes.
+  const char *CmpOpName = Layout->isFixedSizeTrivial() ? "cmp_eq" : "cmp_ule";
   auto Cmp =
     Builder.createBuiltinBinaryFunction(Loc, CmpOpName, WordTy,
                                         BoolTy,

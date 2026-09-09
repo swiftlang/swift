@@ -453,9 +453,23 @@ bool SILValueOwnershipChecker::gatherUsers(
                          << "Address User: " << *op->getUser();
           });
         };
+        SmallVector<Operand *, 8> interiorPointerUses;
         foundError |= (interiorPointerOperand.findTransitiveUses(
-                           &nonLifetimeEndingUsers, &onError)
+                           &interiorPointerUses, &onError)
                        == AddressUseKind::Unknown);
+        // A debug use does not require its operand to be alive, so it must not
+        // become an implicit regular user of the borrow scope. Filter such uses
+        // out here just like we do for the direct uses gathered above: the
+        // transitive address walk reports both debug uses of the projected
+        // address and, via findInnerTransitiveGuaranteedUses, debug uses of the
+        // values loaded from it.
+        for (auto *interiorPointerUse : interiorPointerUses) {
+          auto ownership = interiorPointerUse->getOperandOwnership();
+          if (ownership == OperandOwnership::NonUse ||
+              ownership == OperandOwnership::DebugUse)
+            continue;
+          nonLifetimeEndingUsers.push_back(interiorPointerUse);
+        }
       }
 
       // Finally add the op to the non lifetime ending user list.

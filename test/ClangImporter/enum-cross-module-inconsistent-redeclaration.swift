@@ -82,12 +82,14 @@ import Typed
 import Untyped
 
 let z: UInt16 = SHARED_CONSTANT_NAME
+let w = UInt16(SHARED_CONSTANT_NAME)
 
 //--- untyped-then-typed.swift
 import Untyped
 import Typed
 
 let z: UInt16 = SHARED_CONSTANT_NAME
+let w = UInt16(SHARED_CONSTANT_NAME)
 
 //--- transitivetyped-then-transitiveuntyped.swift
 // This transitive case is interesting because the order that the compiler
@@ -97,6 +99,7 @@ import TransitiveTyped
 import TransitiveUntyped
 
 let z: UInt16 = SHARED_CONSTANT_NAME
+let w = UInt16(SHARED_CONSTANT_NAME)
 
 //--- typed-then-untyped-then-untypedduplicate.swift
 // Typed, whose type doesn't match Untyped/UntypedDuplicate, is imported first
@@ -108,6 +111,7 @@ import UntypedDuplicate
 
 let a: UInt16 = SHARED_CONSTANT_NAME
 let b: Int = SHARED_CONSTANT_NAME
+let c = UInt16(SHARED_CONSTANT_NAME)
 
 //--- untyped-then-untypedduplicate-then-typed.swift
 // Untyped or UntypedDuplicate is imported first and becomes canonical, so the
@@ -119,3 +123,4 @@ import Typed
 
 let a: UInt16 = SHARED_CONSTANT_NAME
 let b: Int = SHARED_CONSTANT_NAME
+let c = UInt16(SHARED_CONSTANT_NAME)

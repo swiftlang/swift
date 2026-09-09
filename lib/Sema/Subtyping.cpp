@@ -738,9 +738,16 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
         return ConflictFlag::TupleArity;
 
       for (unsigned i : indices(lhsTuple->getElements())) {
-        auto lhsElt = lhsTuple->getElementType(i);
-        auto rhsElt = rhsTuple->getElementType(i);
-        auto result = checkConversion(cache, lhsElt, rhsElt, sig);
+        auto lhsElt = lhsTuple->getElement(i);
+        auto rhsElt = rhsTuple->getElement(i);
+        if (lhsElt.hasName() && rhsElt.hasName() &&
+            lhsElt.getName() != rhsElt.getName()) {
+          return ConflictFlag::TupleLabel;
+        }
+
+        auto result = checkConversion(cache,
+                                      lhsElt.getType(),
+                                      rhsElt.getType(), sig);
         if (result)
           return result | ConflictFlag::TupleElement;
       }
@@ -1087,8 +1094,9 @@ static std::optional<AnyFunctionType::ExtInfo>
 extInfoJoinMeetImpl(Operation op,
                     AnyFunctionType::ExtInfo lhsInfo,
                     AnyFunctionType::ExtInfo rhsInfo) {
-  bool noEscape, sendable, throwing, async;
+  bool noEscape, sendable, calledOnce, throwing, async;
   Type sendableDep;
+  Type calledOnceDep;
   Type thrownError;
 
   // Concurrency is too hard to reason about here.
@@ -1097,6 +1105,9 @@ extInfoJoinMeetImpl(Operation op,
 
   auto lhsSendableDep = lhsInfo.getSendableDependentType();
   auto rhsSendableDep = rhsInfo.getSendableDependentType();
+
+  auto lhsCalledOnceDep = lhsInfo.getCalledOnceDependentType();
+  auto rhsCalledOnceDep = rhsInfo.getCalledOnceDependentType();
 
   if (op == Operation::Join) {
     noEscape = lhsInfo.isNoEscape() || rhsInfo.isNoEscape();
@@ -1119,6 +1130,25 @@ extInfoJoinMeetImpl(Operation op,
       sendable = false;
     } else {
       sendable = lhsInfo.isSendable() && rhsInfo.isSendable();
+    }
+
+    if (lhsCalledOnceDep && rhsCalledOnceDep) {
+      // Form a tuple; its @called(once) iff both components are @called(once).
+      SmallVector<TupleTypeElt, 2> elts;
+      elts.push_back(lhsCalledOnceDep);
+      elts.push_back(rhsCalledOnceDep);
+      calledOnceDep = TupleType::get(elts, lhsSendableDep->getASTContext());
+      calledOnce = false;
+    } else if (lhsCalledOnceDep && !rhsCalledOnceDep) {
+      if (rhsInfo.isCalledOnce())
+        calledOnceDep = lhsCalledOnceDep;
+      calledOnce = false;
+    } else if (!lhsCalledOnceDep && rhsCalledOnceDep) {
+      if (lhsInfo.isCalledOnce())
+        calledOnceDep = rhsCalledOnceDep;
+      calledOnce = false;
+    } else {
+      calledOnce = lhsInfo.isCalledOnce() && rhsInfo.isCalledOnce();
     }
 
     throwing = lhsInfo.isThrowing() || rhsInfo.isThrowing();
@@ -1158,6 +1188,27 @@ extInfoJoinMeetImpl(Operation op,
       sendable = lhsInfo.isSendable() || rhsInfo.isSendable();
     }
 
+    if (lhsCalledOnceDep && rhsCalledOnceDep) {
+      // We cannot represent the meet of two @called(once)-dependent types.
+      return std::nullopt;
+    } else if (lhsCalledOnceDep && !rhsCalledOnceDep) {
+      if (rhsInfo.isCalledOnce()) {
+        calledOnce = true;
+      } else {
+        calledOnce = false;
+        calledOnceDep = lhsCalledOnceDep;
+      }
+    } else if (!lhsCalledOnceDep && rhsCalledOnceDep) {
+      if (lhsInfo.isCalledOnce()) {
+        calledOnce = true;
+      } else {
+        calledOnce = false;
+        calledOnceDep = rhsCalledOnceDep;
+      }
+    } else {
+      calledOnce = lhsInfo.isCalledOnce() || rhsInfo.isCalledOnce();
+    }
+
     throwing = lhsInfo.isThrowing() && rhsInfo.isThrowing();
     Type thrownError;
     if (throwing) {
@@ -1182,6 +1233,8 @@ extInfoJoinMeetImpl(Operation op,
       .withAsync(async)
       .withSendable(sendable)
       .withSendableDependentType(sendableDep)
+      .withCalledOnce(calledOnce)
+      .withCalledOnceDependentType(calledOnceDep)
       .build();
 }
 
@@ -1719,6 +1772,8 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " conformance";
   if (reason.contains(ConflictFlag::TupleArity))
     out << " tuple_arity";
+  if (reason.contains(ConflictFlag::TupleLabel))
+    out << " tuple_label";
   if (reason.contains(ConflictFlag::TupleElement))
     out << " tuple_element";
   if (reason.contains(ConflictFlag::Existential))

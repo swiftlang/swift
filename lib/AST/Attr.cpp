@@ -1100,8 +1100,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (auto *BD = VD->getOverriddenDecl()) {
         // If the overridden decl won't be printed, printing override will fail
-        // the build of the interface file.
-        if (!Options.shouldPrint(BD))
+        // the build of the interface file. The exception is a member of an
+        // `@objc @implementation` extension: it's deliberately omitted from
+        // the interface because it's already visible through the imported
+        // Objective-C header, so the override is still resolvable there.
+        auto *overriddenExt = dyn_cast<ExtensionDecl>(BD->getDeclContext());
+        bool overriddenIsObjCImpl =
+            overriddenExt && overriddenExt->isObjCImplementation() &&
+            BD->isObjC();
+        if (!overriddenIsObjCImpl && !Options.shouldPrint(BD))
           return false;
         if (!BD->hasClangNode() &&
             !BD->getFormalAccessScope(VD->getDeclContext(),
@@ -1140,13 +1147,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
           return false;
       }
     }
-    break;
-  }
-  case DeclAttrKind::OriginallyDefinedIn: {
-    auto Attr = cast<OriginallyDefinedInAttr>(this);
-    auto Name = D->getDeclContext()->getParentModule()->getName().str();
-    if (Options.IsForSwiftInterface && Attr->getManglingModuleName() == Name)
-      return false;
     break;
   }
   default:

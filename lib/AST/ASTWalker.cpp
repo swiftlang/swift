@@ -2452,8 +2452,17 @@ bool Traversal::visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T) {
 
 bool Traversal::visitGenericArgumentExprTypeRepr(
     GenericArgumentExprTypeRepr *T) {
-  return false; // Don't walk the inner expression; it will be type-checked
-                // independently by `resolveGenericArgumentExprTypeRepr`
+  if (!Walker.shouldWalkIntoGenericArgumentExprTypeRepr())
+    return false; // Don't walk the inner expression; it will be type-checked
+                  // independently by `resolveGenericArgumentExprTypeRepr`
+
+  auto *argExpr = T->getArgExpr();
+  if (!argExpr)
+    argExpr = T->getOriginalArgExpr();
+  if (!argExpr)
+    return false;
+
+  return doIt(argExpr) == nullptr;
 }
 
 Expr *Expr::walk(ASTWalker &walker) {

@@ -526,8 +526,8 @@ ExistentialLayout::resolveCOMInterface() const {
   COMExistentialInterfaceResolution resolution;
 
   for (ProtocolDecl *protocol : getProtocols()) {
-    if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface)) {
-      resolution.containsCOMInterfaceProtocol = true;
+    if (protocol->isCOMIdentity()) {
+      resolution.identityProtocol = protocol;
       continue;
     }
 
@@ -561,10 +561,7 @@ ExistentialLayout::resolveCOMInterface() const {
 
 ProtocolDecl *ExistentialLayout::getCOMInterface() const {
   COMExistentialInterfaceResolution result = resolveCOMInterface();
-  if (hasExplicitAnyObject || explicitSuperclass ||
-      result.containsCOMInterfaceProtocol ||
-      result.firstIncomparableInterface ||
-      result.firstNonMarkerProtocol)
+  if (hasExplicitAnyObject || explicitSuperclass || result.isInvalid())
     return nullptr;
   return result.interface;
 }
@@ -1638,6 +1635,11 @@ Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
     std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
       // Fold away the sendable dependence if present, the function type will
       // just become non-Sendable.
+      return std::make_pair(Type(), false);
+    }
+    std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
+      // Fold away the @called(once) dependence if present, the function type will
+      // just become non-@called(once).
       return std::make_pair(Type(), false);
     }
   };
@@ -4523,6 +4525,17 @@ Type AnyFunctionType::getSendableDependentType() const {
   }
 }
 
+Type AnyFunctionType::getCalledOnceDependentType() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getCalledOnceDependentType();
+  case TypeKind::GenericFunction:
+    return Type();
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
+}
+
 bool AnyFunctionType::isSendable() const {
   ASSERT(!hasSendableDependentType() && "Query Sendable dependence first");
   return getExtInfo().isSendable();
@@ -4573,6 +4586,11 @@ AnyFunctionType::getLifetimeDependenceForResult(const ValueDecl *decl) const {
   return getLifetimeDependenceFor(resultIndex);
 }
 
+bool AnyFunctionType::isCalledOnce() const {
+  ASSERT(!hasCalledOnceDependentType() && "Query CalledOnce dependence first");
+  return getExtInfo().isCalledOnce();
+}
+
 ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
   return getClangTypeInfo().getCanonical();
 }
@@ -4613,11 +4631,15 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
   if (sendableDependentType)
     sendableDependentType = sendableDependentType->getCanonicalType();
 
+  Type calledOnceDependentType = getCalledOnceDependentType();
+  if (calledOnceDependentType)
+    calledOnceDependentType = calledOnceDependentType->getCanonicalType();
+
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
                  globalActor, thrownError, sendableDependentType,
-                 getLifetimeDependencies());
+                 calledOnceDependentType, getLifetimeDependencies());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
@@ -5046,6 +5068,11 @@ AnyFunctionType::withIsolation(FunctionTypeIsolation isolation) const {
 
 AnyFunctionType *AnyFunctionType::withSendable(bool newValue) const {
   auto info = getExtInfo().intoBuilder().withSendable(newValue).build();
+  return withExtInfo(info);
+}
+
+AnyFunctionType *AnyFunctionType::withCalledOnce(bool newValue) const {
+  auto info = getExtInfo().intoBuilder().withCalledOnce(newValue).build();
   return withExtInfo(info);
 }
 

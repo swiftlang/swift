@@ -2408,7 +2408,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           dyn_cast<clang::ClassTemplateSpecializationDecl>(D)) {
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
       auto name = printClassTemplateSpecializationName(classTemplateSpecDecl,
-                                                       swiftCtx, this, version);
+                                                       this, version);
       baseName = swiftCtx.getIdentifier(name).get();
     }
   }

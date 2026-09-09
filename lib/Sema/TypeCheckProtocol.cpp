@@ -215,6 +215,18 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
   return std::make_tuple(reqtType, witnessType, optAdjustment);
 }
 
+static bool haveMatchingOptionalObjectTypes(Type reqtType, Type witnessType) {
+  Type reqtObjectType = reqtType->getOptionalObjectType();
+  if (!reqtObjectType)
+    return false;
+
+  Type witnessObjectType = witnessType->getOptionalObjectType();
+  if (!witnessObjectType)
+    return false;
+
+  return reqtObjectType->isEqual(witnessObjectType);
+}
+
 /// Check that the Objective-C method(s) provided by the witness have
 /// the same selectors as those required by the requirement.
 static bool checkObjCWitnessSelector(ValueDecl *req, ValueDecl *witness) {
@@ -833,8 +845,15 @@ RequirementMatch swift::matchWitness(
 
       if (!req->isObjC() &&
           !isa_and_nonnull<clang::CXXMethodDecl>(witness->getClangDecl()) &&
-          reqTypeIsIUO != witnessTypeIsIUO)
+          reqTypeIsIUO != witnessTypeIsIUO) {
+        if (haveMatchingOptionalObjectTypes(std::get<0>(types),
+                                            std::get<1>(types)))
+          return RequirementMatch(
+              witness, MatchKind::ImplicitlyUnwrappedOptionalConflict,
+              witnessType);
+
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+      }
 
       // If our requirement says that it has a sending result, then our witness
       // must also have a sending result since otherwise, in generic contexts,
@@ -905,8 +924,18 @@ RequirementMatch swift::matchWitness(
           OptionalAdjustment(std::get<2>(types), i));
       }
 
-      if (!req->isObjC() && reqParamTypeIsIUO != witnessParamTypeIsIUO)
-        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+      if (!req->isObjC() && reqParamTypeIsIUO != witnessParamTypeIsIUO) {
+        if (!haveMatchingOptionalObjectTypes(std::get<0>(types),
+                                             std::get<1>(types)))
+          return RequirementMatch(witness, MatchKind::TypeConflict,
+                                  witnessType);
+
+        RequirementMatch match(witness,
+                               MatchKind::ImplicitlyUnwrappedOptionalConflict,
+                               witnessType);
+        match.IUOConflictParamIndex = i;
+        return match;
+      }
 
       if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
         return std::move(result.value());
@@ -952,8 +981,15 @@ RequirementMatch swift::matchWitness(
         OptionalAdjustment(std::get<2>(types)));
     }
 
-    if (!req->isObjC() && reqTypeIsIUO != witnessTypeIsIUO)
+    if (!req->isObjC() && reqTypeIsIUO != witnessTypeIsIUO) {
+      if (haveMatchingOptionalObjectTypes(std::get<0>(types),
+                                          std::get<1>(types)))
+        return RequirementMatch(witness,
+                                MatchKind::ImplicitlyUnwrappedOptionalConflict,
+                                witnessType);
+
       return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+    }
 
     auto reqType = std::get<0>(types);
     auto witnessType = std::get<1>(types);
@@ -3167,6 +3203,36 @@ static void addOptionalityFixIts(
 
 }
 
+/// Retrieve the location of the '?' or '!' in the written type of the given
+/// witness that carries the implicit unwrapping difference described by a
+/// \c MatchKind::ImplicitlyUnwrappedOptionalConflict match.
+///
+/// The location is invalid when the witness has no type representation, which
+/// is the case for a witness imported from Clang.
+static SourceLoc getIUOConflictLoc(ValueDecl *witness,
+                                   std::optional<unsigned> paramIndex) {
+  TypeRepr *tyR = nullptr;
+  if (paramIndex) {
+    if (auto *params = witness->getParameterList())
+      tyR = params->get(*paramIndex)->getTypeRepr();
+  } else if (auto *func = dyn_cast<FuncDecl>(witness)) {
+    tyR = func->getResultTypeRepr();
+  } else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(witness)) {
+    tyR = subscriptDecl->getElementTypeRepr();
+  } else if (auto *var = dyn_cast<VarDecl>(witness)) {
+    tyR = var->getTypeReprOrParentPatternTypeRepr();
+  }
+
+  if (auto *optRepr = dyn_cast_or_null<OptionalTypeRepr>(tyR))
+    return optRepr->getQuestionLoc();
+
+  if (auto *iuoRepr =
+          dyn_cast_or_null<ImplicitlyUnwrappedOptionalTypeRepr>(tyR))
+    return iuoRepr->getExclamationLoc();
+
+  return SourceLoc();
+}
+
 /// Diagnose a requirement match, describing what went wrong (or not).
 static void
 diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
@@ -3253,6 +3319,31 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
                      diag::protocol_witness_type_conflict,
                      witnessType, withAssocTypes);
     }
+    break;
+  }
+
+  case MatchKind::ImplicitlyUnwrappedOptionalConflict: {
+    auto paramIndex = match.IUOConflictParamIndex;
+    bool witnessIsIUO;
+    OptionalAdjustmentPosition position;
+    if (paramIndex) {
+      auto *witnessParam = match.Witness->getParameterList()->get(*paramIndex);
+      witnessIsIUO = witnessParam->isImplicitlyUnwrappedOptional();
+      position = OptionalAdjustmentPosition::Param;
+    } else {
+      witnessIsIUO = match.Witness->isImplicitlyUnwrappedOptional();
+      position = isa<VarDecl>(req) ? OptionalAdjustmentPosition::VarType
+                                   : OptionalAdjustmentPosition::Result;
+    }
+
+    auto diag = diags.diagnose(
+        match.Witness, diag::protocol_witness_iuo_conflict,
+        static_cast<unsigned>(position), witnessIsIUO, withAssocTypes);
+
+    // Offer to rewrite the witness, when it was written in Swift source.
+    auto optionalityLoc = getIUOConflictLoc(match.Witness, paramIndex);
+    if (optionalityLoc.isValid())
+      diag.fixItReplace(optionalityLoc, witnessIsIUO ? "?" : "!");
     break;
   }
 
@@ -6937,7 +7028,11 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
     // Check and record normal conformances.
     if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
-      groupChecker.addConformance(normal);
+      auto *protocol = normal->getProtocol();
+      bool isCOMIdentity =
+          Context.LangOpts.EnableCOMInterop && protocol->isCOMIdentity();
+      if (!normal->isInvalid() || !isCOMIdentity)
+        groupChecker.addConformance(normal);
     }
 
     // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which

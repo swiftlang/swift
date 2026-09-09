@@ -132,6 +132,11 @@ class Traversal : public TypeVisitor<Traversal, bool>
         return true;
     }
 
+    if (auto calledOnceDep = ty->getCalledOnceDependentType()) {
+      if (doIt(calledOnceDep))
+        return true;
+    }
+
     return doIt(ty->getResult());
   }
 

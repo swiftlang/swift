@@ -918,6 +918,12 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(AllocRawTyped, "allocRawTyped", "", Special)
 /// is used by the runtime to compute a type descriptor for the allocation.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(DeallocRawTyped, "deallocRawTyped", "", Special)
 
+/// TypedAllocationID : <T> T.Type -> Int64
+///
+/// Returns the 64-bit typed-malloc descriptor for T. Embedded Swift +
+/// TypedAllocation only.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(TypedAllocationID, "typedAllocationID", "n", Special)
+
 /// AllocErrorBoxTyped : (Builtin.RawPointer, Int, Int) -> Builtin.RawPointer
 ///
 /// Allocates a boxed `Error` existential (heap object header + type

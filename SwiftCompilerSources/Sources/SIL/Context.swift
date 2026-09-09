@@ -130,6 +130,14 @@ extension MutatingContext {
     precondition(_bridged.isTransforming(function.bridged), "pass modifies wrong function")
   }
 
+  /// Verifies that:
+  /// - the instruction is not deleted
+  /// - the parent function is the currently transformed function
+  public func verifyModifying(instruction: Instruction) {
+    precondition(!instruction.isDeleted, "trying to modify or use a deleted instruction")
+    verifyIsTransforming(function: instruction.parentFunction)
+  }
+
   public func notifyInstructionsChanged() {
     _bridged.notifyChanges(.Instructions)
   }

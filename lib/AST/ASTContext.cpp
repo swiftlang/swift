@@ -1697,6 +1697,8 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
   case KnownProtocolKind::COMInterface:
+  case KnownProtocolKind::COMActivatable:
+  case KnownProtocolKind::COMAggregatable:
     M = getLoadedModule(Id_COM);
     if (!M)
       M = MainModule;
@@ -5092,7 +5094,8 @@ DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
 static RecursiveTypeProperties
 getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                Type result, Type globalActor, Type thrownError,
-                               Type sendableDependentType) {
+                               Type sendableDependentType,
+                               Type calledOnceDependentType) {
   RecursiveTypeProperties properties;
   for (auto param : params)
     properties |= param.getPlainType()->getRecursiveProperties();
@@ -5103,6 +5106,11 @@ getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
     properties |= thrownError->getRecursiveProperties();
   if (sendableDependentType) {
     ASSERT(sendableDependentType->hasTypeVariable());
+    properties |= RecursiveTypeProperties::SolverAllocated;
+    properties |= RecursiveTypeProperties::HasTypeVariable;
+  }
+  if (calledOnceDependentType) {
+    ASSERT(calledOnceDependentType->hasTypeVariable());
     properties |= RecursiveTypeProperties::SolverAllocated;
     properties |= RecursiveTypeProperties::HasTypeVariable;
   }
@@ -5289,14 +5297,17 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   Type thrownError;
   Type globalActor;
   Type sendableDependentType;
+  Type calledOnceDependentType;
   if (info.has_value()) {
     thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
     sendableDependentType = info->getSendableDependentType();
+    calledOnceDependentType = info->getCalledOnceDependentType();
   }
 
   auto properties = getFunctionRecursiveProperties(
-      params, result, globalActor, thrownError, sendableDependentType);
+      params, result, globalActor, thrownError, sendableDependentType,
+      calledOnceDependentType);
   auto arena = getArena(properties);
 
   if (info.has_value()) {
@@ -5329,7 +5340,8 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
       info.has_value() && !info.value().getClangTypeInfo().empty();
 
   unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0) +
-                      (sendableDependentType ? 1 : 0);
+                      (sendableDependentType ? 1 : 0) +
+                      (calledOnceDependentType ? 1 : 0);
 
   bool hasLifetimeDependenceInfo =
       info.has_value() ? !info->getLifetimeDependencies().empty() : false;
@@ -5402,6 +5414,10 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
       getTrailingObjects<Type>()[typeIdx] = sendableDependentType;
       typeIdx += 1;
     }
+    if (Type calledOnceDependentType = info->getCalledOnceDependentType()) {
+      getTrailingObjects<Type>()[typeIdx] = calledOnceDependentType;
+      typeIdx += 1;
+    }
     auto lifetimeDependenceInfo = info->getLifetimeDependencies();
     if (!lifetimeDependenceInfo.empty()) {
       *getTrailingObjects<size_t>() = lifetimeDependenceInfo.size();
@@ -5470,8 +5486,10 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
     thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
 
-    // Generic functions can't currently have Sendable dependence.
+    // Generic functions can't currently have Sendable or @called(once)
+    // dependence.
     ASSERT(!info->getSendableDependentType());
+    ASSERT(!info->getCalledOnceDependentType());
   }
 
   if (thrownError) {

@@ -1362,3 +1362,6 @@ Added: __swift_isRestrictedProcess
 // Non-consuming dynamic cast test, for `is` / `case is T` on a value that
 // cannot be copied. See CastConsumptionKind::TestOnly.
 Added: _swift_dynamicCastTest
+
+// Setter for typed willThrow hook.
+Added: __swift_setWillThrowTypedHandler
