@@ -451,6 +451,10 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
   llvm::SmallPtrSet<SILInstruction *, 8> nextInsts;
   while (!deadInsts.empty()) {
     for (auto inst : deadInsts) {
+      // Salvaging debug info may delete and rewrite queued instructions.
+      if (inst->isDeleted())
+        continue;
+
       // Call the callback before we mutate the to be deleted instruction in any
       // way, and salvage debug info while it's meaningful.
       callbacks.notifyWillBeDeleted(inst);
@@ -482,6 +486,8 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
     }
 
     for (auto inst : deadInsts) {
+      if (inst->isDeleted())
+        continue;
       // This will remove this instruction and all its uses.
       eraseFromParentWithDebugInsts(inst, callbacks);
     }
