@@ -224,6 +224,11 @@ public:
 
   std::optional<uint64_t>
   computeTypedMallocTypeDescriptor(IRGenModule &IGM, SILType selfType) const;
+
+private:
+  static void collectAllStoredPropertyTypes(
+      IRGenModule &IGM, SILType classType,
+      SmallVectorImpl<SILType> &fieldTypes);
 };
 
 } // end namespace irgen
