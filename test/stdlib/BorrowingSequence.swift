@@ -223,11 +223,11 @@ suite.test("Span.BorrowingIterator/skip-basic")
   expectEqual(iterSpan[0], 3)
   
   // skip(by: inout Int)
-  iter = span.makeBorrowingIterator()
+  var iter2 = span.makeBorrowingIterator()
   var skipAmount = 2
-  iter.skip(by: &skipAmount)
+  iter2.skip(by: &skipAmount)
   expectEqual(skipAmount, 0)
-  let iterSpan2 = iter.nextSpan(maxCount: .max)
+  let iterSpan2 = iter2.nextSpan(maxCount: .max)
   expectEqual(iterSpan2.count, 3)
   expectEqual(iterSpan2[0], 3)
 }
@@ -248,11 +248,11 @@ suite.test("Span.BorrowingIterator/skip-past-end")
   expectTrue(iterSpan.isEmpty)
 
   // skip(by: inout Int)
-  iter = span.makeBorrowingIterator()
+  var iter2 = span.makeBorrowingIterator()
   var skipAmount = 100
-  iter.skip(by: &skipAmount)
+  iter2.skip(by: &skipAmount)
   expectEqual(skipAmount, 97)
-  let iterSpan2 = iter.nextSpan(maxCount: .max)
+  let iterSpan2 = iter2.nextSpan(maxCount: .max)
   expectTrue(iterSpan2.isEmpty)
 }
 
@@ -272,11 +272,11 @@ suite.test("Span.BorrowingIterator/skip-zero")
   expectEqual(iterSpan[0], 1)
   
   // skip(by: inout Int)
-  iter = span.makeBorrowingIterator()
+  var iter2 = span.makeBorrowingIterator()
   var skipAmount = 0
-  iter.skip(by: &skipAmount)
+  iter2.skip(by: &skipAmount)
   expectEqual(skipAmount, 0)
-  let iterSpan2 = iter.nextSpan(maxCount: .max)
+  let iterSpan2 = iter2.nextSpan(maxCount: .max)
   expectEqual(iterSpan2.count, 3)
   expectEqual(iterSpan2[0], 1)
 }
@@ -291,7 +291,7 @@ suite.test("Span.BorrowingIterator/skip-negative")
   let span = arr.span
   var iter = span.makeBorrowingIterator()
   expectCrashLater()
-  let skipped = iter.skip(by: -10)
+  _ = iter.skip(by: -10)
 }
 
 suite.test("Span.BorrowingIterator/skip-inout-negative")

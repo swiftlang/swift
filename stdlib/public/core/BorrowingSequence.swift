@@ -115,6 +115,7 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func skip(by offset: inout Int) throws(Failure) {
+    _precondition(offset >= 0, "Can't skip by a negative offset")
     while offset > 0 {
       let span = try nextSpan(maxCount: offset)
       if span.isEmpty { break }
