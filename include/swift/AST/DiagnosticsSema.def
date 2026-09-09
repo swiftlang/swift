@@ -3546,6 +3546,11 @@ NOTE(protocol_witness_kind_conflict,none,
      "a subscript}0", (RequirementKind))
 NOTE(protocol_witness_type_conflict,none,
      "candidate has non-matching type %0%1", (WitnessType, StringRef))
+NOTE(protocol_witness_iuo_conflict,none,
+     "candidate %select{type|result type|parameter type}0 is "
+     "%select{an optional|an implicitly unwrapped optional}1, but the protocol "
+     "requires %select{an implicitly unwrapped optional|an optional}1%2",
+     (unsigned, bool, StringRef))
 NOTE(protocol_witness_missing_requirement,none,
      "candidate would match if %0 %select{conformed to|subclassed|"
      "was the same type as|%error|%error}2 %1", (Type, Type, unsigned))
