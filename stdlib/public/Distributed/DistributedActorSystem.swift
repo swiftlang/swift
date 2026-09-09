@@ -209,15 +209,40 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
 
   /// Type of ``DistributedTargetInvocationEncoder`` that should be used when the Swift runtime needs to encode
   /// a distributed target call into an encoder, before passing it off to `remoteCall(...)`.
+  ///
+  /// ### Embedded Swift
+  /// The encoder's protocol is not parameterized on the ``SerializationRequirement`` and declares no
+  /// formal requirements beyond `doneRecording()`; see ``DistributedTargetInvocationEncoder``.
+#if $Embedded
+  associatedtype InvocationEncoder: DistributedTargetInvocationEncoder
+#else
   associatedtype InvocationEncoder: DistributedTargetInvocationEncoder<SerializationRequirement>
+#endif
   /// Type of ``DistributedTargetInvocationDecoder`` that should be used when decoding invocations during
   /// ``executeDistributedTarget(on:target:invocationDecoder:handler:)`` calls.
+  ///
+  /// ### Embedded Swift
+  /// The decoder's protocol is not parameterized on the ``SerializationRequirement`` and declares no
+  /// formal requirements; see ``DistributedTargetInvocationDecoder``.
+#if $Embedded
+  associatedtype InvocationDecoder: DistributedTargetInvocationDecoder
+#else
   associatedtype InvocationDecoder: DistributedTargetInvocationDecoder<SerializationRequirement>
+#endif
 
   /// The type of the result handler which will be offered the results
   /// returned by a distributed function invocation called via
   /// ``executeDistributedTarget(on:target:invocationDecoder:handler:)``.
+  ///
+  /// ### Embedded Swift
+  /// The result handler's protocol is not parameterized on the ``SerializationRequirement``, and only
+  /// `onReturnVoid()` and `onThrow(error:)` are formal requirements; see
+  /// ``DistributedTargetInvocationResultHandler``.
+#if $Embedded
+  associatedtype ResultHandler: DistributedTargetInvocationResultHandler
+#else
   associatedtype ResultHandler: DistributedTargetInvocationResultHandler<SerializationRequirement>
+#endif
 
   /// The serialization requirement that will be applied to all distributed targets used with this system.
   associatedtype SerializationRequirement // TODO: constrain SerializationRequirement in type-system to only be ok with protocol or class here
@@ -258,9 +283,19 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   ///
   /// - Throws: When unable to confirm if the `id` is correct, the resolved actor does not match the expected `actorType`,
   ///           or any other internal validation error within the actor system's resolve process occurs.
+  ///
+  /// ### Embedded Swift
+  /// The requirement is constrained to `Act.ActorSystem == Self` rather than only `Act.ID == ActorID`
+  /// (the former implies the latter). See ``actorReady(_:)`` for why Embedded relates `Act` back to `Self`.
+#if $Embedded
+  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+    where Act: DistributedActor,
+          Act.ActorSystem == Self
+#else
   func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
     where Act: DistributedActor,
     Act.ID == ActorID
+#endif
 
   // ==== ---------------------------------------------------------------------
   // - MARK: Actor Lifecycle
@@ -275,9 +310,18 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// E.g. if an actor is created under address `addr1` then immediately invoking
   /// `system.resolve(id: addr1, as: Greeter.self)` MUST return a reference
   /// to the same actor.
+  ///
+  /// ### Embedded Swift
+  /// The requirement is constrained to `Act.ActorSystem == Self` rather than only `Act.ID == ActorID`.
+#if $Embedded
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
+    where Act: DistributedActor,
+          Act.ActorSystem == Self
+#else
   func assignID<Act>(_ actorType: Act.Type) -> ActorID
     where Act: DistributedActor,
           Act.ID == ActorID
+#endif
 
   /// Invoked during a distributed actor's initialization, as soon as it becomes fully initialized.
   ///
@@ -294,9 +338,22 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// very unexpected use of the system.
   ///
   /// - Parameter actor: reference to the (local) actor that was just fully initialized.
+  ///
+  /// ### Embedded Swift
+  /// The requirement is constrained to `Act.ActorSystem == Self` rather than only `Act.ID == ActorID`.
+  /// Embedded dispatch is monomorphized: to register an actor's receive entrypoint the system must be
+  /// able to form a call to `actor._executeDistributedTarget`, whose decoder / handler are
+  /// `Act.ActorSystem.InvocationDecoder` / `.ResultHandler`. That call only type-checks when the actor's
+  /// system is known to be this one, which `Act.ActorSystem == Self` provides.
+#if $Embedded
+  func actorReady<Act>(_ actor: Act)
+    where Act: DistributedActor,
+          Act.ActorSystem == Self
+#else
   func actorReady<Act>(_ actor: Act)
     where Act: DistributedActor,
           Act.ID == ActorID
+#endif
 
   /// Called during when a *local* distributed actor is deinitialized, or fails to initialize completely (e.g. by throwing
   /// out of an `init` that did not completely initialize all of the actors stored properties yet).
@@ -310,6 +367,7 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// - SeeAlso: ``resignRemoteID(_:)`` which is called for remote distributed actor referencesd.
   func resignID(_ id: ActorID)
 
+#if !$Embedded
   /// Called when a *remote* distributed actor reference is being deinitialized.
   ///
   /// Paired with a prior `resolve(id:as:)` call for this `id` that resulted in a remote reference being created.
@@ -333,6 +391,7 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// - SeeAlso: ``resignID(_:)`` which is called for local distributed actors
   @available(SwiftStdlib 6.5, *)
   func resignRemoteID(_ id: ActorID)
+#endif // !$Embedded
 
   // ==== ---------------------------------------------------------------------
   // - MARK: Remote Method Invocations
@@ -357,6 +416,24 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// ## Errors
   /// This method is allowed to throw because of underlying transport or serialization errors,
   /// as well as by re-throwing the error received from the remote callee (if able to).
+  ///
+  /// ### Embedded Swift
+  /// In Embedded Swift the function signature is slightly different, as the passed in target actor's
+  /// actor system must be exactly the same as the system the method is defined on,
+  /// rather only be ID compatible, as it is in non-Embedded swift.
+#if $Embedded
+  func remoteCall<Act, Err, Res>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation: inout InvocationEncoder,
+      throwing: Err.Type,
+      returning: Res.Type
+  ) async throws -> Res
+      where Act: DistributedActor,
+            Act.ActorSystem == Self,
+            Err: Error
+//          Res: SerializationRequirement
+#else
   @available(SwiftStdlib 6.0, *)
   func remoteCall<Act, Err, Res>(
       on actor: Act,
@@ -369,6 +446,7 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
             Act.ID == ActorID,
             Err: Error
 //          Res: SerializationRequirement
+#endif
 
   /// Invoked by the Swift runtime when making a remote call.
   ///
@@ -380,6 +458,22 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// ## Errors
   /// This method is allowed to throw because of underlying transport or serialization errors,
   /// as well as by re-throwing the error received from the remote callee (if able to).
+  ///
+  /// ### Embedded Swift
+  /// In Embedded Swift the function signature is slightly different, as the passed in target actor's
+  /// actor system must be exactly the same as the system the method is defined on,
+  /// rather only be ID compatible, as it is in non-Embedded swift.
+#if $Embedded
+  func remoteCallVoid<Act, Err>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation: inout InvocationEncoder,
+      throwing: Err.Type
+  ) async throws
+      where Act: DistributedActor,
+            Act.ActorSystem == Self,
+            Err: Error
+#else
   @available(SwiftStdlib 6.0, *)
   func remoteCallVoid<Act, Err>(
       on actor: Act,
@@ -390,7 +484,9 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
       where Act: DistributedActor,
             Act.ID == ActorID,
             Err: Error
+#endif
 
+#if !$Embedded
   // Implementation notes:
   // The `metatype` must be the type of `Value`, and it must conform to
   // `SerializationRequirement`. If it does not, the method will crash at
@@ -406,13 +502,16 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
     resultBuffer: UnsafeRawPointer,
     metatype: Any.Type
   ) async throws
+#endif // !$Embedded
 }
 
+#if !$Embedded
 @available(SwiftStdlib 6.5, *)
 extension DistributedActorSystem {
   /// Default implementation, does nothing.
   public func resignRemoteID(_ id: ActorID) {}
 }
+#endif // !$Embedded
 
 // ==== ----------------------------------------------------------------------------------------------------------------
 // MARK: Execute Distributed Methods
@@ -449,6 +548,28 @@ extension DistributedActorSystem {
   ///           Throws ``ExecuteDistributedTargetMissingAccessorError`` if the `target`
   ///           does not resolve to a valid distributed function accessor, i.e. the
   ///           call identifier is incorrect, corrupted, or simply not present in this process.
+#if $Embedded
+  // Embedded Swift: Since there are no accessible-function records emitted in embedded,
+  // we forward the call to the synthesized `_executeDistributedTarget` on the target actor.
+  // `@_transparent` so the trivial forward is mandatory-inlined into the caller: that lets
+  // this be called even from a still-generic context (e.g. a system's `actorReady<Act>`
+  // witness closure), where a non-inlined reference to this generic function would have no
+  // valid monomorphic Embedded signature.
+  @_transparent
+  @available(SwiftStdlib 6.5, *)
+  public func executeDistributedTarget<Act>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocationDecoder: inout InvocationDecoder,
+    handler: Self.ResultHandler
+  ) async throws where Act: DistributedActor,
+                       Act.ActorSystem == Self { // slightly stricter requirement in Embedded
+    try await actor._executeDistributedTarget(
+      target: target,
+      invocationDecoder: &invocationDecoder,
+      resultHandler: handler)
+  }
+#else
   @available(SwiftStdlib 5.7, *)
   public func executeDistributedTarget<Act>(
     on actor: Act,
@@ -656,8 +777,10 @@ extension DistributedActorSystem {
       try await handler.onThrow(error: error)
     }
   }
+#endif // $Embedded
 }
 
+#if !$Embedded
 @export(implementation)
 @available(SwiftStdlib 5.7, *)
 internal func _validateMatchingInvocationDecoder<
@@ -709,6 +832,7 @@ internal func _validateMatchingResultHandler<
       errorCode: errorCode)
   }
 }
+#endif // !$Embedded
 
 /// Represents a 'target' of a distributed call, such as a `distributed func` or
 /// `distributed` computed property. Identification schemes may vary between
@@ -739,15 +863,21 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
   /// Attempts to pretty format the underlying target identifier.
   /// If unable to, returns the raw underlying identifier.
   public var description: String {
+    #if !$Embedded
     if let name = _getFunctionFullNameFromMangledName(mangledName: _identifier) {
       return name
     } else {
       return "\(_identifier)"
     }
+    #else
+    // Embedded Swift has no runtime demangler; return the raw mangled name.
+    return _identifier
+    #endif
   }
 }
 
 @available(SwiftStdlib 5.7, *)
+@_unavailableInEmbedded
 @_silgen_name("swift_distributed_execute_target")
 func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
   on actor: AnyObject, // : DistributedActor
@@ -791,6 +921,32 @@ func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
 /// Note that the decoding will be provided the specific types that the sending side used to preform the call,
 /// so decoding can rely on simply invoking e.g. `Codable` (if that is the `SerializationRequirement`) decoding
 /// entry points on the provided types.
+///
+/// ### Embedded Swift
+/// The protocol is not parameterized on the ``SerializationRequirement``, and only `doneRecording()` is a
+/// formal requirement. The concrete encoder provides a single generic
+/// `recordArgument<Value: SerializationRequirement>(_:)` member (typically via an extension), resolved by
+/// name; the compiler emits specialized calls to it from the synthesized distributed thunk, so it is never
+/// dispatched through a runtime witness table. `recordGenericSubstitution` / `recordErrorType` /
+/// `recordReturnType` carry no wire metadata in Embedded Swift and are not part of the protocol.
+#if $Embedded
+
+@available(SwiftStdlib 5.7, *)
+public protocol DistributedTargetInvocationEncoder {
+  /// Signals that all arguments have been recorded.
+  mutating func doneRecording() throws
+
+  // The record method is ad-hoc and provided by the concrete encoder:
+  //
+  //   mutating func recordArgument<Value: SerializationRequirement>(
+  //     _ argument: RemoteCallArgument<Value>) throws
+  //
+  // The compiler emits specialized calls to it in the synthesized distributed
+  // thunk; it is never dispatched through a runtime witness table.
+}
+
+#else
+
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationEncoder<SerializationRequirement> {
   /// The serialization requirement that the types passed to `recordArgument` and `recordReturnType` are required to conform to.
@@ -834,6 +990,8 @@ public protocol DistributedTargetInvocationEncoder<SerializationRequirement> {
   /// e.g. computing a checksum, or some additional message signing or finalization step.
   mutating func doneRecording() throws
 }
+
+#endif // !$Embedded
 
 /// Represents an argument passed to a distributed call target.
 @available(SwiftStdlib 5.7, *)
@@ -909,6 +1067,26 @@ public struct RemoteCallArgument<Value> {
 ///   return try Argument.decode(
 /// }
 /// ```
+///
+/// ### Embedded Swift
+/// The protocol is not parameterized on the ``SerializationRequirement`` and declares no formal
+/// requirements. The concrete decoder provides a single generic
+/// `decodeNextArgument<Argument: SerializationRequirement>() -> Argument` member (typically via an
+/// extension), resolved by name. It is used both to decode arguments on the receiver side and to decode the
+/// call's return value on the sender side (inside the system's `remoteCall`). The generic-substitution /
+/// error-type / return-type decoding entry points are not part of the Embedded protocol.
+#if $Embedded
+
+@available(SwiftStdlib 5.7, *)
+public protocol DistributedTargetInvocationDecoder {
+  // The decode method is ad-hoc and provided by the concrete decoder:
+  //
+  //   mutating func decodeNextArgument<Argument: SerializationRequirement>()
+  //     throws -> Argument
+}
+
+#else
+
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationDecoder<SerializationRequirement> {
   /// The serialization requirement that the types passed to `decodeNextArgument` are required to conform to.
@@ -955,12 +1133,39 @@ public protocol DistributedTargetInvocationDecoder<SerializationRequirement> {
   mutating func decodeReturnType() throws -> Any.Type?
 }
 
+#endif // !$Embedded
+
 /// Protocol a distributed invocation execution's result handler.
 ///
 /// An instance conforming to this type must be passed when invoking
 /// ``DistributedActorSystem/executeDistributedTarget(on:target:invocationDecoder:handler:)`` while handling an incoming distributed call.
 ///
 /// The handler will then be invoked with the return value (or error) that the invoked target returned (or threw).
+///
+/// ### Embedded Swift
+/// The protocol is not parameterized on the ``SerializationRequirement``, and only `onReturnVoid()` and
+/// `onThrow(error:)` are formal requirements. The concrete handler provides a single generic
+/// `onReturn<Success: SerializationRequirement>(_:)` member (typically via an extension), resolved by name.
+/// `onThrow` takes the error boxed as `any Error`; there is no `<Err>` generic.
+#if $Embedded
+
+@available(SwiftStdlib 5.7, *)
+public protocol DistributedTargetInvocationResultHandler {
+  /// Invoked when the distributed target returns `Void`.
+  func onReturnVoid() async throws
+
+  /// Invoked when the distributed target threw an error. The error is boxed as
+  /// `any Error`; there is no `<Err>` generic.
+  func onThrow(error: any Error) async throws
+
+  // The onReturn method is ad-hoc and provided by the concrete handler:
+  //
+  //   func onReturn<Success: SerializationRequirement>(_ value: Success)
+  //     async throws
+}
+
+#else
+
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationResultHandler<SerializationRequirement> {
   /// The serialization requirement that the value passed to `onReturn` is required to conform to.
@@ -986,13 +1191,27 @@ public protocol DistributedTargetInvocationResultHandler<SerializationRequiremen
   func onThrow<Err: Error>(error: Err) async throws
 }
 
+#endif // !$Embedded
+
 /******************************************************************************/
 /******************************** Errors **************************************/
 /******************************************************************************/
 
+#if $Embedded
+/// Thrown by the compiler-synthesized `_executeDistributedTarget` when the
+/// given `RemoteCallTarget` does not match any of the actor's distributed
+/// functions.
+@available(SwiftStdlib 6.5, *)
+public struct EmbeddedDistributedTargetNotFound: Error, Sendable {
+  public let target: String
+  public init(target: String) { self.target = target }
+}
+#endif // $Embedded
+
 /// Error protocol to which errors thrown by any `DistributedActorSystem` should conform.
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedActorSystemError: Error {}
+
 
 /// Error thrown by ``DistributedActorSystem/executeDistributedTarget(on:target:invocationDecoder:handler:)``.
 ///

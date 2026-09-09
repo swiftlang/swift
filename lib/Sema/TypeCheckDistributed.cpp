@@ -722,6 +722,13 @@ bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
     return true;
   }
 
+  auto &C = nominal->getASTContext();
+  if (C.LangOpts.hasFeature(Feature::Embedded) &&
+      !C.LangOpts.hasFeature(Feature::EmbeddedDistributed)) {
+    nominal->diagnose(diag::distributed_embedded_requires_feature);
+    return true;
+  }
+
   // === AssociatedTypes
   // --- SerializationRequirement MUST be a protocol TODO(distributed): rdar://91663941
   // we may lift this in the future and allow classes but this requires more
@@ -795,6 +802,177 @@ static void emitResolvableProtocolMissingActorSystemFixit(
       .fixItInsert(fixItLoc, fixIt);
 }
 
+/// Classify `T` as `any P` / `some P` for the purpose of the embedded
+/// Phase 2 diagnostic. Returns "'any'"/"'some'" when the type is an
+/// existential or opaque/generic type whose conformances include
+/// non-marker protocols - i.e. when proxying would require the
+/// `@Resolvable` `$P` stub machinery, which Embedded doesn't support yet.
+/// Returns empty when the type is concrete, or only refers to marker
+/// protocols (like `any AnyObject`).
+///
+/// Pass both the interface type (may be a `GenericTypeParamType` for
+/// `some P` params) and the contextual type (mapped into the function's
+/// generic environment) to catch both forms.
+///
+/// Distributed `self` and concrete distributed-actor types are excluded:
+/// the synthesized thunk handles them via `is-remote` dispatch, not the
+/// `$P` proxy machinery.
+static StringRef classifyAnySomeForEmbedded(Type interfaceTy,
+                                            Type contextualTy) {
+  if ((!interfaceTy || interfaceTy->hasError()) &&
+      (!contextualTy || contextualTy->hasError()))
+    return {};
+
+  auto hasNonMarkerProtocol =
+      [](llvm::ArrayRef<ProtocolDecl *> protos) -> bool {
+        for (auto *p : protos) {
+          if (!p->isMarkerProtocol())
+            return true;
+        }
+        return false;
+      };
+
+  // `any P` / protocol composition like `any P & Q`.
+  if (interfaceTy && (interfaceTy->isAnyExistentialType() ||
+                      interfaceTy->isConstraintType())) {
+    auto layout = interfaceTy->getExistentialLayout();
+    llvm::SmallVector<ProtocolDecl *, 2> protos(layout.getProtocols().begin(),
+                                                layout.getProtocols().end());
+    if (hasNonMarkerProtocol(protos))
+      return "'any'";
+  }
+
+  // `some P` / generic parameter constrained to P. Use the contextual
+  // type (after `mapTypeIntoEnvironment`) to get the archetype's
+  // `getConformsTo()` list.
+  if (contextualTy) {
+    if (auto archetype = contextualTy->getAs<ArchetypeType>()) {
+      if (hasNonMarkerProtocol(archetype->getConformsTo()))
+        return "'some'";
+    }
+  }
+
+  return {};
+}
+
+/// Additional checks to distributed functions when in Embedded Swift.
+static bool checkEmbeddedDistributedFunction(AbstractFunctionDecl *func) {
+  auto &C = func->getASTContext();
+  if (!C.LangOpts.hasFeature(Feature::Embedded))
+    return false; // nothing to check
+
+  // Implicit generic params introduced by `some P` parameters are handled
+  // per-parameter below so the diagnostic points at the offending `some P`
+  // rather than the function as a whole. A user-written generic param is
+  // permitted only when it is equivalent to `some P` for an `@Resolvable`
+  // `P` - i.e. its only non-marker requirement is a single conformance with
+  // a `$P` wire stub - since that is exactly the shape the per-parameter
+  // check below already knows how to lower. Anything else (a bare `<T>`, a
+  // non-Resolvable protocol bound, an ambiguous multi-protocol bound, etc.)
+  // has no wire representation Embedded can lower to.
+  if (auto *genericParams = func->getGenericParams()) {
+    for (auto *param : genericParams->getParams()) {
+      if (param->isOpaqueType())
+        continue;
+
+      Type contextualTy =
+          func->mapTypeIntoEnvironment(param->getDeclaredInterfaceType());
+      auto resolvable =
+          findDistributedResolvableExistentialOrOpaqueProtocol(contextualTy);
+      if (!resolvable.proto ||
+          !getDistributedResolvableProtocolStubDecl(resolvable.proto)) {
+        func->diagnose(diag::distributed_embedded_generic_func_not_supported, func);
+        return true;
+      }
+    }
+  }
+
+  bool anyMissing = false;
+
+  // Reject parameter shapes embedded can't lower. Embedded accepts exactly the
+  // shapes non-embedded accepts:
+  //   - `any P` / `some P` where P is `@Resolvable`: accepted; the thunk
+  //     substitutes the wire-level `$P` stub. `some P` needs no generic
+  //     substitution because it is always monomorphized to `$P` (the embedded
+  //     encoder has no `recordGenericSubstitution`, which is fine).
+  //   - `any P` / `some P` where P is not `@Resolvable`: rejected; there is no
+  //     `$P` wire stub, so the existential/opaque type has no wire shape.
+  for (auto *param : *func->getParameters()) {
+    Type paramTy = func->mapTypeIntoEnvironment(param->getInterfaceType());
+    Type printableParamTy = param->getInterfaceType();
+
+    if (auto kind = classifyAnySomeForEmbedded(printableParamTy, paramTy);
+        !kind.empty()) {
+      auto resolvable =
+          findDistributedResolvableExistentialOrOpaqueProtocol(paramTy);
+      auto *stub = resolvable.proto
+                       ? getDistributedResolvableProtocolStubDecl(resolvable.proto)
+                       : nullptr;
+
+      if (!stub) {
+        // `any P` / `some P` where P is not `@Resolvable`: no `$P` wire stub
+        // exists for the parameter to travel as.
+        func->diagnose(
+            diag::distributed_embedded_any_some_param_not_supported,
+            param->getArgumentName(), printableParamTy, func);
+        anyMissing = true;
+        continue;
+      }
+      // `any P` / `some P` with `@Resolvable`: accepted; the thunk substitutes `$P`.
+    }
+  }
+
+  // Reject return shapes embedded can't lower, mirroring the parameter loop.
+  // The one asymmetry vs. parameters: a `some P` *return* is never supported
+  // (even for `@Resolvable` P), because the synthesized thunk's local branch
+  // returns the real underlying type while the remote branch returns `$P`,
+  // which the opaque return type's single-underlying-type rule cannot unify.
+  // This matches non-embedded, where the same shape fails to compile. `any P`
+  // returns (for `@Resolvable` P) are supported, so steer users there.
+  if (auto *funcDecl = dyn_cast<FuncDecl>(func)) {
+    Type returnInterfaceTy = funcDecl->getResultInterfaceType();
+    if (!returnInterfaceTy->isVoid()) {
+      Type returnTy = funcDecl->mapTypeIntoEnvironment(returnInterfaceTy);
+
+      if (auto kind = classifyAnySomeForEmbedded(returnInterfaceTy, returnTy);
+          !kind.empty()) {
+        auto resolvable =
+            findDistributedResolvableExistentialOrOpaqueProtocol(returnTy);
+        auto *stub = resolvable.proto
+                         ? getDistributedResolvableProtocolStubDecl(resolvable.proto)
+                         : nullptr;
+
+        if (kind == "'some'") {
+          // `some P` returns are unsupported. For `@Resolvable` P, `any P`
+          // returns work, so suggest that; otherwise fall to the unified
+          // not-supported message.
+          if (auto *proto = resolvable.proto) {
+            func->diagnose(
+                diag::distributed_embedded_some_result_not_supported,
+                returnInterfaceTy, func, proto->getName().str());
+          } else {
+            func->diagnose(
+                diag::distributed_embedded_any_some_result_not_supported,
+                returnInterfaceTy, func);
+          }
+          return true;
+        }
+
+        if (!stub) {
+          // `any P` where P is not `@Resolvable`.
+          func->diagnose(
+              diag::distributed_embedded_any_some_result_not_supported,
+              returnInterfaceTy, func);
+          return true;
+        }
+        // `any P` with `@Resolvable`: accepted; the thunk substitutes `$P`.
+      }
+    }
+  }
+
+  return anyMissing;
+}
+
 bool CheckDistributedFunctionRequest::evaluate(
     Evaluator &evaluator, AbstractFunctionDecl *func) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
@@ -812,6 +990,14 @@ bool CheckDistributedFunctionRequest::evaluate(
                    func);
     return true;
   }
+
+  // Embedded Swift: reject parameter/return language shapes embedded cannot
+  // lower (user-written generics, `some P`, non-`@Resolvable` `any P`) before
+  // the standard per-parameter conformance check below, so those shapes get a
+  // single targeted diagnostic rather than also tripping the generic
+  // "does not conform to serialization requirement" diagnostic.
+  if (checkEmbeddedDistributedFunction(func))
+    return true;
 
   Type serializationReqType =
       getDistributedActorSerializationType(func->getDeclContext());
@@ -1021,6 +1207,38 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   recordRequiredImportAccessLevelForDecl(distributedActorProto, nominal,
                                          nominal->getEffectiveAccess(), loc);
 
+  // Embedded distributed support is gated behind an experimental feature that
+  // is not available in production compilers. Reject distributed actors under
+  // Embedded Swift unless the feature is enabled. Protocols are skipped: the
+  // `DistributedActor` protocol (and refinements) reach this check too, and the
+  // gate concerns concrete actors that would trigger embedded synthesis.
+  if (C.LangOpts.hasFeature(Feature::Embedded) &&
+      !C.LangOpts.hasFeature(Feature::EmbeddedDistributed) &&
+      !isa<ProtocolDecl>(nominal)) {
+    nominal->diagnose(diag::distributed_embedded_requires_feature);
+    return;
+  }
+
+  // In Embedded Swift the serialization surface is monomorphized: every
+  // recordArgument / decodeNextArgument / onReturn call, and the synthesized
+  // receiver-side dispatch, resolves to a concrete per-type overload on the
+  // actor system's encoder/decoder/handler. That requires a concrete
+  // `ActorSystem`. An actor generic over its actor system has an archetype
+  // system with no such overloads, so reject it up front with a clear error
+  // instead of failing confusingly later during synthesis.
+  //
+  // Only concrete distributed actors carry a bound `ActorSystem`; the
+  // `DistributedActor` protocol (and its extensions) reach this check too, but
+  // `getDistributedActorSystemType` asserts on a `ProtocolDecl`
+  if (C.LangOpts.hasFeature(Feature::Embedded) && !isa<ProtocolDecl>(nominal)) {
+    Type systemTy = getDistributedActorSystemType(nominal);
+    if (systemTy && !systemTy->hasError() && !systemTy->getAnyNominal()) {
+      nominal->diagnose(
+          diag::distributed_embedded_generic_actor_system_not_supported);
+      return;
+    }
+  }
+
   // ==== Constructors
   // --- Get the default initializer
   // If applicable, this will create the default 'init(transport:)' initializer
@@ -1031,6 +1249,18 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
     if (auto *var = dyn_cast<VarDecl>(member)) {
       if (!var->isDistributed())
         continue;
+
+      // Embedded Swift does not support 'distributed var' (computed distributed
+      // properties): the synthesized receive-side dispatch table only walks
+      // 'distributed func' members, so a remote property read would have no
+      // matching dispatch branch and would fail at runtime. Diagnose the
+      // declaration rather than allowing that silent runtime failure, and skip
+      // synthesizing a thunk for it.
+      if (C.LangOpts.hasFeature(Feature::Embedded)) {
+        var->diagnose(diag::distributed_embedded_distributed_var_not_supported,
+                      var->getName());
+        continue;
+      }
 
       if (auto thunk = var->getDistributedThunk())
         SF->addDelayedFunction(thunk);
@@ -1158,6 +1388,15 @@ FuncDecl *
 GetDistributedActorConcreteArgumentDecodingMethodRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
+
+  // In Embedded Swift, the `DistributedActorSystem` protocol has no
+  // `SerializationRequirement` associated type. The user provides
+  // per-type non-generic `decodeNextArgument(_: T.Type) -> T` overloads
+  // on their concrete decoder; there is no single
+  // `decodeNextArgument<Arg: ...>()` method to identify, and IRGen never
+  // takes its address. Return null to short-circuit the search.
+  if (ctx.LangOpts.hasFeature(Feature::Embedded))
+    return nullptr;
 
   if (auto actor = dyn_cast<ClassDecl>(decl)) {
     auto *decoder = getDistributedActorInvocationDecoder(actor);

@@ -265,6 +265,14 @@ final public class SubscriptDecl: AbstractStorageDecl, GenericContext {}
 
 public class AbstractFunctionDecl: ValueDecl, GenericContext {
   final public var isOverridden: Bool { bridged.AbstractFunction_isOverridden() }
+
+  /// True if this function is a witness to a distributed protocol requirement
+  /// with an ad-hoc `SerializationRequirement` conformance (e.g. `remoteCall` or
+  /// `recordArgument`). Such witnesses have generic parameters that cannot be class-bound,
+  /// so the SIL-level embedded validity checks need to be relaxed for them.
+  final public var isDistributedWitnessWithAdHocSerializationRequirement: Bool {
+    bridged.AbstractFunction_isDistributedWitnessWithAdHocSerializationRequirement()
+  }
 }
 
 final public class ConstructorDecl: AbstractFunctionDecl {

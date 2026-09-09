@@ -4834,6 +4834,11 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
 
 void IRGenModule::emitAccessibleFunction(StringRef sectionName,
                                          const AccessibleFunction &func) {
+  // In Embedded Distributed swift does not use accessible functions for executing targets,
+  // if we were about to emit a distributed function accessor, that's a bug.
+  assert(!(func.isDistributed() && Context.LangOpts.hasFeature(Feature::Embedded)) &&
+         "should not emit a distributed accessible function record in Embedded Swift");
+
   auto var = new llvm::GlobalVariable(
       Module, AccessibleFunctionRecordTy, /*isConstant=*/true,
       llvm::GlobalValue::PrivateLinkage, /*initializer=*/nullptr,
