@@ -212,6 +212,19 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       CAS(CAS), ActionCache(ActionCache),
       diagnosticReporter(DiagnosticReporter),
       ShareClangCompilerInstance(ShareClangCompilerInstance) {
+  // Clang scanning workers get a physical file system by default, which lacks
+  // the files the ClangImporter injects in memory: the platform module maps,
+  // and the empty stubs standing in for headers the toolchain does not ship.
+  if (!globalScanningService.MakeScannerFileSystem) {
+    auto mapping = std::make_shared<ClangInvocationFileMapping>(
+        getClangInvocationFileMapping(ScanASTContext));
+    auto recipe =
+        ClangImporter::computeClangImporterVFSRecipe(ScanASTContext, *mapping);
+    globalScanningService.MakeScannerFileSystem = [mapping, recipe]() {
+      return ClangImporter::computeClangImporterFileSystem(
+          recipe, llvm::vfs::createPhysicalFileSystem());
+    };
+  }
   assert(globalScanningService.ClangScanningService->getCAS() == CAS &&
          "Need to be the same CAS instance");
   assert(globalScanningService.ClangScanningService->getActionCache() ==

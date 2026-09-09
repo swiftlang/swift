@@ -1080,6 +1080,11 @@ class SwiftDependencyScanningService {
   mutable llvm::sys::SmartMutex<true> ScanningServiceGlobalLock;
 
 public:
+  /// Builds the file system handed to each Clang scanning worker. Set by the
+  /// scanner so that workers see the ClangImporter's in-memory overlays.
+  std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()>
+      MakeScannerFileSystem;
+
   SwiftDependencyScanningService();
   SwiftDependencyScanningService(const SwiftDependencyScanningService &) =
       delete;
