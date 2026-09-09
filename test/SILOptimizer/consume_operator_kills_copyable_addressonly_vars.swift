@@ -164,7 +164,7 @@ struct S<T> {
             let maybeNewB = exchangeUse(b)
             self = .init(buffer: maybeNewB)
             try f()
-        } catch {
+        } catch _ {
         }
     }
 
@@ -199,7 +199,7 @@ struct S<T> {
             try f()
             let maybeNewB = exchangeUse(b)
             self = .init(buffer: maybeNewB)
-        } catch {
+        } catch _ {
         }
     } // expected-note {{used here}}
 
@@ -208,7 +208,7 @@ struct S<T> {
             let b = (consume self).buffer // expected-note {{consumed here}}
             let _ = b
             try f()
-        } catch {
+        } catch _ {
         }
     } // expected-note {{used here}}
 }

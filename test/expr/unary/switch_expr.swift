@@ -1415,7 +1415,7 @@ func trySwitch13() throws -> Int {
     // Okay.
     do {
       _ = try trySwitch4()
-    } catch {}
+    } catch _ {}
 
     print("hello")
     throw Err()
@@ -1461,14 +1461,14 @@ func trySwitch18() {
   // Make sure we don't warn here.
   do {
     let _ = switch Bool.random() { case true: try trySwitch4() case false: 1 }
-  } catch {}
+  } catch _ {}
 }
 
 func trySwitch19() {
   // Make sure we don't warn here.
   do {
     let _ = switch Bool.random() { case true: throw Err() case false: 1 }
-  } catch {}
+  } catch _ {}
 }
 
 func trySwitch19() throws -> Int {

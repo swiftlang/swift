@@ -365,7 +365,7 @@ func test(_ a : Int?, b : Any) {
     if let aaa = (try! throwingAA()) as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{38-41=is}}
     if let aaa = try throwingAA() as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{35-38=is}}
     if let aaa = (try throwingAA()) as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{37-40=is}}
-  } catch { }
+  } catch _ { }
   if let aaa = try? throwingAA() as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{6-16=(}} {{41-41=) != nil}}
   if let aaa = (try? throwingAA()) as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{36-39=is}}
   
@@ -375,7 +375,7 @@ func test(_ a : Int?, b : Any) {
     if let bbb = (try! throwingBB()) as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{38-41=is}}
     if let bbb = try throwingBB() as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{35-38=is}}
     if let bbb = (try throwingBB()) as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{37-40=is}}
-  } catch { }
+  } catch _ { }
   if let bbb = try? throwingBB() as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{6-16=(}} {{41-41=) != nil}}
   if let bbb = (try? throwingBB()) as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{36-39=is}}
 

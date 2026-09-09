@@ -108,7 +108,7 @@ func testThrowingAndAsync() async throws {
 func testExhaustiveDoCatch() async {
   do {
     _ = try await throwingAndAsync()
-  } catch {
+  } catch _ {
   }
 
   do {
@@ -121,7 +121,7 @@ func testExhaustiveDoCatch() async {
   let fn = {
     do {
       _ = try await throwingAndAsync()
-    } catch {
+    } catch _ {
     }
   }
 
@@ -175,7 +175,7 @@ func testAsyncLet() async throws {
   do {
     try mightThrow()
   } catch let e where e.number == x { // expected-error{{async let 'x' cannot be referenced in a catch guard expression}}
-  } catch {
+  } catch _ {
   }
 
   defer {
