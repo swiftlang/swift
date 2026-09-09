@@ -872,7 +872,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   SILValue indirectResult;
   if (funcTy->getNumResults() != 0) {
     auto result = funcTy->getSingleResult();
-    if (result.getConvention() == ResultConvention::Indirect) {
+    // A formally indirect result only occupies an indirect SIL argument in
+    // lowered-address mode; with opaque values it is returned as a value.
+    if (fnConv.isSILIndirect(result)) {
       SILType resultTy =
           fnConv.getSILType(result, SGF.getTypeExpansionContext());
       indirectResult = entry->createFunctionArgument(resultTy);
