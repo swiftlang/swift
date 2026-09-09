@@ -575,8 +575,6 @@ func testConformances() {
 
 // MARK: - Throwing Iterable tests
 
-#if false // error: lifetime-dependent value escapes its scope
-
 suite.test("ThrowingIterable/success-no-throw")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
@@ -645,7 +643,35 @@ suite.test("ThrowingIterable/exact-limit-no-throw")
     expectTrue(false)
   }
 }
-#endif
+
+suite.test("ThrowingIterable/skip-throw")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let arr = [1, 2, 3]
+  let span = arr.span
+  
+  // simple skip(by:) throws immediately when hitting an error
+  do {
+    let seq = LimitedSeq(span, limit: 1)
+    var iter = seq.makeBorrowingIterator()
+    _ = try iter.skip(by: 2)
+    expectTrue(false)
+  } catch {
+    // expected
+  }
+  
+  // inout skip(by:) updates offset param with remainder to skip
+  var skipAmount = 2
+  do {
+    let seq = LimitedSeq(span, limit: 1)
+    var iter = seq.makeBorrowingIterator()
+    try iter.skip(by: &skipAmount)
+    expectTrue(false)
+  } catch {
+    expectEqual(skipAmount, 1)
+  }
+}
 
 #if false // error: lifetime-dependent variable '$generator' escapes its scope
 
@@ -1015,10 +1041,16 @@ struct LimitedIterator: BorrowingIteratorProtocol, ~Copyable, ~Escapable {
   @_lifetime(&self)
   @_lifetime(self: copy self)
   mutating func nextSpan(maxCount: Int) throws(CountdownError) -> Span<Int> {
-    guard _remaining > 0 else { throw .limitReached }
-    let n = Swift.min(maxCount, _remaining)
+    // Request only up to _remaining, but at least one if _remaining is zero
+    let n = Swift.max(1, Swift.min(maxCount, _remaining))
     let span = _inner.nextSpan(maxCount: n)
     _remaining -= span.count
+
+    // Terminal conditions:
+    // - if span is empty, underlying iterator is exhausted (bc we always request at least one)
+    // - if remaining < 0, underlying iterator still has elements, but we reached limit on last call
+    if span.isEmpty { return span }
+    if _remaining < 0 { throw .limitReached }
     return span
   }
 }
