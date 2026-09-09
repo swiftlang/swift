@@ -28,6 +28,7 @@ sil [_semantics "sequence.forEach"] @forEach : $@convention(method) <τ_0_0 wher
 sil @forEachBody : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @error any Error
 
 // CHECK-LABEL: forEachLoopUnrollTest
+// CHECK-NOT: _allocateUninitializedArray
 // CHECK: [[LIT1:%[0-9]+]] = integer_literal $Builtin.Int64, 15
 // CHECK: [[LIT2:%[0-9]+]] = integer_literal $Builtin.Int64, 27
 // CHECK: [[BODYCLOSURE:%[0-9]+]] = thin_to_thick_function
@@ -48,13 +49,15 @@ sil @forEachBody : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @error a
 
 // CHECK: [[NORMAL2]](%{{.*}} : $()):
 // CHECK: dealloc_stack [[STACK]]
-// Note that the temporary alloc_stack of the array created for the forEach call
-// will be cleaned up when the forEach call is removed.
-// CHECK: destroy_value
+// Note that the array literal is deleted along with the forEach call, as
+// nothing uses it anymore, and so is the temporary alloc_stack of the array
+// that was created for the call.
+// CHECK: return
 
 // CHECK: [[ERROR3]]([[ERRPARAM3:%[0-9]+]] : @owned $any Error):
 // CHECK: dealloc_stack [[STACK]]
 // CHECK: unreachable
+// CHECK-LABEL: end sil function 'forEachLoopUnrollTest'
 
 sil hidden [ossa] @forEachLoopUnrollTest : $@convention(thin) () -> () {
 bb0:
@@ -101,15 +104,15 @@ bb2(%39 : @owned $Error):
 
 sil @forEachBody2 : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error any Error
 
+// The array literal is dead once the forEach call is unrolled, so it is
+// deleted and the unrolled code uses the elements directly instead of copies.
 // CHECK-LABEL: nonTrivialForEachLoopUnrollTest
-// CHECK: [[ELEM1:%[0-9]+]] = copy_value %0
-// CHECK-NEXT: store %0 to [init] %{{.*}} : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
-// CHECK: [[ELEM2:%[0-9]+]] = copy_value %1
-// CHECK-NEXT: store %1 to [init] %{{.*}} : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+// CHECK-NOT: _allocateUninitializedArray
+// CHECK-NOT: copy_value
 // CHECK: [[BODYCLOSURE:%[0-9]+]] = thin_to_thick_function
 // CHECK-NOT: forEach
 // CHECK: [[STACK:%[0-9]+]] = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
-// CHECK: [[ELEM1BORROW:%[0-9]+]] = begin_borrow [[ELEM1]]
+// CHECK: [[ELEM1BORROW:%[0-9]+]] = begin_borrow %0
 // CHECK: [[SB1:%.*]] = store_borrow [[ELEM1BORROW]] to [[STACK]]
 // CHECK: try_apply [[BODYCLOSURE]]([[SB1]]) : $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>) -> @error any Error, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
 
@@ -118,7 +121,7 @@ sil @forEachBody2 : $@convention(thin) (@in_guaranteed @callee_guaranteed @subst
 
 // CHECK: [[NORMAL]](%{{.*}} : $()):
 // CHECK: end_borrow [[ELEM1BORROW]]
-// CHECK: [[ELEM2BORROW:%[0-9]+]] = begin_borrow [[ELEM2]]
+// CHECK: [[ELEM2BORROW:%[0-9]+]] = begin_borrow %1
 // CHECK: [[SB2:%.*]] = store_borrow [[ELEM2BORROW]] to [[STACK]]
 // CHECK: try_apply [[BODYCLOSURE]]([[SB2]]) : $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>) -> @error any Error, normal [[NORMAL2:bb[0-9]+]], error [[ERROR2:bb[0-9]+]]
 
@@ -128,13 +131,16 @@ sil @forEachBody2 : $@convention(thin) (@in_guaranteed @callee_guaranteed @subst
 // CHECK: [[NORMAL2]](%{{.*}} : $()):
 // CHECK: end_borrow [[ELEM2BORROW]]
 // CHECK: dealloc_stack [[STACK]]
-// Note that the temporary alloc_stack of the array created for the forEach call
-// will be cleaned up when the forEach call is removed.
-// CHECK: destroy_value
+// The elements are destroyed where the array's lifetime used to end.
+// CHECK: destroy_value %0
+// CHECK: destroy_value %1
 
 // CHECK: [[ERROR3]]([[ERRPARAM3:%[0-9]+]] : @owned $any Error):
 // CHECK: dealloc_stack [[STACK]]
+// CHECK: destroy_value %0
+// CHECK: destroy_value %1
 // CHECK: unreachable
+// CHECK-LABEL: end sil function 'nonTrivialForEachLoopUnrollTest'
 sil hidden [ossa] @nonTrivialForEachLoopUnrollTest : $@convention(thin) (@owned @callee_guaranteed @substituted <A> () -> @out A for <Int>, @owned @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> () {
 bb0(%0: @owned $@callee_guaranteed @substituted <A> () -> @out A for <Int>, %1: @owned $@callee_guaranteed @substituted <A> () -> @out A for <Int>):
   %2 = integer_literal $Builtin.Word, 2
@@ -176,8 +182,14 @@ bb2(%39 : @owned $Error):
   unreachable
 }
 
+// The fix_lifetime is a request to keep the array alive, so the array literal
+// must be preserved even though the forEach call over it is unrolled.
+//
 // CHECK-LABEL: @checkIndirectFixLifetimeUsesAreIgnored
 // CHECK-NOT: function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error any Error, @in_guaranteed τ_0_0) -> @error any Error
+// CHECK: @_allocateUninitializedArray
+// CHECK: @_finalizeArray
+// CHECK: fix_lifetime
 // CHECK: end sil function 'checkIndirectFixLifetimeUsesAreIgnored'
 sil hidden [ossa] @checkIndirectFixLifetimeUsesAreIgnored : $@convention(thin) () -> () {
 bb0:
@@ -229,11 +241,13 @@ bb2(%39 : @owned $Error):
 }
 
 // Test that dead instructions (specifically a begin_borrow of the array used
-// for the forEach call) are cleaned up after unrolling.
+// for the forEach call) are cleaned up after unrolling. Here the array literal
+// itself is dead as well, so all of it goes away.
 //
 // CHECK-LABEL: @testDeadInstructionCleanupAfterUnroll
-// CHECK-NOT: forEach
-// CHECK: @_finalizeArray
+// CHECK-NOT: @forEach :
+// CHECK-NOT: @_allocateUninitializedArray
+// CHECK-NOT: @_finalizeArray
 // CHECK-NOT: begin_borrow
 // CHECK: end sil function 'testDeadInstructionCleanupAfterUnroll'
 sil hidden [ossa] @testDeadInstructionCleanupAfterUnroll : $@convention(thin) () -> () {
@@ -360,11 +374,12 @@ sil [_semantics "sequence.forEach"] @forEachDirectSelf : $@convention(method) (@
 
 // CHECK: [[NORMAL2]](%{{.*}} : $()):
 // CHECK: dealloc_stack [[STACK]]
-// CHECK: destroy_value
+// CHECK: return
 
 // CHECK: [[ERROR3]]([[ERRPARAM3:%[0-9]+]] : @owned $any Error):
 // CHECK: dealloc_stack [[STACK]]
 // CHECK: unreachable
+// CHECK-LABEL: end sil function 'forEachLoopUnrollDirectSelfTest'
 
 sil hidden [ossa] @forEachLoopUnrollDirectSelfTest : $@convention(thin) () -> () {
 bb0:
@@ -512,6 +527,134 @@ bb2(%39 : @owned $any Error):
   end_borrow %sb : $*MyArray<Builtin.Int64>
   dealloc_stack %22 : $*MyArray<Builtin.Int64>
   destroy_value [dead_end] %39
+  destroy_value [dead_end] %a2
+  unreachable
+}
+
+// A fix_lifetime keeps the array alive past the forEach call, so the array
+// literal has to be kept and the unrolled code has to use copies of the
+// elements.
+
+// CHECK-LABEL: sil hidden [ossa] @forEachUnrollWithSurvivingArrayTest
+// CHECK: @_allocateUninitializedArray
+// CHECK: [[ELEM1:%[0-9]+]] = copy_value %0
+// CHECK-NEXT: store %0 to [init] %{{.*}} : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+// CHECK: [[ELEM2:%[0-9]+]] = copy_value %1
+// CHECK-NEXT: store %1 to [init] %{{.*}} : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+// CHECK: [[ARRAY:%[0-9]+]] = apply %{{[0-9]+}}<() -> Int>(%{{[0-9]+}}) : $@convention(thin) <τ_0_0> (@owned MyArray<τ_0_0>) -> @owned MyArray<τ_0_0>
+// CHECK-NOT: @forEach :
+// CHECK: begin_borrow [[ELEM1]]
+// CHECK: begin_borrow [[ELEM2]]
+// CHECK: fix_lifetime [[ARRAY]]
+// CHECK-LABEL: } // end sil function 'forEachUnrollWithSurvivingArrayTest'
+
+sil hidden [ossa] @forEachUnrollWithSurvivingArrayTest : $@convention(thin) (@owned @callee_guaranteed @substituted <A> () -> @out A for <Int>, @owned @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> () {
+bb0(%0: @owned $@callee_guaranteed @substituted <A> () -> @out A for <Int>, %1: @owned $@callee_guaranteed @substituted <A> () -> @out A for <Int>):
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = function_ref @_allocateUninitializedArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned MyArray<τ_0_0>, Builtin.RawPointer)
+  %4 = apply %3<() -> Int>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned MyArray<τ_0_0>, Builtin.RawPointer)
+  (%5, %6a) = destructure_tuple %4 : $(MyArray<()->Int>, Builtin.RawPointer)
+  %6 = begin_borrow %5
+  %b = struct_extract %6, #MyArray.buffer
+  %7 = ref_tail_addr %b, $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  store %0 to [init] %7 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int>
+  %12 = integer_literal $Builtin.Word, 1
+  %13 = index_addr %7 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int>, %12 : $Builtin.Word
+  store %1 to [init] %13 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int>
+  end_borrow %6
+  %f = function_ref @_finalizeArray : $@convention(thin) <τ_0_0> (@owned MyArray<τ_0_0>) -> @owned MyArray<τ_0_0>
+  %a2 = apply %f<()->Int>(%5) : $@convention(thin) <τ_0_0> (@owned MyArray<τ_0_0>) -> @owned MyArray<τ_0_0>
+  %21 = begin_borrow %a2
+  %22 = alloc_stack $MyArray<()->Int>
+  %23 = store_borrow %21 to %22 : $*MyArray<()->Int>
+  %24 = function_ref @forEachBody2 : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error any Error
+  %25 = convert_function %24 : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error any Error to $@convention(thin) @noescape (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error any Error
+  %26 = thin_to_thick_function %25 : $@convention(thin) @noescape (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error any Error to $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error any Error
+  // A stub for Sequence.forEach(_:)
+  %30 = function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
+  try_apply %30<MyArray<() -> Int>>(%26, %23) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
+
+bb1(%32 : $()):
+  end_borrow %23 : $*MyArray<() -> Int>
+  dealloc_stack %22 : $*MyArray<() -> Int>
+  end_borrow %21 : $MyArray<() -> Int>
+  // A use of the array that outlives the forEach call.
+  fix_lifetime %a2 : $MyArray<() -> Int>
+  destroy_value %a2
+  %37 = tuple ()
+  return %37 : $()
+
+bb2(%39 : @owned $Error):
+  destroy_value [dead_end] %39
+  end_borrow %21
+  destroy_value [dead_end] %a2
+  unreachable
+}
+
+// Two forEach calls over the same array literal. The literal is still dead once
+// both are unrolled, but the ownership of the elements cannot be handed over to
+// two callers, so the elements are copied.
+
+// CHECK-LABEL: sil hidden [ossa] @twoForEachCallsOverArrayTest
+// CHECK-NOT: @_allocateUninitializedArray
+// CHECK: copy_value %0
+// CHECK: copy_value %1
+// CHECK-NOT: @forEach :
+// CHECK-LABEL: } // end sil function 'twoForEachCallsOverArrayTest'
+
+sil hidden [ossa] @twoForEachCallsOverArrayTest : $@convention(thin) (@owned @callee_guaranteed @substituted <A> () -> @out A for <Int>, @owned @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> () {
+bb0(%0: @owned $@callee_guaranteed @substituted <A> () -> @out A for <Int>, %1: @owned $@callee_guaranteed @substituted <A> () -> @out A for <Int>):
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = function_ref @_allocateUninitializedArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned MyArray<τ_0_0>, Builtin.RawPointer)
+  %4 = apply %3<() -> Int>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned MyArray<τ_0_0>, Builtin.RawPointer)
+  (%5, %6a) = destructure_tuple %4 : $(MyArray<()->Int>, Builtin.RawPointer)
+  %6 = begin_borrow %5
+  %b = struct_extract %6, #MyArray.buffer
+  %7 = ref_tail_addr %b, $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  store %0 to [init] %7 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int>
+  %12 = integer_literal $Builtin.Word, 1
+  %13 = index_addr %7 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int>, %12 : $Builtin.Word
+  store %1 to [init] %13 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int>
+  end_borrow %6
+  %f = function_ref @_finalizeArray : $@convention(thin) <τ_0_0> (@owned MyArray<τ_0_0>) -> @owned MyArray<τ_0_0>
+  %a2 = apply %f<()->Int>(%5) : $@convention(thin) <τ_0_0> (@owned MyArray<τ_0_0>) -> @owned MyArray<τ_0_0>
+  %21 = begin_borrow %a2
+  %22 = alloc_stack $MyArray<()->Int>
+  %23 = store_borrow %21 to %22 : $*MyArray<()->Int>
+  %24 = function_ref @forEachBody2 : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error any Error
+  %25 = convert_function %24 : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error any Error to $@convention(thin) @noescape (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error any Error
+  %26 = thin_to_thick_function %25 : $@convention(thin) @noescape (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error any Error to $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error any Error
+  // A stub for Sequence.forEach(_:)
+  %30 = function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
+  try_apply %30<MyArray<() -> Int>>(%26, %23) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
+
+bb1(%32 : $()):
+  end_borrow %23 : $*MyArray<() -> Int>
+  dealloc_stack %22 : $*MyArray<() -> Int>
+  // A second forEach call over the same array.
+  %40 = alloc_stack $MyArray<()->Int>
+  %41 = store_borrow %21 to %40 : $*MyArray<()->Int>
+  try_apply %30<MyArray<() -> Int>>(%26, %41) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb3, error bb4
+
+bb2(%39 : @owned $Error):
+  destroy_value [dead_end] %39
+  end_borrow %21
+  destroy_value [dead_end] %a2
+  unreachable
+
+bb3(%42 : $()):
+  end_borrow %41 : $*MyArray<() -> Int>
+  dealloc_stack %40 : $*MyArray<() -> Int>
+  end_borrow %21 : $MyArray<() -> Int>
+  destroy_value %a2
+  %43 = tuple ()
+  return %43 : $()
+
+bb4(%44 : @owned $Error):
+  destroy_value [dead_end] %44
+  end_borrow %41 : $*MyArray<() -> Int>
+  dealloc_stack %40 : $*MyArray<() -> Int>
+  end_borrow %21
   destroy_value [dead_end] %a2
   unreachable
 }
