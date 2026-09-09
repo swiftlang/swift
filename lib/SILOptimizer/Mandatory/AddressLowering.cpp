@@ -4255,7 +4255,6 @@ emitEndBorrowsAtEnclosingGuaranteedBoundary(SILValue lifetimeToEnd,
 
 // Extract from an opaque struct or tuple.
 void UseRewriter::emitExtract(SingleValueInstruction *extractInst) {
-  auto source = extractInst->getOperand(0);
   AddressMaterialization addrMat(pass, extractInst, builder);
   SILValue extractAddr = addrMat.materializeDefProjection(extractInst);
 
@@ -4287,7 +4286,8 @@ void UseRewriter::emitExtract(SingleValueInstruction *extractInst) {
   SILValue loadElement =
       builder.emitLoadBorrowOperation(extractInst->getLoc(), extractAddr);
   replaceUsesWithLoad(extractInst, loadElement);
-  emitEndBorrowsAtEnclosingGuaranteedBoundary(loadElement, source, pass);
+  // End the borrow at the load_borrow's liveness boundary.
+  emitEndBorrows(loadElement, pass);
 }
 
 void UseRewriter::visitStructExtractInst(StructExtractInst *extractInst) {
