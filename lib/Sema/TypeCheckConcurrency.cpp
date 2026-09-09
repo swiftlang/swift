@@ -5592,14 +5592,15 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
     case ActorIsolation::GlobalActor:
       // If we encountered an explicit globally isolated conformance, allow it
       // to override the _nonisolated_ isolation.
-      if (conformance->getSourceKind() == ConformanceEntryKind::Explicit &&
-          (!foundIsolation || foundIsolation->isolation.isNonisolated())) {
+      if (!foundIsolation ||
+          (foundIsolation->isolation.isNonisolatedOrConcurrent() &&
+           conformance->getSourceKind() == ConformanceEntryKind::Explicit)) {
         foundIsolation = {protoIsolation,
                           IsolationSource(proto, IsolationSource::Conformance)};
         continue;
       }
 
-      if (foundIsolation && foundIsolation->isolation != protoIsolation)
+      if (foundIsolation->isolation != protoIsolation)
         return std::nullopt;
 
       break;
