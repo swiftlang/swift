@@ -5146,9 +5146,12 @@ namespace {
           importFullName(decl->getAsFunction());
       if (!importedName)
         return nullptr;
-      // All template parameters must be template type parameters.
+      // All template parameters must be template type parameters, and none of
+      // them may be a parameter pack.
       if (!llvm::all_of(*decl->getTemplateParameters(), [](auto param) {
-            return isa<clang::TemplateTypeParmDecl>(param);
+            const auto *typeParam =
+                dyn_cast<clang::TemplateTypeParmDecl>(param);
+            return typeParam && !typeParam->isParameterPack();
           }))
         return nullptr;
       auto *imported = importFunctionDecl(decl->getAsFunction(), importedName,
