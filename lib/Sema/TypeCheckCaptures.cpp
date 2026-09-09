@@ -422,8 +422,12 @@ public:
     if (NoEscape)
       Flags |= CapturedValue::IsNoEscape;
 
-    if (CalledOnce && ConsumedValues.count(D))
-      Flags |= CapturedValue::IsConsumed;
+    if (CalledOnce) {
+      Flags |= CapturedValue::IsCalledOnce;
+
+      if (ConsumedValues.count(D))
+        Flags |= CapturedValue::IsConsumed;
+    }
 
     addCapture(CapturedValue(D, Flags, DRE->getStartLoc()));
 
@@ -472,6 +476,8 @@ public:
         Flags &= ~CapturedValue::IsConsumed;
         // ... or have `sending` captures.
         Flags &= ~CapturedValue::IsSending;
+        // ... and aren't `@called(once)` themselves.
+        Flags &= ~CapturedValue::IsCalledOnce;
       }
 
       addCapture(capture.mergeFlags(Flags));

@@ -89,6 +89,10 @@ public:
     /// i.e. `[sending x]`. Such captures are only valid in a `@called(once)`
     /// closure.
     IsSending = 1 << 3,
+
+    /// IsCalledOnce is set when the closure directly capturing this value is
+    /// `@called(once)`.
+    IsCalledOnce = 1 << 4,
   };
 
   CapturedValue(ValueDecl *Val, unsigned Flags, SourceLoc Loc)
@@ -105,6 +109,7 @@ public:
   bool isNoEscape() const { return Flags & IsNoEscape; }
   bool isConsumed() const { return Flags & IsConsumed; }
   bool isSending() const { return Flags & IsSending; }
+  bool isCalledOnce() const { return Flags & IsCalledOnce; }
 
   bool isDynamicSelfMetadata() const { return !Value; }
 
