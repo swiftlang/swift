@@ -3390,16 +3390,6 @@ namespace {
       }
 
       if (auto erasureExpr = dyn_cast<ErasureExpr>(expr)) {
-        // Erasure lets everything the conformance is built from escape, so
-        // look through specialized conformances into their substitutions.
-        for (auto conformance : erasureExpr->getConformances()) {
-          if (conformance.isConcrete()) {
-            checkIsolatedConformancesInContext(
-                conformance.getConcrete()->getSubstitutionMap(),
-                erasureExpr->getLoc(), getDeclContext(),
-                RefineConformances{*this});
-          }
-        }
         checkIsolatedConformancesInContext(
             erasureExpr->getConformances(), erasureExpr->getLoc(),
             getDeclContext(), RefineConformances{*this});
@@ -9384,9 +9374,14 @@ namespace {
       if (!normal)
         return false;
 
+      // Keep walking through a nonisolated conformance: its substitutions
+      // can still carry an isolated one. Returning true would stop the whole
+      // traversal, not just this subtree.
       auto conformanceIsolation = concrete->getIsolation();
-      if (!conformanceIsolation.isGlobalActor() ||
-          conformanceIsolation == getIsolation())
+      if (!conformanceIsolation.isGlobalActor())
+        return false;
+
+      if (conformanceIsolation == getIsolation())
         return true;
 
       // In a nonisolated(nonsending) context the conformance is valid because
