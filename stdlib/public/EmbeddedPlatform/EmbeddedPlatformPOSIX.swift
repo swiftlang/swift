@@ -24,6 +24,20 @@ func arc4random_buf(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 @_extern(c, "putchar")
 func putchar(_: CInt) -> CInt
 
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+@_silgen_name("__stdoutp")
+nonisolated(unsafe) private var stdoutPointer: UnsafeMutableRawPointer
+#elseif os(Linux)
+@_silgen_name("stdout")
+nonisolated(unsafe) private var stdoutPointer: UnsafeMutableRawPointer
+#endif
+
+@_extern(c, "flockfile")
+private func flockfile(_ stream: UnsafeMutableRawPointer)
+
+@_extern(c, "funlockfile")
+private func funlockfile(_ stream: UnsafeMutableRawPointer)
+
 @_extern(c, "exit")
 func exit(_: CInt) /* -> Never */
 
@@ -104,6 +118,22 @@ public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 @implementation @c
 public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) {
   generateRandom(buf, nbytes)
+}
+
+@export(interface)
+@implementation @c
+public func _swift_lockStandardOutput() {
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) || os(Linux)
+  unsafe flockfile(stdoutPointer)
+#endif
+}
+
+@export(interface)
+@implementation @c
+public func _swift_unlockStandardOutput() {
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) || os(Linux)
+  unsafe funlockfile(stdoutPointer)
+#endif
 }
 
 @export(interface)

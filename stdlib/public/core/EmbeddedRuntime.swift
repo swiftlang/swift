@@ -198,6 +198,50 @@ func arc4random_buf(buf: UnsafeMutableRawPointer, nbytes: Int)
 
 #endif
 
+/// Standard output
+
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+@_extern(c, "_swift_lockStandardOutput")
+private func _swift_lockStandardOutput()
+
+@_extern(c, "_swift_unlockStandardOutput")
+private func _swift_unlockStandardOutput()
+#else
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+@_silgen_name("__stdoutp")
+nonisolated(unsafe) private var _embeddedStdout: UnsafeMutableRawPointer
+#elseif os(Linux)
+@_silgen_name("stdout")
+nonisolated(unsafe) private var _embeddedStdout: UnsafeMutableRawPointer
+#endif
+
+@_extern(c, "flockfile")
+private func flockfile(_ stream: UnsafeMutableRawPointer)
+
+@_extern(c, "funlockfile")
+private func funlockfile(_ stream: UnsafeMutableRawPointer)
+#endif
+
+// Hold the recursive stream lock across every write in a print call, including
+// its terminator. The non-PAL freestanding path retains its putchar-only ABI.
+@c
+public func _swift_stdlib_flockfile_stdout() {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  _swift_lockStandardOutput()
+#elseif os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) || os(Linux)
+  unsafe flockfile(_embeddedStdout)
+#endif
+}
+
+@c
+public func _swift_stdlib_funlockfile_stdout() {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  _swift_unlockStandardOutput()
+#elseif os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) || os(Linux)
+  unsafe funlockfile(_embeddedStdout)
+#endif
+}
+
 /// Allocations
 
 func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
@@ -1283,7 +1327,7 @@ public func swift_getPlatformLayerVersion(
   _ minor: UnsafeMutablePointer<Int>
 ) {
   unsafe major.pointee = 1 // EMBEDDED_SWIFT_PLATFORM_VERSION_MAJOR
-  unsafe minor.pointee = 1 // EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR
+  unsafe minor.pointee = 2 // EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR
 }
 #endif
 
