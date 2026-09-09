@@ -573,6 +573,37 @@ swift_auth_code(T value, unsigned extra) {
 #endif
 }
 
+/// Authenticate an address-diversified code pointer stored at `address`, and
+/// return it carrying the default C function pointer schema, so it can be
+/// called or assigned to a function pointer.
+template <typename T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline T
+swift_auth_code_address(T value, const void *address, unsigned extra) {
+#if SWIFT_PTRAUTH
+  return (T)ptrauth_auth_function(
+      (void *)value, ptrauth_key_process_independent_code,
+      ptrauth_blend_discriminator(address, extra));
+#else
+  return value;
+#endif
+}
+
+/// Re-sign a code pointer for at-rest storage at `address`. The value must
+/// carry the default C function pointer schema, which is what a function
+/// pointer passed through a void * or uintptr_t still has.
+template <typename T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline T
+swift_sign_code_address(T value, const void *address, unsigned extra) {
+#if SWIFT_PTRAUTH
+  return (T)ptrauth_auth_and_resign(
+      (void *)value, ptrauth_key_function_pointer, 0,
+      ptrauth_key_process_independent_code,
+      ptrauth_blend_discriminator(address, extra));
+#else
+  return value;
+#endif
+}
+
 /// Does this platform support backtrace-on-crash?
 #ifdef __APPLE__
 #  include <TargetConditionals.h>
