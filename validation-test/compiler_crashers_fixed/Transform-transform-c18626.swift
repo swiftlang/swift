@@ -6,5 +6,5 @@ protocol a {
   }
 }
 func c(d: [a.Type]) {
-  d.map(\.b) // expected-error {{key path cannot refer to static member 'b' of protocol type 'a'}}
+  _ = d.map(\.b)
 }
