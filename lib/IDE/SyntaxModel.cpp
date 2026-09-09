@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/SyntaxModel.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -27,11 +26,9 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Token.h"
-#include "swift/Config.h"
 #include "swift/Subsystems.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include <vector>
 #include <regex>
 

@@ -16,7 +16,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"

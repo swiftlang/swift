@@ -13,22 +13,15 @@
 // binaries.
 //===----------------------------------------------------------------------===//
 
-#include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/RemoteInspection/ReflectionContext.h"
 #include "swift/RemoteInspection/TypeRef.h"
 #include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/StaticMirror/ObjectFileContext.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Object/Archive.h"
 #include "llvm/Object/COFF.h"
-#include "llvm/Object/ELF.h"
-#include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Object/RelocationResolver.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Error.h"
 
 #if defined(_WIN32)
 #include <io.h>
@@ -40,7 +33,6 @@
 #include <TargetConditionals.h>
 #endif
 
-#include <algorithm>
 #include <csignal>
 #include <iostream>
 

@@ -17,8 +17,6 @@
 #include "ArgumentSource.h"
 #include "Conversion.h"
 #include "Initialization.h"
-#include "swift/Basic/Assertions.h"
-#include "clang/AST/DeclCXX.h"
 
 using namespace swift;
 using namespace Lowering;

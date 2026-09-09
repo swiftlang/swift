@@ -21,7 +21,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeTransform.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 
 using namespace swift;
 

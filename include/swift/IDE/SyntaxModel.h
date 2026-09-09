@@ -15,7 +15,6 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Config.h"
 
 #include <vector>
 

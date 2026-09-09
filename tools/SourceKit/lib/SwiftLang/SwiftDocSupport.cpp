@@ -31,10 +31,8 @@
 #include "swift/Refactoring/Refactoring.h"
 // This is included only for createLazyResolver(). Move to different header ?
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/Config.h"
 
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 
 using namespace SourceKit;
 using namespace swift;

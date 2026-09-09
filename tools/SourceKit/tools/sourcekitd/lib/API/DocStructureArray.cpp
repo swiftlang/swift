@@ -17,7 +17,6 @@
 #include "SourceKit/Support/UIdent.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace SourceKit;
 using namespace sourcekitd;

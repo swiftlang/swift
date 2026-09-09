@@ -18,7 +18,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

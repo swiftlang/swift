@@ -17,12 +17,9 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "clang/AST/DeclObjC.h"
 #include "swift/AST/TypeCheckRequests.h"
-
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 

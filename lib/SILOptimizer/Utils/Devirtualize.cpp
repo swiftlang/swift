@@ -32,7 +32,6 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Casting.h"
 using namespace swift;
 
 STATISTIC(NumClassDevirt, "Number of class_method applies devirtualized");

@@ -10,13 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Fingerprint.h"
-#include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include <inttypes.h>
 #include <sstream>
 
 using namespace swift;

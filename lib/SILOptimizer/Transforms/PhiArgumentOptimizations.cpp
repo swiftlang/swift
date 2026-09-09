@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-optimize-block-arguments"
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILArgument.h"

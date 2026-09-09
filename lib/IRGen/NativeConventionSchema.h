@@ -18,10 +18,10 @@
 #define SWIFT_IRGEN_NATIVECONVENTIONSCHEMA_H
 
 #include "clang/CodeGen/SwiftCallingConv.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
 #include "IRGen.h"
 #include "IRGenFunction.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 namespace irgen {

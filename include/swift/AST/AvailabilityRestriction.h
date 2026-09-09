@@ -20,7 +20,6 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
-#include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/Support/raw_ostream.h"

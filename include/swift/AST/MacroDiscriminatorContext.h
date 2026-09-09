@@ -13,8 +13,6 @@
 #ifndef SWIFT_AST_MACRO_DISCRIMINATOR_CONTEXT_H
 #define SWIFT_AST_MACRO_DISCRIMINATOR_CONTEXT_H
 
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {

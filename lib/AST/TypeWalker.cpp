@@ -18,7 +18,6 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

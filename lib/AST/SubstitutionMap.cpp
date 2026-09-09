@@ -35,7 +35,6 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 

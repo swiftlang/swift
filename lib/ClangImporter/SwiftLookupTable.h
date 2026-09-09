@@ -28,11 +28,9 @@
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/Compiler.h"
-#include <functional>
 #include <optional>
 #include <utility>
+#include "llvm/ADT/TinyPtrVector.h"
 
 namespace llvm {
 class BitstreamWriter;

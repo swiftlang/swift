@@ -17,7 +17,6 @@
 #define SWIFT_SEMA_TYPECHECKMACROS_H
 
 #include "swift/AST/Attr.h"
-#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Type.h"
 
 /// Prefix used for the names of macro expansion buffers, to replace the

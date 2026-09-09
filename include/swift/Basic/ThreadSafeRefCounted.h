@@ -13,9 +13,9 @@
 #ifndef SWIFT_BASIC_THREADSAFEREFCOUNTED_H
 #define SWIFT_BASIC_THREADSAFEREFCOUNTED_H
 
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include <atomic>
 #include <cassert>
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 
 namespace swift {
 

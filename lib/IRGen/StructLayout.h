@@ -19,10 +19,10 @@
 #define SWIFT_IRGEN_STRUCTLAYOUT_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "swift/Basic/ClusteredBitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "IRGen.h"
+#include "swift/Basic/ClusteredBitVector.h"
 
 namespace llvm {
   class Constant;

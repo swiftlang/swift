@@ -27,13 +27,9 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 

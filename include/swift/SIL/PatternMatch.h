@@ -21,7 +21,6 @@
 #ifndef SWIFT_SIL_PATTERNMATCH_H
 #define SWIFT_SIL_PATTERNMATCH_H
 
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 namespace swift {

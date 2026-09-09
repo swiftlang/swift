@@ -15,7 +15,6 @@
 #include "Symbol.h"
 #include "SymbolGraphASTWalker.h"
 
-#include <queue>
 
 using namespace swift;
 using namespace symbolgraphgen;

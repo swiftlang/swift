@@ -22,7 +22,6 @@
 
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/SIL/ApplySite.h"
 #include "llvm/IR/CallingConv.h"
 
 #include "Callee.h"

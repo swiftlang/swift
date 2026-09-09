@@ -36,17 +36,9 @@
 #include "swift/Sema/SolutionResult.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/Allocator.h"
-#include "llvm/Support/Format.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
-#include <iterator>
-#include <map>
-#include <memory>
-#include <tuple>
 #include <utility>
 
 using namespace swift;

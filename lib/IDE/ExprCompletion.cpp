@@ -13,7 +13,6 @@
 #include "swift/IDE/ExprCompletion.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
-#include "swift/Sema/ConstraintSystem.h"
 
 using namespace swift;
 using namespace swift::ide;

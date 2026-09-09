@@ -20,7 +20,6 @@
 
 #include "ManagedValue.h"
 #include "swift/Basic/PossiblyUniquePtr.h"
-#include "swift/SIL/AbstractionPattern.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include <memory>
 

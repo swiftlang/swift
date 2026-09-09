@@ -13,7 +13,6 @@
 #define SWIFT_PLUGIN_REGISTRY_H
 
 #include "swift/Basic/StringExtras.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Chrono.h"
@@ -21,7 +20,7 @@
 #include "llvm/Support/Program.h"
 
 #include <mutex>
-#include <vector>
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
 

@@ -21,7 +21,6 @@
 #include "swift/Markup/XMLUtils.h"
 #include "swift/Parse/Token.h"
 #include "swift/Subsystems.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"

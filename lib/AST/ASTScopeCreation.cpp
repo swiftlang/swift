@@ -30,13 +30,9 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
-#include "swift/Basic/STLExtras.h"
-#include "llvm/Support/Compiler.h"
 #include <algorithm>
-#include <unordered_set>
 
 using namespace swift;
 using namespace ast_scope;
