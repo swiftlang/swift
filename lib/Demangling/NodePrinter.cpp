@@ -3790,6 +3790,8 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
     NodePointer firstChild = root->getChild(0);
     if (firstChild->getKind() == Node::Kind::KeyPathGetterThunkHelper) {
       NodePointer child = firstChild->getChild(0);
+      if (child == nullptr)
+        return invalid;
       switch (child->getKind()) {
       case Node::Kind::Subscript: {
         std::string subscriptText = "subscript(";
@@ -3800,6 +3802,9 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
           return std::string("<unknown>");
         };
         auto getArgumentNodeName = [](NodePointer node) {
+          if (node == nullptr) {
+            return std::string("<unknown>");
+          }
           if (node->getKind() == Node::Kind::Identifier) {
             return std::string(node->getText());
           }
@@ -3833,8 +3838,15 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
             NodePointer argumentType = argList->getChild(idx);
             idx += 1;
             if (argumentType->getKind() == Node::Kind::TupleElement) {
-              argumentType =
-                  argumentType->getChild(0)->getChild(0)->getChild(1);
+              // A tuple element has the type as its last child, but is not
+              // required to have the shape TupleElement -> Type -> <nominal> ->
+              // [Module, Identifier]. For example, an empty-tuple element has a
+              // childless Tuple as the grandchild, so every step here can produce
+              // null.
+              NodePointer typeNode = argumentType->getLastChild();
+              NodePointer nominal =
+                  typeNode ? typeNode->getChild(0) : nullptr;
+              argumentType = nominal ? nominal->getChild(1) : nullptr;
               argumentTypeNames.push_back(getArgumentNodeName(argumentType));
               continue;
             }
@@ -3850,8 +3862,9 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
                          std::make_pair(Node::Kind::Type, 0),
                      });
           if (argList != nullptr) {
+            NodePointer argType = argList->getChild(0);
             argumentTypeNames.push_back(
-                getArgumentNodeName(argList->getChild(0)->getChild(1)));
+                getArgumentNodeName(argType ? argType->getChild(1) : nullptr));
           }
         }
         child = child->getChild(1);
