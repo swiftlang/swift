@@ -553,38 +553,114 @@ void com::validateImplementation(ClassDecl *CD) {
 
 void com::validateConformance(ProtocolConformance *conformance) {
   auto *normal = dyn_cast<NormalProtocolConformance>(conformance);
-  if (!normal ||
-      normal->getSourceKind() != ConformanceEntryKind::Explicit)
+  if (!normal || normal->getSourceKind() != ConformanceEntryKind::Explicit)
     return;
 
+  auto &diagnostics = normal->getDeclContext()->getASTContext().Diags;
+
   auto *protocol = normal->getProtocol();
+  if (protocol->isCOMIdentity()) {
+    diagnostics.diagnose(normal->getLoc(),
+                         diag::com_identity_explicit_conformance,
+                         protocol->getName());
+    normal->setInvalid();
+    return;
+  }
+
   if (!protocol->isCOMInterface())
     return;
 
   Type type = normal->getType();
   auto *nominal = type->getAnyNominal();
   auto *CD = dyn_cast_or_null<ClassDecl>(nominal);
-  auto &context = normal->getDeclContext()->getASTContext();
   if (!CD) {
-    context.Diags.diagnose(normal->getLoc(),
-                           diag::com_conformance_requires_class, type,
-                           protocol->getDeclaredInterfaceType());
+    diagnostics.diagnose(normal->getLoc(), diag::com_conformance_requires_class,
+                         type, protocol->getDeclaredInterfaceType());
     return;
   }
 
   auto *typeModule = CD->getParentModule();
   auto *conformanceModule = normal->getDeclContext()->getParentModule();
-  if (!typeModule->isSameModuleLookingThroughOverlays(conformanceModule)) {
-    context.Diags.diagnose(normal->getLoc(),
-                           diag::com_conformance_must_be_in_type_module, type,
-                           protocol->getDeclaredInterfaceType());
+  if (!typeModule->isSameModuleLookingThroughOverlays(conformanceModule))
+    diagnostics.diagnose(normal->getLoc(),
+                         diag::com_conformance_must_be_in_type_module, type,
+                         protocol->getDeclaredInterfaceType());
+
+  if (!normal->getConditionalRequirements().empty())
+    diagnostics.diagnose(normal->getLoc(), diag::com_conditional_conformance,
+                         type, protocol->getDeclaredInterfaceType());
+}
+
+namespace {
+/// Validate a protocol whose sole requirement is the given identity property.
+void validateIdentityRequirement(ProtocolDecl *PD,
+                                 COMIdentityRequirementKind expected,
+                                 Identifier ident) {
+  VarDecl *identity = nullptr;
+  for (auto *requirement : PD->getProtocolRequirements()) {
+    auto kind = classifyCOMIdentityRequirement(requirement);
+    if (!kind || *kind != expected) {
+      requirement->diagnose(diag::com_identity_unsupported_requirement,
+                            requirement->getName(), PD->getName());
+      PD->setInvalid();
+      continue;
+    }
+
+    identity = dyn_cast<VarDecl>(requirement);
   }
 
-  if (!normal->getConditionalRequirements().empty()) {
-    context.Diags.diagnose(normal->getLoc(),
-                           diag::com_conditional_conformance, type,
-                           protocol->getDeclaredInterfaceType());
+  auto &context = PD->getASTContext();
+  auto *decl =
+      ::com::lookup(context, PD->getDeclContext(), ident, PD->getLoc());
+
+  if (!decl) {
+    PD->setInvalid();
+    return;
   }
+
+  auto *getter = identity ? identity->getAccessor(AccessorKind::Get) : nullptr;
+  bool hasValidIdentity = identity && !identity->isStatic() &&
+                          !identity->isSettable(nullptr) && getter &&
+                          !getter->hasAsync() && !getter->hasThrows() &&
+                          identity->getValueInterfaceType()->isEqual(
+                              decl->getDeclaredInterfaceType());
+  if (!hasValidIdentity) {
+    PD->diagnose(diag::com_identity_invalid_requirement, PD->getName().str(),
+                 ident.str(), ident.str());
+    PD->setInvalid();
+  }
+}
+}
+
+void com::validateIdentityProtocol(ProtocolDecl *PD) {
+  if (!PD->isCOMIdentity())
+    return;
+
+  auto &context = PD->getASTContext();
+  if (PD->isSpecificProtocol(KnownProtocolKind::COMInterface)) {
+    validateIdentityRequirement(PD, COMIdentityRequirementKind::InterfaceID,
+                                context.Id_IID);
+    return;
+  }
+
+  ASSERT(PD->isSpecificProtocol(KnownProtocolKind::COMActivatable));
+  ASSERT(context.LangOpts.COMModel &&
+         "COM activation requires an interop model");
+  switch (*context.LangOpts.COMModel) {
+  case LangOptions::COMInteropModel::Microsoft:
+    validateIdentityRequirement(PD, COMIdentityRequirementKind::ActivationID,
+                                context.Id_CLSID);
+    return;
+  case LangOptions::COMInteropModel::CoreFoundation:
+    // The current CoreFoundation activation contract has no requirements.
+    for (auto *requirement : PD->getProtocolRequirements()) {
+      requirement->diagnose(diag::com_identity_unsupported_requirement,
+                            requirement->getName(), PD->getName());
+      PD->setInvalid();
+    }
+    return;
+  }
+  llvm_unreachable("unhandled COMInteropModel");
 }
 
 ProtocolConformance *

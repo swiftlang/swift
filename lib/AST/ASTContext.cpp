@@ -1697,6 +1697,8 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
   case KnownProtocolKind::COMInterface:
+  case KnownProtocolKind::COMActivatable:
+  case KnownProtocolKind::COMAggregatable:
     M = getLoadedModule(Id_COM);
     if (!M)
       M = MainModule;
