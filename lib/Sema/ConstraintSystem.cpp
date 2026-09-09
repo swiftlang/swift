@@ -1723,11 +1723,19 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
       if (auto selfType = lookupBaseType->getAs<DynamicSelfType>())
         lookupBaseType = selfType->getSelfType();
 
+      // Whether we have established that the base type cannot conform to
+      // the associated type's protocol.
+      bool cannotConform = false;
+
       if (lookupBaseType->mayHaveMembers() ||
           lookupBaseType->is<PackType>()) {
         auto *proto = assocType->getProtocol();
         auto conformance = CS.lookupConformance(lookupBaseType, proto);
-        if (!conformance) {
+        if (conformance) {
+          auto result = conformance.getTypeWitness(assocType);
+          if (result && !result->hasError())
+            return result;
+        } else {
           // Special case: When building slab literals, we go through the same
           // array literal machinery, so there will be a conversion constraint
           // for the element to ExpressibleByArrayLiteral.ArrayLiteralType.
@@ -1742,23 +1750,25 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
             }
           }
 
-          // If the base type doesn't conform to the associatedtype's protocol,
-          // there will be a missing conformance fix applied in diagnostic mode,
-          // so the concrete dependent member type is considered a "hole" in
-          // order to continue solving.
-          auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
-          if (CS.inSalvageMode())
-            return PlaceholderType::get(CS.getASTContext(), memberTy);
-
-          return memberTy;
+          cannotConform = true;
         }
-
-        auto result = conformance.getTypeWitness(assocType);
-        if (result && !result->hasError())
-          return result;
+      } else if (!lookupBaseType->isTypeVariableOrMember()) {
+        // The base is a type that cannot have members, such as a function
+        // or metatype type, so it cannot conform to the protocol either.
+        cannotConform = true;
       }
 
-      return DependentMemberType::get(lookupBaseType, assocType);
+      auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
+
+      // If the base type doesn't conform to the associatedtype's protocol,
+      // there will be a missing conformance fix applied in diagnostic mode,
+      // so the concrete dependent member type is considered a "hole" in
+      // order to continue solving. Leaving a concrete dependent member type
+      // behind instead is not something the rest of the solver expects.
+      if (cannotConform && CS.inSalvageMode())
+        return PlaceholderType::get(CS.getASTContext(), memberTy);
+
+      return memberTy;
     }
 
     return std::nullopt;
