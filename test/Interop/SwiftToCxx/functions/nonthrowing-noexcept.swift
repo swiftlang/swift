@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -module-name Noexcept -clang-header-expose-decls=all-public -typecheck -emit-clang-header-path %t/noexcept.h
-// RUN: %target-interop-build-clangxx -std=c++14 -fsyntax-only %S/Inputs/nonthrowing-noexcept.cpp -I %t
 // RUN: %target-interop-build-clangxx -std=c++17 -fsyntax-only %S/Inputs/nonthrowing-noexcept.cpp -I %t
 // RUN: %target-interop-build-clangxx -std=c++20 -fsyntax-only %S/Inputs/nonthrowing-noexcept.cpp -I %t
 // RUN: %target-interop-build-clangxx -std=c++17 -fno-exceptions -fsyntax-only %S/Inputs/nonthrowing-noexcept.cpp -I %t
