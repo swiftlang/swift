@@ -274,12 +274,13 @@ struct TypeSubElementCount {
   /// computeNumLeafSubElements(F) when added to F's start sub element number
   /// will go to the next sibling node in the type tree, walking up the tree and
   /// attempting to find siblings if no further siblings exist.
-  TypeSubElementCount(SILType type, SILModule &mod,
+  TypeSubElementCount(SILType type,
+                      Lowering::TypeConverter &TC,
                       TypeExpansionContext context);
 
-  /// Helper method that invokes the SILModule &mod entry point.
+  /// Helper method that invokes the TypeConverter entry point.
   TypeSubElementCount(SILType type, SILFunction *fn)
-      : TypeSubElementCount(type, fn->getModule(), TypeExpansionContext(*fn)) {}
+      : TypeSubElementCount(type, fn->getModule().Types, TypeExpansionContext(*fn)) {}
 
   TypeSubElementCount(SILValue value);
 
