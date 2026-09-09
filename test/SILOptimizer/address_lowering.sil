@@ -3842,3 +3842,23 @@ bb0:
   return %0 : $T
 }
 
+
+sil hidden [ossa] @zzaMultiResultPair : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
+bb0(%0 : @guaranteed $T):
+  %1 = copy_value %0 : $T
+  %2 = copy_value %0 : $T
+  %3 = tuple (%1 : $T, %2 : $T)
+  return %3 : $(T, T)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @zzaMultiResultReturnsCallResult : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
+// CHECK:       bb0(%0 : $*T, %1 : $*T, %2 : $*T):
+// CHECK:         [[F:%[^ ]+]] = function_ref @zzaMultiResultPair
+// CHECK:         apply [[F]]<T>(%0, %1, %2)
+// CHECK:       } // end sil function 'zzaMultiResultReturnsCallResult'
+sil hidden [ossa] @zzaMultiResultReturnsCallResult : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
+bb0(%0 : @guaranteed $T):
+  %1 = function_ref @zzaMultiResultPair : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
+  %2 = apply %1<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
+  return %2 : $(T, T)
+}
