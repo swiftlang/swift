@@ -62,7 +62,7 @@
 #include "swift/Strings.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Frontend/CompilerInstance.h"
-#include "clang/Index/USRGeneration.h"
+#include "clang/UnifiedSymbolResolution/USRGeneration.h"
 #include "clang/Serialization/ASTReader.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -1559,7 +1559,8 @@ void Serializer::writeInputBlock() {
         auto *pch = clangImporter->getClangInstance()
                         .getASTReader()
                         ->getModuleManager()
-                        .lookupByFileName(Options.ImportedPCHPath);
+                        .lookupByFileName(clang::ModuleFileName::makeExplicit(
+                            Options.ImportedPCHPath));
         if (importedHeaderPath.empty())
           importedHeaderPath = pch->OriginalSourceFileName;
         pchIncludeTree = pch->IncludeTreeID;

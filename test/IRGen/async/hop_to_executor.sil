@@ -25,7 +25,7 @@ import _Concurrency
 // CHECK-arm64e:  [[T0:%.*]] = ptrtoint ptr [[RET_CONTINUATION]] to i64
 // CHECK-arm64e:  [[T1:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[T0]]
 // CHECK-arm64e:  [[RET_CONTINUATION:%.*]] = inttoptr i64 [[T1]] to ptr
-// CHECK: call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{.*}}, i1 false, ptr @[[TAIL_CALL_FUNC:.*]], ptr [[RET_CONTINUATION]]
+// CHECK: call void (ptr, i1, ...) @llvm.coro.end.async(ptr {{.*}}, i1 false, ptr @[[TAIL_CALL_FUNC:.*]], ptr [[RET_CONTINUATION]]
 // CHECK: unreachable
 
 sil @test_simple : $@async (@guaranteed Optional<Builtin.Executor>) -> () {

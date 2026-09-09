@@ -323,7 +323,7 @@ namespace {
     }
 
     template <class... T>
-    static size_t getExtraAllocationSize(T &&... ignored) {
+    [[maybe_unused]] static size_t getExtraAllocationSize(T &&... ignored) {
       return 0;
     }
   };
@@ -1107,7 +1107,7 @@ namespace {
     }
 
     template <class... T>
-    static size_t getExtraAllocationSize(T &&... ignored) {
+    [[maybe_unused]] static size_t getExtraAllocationSize(T &&... ignored) {
       return 0;
     }
   };
@@ -1255,7 +1255,7 @@ public:
   }
 
   template <class... Args>
-  static size_t getExtraAllocationSize(Args &&... ignored) {
+  [[maybe_unused]] static size_t getExtraAllocationSize(Args &&... ignored) {
     return 0;
   }
 };
