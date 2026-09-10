@@ -902,6 +902,13 @@ namespace {
              X->getType()    == RHS->getType();
     }
 
+    bool visitCOMMethodInst(COMMethodInst *RHS) {
+      auto *X = cast<COMMethodInst>(LHS);
+      return X->getMember() == RHS->getMember() &&
+             X->getOperand() == RHS->getOperand() &&
+             X->getType() == RHS->getType();
+    }
+
     bool visitObjCSuperMethodInst(ObjCSuperMethodInst *RHS) {
       auto *X = cast<ObjCSuperMethodInst>(LHS);
       return X->getMember()  == RHS->getMember() &&
@@ -2409,3 +2416,12 @@ ApplyInstBase<TryApplyInst, TryApplyInstBase, false>::getCalleeDeclRef() const;
 #include "swift/SIL/SILNodes.def"
 
 #endif
+
+namespace swift::test {
+static FunctionTest InstructionsIdentical(
+    "instructions-identical", [](auto &function, auto &arguments, auto &test) {
+      auto *lhs = arguments.takeInstruction();
+      auto *rhs = arguments.takeInstruction();
+      llvm::outs() << (lhs->isIdenticalTo(rhs) ? "true" : "false") << '\n';
+    });
+} // namespace swift::test
