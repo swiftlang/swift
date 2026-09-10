@@ -264,6 +264,7 @@ public:
   bool isCalleeThin() const {
     switch (getSubstCalleeType()->getRepresentation()) {
     case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:

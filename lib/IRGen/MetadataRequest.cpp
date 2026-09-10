@@ -3578,6 +3578,7 @@ public:
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::ObjCMethod:
+    case SILFunctionType::Representation::COMMethod:
     case SILFunctionType::Representation::CXXMethod:
     case SILFunctionType::Representation::CFunctionPointer:
     case SILFunctionType::Representation::Closure:
@@ -3763,6 +3764,7 @@ namespace {
       case SILFunctionType::Representation::Method:
       case SILFunctionType::Representation::WitnessMethod:
       case SILFunctionType::Representation::ObjCMethod:
+      case SILFunctionType::Representation::COMMethod:
       case SILFunctionType::Representation::CXXMethod:
       case SILFunctionType::Representation::CFunctionPointer:
       case SILFunctionType::Representation::Closure:
