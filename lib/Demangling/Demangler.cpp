@@ -4748,8 +4748,7 @@ NodePointer Demangler::demangleMacroExpansion() {
   } else {
     result = createWithChildren(kind, context, macroName, discriminator);
   }
-  if (privateDiscriminator)
-    result->addChild(privateDiscriminator, *this);
+  addChild(result, privateDiscriminator);
   return result;
 }
 
