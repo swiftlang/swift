@@ -2489,6 +2489,10 @@ The result is a context-free function with the `com_method` convention. A
 lookup does not consume its receiver. The receiver remains the final SIL
 argument when applying the resulting function.
 
+The lookup carries type-dependent operands for opened archetypes in both its
+receiver type and its result type. A generic callee type can omit the receiver's
+opened archetype, so the result type alone does not determine these dependencies.
+
 ### super_method
 
 ```

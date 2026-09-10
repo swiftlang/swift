@@ -1,0 +1,63 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -enable-sil-verify-all -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -emit-sib -module-name COMDependencies %s -o %t/COMDependencies.sib
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -enable-sil-verify-all -emit-sorted-sil -module-name COMDependencies %t/COMDependencies.sib | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -enable-sil-verify-all -inline %s | %FileCheck %s --check-prefix=CLONE
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IInterface {
+  func method() -> Int32
+}
+
+// The generic callee type does not mention the receiver's opened archetype.
+// A lookup through an address must still depend on the opening instruction,
+// not just on the instruction producing the address.
+// CHECK-LABEL: sil [ossa] @lookup_address
+// CHECK: [[OPEN:%[0-9]+]] = open_com_existential %0
+// CHECK: [[ADDRESS:%[0-9]+]] = alloc_stack $@opened({{.*}}, any IInterface) Self
+// CHECK: com_method [[ADDRESS]] : $*@opened({{.*}}, any IInterface) Self, #IInterface.method : {{.*}}, $@convention(com_method) <τ_0_0 where τ_0_0 : IInterface> (@in_guaranteed τ_0_0) -> Int32 // type-defs: [[OPEN]];
+sil [ossa] @lookup_address : $@convention(thin) (@owned IInterface) -> () {
+bb0(%value : @owned $IInterface):
+  %opened = open_com_existential %value : $IInterface to $@opened(1, IInterface) Self
+  %address = alloc_stack $@opened(1, IInterface) Self
+  store %opened to [init] %address : $*@opened(1, IInterface) Self
+  %method = com_method %address : $*@opened(1, IInterface) Self, #IInterface.method, $@convention(com_method) <T: IInterface> (@in_guaranteed T) -> Int32
+  fix_lifetime %method : $@convention(com_method) <T: IInterface> (@in_guaranteed T) -> Int32
+  destroy_addr %address : $*@opened(1, IInterface) Self
+  dealloc_stack %address : $*@opened(1, IInterface) Self
+  %result = tuple ()
+  return %result : $()
+}
+
+// The same rule applies to a receiver held directly as a SIL value.
+// CHECK-LABEL: sil [ossa] @lookup_value
+// CHECK: [[OPEN:%[0-9]+]] = open_com_existential %0
+// CHECK: com_method [[OPEN]] : {{.*}} // type-defs: [[OPEN]];
+sil [ossa] @lookup_value : $@convention(thin) (@guaranteed IInterface) -> () {
+bb0(%value : @guaranteed $IInterface):
+  %opened = open_com_existential %value : $IInterface to $@opened(2, IInterface) Self
+  %method = com_method %opened : $@opened(2, IInterface) Self, #IInterface.method, $@convention(com_method) <T: IInterface> (@in_guaranteed T) -> Int32
+  fix_lifetime %method : $@convention(com_method) <T: IInterface> (@in_guaranteed T) -> Int32
+  %result = tuple ()
+  return %result : $()
+}
+
+// Cloning must recreate the dependency on the newly opened archetype.
+// CLONE-LABEL: sil [ossa] @clone_lookup_address
+// CLONE: [[OPEN:%[0-9]+]] = open_com_existential %0
+// CLONE: [[ADDRESS:%[0-9]+]] = alloc_stack
+// CLONE: com_method [[ADDRESS]] : {{.*}} // type-defs: [[OPEN]];
+// CLONE-NOT: apply
+// CLONE: return
+sil [ossa] @clone_lookup_address : $@convention(thin) (@owned IInterface) -> () {
+bb0(%value : @owned $IInterface):
+  %function = function_ref @lookup_address : $@convention(thin) (@owned IInterface) -> ()
+  %result = apply %function(%value) : $@convention(thin) (@owned IInterface) -> ()
+  return %result : $()
+}
