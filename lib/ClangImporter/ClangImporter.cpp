@@ -8141,10 +8141,89 @@ static bool isInSystemHeader(const clang::Decl *decl) {
       decl->getLocation());
 }
 
+/// Emit the note explaining \p explanation at \p loc.
+static void
+diagnoseUnsafetyReason(ClangImporter::Implementation &Impl, HeaderLoc loc,
+                       importer::CxxUnsafetyExplanation explanation) {
+  bool named = explanation.culprit;
+  StringRef culprit = named ? explanation.culprit->getName() : StringRef();
+  auto note = [&](auto &&...args) { Impl.diagnose(loc, args...); };
+
+  switch (explanation.reason) {
+  case importer::CxxUnsafetyReason::IteratorFromBeginEnd:
+    return note(diag::cxx_unsafe_iterator_from_begin_end);
+  case importer::CxxUnsafetyReason::PointerProjection:
+    return note(diag::cxx_unsafe_pointer_projection);
+  case importer::CxxUnsafetyReason::KnownUnsafeStdMethod:
+    return note(diag::cxx_unsafe_known_std_method);
+  case importer::CxxUnsafetyReason::ReturnsIterator:
+    return note(diag::cxx_unsafe_returns_iterator);
+  case importer::CxxUnsafetyReason::ViewProjection:
+    return note(diag::cxx_unsafe_view_projection);
+
+  case importer::CxxUnsafetyReason::UnsafeField:
+    return note(diag::cxx_unsafe_field, named, culprit);
+  case importer::CxxUnsafetyReason::UnsafeTemplateArgument:
+    return note(diag::cxx_unsafe_template_argument, named,
+                         culprit);
+  case importer::CxxUnsafetyReason::ExplicitAnnotation:
+    return note(diag::cxx_unsafe_explicit_annotation, named,
+                         culprit);
+  case importer::CxxUnsafetyReason::IndirectView:
+    return note(diag::cxx_unsafe_indirect_view);
+
+  case importer::CxxUnsafetyReason::InferredResultDependence:
+    return note(diag::cxx_unsafe_inferred_result_dependence);
+  case importer::CxxUnsafetyReason::UnannotatedNonEscapableParam:
+    return note(diag::cxx_unsafe_unannotated_nonescapable_param,
+                         named, culprit);
+
+  case importer::CxxUnsafetyReason::SkippedLifetimeEscapableResult:
+    return note(diag::cxx_unsafe_skipped_lifetime_escapable_result);
+  case importer::CxxUnsafetyReason::SkippedLifetimeImportedAsClass:
+    return note(diag::cxx_unsafe_skipped_lifetime_imported_as_class, named,
+                culprit);
+  case importer::CxxUnsafetyReason::SkippedLifetimeRValueReference:
+    return note(diag::cxx_unsafe_skipped_lifetime_rvalue_reference, named,
+                culprit);
+  case importer::CxxUnsafetyReason::SkippedLifetimeNoBorrowableStorage:
+    return note(diag::cxx_unsafe_skipped_lifetime_no_borrowable_storage, named,
+                culprit);
+  }
+  llvm_unreachable("covered switch");
+}
+
+/// Emit the note explaining \p unknown at \p loc.
+static void
+diagnoseUnknownEscapability(ClangImporter::Implementation &Impl, HeaderLoc loc,
+                            importer::CxxUnknownEscapabilityReason reason,
+                            const clang::NamedDecl *culpritDecl) {
+  bool named = culpritDecl;
+  StringRef culprit = named ? culpritDecl->getName() : StringRef();
+  auto note = [&](auto &&...args) { Impl.diagnose(loc, args...); };
+  switch (reason) {
+  case importer::CxxUnknownEscapabilityReason::ConditionalArgument:
+    return note(diag::cxx_unknown_escapability_conditional_argument, named,
+                culprit);
+  case importer::CxxUnknownEscapabilityReason::CannotDeriveFromMembers:
+    return note(diag::cxx_unknown_escapability_cannot_derive);
+  case importer::CxxUnknownEscapabilityReason::Pointer:
+    // Named only when the member belongs to the type being explained; the
+    // traversal is flattened, so otherwise the caller follows the chain to the
+    // record that owns it.
+    return note(diag::cxx_unknown_escapability_pointer, named,
+                         culprit);
+  }
+  llvm_unreachable("covered switch");
+}
+
 void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
                                               SourceLoc useLoc) {
   if (decl)
     if (auto *original = Impl.getOriginalForClonedMember(decl))
+      decl = original;
+  if (auto *func = dyn_cast_or_null<FuncDecl>(decl))
+    if (auto *original = Impl.getOriginalForVirtualThunk(func))
       decl = original;
 
   // A declaration: explain which rule made this method unsafe.
@@ -8167,11 +8246,8 @@ void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
     // decision later.
     auto recorded = Impl.LifetimeUnsafetyReasons.find(decl);
     if (recorded != Impl.LifetimeUnsafetyReasons.end()) {
-      Impl.diagnose(HeaderLoc(clangDecl->getLocation(), useLoc),
-                    diag::cxx_unsafe_decl_reason,
-                    cast<clang::NamedDecl>(clangDecl)->getNameAsString(),
-                    importer::describe(recorded->second.reason,
-                                       recorded->second.culprit));
+      diagnoseUnsafetyReason(Impl, HeaderLoc(clangDecl->getLocation(), useLoc),
+                             recorded->second);
       return;
     }
 
@@ -8179,9 +8255,9 @@ void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
       if (auto reason =
               importer::shouldRenameCXXMethodAsUnsafe(method,
                                                       Impl.SwiftContext)) {
-        Impl.diagnose(HeaderLoc(method->getLocation(), useLoc),
-                      diag::cxx_unsafe_decl_reason, method->getNameAsString(),
-                      importer::describe(*reason));
+        diagnoseUnsafetyReason(Impl,
+                               HeaderLoc(method->getLocation(), useLoc),
+                               {*reason, nullptr});
         return;
       }
     }
@@ -8234,14 +8310,14 @@ void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
     if (!isInSystemHeader(current)) {
       // Naming the record the explanation moves to, not its member: the next
       // note describes that record.
-      auto phrase =
-          next ? importer::describe(
-                     importer::CxxUnknownEscapabilityReason::ConditionalArgument,
-                     next)
-               : importer::describe(unknown->reason, unknown->culprit);
-      Impl.diagnose(HeaderLoc(current->getLocation(), useLoc),
-                    diag::cxx_unknown_escapability_reason,
-                    current->getNameAsString(), phrase);
+      HeaderLoc loc(current->getLocation(), useLoc);
+      if (next)
+        diagnoseUnknownEscapability(
+            Impl, loc,
+            importer::CxxUnknownEscapabilityReason::ConditionalArgument, next);
+      else
+        diagnoseUnknownEscapability(Impl, loc, unknown->reason,
+                                    unknown->culprit);
     }
 
     current = next;
@@ -8252,11 +8328,10 @@ void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
   if (isInSystemHeader(recordDecl))
     return;
 
-  if (auto unsafe =
-          importer::explainRecordUnsafety(recordDecl, Impl.SwiftContext))
-    Impl.diagnose(HeaderLoc(recordDecl->getLocation(), useLoc),
-                  diag::cxx_unsafe_type_reason, recordDecl->getNameAsString(),
-                  importer::describe(unsafe->reason, unsafe->culprit));
+  if (auto unsafe = importer::explainRecordUnsafety(
+          recordDecl, Impl.SwiftContext, isa<ClassDecl>(nominal)))
+    diagnoseUnsafetyReason(Impl, HeaderLoc(recordDecl->getLocation(), useLoc),
+                           *unsafe);
 }
 
 bool ClangImporter::isAnnotatedWith(const clang::CXXMethodDecl *method,
@@ -9151,6 +9226,8 @@ computeClangDeclExplicitSafety(Evaluator &evaluator,
     }
 
     if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
+      // A base is always a record, never a pointer, so it is never unsafe on
+      // its own: the call enqueues it, and it is explained by what it contains.
       for (auto base : cxxRecordDecl->bases())
         (void)isUnsafe(base.getType());
     }
@@ -9175,8 +9252,8 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
 
 std::optional<importer::CxxUnsafetyExplanation>
 importer::explainRecordUnsafety(const clang::RecordDecl *recordDecl,
-                                ASTContext &ctx) {
-  ClangDeclExplicitSafetyDescriptor desc(recordDecl, /*isClass=*/false);
+                                ASTContext &ctx, bool isClass) {
+  ClangDeclExplicitSafetyDescriptor desc(recordDecl, isClass);
   // As in explainUnknownEscapability: the cached request answers whether there
   // is anything to explain, and only then is the walk repeated for the reason.
   if (evaluateOrDefault(ctx.evaluator, ClangDeclExplicitSafety(desc),

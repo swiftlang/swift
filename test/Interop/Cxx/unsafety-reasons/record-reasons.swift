@@ -23,24 +23,24 @@ struct SWIFT_UNSAFE Bad {
   int x;
 };
 
-// expected-note@+1 {{type 'HasBadField' is unsafe because 'Bad' is annotated unsafe in C++}}
+// expected-note@+1 {{'Bad' is annotated unsafe in C++}}
 struct HasBadField {
   Bad bad;
 };
 
-// expected-note@+1 {{type 'HasBadBase' is unsafe because 'Bad' is annotated unsafe in C++}}
+// expected-note@+1 {{'Bad' is annotated unsafe in C++}}
 struct HasBadBase : Bad {};
 
 // A non-escapable type is a safe "view" only if what it points to is
 // self-contained. A 'void *' could point at anything, so this one is not.
-// expected-note@+1 {{type 'Indirect' is unsafe because it is a non-escapable view whose lifetime dependency Swift cannot track}}
+// expected-note@+1 {{this is a non-escapable view whose lifetime dependency Swift cannot track}}
 struct SWIFT_NONESCAPABLE Indirect {
   void *p;
 };
 
 // When escapability is unknown and a reason was recorded for it, that is
 // reported instead: it is the root cause, and it is what the user can annotate.
-// expected-note@+1 {{type 'HasPointerField' has unknown escapability because its member 'p' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
+// expected-note@+1 {{this type has unknown escapability: its member 'p' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
 struct HasPointerField {
   int *p;
 };
@@ -49,7 +49,7 @@ struct HasPointerField {
 // the annotation already says everything -- so here the safety walk's own
 // reasons are what surface. The pointer field is found before the annotated
 // member type is popped, so it is the one named.
-// expected-note@+1 {{type 'MixedField' is unsafe because it has an unsafe field 'p'}}
+// expected-note@+1 {{this type has an unsafe field 'p'}}
 struct MixedField {
   Bad bad;
   int *p;
@@ -57,13 +57,13 @@ struct MixedField {
 
 // A base is only ever unsafe transitively, so the pointer field is named here
 // too, not the base.
-// expected-note@+1 {{type 'MixedBase' is unsafe because it has an unsafe field 'p'}}
+// expected-note@+1 {{this type has an unsafe field 'p'}}
 struct MixedBase : Bad {
   int *p;
 };
 
 // Template arguments are checked before fields.
-// expected-note@+1 {{type 'Pair' is unsafe because it has an unsafe template argument}}
+// expected-note@+1 {{this type has an unsafe template argument}}
 template <class T, class U> struct Pair { T a; U b; };
 using UnsafePair = Pair<int *, Bad>;
 

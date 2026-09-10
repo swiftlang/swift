@@ -25,7 +25,7 @@ struct SWIFT_NONESCAPABLE View {
 };
 
 // A non-escapable parameter with no lifetime annotation: the note names it.
-// expected-note@+1 {{'takeView' is unsafe because its non-escapable parameter 'v' has no lifetime annotation}}
+// expected-note@+1 {{non-escapable parameter 'v' has no lifetime annotation}}
 void takeView(View v);
 
 // Annotating the parameter as non-escaping settles it, so this one is safe and
@@ -38,10 +38,10 @@ struct Owner {
 
 // A written annotation Swift cannot represent: the note names the parameter and
 // what defeated the annotation.
-// expected-note@+1 {{'viewFromRValue' is unsafe because Swift cannot represent the lifetime annotation on parameter 'o', an rvalue reference that is not guaranteed to outlive the call}}
+// expected-note@+1 {{Swift cannot represent the lifetime annotation on parameter 'o', an rvalue reference that is not guaranteed to outlive the call}}
 View viewFromRValue(Owner &&o [[clang::lifetimebound]]);
 
-// expected-note@+1 {{'viewFromValue' is unsafe because Swift cannot represent the lifetime annotation on parameter 'o', which has no borrowable storage}}
+// expected-note@+1 {{Swift cannot represent the lifetime annotation on parameter 'o', which has no borrowable storage}}
 View viewFromValue(Owner o [[clang::lifetimebound]]);
 
 //--- test.swift

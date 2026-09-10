@@ -30,7 +30,7 @@ module Esc {
 #include <memory>
 
 // Not copyable and polymorphic, so escapability cannot be derived from members.
-// expected-note@+1 4 {{type 'Polymorphic' has unknown escapability because Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 4 {{this type has unknown escapability: Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
 struct Polymorphic {
   virtual ~Polymorphic() {}
   Polymorphic(const Polymorphic &) = delete;
@@ -46,7 +46,7 @@ inline std::shared_ptr<std::shared_ptr<Polymorphic>> makeNested() {
 }
 
 // When a member is what makes escapability underivable, the note names it.
-// expected-note@+1 2 {{type 'HasPointerMember' has unknown escapability because its member 'numbers' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
+// expected-note@+1 2 {{this type has unknown escapability: its member 'numbers' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
 struct HasPointerMember {
   int *numbers;
 };

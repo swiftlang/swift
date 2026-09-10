@@ -56,7 +56,7 @@ ViewOfIncomplete makeView();
 // Same shape without the reference annotation: not imported as a class, so this
 // one stays unsafe. Keeps the test honest about -strict-memory-safety being on.
 struct PlainFwd;
-// expected-note@+1 {{type 'HoldsPlainFwd' has unknown escapability because its member 'plain' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
+// expected-note@+1 {{this type has unknown escapability: its member 'plain' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
 struct HoldsPlainFwd {
   PlainFwd *plain;
 };

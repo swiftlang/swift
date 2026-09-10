@@ -211,12 +211,76 @@ NOTE(mark_safe_to_import, none, "annotate method '%0' with SWIFT_RETURNS_INDEPEN
                                 "make it available in Swift",
      (StringRef))
 
-NOTE(cxx_unsafe_decl_reason, none, "'%0' is unsafe because %1",
-     (StringRef, StringRef))
-NOTE(cxx_unsafe_type_reason, none, "type '%0' is unsafe because %1",
-     (StringRef, StringRef))
-NOTE(cxx_unknown_escapability_reason, none,
-     "type '%0' has unknown escapability because %1", (StringRef, StringRef))
+// Why the importer judged a C++ entity unsafe, emitted at the declaration
+// responsible. The unsafe-use diagnostic already names the declaration or type,
+// so these notes do not repeat it.
+NOTE(cxx_unsafe_iterator_from_begin_end, none,
+     "'begin' and 'end' are assumed to return iterators, which do not keep the "
+     "underlying storage alive", ())
+NOTE(cxx_unsafe_pointer_projection, none,
+     "this returns a pointer or reference into a type that owns its storage",
+     ())
+NOTE(cxx_unsafe_known_std_method, none,
+     "this standard library method is known to be hard to use correctly from "
+     "Swift", ())
+NOTE(cxx_unsafe_returns_iterator, none,
+     "this returns an iterator, which does not keep the underlying storage "
+     "alive", ())
+NOTE(cxx_unsafe_view_projection, none,
+     "this returns a view into a type that owns its storage", ())
+
+NOTE(cxx_unsafe_field, none,
+     "this type has an unsafe field%select{| '%1'}0", (bool, StringRef))
+NOTE(cxx_unsafe_template_argument, none,
+     "this type has an unsafe template argument%select{| '%1'}0",
+     (bool, StringRef))
+NOTE(cxx_unsafe_explicit_annotation, none,
+     "%select{this type is|'%1' is}0 annotated unsafe in C++",
+     (bool, StringRef))
+NOTE(cxx_unsafe_indirect_view, none,
+     "this is a non-escapable view whose lifetime dependency Swift cannot "
+     "track", ())
+
+NOTE(cxx_unsafe_inferred_result_dependence, none,
+     "this returns a non-escapable value whose lifetime Swift had to infer; "
+     "annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the "
+     "result depends on", ())
+NOTE(cxx_unsafe_unannotated_nonescapable_param, none,
+     "%select{this takes a non-escapable parameter with no lifetime annotation|"
+     "non-escapable parameter '%1' has no lifetime annotation}0",
+     (bool, StringRef))
+NOTE(cxx_unsafe_skipped_lifetime_escapable_result, none,
+     "this lifetime annotation is not enforced: the result is Escapable, so "
+     "Swift drops the dependency", ())
+// The annotation sits either on a parameter or on 'self', which has no
+// declaration to name.
+NOTE(cxx_unsafe_skipped_lifetime_imported_as_class, none,
+     "Swift cannot represent the lifetime annotation on "
+     "%select{'self'|parameter '%1'}0, which is imported as a class",
+     (bool, StringRef))
+NOTE(cxx_unsafe_skipped_lifetime_rvalue_reference, none,
+     "Swift cannot represent the lifetime annotation on "
+     "%select{'self'|parameter '%1'}0, an rvalue reference that is not "
+     "guaranteed to outlive the call", (bool, StringRef))
+NOTE(cxx_unsafe_skipped_lifetime_no_borrowable_storage, none,
+     "Swift cannot represent the lifetime annotation on "
+     "%select{'self'|parameter '%1'}0, which has no borrowable storage",
+     (bool, StringRef))
+
+// Why a type's escapability could not be determined. Also emitted at the type,
+// which is why these do not name it either.
+NOTE(cxx_unknown_escapability_conditional_argument, none,
+     "this type has unknown escapability: it depends on "
+     "%select{a type whose|'%1', whose}0 escapability is unknown",
+     (bool, StringRef))
+NOTE(cxx_unknown_escapability_cannot_derive, none,
+     "this type has unknown escapability: Swift cannot infer it from the type's "
+     "members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE",
+     ())
+NOTE(cxx_unknown_escapability_pointer, none,
+     "this type has unknown escapability: %select{it holds|its member '%1' is}0 "
+     "a pointer or reference, and Swift cannot tell whether it owns what it "
+     "points to", (bool, StringRef))
 
 NOTE(at_to_subscript, none, "do you want to replace it with a call "
                             "to the subscript operator?",

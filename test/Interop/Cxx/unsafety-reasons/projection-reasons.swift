@@ -21,12 +21,12 @@ module Proj {
 
 // The user-declared copy constructor makes Owner self-contained, so returning
 // a pointer out of it is a projection.
-// expected-note@+1 2 {{type 'Owner' has unknown escapability because Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 2 {{this type has unknown escapability: Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
 struct Owner {
   void *ptr;
   Owner(const Owner &);
 
-  // expected-note@+1 2 {{'data' is unsafe because it returns a pointer or reference into a type that owns its storage}}
+  // expected-note@+1 2 {{this returns a pointer or reference into a type that owns its storage}}
   int *data() const;
 };
 
@@ -38,7 +38,7 @@ struct Iter {
 };
 struct HasIter {
   int x;
-  // expected-note@+1 {{'get' is unsafe because it returns an iterator, which does not keep the underlying storage alive}}
+  // expected-note@+1 {{this returns an iterator, which does not keep the underlying storage alive}}
   Iter get() const;
 };
 
@@ -46,12 +46,12 @@ struct HasIter {
 struct SWIFT_NONESCAPABLE Slice {
   const int *p;
 };
-// expected-note@+1 {{type 'SelfContained' has unknown escapability because Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 {{this type has unknown escapability: Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
 struct SelfContained {
   void *ptr;
   SelfContained(const SelfContained &);
 
-  // expected-note@+1 {{'slice' is unsafe because it returns a view into a type that owns its storage}}
+  // expected-note@+1 {{this returns a view into a type that owns its storage}}
   Slice slice() const [[clang::lifetimebound]];
 };
 
@@ -62,7 +62,7 @@ namespace std {
 template <class T>
 struct set {
   T x;
-  // expected-note@+1 {{'insert' is unsafe because this standard library method is known to be hard to use correctly from Swift}}
+  // expected-note@+1 {{this standard library method is known to be hard to use correctly from Swift}}
   void insert(T value);
 };
 } // namespace std
@@ -70,7 +70,7 @@ using IntSet = std::set<int>;
 
 // A member inherited into a derived type is imported as a clone of the base's,
 // and is explained by the rule applied to the original.
-// expected-note@+1 {{type 'Derived' has unknown escapability because its escapability depends on 'Owner', whose escapability is unknown}}
+// expected-note@+1 {{this type has unknown escapability: it depends on 'Owner', whose escapability is unknown}}
 struct Derived : Owner {};
 
 //--- test.swift

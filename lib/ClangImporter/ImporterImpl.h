@@ -2420,9 +2420,13 @@ explainUnknownEscapability(const clang::RecordDecl *recordDecl,
 /// Which part of \p recordDecl made it unsafe, or nothing when it is not.
 ///
 /// Shares the ClangDeclExplicitSafety walk rather than repeating it, so the
-/// reason cannot contradict the verdict.
+/// reason cannot contradict the verdict. \p isClass must match how the record is
+/// imported: a type imported as a class inherits unsafety from its bases and
+/// from nothing else, so asking under the wrong rules can answer that a record
+/// is safe when the compiler treats it as unsafe.
 std::optional<CxxUnsafetyExplanation>
-explainRecordUnsafety(const clang::RecordDecl *recordDecl, ASTContext &ctx);
+explainRecordUnsafety(const clang::RecordDecl *recordDecl, ASTContext &ctx,
+                      bool isClass);
 
 /// Whether the C++ method \p method can be safely used in Swift, i.e. it is not
 /// a projection that could yield a dangling pointer/reference/iterator. Methods

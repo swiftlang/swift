@@ -48,7 +48,7 @@ struct SWIFT_IMMORTAL_REFERENCE Immortal {
 
 // Same shape, but not a reference type: escapability stays unknown, so this one
 // is still unsafe. Keeps the test honest about -strict-memory-safety being on.
-// expected-note@+1 2 {{type 'Polymorphic' has unknown escapability because Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 2 {{this type has unknown escapability: Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
 struct Polymorphic {
   virtual ~Polymorphic() {}
   Polymorphic(const Polymorphic &) = delete;

@@ -14,8 +14,6 @@
 #define SWIFT_CLANGIMPORTER_CXXUNSAFETYREASON_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/StringRef.h"
-#include <string>
 
 namespace clang {
 class NamedDecl;
@@ -97,18 +95,6 @@ struct CxxUnknownEscapability {
   /// different record, the explanation belongs to that one.
   const clang::RecordDecl *owner = nullptr;
 };
-
-/// A phrase completing "'x' is unsafe because ...". No leading capital, no
-/// trailing period.
-///
-/// Reasons that name a declaration fall back to wording without one when
-/// \p culprit is null, so callers need not check.
-std::string describe(CxxUnsafetyReason reason,
-                     const clang::NamedDecl *culprit = nullptr);
-
-/// A phrase completing "'x' has unknown escapability because ...".
-std::string describe(CxxUnknownEscapabilityReason reason,
-                     const clang::NamedDecl *culprit = nullptr);
 
 } // end namespace swift::importer
 
