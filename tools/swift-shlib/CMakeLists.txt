@@ -87,26 +87,19 @@ set_output_directory(SwiftCompilerShared
 # path, the linker cannot reason that they are the same and loads everything
 # twice.
 
-set(link_args)
-foreach(lib ${llvm_libraries} ${clang_libraries})
-  list(APPEND link_args ${lib} -Wl,-force_load,$<TARGET_LINKER_FILE:${lib}>)
-endforeach()
+target_link_libraries(SwiftCompilerShared PRIVATE ${llvm_libraries} ${clang_libraries} ${swift_libraries})
+
+list(TRANSFORM llvm_libraries REPLACE "(.+)" "LINKER:-force_load,$<TARGET_LINKER_FILE:\\1>")
+list(TRANSFORM clang_libraries REPLACE "(.+)" "LINKER:-force_load,$<TARGET_LINKER_FILE:\\1>")
+target_link_options(SwiftCompilerShared PRIVATE ${llvm_libraries} ${clang_libraries})
 
 foreach(lib ${swift_libraries})
   get_target_property(_is_pure_swift ${lib} PURE_SWIFT_LIB)
   get_target_property(_type ${lib} TYPE)
-  if (${_is_pure_swift})
-    list(APPEND link_args ${lib})
-  else()
-    if (_type STREQUAL "STATIC_LIBRARY")
-      list(APPEND link_args ${lib} -Wl,-force_load,$<TARGET_LINKER_FILE:${lib}>)
-    else()
-      list(APPEND link_args ${lib})
-    endif()
+  if (NOT ${_is_pure_swift} AND _type STREQUAL "STATIC_LIBRARY")
+    target_link_options(SwiftCompilerShared PRIVATE "LINKER:-force_load,$<TARGET_LINKER_FILE:${lib}>")
   endif()
 endforeach()
-
-target_link_libraries(SwiftCompilerShared PRIVATE ${link_args})
 
 set_property(
   TARGET SwiftCompilerShared
