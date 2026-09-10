@@ -7050,6 +7050,32 @@ Decl *Decl::getObjCImplementationDecl() const {
   return result.implementationDecl;
 }
 
+bool Decl::hasObjCImplementation() const {
+  if (!hasClangNode())
+    // This *is* the implementation, if it has one.
+    return false;
+
+  // ABI-only attributes don't have an `@implementation`, so query the API
+  // counterpart.
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->hasObjCImplementation();
+
+  // Only consult the already-populated interface-to-implementation cache.
+  // Unlike `getObjCImplementationDecl()`, we deliberately avoid evaluating
+  // `ObjCInterfaceAndImplementationRequest` here so that no reverse name
+  // lookup is performed. The cache is populated when the matching
+  // `@implementation` is type-checked, which precedes any SIL/IRGen query.
+  auto *loader = getASTContext().getClangModuleLoader();
+  if (!loader)
+    return false;
+  return static_cast<ClangImporter *>(loader)->hasObjCImplementation(this);
+}
+
+bool ClangImporter::hasObjCImplementation(const Decl *interfaceDecl) const {
+  return Impl.ImplementationsByInterface.count(const_cast<Decl *>(interfaceDecl));
+}
+
 llvm::TinyPtrVector<Decl *>
 ClangCategoryLookupRequest::evaluate(Evaluator &evaluator,
                                      ClangCategoryLookupDescriptor desc) const {
