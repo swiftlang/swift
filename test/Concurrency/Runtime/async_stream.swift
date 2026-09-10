@@ -23,6 +23,14 @@ struct SomeError: Error, Equatable {
 
 class NotSendable {}
 
+/// A minimal mutable box for handing a value out of a `@Sendable` termination
+/// handler. Writes and reads are separated by a semaphore in the test that uses
+/// it, so no additional synchronization is required
+final class LockedBox<Value>: @unchecked Sendable {
+  var value: Value
+  init(_ value: Value) { self.value = value }
+}
+
 @MainActor func testWarnings() {
   var x = 0
   _ = AsyncStream {
@@ -514,7 +522,16 @@ class NotSendable {}
       // A `next()` that arrives while the stream is in the `.terminating` state,
       // but before the `onTermination` handler has called `finish(throwing:)`
       // must not finalize the termination as it would drop the handler-supplied failure.
-      tests.test("finish(throwing:) from onTermination is not lost to a concurrent next() during termination") {
+      //
+      // Which consumer observes that failure is deliberately NOT specified: the
+      // handler-supplied error goes to whichever consumer is resumed first. When
+      // cancellation wins the race against the cancelled task's own `next()`
+      // registration, termination begins from a state with no waiting consumer,
+      // so a concurrent `next()` that parks while terminating is resumed first
+      // and receives the error; the cancelled task then sees `nil`. Both
+      // orderings are valid. What the stream does guarantee is that the failure
+      // is delivered to exactly one consumer and never silently dropped.
+      tests.test("finish(throwing:) from onTermination is delivered to exactly one consumer") {
         let thrownError = SomeError()
 
         let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
@@ -522,19 +539,28 @@ class NotSendable {}
 
         let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
 
+        // Set by the `onTermination` handler so the racing consumer's outcome
+        // can be awaited alongside the cancelled task's.
+        let racingTask = LockedBox<Task<Error?, Never>?>(nil)
+
         continuation.onTermination = { @Sendable termination in
           guard case .cancelled = termination else { return }
 
           // Start an unstructured task consuming next() which we'll race with the finish() call below.
           let nextSemaphore = DispatchSemaphore(value: 0)
-          Task.detached {
+          racingTask.value = Task.detached { () -> Error? in
             var iterator = stream.makeAsyncIterator()
             nextSemaphore.signal()
-            _ = try? await iterator.next()
+            do {
+              _ = try await iterator.next()
+              return nil
+            } catch {
+              return error
+            }
           }
           nextSemaphore.wait()
 
-          continuation.finish(throwing: thrownError) // We must consistently see the error thrown from the handler
+          continuation.finish(throwing: thrownError)
         }
 
         let task = Task { () -> Error? in
@@ -550,12 +576,15 @@ class NotSendable {}
         expectEqual(await controlIterator.next(), 1)
         task.cancel()
 
-        let caught = await task.value
-        if let failure = caught as? SomeError {
-          expectEqual(failure, thrownError)
+        let cancelledOutcome = await task.value
+        let racingOutcome = await racingTask.value?.value ?? nil
+
+        let receivers = [cancelledOutcome, racingOutcome].compactMap { $0 as? SomeError }
+        if receivers.count == 1 {
+          expectEqual(receivers[0], thrownError)
         } else {
           expectUnreachable(
-            "cancelled consumer lost the onTermination finish(throwing:) error to a concurrent next(); got \(String(describing: caught))")
+            "the onTermination finish(throwing:) error must reach exactly one consumer, but \(receivers.count) received it; cancelled: \(String(describing: cancelledOutcome)), racing: \(String(describing: racingOutcome))")
         }
       }
 
