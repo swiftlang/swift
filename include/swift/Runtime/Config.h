@@ -350,6 +350,9 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_concurrency_hook                                       \
   __ptrauth(ptrauth_key_function_pointer, 1,                                   \
             SpecialPointerAuthDiscriminators::ConcurrencyHook)
+#define __ptrauth_swift_thread_sanitizer_hook                                   \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::ThreadSanitizerHook)
 
 #if __has_attribute(ptrauth_struct)
 #define swift_ptrauth_struct(key, discriminator)                               \
@@ -395,6 +398,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_deinit_work_function
 #define __ptrauth_swift_is_global_actor_function
 #define __ptrauth_swift_concurrency_hook
+#define __ptrauth_swift_thread_sanitizer_hook
 #define swift_ptrauth_struct(key, discriminator)
 #define swift_ptrauth_struct_derived(from)
 #endif
