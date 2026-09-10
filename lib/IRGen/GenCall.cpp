@@ -4579,23 +4579,27 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
   unsigned firstParam = 0;
   unsigned paramEnd = FI.arg_size();
 
-  // Handle the ObjC prefix.
-  if (callee.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
+  switch (callee.getRepresentation()) {
+  case SILFunctionTypeRepresentation::ObjCMethod:
     // Ignore both the logical and the physical parameters associated
     // with self and (if not objc_direct) _cmd.
     firstParam += callee.isDirectObjCMethod() ? 1 :  2;
     params = params.drop_back();
+    break;
 
-  // Or the block prefix.
-  } else if (fnType->getRepresentation()
-                == SILFunctionTypeRepresentation::Block) {
+  case SILFunctionTypeRepresentation::Block:
     // Ignore the physical block-object parameter.
     firstParam += 1;
-  } else if (callee.getRepresentation() ==
-             SILFunctionTypeRepresentation::CXXMethod) {
+    break;
+
+  case SILFunctionTypeRepresentation::CXXMethod:
     // Skip the "self" param.
     firstParam += 1;
     params = params.drop_back();
+    break;
+
+  default:
+    break;
   }
 
   bool formalIndirectResult = fnType->getNumResults() > 0 &&
