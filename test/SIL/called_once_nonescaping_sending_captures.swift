@@ -152,15 +152,12 @@ func testNoncopyableRefAndUndo() {
     func test() {}
   }
 
-  // FIXME: There should be no errors here. This is currently considered to be
-  // a consuming use of `v` because `@called(once)` is never marked as `[on_stack]`.
-  // The move-only checker needs to be tought about non-escaping `@called(once)`.
-  let v = NCS() // expected-error {{'v' used after consume}}
-  calledOnce { // expected-note {{consumed here}}
+  let v = NCS()
+  calledOnce {
     v.test()
   }
 
-  _ = v // expected-note {{used here}}
+  _ = v // Ok
 }
 
 func testVarMutatedInClosure() {

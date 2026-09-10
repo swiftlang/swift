@@ -416,3 +416,32 @@ func testGenericEraseConsumesCapture<T: Usable & ~Copyable>(_ v: consuming T) {
   let fn = { @called(once) in v as any Usable & ~Copyable }
   _ = fn()
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s30called_once_consuming_captures35testBorrowingUseOfLetDoesNotConsumeyyF : $@convention(thin) () -> () {
+// CHECK:  [[R_BOX:%.*]] = alloc_box ${ let Resource }, let, name "r"
+// CHECK:  [[R_BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[R_BOX]] : ${ let Resource }
+// CHECK:  [[R_PROJ:%.*]] = project_box [[R_BORROW]] : ${ let Resource }, 0
+// CHECK:  [[CLOSURE_REF:%.*]] = function_ref @$s30called_once_consuming_captures35testBorrowingUseOfLetDoesNotConsumeyyFyyXEfU_
+// CHECK:  [[R_BORROW_COPY:%.*]] = copy_value [[R_BORROW]] : ${ let Resource }
+// CHECK:  partial_apply [called_once] [[CLOSURE_REF]]([[R_BORROW_COPY]]) : $@convention(thin) (@guaranteed { let Resource }) -> ()
+// CHECK:  [[R_READ_ADDR:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[R_PROJ]] : $*Resource
+// CHECK:  {{.*}} = load_borrow [[R_READ_ADDR]] : $*Resource
+// CHECK: } // end sil function '$s30called_once_consuming_captures35testBorrowingUseOfLetDoesNotConsumeyyF'
+
+// CHECK-LABEL: sil private [ossa] @$s30called_once_consuming_captures35testBorrowingUseOfLetDoesNotConsumeyyFyyXEfU_ : $@convention(thin) (@guaranteed { let Resource }) -> () {
+// CHECK: bb0([[R_CAPTURE:%.*]] : @closureCapture @guaranteed ${ let Resource }):
+// CHECK:  [[R_PROJ:%.*]] = project_box [[R_CAPTURE]] : ${ let Resource }, 0
+// CHECK:  [[R_ADDR:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[R_PROJ]] : $*Resource
+// CHECK:  [[R_BORROW:%.*]] = load_borrow [[R_ADDR]] : $*Resource
+// CHECK:  [[PEEK_REF:%.*]] = function_ref @$s30called_once_consuming_captures8ResourceV4peekyyF
+// CHECK:  apply [[PEEK_REF]]([[R_BORROW]]) : $@convention(method) (@guaranteed Resource) -> ()
+// CHECK: } // end sil function '$s30called_once_consuming_captures35testBorrowingUseOfLetDoesNotConsumeyyFyyXEfU_'
+func testBorrowingUseOfLetDoesNotConsume() {
+  func calledOnce(_: @called(once) () -> Void) {}
+
+  let r = Resource()
+  calledOnce {
+    r.peek()
+  }
+  _ = r
+}

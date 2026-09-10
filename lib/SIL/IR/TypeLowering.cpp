@@ -146,11 +146,17 @@ TypeConverter::getDeclCaptureKind(CapturedValue capture,
                           expansion.getResilienceExpansion()));
 
   // If this is a noncopyable 'let' constant that is not a shared paramdecl or
-  // used by a noescape capture, then we know it is boxed and want to pass it in
-  // its boxed form so we can obey Swift's capture reference semantics.
+  // used by a noescape (excluding `@called(once)`) capture, then we know it is
+  // boxed and want to pass it in its boxed form so we can obey Swift's capture
+  // reference semantics.
+  //
+  // `@called(once)` is special here since capturing as a `Constant` is going
+  // to consume the value due to owned callee convention used for "at most once"
+  // enforcement. If the capture is not marked as "consuming" it should be boxed
+  // even if it's a `let`.
   if (!var->supportsMutation()
       && contextTy->isNoncopyable()
-      && !capture.isNoEscape()) {
+      && (!capture.isNoEscape() || capture.isCalledOnce())) {
       auto *param = dyn_cast<ParamDecl>(var);
       if (!param || (param->getValueOwnership() != ValueOwnership::Shared &&
                      !param->isSelfParameter())) {
