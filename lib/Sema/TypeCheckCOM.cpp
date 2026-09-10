@@ -630,12 +630,8 @@ void validateIdentityRequirement(ProtocolDecl *PD,
     PD->setInvalid();
   }
 }
-}
 
-void com::validateIdentityProtocol(ProtocolDecl *PD) {
-  if (!PD->isCOMIdentity())
-    return;
-
+void validateIdentityProtocol(ProtocolDecl *PD) {
   auto &context = PD->getASTContext();
   if (PD->isSpecificProtocol(KnownProtocolKind::COMInterface)) {
     validateIdentityRequirement(PD, COMIdentityRequirementKind::InterfaceID,
@@ -661,6 +657,90 @@ void com::validateIdentityProtocol(ProtocolDecl *PD) {
     return;
   }
   llvm_unreachable("unhandled COMInteropModel");
+}
+
+bool validateInterfaceMethod(AbstractFunctionDecl *AFD) {
+  bool invalid = false;
+  DeclName name = AFD->getName();
+  if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
+    name = accessor->getStorage()->getName();
+
+  if (isa<ConstructorDecl>(AFD)) {
+    AFD->diagnose(diag::com_interface_unsupported_requirement, 0, name);
+    return true;
+  }
+
+  if (AFD->isStatic()) {
+    AFD->diagnose(diag::com_interface_unsupported_requirement, 1, name);
+    invalid = true;
+  }
+
+  if (AFD->hasGenericParamList()) {
+    AFD->diagnose(diag::com_interface_unsupported_requirement, 2, name);
+    invalid = true;
+  }
+
+  if (AFD->hasAsync()) {
+    AFD->diagnose(diag::com_interface_unsupported_requirement, 3, name);
+    invalid = true;
+  }
+
+  if (AFD->hasThrows()) {
+    AFD->diagnose(diag::com_interface_unsupported_requirement, 4, name);
+    invalid = true;
+  }
+
+  Type RTy = cast<FuncDecl>(AFD)->getResultInterfaceType();
+  if (!RTy->isVoid() && !RTy->isRepresentableIn(ForeignLanguage::C, AFD)) {
+    AFD->diagnose(diag::com_interface_unsupported_type, RTy, name);
+    invalid = true;
+  }
+
+  for (auto *P : *AFD->getParameters()) {
+    if (P->isVariadic() || P->getSpecifier() != ParamSpecifier::Default) {
+      AFD->diagnose(diag::com_interface_unsupported_parameter, P->getName(),
+                    name);
+      invalid = true;
+    }
+
+    Type PTy = P->getTypeInContext();
+    if (!PTy->isRepresentableIn(ForeignLanguage::C, AFD)) {
+      AFD->diagnose(diag::com_interface_unsupported_type, PTy, name);
+      invalid = true;
+    }
+  }
+
+  return invalid;
+}
+
+void validateInterfaceRequirements(ProtocolDecl *PD) {
+  bool invalid = false;
+  for (auto *member : PD->getProtocolRequirements()) {
+    if (auto *AT = dyn_cast<AssociatedTypeDecl>(member)) {
+      AT->diagnose(diag::com_interface_unsupported_requirement, 0,
+                   AT->getName());
+      invalid = true;
+    } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member)) {
+      invalid |= validateInterfaceMethod(AFD);
+    } else if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
+      ASD->visitOpaqueAccessors([&](AccessorDecl *AFD) {
+        if (AFD->requiresNewWitnessTableEntry())
+          invalid |= validateInterfaceMethod(AFD);
+      });
+    }
+  }
+
+  if (invalid)
+    PD->setInvalid();
+}
+
+} // end anonymous namespace
+
+void com::validateProtocol(ProtocolDecl *PD) {
+  if (PD->isCOMIdentity())
+    validateIdentityProtocol(PD);
+  else if (PD->isCOMInterface())
+    validateInterfaceRequirements(PD);
 }
 
 ProtocolConformance *
