@@ -235,13 +235,9 @@ private:
 /// initializations that have an addressable memory object to be stored into.
 class SingleBufferInitialization : virtual public Initialization {
   llvm::TinyPtrVector<CleanupHandle::AsPointer> SplitCleanups;
-
-  /// Whether this buffer may be initialized element-by-element via splitIntoTupleElements().
-  bool CanSplitIntoTupleElements = true;
-
 public:
   SingleBufferInitialization() {}
-
+  
   bool canPerformInPlaceInitialization() const override {
     return true;
   }
@@ -251,13 +247,9 @@ public:
                                               SILLocation loc) override = 0;
 
   bool isInPlaceInitializationOfGlobal() const override = 0;
-
+  
   bool canSplitIntoTupleElements() const override {
-    return CanSplitIntoTupleElements;
-  }
-
-  void setCanSplitIntoTupleElements(bool canSplit) {
-    CanSplitIntoTupleElements = canSplit;
+    return true;
   }
   
   MutableArrayRef<InitializationPtr>
