@@ -4199,7 +4199,7 @@ struct DbgIntrinsicEmitter {
     }
 
     // DbgValue: keep expression as-is (all derefs are explicit).
-    return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL,
+    return DIBuilder.insertDbgValue(Addr, VarInfo, Expr, DL,
                                              InsertBefore->getIterator());
   }
 
@@ -4218,7 +4218,7 @@ struct DbgIntrinsicEmitter {
     }
 
     // DbgValue: keep expression as-is (all derefs are explicit).
-    return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL, Block);
+    return DIBuilder.insertDbgValue(Addr, VarInfo, Expr, DL, Block);
   }
 };
 
@@ -4258,7 +4258,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   // /always/ emit an llvm.dbg.value of undef.
   // If we have undef, always emit a llvm.dbg.value in the current position.
   if (isa<llvm::UndefValue>(Storage)) {
-    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock);
+    DBuilder.insertDbgValue(Storage, Var, Expr, DL, ParentBlock);
     return;
   }
 
@@ -4357,13 +4357,13 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       // non-argument debug variable -- usually via a !DIExpression -- we
       // need to make sure that dbg.value is before any non-phi / no-dbg
       // instruction.
-      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, InsertPt);
+      DBuilder.insertDbgValue(Storage, Var, Expr, DL, InsertPt);
 
       return;
     }
   }
 
-  DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock->end());
+  DBuilder.insertDbgValue(Storage, Var, Expr, DL, ParentBlock->end());
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
