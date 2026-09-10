@@ -1579,6 +1579,44 @@ namespace {
                                  weakLinkage);
     }
 
+    /// Whether every class in this class's superclass chain, including the
+    /// class itself, is a Swift class with a known Swift implementation, i.e.
+    /// the hierarchy contains no Objective-C or imported classes.
+    bool hasOnlyKnownSwiftHierarchy(ClassDecl *cls) {
+      return !cls->walkSuperclasses([](ClassDecl *superclass) {
+        if (superclass->isObjC() || !superclass->hasKnownSwiftImplementation())
+          return TypeWalker::Action::Stop;
+        return TypeWalker::Action::Continue;
+      });
+    }
+
+    /// Whether the ivar list of this class can be replaced by a null pointer
+    /// in the rodata.
+    ///
+    /// Under -disable-objc-ivar-metadata, a class whose entire hierarchy is
+    /// Swift-only and whose metadata layout is fixed does not need its ivars
+    /// described to the Objective-C runtime: the ivar offsets are statically
+    /// known, so the runtime never has to slide them. Emitting a null ivar
+    /// list for such classes saves binary size, at the cost of introspecting
+    /// their ivars through the Objective-C runtime.
+    ///
+    /// Classes with Objective-C ancestry keep their ivar metadata even under
+    /// the flag, so that runtime and reflection paths walking ObjC ivars
+    /// through mixed Swift/Objective-C inheritance keep working.
+    bool shouldOmitIvarList() {
+      if (!IGM.getOptions().DisableObjCIvarMetadata)
+        return false;
+
+      ClassDecl *cls = getClass();
+      if (cls->isObjC() || cls->hasClangNode() ||
+          cls->getObjCImplementationDecl())
+        return false;
+      if (!hasOnlyKnownSwiftHierarchy(cls))
+        return false;
+
+      return IGM.getClassMetadataStrategy(cls) == ClassMetadataStrategy::Fixed;
+    }
+
     void emitRODataFields(ConstantStructBuilder &b,
                           ForMetaClass_t forMeta,
                           HasUpdateCallback_t hasUpdater) {
@@ -1646,7 +1684,7 @@ namespace {
       b.add(buildProtocolList(llvm::GlobalVariable::InternalLinkage));
 
       //   const ivar_list_t *ivars;
-      if (forMeta) {
+      if (forMeta || shouldOmitIvarList()) {
         b.addNullPointer(IGM.Int8PtrTy);
       } else {
         b.add(buildIvarList());
