@@ -4426,9 +4426,31 @@ ConstraintSystem::applyPropertyWrapperToParameter(
   auto wrapperInfo = param->getAttachedPropertyWrapperTypeInfo(0);
   if (!argLabel.hasDollarPrefix() && !wrapperInfo.wrappedValueInit &&
       param->hasExternalPropertyWrapper()) {
+    bool projectionResolves = false;
+
+    Type projectionType = computeProjectedValueType(param, wrapperType);
+    if (projectionType && !paramType->isEqual(wrapperType)) {
+      llvm::SaveAndRestore<ConstraintSystemOptions> options(
+          Options, Options - ConstraintSystemFlags::AllowFixes);
+      projectionResolves = matchTypes(paramType, projectionType, matchKind,
+                                      TypeMatchFlags::TMF_ApplyingFix, locator)
+                    == SolutionKind::Solved;
+    }
+    
+    
+    // If the property wrapper has a projected value and the type of the
+    // argument matches that of the projected value, record a fix to insert "$"
+    // on the argument label. Otherwise, record a fix for argument mismatch.
     auto *loc = getConstraintLocator(locator);
-    auto *fix = UsePropertyWrapper::create(
-        *this, param, /*usingProjection=*/true, paramType, wrapperType, loc);
+    ConstraintFix *fix;
+    if (projectionResolves) {
+      fix = UsePropertyWrapper::create(*this, param, /*usingProjection=*/true,
+                                       paramType, wrapperType, loc);
+    } else {
+      Type wrappedValueType = computeWrappedValueType(param, wrapperType);
+      fix = AllowArgumentMismatch::create(*this, paramType, wrappedValueType,
+                                          loc);
+    }
     return recordPropertyWrapperFix(fix);
   }
 
