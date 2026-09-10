@@ -1408,8 +1408,15 @@ public:
           parent = nextParent;
         }
         
+        // A subscript only accepts `&` on an argument when its parameters may
+        // be declared `inout`.
+        bool inoutSubscriptArg =
+            isa<SubscriptExpr>(parent) &&
+            Ctx.LangOpts.hasFeature(
+                Feature::SubscriptParametersWithOwnership);
+
         if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent) ||
-            isa<MacroExpansionExpr>(parent)) {
+            isa<MacroExpansionExpr>(parent) || inoutSubscriptArg) {
           // If outermost paren is associated with a call or
           // a member reference, it might be valid to have `&`
           // before all of the parens.

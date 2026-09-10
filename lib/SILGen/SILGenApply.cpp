@@ -7848,22 +7848,52 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
 
 static void collectFakeIndexParameters(SILGenFunction &SGF,
                                        CanType substType,
+                                       ValueOwnership ownership,
                                     SmallVectorImpl<SILParameterInfo> &params) {
-  if (auto tuple = dyn_cast<TupleType>(substType)) {
-    for (auto substEltType : tuple.getElementTypes())
-      collectFakeIndexParameters(SGF, substEltType, params);
-    return;
+  // An `inout` index is passed as a single address, even if its type is a
+  // tuple, so it must not be destructured into one parameter per element.
+  if (ownership != ValueOwnership::InOut) {
+    if (auto tuple = dyn_cast<TupleType>(substType)) {
+      for (auto substEltType : tuple.getElementTypes())
+        collectFakeIndexParameters(SGF, substEltType, ownership, params);
+      return;
+    }
   }
 
-  // Use conventions that will produce a +1 value.
   auto &tl = SGF.getTypeLowering(substType);
   ParameterConvention convention;
-  if (tl.getRecursiveProperties().isAddressOnly()) {
-    convention = ParameterConvention::Indirect_In;
-  } else if (tl.isTrivial()) {
-    convention = ParameterConvention::Direct_Unowned;
-  } else {
-    convention = ParameterConvention::Direct_Owned;
+
+  switch (ownership) {
+  case ValueOwnership::InOut:
+    // An `inout` index is a single exclusive access that spans the whole formal
+    // access on the storage.
+    convention = ParameterConvention::Indirect_Inout;
+    break;
+
+  case ValueOwnership::Shared:
+    // A `borrowing` index is borrowed for the whole formal access on the
+    // storage.
+    if (tl.getRecursiveProperties().isAddressOnly()) {
+      convention = ParameterConvention::Indirect_In_Guaranteed;
+    } else if (tl.isTrivial()) {
+      convention = ParameterConvention::Direct_Unowned;
+    } else {
+      convention = ParameterConvention::Direct_Guaranteed;
+    }
+    break;
+
+  case ValueOwnership::Default:
+  case ValueOwnership::Owned:
+    // Use conventions that will produce a +1 value, which the storage
+    // component then copies for each accessor it runs.
+    if (tl.getRecursiveProperties().isAddressOnly()) {
+      convention = ParameterConvention::Indirect_In;
+    } else if (tl.isTrivial()) {
+      convention = ParameterConvention::Direct_Unowned;
+    } else {
+      convention = ParameterConvention::Direct_Owned;
+    }
+    break;
   }
 
   params.push_back(SILParameterInfo{tl.getLoweredType().getASTType(),
@@ -7881,7 +7911,8 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
   SmallVector<SILParameterInfo, 4> substParamTys;
   for (auto substParam : substParams) {
     auto substParamType = substParam.getParameterType()->getCanonicalType();
-    collectFakeIndexParameters(SGF, substParamType, substParamTys);
+    collectFakeIndexParameters(SGF, substParamType,
+                               substParam.getValueOwnership(), substParamTys);
   }
 
   SmallVector<ManagedValue, 4> argValues;
@@ -7948,6 +7979,21 @@ PreparedArguments SILGenFunction::prepareIndices(SILLocation loc,
   ArrayRef<ManagedValue> remainingArgs = argValues;
   for (auto i : indices(substParams)) {
     auto substParamType = substParams[i].getParameterType()->getCanonicalType();
+
+    // An `inout` index is a single exclusive access on the argument, which the
+    // emission above has already opened.
+    if (substParams[i].isInOut()) {
+      auto address = remainingArgs.front();
+      remainingArgs = remainingArgs.slice(1);
+      result.addArbitrary(ArgumentSource(
+          argList->getExpr(i),
+          LValue::forAddress(SGFAccessKind::ReadWrite, address,
+                             /*enforcement=*/std::nullopt,
+                             AbstractionPattern(substParamType),
+                             substParamType)));
+      continue;
+    }
+
     auto count = RValue::getRValueSize(substParamType);
     RValue elt(*this, remainingArgs.slice(0, count), substParamType);
     result.add(argList->getExpr(i), std::move(elt));
@@ -8039,6 +8085,12 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
 
   if (!subscriptIndices.isNull()) {
     for (auto &component : std::move(subscriptIndices).getSources()) {
+      // An `inout` index is carried as an l-value referring to an access that
+      // has already been opened for the whole formal access on the storage.
+      if (component.isLValue()) {
+        values.addArbitrary(std::move(component));
+        continue;
+      }
       auto argLoc = component.getKnownRValueLocation();
       RValue &&arg = std::move(component).asKnownRValue(*this);
       values.add(argLoc, std::move(arg));
