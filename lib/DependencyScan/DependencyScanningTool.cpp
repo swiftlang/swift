@@ -409,10 +409,6 @@ llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
 
     Invocation->getFrontendOptions().LLVMArgs.clear();
 
-    // Setup the scanning service after the instance finishes setup.
-    if (ScanningService->setupDependencyScanningService(*Instance))
-      return std::make_error_code(std::errc::invalid_argument);
-
     (void)Instance->getMainModule();
   }
 
