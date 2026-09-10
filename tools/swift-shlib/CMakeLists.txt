@@ -87,11 +87,7 @@ set_output_directory(SwiftCompilerShared
 # path, the linker cannot reason that they are the same and loads everything
 # twice.
 
-target_link_libraries(SwiftCompilerShared PRIVATE ${llvm_libraries} ${clang_libraries} ${swift_libraries})
-
-list(TRANSFORM llvm_libraries REPLACE "(.+)" "LINKER:-force_load,$<TARGET_LINKER_FILE:\\1>")
-list(TRANSFORM clang_libraries REPLACE "(.+)" "LINKER:-force_load,$<TARGET_LINKER_FILE:\\1>")
-target_link_options(SwiftCompilerShared PRIVATE ${llvm_libraries} ${clang_libraries})
+target_link_libraries(SwiftCompilerShared PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,${llvm_libraries}>" "$<LINK_LIBRARY:WHOLE_ARCHIVE,${clang_libraries}>" ${swift_libraries})
 
 foreach(lib ${swift_libraries})
   get_target_property(_is_pure_swift ${lib} PURE_SWIFT_LIB)
