@@ -268,9 +268,42 @@ PreparedArguments::copy(SILGenFunction &SGF, SILLocation loc) const {
   if (isNull()) return PreparedArguments();
 
   assert(isValid());
-  PreparedArguments result(getParams());
-  for (auto &elt : Arguments) {
+  auto params = getParams();
+  PreparedArguments result(params);
+  for (auto i : indices(Arguments)) {
+    auto &elt = Arguments[i];
+
+    // An `inout` argument is a single exclusive access that spans the whole
+    // formal access, so every accessor that access runs has to mutate through
+    // it.
+    if (params[i].isInOut()) {
+      assert(elt.isLValue());
+      auto shared = elt.asKnownLValue().copyOfValueReference();
+      assert(shared.isValid() &&
+             "an inout argument must be an already-opened access");
+      result.addArbitrary(
+          ArgumentSource(elt.getKnownLValueLocation(), std::move(shared)));
+      continue;
+    }
+
     assert(elt.isRValue());
+    // A `borrowing` argument is only borrowed for the duration of the formal
+    // access it belongs to, so hand out another borrow of the same value
+    // rather than copying it.
+    if (params[i].getValueOwnership() == ValueOwnership::Shared) {
+      auto &rvalue = elt.asKnownRValue();
+      result.add(elt.getKnownRValueLocation(),
+                 SGF.isInFormalEvaluationScope()
+                     ? rvalue.formalAccessBorrow(SGF, loc)
+                     : rvalue.borrow(SGF, loc));
+      continue;
+    }
+
+    // A `consuming` argument is consumed by whichever accessor runs, so it must
+    // never be shared between two of them.
+    assert(params[i].getValueOwnership() != ValueOwnership::Owned &&
+           "a consuming argument would be consumed more than once");
+
     result.add(elt.getKnownRValueLocation(),
                elt.asKnownRValue().copy(SGF, loc));
   }
