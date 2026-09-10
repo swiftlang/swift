@@ -877,6 +877,12 @@ function(add_swift_host_library name)
       ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
       LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
       RUNTIME DESTINATION bin COMPONENT dev)
+    if(ASHL_SHARED AND CMAKE_CXX_LINKER_SUPPORTS_PDB)
+      swift_install_in_component(FILES $<TARGET_PDB_FILE:${name}>
+        DESTINATION bin
+        COMPONENT dev
+        OPTIONAL)
+    endif()
   endif()
 
   swift_is_installing_component(dev is_installing)
@@ -1071,6 +1077,12 @@ function(add_swift_host_tool executable)
                                  DESTINATION bin
                                  COMPONENT ${ASHT_SWIFT_COMPONENT}
     )
+    if(CMAKE_CXX_LINKER_SUPPORTS_PDB)
+      swift_install_in_component(FILES $<TARGET_PDB_FILE:${executable}>
+                                  DESTINATION bin
+                                  COMPONENT ${ASHT_SWIFT_COMPONENT}
+                                  OPTIONAL)
+    endif()
 
     swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
   endif()
