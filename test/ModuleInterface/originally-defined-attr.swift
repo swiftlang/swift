@@ -85,3 +85,9 @@ public struct SimpleThingInAlphabeticalOrderForMacros5_VersionsMappingTo27 {}
 @available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
 @_originallyDefinedIn(module: "pre26", macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26)
 public struct SimpleThingInAlphabeticalOrderForMacros6_Version26 {}
+
+// CHECK: @_originallyDefinedIn(module: "Foo;FooCompatibility", macOS 13.13)
+// CHECK-LABEL: struct SimpleThingInAlphabeticalOrderForMacros8_DifferentLinkerModule
+@available(OSX 10.8, *)
+@_originallyDefinedIn(module: "Foo;FooCompatibility", OSX 13.13)
+public struct SimpleThingInAlphabeticalOrderForMacros8_DifferentLinkerModule {}
