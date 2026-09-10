@@ -8885,8 +8885,8 @@ bool KeyPathRootTypeMismatchFailure::diagnoseAsError() {
 
 bool MultiArgFuncKeyPathFailure::diagnoseAsError() {
   // Diagnose use a keypath where a function with multiple arguments is expected
-  emitDiagnostic(diag::expr_keypath_multiparam_func_conversion,
-                 resolveType(functionType));
+  emitDiagnostic(diag::expr_keypath_wrong_param_func_conversion,
+                 resolveType(functionType), resolveType(expectedType));
   return true;
 }
 
