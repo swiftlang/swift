@@ -192,7 +192,6 @@ KNOWN_SETTINGS=(
     lldb-assertions                               "1"               "build lldb with assertions enabled"
     lldb-extra-cmake-args                         ""                "extra command line args to pass to lldb cmake"
     lldb-test-cc                                  ""                "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
-    lldb-test-swift-compatibility                 ""                "specify additional Swift compilers to test lldb with"
     lldb-test-swift-only                          "0"               "when running lldb tests, only include Swift-specific tests"
     lldb-use-system-debugserver                   ""                "don't try to codesign debugserver, and use the system's debugserver instead"
     lldb-configure-tests                          "1"               "if set, will make sure we configure LLDB's test target without running the tests"
@@ -2776,18 +2775,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
                          ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
-
-                if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
-                    echo "Running LLDB swift compatibility tests against" \
-                         "${LLDB_TEST_SWIFT_COMPATIBILITY}"
-                    DOTEST_ARGS="-G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\""
-                    with_pushd ${results_dir} \
-                       call "${llvm_build_dir}/bin/llvm-lit" \
-                            "${lldb_build_dir}/test" \
-                            ${LLVM_LIT_ARGS} \
-                            --param dotest-args="${DOTEST_ARGS}" \
-                            --filter=compat
-                fi
                 continue
                 ;;
             llbuild)
