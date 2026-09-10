@@ -120,9 +120,7 @@ fileprivate struct Disconnected<Value: ~Copyable>: ~Copyable, @unchecked Sendabl
 /// Once the stream has reached its terminal state, all subsequent consumers will **immediately return nil**,
 /// and any **new values are rejected**.
 @safe
-internal final class _AsyncStreamStorage<
-  Element, Failure: Error, PublicTermination
->: @unchecked Sendable {
+internal final class _AsyncStreamStorage<Element, Failure: Error>: @unchecked Sendable {
   struct Continuation {
     enum BufferingPolicy {
       case unbounded
@@ -152,7 +150,7 @@ internal final class _AsyncStreamStorage<
     typealias Buffer = _Deque<Element>
     typealias Consumer = UnsafeContinuation<Result<Element?, Failure>, Never> // TODO: Switch to ~Copyable Continuation
     typealias Consumers = _Deque<Consumer> // TODO: Switch to UniqueDeque
-    typealias TerminationHandler = _AsyncStreamTerminationHandlerBox<Element, Failure, PublicTermination>
+    typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
 
     @unsafe
     enum State: ~Copyable {
@@ -266,33 +264,6 @@ internal final class _AsyncStreamStorage<
   }
 }
 
-/// Holds the termination handler an adopter installed through the public
-/// `Continuation.onTermination` setter.
-@safe
-internal final class _AsyncStreamTerminationHandlerBox<
-  Element, Failure: Error, TerminationType
->: Sendable {
-  typealias StorageTermination =
-    _AsyncStreamStorage<Element, Failure, TerminationType>.Continuation.Termination
-
-  let handler: @Sendable (TerminationType) -> Void
-  private let invokeHandler: @Sendable (StorageTermination) -> Void
-
-  /// `map` translates the storage's `Termination` and is installed once, when
-  /// the box is created, so no wrapper is ever appended to `handler` itself
-  init(
-    handler: @escaping @Sendable (TerminationType) -> Void,
-    map: @escaping @Sendable (StorageTermination) -> TerminationType
-  ) {
-    self.handler = handler
-    self.invokeHandler = { termination in handler(map(termination)) }
-  }
-
-  func invoke(_ termination: StorageTermination) {
-    self.invokeHandler(termination)
-  }
-}
-
 extension _AsyncStreamStorage.StateMachine {
   enum BufferingNewestDecision {
     case append
@@ -326,35 +297,24 @@ extension _AsyncStreamStorage.StateMachine {
     }
   }
 
-  /// Set a termination handler.
-  ///
-  /// - Returns: the previous handler, if there was one.
-  mutating func setOnTermination(_ newValue: TerminationHandler?) -> TerminationHandler? {
-    var previous: TerminationHandler? = nil
-
+  mutating func setOnTermination(_ newValue: TerminationHandler?) {
     switch unsafe consume self.state { // TODO: Set a TerminationHandler only in certain states
     case .idle(var idle):
-      previous = idle.terminationHandler
       idle.terminationHandler = newValue
       unsafe self = .init(state: .idle(idle))
 
     case .waiting(var waiting):
-      previous = unsafe waiting.terminationHandler
       unsafe waiting.terminationHandler = newValue
       unsafe self = .init(state: .waiting(waiting))
 
     case .draining(var draining):
-      previous = draining.terminationHandler
       draining.terminationHandler = newValue
       unsafe self = .init(state: .draining(draining))
 
     case .terminated(var terminated):
-      previous = terminated.terminationHandler
       terminated.terminationHandler = newValue
       unsafe self = .init(state: .terminated(terminated))
     }
-
-    return previous
   }
 
   mutating func yield(_ value: consuming sending Element) -> YieldAction {
@@ -575,13 +535,9 @@ extension _AsyncStreamStorage {
   }
 
   func setOnTermination(_ newValue: StateMachine.TerminationHandler?) {
-    // The handler we're replacing must be released after the lock is
-    // dropped: an adopter may have composed a chain of handlers, and releasing
-    // that chain can run arbitrary `deinit` code
-    let previous = withLock { state in
-      return state.setOnTermination(newValue)
+    withLock { state in
+      state.setOnTermination(newValue)
     }
-    withExtendedLifetime(previous) {}
   }
 
   func yield(_ value: consuming sending Element) -> Continuation.YieldResult {
@@ -644,7 +600,7 @@ extension _AsyncStreamStorage {
 
     switch unsafe consume action {
     case .callAndResume(var callAndResume):
-      unsafe callAndResume.terminationHandler?.invoke(terminationReason)
+      unsafe callAndResume.terminationHandler?(terminationReason)
 
       if let failure = unsafe callAndResume.failure {
         let consumer = unsafe callAndResume.consumers.removeFirst()
@@ -656,7 +612,7 @@ extension _AsyncStreamStorage {
       }
 
     case .call(let terminationHandler):
-      terminationHandler?.invoke(terminationReason)
+      terminationHandler?(terminationReason)
 
     case .none:
       return

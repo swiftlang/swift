@@ -122,9 +122,7 @@ public struct AsyncStream<Element> {
       /// The stream finished as a result of cancellation.
       case cancelled
     }
-
-    internal typealias Storage = _AsyncStreamStorage<Element, Never, Termination>
-
+    
     /// A type that indicates the result of yielding a value to a client, by
     /// way of the continuation.
     ///
@@ -183,7 +181,7 @@ public struct AsyncStream<Element> {
       case bufferingNewest(Int)
     }
 
-    let storage: Storage
+    let storage: _AsyncStreamStorage<Element, Never>
 
     /// Resume the task awaiting the next iteration point by having it return
     /// normally from its suspension point with a given element.
@@ -231,20 +229,20 @@ public struct AsyncStream<Element> {
     /// ``withTaskCancellationHandler(operation:onCancel:)``.
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
-        return unbox(storage.getOnTermination())
+        return adaptToStreamTerminationHandler(storage.getOnTermination())
       }
       nonmutating set {
-        storage.setOnTermination(box(newValue))
+        storage.setOnTermination(adaptToStorageTerminationHandler(newValue))
       }
     }
   }
 
   final class _Context {
-    let storage: Continuation.Storage?
+    let storage: _AsyncStreamStorage<Element, Never>?
     let produce: () async -> Element?
 
     init(
-      storage: Continuation.Storage? = nil,
+      storage: _AsyncStreamStorage<Element, Never>? = nil,
       produce: @escaping () async -> Element?
     ) {
       self.storage = storage
@@ -306,7 +304,7 @@ public struct AsyncStream<Element> {
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
     _ build: (Continuation) -> Void
   ) {
-    let storage: Continuation.Storage = .init(
+    let storage: _AsyncStreamStorage<Element, Never> = .init(
       bufferingPolicy: limit.asStorageBufferingPolicy()
     )
     context = _Context(storage: storage, produce: storage.next)
