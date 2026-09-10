@@ -902,10 +902,12 @@ ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 /// are type names.
 ///
 /// \param preferTypeLookup Resolve an identifier that names a type as a type,
-/// without performing unqualified value lookup. Use this where value lookup is
-/// not available, such as while computing a protocol's structural requirements.
+/// without performing unqualified value lookup, and fold a dotted name rooted
+/// at a dependent type into a member type from its syntax alone. Use this only
+/// where value lookup would cycle: computing the structural requirements of a
+/// protocol, which is what that lookup would ask for.
 TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E,
-                                          bool preferTypeLookup = false);
+                                          bool preferTypeLookup);
 
 /// \name Name lookup
 ///
