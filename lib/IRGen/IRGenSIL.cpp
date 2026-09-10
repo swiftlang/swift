@@ -834,7 +834,7 @@ public:
         llvm::findDbgValues(Var, DbgValues);
         for (auto *DVR : DbgValues)
           if (DVR->getParent() == BB)
-            IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
+            IGM.DebugInfo->getBuilder().insertDbgValue(
                 DVR->getValue(), DVR->getVariable(), DVR->getExpression(),
                 DVR->getDebugLoc(), CurBB->getFirstInsertionPt());
       }
