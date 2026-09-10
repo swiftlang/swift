@@ -268,7 +268,12 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
         ++Cost;
       if (auto AI = FullApplySite::isa(&Inst)) {
         auto Callee = AI.getCalleeFunction();
-        if (Callee && getEligibleFunction(AI, InlineSelection::Everything, SRA)) {
+        if (!Callee) {
+          // If the callee is unknown, we cannot estimate the cost of unrolling,
+          // bailout.
+          return false;
+        }
+        if (getEligibleFunction(AI, InlineSelection::Everything, SRA)) {
           // If callee is rather big and potentially inlinable, it may be better
           // not to unroll, so that the body of the callee can be inlined later.
           Cost += Callee->size() * InsnsPerBB;
