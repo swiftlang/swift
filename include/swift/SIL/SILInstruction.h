@@ -8373,6 +8373,25 @@ public:
   }
 };
 
+/// Opens a COM existential while preserving its one-word interface-pointer
+/// representation. The result is not a Swift class reference.
+class OpenCOMExistentialInst
+    : public UnaryInstructionBase<SILInstructionKind::OpenCOMExistentialInst,
+                                  OwnershipForwardingSingleValueInstruction> {
+  friend SILBuilder;
+
+  OpenCOMExistentialInst(SILDebugLocation dl, SILValue operand, SILType type,
+                         ValueOwnershipKind forwardingOwnershipKind);
+
+public:
+  CanExistentialArchetypeType getDefinedOpenedArchetype() const {
+    const auto archetype = getOpenedArchetypeOf(getType().getASTType());
+    assert(archetype && archetype->isRoot() &&
+           "Type should be a root opened archetype");
+    return archetype;
+  }
+};
+
 /// Given an existential metatype,
 /// "opens" the existential by returning a pointer to a fresh
 /// archetype metatype T.Type, which also captures the (dynamic)
@@ -12006,6 +12025,7 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:

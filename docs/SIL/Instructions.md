@@ -4098,6 +4098,22 @@ pointer can be used with any operation on archetypes, such as
 [witness_method](#witness_method). When the operand is of metatype type,
 the result will be the metatype of the opened archetype.
 
+### open_com_existential
+
+```
+sil-instruction ::= 'open_com_existential' sil-operand 'to' sil-type
+
+%1 = open_com_existential %0 : $any P to $@opened(1, any P) Self
+```
+
+Opens a COM existential value as a fresh archetype with the same interface
+constraints. Both operand and result are object values. The result preserves
+the existential's interface-pointer representation and forwards ownership of
+the operand. It is a nontrivial, loadable value, not a Swift class reference.
+
+The instruction defines the opened archetype for subsequent instructions in
+the function. Cloning an opening creates a fresh archetype and remaps its uses.
+
 ### init_existential_metatype
 
 ```
