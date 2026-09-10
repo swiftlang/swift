@@ -38,6 +38,8 @@ extension ASTGenVisitor {
       return self.generate(enumDecl: node)?.asDecl
     case .extensionDecl(let node):
       return self.generate(extensionDecl: node).asDecl
+    case .fileDefaultDecl(let node):
+      return self.generate(fileDefaultDecl: node)?.asDecl
     case .functionDecl(let node):
       return self.generate(functionDecl: node)?.asDecl
     case .ifConfigDecl:
@@ -72,8 +74,6 @@ extension ASTGenVisitor {
       return nil
     case .variableDecl(let node):
       return self.generate(variableDecl: node)
-    case .usingDecl(let node):
-      return self.generate(usingDecl: node)?.asDecl
     }
   }
 
@@ -1145,7 +1145,7 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  func generate(usingDecl node: UsingDeclSyntax) -> BridgedFileDefaultDecl? {
+  func generate(fileDefaultDecl node: FileDefaultDeclSyntax) -> BridgedFileDefaultDecl? {
     var attrs = BridgedDeclAttributes()
     var addedAny = false
 
@@ -1157,7 +1157,7 @@ extension ASTGenVisitor {
       }
     case .modifier(let modifier):
       guard case .identifier("nonisolated") = modifier.tokenKind else {
-        self.diagnose(.invalidDefaultSpecifier(node.specifier))
+        self.diagnose(.invalidFileDefaultSpecifier(node.specifier))
         return nil
       }
       let nonisolatedAttr = BridgedNonisolatedAttr.createParsed(
@@ -1170,14 +1170,14 @@ extension ASTGenVisitor {
       addedAny = true
     }
     guard addedAny else {
-      self.diagnose(.invalidDefaultSpecifier(node.specifier))
+      self.diagnose(.invalidFileDefaultSpecifier(node.specifier))
       return nil
     }
 
     return BridgedFileDefaultDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
-      defaultKeywordLoc: self.generateSourceLoc(node.usingKeyword),
+      defaultKeywordLoc: self.generateSourceLoc(node.defaultKeyword),
       specifiedAttributes: attrs
     )
   }

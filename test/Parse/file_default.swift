@@ -4,105 +4,160 @@
 
 // REQUIRES: concurrency
 
-using @MainActor
+default @MainActor
 // expected-note@-1:1 {{file-level default isolation previously declared here}}
 
-using nonisolated
-// expected-error@-1:1 {{invalid redeclaration of file-level default isolation}}
+nonisolated func foo() {}
+foo(); default nonisolated; foo()
+// expected-error@-1:8 {{invalid redeclaration of file-level default isolation}}
 
-using @Test // expected-error {{cannot find type 'Test' in scope}}
-// expected-note@-1:7 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
-using test // expected-error@:7 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'using'}}
+default @diagnose(StrictMemorySafety, as: error)
 
-using @inlinable
-// expected-error@-1 {{'@inlinable' is not valid in a 'using' declaration}}
-// expected-note@-2 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+default @diagnose(StrictMemorySafety, as: warning); default @diagnose(StrictMemorySafety, as: error)
 
-using @backDeployed(before: macOS 13.0)
-// expected-error@-1:8 {{'@backDeployed' is not valid in a 'using' declaration}}
-// expected-note@-2:8 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+default @diagnose(StrictMemorySafety, as: error) func frog() {}
+// expected-error@-1:49 {{consecutive statements on a line must be separated by ';'}}{{49-49=;}}
 
-using @backDeployed(before: macOS 13.0, iOS 16.0)
-// expected-error@-1:8 {{'@backDeployed' is not valid in a 'using' declaration}}
-// expected-note@-2:8 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+default func bizarre() {}
+// expected-error@-1:9 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
 
-using @_originallyDefinedIn(module: "Other", macOS 13.0)
-// expected-error@-1:8 {{'@_originallyDefinedIn' is not valid in a 'using' declaration}}
-// expected-note@-2:8 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+default foo
+// expected-error@-1:9 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
 
-using @_originallyDefinedIn(module: "Other", macOS 13.0, iOS 16.0)
-// expected-error@-1:8 {{'@_originallyDefinedIn' is not valid in a 'using' declaration}}
-// expected-note@-2:8 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+default `nonisolated`
+// expected-error@-1:9 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
 
-do {
-  using // expected-warning {{expression of type 'Int' is unused}}
-  @MainActor
-// expected-error@+1 {{expected declaration}}
-}
+default =
+// expected-error@-1:9 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
 
-using @diagnose(StrictMemorySafety, as: error)
+default @foo
+// expected-error@-1:10 {{cannot find type 'foo' in scope}}
+// expected-note@-2:9 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
 
-// We have a tailored diagnostic for global actors that aren't MainActor.
+// Looking on the next line would risk cascading errors.
+default
+// expected-error@-1:8 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
+nonisolated func bar() {}
+
+default
+// expected-error@-1:8 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
+@available(*, deprecated, message: "no more baz!")
+func baz() {}
+
+default
+// expected-error@-1:8 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
+
+// TODO: in the future, consider a more nuanced recovery for ':' in file level default?
+
+default: @MainActor
+// expected-error@-1:1 {{'default' label can only appear inside a 'switch' statement}} {{none}}
+
+// An example of why we probably can't just look for '@':
+func braceMismatch() {
+  switch Bool.random() {
+  case true: break
+  case false: break
+  }} // Accidentally close the switch early...
+  default: @MainActor struct Bar {}
+  // expected-error@-1:3 {{'default' label can only appear inside a 'switch' statement}} {{none}}
+
+private default @diagnose(StrictMemorySafety, as: error)
+// expected-error@-1:1 {{attribute cannot be attached to a file-level default}}
+
+default @inlinable
+// expected-error@-1:9 {{'@inlinable' is not a valid file-level default}}
+// expected-note@-2:9 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
+
+default @backDeployed(before: macOS 13.0)
+// expected-error@-1:10 {{'@backDeployed' is not a valid file-level default}}
+// expected-note@-2:10 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
+
+default @backDeployed(before: macOS 13.0, iOS 16.0)
+// expected-error@-1:10 {{'@backDeployed' is not a valid file-level default}}
+// expected-note@-2:10 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
+
+default @_originallyDefinedIn(module: "Other", macOS 13.0)
+// expected-error@-1:10 {{'@_originallyDefinedIn' is not a valid file-level default}}
+// expected-note@-2:10 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
+
+default @_originallyDefinedIn(module: "Other", macOS 13.0, iOS 16.0)
+// expected-error@-1:10 {{'@_originallyDefinedIn' is not a valid file-level default}}
+// expected-note@-2:10 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
+
 @globalActor
 actor MyActor { // expected-note@:7 {{'MyActor' declared here}}
   static let shared = MyActor()
-  using @MyActor
+  default @MyActor
   // expected-error@-1:3 {{declaration is only valid at file scope}}
-  // TODO: we don't diagnose nested 'using' misuse since the request doesn't see it.
+  // TODO: we don't diagnose nested 'default' misuse since the request doesn't see it.
+  // Fixing that would also fix diagnosing in files with only 'default'...
 }
 
-using @MyActor // expected-error@:7 {{global actor 'MyActor' is not valid in a 'using' declaration}}
-// expected-note@-1:7 {{file-level default isolation must be '@MainActor' or 'nonisolated'}}
+default @MyActor
+// expected-error@-1:9 {{global actor 'MyActor' is not a valid file-level default}}
+// expected-note@-2:9 {{file-level default isolation must be '@MainActor' or 'nonisolated'}}
 
 do {
-  using // expected-warning {{expression of type 'Int' is unused}}
-  nonisolated // expected-error {{cannot find 'nonisolated' in scope}}
-}
-
-do {
-  func
-  using (x: Int) {}
-
-  using(x: 42)
-}
-
-do {
-  func
-  using
-  (x: Int) {}
-
-  using(x: 42)
-}
-
-let
-  using = 42
-
-let (x: Int, using: String) = (x: 42, using: "")
-
-do {
-  using @MainActor // expected-error@:3 {{declaration is only valid at file scope}}
-}
+  default @MainActor // expected-error@:3 {{declaration is only valid at file scope}}
+  default: @MainActor // expected-error@:3 {{'default' label can only appear inside a 'switch' statement}}
+} // expected-error@:1 {{expected declaration}}
 
 func test() {
-  using @MainActor // expected-error@:3 {{declaration is only valid at file scope}}
-}
+  default @MainActor // expected-error@:3 {{declaration is only valid at file scope}}
+  default: @MainActor // expected-error@:3 {{'default' label can only appear inside a 'switch' statement}}
+} // expected-error@:1 {{expected declaration}}
 
 struct S {
   var x: Int {
-    using @MainActor // expected-error@:5 {{declaration is only valid at file scope}}
+    default @MainActor // expected-error@:5 {{declaration is only valid at file scope}}
+    default: nonisolated // expected-error@:5 {{'default' label can only appear inside a 'switch' statement}}
   }
 
-  using @MainActor func test() {}
-  // expected-error@-1 {{declaration is only valid at file scope}}
-  // expected-error@-2 {{consecutive declarations on a line must be separated by ';'}}
+  default @MainActor func lion() {}
+  // expected-error@-1:3 {{declaration is only valid at file scope}}
+  // expected-error@-2:21 {{consecutive declarations on a line must be separated by ';'}}{{21-21=;}}
 
-  using nonisolated subscript(a: Int) -> Bool { false }
-  // expected-error@-1 {{declaration is only valid at file scope}}
-  // expected-error@-2 {{consecutive declarations on a line must be separated by ';'}}
+  default nonisolated subscript(a: Int) -> Bool { false }
+  // expected-error@-1:3 {{declaration is only valid at file scope}}
+  // expected-error@-2:22 {{consecutive declarations on a line must be separated by ';'}}{{22-22=;}}
+
+  default: func lamb() {}
+  // expected-error@-1:10 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
+  // expected-error@-2:11 {{consecutive declarations on a line must be separated by ';'}}{{11-11=;}}
+
+  default: nonisolated func lobster() {}
+  // expected-error@-1:10 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
+  // expected-error@-2:11 {{consecutive declarations on a line must be separated by ';'}}{{11-11=;}}
 }
 
 do {
-  @objc using @MainActor
+  @objc default @MainActor
   // expected-error@-1:9 {{declaration is only valid at file scope}}
-  // expected-error@-2:4 {{attribute cannot be attached to a 'using' declaration}}
+  // expected-error@-2:4 {{attribute cannot be attached to a file-level default}}
 }
+
+switch 3 {
+case 3: print("3")
+default nonisolated
+// expected-error@-1:9 {{expected ':' after 'default'}}
+// expected-error@-2:9 {{cannot find 'nonisolated' in scope}}
+}
+
+switch 4 {
+case 4: print("4")
+default: nonisolated
+// expected-error@-1:10 {{cannot find 'nonisolated' in scope}}
+}
+
+// TODO: maybe these could be better...
+
+switch 5 {
+case 5: print("5");
+default @MainActor
+// expected-error@-1:9 {{expected ':' after 'default'}}
+} // expected-error {{expected declaration}}
+
+switch 6 {
+case 6: print("6");
+default: @MainActor
+} // expected-error {{expected declaration}}

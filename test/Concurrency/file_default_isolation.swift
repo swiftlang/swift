@@ -8,7 +8,7 @@
 
 //--- main.swift
 
-using @MainActor
+default @MainActor
 
 class C {
   // CHECK: // static C.shared.getter
@@ -44,7 +44,7 @@ nonisolated func test_defer() {
 
 //--- concurrent.swift
 
-using nonisolated
+default nonisolated
 
 // CHECK: // S.init(value:)
 // CHECK-NEXT: // Isolation: nonisolated
