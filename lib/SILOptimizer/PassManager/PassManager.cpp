@@ -1690,6 +1690,8 @@ createEmptyFunction(StringRef name,
       fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(),
       fromFn->getEffectsKind(), nullptr, fromFn->getDebugScope());
 
+  newF->setHasLoweredAddresses(fromFn->hasLoweredAddresses());
+
   return newF;
 }
 

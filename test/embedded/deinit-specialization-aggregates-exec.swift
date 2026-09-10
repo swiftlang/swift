@@ -10,7 +10,6 @@
 // assertion in fixUsedVoidType). That is pre-existing and unrelated to deinits;
 // specializing the element deinits of an InlineArray or tuple is just the first
 // thing in this configuration to reach that code.
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 var deinits = 0
 

@@ -17,7 +17,6 @@
 // Embedded key paths and SIL opaque values don't currently mix: the
 // combination trips `getSILArgumentConvention`. `keypaths-static.swift` and
 // `keypaths-exec.swift` carry the same XFAIL.
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 struct Erasable {
   var x: Int32
