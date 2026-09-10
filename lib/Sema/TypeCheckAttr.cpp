@@ -8550,17 +8550,17 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         // Otherwise, this stored property has to be qualified as 'unsafe'.
         if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
           if (var->hasAttachedPropertyWrapper()) {
-            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage, var->getName())
                 .warnUntilLanguageModeIf(attr->isImplicit(), LanguageMode::v6)
                 .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else if (var->getAttrs().hasAttribute<LazyAttr>()) {
-            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage, var->getName())
                 .warnUntilLanguageMode(LanguageMode::v6)
                 .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else {
-            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage, var->getName())
               .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             if (var->hasStorage())
               var->diagnose(diag::nonisolated_mutable_storage_note, var);
