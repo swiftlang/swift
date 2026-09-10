@@ -442,13 +442,14 @@ void swift::eliminateDeadInstruction(SILInstruction *inst,
 void swift::recursivelyDeleteTriviallyDeadInstructions(
     ArrayRef<SILInstruction *> ia, bool force, InstModCallbacks callbacks) {
   // Delete these instruction and others that become dead after it's deleted.
-  llvm::SmallPtrSet<SILInstruction *, 8> deadInsts;
-  for (auto *inst : ia) {
+  llvm::SmallSetVector<SILInstruction *, 8> deadInsts;
+  // Salvage debug info needs reverse iteration to work.
+  for (auto *inst : llvm::reverse(ia)) {
     // If the instruction is not dead and force is false, do nothing.
     if (force || isInstructionTriviallyDead(inst))
       deadInsts.insert(inst);
   }
-  llvm::SmallPtrSet<SILInstruction *, 8> nextInsts;
+  llvm::SmallSetVector<SILInstruction *, 8> nextInsts;
   while (!deadInsts.empty()) {
     for (auto inst : deadInsts) {
       // Salvaging debug info may delete and rewrite queued instructions.
