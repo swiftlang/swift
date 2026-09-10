@@ -340,11 +340,13 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// - Parameter actor: reference to the (local) actor that was just fully initialized.
   ///
   /// ### Embedded Swift
-  /// The requirement is constrained to `Act.ActorSystem == Self` rather than only `Act.ID == ActorID`.
-  /// Embedded dispatch is monomorphized: to register an actor's receive entrypoint the system must be
-  /// able to form a call to `actor._executeDistributedTarget`, whose decoder / handler are
-  /// `Act.ActorSystem.InvocationDecoder` / `.ResultHandler`. That call only type-checks when the actor's
-  /// system is known to be this one, which `Act.ActorSystem == Self` provides.
+  /// In Embedded Swift the function signature is slightly different, as the passed in target actor's
+  /// actor system must be exactly the same as the system the method is defined on,
+  /// rather only be ID compatible, as it is in non-Embedded swift.
+  ///
+  /// This is crucial for `actorReady` implementations, which must prepare a closure which can
+  /// be used to `actor._executeDistributedTarget(...)` on the passed in actor, while ensuring
+  /// the call can be entirely monomorphic, as required by Embedded Swift.
 #if $Embedded
   func actorReady<Act>(_ actor: Act)
     where Act: DistributedActor,

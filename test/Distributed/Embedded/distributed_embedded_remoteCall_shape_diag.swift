@@ -2,6 +2,7 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_EmbeddedDistributed
 
 // Missing remoteCall implementation should diagnose the right "Embedded shape" that users must implement.
 
