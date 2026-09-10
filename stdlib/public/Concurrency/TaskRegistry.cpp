@@ -28,9 +28,19 @@ TaskRegistryShard
 
 #if SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
 
+SWIFT_EXPORT_FROM(swift_Concurrency)
+bool _swift_concurrency_task_registry_enabled = true;
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+const size_t _swift_concurrency_task_registry_shard_size = sizeof(TaskRegistryShard);
+
 static inline bool isTaskRegistryEnabled() {
-  static bool enabled = runtime::environment::concurrencyEnableTaskRegistry();
-  return enabled;
+  static bool initialized = false;
+  if (!initialized) {
+    _swift_concurrency_task_registry_enabled = runtime::environment::concurrencyEnableTaskRegistry();
+    initialized = true;
+  }
+  return _swift_concurrency_task_registry_enabled;
 }
 
 void swift::taskRegistryInsert(AsyncTask *task) {
