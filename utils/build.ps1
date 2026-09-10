@@ -17,16 +17,16 @@ This script performs various steps associated with building the Swift toolchain:
 .PARAMETER SourceCache
 The path to a directory where projects contributing to the Swift toolchain have
 been cloned.
-Default: 'S:\SourceCache'
+Default: 'SourceCache' beneath BuildRoot.
 
 .PARAMETER BinaryCache
 The path to a directory where to write build system files and outputs.
-Default: 'S:\b'
+Default: 'BinaryCache' beneath BuildRoot.
 
 .PARAMETER ArtifactCache
 The path to a directory containing downloaded build artifacts that can be
 shared by multiple build trees.
-Default: 'S:\ArtifactCache'
+Default: 'ArtifactCache' beneath BuildRoot.
 
 .PARAMETER BuildRoot
 The path to the merged file system image populated by the build. The
@@ -37,7 +37,7 @@ Default: 'S:\'
 .PARAMETER ObjectStore
 The path to the content-addressed object store used for build caching.
 Cache is retained as a compatibility alias.
-Default: 'S:\ObjectStore'
+Default: 'ObjectStore' beneath BuildRoot.
 
 .PARAMETER Stage
 The path to a directory where built msi's and the installer executable should be
@@ -147,13 +147,13 @@ PS> .\Build.ps1 -WindowsSDKArchitectures x64 -ProductVersion 1.2.3 -Test foundat
 param
 (
   # Build Paths
-  [System.IO.FileInfo] $SourceCache = "S:\SourceCache",
-  [System.IO.FileInfo] $BinaryCache = "S:\BinaryCache",
-  [System.IO.FileInfo] $ArtifactCache = "S:\ArtifactCache",
+  [System.IO.FileInfo] $SourceCache = $null,
+  [System.IO.FileInfo] $BinaryCache = $null,
+  [System.IO.FileInfo] $ArtifactCache = $null,
   [Alias("ImageRoot")]
   [System.IO.FileInfo] $BuildRoot = "S:",
   [Alias("Cache")]
-  [System.IO.FileInfo] $ObjectStore = "S:\ObjectStore",
+  [System.IO.FileInfo] $ObjectStore = $null,
   [string] $Stage = "",
 
   # (Pinned) Bootstrap Toolchain
@@ -238,6 +238,15 @@ param
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version 3.0
+
+# A parameter default cannot reference another parameter, so the paths that sit
+# beneath BuildRoot are resolved here, ahead of the first thing that reads them.
+$BuildRootPath = "$BuildRoot".TrimEnd('\', '/')
+if (-not $SourceCache) { $SourceCache = "$BuildRootPath\SourceCache" }
+if (-not $BinaryCache) { $BinaryCache = "$BuildRootPath\BinaryCache" }
+if (-not $ArtifactCache) { $ArtifactCache = "$BuildRootPath\ArtifactCache" }
+if (-not $ObjectStore) { $ObjectStore = "$BuildRootPath\ObjectStore" }
+
 $WindowsSxSAssemblyPublicKeyToken = $WindowsSxSAssemblyPublicKeyToken.ToLowerInvariant()
 # Share Clang modules across build phases without using the per-user cache.
 $ModuleCache = "$BinaryCache\ModuleCache"
