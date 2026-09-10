@@ -187,6 +187,9 @@ FRONTEND_STATISTIC(ClangImporter, ClangImportDeclCacheHit)
 /// Clang declarations imported for the first time (import-decl cache miss).
 FRONTEND_STATISTIC(ClangImporter, ClangImportDeclCacheMiss)
 
+/// Maximum recursion depth when importing Clang declarations.
+FRONTEND_STATISTIC(ClangImporter, ClangImportDeclRecursionDepth)
+
 /// Clang types imported.
 FRONTEND_STATISTIC(ClangImporter, ClangImportType)
 
