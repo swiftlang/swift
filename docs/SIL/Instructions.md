@@ -2471,6 +2471,24 @@ Performs Objective-C method dispatch using `objc_msgSend()`.
 
 Objective-C method calls are never candidates for de-virtualization.
 
+### com_method
+
+```
+sil-instruction ::= 'com_method' sil-operand ',' sil-decl-ref ',' sil-type
+
+%method = com_method %self : $@opened(1, any P) Self, #P.method,
+    $@convention(com_method) (@guaranteed @opened(1, any P) Self) -> ()
+```
+
+Looks up an instance requirement in a COM interface's vtable. The receiver is
+an archetype constrained to the declaring interface or an interface that
+inherits from it; it may be a value or an address. Extension helpers do not
+occupy interface vtable slots and cannot be referenced by this instruction.
+
+The result is a context-free function with the `com_method` convention. A
+lookup does not consume its receiver. The receiver remains the final SIL
+argument when applying the resulting function.
+
 ### super_method
 
 ```

@@ -4801,6 +4801,35 @@ public:
 #endif
   }
 
+  void checkCOMMethodInst(COMMethodInst *CMI) {
+    auto member = CMI->getMember();
+    auto *protocol = dyn_cast<ProtocolDecl>(member.getDecl()->getDeclContext());
+    require(protocol && protocol->isCOMInterface(),
+            "com_method must reference a COM interface requirement");
+
+    auto methodType =
+        requireObjectType(SILFunctionType, CMI, "result of com_method");
+    require(!methodType->getExtInfo().hasContext(),
+            "result method must be of a context-free function type");
+    require(methodType->getRepresentation() ==
+                SILFunctionTypeRepresentation::COMMethod,
+            "wrong function type representation");
+
+    auto operandType = CMI->getOperand()->getType();
+    // The receiver may be a value or the address of a materialized interface
+    // value.
+    auto archetype = operandType.getASTType()->getAs<ArchetypeType>();
+    require(archetype &&
+                llvm::any_of(archetype->getConformsTo(),
+                             [&](ProtocolDecl *constraint) {
+                               return constraint == protocol ||
+                                      constraint->inheritsFrom(protocol);
+                             }),
+            "com_method operand must be an archetype constrained to the "
+            "declaring COM interface");
+    verifyLocalArchetype(CMI, operandType.getASTType());
+  }
+
   void checkObjCSuperMethodInst(ObjCSuperMethodInst *OMI) {
     auto member = OMI->getMember();
     auto overrideTy =
