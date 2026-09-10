@@ -932,6 +932,10 @@ namespace {
       return true;
     }
 
+    bool visitOpenCOMExistentialInst(const OpenCOMExistentialInst *RHS) {
+      return true;
+    }
+
     bool
     visitInitExistentialMetatypeInst(const InitExistentialMetatypeInst *RHS) {
       auto *X = cast<InitExistentialMetatypeInst>(LHS);
@@ -1635,6 +1639,7 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   }
 
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
+      isa<OpenCOMExistentialInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) ||
       isa<OpenExistentialBoxInst>(this) ||
@@ -1931,6 +1936,7 @@ void SILInstruction::forEachDefinedLocalEnvironment(
   }
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialAddrInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialRefInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenCOMExistentialInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxValueInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialMetatypeInst)
