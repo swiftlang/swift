@@ -276,6 +276,18 @@ var x2 { // expected-error{{computed property must have an explicit type}} {{7-7
   }
 }
 
+var x2_read { // expected-error{{computed property must have an explicit type}} {{12-12=: <# Type #>}} expected-error{{type annotation missing in pattern}}
+  _read {
+    yield _x
+  }
+}
+
+var x2_modify { // expected-error{{computed property must have an explicit type}} {{14-14=: <# Type #>}} expected-error{{type annotation missing in pattern}}
+  _modify {
+    yield &_x // expected-error{{cannot yield reference to storage of type 'X' as an inout yield of type '_'}}
+  }
+}
+
 var (x3): X { // expected-error{{getter/setter can only be defined for a single variable}}
   get {
     return _x
