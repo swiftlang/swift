@@ -2069,11 +2069,13 @@ public:
 
 class AllowMultiArgFuncKeyPathMismatch final : public ConstraintFix {
   Type functionType;
+  Type expectedType;
 
   AllowMultiArgFuncKeyPathMismatch(ConstraintSystem &cs, Type fnType,
+                                   Type expectedType,
                                    ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AllowMultiArgFuncKeyPathMismatch, locator),
-        functionType(fnType) {}
+        functionType(fnType), expectedType(expectedType) {}
 
 public:
   std::string getName() const override {
@@ -2084,6 +2086,7 @@ public:
 
   static AllowMultiArgFuncKeyPathMismatch *create(ConstraintSystem &cs,
                                                   Type fnType,
+                                                  Type expectedType,
                                                   ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
