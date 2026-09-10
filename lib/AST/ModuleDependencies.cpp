@@ -675,6 +675,15 @@ makeClangScanningVFSFactory(
 
 bool SwiftDependencyScanningService::setupDependencyScanningService(
     CompilerInstance &Instance) {
+  // Serialize the check-and-create below. Several scans can start concurrently
+  // on a fresh service, and creating the Clang scanning service twice would
+  // dangle the references held by the workers of whichever scan got there
+  // first.
+  //
+  // Note that this lock must stay recursive: \c save() takes it too, and is
+  // reached from \c makeClangScanningVFSFactory below.
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
+
   const auto &invocation = Instance.getInvocation();
 
   if (ClangScanningService) {
