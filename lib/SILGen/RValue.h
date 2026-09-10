@@ -338,6 +338,10 @@ public:
   /// Borrow all subvalues of the rvalue.
   RValue borrow(SILGenFunction &SGF, SILLocation loc) const &;
 
+  /// Borrow all subvalues of the rvalue for the duration of the enclosing
+  /// formal evaluation scope.
+  RValue formalAccessBorrow(SILGenFunction &SGF, SILLocation loc) const &;
+
   RValue copyForDiagnostics() const;
 
   static bool areObviouslySameValue(SILValue lhs, SILValue rhs);

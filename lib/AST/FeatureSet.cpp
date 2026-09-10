@@ -184,6 +184,16 @@ UNINTERESTING_FEATURE(BuiltinAllocRawTyped)
 UNINTERESTING_FEATURE(BuiltinTypedAllocationID)
 UNINTERESTING_FEATURE(MutateAndConsumeInDeinit)
 
+static bool usesFeatureSubscriptParametersWithOwnership(Decl *decl) {
+  auto *SD = dyn_cast<SubscriptDecl>(decl);
+  if (!SD)
+    return false;
+
+  return llvm::any_of(*SD->getIndices(), [](const ParamDecl *index) {
+    return index->getSpecifier() != ParamSpecifier::Default;
+  });
+}
+
 static bool usesFeatureUnderscoreOwned(Decl *D) {
   return D->getAttrs().hasAttribute<OwnedAttr>();
 }
