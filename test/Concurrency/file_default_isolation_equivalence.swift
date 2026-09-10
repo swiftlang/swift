@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// File-level `using @MainActor` should produce the same SIL as writing
+// File-level `default @MainActor` should produce the same SIL as writing
 // `@MainActor` explicitly on every top-level declaration (including
 // extensions, which is where it diverges from module-level `-default-isolation
 // MainActor` since SE-0466 carve-outs do not apply at file scope).
@@ -19,7 +19,7 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_DefaultIsolationPerFile
 
-// The using decl is lower in the file to ensure it applies to preceding decls.
+// The default decl is lower in the file to ensure it applies to preceding decls.
 
 #if EXPLICIT
 @MainActor
@@ -62,7 +62,7 @@ class C {
 }
 
 #if FILE_DEFAULT
-using @MainActor
+default @MainActor
 #endif
 
 #if EXPLICIT

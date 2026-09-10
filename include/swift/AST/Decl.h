@@ -10356,8 +10356,8 @@ public:
   }
 };
 
-/// FileDefaultDecl - This represents a single `using` declaration, e.g.:
-///   using @MainActor
+/// FileDefaultDecl - This represents a single `default` declaration, e.g.:
+///   default @MainActor
 class FileDefaultDecl : public Decl {
   friend class Decl;
 

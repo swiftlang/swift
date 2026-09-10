@@ -413,7 +413,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(OpaqueVarType, "type");
   ENTRY(Macro, "macro");
   ENTRY(MacroExpansion, "pound literal");
-  ENTRY(FileDefault, "using");
+  ENTRY(FileDefault, "file default");
   ENTRY(BorrowAccessor, "borrow accessor");
   ENTRY(MutateAccessor, "mutate accessor");
   ENTRY(YieldingBorrowAccessor, "yielding borrow accessor");

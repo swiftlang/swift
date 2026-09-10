@@ -5351,7 +5351,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true) {
 /// Determine the default isolation for the given declaration context.
 ///
 /// Only the module-level setting (`-default-isolation`) is returned here.
-/// File-level `using` defaults are inferred in `ActorIsolationRequest`.
+/// File-level `default` defaults are inferred in `ActorIsolationRequest`.
 static DefaultIsolation getDefaultIsolationForContext(const DeclContext *dc) {
   // If we're in the main module, check the language option.
   ASTContext &ctx = dc->getASTContext();

@@ -36,7 +36,7 @@ class FileDefaultDecl;
 class AvailableAttr;
 enum class DefaultIsolation : uint8_t;
 
-/// The set of `using ...` defaults declared at the top of a source file.
+/// The set of defaults declared by top-level `default ...` in a source file.
 struct FileDefaults {
   struct Isolation {
     DefaultIsolation kind;
@@ -723,7 +723,7 @@ public:
     DelayedParserState = std::move(state);
   }
 
-  /// Retrieve the file-level defaults declared via top-level `using ...`
+  /// Retrieve the file-level defaults declared via top-level `default ...`
   /// declarations, including default actor isolation and any default
   /// `@available` attributes.
   FileDefaults getFileDefaults() const;

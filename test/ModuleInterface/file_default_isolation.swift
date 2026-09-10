@@ -1,26 +1,26 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -enable-experimental-feature DefaultIsolationPerFile -module-name UsingIsolation -swift-version 5 -emit-module-interface-path %t/v5.swiftinterface %s
-// RUN: %target-swift-frontend -typecheck-module-from-interface %t/v5.swiftinterface -module-name UsingIsolation
+// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -enable-experimental-feature DefaultIsolationPerFile -module-name FileDefaultIsolation -swift-version 5 -emit-module-interface-path %t/v5.swiftinterface %s
+// RUN: %target-swift-frontend -typecheck-module-from-interface %t/v5.swiftinterface -module-name FileDefaultIsolation
 // RUN: %FileCheck %s --input-file %t/v5.swiftinterface
 
-// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -enable-experimental-feature DefaultIsolationPerFile -module-name UsingIsolation -swift-version 5 -strict-concurrency=complete -emit-module-interface-path %t/v5_complete.swiftinterface %s
-// RUN: %target-swift-frontend -typecheck-module-from-interface %t/v5_complete.swiftinterface -module-name UsingIsolation
+// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -enable-experimental-feature DefaultIsolationPerFile -module-name FileDefaultIsolation -swift-version 5 -strict-concurrency=complete -emit-module-interface-path %t/v5_complete.swiftinterface %s
+// RUN: %target-swift-frontend -typecheck-module-from-interface %t/v5_complete.swiftinterface -module-name FileDefaultIsolation
 // RUN: %FileCheck %s --input-file %t/v5_complete.swiftinterface
 
-// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -enable-experimental-feature DefaultIsolationPerFile -module-name UsingIsolation -swift-version 6 -emit-module-interface-path %t/v6.swiftinterface %s
-// RUN: %target-swift-frontend -typecheck-module-from-interface %t/v6.swiftinterface -module-name UsingIsolation
+// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -enable-experimental-feature DefaultIsolationPerFile -module-name FileDefaultIsolation -swift-version 6 -emit-module-interface-path %t/v6.swiftinterface %s
+// RUN: %target-swift-frontend -typecheck-module-from-interface %t/v6.swiftinterface -module-name FileDefaultIsolation
 // RUN: %FileCheck %s --input-file %t/v6.swiftinterface
 
 // REQUIRES: swift_feature_DefaultIsolationPerFile
 
-// The `using` declaration itself must not appear in the emitted interface.
-// CHECK-NOT: using @MainActor
+// The `default` declaration itself must not appear in the emitted interface.
+// CHECK-NOT: default @MainActor
 
 // Unlike module-level `-default-isolation MainActor`, @preconcurrency should not be included by default.
 // CHECK-NOT: @preconcurrency
 
-using @MainActor
+default @MainActor
 
 // CHECK: @_Concurrency::MainActor public func defaultedFunc()
 public func defaultedFunc() {}
@@ -54,7 +54,7 @@ public nonisolated class NonisolatedClass {
   @MainActor public func mainActorMethod() {}
 }
 
-// CHECK: @_Concurrency::MainActor extension UsingIsolation::NonisolatedClass
+// CHECK: @_Concurrency::MainActor extension FileDefaultIsolation::NonisolatedClass
 extension NonisolatedClass {
   // CHECK: @_Concurrency::MainActor public func extensionMethod()
   public func extensionMethod() {}
@@ -68,7 +68,7 @@ public nonisolated protocol NonisolatedProto {
 // CHECK: @_Concurrency::MainActor public class Conformer
 public class Conformer {}
 
-// CHECK: @_Concurrency::MainActor extension UsingIsolation::Conformer : UsingIsolation::NonisolatedProto
+// CHECK: @_Concurrency::MainActor extension FileDefaultIsolation::Conformer : FileDefaultIsolation::NonisolatedProto
 extension Conformer: NonisolatedProto {
   // This is nonisolated due to the explicit nonisolated on NonisolatedProto...
   // CHECK: nonisolated public func req()

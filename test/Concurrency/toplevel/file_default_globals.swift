@@ -21,33 +21,33 @@
 // REQUIRES: swift_feature_DefaultIsolationPerFile
 
 //--- script_nonisolated.swift
-using nonisolated
+default nonisolated
 
 let storedLetGlobal = 0
 var computedGlobal: Int { 0 }
 
 //--- script_mainactor.swift
-using @MainActor
+default @MainActor
 
 let storedLetGlobal = 0
 var storedVarGlobal = 0
 var computedGlobal: Int { 0 }
 
 //--- library_nonisolated.swift
-using nonisolated
+default nonisolated
 
 let storedLetGlobal = 0
 var computedGlobal: Int { 0 }
 
 //--- library_mainactor.swift
-using @MainActor
+default @MainActor
 
 let storedLetGlobal = 0
 var storedVarGlobal = 0
 var computedGlobal: Int { 0 }
 
 //--- script_nonisolated_mutable.swift
-using nonisolated
+default nonisolated
 
 // A mutable nonisolated stored TLG is one error in any mode, but we complain more in later modes.
 var storedVarGlobal = 0

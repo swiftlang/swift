@@ -2453,7 +2453,7 @@ public:
 
   void visitFileDefaultDecl(FileDefaultDecl *FDD) {
     if (!FDD->getDeclContext()->isModuleScopeContext()) {
-      // 'using' is only valid at file scope.
+      // 'default' is only valid at file scope.
       FDD->diagnose(diag::decl_inner_scope);
     }
   }

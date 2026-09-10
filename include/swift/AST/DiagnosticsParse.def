@@ -2245,15 +2245,18 @@ ERROR(nonisolated_nonsending_repeated,none,
       "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
 
 //------------------------------------------------------------------------------
-// MARK: using @<attribute> or using <identifier>
+// MARK: default @<attribute> or default <identifier>
 //------------------------------------------------------------------------------
 ERROR(file_default_invalid_specifier,PointsToFirstBadToken,
-      "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'using'",
+      "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'",
       ())
 ERROR(experimental_file_default_disabled,PointsToFirstBadToken,
-      "'using' is an experimental feature that is currently disabled", ())
+      "file-level defaults are an experimental feature that is currently "
+      "disabled", ())
 ERROR(file_default_rejects_attributes,PointsToFirstBadToken,
-      "attribute cannot be attached to a 'using' declaration", ())
+      "attribute cannot be attached to a 'default' declaration", ())
+ERROR(file_default_unexpected_separator,PointsToFirstBadToken,
+      "unexpected '%0' in file-level default", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

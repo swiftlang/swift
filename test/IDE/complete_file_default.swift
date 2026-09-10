@@ -1,6 +1,6 @@
 // RUN: %batch-code-completion
 
-// USING-DAG: Keyword/None:                       @MainActor; name=@MainActor
-// USING-DAG: Keyword/None:                       nonisolated; name=nonisolated
+// FILE_DEFAULT-DAG: Keyword/None:                       @MainActor; name=@MainActor
+// FILE_DEFAULT-DAG: Keyword/None:                       nonisolated; name=nonisolated
 
-using #^USING^#
+default #^FILE_DEFAULT^#

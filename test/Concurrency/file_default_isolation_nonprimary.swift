@@ -2,13 +2,13 @@
 // RUN: split-file %s %t
 
 // Non-primary's default is respected.
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -disable-availability-checking -verify -primary-file %t/dir_np_respected/plain.swift %t/dir_np_respected/withUsing.swift
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -disable-availability-checking -verify -primary-file %t/dir_np_respected/plain.swift %t/dir_np_respected/withDefault.swift
 
 // Primary's default doesn't leak to non-primary.
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -disable-availability-checking -verify -primary-file %t/dir_p_no_bleed/withUsing.swift %t/dir_p_no_bleed/plain.swift
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -disable-availability-checking -verify -primary-file %t/dir_p_no_bleed/withDefault.swift %t/dir_p_no_bleed/plain.swift
 
 // Non-primary's default doesn't leak to primary.
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -disable-availability-checking -verify -primary-file %t/dir_np_no_bleed/plain.swift %t/dir_np_no_bleed/withUsing.swift
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -disable-availability-checking -verify -primary-file %t/dir_np_no_bleed/plain.swift %t/dir_np_no_bleed/withDefault.swift
 
 // Both files have defaults.
 // RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -disable-availability-checking -verify -primary-file %t/dir_both/primary.swift %t/dir_both/nonprimary.swift
@@ -18,26 +18,26 @@
 
 //--- dir_np_respected/plain.swift
 // PRIMARY
-// Error fires iff non-primary's `using` was honored.
+// Error fires iff non-primary's `default` was honored.
 nonisolated func callerInPlain() {
-  TypeInWithUsing.staticMethod() // expected-error {{main actor-isolated}}
+  TypeInWithDefault.staticMethod() // expected-error {{main actor-isolated}}
 }
 
-//--- dir_np_respected/withUsing.swift
+//--- dir_np_respected/withDefault.swift
 // NON-PRIMARY
-using @MainActor
+default @MainActor
 
-class TypeInWithUsing {
+class TypeInWithDefault {
   static func staticMethod() {} // expected-note {{calls to static method 'staticMethod()' from outside of its actor context are implicitly asynchronous}}
   // expected-note@-1 {{main actor isolation inferred from file-level default isolation}}
 }
 
-//--- dir_p_no_bleed/withUsing.swift
+//--- dir_p_no_bleed/withDefault.swift
 // PRIMARY
-using @MainActor
+default @MainActor
 
-// Unexpected error fires iff primary's `using` bled into plain.swift.
-nonisolated func callerInWithUsing() {
+// Unexpected error fires iff primary's `default` bled into plain.swift.
+nonisolated func callerInWithDefault() {
   TypeInPlain.staticMethod()
 }
 
@@ -51,20 +51,20 @@ class TypeInPlain {
 // PRIMARY
 // Calls MainActor from unannotated. Error fires iff no bleed.
 func callerInPlainUnannotated() { // expected-note {{add '@MainActor' to make global function 'callerInPlainUnannotated()' part of global actor 'MainActor'}}
-  TypeInWithUsingExplicit.explicitMainActorMethod() // expected-error {{main actor-isolated}}
+  TypeInWithDefaultExplicit.explicitMainActorMethod() // expected-error {{main actor-isolated}}
 }
 
-//--- dir_np_no_bleed/withUsing.swift
+//--- dir_np_no_bleed/withDefault.swift
 // NON-PRIMARY
-using @MainActor
+default @MainActor
 
-class TypeInWithUsingExplicit {
+class TypeInWithDefaultExplicit {
   @MainActor static func explicitMainActorMethod() {} // expected-note {{calls to static method 'explicitMainActorMethod()' from outside of its actor context are implicitly asynchronous}}
 }
 
 //--- dir_both/primary.swift
 // PRIMARY
-using @MainActor
+default @MainActor
 
 nonisolated func callerInBothPrimary() {
   TypeInBothNonprimary.staticMethod() // expected-error {{main actor-isolated}}
@@ -72,7 +72,7 @@ nonisolated func callerInBothPrimary() {
 
 //--- dir_both/nonprimary.swift
 // NON-PRIMARY
-using @MainActor
+default @MainActor
 
 class TypeInBothNonprimary {
   static func staticMethod() {} // expected-note {{calls to static method 'staticMethod()' from outside of its actor context are implicitly asynchronous}}

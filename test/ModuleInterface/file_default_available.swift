@@ -53,10 +53,10 @@
 // REQUIRES: swift_feature_DefaultIsolationPerFile
 
 //--- legacy.swift
-// The `using` declaration itself must not appear in the emitted interface.
-// CHECK-NOT: using @available
+// The `default` declaration itself must not appear in the emitted interface.
+// CHECK-NOT: default @available
 
-using @available(*, deprecated, message: "legacy module")
+default @available(*, deprecated, message: "legacy module")
 
 // CHECK:      @available(*, deprecated, message: "legacy module")
 // CHECK-NEXT: public func defaultedFunc()
@@ -86,12 +86,12 @@ extension DefaultedClass {
 public func explicitlyDeprecated() {}
 
 //--- ordering.swift
-// CHECK-NOT: using @available
+// CHECK-NOT: default @available
 
 // We want multiple available attrs to show up in the right order.
 #if TOP
-using @available(*, deprecated, message: "first default")
-using @available(*, deprecated, message: "second default")
+default @available(*, deprecated, message: "first default")
+default @available(*, deprecated, message: "second default")
 #endif
 
 // CHECK:      @available(*, deprecated, message: "first default")
@@ -107,8 +107,8 @@ public func defaultedOrderedFunc() {}
 public func orderedFunc() {}
 
 #if BOTTOM
-using @available(*, deprecated, message: "first default")
-using @available(*, deprecated, message: "second default")
+default @available(*, deprecated, message: "first default")
+default @available(*, deprecated, message: "second default")
 #endif
 
 //--- consumer.swift

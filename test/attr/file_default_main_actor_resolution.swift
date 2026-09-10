@@ -10,34 +10,34 @@
 
 //--- module_absent.swift
 
-using @MainActor
-// expected-error@-1:8 {{cannot find type 'MainActor' in scope}}
-// expected-note@-2:7 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+default @MainActor
+// expected-error@-1:10 {{cannot find type 'MainActor' in scope}}
+// expected-note@-2:9 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
 
 struct NotAnActor {} // expected-note@:8 {{'NotAnActor' declared here}}
 
-using @NotAnActor
-// expected-error@-1:7 {{'@NotAnActor' is not valid in a 'using' declaration}}
-// expected-note@-2:7 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+default @NotAnActor
+// expected-error@-1:9 {{'@NotAnActor' is not valid in a 'default' declaration}}
+// expected-note@-2:9 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
 
-using nonisolated
-using @available(*, deprecated, message: "legacy")
+default nonisolated
+default @available(*, deprecated, message: "legacy")
 
 //--- module_absent_shadowed.swift
 
 struct MainActor {} // expected-note@:8 {{'MainActor' declared here}}
 
-using @MainActor
-// expected-error@-1:7 {{'@MainActor' is not valid in a 'using' declaration}}
-// expected-note@-2:7 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+default @MainActor
+// expected-error@-1:9 {{'@MainActor' is not valid in a 'default' declaration}}
+// expected-note@-2:9 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
 
 //--- shadowed_by_type.swift
 
 struct MainActor {} // expected-note@:8 {{'MainActor' declared here}}
 
-using @MainActor
-// expected-error@-1:7 {{'@MainActor' is not valid in a 'using' declaration}}
-// expected-note@-2:7 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+default @MainActor
+// expected-error@-1:9 {{'@MainActor' is not valid in a 'default' declaration}}
+// expected-note@-2:9 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
 
 //--- shadowed_by_global_actor.swift
 
@@ -46,6 +46,6 @@ actor MainActor { // expected-note@:7 {{'MainActor' declared here}}
   static let shared = MainActor()
 }
 
-using @MainActor
-// expected-error@-1:7 {{global actor 'MainActor' is not valid in a 'using' declaration}}
-// expected-note@-2:7 {{file-level default isolation must be '@MainActor' or 'nonisolated'}}
+default @MainActor
+// expected-error@-1:9 {{global actor 'MainActor' is not valid in a 'default' declaration}}
+// expected-note@-2:9 {{file-level default isolation must be '@MainActor' or 'nonisolated'}}

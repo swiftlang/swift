@@ -9579,22 +9579,22 @@ ERROR(nonexhaustive_attr_on_internal_type,none,
       (DeclName, AccessLevel))
 
 //===----------------------------------------------------------------------===//
-// MARK: `using` declaration
+// MARK: `default` declaration
 //===----------------------------------------------------------------------===//
 ERROR(invalid_redecl_of_file_isolation,none,
       "invalid redeclaration of file-level default isolation", ())
 NOTE(invalid_redecl_of_file_isolation_prev,none,
      "file-level default isolation previously declared here", ())
 ERROR(invalid_actor_for_file_isolation,none,
-     "global actor %0 is not valid in a 'using' declaration",
+     "global actor %0 is not valid in a 'default' declaration",
      (Type))
 NOTE(invalid_actor_for_file_isolation_note,none,
      "file-level default isolation must be '@MainActor' or 'nonisolated'", ())
 ERROR(file_default_invalid_attribute,none,
-     "'%0' is not valid in a 'using' declaration",
+     "'%0' is not valid in a 'default' declaration",
      (DeclAttribute))
 NOTE(file_default_invalid_attribute_note,none,
-     "'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'", ())
+     "a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'", ())
 
 //===----------------------------------------------------------------------===//
 // MARK: `@inline(always)` attribute

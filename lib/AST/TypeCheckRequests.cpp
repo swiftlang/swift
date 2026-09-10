@@ -2668,7 +2668,7 @@ DeclAttributes SemanticDeclAttrsRequest::evaluate(Evaluator &evaluator,
     (void)asd->hasStorage();
   }
 
-  // Materialize file-level `using ...` attributes onto top-level decls.
+  // Materialize file-level `default ...` attributes onto top-level decls.
   mutableDecl->applyFileDefaults();
 
   return decl->getAttrs();
