@@ -405,7 +405,6 @@ static bool precompileBridgingHeader(const CompilerInstance &Instance) {
       Instance.getASTContext().getClangModuleLoader());
   auto &ImporterOpts = Invocation.getClangImporterOptions();
   auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
-  auto OutputBackend = Instance.getOutputBackend().clone();
   if (!PCHOutDir.empty()) {
     // Create or validate a persistent PCH.
     auto SwiftPCHHash = Invocation.getPCHHash();
