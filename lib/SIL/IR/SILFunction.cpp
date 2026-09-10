@@ -419,6 +419,7 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
   newSnapshot->OptMode = OptMode;
   newSnapshot->copyEffects(this);
+  newSnapshot->HasLoweredAddresses = HasLoweredAddresses;
 
   SILFunctionCloner cloner(newSnapshot);
   cloner.cloneFunction(this);
