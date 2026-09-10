@@ -4171,7 +4171,7 @@ struct DbgIntrinsicEmitter {
 
   ///
 
-  llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+  llvm::DbgRecord *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL) {
     if (auto *Inst = InsertPt.dyn_cast<llvm::Instruction *>()) {
@@ -4182,7 +4182,7 @@ struct DbgIntrinsicEmitter {
     }
   }
 
-  llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+  llvm::DbgRecord *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::Instruction *InsertBefore) {
@@ -4203,7 +4203,7 @@ struct DbgIntrinsicEmitter {
                                              InsertBefore->getIterator());
   }
 
-  llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+  llvm::DbgRecord *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::BasicBlock *Block) {
