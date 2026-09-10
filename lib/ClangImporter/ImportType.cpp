@@ -193,6 +193,11 @@ importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
     return std::nullopt;
+
+    // SPIRV opaque builtin types that don't have Swift equivalents.
+#define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/SPIRVTypes.def"
+    return std::nullopt;
   }
 
   llvm_unreachable("Invalid BuiltinType.");
