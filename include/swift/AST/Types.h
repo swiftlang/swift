@@ -1165,6 +1165,14 @@ public:
   /// If this is a class, check if this class is a foreign reference type.
   bool isForeignReferenceType();
 
+  /// Determine whether this type is spelled as the C type \c CFTypeRef, or as
+  /// some typealias thereof.
+  ///
+  /// This deliberately looks at sugar. \c CFTypeRef is imported as
+  /// \c AnyObject, but a type written as \c AnyObject is a Swift existential
+  /// and is not interchangeable with the C type.
+  bool isCFTypeRef();
+
   /// Determine whether this type may have a superclass, which holds for
   /// classes, bound generic classes, and archetypes that are only instantiable
   /// with a class type.

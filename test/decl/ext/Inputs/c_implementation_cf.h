@@ -19,3 +19,9 @@ CFStringRef CImplReturnsUnauditedCFString(void);
 
 // 'CFTypeRef' is imported as 'AnyObject'.
 void CImplTakesCFTypeRef(CFTypeRef obj);
+
+CF_RETURNS_RETAINED
+CFTypeRef CImplReturnsRetainedCFTypeRef(void);
+
+// Not ownership-audited: imported as returning 'Unmanaged<CFTypeRef>?'.
+CFTypeRef CImplReturnsUnauditedCFTypeRef(void);

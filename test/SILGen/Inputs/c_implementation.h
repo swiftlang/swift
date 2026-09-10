@@ -17,3 +17,9 @@ void passes_consumed(CF_CONSUMED CFStringRef string);
 // Not ownership-audited, so this is imported as returning
 // 'Unmanaged<CFString>?'.
 CFStringRef returns_unaudited(void);
+
+// 'CFTypeRef' is imported as 'AnyObject', and uses the same reference counting.
+void passes_any_borrowed(CFTypeRef obj);
+
+CF_RETURNS_RETAINED
+CFTypeRef returns_any_retained(void);

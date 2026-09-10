@@ -2047,26 +2047,6 @@ private:
     return true;
   }
 
-  /// Returns whether \p ty is the C type \c CFTypeRef, or some typealias
-  /// thereof.
-  bool isCFTypeRef(Type ty) {
-    if (auto existential = dyn_cast<ExistentialType>(ty.getPointer()))
-      ty = existential->getConstraintType();
-
-    const TypeAliasDecl *TAD = nullptr;
-    while (auto aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
-      TAD = aliasTy->getDecl();
-      ty = aliasTy->getSinglyDesugaredType();
-    }
-
-    if (!TAD || !TAD->hasClangNode())
-      return false;
-
-    if (owningPrinter.ID_CFTypeRef.empty())
-      owningPrinter.ID_CFTypeRef = getASTContext().getIdentifier("CFTypeRef");
-    return TAD->getName() == owningPrinter.ID_CFTypeRef;
-  }
-
   /// Returns true if \p ty can be used with Objective-C reference-counting
   /// annotations like \c strong and \c weak.
   bool isObjCReferenceCountableObjectType(Type ty) {
@@ -2083,7 +2063,7 @@ private:
       }
     }
 
-    if ((ty->isObjCExistentialType() || ty->isAny()) && !isCFTypeRef(ty))
+    if ((ty->isObjCExistentialType() || ty->isAny()) && !ty->isCFTypeRef())
       return true;
 
     return false;

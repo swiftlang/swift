@@ -28,10 +28,22 @@ func CImplReturnsNotRetainedCFString() -> CFString? { fatalError() }
 @implementation @c
 func CImplReturnsUnauditedCFString() -> Unmanaged<CFString>? { fatalError() }
 
-// 'CFTypeRef' is imported as 'AnyObject', which is not representable in C, so
-// there is no way to write an implementation for a function that takes one.
-// FIXME: This should be allowed.
+// 'CFTypeRef' is imported as 'AnyObject', but it names the C type
+// 'const void *' and so is representable in C.
 @implementation @c
 func CImplTakesCFTypeRef(_ obj: CFTypeRef?) { }
+
+@implementation @c
+func CImplReturnsRetainedCFTypeRef() -> CFTypeRef? { fatalError() }
+
+// 'Unmanaged<CFTypeRef>' composes the two rules, which is what an unaudited
+// 'CFTypeRef'-returning C function imports as.
+@implementation @c
+func CImplReturnsUnauditedCFTypeRef() -> Unmanaged<CFTypeRef>? { fatalError() }
+
+// Writing the same type as 'AnyObject' does not name the C type, so it cannot
+// be used to implement the same function.
+@implementation @c(CImplTakesCFTypeRef)
+// expected-error@-1 {{could not find imported function 'CImplTakesCFTypeRef' matching global function 'CImplTakesAnyObject'; make sure you import the module or header that declares it}}
+func CImplTakesAnyObject(_ obj: AnyObject?) { }
 // expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
-// expected-error@-2 {{selector 'CImplTakesCFTypeRef:' for global function 'CImplTakesCFTypeRef' not found in header; did you mean 'CImplTakesCFTypeRef'?}}

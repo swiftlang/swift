@@ -3330,6 +3330,15 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     wasOptional = true;
   }
 
+  // 'CFTypeRef' is imported as 'AnyObject', but the C type it stands for
+  // ('const void *') is representable in C and C++. Recognize it
+  // only when it is spelled as 'CFTypeRef' (or a typealias thereof): a type
+  // written as 'AnyObject' is a Swift existential, which is not.
+  //
+  // A value passed this way is reference counted the way 'AnyObject' is.
+  if (language != ForeignLanguage::ObjectiveC && type->isCFTypeRef())
+    return { ForeignRepresentableKind::Trivial, nullptr };
+
   if (auto existential = type->getAs<ExistentialType>())
     type = existential->getConstraintType();
 
@@ -5139,6 +5148,26 @@ bool TypeBase::isForeignReferenceType() {
   if (auto *classDecl = lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
     return classDecl->isForeignReferenceType();
   return false;
+}
+
+bool TypeBase::isCFTypeRef() {
+  Type ty(this);
+
+  if (auto existential = dyn_cast<ExistentialType>(ty.getPointer()))
+    ty = existential->getConstraintType();
+
+  // Walk down to the innermost typealias, so that a typealias of 'CFTypeRef'
+  // is recognized as well.
+  const TypeAliasDecl *aliasDecl = nullptr;
+  while (auto aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
+    aliasDecl = aliasTy->getDecl();
+    ty = aliasTy->getSinglyDesugaredType();
+  }
+
+  if (!aliasDecl || !aliasDecl->hasClangNode())
+    return false;
+
+  return aliasDecl->getName() == getASTContext().Id_CFTypeRef;
 }
 
 bool TypeBase::hasSimpleTypeRepr() const {
