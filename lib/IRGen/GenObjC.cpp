@@ -672,8 +672,9 @@ namespace {
       case SILDeclRef::Kind::Deallocator:
         Text = "dealloc";
         break;
-          
+
       case SILDeclRef::Kind::Func:
+      case SILDeclRef::Kind::DistributedThunk:
         Text = cast<FuncDecl>(ref.getDecl())->getObjCSelector()
                  .getString(Buffer);
         break;
