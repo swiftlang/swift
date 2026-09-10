@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t/Lib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface \
 // RUN:   -enable-library-evolution -swift-version 5 -module-name Lib \
+// RUN:   -enable-experimental-feature SubscriptParametersWithOwnership \
 // RUN:   %s -DLIB
 // RUN: %FileCheck %s < %t/Lib.swiftinterface
 
@@ -14,7 +15,10 @@
 // ...and a client must be able to use it through that module.
 // RUN: %empty-directory(%t/mods)
 // RUN: cp %t/LibFromInterface.swiftmodule %t/mods/Lib.swiftmodule
-// RUN: %target-swift-frontend -typecheck -I %t/mods %s -DCLIENT
+// RUN: %target-swift-frontend -typecheck -I %t/mods %s -DCLIENT \
+// RUN:   -enable-experimental-feature SubscriptParametersWithOwnership
+
+// REQUIRES: swift_feature_SubscriptParametersWithOwnership
 
 #if LIB
 
@@ -28,18 +32,23 @@ public struct Pub {
   public var slots: [Int] = [0, 0]
   public init() {}
 
+  // Ownership on a subscript parameter is experimental, so each of these is
+  // printed behind a feature guard.
+  // CHECK: #if compiler(>=5.3) && $SubscriptParametersWithOwnership
   // CHECK: public subscript(b i: borrowing Swift{{(::|\.)}}Int) -> Swift{{(::|\.)}}Int
   public subscript(b i: borrowing Int) -> Int {
     get { return slots[i] }
     set { slots[i] = newValue }
   }
 
+  // CHECK: #if compiler(>=5.3) && $SubscriptParametersWithOwnership
   // CHECK: public subscript(io i: inout Swift{{(::|\.)}}Int) -> Swift{{(::|\.)}}Int
   public subscript(io i: inout Int) -> Int {
     get { return slots[i] }
     set { slots[i] = newValue; i += 1 }
   }
 
+  // CHECK: #if compiler(>=5.3) && $SubscriptParametersWithOwnership
   // CHECK: public subscript(ncio n: inout Lib{{(::|\.)}}NC) -> Swift{{(::|\.)}}Int
   public subscript(ncio n: inout NC) -> Int {
     get { return slots[n.v] }
@@ -52,19 +61,23 @@ public struct Pub {
   // checker, because the `modify` coroutine synthesized for resilient storage
   // forwards the index across its yield and the prologue copy of the index
   // cannot be eliminated there.
+  // CHECK: #if compiler(>=5.3) && $SubscriptParametersWithOwnership
   // CHECK: public subscript(ncb n: borrowing Lib{{(::|\.)}}NC) -> Swift{{(::|\.)}}Int
   public subscript(ncb n: borrowing NC) -> Int {
     get { return slots[n.v] }
   }
 
+  // CHECK: #if compiler(>=5.3) && $SubscriptParametersWithOwnership
   // CHECK: public subscript<T>(g t: borrowing T) -> Swift{{(::|\.)}}Int where T : ~Copyable
   public subscript<T: ~Copyable>(g t: borrowing T) -> Int { return 0 }
 }
 
 // CHECK: public protocol HasSubs {
 public protocol HasSubs {
+  // CHECK: #if compiler(>=5.3) && $SubscriptParametersWithOwnership
   // CHECK: subscript(pb i: borrowing Swift{{(::|\.)}}Int) -> Swift{{(::|\.)}}Int { get }
   subscript(pb i: borrowing Int) -> Int { get }
+  // CHECK: #if compiler(>=5.3) && $SubscriptParametersWithOwnership
   // CHECK: subscript(pio i: inout Swift{{(::|\.)}}Int) -> Swift{{(::|\.)}}Int { get set }
   subscript(pio i: inout Int) -> Int { get set }
 }

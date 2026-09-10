@@ -620,6 +620,10 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
 
+/// Enable subscript parameters that have ownership (inout, borrowing,
+/// consuming).
+EXPERIMENTAL_FEATURE(SubscriptParametersWithOwnership, true)
+
 /// Emit typed allocation calls in Embedded Swift.
 EXPERIMENTAL_FEATURE(TypedAllocation, true)
 

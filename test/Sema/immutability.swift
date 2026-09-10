@@ -654,14 +654,12 @@ func f(a : FooClass, b : LetStructMembers) {
 }
 
 // https://github.com/apple/swift/issues/44961
-// Subscript declarations may have `inout` parameters: such an index takes the
-// exclusive access itself, so one access spans every accessor that a single
-// formal access on the subscript runs.
+// Reject subscript declarations with mutable parameters.
 class MutableSubscripts {
   var x : Int = 0
 
-  subscript(x: inout Int) -> () { x += 1 }
-  subscript<T>(x: inout T) -> () {
+  subscript(x: inout Int) -> () { x += 1 } // expected-error {{'inout' may only be used on function or initializer parameters}}
+  subscript<T>(x: inout T) -> () { // expected-error {{'inout' may only be used on function or initializer parameters}}
     fatalError()
   }
 

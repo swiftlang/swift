@@ -1,5 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature SubscriptParametersWithOwnership
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_SubscriptParametersWithOwnership
 
 import Foundation
 

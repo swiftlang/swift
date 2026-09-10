@@ -205,7 +205,7 @@ func rdar94888357() {
 
 // https://github.com/apple/swift/issues/68417
 enum E {
-  subscript(x: inout Int) -> Bool { true } // ok
+  subscript(x: inout Int) -> Bool { true } // expected-error {{'inout' may only be used on function or initializer parameters}}
   case c(x: inout Int) // expected-error {{'inout' may only be used on function or initializer parameters}}
   func d(x: inout Int ...) {} // expected-error {{'inout' must not be used on variadic parameters}}
   func e(x: inout Int) {} // ok

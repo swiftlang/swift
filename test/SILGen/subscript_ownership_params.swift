@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature SubscriptParametersWithOwnership %s | %FileCheck %s
+
+// REQUIRES: swift_feature_SubscriptParametersWithOwnership
 
 // Ownership specifiers on subscript parameters.
 //

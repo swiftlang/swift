@@ -1,5 +1,6 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature SubscriptParametersWithOwnership) | %FileCheck %s
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_SubscriptParametersWithOwnership
 
 // Ownership specifiers on subscript parameters, at runtime.
 //

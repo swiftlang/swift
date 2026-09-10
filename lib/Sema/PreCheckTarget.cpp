@@ -1408,8 +1408,15 @@ public:
           parent = nextParent;
         }
         
+        // A subscript only accepts `&` on an argument when its parameters may
+        // be declared `inout`.
+        bool inoutSubscriptArg =
+            isa<SubscriptExpr>(parent) &&
+            Ctx.LangOpts.hasFeature(
+                Feature::SubscriptParametersWithOwnership);
+
         if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent) ||
-            isa<MacroExpansionExpr>(parent) || isa<SubscriptExpr>(parent)) {
+            isa<MacroExpansionExpr>(parent) || inoutSubscriptArg) {
           // If outermost paren is associated with a call or
           // a member reference, it might be valid to have `&`
           // before all of the parens.
@@ -1422,6 +1429,12 @@ public:
             diags.diagnose(expr->getStartLoc(),
                            diag::cannot_pass_inout_arg_to_keypath_method);
           return finish(true, expr);
+        }
+
+        if (isa<SubscriptExpr>(parent)) {
+          diags.diagnose(expr->getStartLoc(),
+                         diag::cannot_pass_inout_arg_to_subscript);
+          return finish(false, nullptr);
         }
       }
       if (auto *accessor = DC->getInnermostPropertyAccessorContext()) {

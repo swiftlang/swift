@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature SubscriptParametersWithOwnership
+
+// REQUIRES: swift_feature_SubscriptParametersWithOwnership
 
 struct NC: ~Copyable { var v: Int }
 

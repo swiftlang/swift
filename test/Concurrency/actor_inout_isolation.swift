@@ -39,7 +39,7 @@ actor TestActor {
   var value2: Int = 1 // expected-note 5{{property declared here}}
   var points: [Point] = [] // expected-note {{property declared here}}
 
-  subscript(x : inout Int) -> Int { // ok: subscripts may take 'inout' indices
+  subscript(x : inout Int) -> Int { // expected-error {{'inout' may only be used on function or initializer parameters}}
     x += 1
     return x
   }

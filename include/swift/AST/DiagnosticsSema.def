@@ -8835,6 +8835,8 @@ ERROR(inverse_conditional_must_be_fully_explicit,none,
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
       "parameter of noncopyable type %0 must specify ownership", (Type))
+ERROR(noncopyable_parameter_subscript_unsupported, none,
+      "subscripts cannot have noncopyable parameters yet", ())
 NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
 ERROR(ownership_specifier_nonescaping_closure,none,

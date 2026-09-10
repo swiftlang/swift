@@ -2884,6 +2884,16 @@ bool swift::diagnoseMissingOwnership(ParamSpecifier ownership,
   auto loc = repr->getLoc();
   repr->setInvalid();
 
+  // Without SubscriptParametersWithOwnership there is no ownership specifier
+  // to suggest for a subscript parameter, so say that the type simply cannot
+  // be used here.
+  if (options.hasBase(TypeResolverContext::SubscriptDecl) &&
+      !resolution.getASTContext().LangOpts.hasFeature(
+          Feature::SubscriptParametersWithOwnership)) {
+    diags.diagnose(loc, diag::noncopyable_parameter_subscript_unsupported);
+    return true;
+  }
+
   diags.diagnose(loc, diag::noncopyable_parameter_requires_ownership, ty);
 
   diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
@@ -5676,10 +5686,17 @@ NeverNullType
 TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
                                        TypeResolutionOptions options) {
   auto ownershipRepr = dyn_cast<OwnershipTypeRepr>(repr);
+
   // Ownership is valid on function, initializer, and subscript parameters,
-  // but not on enum case payloads.
+  // but not on enum case payloads. Subscript parameters are only allowed
+  // ownership under the SubscriptParametersWithOwnership feature.
+  bool ownershipOnSubscriptParams =
+      getASTContext().LangOpts.hasFeature(
+          Feature::SubscriptParametersWithOwnership);
   if (!options.is(TypeResolverContext::FunctionInput) ||
-      options.hasBase(TypeResolverContext::EnumElementDecl)) {
+      options.hasBase(TypeResolverContext::EnumElementDecl) ||
+      (options.hasBase(TypeResolverContext::SubscriptDecl) &&
+       !ownershipOnSubscriptParams)) {
 
     decltype(diag::attr_only_on_parameters) diagID;
     if (options.is(TypeResolverContext::VariadicFunctionInput)) {
@@ -5697,24 +5714,6 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
     }
     diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, name);
     return ErrorType::get(getASTContext());
-  }
-
-  // A subscript index may be `borrowing` or `inout`.
-  if (options.hasBase(TypeResolverContext::SubscriptDecl) && ownershipRepr) {
-    switch (ownershipRepr->getSpecifier()) {
-    case ParamSpecifier::Consuming:
-    case ParamSpecifier::ImplicitlyCopyableConsuming:
-    case ParamSpecifier::LegacyOwned:
-      // Whether a `consuming` index is legal depends on which accessors the
-      // subscript has, which is not known here.
-      break;
-
-    case ParamSpecifier::Default:
-    case ParamSpecifier::Borrowing:
-    case ParamSpecifier::LegacyShared:
-    case ParamSpecifier::InOut:
-      break;
-    }
   }
 
   if (ownershipRepr && ownershipRepr->getSpecifier() == ParamSpecifier::InOut
