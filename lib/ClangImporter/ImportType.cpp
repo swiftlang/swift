@@ -1075,6 +1075,7 @@ namespace {
     SUGAR_TYPE(Using)
     SUGAR_TYPE(BTFTagAttributed)
     SUGAR_TYPE(PredefinedSugar)
+    SUGAR_TYPE(LateParsedAttr)
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
