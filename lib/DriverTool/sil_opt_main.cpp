@@ -543,6 +543,10 @@ struct SILOptOptions {
                        llvm::cl::desc("Enable C++ interop."),
                        llvm::cl::init(false));
 
+  llvm::cl::opt<bool> EnableCOMInterop{"enable-experimental-com-interop",
+                                       llvm::cl::desc("Enable COM interop."),
+                                       llvm::cl::init(false)};
+
   llvm::cl::opt<bool>
       IgnoreAlwaysInline = llvm::cl::opt<bool>("ignore-always-inline",
                          llvm::cl::desc("Ignore [always_inline] attribute."),
@@ -811,6 +815,14 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getLangOptions().EnableCXXInterop = options.EnableCxxInterop;
   Invocation.computeCXXStdlibOptions();
+
+  if (options.EnableCOMInterop) {
+    auto &LangOpts = Invocation.getLangOptions();
+    LangOpts.EnableCOMInterop = true;
+    LangOpts.COMModel = LangOpts.Target.isOSDarwin()
+                            ? LangOptions::COMInteropModel::CoreFoundation
+                            : LangOptions::COMInteropModel::Microsoft;
+  }
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;

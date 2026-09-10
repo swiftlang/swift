@@ -1,0 +1,54 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -test-runner %s -o /dev/null | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface {}
+
+protocol Native {}
+
+// A generic constraint does not change Swift's opaque generic representation.
+// CHECK-LABEL: generic_com: print-type-lowering
+// CHECK: isFixedABI: false
+// CHECK: isAddressOnly: true
+sil @generic_com : $@convention(thin) <T: IInterface> (@in_guaranteed T) -> () {
+bb0(%value : $*T):
+  specify_test "print-type-lowering %value"
+  %result = tuple ()
+  return %result : $()
+}
+
+// An opened COM archetype has the fixed, loadable interface representation.
+// Open the metatype here so this test does not depend on open_com_existential.
+// CHECK-LABEL: opened_com: print-type-lowering
+// CHECK: isTrivial: false
+// CHECK: isFixedABI: true
+// CHECK: isAddressOnly: false
+sil @opened_com : $@convention(thin) (@thick IInterface.Type) -> () {
+bb0(%type : $@thick IInterface.Type):
+  %opened = open_existential_metatype %type : $@thick IInterface.Type to $@thick (@opened(1, IInterface) Self).Type
+  %value = alloc_stack $@opened(1, IInterface) Self
+  specify_test "print-type-lowering %value"
+  dealloc_stack %value : $*@opened(1, IInterface) Self
+  %result = tuple ()
+  return %result : $()
+}
+
+// Ordinary opened existentials retain their opaque representation.
+// CHECK-LABEL: opened_native: print-type-lowering
+// CHECK: isFixedABI: false
+// CHECK: isAddressOnly: true
+sil @opened_native : $@convention(thin) (@thick Native.Type) -> () {
+bb0(%type : $@thick Native.Type):
+  %opened = open_existential_metatype %type : $@thick Native.Type to $@thick (@opened(2, Native) Self).Type
+  %value = alloc_stack $@opened(2, Native) Self
+  specify_test "print-type-lowering %value"
+  dealloc_stack %value : $*@opened(2, Native) Self
+  %result = tuple ()
+  return %result : $()
+}
