@@ -2584,7 +2584,8 @@ static bool diagnoseAmbiguityWithContextualType(
 /// same-type requirement mismatches, etc.
 static bool diagnoseAmbiguityWithGenericRequirements(
     ConstraintSystem &cs,
-    ArrayRef<std::pair<const Solution *, const ConstraintFix *>> aggregate) {
+    ArrayRef<std::pair<const Solution *, const ConstraintFix *>> aggregate,
+    const SolutionDiff &diff) {
   // If all of the fixes point to the same overload choice,
   // we can diagnose this an a single error.
   bool hasNonDeclOverloads = false;
@@ -2641,7 +2642,7 @@ static bool diagnoseAmbiguityWithGenericRequirements(
 static bool diagnoseAmbiguity(
     ConstraintSystem &cs, const SolutionDiff::OverloadDiff &ambiguity,
     ArrayRef<std::pair<const Solution *, const ConstraintFix *>> aggregateFix,
-    ArrayRef<Solution> solutions) {
+    const SolutionDiff &diff, ArrayRef<Solution> solutions) {
   auto *locator = aggregateFix.front().second->getLocator();
   auto anchor = aggregateFix.front().second->getAnchor();
 
@@ -3098,7 +3099,8 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       continue;
 
     auto aggregate = fixes->second;
-    diagnosed |= ::diagnoseAmbiguity(*this, ambiguity, aggregate, solutions);
+    diagnosed |= ::diagnoseAmbiguity(*this, ambiguity, aggregate, solutionDiff,
+                                     solutions);
 
     consideredFixes.insert(aggregate.begin(), aggregate.end());
   }
@@ -3158,7 +3160,8 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     }
 
     for (auto &aggregate : viableGroups) {
-      if (diagnoseAmbiguityWithGenericRequirements(*this, aggregate)) {
+      if (diagnoseAmbiguityWithGenericRequirements(*this, aggregate,
+                                                   solutionDiff)) {
         // Remove diagnosed fixes.
         fixes.set_subtract(aggregate);
         diagnosed = true;

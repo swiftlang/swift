@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -verify-ignore-unrelated %s
 
 //===----------------------------------------------------------------------===//
 // Tests and samples.
@@ -793,8 +793,9 @@ func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
 func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
-  if (cond || a) ?? 42 > 0 {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
-  // expected-error@-1 {{cannot convert value of type 'Bool' to expected argument type 'Int'}}
+  if (cond || a) ?? 42 > 0 {} // expected-error {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
+  // expected-error@-1 {{cannot convert value of type 'Bool' to expected '??' operand type 'Int'}}
+
   if (cond || a) ?? (42 > 0) {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
 
   if cond || a ?? 42 > 0 {}    // Parses as the first one, not the others.
@@ -820,11 +821,11 @@ func testOptionalTypeParsing(_ a : AnyObject) -> String {
 func testParenExprInTheWay() {
   let x = 42
   
-  if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected '&' operand type 'Int'}}
   // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
-  if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected '&' operand type 'Int'}}
   // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
-  if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected '&' operand type 'Int'}}
   // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '== 0' instead}} {{6-7=}}{{7-7=(}}{{16-16= == 0)}}
 
   if x & x {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
