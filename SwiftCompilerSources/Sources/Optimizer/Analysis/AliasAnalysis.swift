@@ -246,6 +246,11 @@ struct AliasAnalysis {
       } else {
         return .noEffects
       }
+    case let loadBorrow as LoadBorrowInst:
+      // Like a `load`, a `load_borrow` physically only reads from its address. That the memory must not
+      // be modified until the end of the borrow scope is modelled by the effects of the `end_borrow`.
+      return memLoc.mayAlias(with: loadBorrow.address, self) ? .init(read: true) : .noEffects
+
     case let store as StoreInst:
       if memLoc.isLetValue && store.destination.accessBase != memLoc.address.accessBase {
         return .noEffects
