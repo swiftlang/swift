@@ -7,12 +7,10 @@
 //
 // Compare usability of function.h in Swift with swift-frontend
 // RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}function.h \
 // RUN:   -typo-correction-limit 0 \
 // RUN:   %t%{fs-sep}ok.swift -verify-additional-prefix ok-swift-
 // RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}function.h \
 // RUN:   -typo-correction-limit 0 \
 // RUN:   %t%{fs-sep}err.swift -verify-additional-prefix swift-
@@ -24,10 +22,7 @@
 // Check module interface of function.h
 // RUN: %target-swift-ide-test -print-module -source-filename=x \
 // RUN:   -cxx-interoperability-mode=default -I %t/Inputs \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -module-to-print=Function | %FileCheck %s
-//
-// REQUIRES: swift_feature_ImportCxxMembersLazily
 
 //--- Inputs/module.modulemap
 module Function {
@@ -91,8 +86,10 @@ struct GoodStruct {
   // FIXME: operators are imported eagerly, so having this member would make GoodStruct unusable
   // int operator+(Bro<Ken>) const;
 
-  Bro<Ken> begin() const;
-  Bro<Ken> end() const;
+  // FIXME: begin()/end() are imported eagerly to derive the CxxSequence
+  // conformance, so having these members would make GoodStruct unusable
+  // Bro<Ken> begin() const;
+  // Bro<Ken> end() const;
 
   // Return type templates are instantiated only if the function member is
   // actually imported, e.g., not if the function member is deleted.
@@ -118,9 +115,6 @@ struct GoodStruct {
 //
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
 // NOTE-MISSING: func overloadsDiffNumArgs(_: Never)
-//
-// CHECK-NEXT:   func __beginUnsafe() -> Never
-// CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
 
 
@@ -132,8 +126,6 @@ struct DerivedGoodStruct : GoodStruct {};
 // NOTE-MISSING: func badVirtual(_: Never) -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
-// CHECK-NEXT:   func __beginUnsafe() -> Never
-// CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
 
 struct UsingGoodStruct : GoodStruct {
@@ -149,8 +141,6 @@ struct UsingGoodStruct : GoodStruct {
 // CHECK-NEXT:   func getBad() -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
-// CHECK-NEXT:   func __beginUnsafe() -> Never
-// CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
 
 
