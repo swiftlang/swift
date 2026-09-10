@@ -30,6 +30,7 @@
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 using namespace swift;
+using namespace swift::Lowering;
 
 static llvm::cl::opt<bool> EmitLogging(
     "sil-move-only-checker-emit-pruned-liveness-logging");
@@ -54,30 +55,40 @@ static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
 //                         MARK: TypeSubElementCount
 //===----------------------------------------------------------------------===//
 
-TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
-                                         TypeExpansionContext context)
-    : number(1) {
+uint32_t TypeConverter::getTypeSubElementCount(SILType type,
+                                               TypeExpansionContext context) {
+  auto key = std::make_pair(type, context);
+  auto found = TypeSubElementCache.find(key);
+  if (found != TypeSubElementCache.end())
+    return found->second;
+
+  uint32_t number = 1;
+
   if (auto tupleType = type.getAs<TupleType>()) {
     unsigned numElements = 0;
     for (auto index : indices(tupleType.getElementTypes()))
       numElements +=
-          TypeSubElementCount(type.getTupleElementType(index), mod, context);
+          getTypeSubElementCount(type.getTupleElementType(index), context);
     number = numElements;
-    return;
+    TypeSubElementCache[key] = number;
+    return number;
   }
 
   if (auto *structDecl = getFullyReferenceableStruct(type)) {
     // A resilient struct has 1 element.
-    if (structDecl->isResilient(mod.getSwiftModule(),
+    auto *swiftModule = context.getContext()->getParentModule();
+    ASSERT(swiftModule != nullptr);
+    if (structDecl->isResilient(swiftModule,
                                 ResilienceExpansion::Maximal)) {
       number = 1;
-      return;
+      TypeSubElementCache[key] = number;
+      return number;
     }
 
     unsigned numElements = 0;
     for (auto *fieldDecl : structDecl->getStoredProperties())
-      numElements += TypeSubElementCount(
-          type.getFieldType(fieldDecl, mod, context), mod, context);
+      numElements += getTypeSubElementCount(
+          type.getFieldType(fieldDecl, *this, context), context);
     number = numElements;
 
     // If we do not have any elements, just set our size to 1.
@@ -89,7 +100,8 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
       ++number;
     }
 
-    return;
+    TypeSubElementCache[key] = number;
+    return number;
   }
 
   if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
@@ -97,8 +109,8 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
     for (auto *eltDecl : enumDecl->getAllElements()) {
       if (!eltDecl->hasAssociatedValues())
         continue;
-      auto elt = type.getEnumElementType(eltDecl, mod, context);
-      numElements += unsigned(TypeSubElementCount(elt, mod, context));
+      auto elt = type.getEnumElementType(eltDecl, *this, context);
+      numElements += unsigned(getTypeSubElementCount(elt, context));
     }
     number = numElements + 1;
     if (type.isValueTypeWithDeinit()) {
@@ -106,15 +118,22 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
       // end of the structure.
       ++number;
     }
-    return;
+    TypeSubElementCache[key] = number;
+    return number;
   }
 
-  // If this isn't a tuple, struct, or enum, it is a single element. This was
-  // our default value, so we can just return.
+  // If this isn't a tuple, struct, or enum, it is a single element.
+  TypeSubElementCache[key] = number;
+  return number;
 }
 
+TypeSubElementCount::TypeSubElementCount(SILType type,
+                                         TypeConverter &TC,
+                                         TypeExpansionContext context)
+    : number(TC.getTypeSubElementCount(type, context)) {}
+
 TypeSubElementCount::TypeSubElementCount(SILValue value) : number(1) {
-  auto whole = TypeSubElementCount(value->getType(), *value->getModule(),
+  auto whole = TypeSubElementCount(value->getType(), value->getModule()->Types,
                                    TypeExpansionContext(*value->getFunction()));
   // The value produced by a drop_deinit has one fewer subelement than that of
   // its type--the deinit bit is not included.
@@ -210,7 +229,7 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       // Keep track of what subelement is being referenced.
       for (unsigned i : range(teai->getFieldIndex())) {
         finalSubElementOffset += TypeSubElementCount(
-            tupleType.getTupleElementType(i), mod,
+            tupleType.getTupleElementType(i), mod.Types,
             TypeExpansionContext(*rootAddress->getFunction()));
       }
       projectionDerivedFromRoot = teai->getOperand();
@@ -228,7 +247,7 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
           break;
         auto context = TypeExpansionContext(*rootAddress->getFunction());
         finalSubElementOffset += TypeSubElementCount(
-            type.getFieldType(fieldDecl, mod, context), mod, context);
+            type.getFieldType(fieldDecl, mod.Types, context), mod.Types, context);
       }
 
       projectionDerivedFromRoot = seai->getOperand();
@@ -245,9 +264,9 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
         if (element == enumData->getElement())
           break;
         auto context = TypeExpansionContext(*rootAddress->getFunction());
-        auto elementTy = ty.getEnumElementType(element, mod, context);
+        auto elementTy = ty.getEnumElementType(element, mod.Types, context);
         finalSubElementOffset +=
-            unsigned(TypeSubElementCount(elementTy, mod, context));
+            unsigned(TypeSubElementCount(elementTy, mod.Types, context));
       }
       projectionDerivedFromRoot = enumData->getEnum();
       continue;
@@ -317,7 +336,7 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
       // Keep track of what subelement is being referenced.
       for (unsigned i : range(teai->getFieldIndex())) {
         finalSubElementOffset += TypeSubElementCount(
-            tupleType.getTupleElementType(i), mod,
+            tupleType.getTupleElementType(i), mod.Types,
             TypeExpansionContext(*rootAddress->getFunction()));
       }
       projectionDerivedFromRoot = teai->getOperand();
@@ -337,7 +356,7 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
             break;
           auto context = TypeExpansionContext(*rootAddress->getFunction());
           finalSubElementOffset += TypeSubElementCount(
-              type.getFieldType(pair.value(), mod, context), mod, context);
+              type.getFieldType(pair.value(), mod.Types, context), mod.Types, context);
         }
 
         projectionDerivedFromRoot = dsi->getOperand();
@@ -352,7 +371,7 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
         for (unsigned i : range(resultIndex)) {
           auto context = TypeExpansionContext(*rootAddress->getFunction());
           finalSubElementOffset +=
-              TypeSubElementCount(type.getTupleElementType(i), mod, context);
+              TypeSubElementCount(type.getTupleElementType(i), mod.Types, context);
         }
 
         projectionDerivedFromRoot = dti->getOperand();
@@ -370,7 +389,7 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
           break;
         auto context = TypeExpansionContext(*rootAddress->getFunction());
         finalSubElementOffset += TypeSubElementCount(
-            type.getFieldType(fieldDecl, mod, context), mod, context);
+            type.getFieldType(fieldDecl, mod.Types, context), mod.Types, context);
       }
 
       projectionDerivedFromRoot = seai->getOperand();

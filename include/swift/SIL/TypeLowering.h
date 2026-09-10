@@ -696,6 +696,9 @@ class TypeConverter {
   /// Second element is a ResilienceExpansion.
   llvm::DenseMap<std::pair<SILType, unsigned>, unsigned> TypeFields;
 
+  /// Cache for TypeSubElementCount.
+  llvm::DenseMap<std::pair<SILType, TypeExpansionContext>, unsigned> TypeSubElementCache;
+
   llvm::DenseMap<AbstractClosureExpr *, FunctionTypeInfo> ClosureInfos;
   llvm::DenseMap<SILDeclRef, TypeExpansionContext>
     CaptureTypeExpansionContexts;
@@ -827,8 +830,13 @@ public:
   /// Get the method dispatch strategy for a protocol.
   static ProtocolDispatchStrategy getProtocolDispatchStrategy(ProtocolDecl *P);
 
-  /// Count the total number of fields inside the given SIL Type
+  /// Count the total number of fields inside the given SILType.
   unsigned countNumberOfFields(SILType Ty, TypeExpansionContext expansion);
+
+  /// Count number of sub-elements inside the given SILType.
+  ///
+  /// FIXME: This is going away soon.
+  uint32_t getTypeSubElementCount(SILType type, TypeExpansionContext context);
 
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
