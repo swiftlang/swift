@@ -2040,6 +2040,7 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
     llvm::SmallPtrSet<clang::Decl *, 8> alreadyAdded;
     alreadyAdded.insert(named->getCanonicalDecl());
 
+    auto *Stats = nameImporter.getContext().Stats;
     auto dc = cast<clang::DeclContext>(named);
     for (auto member : dc->decls()) {
       auto canonicalMember = isa<clang::NamespaceDecl>(member)
@@ -2055,6 +2056,9 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
           if (auto def = recordDecl->getDefinition())
             namedMember = def;
         addEntryToLookupTable(table, namedMember, nameImporter);
+        if (Stats)
+          ++Stats->getFrontendCounters()
+                .ClangNamespaceMembersAddedToLookupTable;
       }
     }
   }

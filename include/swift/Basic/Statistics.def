@@ -160,6 +160,9 @@ FRONTEND_STATISTIC(ClangImporter, ClangRecordMemberLookupMatched)
 /// Members whose names were imported to search a class template specialization.
 FRONTEND_STATISTIC(ClangImporter, ClangRecordMemberLookupTemplateMembersScanned)
 
+/// Namespace members added to the __ObjC SwiftLookupTable.
+FRONTEND_STATISTIC(ClangImporter, ClangNamespaceMembersAddedToLookupTable)
+
 /// Declarations considered as candidate members during namespace lookup.
 FRONTEND_STATISTIC(ClangImporter, ClangNamespaceMemberLookupCandidates)
 
