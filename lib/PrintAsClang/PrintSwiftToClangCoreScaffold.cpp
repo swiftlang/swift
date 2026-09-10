@@ -15,6 +15,8 @@
 #include "PrimitiveTypeMapping.h"
 #include "SwiftToClangInteropContext.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Assertions.h"
@@ -192,22 +194,6 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   // compilable everywhere while still supporting these types where possible.
   auto stdlibModule = astContext.getStdlibModule();
 
-  if (Type unicodeScalar =
-          astContext.getNamedSwiftType(stdlibModule, "CChar32"))
-    supportedPrimitiveTypes.push_back(unicodeScalar);
-
-  if (clangTI.hasInt128Type()) {
-    if (Type int128Ty = astContext.getInt128Type())
-      supportedPrimitiveTypes.push_back(int128Ty);
-    if (Type uint128Ty = astContext.getUInt128Type())
-      supportedPrimitiveTypes.push_back(uint128Ty);
-  }
-
-  if (clangTI.hasFloat16Type()) {
-    if (Type float16 = astContext.getNamedSwiftType(stdlibModule, "Float16"))
-      supportedPrimitiveTypes.push_back(float16);
-  }
-
   // We do not have metadata for primitive types in Embedded Swift.
   // As a result, the following features are not supported with primitive types in this mode:
   // - Dynamic casts
@@ -215,6 +201,34 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   // - Generic requirement parameters
   // - Metadata source parameter
   bool embedded = astContext.LangOpts.hasFeature(Feature::Embedded);
+
+  // Some of these types were introduced after the oldest runtime that the
+  // deployment target supports. Referencing their type metadata from the
+  // generated header would make the C++ client fail to launch when back
+  // deployed.
+  auto isAvailableAtDeploymentTarget = [&](Type type) {
+    auto nominal = type->getNominalOrBoundGenericNominal();
+    if (!nominal)
+      return false;
+    if (embedded)
+      return true;
+    return AvailabilityRange::forDeploymentTarget(astContext)
+        .isContainedIn(AvailabilityInference::availableRange(nominal));
+  };
+  auto addIfAvailable = [&](Type type) {
+    if (type && isAvailableAtDeploymentTarget(type))
+      supportedPrimitiveTypes.push_back(type);
+  };
+
+  addIfAvailable(astContext.getNamedSwiftType(stdlibModule, "CChar32"));
+
+  if (clangTI.hasInt128Type()) {
+    addIfAvailable(astContext.getInt128Type());
+    addIfAvailable(astContext.getUInt128Type());
+  }
+
+  if (clangTI.hasFloat16Type())
+    addIfAvailable(astContext.getNamedSwiftType(stdlibModule, "Float16"));
 
   for (Type type : supportedPrimitiveTypes) {
     auto typeInfo = *typeMapping.getKnownCxxTypeInfo(
@@ -242,7 +256,10 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
 
     os << "template<>\nstruct TypeMetadataTrait<" << typeInfo.name << "> {\n"
        << "  static ";
-    ClangSyntaxPrinter(astContext, os).printInlineForThunk();
+    // This is deliberately not printed as an inline thunk: in debug mode
+    // inline thunks are marked as `used`, which would emit all of these
+    // accessors even when the program never uses the corresponding type.
+    ClangSyntaxPrinter(astContext, os).printInlineForHelperFunction();
     os << "void * _Nonnull getTypeMetadata() {\n"
        << "    return &" << cxx_synthesis::getCxxImplNamespaceName()
        << "::" << typeMetadataVarName << ";\n"
