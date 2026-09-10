@@ -10389,8 +10389,14 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
     return Known.value();
   }
 
-  if (auto *Stats = SwiftContext.Stats)
+  ++importDeclRecursionDepth;
+  SWIFT_DEFER { --importDeclRecursionDepth; };
+
+  if (auto *Stats = SwiftContext.Stats) {
     ++Stats->getFrontendCounters().ClangImportDeclCacheMiss;
+    auto &maxDepth = Stats->getFrontendCounters().ClangImportDeclRecursionDepth;
+    maxDepth = std::max(maxDepth, importDeclRecursionDepth);
+  }
 
   bool TypedefIsSuperfluous = false;
   bool HadForwardDeclaration = false;
