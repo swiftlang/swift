@@ -36,3 +36,10 @@ func passes_consumed(_ string: consuming CFString?) {
 
 // CHECK-LABEL: sil{{.*}} @$s16c_implementation15passes_consumedyySo11CFStringRefaSgnFTo : $@convention(c) (@owned Optional<CFString>) -> () {
 
+@c @implementation
+func returns_unaudited() -> Unmanaged<CFString>? {
+  return Unmanaged.passRetained(getString() as CFString)
+}
+
+// CHECK-LABEL: sil{{.*}} @$s16c_implementation17returns_unauditeds9UnmanagedVySo11CFStringRefaGSgyFTo : $@convention(c) () -> Optional<Unmanaged<CFString>> {
+

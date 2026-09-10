@@ -3446,9 +3446,9 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   ASTContext &ctx = nominal->getASTContext();
 
-  // Unmanaged<T> can be trivially represented in Objective-C if T
-  // is trivially represented in Objective-C.
-  if (language == ForeignLanguage::ObjectiveC && type->isUnmanaged()) {
+  // Unmanaged<T> can be trivially represented in a foreign language if T
+  // is trivially represented in that language.
+  if (type->isUnmanaged()) {
     auto boundGenericType = type->getAs<BoundGenericType>();
 
     // Note: works around a broken Unmanaged<> definition.
@@ -3469,15 +3469,20 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     case ForeignLanguage::C:
     case ForeignLanguage::Cxx:
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
-        switch (classDecl->getForeignClassKind()) {
-        case ClassDecl::ForeignKind::Normal:
-        case ClassDecl::ForeignKind::RuntimeOnly:
-          // Imported classes cannot be represented in C or C++.
-          return failure();
-        case ClassDecl::ForeignKind::CFType:
-          // Imported CF types can be represented as trivial pointer types in C
-          // or C++.
-          break;
+        // Foreign reference types are imported as classes, but they are
+        // passed around as a pointer to the underlying C or C++ record, so
+        // they are representable in both languages.
+        if (!classDecl->isForeignReferenceType()) {
+          switch (classDecl->getForeignClassKind()) {
+          case ClassDecl::ForeignKind::Normal:
+          case ClassDecl::ForeignKind::RuntimeOnly:
+            // Imported classes cannot be represented in C or C++.
+            return failure();
+          case ClassDecl::ForeignKind::CFType:
+            // Imported CF types can be represented as trivial pointer types in
+            // C or C++.
+            break;
+          }
         }
       }
 

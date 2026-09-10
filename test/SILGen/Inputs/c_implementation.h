@@ -13,3 +13,7 @@ CFStringRef returns_not_retained(void);
 void passes_borrowed(CFStringRef string);
 
 void passes_consumed(CF_CONSUMED CFStringRef string);
+
+// Not ownership-audited, so this is imported as returning
+// 'Unmanaged<CFString>?'.
+CFStringRef returns_unaudited(void);
