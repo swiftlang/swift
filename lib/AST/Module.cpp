@@ -2080,6 +2080,11 @@ bool SourceFile::registerMainDecl(ValueDecl *mainDecl, SourceLoc diagLoc) {
   return false;
 }
 
+void SourceFile::disableTopLevelCode() {
+  assert(Kind == SourceFileKind::Main);
+  TopLevelCodeDisabled = true;
+}
+
 NominalTypeDecl *ModuleDecl::getMainTypeDecl() const {
   if (!EntryPointInfo.hasEntryPoint())
     return nullptr;
@@ -3595,12 +3600,6 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
 
   assert(!IsPrimary || M.isMainModule() &&
          "A primary cannot appear outside the main module");
-
-  if (isScriptMode()) {
-    bool problem = M.registerEntryPointFile(this, SourceLoc(), std::nullopt);
-    assert(!problem && "multiple main files?");
-    (void)problem;
-  }
 
   M.getASTContext().SourceMgr.recordSourceFile(bufferID, this);
 }

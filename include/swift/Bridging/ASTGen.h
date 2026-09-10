@@ -80,6 +80,9 @@ void swift_ASTGen_buildTopLevelASTNodes(
     BridgedASTContext astContext, void *_Nonnull outputContext,
     void (*_Nonnull)(BridgedASTNode, void *_Nonnull));
 
+bool swift_ASTGen_sourceFileHasMainTypeDecl(BridgedASTContext astContext,
+                                            void *_Nonnull sourceFile);
+
 BridgedFingerprint
 swift_ASTGen_getSourceFileFingerprint(void *_Nonnull sourceFile,
                                       BridgedASTContext astContext);
