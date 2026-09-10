@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 6 -disable-availability-checking -emit-sil -o /dev/null %s -parse-as-library -verify -import-objc-header %S/Inputs/sending.h
+// RUN: %target-swift-frontend -swift-version 6 -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null %s -parse-as-library -verify -import-objc-header %S/Inputs/sending.h
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

@@ -4,16 +4,16 @@
 // extensions, which is where it diverges from module-level `-default-isolation
 // MainActor` since SE-0466 carve-outs do not apply at file scope).
 
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -disable-availability-checking -module-name equivalence -DFILE_DEFAULT %s > %t/file-5.sil
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -disable-availability-checking -module-name equivalence -DEXPLICIT %s > %t/explicit-5.sil
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -target %target-swift-5.1-abi-triple -module-name equivalence -DFILE_DEFAULT %s > %t/file-5.sil
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -target %target-swift-5.1-abi-triple -module-name equivalence -DEXPLICIT %s > %t/explicit-5.sil
 // RUN: diff %t/file-5.sil %t/explicit-5.sil
 
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -strict-concurrency=complete -disable-availability-checking -module-name equivalence -DFILE_DEFAULT %s > %t/file-5c.sil
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -strict-concurrency=complete -disable-availability-checking -module-name equivalence -DEXPLICIT %s > %t/explicit-5c.sil
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -strict-concurrency=complete -target %target-swift-5.1-abi-triple -module-name equivalence -DFILE_DEFAULT %s > %t/file-5c.sil
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -strict-concurrency=complete -target %target-swift-5.1-abi-triple -module-name equivalence -DEXPLICIT %s > %t/explicit-5c.sil
 // RUN: diff %t/file-5c.sil %t/explicit-5c.sil
 
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -disable-availability-checking -module-name equivalence -DFILE_DEFAULT %s > %t/file-6.sil
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -disable-availability-checking -module-name equivalence -DEXPLICIT %s > %t/explicit-6.sil
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -module-name equivalence -DFILE_DEFAULT %s > %t/file-6.sil
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -module-name equivalence -DEXPLICIT %s > %t/explicit-6.sil
 // RUN: diff %t/file-6.sil %t/explicit-6.sil
 
 // REQUIRES: concurrency
