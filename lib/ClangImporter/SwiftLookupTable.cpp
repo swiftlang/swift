@@ -2063,6 +2063,8 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
           if (auto def = recordDecl->getDefinition())
             namedMember = def;
         addEntryToLookupTable(table, namedMember, nameImporter);
+        bumpCounter(swiftCtx,
+                    &Counters::ClangNamespaceMembersAddedToLookupTable);
       }
     }
   }
