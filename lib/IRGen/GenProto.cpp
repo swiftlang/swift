@@ -1210,6 +1210,13 @@ static bool hasConditionalConformances(IRGenModule &IGM,
 /// tables to be dependently-generated?
 bool IRGenModule::isDependentConformance(
     const RootProtocolConformance *conformance) {
+  // A dependent conformance requires its witness table to be instantiated at runtime.
+  // This is not possible in Embedded Swift, which has no such runtime. It's also not
+  // needed: the mandatory pipeline specializes all witness tables, so that every
+  // conformance which is used at runtime is fully concrete.
+  if (Context.LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
   return ::isDependentConformance(
       *this, conformance,
@@ -1772,8 +1779,12 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
 
       if (IGM.isEmbeddedWithExistentials()) {
         // In Embedded Swift associated type witness point to the metadata.
-        llvm::Constant *witnessEntry = IGM.getAddrOfTypeMetadata(
-          typeWitness->getCanonicalType());
+        // The type witness can be an opaque result type, which has no metadata of its
+        // own. Its underlying type is always known in Embedded Swift.
+        CanType canTypeWitness = typeWitness->getCanonicalType();
+        if (canTypeWitness->hasOpaqueArchetype())
+          canTypeWitness = IGM.substOpaqueTypesWithUnderlyingTypes(canTypeWitness);
+        llvm::Constant *witnessEntry = IGM.getAddrOfTypeMetadata(canTypeWitness);
         auto &schema = IGM.getOptions().PointerAuth
                           .ProtocolAssociatedTypeAccessFunctions;
         Table.addSignedPointer(witnessEntry, schema, assocType);
@@ -1843,7 +1854,15 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
       if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
         // In Embedded Swift associated-conformance entries simply point to the witness table
         // of the associated conformance.
-        ProtocolConformance *assocConf = associatedWitness.Witness.getConcrete();
+        ProtocolConformanceRef assocConfRef = associatedWitness.Witness;
+        // An associated type which is an opaque result type has an abstract conformance.
+        // In Embedded Swift the underlying type of an opaque type is always known, so
+        // replace the opaque type to get the concrete conformance.
+        if (assocConfRef.isAbstract() &&
+            assocConfRef.getType()->hasOpaqueArchetype()) {
+          assocConfRef = IGM.substOpaqueTypesWithUnderlyingTypes(assocConfRef);
+        }
+        ProtocolConformance *assocConf = assocConfRef.getConcrete();
         llvm::Constant *witnessEntry = IGM.getAddrOfWitnessTable(assocConf);
         auto &schema = IGM.getOptions().PointerAuth
                           .ProtocolAssociatedTypeWitnessTableAccessFunctions;

@@ -3616,6 +3616,12 @@ OptionalBridgedWitnessTable BridgedContext::lookupWitnessTable(BridgedConformanc
   return {context->getModule()->lookUpWitnessTable(ref.getConcrete())};
 }
 
+BridgedConformance BridgedContext::substOpaqueTypesWithUnderlyingTypes(BridgedConformance conformance) const {
+  swift::SILModule *mod = context->getModule();
+  return {swift::substOpaqueTypesWithUnderlyingTypes(conformance.unbridged(),
+                                                     mod->getMaximalTypeExpansionContext())};
+}
+
 bool BridgedContext::calleesAreStaticallyKnowable(BridgedDeclRef method) const {
   return swift::calleesAreStaticallyKnowable(*context->getModule(), method.unbridged());
 }
