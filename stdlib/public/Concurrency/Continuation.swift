@@ -248,12 +248,16 @@ public struct ContinuationAwaiter<Success: ~Copyable, Failure: Error>: ~Copyable
   /// not suspend at all and returns the value directly.
   @export(implementation)
   public nonisolated(nonsending) consuming func wait() async throws(Failure) -> sending Success {
+    #if $SplitContinuations
     do {
       return try await Builtin.awaitSplitThrowingContinuation(_takeContext())
     } catch {
       // Matches the cast Continuation.resume uses.
       throw error as! Failure
     }
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Suspend until the paired ``Continuation`` is resumed, with an optional
@@ -296,7 +300,11 @@ public struct ContinuationAwaiter<Success: ~Copyable, Failure: Error>: ~Copyable
     defer { unsafe _taskRemovePriorityEscalationHandler(record: escalationRecord) }
 
     do {
+      #if $SplitContinuations
       return try await Builtin.awaitSplitThrowingContinuation(context)
+      #else
+      fatalError("Swift compiler is incompatible with this SDK version")
+      #endif
     } catch {
       throw error as! Failure
     }
@@ -342,6 +350,7 @@ public nonisolated(nonsending) func withContinuation<
     consuming ContinuationAwaiter<Success, Failure>
   ) async throws(BodyFailure) -> BodyResult
 ) async throws(BodyFailure) -> BodyResult {
+  #if $SplitContinuations
   // Create the split continuation once and vend both halves from it: the resume
   // half (given to whoever performs the work) and the await half (awaited by
   // `body`). The continuation is destroyed when this scope exits, after the
@@ -357,6 +366,9 @@ public nonisolated(nonsending) func withContinuation<
     Builtin.destroySplitContinuation(token)
     throw error
   }
+  #else
+  fatalError("Swift compiler is incompatible with this SDK version")
+  #endif
 }
 
 // MARK: - Resuming on the resumer's own thread
@@ -389,9 +401,13 @@ extension Continuation where Success: ~Copyable {
     returning value: consuming sending Success,
     isolatedTo serialExecutor: UnownedSerialExecutor
   ) {
+    #if $BuiltinContinuationNonCopyableSuccess
     unsafe _continuationSetResumingExecutors(
       self.context, serialExecutor._executor, _getUndefinedTaskExecutor())
     Builtin.resumeThrowingContinuationReturning(_takeContext(), value)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting this continuation by having it throw the given
@@ -403,9 +419,13 @@ extension Continuation where Success: ~Copyable {
     throwing error: __owned Failure,
     isolatedTo serialExecutor: UnownedSerialExecutor
   ) {
+    #if $BuiltinContinuationNonCopyableSuccess
     unsafe _continuationSetResumingExecutors(
       self.context, serialExecutor._executor, _getUndefinedTaskExecutor())
     Builtin.resumeThrowingContinuationThrowing(_takeContext(), error)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting this continuation by having it either return or
@@ -418,6 +438,7 @@ extension Continuation where Success: ~Copyable {
     with result: consuming sending Result<Success, Failure>,
     isolatedTo serialExecutor: UnownedSerialExecutor
   ) {
+    #if $BuiltinContinuationNonCopyableSuccess
     unsafe _continuationSetResumingExecutors(
       self.context, serialExecutor._executor, _getUndefinedTaskExecutor())
     switch consume result {
@@ -426,6 +447,9 @@ extension Continuation where Success: ~Copyable {
     case .failure(let error):
       Builtin.resumeThrowingContinuationThrowing(_takeContext(), error)
     }
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting this continuation by having it return the given
@@ -445,9 +469,13 @@ extension Continuation where Success: ~Copyable {
     returning value: consuming sending Success,
     on taskExecutor: UnownedTaskExecutor
   ) {
+    #if $BuiltinContinuationNonCopyableSuccess
     unsafe _continuationSetResumingExecutors(
       self.context, _getGenericSerialExecutor(), taskExecutor._executor)
     Builtin.resumeThrowingContinuationReturning(_takeContext(), value)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting this continuation by having it throw the given
@@ -459,9 +487,13 @@ extension Continuation where Success: ~Copyable {
     throwing error: __owned Failure,
     on taskExecutor: UnownedTaskExecutor
   ) {
+    #if $BuiltinContinuationNonCopyableSuccess
     unsafe _continuationSetResumingExecutors(
       self.context, _getGenericSerialExecutor(), taskExecutor._executor)
     Builtin.resumeThrowingContinuationThrowing(_takeContext(), error)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting this continuation by having it either return or
@@ -474,6 +506,7 @@ extension Continuation where Success: ~Copyable {
     with result: consuming sending Result<Success, Failure>,
     on taskExecutor: UnownedTaskExecutor
   ) {
+    #if $BuiltinContinuationNonCopyableSuccess
     unsafe _continuationSetResumingExecutors(
       self.context, _getGenericSerialExecutor(), taskExecutor._executor)
     switch consume result {
@@ -482,6 +515,9 @@ extension Continuation where Success: ~Copyable {
     case .failure(let error):
       Builtin.resumeThrowingContinuationThrowing(_takeContext(), error)
     }
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting this continuation by having it return the given
@@ -500,9 +536,13 @@ extension Continuation where Success: ~Copyable {
     isolatedTo serialExecutor: UnownedSerialExecutor,
     taskExecutor: UnownedTaskExecutor
   ) {
+    #if $BuiltinContinuationNonCopyableSuccess
     unsafe _continuationSetResumingExecutors(
       self.context, serialExecutor._executor, taskExecutor._executor)
     Builtin.resumeThrowingContinuationReturning(_takeContext(), value)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting this continuation by having it throw the given
@@ -516,9 +556,13 @@ extension Continuation where Success: ~Copyable {
     isolatedTo serialExecutor: UnownedSerialExecutor,
     taskExecutor: UnownedTaskExecutor
   ) {
+    #if $BuiltinContinuationNonCopyableSuccess
     unsafe _continuationSetResumingExecutors(
       self.context, serialExecutor._executor, taskExecutor._executor)
     Builtin.resumeThrowingContinuationThrowing(_takeContext(), error)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting this continuation by having it either return or
@@ -533,6 +577,7 @@ extension Continuation where Success: ~Copyable {
     isolatedTo serialExecutor: UnownedSerialExecutor,
     taskExecutor: UnownedTaskExecutor
   ) {
+    #if $BuiltinContinuationNonCopyableSuccess
     unsafe _continuationSetResumingExecutors(
       self.context, serialExecutor._executor, taskExecutor._executor)
     switch consume result {
@@ -541,6 +586,9 @@ extension Continuation where Success: ~Copyable {
     case .failure(let error):
       Builtin.resumeThrowingContinuationThrowing(_takeContext(), error)
     }
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 }
 
