@@ -217,6 +217,7 @@ static BridgedFunction::ParseFn parseFunction = nullptr;
 static BridgedFunction::CopyEffectsFn copyEffectsFunction = nullptr;
 static BridgedFunction::GetEffectInfoFn getEffectInfoFunction = nullptr;
 static BridgedFunction::GetMemBehaviorFn getMemBehvaiorFunction = nullptr;
+static BridgedFunction::HasComputedSideEffectsFn hasComputedSideEffectsFunction = nullptr;
 static BridgedFunction::ArgumentMayReadFn argumentMayReadFunction = nullptr;
 static BridgedFunction::ArgumentMayWriteFn argumentMayWriteFunction = nullptr;
 static BridgedFunction::IsDeinitBarrierFn isDeinitBarrierFunction = nullptr;
@@ -1376,6 +1377,7 @@ void BridgedFunction::registerBridging(
     SwiftMetatype metatype, RegisterFn initFn, RegisterFn destroyFn,
     WriteFn writeFn, ParseFn parseFn, CopyEffectsFn copyEffectsFn,
     GetEffectInfoFn effectInfoFn, GetMemBehaviorFn memBehaviorFn,
+    HasComputedSideEffectsFn hasComputedSideEffectsFn,
     ArgumentMayReadFn argumentMayReadFn, ArgumentMayWriteFn argumentMayWriteFn,
     IsDeinitBarrierFn isDeinitBarrierFn) {
   functionMetatype = metatype;
@@ -1386,6 +1388,7 @@ void BridgedFunction::registerBridging(
   copyEffectsFunction = copyEffectsFn;
   getEffectInfoFunction = effectInfoFn;
   getMemBehvaiorFunction = memBehaviorFn;
+  hasComputedSideEffectsFunction = hasComputedSideEffectsFn;
   argumentMayReadFunction = argumentMayReadFn;
   argumentMayWriteFunction = argumentMayWriteFn;
   isDeinitBarrierFunction = isDeinitBarrierFn;
@@ -1480,6 +1483,14 @@ MemoryBehavior SILFunction::getMemoryBehavior(bool observeRetains) {
 
   auto b = getMemBehvaiorFunction({this}, observeRetains);
   return (MemoryBehavior)b;
+}
+
+// Used by the MemoryLifetimeVerifier
+bool SILFunction::hasComputedSideEffects() const {
+  if (!hasComputedSideEffectsFunction)
+    return false;
+
+  return hasComputedSideEffectsFunction({const_cast<SILFunction *>(this)});
 }
 
 // Used by the MemoryLifetimeVerifier
