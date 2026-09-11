@@ -5,6 +5,8 @@
 // RUN: %target-swift-frontend -c -I %t %t/Main.swift -enable-experimental-feature Embedded -o %t/a.o -parse-as-library
 // RUN: %target-embedded-link %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt %target-embedded-concurrency-threading-shim -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %if embedded_dispatch_executor %{ %target-embedded-link %t/a.o -o %t/dispatch.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-dispatch-executor-opt %target-embedded-concurrency-threading-shim -dead_strip %}
+// RUN: %if embedded_dispatch_executor %{ %target-run %t/dispatch.out | %FileCheck %s %}
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
