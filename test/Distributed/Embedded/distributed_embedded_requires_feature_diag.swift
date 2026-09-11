@@ -39,7 +39,7 @@ public struct MyResultHandler: DistributedTargetInvocationResultHandler {
   public func onThrow(error: any Error) async throws {}
 }
 extension MyResultHandler {
-  public func onReturn<Success: MySerializationRequirement>(_ value: Success) async throws {}
+  public func onReturn<Success: MySerializationRequirement>(value: Success) async throws {}
 }
 
 // expected-error@+1{{'distributed actor' in Embedded Swift requires '-enable-experimental-feature EmbeddedDistributed'}}

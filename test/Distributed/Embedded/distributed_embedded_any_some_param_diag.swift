@@ -45,7 +45,7 @@ public struct MyResultHandler: DistributedTargetInvocationResultHandler {
   public func onThrow(error: any Error) async throws {}
 }
 extension MyResultHandler {
-  public func onReturn<Success: MySerializationRequirement>(_ value: Success) async throws {}
+  public func onReturn<Success: MySerializationRequirement>(value: Success) async throws {}
 }
 
 public final class MySystem: DistributedActorSystem, @unchecked Sendable {

@@ -1324,7 +1324,7 @@ public protocol DistributedTargetInvocationDecoder<SerializationRequirement> {
 /// ### Embedded Swift
 /// The protocol is not parameterized on the ``SerializationRequirement``, and only `onReturnVoid()` and
 /// `onThrow(error:)` are formal requirements. The concrete handler provides a single generic
-/// `onReturn<Success: SerializationRequirement>(_:)` member (typically via an extension), resolved by name.
+/// `onReturn<Success: SerializationRequirement>(value:)` member (typically via an extension), resolved by name.
 /// `onThrow` takes the error boxed as `any Error`; there is no `<Err>` generic.
 #if $Embedded
 
@@ -1339,7 +1339,7 @@ public protocol DistributedTargetInvocationResultHandler {
 
   // The onReturn method is ad-hoc and provided by the concrete handler:
   //
-  //   func onReturn<Success: SerializationRequirement>(_ value: Success)
+  //   func onReturn<Success: SerializationRequirement>(value: Success)
   //     async throws
 }
 

@@ -223,7 +223,7 @@ public struct EmbeddedFakeResultHandler: DistributedTargetInvocationResultHandle
 extension EmbeddedFakeResultHandler {
   // The single generic result method. The synthesized receive-dispatch emits a
   // specialized call to it with the distributed func's return value
-  public func onReturn<Success: EmbeddedSerializationRequirement>(_ value: Success) async throws {
+  public func onReturn<Success: EmbeddedSerializationRequirement>(value: Success) async throws {
     writeResponse(value)
   }
 }

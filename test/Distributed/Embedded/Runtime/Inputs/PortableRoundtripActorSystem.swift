@@ -274,7 +274,7 @@ public struct PortableResultHandler: DistributedTargetInvocationResultHandler {
   public func onThrow(error: any Error) async throws { fatalError("threw in handler") }
 }
 extension PortableResultHandler {
-  public func onReturn<Success: PortableSerializationRequirement>(_ value: Success) async throws {
+  public func onReturn<Success: PortableSerializationRequirement>(value: Success) async throws {
     appendField(value.toWireBytes(), to: &buffer.returnBytes)
   }
 }

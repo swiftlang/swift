@@ -1063,7 +1063,7 @@ struct EmbeddedDispatchContext {
 ///     let p2: T2 = try invocationDecoder.decodeNextArgument()
 ///     do {
 ///       let __result = try await self.distFunc(p1, p2)
-///       try await resultHandler.onReturn(__result)
+///       try await resultHandler.onReturn(value: __result)
 ///     } catch {
 ///       try await resultHandler.onThrow(error: error)
 ///     }
@@ -1219,7 +1219,7 @@ static IfStmt *buildEmbeddedDispatchBranch(
           C, stubTy, resultIdExpr, selfSystemExpr);
     }
 
-    // try await resultHandler.onReturn(<__result or $P.resolve(...)>)
+    // try await resultHandler.onReturn(value: <__result or $P.resolve(...)>)
     auto *onReturn =
         UnresolvedDotExpr::createImplicit(
             C, new (C) DeclRefExpr(ConcreteDeclRef(resultHandlerVar), dloc,
@@ -1228,7 +1228,7 @@ static IfStmt *buildEmbeddedDispatchBranch(
     Expr *onReturnCall = CallExpr::createImplicit(
         C, onReturn,
         ArgumentList::createImplicit(
-            C, { Argument(sloc, Identifier(), resultArgExpr) }));
+            C, { Argument(sloc, C.getIdentifier("value"), resultArgExpr) }));
     onReturnCall = AwaitExpr::createImplicit(C, sloc, onReturnCall);
     onReturnCall = TryExpr::createImplicit(C, sloc, onReturnCall);
     doStmts.push_back(onReturnCall);
