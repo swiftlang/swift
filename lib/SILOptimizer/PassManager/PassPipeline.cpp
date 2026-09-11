@@ -825,6 +825,8 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
 
   // Should be after FunctionSignatureOpts and before the last inliner.
+  P.addClassDestroyDevirtualizer(); // currently a no-op in non-OSSA
+  // TODO: remove the ReleaseDevirtualizer once we have OSSA at this place in the pipeline.
   P.addReleaseDevirtualizer();
 
   addFunctionPasses(P, OptimizationLevelKind::LowLevel);

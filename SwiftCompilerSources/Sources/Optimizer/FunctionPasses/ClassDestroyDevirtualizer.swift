@@ -1,8 +1,8 @@
-//===--- ReleaseDevirtualizer.swift - Devirtualizes release-instructions --===//
+//===--- ClassDestroyDevirtualizer.swift ----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,27 +13,28 @@
 import AST
 import SIL
 
-// TODO: remove the ReleaseDevirtualizer once the ClassDestroyDevirtualizer runs on OSSA
-
-/// Devirtualizes release instructions which are known to destruct the object.
+/// Devirtualizes `destroy_value` instructions which are known to destruct a class object.
 ///
 /// This means, it replaces a sequence of
+/// ```
 ///    %x = alloc_ref [stack] $X
 ///      ...
-///    strong_release %x
+///    destroy_value %x
 ///    dealloc_stack_ref %x
+/// ```
 /// with
+/// ```
 ///    %x = alloc_ref [stack] $X
 ///      ...
-///    set_deallocating %x
+///    %y = begin_dealloc_ref %x
 ///    %d = function_ref @dealloc_of_X
-///    %a = apply %d(%x)
+///    %a = apply %d(%y)
 ///    dealloc_stack_ref %x
+/// ```
 ///
-/// The optimization is only done for stack promoted objects because they are
-/// known to have no associated objects (which are not explicitly released
-/// in the deinit method).
-let releaseDevirtualizerPass = FunctionPass(name: "release-devirtualizer") {
+/// The optimization is only done for stack promoted objects because they are known to have no
+/// associated objects (which are not explicitly released in the deinit method).
+let classDestroyDevirtualizerPass = FunctionPass(name: "class-destroy-devirtualizer") {
   (function: Function, context: FunctionPassContext) in
 
   for inst in function.instructions {
@@ -41,23 +42,21 @@ let releaseDevirtualizerPass = FunctionPass(name: "release-devirtualizer") {
       if !context.continueWithNextSubpassRun(for: dealloc) {
         return
       }
-      tryDevirtualizeRelease(of: dealloc, context)
+      tryDevirtualizeDestroy(of: dealloc, context)
     }
   }
 }
 
-private func tryDevirtualizeRelease(of dealloc: DeallocStackRefInst, _ context: FunctionPassContext) {
-  guard let (lastRelease, pathToRelease) = findLastRelease(of: dealloc, context) else {
-    return
-  }
-
-  if !pathToRelease.isMaterializable {
+private func tryDevirtualizeDestroy(of dealloc: DeallocStackRefInst, _ context: FunctionPassContext) {
+  guard let (lastDestroy, pathToDestroy) = findLastDestroy(of: dealloc, context),
+          pathToDestroy.isMaterializable
+  else {
     return
   }
 
   let allocRef = dealloc.allocRef
   var upWalker = FindAllocationWalker(allocation: allocRef)
-  if upWalker.walkUp(value: lastRelease.operand.value, path: pathToRelease) == .abortWalk {
+  if upWalker.walkUp(value: lastDestroy.destroyedValue, path: pathToDestroy) == .abortWalk {
     return
   }
 
@@ -67,14 +66,14 @@ private func tryDevirtualizeRelease(of dealloc: DeallocStackRefInst, _ context: 
     return
   }
 
-  let builder = Builder(before: lastRelease, location: lastRelease.location, context)
+  let builder = Builder(before: lastDestroy, location: lastDestroy.location, context)
 
-  var object = lastRelease.operand.value.createProjection(path: pathToRelease, builder: builder)
+  var object = lastDestroy.operand.value.createProjection(path: pathToDestroy, builder: builder)
   if object.type != type {
     object = builder.createUncheckedRefCast(from: object, to: type)
   }
 
-  // Do what a release would do before calling the deallocator: set the object
+  // Do what a `destroy_value` would do before calling the deallocator: set the object
   // in deallocating state, which means set the RC_DEALLOCATING_FLAG flag.
   let beginDealloc = builder.createBeginDeallocRef(reference: object, allocation: allocRef)
 
@@ -91,30 +90,26 @@ private func tryDevirtualizeRelease(of dealloc: DeallocStackRefInst, _ context: 
   }
 
   builder.createApply(function: functionRef, substitutionMap, arguments: [beginDealloc])
-  context.erase(instruction: lastRelease)
+  context.erase(instruction: lastDestroy)
 }
 
-private func findLastRelease(
+private func findLastDestroy(
   of dealloc: DeallocStackRefInst,
   _ context: FunctionPassContext
-) -> (lastRelease: RefCountingInst, pathToRelease: SmallProjectionPath)? {
+) -> (lastDestroy: DestroyValueInst, pathToDestroy: SmallProjectionPath)? {
   let allocRef = dealloc.allocRef
 
-  // Search for the final release in the same basic block of the dealloc.
+  // Search for the final `destroy_value` in the same basic block of the dealloc.
   for instruction in ReverseInstructionList(first: dealloc.previous) {
     switch instruction {
-    case let strongRelease as StrongReleaseInst:
-      if let pathToRelease = getPathToRelease(from: allocRef, to: strongRelease) {
-        return (strongRelease, pathToRelease)
-      }
-    case let releaseValue as ReleaseValueInst:
-      if releaseValue.value.type.containsSingleReference(in: dealloc.parentFunction) {
-        if let pathToRelease = getPathToRelease(from: allocRef, to: releaseValue) {
-          return (releaseValue, pathToRelease)
+    case let destroy as DestroyValueInst:
+      if destroy.destroyedValue.type.containsSingleReference(in: dealloc.parentFunction) {
+        if let pathToDestroy = getPathToDestroy(from: allocRef, to: destroy) {
+          return (destroy, pathToDestroy)
         }
       }
     case is BeginDeallocRefInst, is DeallocRefInst:
-      // Check if the last release was already de-virtualized.
+      // Check if the last `destroy_value` was already de-virtualized.
       if allocRef.escapes(to: instruction, context) {
         return nil
       }
@@ -122,36 +117,36 @@ private func findLastRelease(
       break
     }
     if instruction.mayRelease && allocRef.escapes(to: instruction, context) {
-      // This instruction may release the allocRef, which means that any release we find
-      // earlier in the block is not guaranteed to be the final release.
+      // This instruction may release the allocRef, which means that any destroy we find
+      // earlier in the block is not guaranteed to be the final destroy.
       return nil
     }
   }
   return nil
 }
 
-// If the release is a release_value it might release a struct which _contains_ the allocated object.
+// The final destroy might destroy a struct which _contains_ the allocated object.
 // Return a projection path to the contained object in this case.
-private func getPathToRelease(from allocRef: AllocRefInstBase, to release: RefCountingInst) -> SmallProjectionPath? {
-  var downWalker = FindReleaseWalker(release: release)
+private func getPathToDestroy(from allocRef: AllocRefInstBase, to destroy: DestroyValueInst) -> SmallProjectionPath? {
+  var downWalker = FindDestroyWalker(destroy: destroy)
   if downWalker.walkDownUses(ofValue: allocRef, path: SmallProjectionPath()) == .continueWalk {
     return downWalker.result
   }
   return nil
 }
 
-private struct FindReleaseWalker : ValueDefUseWalker {
-  private let release: RefCountingInst
+private struct FindDestroyWalker : ValueDefUseWalker {
+  private let destroy: DestroyValueInst
   private(set) var result: SmallProjectionPath? = nil
 
   var walkDownCache = WalkerCache<SmallProjectionPath>()
 
-  init(release: RefCountingInst) {
-    self.release = release
+  init(destroy: DestroyValueInst) {
+    self.destroy = destroy
   }
 
   mutating func leafUse(value: Operand, path: SmallProjectionPath) -> WalkResult {
-    if value.instruction == release {
+    if value.instruction == destroy {
       if let existingResult = result {
         result = existingResult.merge(with: path)
       } else {
@@ -179,7 +174,7 @@ private struct EscapesToInstructionVisitor : EscapeVisitor {
   }
 }
 
-// Up-walker to find the root of a release instruction.
+// Up-walker to find the root of a `destroy_value` instruction.
 private struct FindAllocationWalker : ValueUseDefWalker {
   private let allocInst: AllocRefInstBase
 
