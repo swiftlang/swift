@@ -231,7 +231,15 @@ Type SubstitutionMap::lookupSubstitution(GenericTypeParamType *genericParam) con
 
 ProtocolConformanceRef
 SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
-  if (!type->isTypeParameter() || empty())
+  // The subject is normally a type parameter, but may be the metatype of one
+  // (e.g. 'T.Type: P'), whose instance is then the type parameter.
+  auto subjectIsAbstract = [](CanType type) {
+    if (auto *metatype = type->getAs<AnyMetatypeType>())
+      return metatype->getInstanceType()->isTypeParameter();
+    return type->isTypeParameter();
+  };
+
+  if (!subjectIsAbstract(type) || empty())
     return ProtocolConformanceRef::forInvalid();
 
   auto genericSig = getGenericSignature();

@@ -1995,7 +1995,12 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Set if the metadata contains a pointer to a layout string
     HasLayoutString = 4,
 
-    /// WARNING: 5 is the last bit!
+    /// Set if a class descriptor is followed by a versioned instance-prefix
+    /// descriptor. The prefix is copied to the allocation base before the
+    /// native heap-object address point is initialized.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_HasInstancePrefix = 5,
 
     // Type-specific flags:
 
@@ -2109,6 +2114,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasDefaultOverrideTable,
                                 class_hasDefaultOverrideTable,
                                 class_setHasDefaultOverrideTable)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasInstancePrefix,
+                                class_hasInstancePrefix,
+                                class_setHasInstancePrefix)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
                                  Class_ResilientSuperclassReferenceKind_width,
@@ -2116,6 +2124,9 @@ public:
                                  class_getResilientSuperclassReferenceKind,
                                  class_setResilientSuperclassReferenceKind)
 };
+
+/// Version of the optional trailing class instance-prefix descriptor.
+static constexpr uint16_t ClassInstancePrefixDescriptorVersion = 0;
 
 /// Extra flags for resilient classes, since we need more than 16 bits of
 /// flags there.

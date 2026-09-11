@@ -392,10 +392,16 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
 ///   - class types, generic or not
 ///   - archetypes with class or class protocol bounds
 ///   - existentials with class or class protocol bounds
+///   - COM interface existentials
 /// But not:
 ///   - function types
 bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
-  return getCanonicalType().allowsOwnership(sig);
+  auto type = getCanonicalType();
+  if (type.allowsOwnership(sig))
+    return true;
+
+  return type->isExistentialType() &&
+         type->getExistentialLayout().getCOMInterface();
 }
 
 static void expandDefaults(SmallVectorImpl<ProtocolDecl *> &protocols,
@@ -3212,6 +3218,18 @@ bool TypeBase::hasRetainablePointerRepresentation() {
   return ::hasRetainablePointerRepresentation(getCanonicalType());
 }
 
+bool TypeBase::hasCCompatibleForeignReferenceRepresentation() {
+  Type type(this);
+  if (auto objectType = type->getOptionalObjectType())
+    type = objectType;
+
+  if (auto existential = type->getAs<ExistentialType>())
+    type = existential->getConstraintType();
+
+  return type->isExistentialType() &&
+         type->getExistentialLayout().getCOMInterface();
+}
+
 bool TypeBase::isBridgeableObjectType() {
   return ::isBridgeableObjectType(getCanonicalType());
 }
@@ -3331,6 +3349,10 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     type = valueType;
     wasOptional = true;
   }
+
+  if (language == ForeignLanguage::C &&
+      type->hasCCompatibleForeignReferenceRepresentation())
+    return { ForeignRepresentableKind::Trivial, nullptr };
 
   if (auto existential = type->getAs<ExistentialType>())
     type = existential->getConstraintType();

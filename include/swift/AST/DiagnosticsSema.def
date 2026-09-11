@@ -2369,6 +2369,17 @@ ERROR(com_non_native_implementation, none,
 ERROR(com_generic_activatable_implementation, none,
       "generic class %0 cannot declare a COM implementation identifier",
       (DeclName))
+ERROR(com_runtime_missing_entry, none,
+      "function '%0' not found in the 'COM' module", (StringRef))
+ERROR(com_runtime_ambiguous_entry, none,
+      "multiple direct C entry points named '%0' found in the 'COM' module",
+      (StringRef))
+ERROR(com_runtime_invalid_entry, none,
+      "function '%0' in the 'COM' module must provide a direct C entry point",
+      (StringRef))
+ERROR(com_runtime_entry_type, none,
+      "function '%0' in the 'COM' module has type %1; expected %2",
+      (StringRef, Type, Type))
 
 ERROR(metatype_extension_com_only, none,
       "protocol metatype extensions are reserved for COM interop", ())
@@ -6932,6 +6943,13 @@ ERROR(invalid_ownership_incompatible_class,none,
 ERROR(invalid_ownership_incompatible_foreign_reference_type,none,
       "%0 is incompatible with 'weak' references, because it is a foreign reference type",
       (Type))
+ERROR(invalid_ownership_com_existential,none,
+      "%0 is incompatible with %1 references because COM interface "
+      "existentials do not support managed reference storage",
+      (Type, ReferenceOwnership))
+NOTE(com_existential_reference_ownership_unmanaged,none,
+     "use 'unowned(unsafe)' to store the interface without ownership tracking",
+     ())
 ERROR(downcast_to_foreign_reference_type,none,
       "downcast from %0 to %1 is not supported for foreign reference types",
       (Type, Type))

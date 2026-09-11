@@ -409,9 +409,32 @@ static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &SGF,
   // RawPointers do not have ownership semantics, so the cleanup on the
   // argument remains.
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
+  if (args[0].getType().isAddress()) {
+    auto address = SGF.B.createUncheckedAddrCast(
+        loc, args[0].getValue(), rawPointerType.getAddressType());
+    auto result = SGF.B.createLoad(loc, address,
+                                   LoadOwnershipQualifier::Trivial);
+    return ManagedValue::forObjectRValueWithoutOwnership(result);
+  }
+
   SILValue result = SGF.B.createRefToRawPointer(loc, args[0].getValue(),
                                                 rawPointerType);
   return ManagedValue::forObjectRValueWithoutOwnership(result);
+}
+
+static ManagedValue emitAddressOnlyFromRawPointer(
+    SILGenFunction &SGF, SILLocation loc, const TypeLowering &destLowering,
+    ManagedValue pointer, SGFContext C, IsTake_t isTake) {
+  auto source = pointer.materialize(SGF, loc);
+  auto destination = SGF.B.createUncheckedAddrCast(
+      loc, source.getValue(), destLowering.getLoweredType().getAddressType());
+
+  return SGF.B.bufferForExpr(
+      loc, destLowering.getLoweredType(), destLowering, C,
+      [&](SILValue buffer) {
+        SGF.B.createCopyAddr(loc, destination, buffer, isTake,
+                             IsInitialization);
+      });
 }
 
 /// Specialized emitter for Builtin.bridgeFromRawPointer.
@@ -425,9 +448,12 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   assert(args.size() == 1 && "bridge should have a single argument");
   
   // The substitution determines the destination type.
-  // FIXME: Archetype destination type?
   auto &destLowering =
     SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
+  if (destLowering.isAddress())
+    return emitAddressOnlyFromRawPointer(
+        SGF, loc, destLowering, args[0], C, IsNotTake);
+
   assert(destLowering.isLoadable());
   SILType destType = destLowering.getLoweredType();
 
@@ -436,6 +462,31 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
                                                 destType);
   // The result has ownership semantics, so retain it with a cleanup.
   return SGF.emitManagedCopy(loc, result, destLowering);
+}
+
+/// Specialized emitter for Builtin.takeFromRawPointer.
+static ManagedValue
+emitBuiltinTakeFromRawPointer(SILGenFunction &SGF, SILLocation loc,
+                              SubstitutionMap substitutions,
+                              ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(substitutions.getReplacementTypes().size() == 1 &&
+         "take should have a single substitution");
+  assert(args.size() == 1 && "take should have a single argument");
+
+  auto &destLowering =
+      SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
+  if (destLowering.isAddress())
+    return emitAddressOnlyFromRawPointer(
+        SGF, loc, destLowering, args[0], C, IsTake);
+
+  assert(destLowering.isLoadable());
+  SILType destType = destLowering.getLoweredType();
+
+  SILValue result = SGF.B.createRawPointerToRef(
+      loc, args[0].getUnmanagedValue(), destType);
+  result = SGF.B.createUncheckedOwnershipConversion(
+      loc, result, OwnershipKind::Owned);
+  return SGF.emitManagedRValueWithCleanup(result, destLowering);
 }
 
 static ManagedValue emitBuiltinAddressOfBuiltins(SILGenFunction &SGF,

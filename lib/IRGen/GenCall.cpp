@@ -380,8 +380,10 @@ irgen::expandCallingConv(IRGenModule &IGM,
                          bool isCalleeAllocatedCoro) {
   switch (convention) {
   case SILFunctionTypeRepresentation::COMMethod:
-    llvm_unreachable(
-        "COM method calling convention lowering is not implemented");
+    if (IGM.Context.LangOpts.COMModel == LangOptions::COMInteropModel::Microsoft &&
+        IGM.Triple.getArch() == llvm::Triple::x86)
+      return llvm::CallingConv::X86_StdCall;
+    return IGM.getOptions().PlatformCCallingConvention;
 
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
@@ -1547,6 +1549,37 @@ static bool doesClangExpansionMatchSchema(IRGenModule &IGM,
   return true;
 }
 
+static std::optional<clang::CallingConv>
+getNonDefaultClangCallingConvention(IRGenModule &IGM,
+                                    CanSILFunctionType fnType) {
+  if (fnType->getRepresentation() !=
+      SILFunctionTypeRepresentation::CFunctionPointer)
+    return std::nullopt;
+
+  auto *clangType = fnType->getClangTypeInfo().getType();
+  if (!clangType)
+    return std::nullopt;
+
+  const clang::FunctionType *functionType = nullptr;
+  if (auto *pointer = clangType->getAs<clang::PointerType>())
+    functionType = pointer->getPointeeType()->getAs<clang::FunctionType>();
+  else if (auto *reference = clangType->getAs<clang::ReferenceType>())
+    functionType =
+        reference->getPointeeType()->getAs<clang::FunctionType>();
+  else
+    functionType = clangType->getAs<clang::FunctionType>();
+
+  ASSERT(functionType && "unexpected Clang C function type");
+  auto callingConv = functionType->getCallConv();
+  auto defaultCallingConv =
+      IGM.getClangASTContext().getDefaultCallingConvention(
+          /*IsVariadic=*/false, /*IsCXXMethod=*/false);
+  if (callingConv == defaultCallingConv)
+    return std::nullopt;
+
+  return callingConv;
+}
+
 /// Expand the result and parameter types to the appropriate LLVM IR
 /// types for C, C++ and Objective-C signatures.
 void SignatureExpansion::expandExternalSignatureTypes() {
@@ -1594,8 +1627,16 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangCtx.VoidPtrTy);
     break;
 
-  case SILFunctionTypeRepresentation::COMMethod:
-    llvm_unreachable("COM method signature lowering is not implemented");
+  case SILFunctionTypeRepresentation::COMMethod: {
+    // COM methods take their interface pointer first.
+
+    // The SIL self parameter is an archetype opened from the interface
+    // existential. It has no corresponding Clang type; its foreign ABI is the
+    // opaque interface pointer carried by that existential.
+    paramTys.push_back(clangCtx.VoidPtrTy);
+    params = params.drop_back();
+    break;
+  }
 
   case SILFunctionTypeRepresentation::CXXMethod: {
     // Cxx methods take their 'self' argument first.
@@ -1637,8 +1678,12 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangTy);
   }
 
-  // Generate function info for this signature.
+  // Generate function info for this signature. Preserve the calling
+  // convention carried by an imported C function type rather than rebuilding
+  // every C function as the platform-default convention.
   auto extInfo = clang::FunctionType::ExtInfo();
+  if (auto callingConv = getNonDefaultClangCallingConvention(IGM, FnType))
+    extInfo = extInfo.withCallingConv(*callingConv);
 
   bool isCXXMethod =
       FnType->getRepresentation() == SILFunctionTypeRepresentation::CXXMethod;
@@ -1897,6 +1942,9 @@ bool SignatureExpansion::isAddressableParam(unsigned paramIdx) {
 bool irgen::hasSelfContextParameter(CanSILFunctionType fnType) {
   if (!fnType->hasSelfParam())
     return false;
+
+  if (fnType->getRepresentation() == SILFunctionTypeRepresentation::COMMethod)
+    return true;
 
   SILParameterInfo param = fnType->getSelfParameter();
 
@@ -2470,6 +2518,9 @@ Signature SignatureExpansion::getSignature() {
   auto callingConv =
       expandCallingConv(IGM, FnType->getRepresentation(), FnType->isAsync(),
                         FnType->isCalleeAllocatedCoroutine());
+  if (getNonDefaultClangCallingConvention(IGM, FnType))
+    callingConv = static_cast<llvm::CallingConv::ID>(
+        ForeignInfo.ClangInfo->getEffectiveCallingConvention());
 
   Signature result;
   result.Type = llvmType;
@@ -2979,7 +3030,10 @@ public:
       break;
 
     case SILFunctionTypeRepresentation::COMMethod:
-      llvm_unreachable("COM method argument lowering is not implemented");
+      adjusted.add(getCallee().getCOMMethodSelf());
+      externalizeArguments(IGF, getCallee(), original, adjusted, Temporaries,
+                           isOutlined);
+      break;
 
     case SILFunctionTypeRepresentation::Block:
     case SILFunctionTypeRepresentation::CXXMethod:
@@ -4256,6 +4310,13 @@ llvm::Value *Callee::getCXXMethodSelf() const {
   return FirstData;
 }
 
+llvm::Value *Callee::getCOMMethodSelf() const {
+  assert(Info.OrigFnType->getRepresentation() == SILFunctionTypeRepresentation::COMMethod &&
+         "not a COM method");
+  assert(FirstData && "no interface pointer set on callee");
+  return FirstData;
+}
+
 llvm::Value *Callee::getObjCMethodReceiver() const {
   assert(Info.OrigFnType->getRepresentation() ==
            SILFunctionTypeRepresentation::ObjCMethod &&
@@ -4612,6 +4673,12 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
 
   case SILFunctionTypeRepresentation::CXXMethod:
     // Skip the "self" param.
+    firstParam += 1;
+    params = params.drop_back();
+    break;
+
+  case SILFunctionTypeRepresentation::COMMethod:
+    // The interface pointer was added as the physical first parameter.
     firstParam += 1;
     params = params.drop_back();
     break;

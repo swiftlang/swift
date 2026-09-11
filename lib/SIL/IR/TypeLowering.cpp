@@ -791,6 +791,23 @@ namespace {
     RetTy
     visitArchetypeType(CanArchetypeType type, AbstractionPattern origType,
                        IsTypeExpansionSensitive_t isSensitive) {
+      // Opening a COM existential exposes the interface pointer already
+      // stored in that existential. This is distinct from an ordinary
+      // generic parameter constrained to a COM interface, which keeps its
+      // opaque Swift generic representation.
+      if (type->is<ExistentialArchetypeType>() &&
+          llvm::any_of(type->getConformsTo(), [](ProtocolDecl *protocol) {
+                         return protocol->isCOMInterface();
+                       })) {
+        return asImpl().handleNonTrivialAggregate(type, {IsNotTrivial,
+                                                         IsFixedABI,
+                                                         IsNotAddressOnly,
+                                                         IsNotResilient,
+                                                         isSensitive,
+                                                         DoesNotHaveRawPointer,
+                                                         IsLexical});
+      }
+
       // TODO: Add a HasOnlyDefaultDeinit "layout protocol".
       auto LayoutInfo = type->getLayoutConstraint();
       if (LayoutInfo) {

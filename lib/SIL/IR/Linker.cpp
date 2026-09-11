@@ -315,7 +315,12 @@ void SILLinkerVisitor::visitProtocolConformance(
 
   // Otherwise try and lookup a witness table for C.
   ProtocolConformance *C = ref.getConcrete();
-  
+
+  // Builtin conformances are implemented directly by the compiler and have no
+  // SIL witness table to deserialise.
+  if (isa<BuiltinProtocolConformance>(C))
+    return;
+
   if (!VisitedConformances.insert(C).second)
     return;
 
@@ -386,15 +391,20 @@ void SILLinkerVisitor::visitProtocolConformance(
     switch (E.getKind()) {
     // If the entry is a witness method...
     case SILWitnessTable::WitnessKind::Method: {
-      // The witness could be removed by dead function elimination.
-      if (!E.getMethodWitness().Witness)
-        continue;
-
-      // Otherwise, deserialize the witness if it has shared linkage, or if
-      // we were asked to deserialize everything.
-      maybeAddFunctionToWorklist(E.getMethodWitness().Witness,
-        (WT->isSerialized() || isAvailableExternally(WT->getLinkage()) ?
-         IsSerialized : WT->getSerializedKind()));
+      // A witness can be absent when dead function elimination removed it or
+      // when only the native COM entry was serialized.
+      if (auto *witness = E.getMethodWitness().Witness)
+        maybeAddFunctionToWorklist(
+            witness,
+            (WT->isSerialized() || isAvailableExternally(WT->getLinkage())
+                 ? IsSerialized
+                 : WT->getSerializedKind()));
+      if (auto *interface = E.getMethodWitness().InterfaceEntry)
+        maybeAddFunctionToWorklist(
+            interface,
+            (WT->isSerialized() || isAvailableExternally(WT->getLinkage())
+                 ? IsSerialized
+                 : WT->getSerializedKind()));
       break;
     }
     

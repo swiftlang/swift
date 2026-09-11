@@ -86,8 +86,14 @@ ProtocolConformanceRef LookUpConformanceInSubstitutionMap::
 operator()(InFlightSubstitution &IFS, Type dependentType,
            ProtocolDecl *conformedProtocol) const {
   if (dependentType->is<PrimaryArchetypeType>() ||
-      dependentType->is<PackArchetypeType>())
+      dependentType->is<PackArchetypeType>()) {
     dependentType = dependentType->mapTypeOutOfEnvironment();
+  } else if (auto *metatype = dependentType->getAs<AnyMetatypeType>()) {
+    auto instanceType = metatype->getInstanceType();
+    if (instanceType->is<PrimaryArchetypeType>() ||
+        instanceType->is<PackArchetypeType>())
+      dependentType = dependentType->mapTypeOutOfEnvironment();
+  }
 
   auto result = Subs.lookupConformance(
       dependentType->getCanonicalType(),
@@ -105,6 +111,13 @@ operator()(InFlightSubstitution &IFS, Type dependentType,
         conformingReplacementType, conformedProtocol,
         /*allowMissing=*/true);
   }
+
+  // A conformance requirement may be stated on the metatype of a generic
+  // parameter. Once the instance type is substituted, lookup the concrete
+  // metatype conformance in the same way as any other concrete subject.
+  if (dependentType->is<AnyMetatypeType>())
+    return lookupConformance(conformingReplacementType, conformedProtocol,
+                             /*allowMissing=*/true);
 
   // Otherwise, the original type might be fixed to a concrete type in
   // the substitution map's input generic signature.

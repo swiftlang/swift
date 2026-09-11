@@ -1295,6 +1295,7 @@ static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
 
   case BuiltinValueKind::BridgeToRawPointer:
   case BuiltinValueKind::BridgeFromRawPointer:
+  case BuiltinValueKind::TakeFromRawPointer:
     builtinTy = Context.TheRawPointerType;
     ownership = ParamSpecifier::Default;
     break;
@@ -3386,6 +3387,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CastFromNativeObject:
   case BuiltinValueKind::BridgeToRawPointer:
   case BuiltinValueKind::BridgeFromRawPointer:
+  case BuiltinValueKind::TakeFromRawPointer:
     if (!Types.empty()) return nullptr;
     return getNativeObjectCast(Context, Id, BV);
 

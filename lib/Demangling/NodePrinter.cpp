@@ -320,6 +320,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::BaseWitnessTableAccessor:
   case Node::Kind::BodyAttachedMacroExpansion:
   case Node::Kind::ClangType:
+  case Node::Kind::COMMethodWitness:
   case Node::Kind::ClassMetadataBaseOffset:
   case Node::Kind::CFunctionPointer:
   case Node::Kind::ConformanceAttachedMacroExpansion:
@@ -2106,6 +2107,13 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::ProtocolWitness: {
     Printer << "protocol witness for ";
+    print(Node->getChild(1), depth + 1);
+    Printer << " in conformance ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  }
+  case Node::Kind::COMMethodWitness: {
+    Printer << "COM method witness for ";
     print(Node->getChild(1), depth + 1);
     Printer << " in conformance ";
     print(Node->getChild(0), depth + 1);

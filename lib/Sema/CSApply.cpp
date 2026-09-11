@@ -1873,12 +1873,29 @@ namespace {
         return forceUnwrapIfExpected(ref, memberLocator);
       }
 
+      // `T.x`, where `T.Type: P` and `x` is a requirement of `P`, applies `x`
+      // to the metatype value. Do not treat it as an unbound instance reference
+      // such as `P.x`.
+      bool isMetatypeConformanceMember = false;
+      if (!baseIsInstance && member->isInstanceMember()) {
+        if (auto *PD = dyn_cast<ProtocolDecl>(member->getDeclContext())) {
+          auto conformance =
+              cs.lookupConformance(cs.getType(base)->getRValueType(), PD);
+
+          // A missing conformance represents the ordinary unbound-reference
+          // case.
+          isMetatypeConformanceMember =
+              conformance && !conformance.hasMissingConformance();
+        }
+      }
+
       const bool isMetatypeExtMember =
           member->getDeclContext()->isMetatypeExtension();
       const bool isUnboundInstanceMember =
           (!baseIsInstance && member->isInstanceMember() &&
-           !isMetatypeExtMember);
+           !isMetatypeExtMember && !isMetatypeConformanceMember);
       const bool needsCurryThunk =
+          !(isMetatypeConformanceMember && baseTy->hasLocalArchetype()) &&
           shouldBuildCurryThunk(choice, baseIsInstance);
 
       // The formal type of the 'self' value for the member's declaration.

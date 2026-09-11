@@ -2162,6 +2162,12 @@ public:
                                          Member, MethodTy, &getFunction()));
   }
 
+  COMMethodInst *createCOMMethod(SILLocation Loc, SILValue Operand,
+                                 SILDeclRef Member, SILType MethodTy) {
+    return insert(COMMethodInst::create(getSILDebugLocation(Loc), Operand,
+                                        Member, MethodTy, &getFunction()));
+  }
+
   ObjCSuperMethodInst *createObjCSuperMethod(SILLocation Loc, SILValue Operand,
                                              SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) ObjCSuperMethodInst(
@@ -2215,6 +2221,22 @@ public:
                            ValueOwnershipKind forwardingOwnershipKind) {
     return insert(new (getModule()) OpenExistentialRefInst(
         getSILDebugLocation(Loc), Operand, Ty, forwardingOwnershipKind));
+  }
+
+  OpenCOMExistentialInst *
+  createOpenCOMExistential(SILLocation Loc, SILValue Operand, SILType Ty) {
+    return createOpenCOMExistential(Loc, Operand, Ty,
+                                    Operand->getOwnershipKind());
+  }
+
+  OpenCOMExistentialInst *
+  createOpenCOMExistential(SILLocation Loc, SILValue Operand, SILType Ty,
+                           ValueOwnershipKind forwardingOwnershipKind) {
+    auto instruction =
+        new (getModule()) OpenCOMExistentialInst(getSILDebugLocation(Loc),
+                                                 Operand, Ty,
+                                                 forwardingOwnershipKind);
+    return insert(instruction);
   }
 
   OpenExistentialBoxInst *
@@ -2278,7 +2300,9 @@ public:
                            CanType FormalConcreteType, SILValue Concrete,
                            ArrayRef<ProtocolConformanceRef> Conformances,
                            ValueOwnershipKind forwardingOwnershipKind) {
-    ASSERT(FormalConcreteType->isBridgeableObjectType());
+    ASSERT(FormalConcreteType->isBridgeableObjectType() ||
+           ExistentialType.canUseExistentialRepresentation(ExistentialRepresentation::COM,
+                                                           FormalConcreteType));
     return insert(InitExistentialRefInst::create(
         getSILDebugLocation(Loc), ExistentialType, FormalConcreteType, Concrete,
         Conformances, &getFunction(), forwardingOwnershipKind));

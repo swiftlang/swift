@@ -121,6 +121,11 @@ public:
     /// parameter pack.
     PackElement,
 
+    /// Appending this symbol to the term for a type 'T' forms 'T.[metatype]',
+    /// which denotes 'T.Type'. The symbol carries no payload and is uniqued
+    /// once per rewrite context.
+    Metatype,
+
     //////
     ////// "Property-like" symbol kinds:
     //////
@@ -138,7 +143,7 @@ public:
     ConcreteType,
   };
 
-  static const unsigned NumKinds = 10;
+  static const unsigned NumKinds = 11;
 
   static const llvm::StringRef Kinds[];
 
@@ -211,6 +216,8 @@ public:
   static Symbol forShape(RewriteContext &ctx);
 
   static Symbol forPackElement(RewriteContext &Ctx);
+
+  static Symbol forMetatype(RewriteContext &Ctx);
 
   static Symbol forLayout(LayoutConstraint layout,
                           RewriteContext &ctx);
