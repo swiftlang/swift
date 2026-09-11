@@ -400,6 +400,18 @@ extension RawSpan {
     _precondition(byteOffsets.contains(position), "Index out of bounds")
   }
 
+  // SILOptimizer looks for fixed_storage.check_range semantics
+  // for bounds checking optimizations.
+  @_semantics("fixed_storage.check_range")
+  @export(implementation) @inline(__always)
+  internal func _checkRange(_ lowerBound: Int, _ upperBound: Int) {
+    _precondition(
+      UInt(bitPattern: lowerBound) <= UInt(bitPattern: _count) &&
+      UInt(bitPattern: upperBound) <= UInt(bitPattern: _count),
+      "Byte offset range out of bounds"
+    )
+  }
+
   /// Accesses the byte at the specified offset in the span.
   ///
   /// - Parameter byteOffset: The offset of the byte to access. `byteOffset`
@@ -443,11 +455,7 @@ extension RawSpan {
   @export(implementation)
   @_lifetime(copy self)
   public func extracting(_ bounds: Range<Int>) -> Self {
-    _precondition(
-      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
-      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Byte offset range out of bounds"
-    )
+    _checkRange(bounds.lowerBound, bounds.upperBound)
     return unsafe extracting(unchecked: bounds)
   }
 
@@ -654,11 +662,7 @@ extension RawSpan {
   public func unsafeLoad<T>(
     fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
-    _precondition(
-      UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
-      MemoryLayout<T>.size <= (_count &- offset),
-      "Byte offset range out of bounds"
-    )
+    _checkRange(offset, offset &+ MemoryLayout<T>.size)
     return unsafe unsafeLoad(fromUncheckedByteOffset: offset, as: T.self)
   }
 
@@ -709,11 +713,7 @@ extension RawSpan {
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
     fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
-    _precondition(
-      UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
-      MemoryLayout<T>.size <= (_count &- offset),
-      "Byte offset range out of bounds"
-    )
+    _checkRange(offset, offset &+ MemoryLayout<T>.size)
     return unsafe unsafeLoadUnaligned(
       fromUncheckedByteOffset: offset, as: T.self
     )
