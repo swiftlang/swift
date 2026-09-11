@@ -122,9 +122,14 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
   // but then in turn be overridden by a derived class in another file in
   // the same module that either doesn't import the ultimate base class's
   // module or else imports it non-publicly in its file.
+  //
+  // Stub initializers do not introduce their own vtable entries, so a thunk
+  // for one must call the synthesized stub directly instead of redispatching.
+  auto *derivedCtor = dyn_cast<ConstructorDecl>(derivedDecl);
   bool baseLessVisibleThanDerived =
     (!usesObjCDynamicDispatch &&
      !derivedDecl->isFinal() &&
+     !(derivedCtor && derivedCtor->hasStubImplementation()) &&
      derivedDecl->isMoreVisibleThan(derivedDecl->getOverriddenDecl()));
 
   // Determine the derived thunk type by lowering the derived type against the
