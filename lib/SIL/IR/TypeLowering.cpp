@@ -60,12 +60,17 @@ llvm::cl::opt<bool> TypeLoweringDisableVerification(
     "type-lowering-disable-verification", llvm::cl::init(false),
     llvm::cl::desc("Disable the asserts-only verification of lowerings"));
 
+// Treat trivial types like regular loadable types with ownership.
+llvm::cl::opt<bool> TypeLoweringNoTrivialTypes(
+    "type-lowering-no-trivial-types", llvm::cl::init(false),
+    llvm::cl::desc("Force TypeLowering to treat trivial types as nontrivial"));
+
 namespace {
   /// A CRTP type visitor for deciding whether the metatype for a type
   /// is a singleton type, i.e. whether there can only ever be one
   /// such value.
   struct HasSingletonMetatype : CanTypeVisitor<HasSingletonMetatype, bool> {
-    /// Class metatypes have non-trivial representation due to the
+    /// Class metatypes have non-empty representation due to the
     /// possibility of subclassing.
     bool visitClassType(CanClassType type) {
       if (type->isForeignReferenceType())
@@ -79,7 +84,7 @@ namespace {
       return false;
     }
 
-    /// Dependent types have non-trivial representation in case they
+    /// Dependent types have non-empty representation in case they
     /// instantiate to a class metatype.
     bool visitGenericTypeParamType(CanGenericTypeParamType type) {
       return false;
@@ -91,7 +96,7 @@ namespace {
       return false;
     }
     
-    /// Archetype metatypes have non-trivial representation in case
+    /// Archetype metatypes have non-empty representation in case
     /// they instantiate to a class metatype.
     bool visitArchetypeType(CanArchetypeType type) {
       return false;
@@ -102,7 +107,7 @@ namespace {
       return visit(type.getInstanceType());
     }
 
-    /// Everything else is trivial.  Note that ordinary metatypes of
+    /// Everything else is empty.  Note that ordinary metatypes of
     /// existential types are still singleton.
     bool visitType(CanType type) {
       return true;
@@ -2454,6 +2459,13 @@ namespace {
                                 SILTypeProperties properties) {
       properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       auto silType = SILType::getPrimitiveObjectType(type);
+      
+      if (TypeLoweringNoTrivialTypes.getValue()) {
+        properties.setNonTrivial();
+        properties.setLexical(IsLexical);
+        return new (TC) MiscNontrivialTypeLowering(silType, properties, Expansion);
+      }
+      
       return new (TC) TrivialTypeLowering(silType, properties, Expansion);
     }
 
@@ -3545,6 +3557,9 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                                           AbstractionPattern origType,
                                           CanType substType,
                                           TypeExpansionContext forExpansion) {
+  if (TypeLoweringNoTrivialTypes) {
+    return;
+  }
   auto *bitwiseCopyableProtocol =
       Context.getProtocol(KnownProtocolKind::BitwiseCopyable);
   if (!bitwiseCopyableProtocol)
