@@ -30,17 +30,31 @@ func CImplGetSharedValue(_ s: Shared) -> Int32 {
   return s.value
 }
 
+// 'Opaque' is a foreign reference type whose C record is never defined. Only
+// the pointer travels across the boundary, so an incomplete type works just as
+// well as a complete one.
+@implementation @c
+func CImplGetOpaqueValue(_ o: Opaque) -> Int32 {
+  return opaqueValue(o)
+}
+
 let s = makeShared(21)
+let o = makeOpaque(7)
 
 // CHECK: CImplTakesImmortal: 42
 // CHECK-NEXT: CImplReturnsImmortal: 42
+// CHECK-NEXT: CImplGetOpaqueValue: 7
 // CHECK-NEXT: value: 21
-print("value: \(callSwiftImplementations(s))")
+print("value: \(callSwiftImplementations(s, o))")
 
 // The Swift caller retains 's' for the duration of the call, and the C code
 // hands it back unchanged.
 // CHECK-NEXT: refCount: 1
 print("refCount: \(sharedRefCount(s))")
+
+// The same balance holds for the forward-declared type.
+// CHECK-NEXT: opaqueRefCount: 1
+print("opaqueRefCount: \(opaqueRefCount(o))")
 
 // CHECK-NEXT: DONE
 print("DONE")

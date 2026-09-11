@@ -23,6 +23,14 @@ class SwiftClass {}
 // expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
 // expected-note@-2 {{Swift structs cannot be represented in C}}
 
+// 'Unmanaged' itself requires an 'AnyObject'-compatible type, so its argument
+// is always something that uses the same reference counting as 'AnyObject'.
+// 'CFTypeRef' qualifies; 'AnyObject' spelled as such does not name a C type.
+@c(unmanagedCFTypeRefParam) func unmanagedCFTypeRefParam(a: Unmanaged<CFTypeRef>) { }
+@c(unmanagedAnyObjectParam) func unmanagedAnyObjectParam(a: Unmanaged<AnyObject>) { }
+// expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note@-2 {{Swift structs cannot be represented in C}}
+
 // CF types that are not bridged to an Objective-C class are representable too.
 @c(cfTreeParams) func cfTreeParams(a: CFTree, b: CFTree?) { }
 @c(cfAllocatorReturn) func cfAllocatorReturn() -> CFAllocator? { fatalError() }
