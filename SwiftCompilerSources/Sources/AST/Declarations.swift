@@ -134,6 +134,12 @@ public class NominalTypeDecl: GenericTypeDecl {
 final public class EnumDecl: NominalTypeDecl {
   public var rawType: Type? { Type(bridgedOrNil: bridged.Enum_getRawType()) }
 
+  /// True if this enum has cases which cannot be referenced in canonical SIL, but which can still
+  /// exist at runtime. Such an enum must not be treated as exhaustive.
+  public var hasCasesUnavailableDuringLowering: Bool {
+    bridged.Enum_hasCasesUnavailableDuringLowering()
+  }
+
   public static func create(
     declContext: DeclContext, enumKeywordLoc: SourceLoc?, name: String,
     nameLoc: SourceLoc?, genericParamList: GenericParameterList?, inheritedTypes: [Type],

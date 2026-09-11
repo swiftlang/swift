@@ -70,10 +70,13 @@ swift::SILResultInfo BridgedResultInfo::unbridged() const {
                               swift::SILResultInfo::Options(options));
 }
 
-BridgedCanType BridgedResultInfo::getReturnValueType(BridgedFunction f) const {
+BridgedCanType
+BridgedResultInfo::getReturnValueType(BridgedCanType ofFunctionType,
+                                      BridgedFunction f) const {
   const auto function = f.getFunction();
   return BridgedCanType(unbridged().getReturnValueType(
-      function->getModule(), function->getLoweredFunctionType().getPointer(),
+      function->getModule(),
+      ofFunctionType.unbridged()->castTo<swift::SILFunctionType>(),
       function->getTypeExpansionContext()));
 }
 
@@ -1101,6 +1104,12 @@ bool BridgedFunction::isSpecialization() const {
 bool BridgedFunction::isResilientNominalDecl(BridgedDeclObj decl) const {
   return decl.getAs<swift::NominalTypeDecl>()->isResilient(getFunction()->getModule().getSwiftModule(),
                                                            getFunction()->getResilienceExpansion());
+}
+
+bool BridgedFunction::isEffectivelyExhaustiveEnumDecl(BridgedDeclObj decl) const {
+  return decl.getAs<swift::EnumDecl>()->isEffectivelyExhaustive(
+      getFunction()->getModule().getSwiftModule(),
+      getFunction()->getResilienceExpansion());
 }
 
 BridgedType BridgedFunction::getLoweredType(BridgedASTType type, bool maximallyAbstracted) const {
