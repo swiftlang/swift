@@ -534,6 +534,7 @@ class AbstractionPattern {
                      Kind kind = Kind::Type) {
     assert(signature || !origType->hasTypeParameter());
     TheKind = unsigned(kind);
+    OtherData = 0;
     OrigType = origType;
     GenericSig = CanGenericSignature();
     GenericSubs = subs;
@@ -898,6 +899,12 @@ public:
   getObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
                 const std::optional<ForeignErrorConvention> &foreignError,
                 const std::optional<ForeignAsyncConvention> &foreignAsync);
+
+  /// Return an abstraction pattern for a C function with a foreign error
+  /// convention.
+  static AbstractionPattern
+  getCFunction(CanType origType, const clang::Type *clangType,
+               const std::optional<ForeignErrorConvention> &foreignError);
 
 private:
   /// Return an abstraction pattern for the uncurried type of an

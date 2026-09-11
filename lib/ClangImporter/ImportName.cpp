@@ -141,8 +141,71 @@ static bool isBlockParameter(const clang::ParmVarDecl *param) {
   return param->getType()->isBlockPointerType();
 }
 
+bool importer::isRecordBridgedToNSError(const clang::RecordDecl *decl) {
+  if (decl->getTagKind() != clang::TagTypeKind::Struct)
+    return false;
+
+  // Read the attribute off the canonical declaration, as CFPointeeInfo does,
+  // so that a bridging attribute on a redeclaration is ignored consistently.
+  decl = cast<clang::RecordDecl>(decl->getCanonicalDecl());
+
+  const clang::IdentifierInfo *bridgedType = nullptr;
+  if (auto bridgeAttr = decl->getAttr<clang::ObjCBridgeAttr>())
+    bridgedType = bridgeAttr->getBridgedType();
+  else if (auto bridgeMutableAttr =
+               decl->getAttr<clang::ObjCBridgeMutableAttr>())
+    bridgedType = bridgeMutableAttr->getBridgedType();
+
+  return bridgedType && bridgedType->getName() == "NSError";
+}
+
+/// Check if a parameter is a CFErrorRef* out-parameter.
+static bool
+isCFErrorOutParameter(const clang::ParmVarDecl *param,
+                      ForeignErrorConvention::IsOwned_t &isErrorOwned,
+                      bool &hasExplicitOwnership) {
+  clang::QualType type = param->getType();
+
+  // Must be a pointer (to CFErrorRef, which is itself a pointer).
+  auto outerPtrType = type->getAs<clang::PointerType>();
+  if (!outerPtrType)
+    return false;
+  auto innerPtrType =
+      outerPtrType->getPointeeType()->getAs<clang::PointerType>();
+  if (!innerPtrType)
+    return false;
+
+  // The inner pointee must be a struct bridged to NSError.
+  auto recordType = innerPtrType->getPointeeType()->getAs<clang::RecordType>();
+  if (!recordType)
+    return false;
+  if (!importer::isRecordBridgedToNSError(recordType->getDecl()))
+    return false;
+
+  // Determine ownership from explicit CF attributes on the parameter.
+  if (param->hasAttr<clang::CFReturnsRetainedAttr>()) {
+    isErrorOwned = ForeignErrorConvention::IsOwned;
+    hasExplicitOwnership = true;
+    return true;
+  }
+  if (param->hasAttr<clang::CFReturnsNotRetainedAttr>()) {
+    isErrorOwned = ForeignErrorConvention::IsNotOwned;
+    hasExplicitOwnership = true;
+    return true;
+  }
+
+  // CFErrorRef* without explicit ownership annotation.
+  hasExplicitOwnership = false;
+  return true;
+}
+
+/// Check if a parameter is an error out-parameter (NSError** or CFErrorRef*).
 static bool isErrorOutParameter(const clang::ParmVarDecl *param,
-                         ForeignErrorConvention::IsOwned_t &isErrorOwned) {
+                                ForeignErrorConvention::IsOwned_t &isErrorOwned,
+                                bool &isCFError, bool &hasExplicitOwnership) {
+  isCFError = false;
+  hasExplicitOwnership = true; // NSError always has known ownership via ARC
+
   clang::QualType type = param->getType();
 
   // Must be a pointer.
@@ -174,7 +237,27 @@ static bool isErrorOutParameter(const clang::ParmVarDecl *param,
       llvm_unreachable("bad error ownership");
     }
   }
+
+  // Check for CFErrorRef*.
+  if (isCFErrorOutParameter(param, isErrorOwned, hasExplicitOwnership)) {
+    isCFError = true;
+    return true;
+  }
+
   return false;
+}
+
+/// Check if a parameter is an NSError** out-parameter.
+static bool
+isErrorOutParameter(const clang::ParmVarDecl *param,
+                    ForeignErrorConvention::IsOwned_t &isErrorOwned) {
+  bool isCFError = false;
+  bool hasExplicitOwnership = false;
+  if (!isErrorOutParameter(param, isErrorOwned, isCFError,
+                           hasExplicitOwnership))
+    return false;
+  // The ObjC path only recognizes NSError**, not CFErrorRef*.
+  return !isCFError;
 }
 
 static bool isBoolType(clang::ASTContext &ctx, clang::QualType type) {
@@ -212,14 +295,22 @@ static bool isIntegerType(clang::QualType clangType) {
   return false;
 }
 
-static std::optional<ForeignErrorConvention::Kind>
-classifyMethodErrorHandling(const clang::ObjCMethodDecl *clangDecl,
-                            OptionalTypeKind resultOptionality) {
-  // TODO: opt out any non-standard methods here?
-  clang::ASTContext &clangCtx = clangDecl->getASTContext();
+/// Classify error handling for a Clang declaration based on its return type
+/// and an optional swift_error attribute. With \p allowsNativeBool true,
+/// recognizes the C-native _Bool/bool builtin in addition to the BOOL/Boolean
+/// typedefs; ObjC import keeps it false to preserve source compatibility for
+/// methods returning bare bool.
+static std::optional<ForeignErrorConvention::Kind> classifyErrorByReturnType(
+    clang::ASTContext &clangCtx, clang::QualType returnType,
+    OptionalTypeKind resultOptionality, const clang::SwiftErrorAttr *attr,
+    bool allowsNativeBool) {
+  auto isBoolish = [&] {
+    return isBoolType(clangCtx, returnType) ||
+           (allowsNativeBool && returnType->isBooleanType());
+  };
 
   // Check for an explicit attribute.
-  if (auto attr = clangDecl->getAttr<clang::SwiftErrorAttr>()) {
+  if (attr) {
     switch (attr->getConvention()) {
     case clang::SwiftErrorAttr::None:
       return std::nullopt;
@@ -231,25 +322,23 @@ classifyMethodErrorHandling(const clang::ObjCMethodDecl *clangDecl,
     // non-optional type.
     case clang::SwiftErrorAttr::NullResult:
       if (resultOptionality != OTK_None &&
-          swift::canImportAsOptional(
-            clangDecl->getReturnType().getTypePtrOrNull()))
+          swift::canImportAsOptional(returnType.getTypePtrOrNull()))
         return ForeignErrorConvention::NilResult;
       return std::nullopt;
 
     // Preserve the original result type on a zero_result unless we
     // imported it as Bool.
     case clang::SwiftErrorAttr::ZeroResult:
-      if (isBoolType(clangCtx, clangDecl->getReturnType())) {
+      if (isBoolish())
         return ForeignErrorConvention::ZeroResult;
-      } else if (isIntegerType(clangDecl->getReturnType())) {
+      if (isIntegerType(returnType))
         return ForeignErrorConvention::ZeroPreservedResult;
-      }
       return std::nullopt;
 
     // There's no reason to do the same for nonzero_result because the
     // only meaningful value remaining would be zero.
     case clang::SwiftErrorAttr::NonZeroResult:
-      if (isIntegerType(clangDecl->getReturnType()))
+      if (isIntegerType(returnType))
         return ForeignErrorConvention::NonZeroResult;
       return std::nullopt;
     }
@@ -259,35 +348,48 @@ classifyMethodErrorHandling(const clang::ObjCMethodDecl *clangDecl,
   // Otherwise, apply the default rules.
 
   // For bool results, a zero value is an error.
-  if (isBoolType(clangCtx, clangDecl->getReturnType())) {
+  if (isBoolish())
     return ForeignErrorConvention::ZeroResult;
-  }
 
   // For optional reference results, a nil value is normally an error.
   if (resultOptionality != OTK_None &&
-      swift::canImportAsOptional(
-        clangDecl->getReturnType().getTypePtrOrNull())) {
+      swift::canImportAsOptional(returnType.getTypePtrOrNull()))
     return ForeignErrorConvention::NilResult;
-  }
 
   return std::nullopt;
+}
+
+static std::optional<ForeignErrorConvention::Kind>
+classifyMethodErrorHandling(const clang::ObjCMethodDecl *clangDecl,
+                            OptionalTypeKind resultOptionality) {
+  // TODO: opt out any non-standard methods here?
+  return classifyErrorByReturnType(
+      clangDecl->getASTContext(), clangDecl->getReturnType(), resultOptionality,
+      clangDecl->getAttr<clang::SwiftErrorAttr>(),
+      /*allowsNativeBool=*/false);
+}
+
+static std::optional<ForeignErrorConvention::Kind>
+classifyFunctionErrorHandling(const clang::FunctionDecl *clangDecl,
+                              OptionalTypeKind resultOptionality) {
+  return classifyErrorByReturnType(
+      clangDecl->getASTContext(), clangDecl->getReturnType(), resultOptionality,
+      clangDecl->getAttr<clang::SwiftErrorAttr>(),
+      /*allowsNativeBool=*/true);
 }
 
 static const char ErrorSuffix[] = "AndReturnError";
 static const char AltErrorSuffix[] = "WithError";
 
-/// Determine the optionality of the given Objective-C method.
-///
-/// \param method The Clang method.
-static OptionalTypeKind getResultOptionality(
-                          const clang::ObjCMethodDecl *method) {
+/// Determine the optionality of the given declaration's return type.
+template <typename DeclT>
+static OptionalTypeKind getResultOptionality(const DeclT *decl) {
   // If nullability is available on the type, use it.
-  if (auto nullability = method->getReturnType()->getNullability()) {
+  if (auto nullability = decl->getReturnType()->getNullability())
     return translateNullability(*nullability);
-  }
 
   // If there is a returns_nonnull attribute, non-null.
-  if (method->hasAttr<clang::ReturnsNonNullAttr>())
+  if (decl->template hasAttr<clang::ReturnsNonNullAttr>())
     return OTK_None;
 
   // Default to implicitly unwrapped optionals.
@@ -1326,6 +1428,47 @@ NameImporter::considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
     ForeignErrorConvention::Info errorInfo(
         *errorKind, index, isErrorOwned,
         (ForeignErrorConvention::IsReplaced_t)replaceParamWithVoid);
+    return errorInfo;
+  }
+
+  // Didn't find an error parameter.
+  return std::nullopt;
+}
+
+std::optional<ForeignErrorConvention::Info>
+NameImporter::considerErrorImportForFunction(
+    const clang::FunctionDecl *clangDecl,
+    ArrayRef<const clang::ParmVarDecl *> params) {
+  // C++ methods import via a different path; refuse them defensively so the
+  // public API doesn't depend on every caller filtering.
+  if (isa<clang::CXXMethodDecl>(clangDecl))
+    return std::nullopt;
+
+  auto errorKind =
+      classifyFunctionErrorHandling(clangDecl, getResultOptionality(clangDecl));
+  if (!errorKind)
+    return std::nullopt;
+
+  // Find the error parameter (scan from the end, skip trailing blocks).
+  for (unsigned index = params.size(); index-- != 0;) {
+    if (isBlockParameter(params[index]))
+      continue;
+
+    auto isErrorOwned = ForeignErrorConvention::IsNotOwned;
+    bool isCFError = false;
+    bool hasExplicitOwnership = false;
+    if (!isErrorOutParameter(params[index], isErrorOwned, isCFError,
+                             hasExplicitOwnership))
+      break;
+
+    // For CFErrorRef* on C functions, require explicit ownership annotation.
+    if (isCFError && !hasExplicitOwnership)
+      return std::nullopt;
+
+    // For C functions, don't replace the parameter with Void --
+    // the throwing variant simply omits it.
+    ForeignErrorConvention::Info errorInfo(
+        *errorKind, index, isErrorOwned, ForeignErrorConvention::IsNotReplaced);
     return errorInfo;
   }
 
