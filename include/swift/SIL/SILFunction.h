@@ -1327,6 +1327,13 @@ public:
   }
   void copyEffects(SILFunction *from);
   bool hasArgumentEffects() const;
+
+  /// True if the side effects of this function have been computed by the
+  /// ComputeSideEffects pass (as opposed to only having defined effects, like
+  /// escape effects, which can be copied from a generic function when
+  /// specializing it).
+  bool hasComputedSideEffects() const;
+
   void visitArgEffects(std::function<void(int, int, bool)> c) const;
   MemoryBehavior getMemoryBehavior(bool observeRetains);
 
