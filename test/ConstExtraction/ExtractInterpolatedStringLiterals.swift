@@ -90,11 +90,8 @@ public struct External: MyProto {
 // CHECK-NEXT:               "value": "Start Interpolation with Member Reference: "
 // CHECK-NEXT:             },
 // CHECK-NEXT:             {
-// CHECK-NEXT:               "valueKind": "MemberReference",
-// CHECK-NEXT:               "value": {
-// CHECK-NEXT:                 "baseType": "ExtractInterpolatedStringLiterals.Internal",
-// CHECK-NEXT:                 "memberLabel": "internalTitle"
-// CHECK-NEXT:               }
+// CHECK-NEXT:               "valueKind": "RawLiteral",
+// CHECK-NEXT:               "value": "Inner title"
 // CHECK-NEXT:             },
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "valueKind": "RawLiteral",
