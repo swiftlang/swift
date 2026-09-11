@@ -99,6 +99,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
   class DiagnoseWalker : public BaseDiagnosticWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
+    SmallPtrSet<const DeclRefExpr *, 4> AlreadyCheckedUnqualifiedAccessUses;
 
     bool IsExprStmt;
 
@@ -874,6 +875,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     void checkUnqualifiedAccessUse(const DeclRefExpr *DRE) {
       const Decl *D = DRE->getDecl();
       if (!D->getAttrs().hasAttribute<WarnUnqualifiedAccessAttr>())
+        return;
+
+      if (!AlreadyCheckedUnqualifiedAccessUses.insert(DRE).second)
         return;
 
       if (auto *parentExpr = Parent.getAsExpr()) {
