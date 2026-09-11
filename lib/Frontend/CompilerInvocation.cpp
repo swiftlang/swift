@@ -3387,6 +3387,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableActorDataRaceChecks |= Args.hasFlag(
       OPT_enable_actor_data_race_checks,
       OPT_disable_actor_data_race_checks, /*default=*/false);
+  if (auto *A = Args.getLastArg(OPT_enable_async_loop_yield,
+                                OPT_disable_async_loop_yield)) {
+    Opts.EnableAsyncLoopYield =
+        A->getOption().matches(OPT_enable_async_loop_yield);
+  }
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   if (Args.hasArg(OPT_CrossModuleOptimization)) {
     Opts.CMOMode = CrossModuleOptimizationMode::Aggressive;

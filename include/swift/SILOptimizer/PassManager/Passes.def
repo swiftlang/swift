@@ -445,6 +445,8 @@ LEGACY_PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 LEGACY_PASS(AssemblyVisionRemarkGenerator, "assembly-vision-remark-generator",
      "Emit assembly vision remarks that provide source level guidance of where runtime calls ended up")
+PASS(AsyncLoopYieldInsertion, "async-loop-yield-insertion",
+     "Insert executor yields on the back-edges of loops containing suspension points")
 LEGACY_PASS(MoveOnlyObjectChecker, "sil-move-only-object-checker",
      "Utility pass that enforces move only invariants on raw SIL for objects for testing purposes")
 LEGACY_PASS(MoveOnlyAddressChecker, "sil-move-only-address-checker",

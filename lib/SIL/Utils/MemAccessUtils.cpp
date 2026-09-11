@@ -2620,6 +2620,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::InitializeNonDefaultDistributedActor:
     case BuiltinValueKind::DestroyDefaultActor:
     case BuiltinValueKind::GetCurrentExecutor:
+    case BuiltinValueKind::YieldToCurrentExecutor:
     case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
     case BuiltinValueKind::FinishAsyncLet:
     case BuiltinValueKind::EndAsyncLetLifetime:

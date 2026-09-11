@@ -1613,6 +1613,16 @@ def disable_async_frame_push_pop_metadata :
   Flag<["-"], "disable-async-frame-push-pop-metadata">,
   HelpText<"Disable async frame push pop metadata">;
 
+def enable_async_loop_yield :
+  Flag<["-"], "enable-async-loop-yield">,
+  HelpText<"Insert executor yields on the back-edges of loops containing "
+           "suspension points (default: only on targets without guaranteed "
+           "async tail calls)">;
+def disable_async_loop_yield :
+  Flag<["-"], "disable-async-loop-yield">,
+  HelpText<"Never insert executor yields on the back-edges of loops "
+           "containing suspension points">;
+
 def enable_emit_type_malloc_for_coro_frame :
   Flag<["-"], "enable-emit-type-malloc-for-coro-frame">,
   HelpText<"Enable emitting typed malloc for coroutine frame allocation">;

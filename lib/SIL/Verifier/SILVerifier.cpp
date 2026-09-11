@@ -2735,6 +2735,15 @@ public:
       return;
     }
 
+    if (builtinKind == BuiltinValueKind::YieldToCurrentExecutor) {
+      require(F.isAsync(),
+              "yieldToCurrentExecutor can only be used in an async function");
+      require(arguments.empty(), "yieldToCurrentExecutor takes no arguments");
+      require(BI->getType().isVoid(),
+              "yieldToCurrentExecutor has no result");
+      return;
+    }
+
     if (builtinKind == BuiltinValueKind::BuildOrdinaryTaskExecutorRef ||
         builtinKind == BuiltinValueKind::BuildOrdinarySerialExecutorRef ||
         builtinKind ==

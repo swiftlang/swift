@@ -11,6 +11,7 @@ swift_compiler_sources(Optimizer
   AssumeSingleThreaded.swift
   CommonSubexpressionElimination.swift
   AsyncDemotion.swift
+  AsyncLoopYieldInsertion.swift
   AutoDiffBranchTracingEnumUtilities.swift
   BooleanLiteralFolding.swift
   ConstantCapturePropagation.swift

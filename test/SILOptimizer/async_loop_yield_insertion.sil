@@ -1,0 +1,213 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-async-loop-yield -async-loop-yield-insertion %s | %FileCheck %s
+
+// REQUIRES: concurrency
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @asyncFn : $@convention(thin) @async () -> ()
+sil @asyncThrowingFn : $@convention(thin) @async () -> @error any Error
+sil @syncFn : $@convention(thin) () -> ()
+
+// A while-style loop: the latch has a single successor, so the yield goes
+// right before its branch.
+//
+// CHECK-LABEL: sil @loopWithAsyncApply : $@convention(thin) @async () -> () {
+// CHECK:       bb2:
+// CHECK:         apply
+// CHECK-NEXT:    builtin "yieldToCurrentExecutor"() : $()
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'loopWithAsyncApply'
+sil @loopWithAsyncApply : $@convention(thin) @async () -> () {
+bb0:
+  br bb1
+bb1:
+  cond_br undef, bb2, bb3
+bb2:
+  %f = function_ref @asyncFn : $@convention(thin) @async () -> ()
+  apply %f() : $@convention(thin) @async () -> ()
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// A repeat-style loop: the condition block branches to a dedicated
+// loop-back block (SIL has no critical edges), which is the latch.
+//
+// CHECK-LABEL: sil @repeatLoopWithAsyncApply : $@convention(thin) @async () -> () {
+// CHECK:       bb1:
+// CHECK:         apply
+// CHECK-NEXT:    cond_br undef, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    builtin "yieldToCurrentExecutor"() : $()
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'repeatLoopWithAsyncApply'
+sil @repeatLoopWithAsyncApply : $@convention(thin) @async () -> () {
+bb0:
+  br bb1
+bb1:
+  %f = function_ref @asyncFn : $@convention(thin) @async () -> ()
+  apply %f() : $@convention(thin) @async () -> ()
+  cond_br undef, bb2, bb3
+bb2:
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// try_apply of an async function counts as a suspension point.
+//
+// CHECK-LABEL: sil @loopWithAsyncTryApply : $@convention(thin) @async () -> @error any Error {
+// CHECK:       bb2({{%.*}} : $()):
+// CHECK-NEXT:    builtin "yieldToCurrentExecutor"() : $()
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'loopWithAsyncTryApply'
+sil @loopWithAsyncTryApply : $@convention(thin) @async () -> @error any Error {
+bb0:
+  br bb1
+bb1:
+  %f = function_ref @asyncThrowingFn : $@convention(thin) @async () -> @error any Error
+  try_apply %f() : $@convention(thin) @async () -> @error any Error, normal bb2, error bb3
+bb2(%n : $()):
+  br bb1
+bb3(%e : $any Error):
+  throw %e : $any Error
+}
+
+// hop_to_executor counts as a suspension point.
+//
+// CHECK-LABEL: sil @loopWithHop : $@convention(thin) @async (@guaranteed Optional<Builtin.Executor>) -> () {
+// CHECK:       bb2:
+// CHECK-NEXT:    hop_to_executor
+// CHECK-NEXT:    builtin "yieldToCurrentExecutor"() : $()
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'loopWithHop'
+sil @loopWithHop : $@convention(thin) @async (@guaranteed Optional<Builtin.Executor>) -> () {
+bb0(%0 : $Optional<Builtin.Executor>):
+  br bb1
+bb1:
+  cond_br undef, bb2, bb3
+bb2:
+  hop_to_executor %0 : $Optional<Builtin.Executor>
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// await_async_continuation counts as a suspension point.
+//
+// CHECK-LABEL: sil @loopWithContinuation : $@convention(thin) @async () -> () {
+// CHECK:         await_async_continuation {{%.*}}, resume bb2
+// CHECK:       bb2({{%.*}} : $Builtin.Int32):
+// CHECK-NEXT:    builtin "yieldToCurrentExecutor"() : $()
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'loopWithContinuation'
+sil @loopWithContinuation : $@convention(thin) @async () -> () {
+bb0:
+  br bb1
+bb1:
+  %c = get_async_continuation Builtin.Int32
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb2
+bb2(%v : $Builtin.Int32):
+  br bb1
+}
+
+// Nested loops: both the inner and the outer back-edge get a yield.
+//
+// CHECK-LABEL: sil @nestedLoops : $@convention(thin) @async () -> () {
+// CHECK:       bb4:
+// CHECK:         apply
+// CHECK-NEXT:    builtin "yieldToCurrentExecutor"() : $()
+// CHECK-NEXT:    br bb3
+// CHECK:       bb5:
+// CHECK-NEXT:    builtin "yieldToCurrentExecutor"() : $()
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'nestedLoops'
+sil @nestedLoops : $@convention(thin) @async () -> () {
+bb0:
+  br bb1
+bb1:
+  cond_br undef, bb2, bb6
+bb2:
+  br bb3
+bb3:
+  cond_br undef, bb4, bb5
+bb4:
+  %f = function_ref @asyncFn : $@convention(thin) @async () -> ()
+  apply %f() : $@convention(thin) @async () -> ()
+  br bb3
+bb5:
+  br bb1
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// A loop without any suspension point is left alone, even in an async
+// function.
+//
+// CHECK-LABEL: sil @loopWithoutSuspension : $@convention(thin) @async () -> () {
+// CHECK-NOT:     yieldToCurrentExecutor
+// CHECK:       } // end sil function 'loopWithoutSuspension'
+sil @loopWithoutSuspension : $@convention(thin) @async () -> () {
+bb0:
+  %f = function_ref @asyncFn : $@convention(thin) @async () -> ()
+  apply %f() : $@convention(thin) @async () -> ()
+  br bb1
+bb1:
+  cond_br undef, bb2, bb3
+bb2:
+  %g = function_ref @syncFn : $@convention(thin) () -> ()
+  apply %g() : $@convention(thin) () -> ()
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Synchronous functions are never touched.
+//
+// CHECK-LABEL: sil @syncLoop : $@convention(thin) () -> () {
+// CHECK-NOT:     yieldToCurrentExecutor
+// CHECK:       } // end sil function 'syncLoop'
+sil @syncLoop : $@convention(thin) () -> () {
+bb0:
+  br bb1
+bb1:
+  cond_br undef, bb2, bb3
+bb2:
+  %g = function_ref @syncFn : $@convention(thin) () -> ()
+  apply %g() : $@convention(thin) () -> ()
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Running the pass on already processed SIL does not insert a second yield.
+//
+// CHECK-LABEL: sil @alreadyYielding : $@convention(thin) @async () -> () {
+// CHECK:       bb2:
+// CHECK:         apply
+// CHECK-NEXT:    builtin "yieldToCurrentExecutor"() : $()
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'alreadyYielding'
+sil @alreadyYielding : $@convention(thin) @async () -> () {
+bb0:
+  br bb1
+bb1:
+  cond_br undef, bb2, bb3
+bb2:
+  %f = function_ref @asyncFn : $@convention(thin) @async () -> ()
+  apply %f() : $@convention(thin) @async () -> ()
+  %y = builtin "yieldToCurrentExecutor"() : $()
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}

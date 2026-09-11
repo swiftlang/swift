@@ -1642,6 +1642,10 @@ static ValueDecl *getGetCurrentExecutor(ASTContext &ctx, Identifier id) {
                             _optional(_executor));
 }
 
+static ValueDecl *getYieldToCurrentExecutor(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _async(_thin), _parameters(), _void);
+}
+
 Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   TupleTypeElt resultTupleElements[2] = {
     ctx.TheNativeObjectType, // task,
@@ -3546,6 +3550,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::GetCurrentExecutor:
     return getGetCurrentExecutor(Context, Id);
+
+  case BuiltinValueKind::YieldToCurrentExecutor:
+    return getYieldToCurrentExecutor(Context, Id);
 
   case BuiltinValueKind::CreateTask:
     return getCreateTask(Context, Id);
