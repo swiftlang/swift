@@ -2130,7 +2130,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
     // Check for a subtyping relationship.
     switch (compareThrownErrorsForSubtyping(
-                overrideThrownError, baseThrownError, overrideFn)) {
+                overrideThrownError, baseThrownError)) {
     case ThrownErrorSubtyping::DropsThrows:
       diags.diagnose(override, diag::override_with_more_effects, override,
                      "throwing");
