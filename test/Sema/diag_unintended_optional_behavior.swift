@@ -197,11 +197,15 @@ extension DefaultStringInterpolation {
 }
 
 /// A type that provides a custom `StringInterpolation` type.
+protocol CustomInterpolatable {}
+extension Int: CustomInterpolatable {}
+extension Optional: CustomInterpolatable where Wrapped: CustomInterpolatable {}
+
 struct CustomInterpolation: ExpressibleByStringInterpolation {
     struct StringInterpolation: StringInterpolationProtocol {
         init(literalCapacity: Int, interpolationCount: Int) {}
         mutating func appendLiteral(_ literal: String) {}
-        mutating func appendInterpolation<T>(_ interp: T) {}
+        mutating func appendInterpolation(_ interp: some CustomInterpolatable) {}
     }
     init(stringInterpolation: StringInterpolation) {}
     init(stringLiteral: String) {}
