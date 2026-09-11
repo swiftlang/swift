@@ -23,3 +23,11 @@ let _ = Bool(fromCxx: PublicUsingBoolBox())
 let _ = Bool(fromCxx: ProtectedUsingBoolBox()) // expected-error {{initializer 'init(fromCxx:)' requires that 'ProtectedUsingBoolBox' conform to 'CxxConvertibleToBool'}}
 
 let _: Bool = BoolBox().__convertToBool() // expected-warning {{use Bool(fromCxx:)}}
+
+func testNonCopyable(_ box: borrowing NonCopyableBoolBox) -> Bool {
+  Bool(fromCxx: box)
+}
+
+func testNonEscapable(_ box: borrowing NonEscapableBoolBox) -> Bool {
+  Bool(fromCxx: box)
+}
