@@ -64,11 +64,22 @@ public extension ConstantTimeAccessor {
     func pullback(v: Array<Element>.TangentVector) -> TangentVector {
             var base: [Element.TangentVector]
             let localZero = Element.TangentVector.zero
-            if v.base.allSatisfy({ $0 == localZero }) {
+            switch v.storage {
+            case .zero:
+              base = []
+            case .oneHot(let index, let value, let count):
+              if value == localZero {
                 base = []
-            }
-            else {
-                base = v.base
+              } else {
+                base = [Element.TangentVector](repeating: .zero, count: count)
+                base[index] = value
+              }
+            case .full(let arr):
+              if arr.allSatisfy({ $0 == localZero }) {
+                base = []
+              } else {
+                base = arr
+              }
             }
             return TangentVector(_base: base, accessed: Element.TangentVector.zero)
     }
