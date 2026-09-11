@@ -274,13 +274,6 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD2<Scalar>()
     let n = scalarCount
-    if n.nonzeroBitCount == 1 {
-      let mask = n &- 1
-      for i in result.indices {
-        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
-      }
-      return result
-    }
     for i in result.indices {
       var position = Int(truncatingIfNeeded: index[i]) % n
       if position < 0 { position &+= n }
@@ -299,13 +292,6 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD3<Scalar>()
     let n = scalarCount
-    if n.nonzeroBitCount == 1 {
-      let mask = n &- 1
-      for i in result.indices {
-        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
-      }
-      return result
-    }
     for i in result.indices {
       var position = Int(truncatingIfNeeded: index[i]) % n
       if position < 0 { position &+= n }
@@ -324,13 +310,6 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD4<Scalar>()
     let n = scalarCount
-    if n.nonzeroBitCount == 1 {
-      let mask = n &- 1
-      for i in result.indices {
-        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
-      }
-      return result
-    }
     for i in result.indices {
       var position = Int(truncatingIfNeeded: index[i]) % n
       if position < 0 { position &+= n }
@@ -349,13 +328,6 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD8<Scalar>()
     let n = scalarCount
-    if n.nonzeroBitCount == 1 {
-      let mask = n &- 1
-      for i in result.indices {
-        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
-      }
-      return result
-    }
     for i in result.indices {
       var position = Int(truncatingIfNeeded: index[i]) % n
       if position < 0 { position &+= n }
@@ -374,13 +346,6 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD16<Scalar>()
     let n = scalarCount
-    if n.nonzeroBitCount == 1 {
-      let mask = n &- 1
-      for i in result.indices {
-        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
-      }
-      return result
-    }
     for i in result.indices {
       var position = Int(truncatingIfNeeded: index[i]) % n
       if position < 0 { position &+= n }
@@ -399,13 +364,6 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD32<Scalar>()
     let n = scalarCount
-    if n.nonzeroBitCount == 1 {
-      let mask = n &- 1
-      for i in result.indices {
-        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
-      }
-      return result
-    }
     for i in result.indices {
       var position = Int(truncatingIfNeeded: index[i]) % n
       if position < 0 { position &+= n }
@@ -424,13 +382,6 @@ extension SIMD {
   where Index: FixedWidthInteger {
     var result = SIMD64<Scalar>()
     let n = scalarCount
-    if n.nonzeroBitCount == 1 {
-      let mask = n &- 1
-      for i in result.indices {
-        result[i] = self[Int(truncatingIfNeeded: index[i]) & mask]
-      }
-      return result
-    }
     for i in result.indices {
       var position = Int(truncatingIfNeeded: index[i]) % n
       if position < 0 { position &+= n }
