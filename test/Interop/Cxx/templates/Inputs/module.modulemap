@@ -168,6 +168,11 @@ module DependentTypes {
   requires cplusplus
 }
 
+module DependentTypesUnnamedParam {
+  header "dependent-types-unnamed-param.h"
+  requires cplusplus
+}
+
 module UnevaluatedContext {
   header "unevaluated-context.h"
   requires cplusplus
