@@ -102,6 +102,16 @@ func _unlock(_ ptr: UnsafeRawPointer)
 /// Furthermore, when the stream reaches its terminal state and an onTermination closure is set,
 /// the closure is invoked **exactly once, after which it is cleared**.
 ///
+/// A failure supplied by the `onTermination` handler itself, via
+/// `finish(throwing:)`, is delivered to **exactly one consumer and is never
+/// dropped**. Which consumer that is, however, is **not specified**: it is
+/// whichever consumer is resumed first. In particular, when cancellation wins
+/// the race against the cancelled task's own `next()` registration, termination
+/// begins from a state with no waiting consumer, so a concurrent `next()` that
+/// parks while the stream is `terminating` is resumed first and observes the
+/// failure, while the cancelled task observes `nil`. Callers must not rely on
+/// the failure reaching one particular consumer.
+///
 /// Once the stream has reached its terminal state, all subsequent consumers will **immediately return nil**,
 /// and any **new values are rejected**.
 @safe
@@ -801,7 +811,9 @@ extension _AsyncStreamStorage {
       let failure = unsafe outcome.failure
       var parked = unsafe outcome.consumers
 
-      // Carry along any consumers from the parked state so that triggered the termination still receives the failure first.
+      // Append any consumers parked during termination after the ones that were
+      // already waiting, so the consumer whose cancellation began the
+      // termination is resumed first and receives the failure
       while let consumer = unsafe parked.popFirst() {
         unsafe callAndResume.consumers.append(consumer)
       }
