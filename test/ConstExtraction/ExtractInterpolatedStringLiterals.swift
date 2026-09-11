@@ -86,10 +86,14 @@ public struct External: MyProto {
 // CHECK-NEXT:         "value": {
 // CHECK-NEXT:           "segments": [
 // CHECK-NEXT:             {
+// CHECK-NEXT:               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractInterpolatedStringLiterals.swift",
+// CHECK-NEXT:               "line": 26,
 // CHECK-NEXT:               "valueKind": "RawLiteral",
 // CHECK-NEXT:               "value": "Start Interpolation with Member Reference: "
 // CHECK-NEXT:             },
 // CHECK-NEXT:             {
+// CHECK-NEXT:               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractInterpolatedStringLiterals.swift",
+// CHECK-NEXT:               "line": 26,
 // CHECK-NEXT:               "valueKind": "MemberReference",
 // CHECK-NEXT:               "value": {
 // CHECK-NEXT:                 "baseType": "ExtractInterpolatedStringLiterals.Internal",
@@ -97,10 +101,14 @@ public struct External: MyProto {
 // CHECK-NEXT:               }
 // CHECK-NEXT:             },
 // CHECK-NEXT:             {
+// CHECK-NEXT:               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractInterpolatedStringLiterals.swift",
+// CHECK-NEXT:               "line": 26,
 // CHECK-NEXT:               "valueKind": "RawLiteral",
 // CHECK-NEXT:               "value": ". Followed By Function Call: "
 // CHECK-NEXT:             },
 // CHECK-NEXT:             {
+// CHECK-NEXT:               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractInterpolatedStringLiterals.swift",
+// CHECK-NEXT:               "line": 26,
 // CHECK-NEXT:               "valueKind": "FunctionCall",
 // CHECK-NEXT:               "value": {
 // CHECK-NEXT:                 "name": "generateString",
@@ -108,6 +116,8 @@ public struct External: MyProto {
 // CHECK-NEXT:                   {
 // CHECK-NEXT:                     "label": "input",
 // CHECK-NEXT:                     "type": "Swift.String",
+// CHECK-NEXT:                     "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractInterpolatedStringLiterals.swift",
+// CHECK-NEXT:                     "line": 26,
 // CHECK-NEXT:                     "valueKind": "RawLiteral",
 // CHECK-NEXT:                     "value": "test"
 // CHECK-NEXT:                   }
@@ -115,10 +125,14 @@ public struct External: MyProto {
 // CHECK-NEXT:               }
 // CHECK-NEXT:             },
 // CHECK-NEXT:             {
+// CHECK-NEXT:               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractInterpolatedStringLiterals.swift",
+// CHECK-NEXT:               "line": 26,
 // CHECK-NEXT:               "valueKind": "RawLiteral",
 // CHECK-NEXT:               "value": ". End with KeyPath: "
 // CHECK-NEXT:             },
 // CHECK-NEXT:             {
+// CHECK-NEXT:               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractInterpolatedStringLiterals.swift",
+// CHECK-NEXT:               "line": 26,
 // CHECK-NEXT:               "valueKind": "KeyPath",
 // CHECK-NEXT:               "value": {
 // CHECK-NEXT:                 "path": "nested.foo",
@@ -136,6 +150,8 @@ public struct External: MyProto {
 // CHECK-NEXT:               }
 // CHECK-NEXT:             },
 // CHECK-NEXT:             {
+// CHECK-NEXT:               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractInterpolatedStringLiterals.swift",
+// CHECK-NEXT:               "line": 26,
 // CHECK-NEXT:               "valueKind": "RawLiteral",
 // CHECK-NEXT:               "value": "."
 // CHECK-NEXT:             }

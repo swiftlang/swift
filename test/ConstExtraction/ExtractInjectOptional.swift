@@ -23,12 +23,16 @@ public struct Bat {
 // CHECK-NEXT: {
 // CHECK-NEXT:   "label": "buz",
 // CHECK-NEXT:   "type": "Swift.Optional<Swift.String>",
+// CHECK-NEXT:   "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractInjectOptional.swift",
+// CHECK-NEXT:   "line": 9,
 // CHECK-NEXT:   "valueKind": "RawLiteral",
 // CHECK-NEXT:   "value": "hello"
 // CHECK-NEXT: },
 // CHECK-NEXT: {
 // CHECK-NEXT:   "label": "fuz",
 // CHECK-NEXT:   "type": "Swift.Int",
+// CHECK-NEXT:   "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractInjectOptional.swift",
+// CHECK-NEXT:   "line": 9,
 // CHECK-NEXT:   "valueKind": "RawLiteral",
 // CHECK-NEXT:   "value": "4"
 // CHECK-NEXT: }
