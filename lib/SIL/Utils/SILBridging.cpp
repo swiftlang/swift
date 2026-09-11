@@ -641,6 +641,53 @@ BridgedInstruction BridgedBuilder::createSwitchEnumAddrInst(BridgedValue enumAdd
                                            convertCases(enumAddr.getSILValue()->getType(), enumCases, numEnumCases))};
 }
 
+static bool canCarryReconstructionBlock(swift::SILValue value,
+                                        swift::SILFunction &function) {
+  swift::SILType type = value->getType();
+
+  // Tokens are not values that can be passed through a block argument.
+  if (type.is<swift::SILTokenType>())
+    return false;
+
+  // Reconstruction blocks do not support packs.
+  if (type.hasAnyPack() || type.isOrContainsPack(function))
+    return false;
+
+  // Avoid local archetypes.
+  if (type.hasLocalArchetype())
+    return false;
+
+  return true;
+}
+
+// Stress-testing only, see the DebugValueSprinkler pass.
+OptionalBridgedInstruction
+BridgedBuilder::createSprinkledDebugValue(BridgedValue src) const {
+  swift::SILBuilder builder = unbridged();
+  swift::SILValue value = src.getSILValue();
+
+  if (!canCarryReconstructionBlock(value, builder.getFunction()))
+    return {nullptr};
+
+  static std::atomic<unsigned> nextID(0);
+  llvm::SmallString<32> name;
+  {
+    llvm::raw_svector_ostream os(name);
+    os << "sprinkle$" << nextID++;
+  }
+
+  swift::SILDebugVariable var(name, /*Constant=*/true, /*ArgNo=*/0,
+                              value->getType().getObjectType());
+  auto *debugValue = builder.emitDebugDescription(regularLoc(), value, var);
+  // The variable is dropped when it has no argument number and a synthesized
+  // location.
+  if (!debugValue)
+    return {nullptr};
+
+  debugValue->getOrCreateDebugReconstructionBlock();
+  return {debugValue};
+}
+
 //===----------------------------------------------------------------------===//
 //                               BridgedCloner
 //===----------------------------------------------------------------------===//
