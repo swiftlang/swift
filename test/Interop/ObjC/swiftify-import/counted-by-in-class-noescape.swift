@@ -9,10 +9,11 @@
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs %t/method.swift -Rmacro-expansions -emit-module \
 // RUN:   -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}method.h -verify-additional-prefix experimental- -eager-macro-checking \
 // RUN:   -Xcc -Wno-nullability-completeness -strict-memory-safety \
-// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -enable-experimental-feature Lifetimes \
+// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersConsumingLifetimebound -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -enable-experimental-feature Lifetimes \
 // RUN:   -verify-ignore-macro-note -verify-child-notes
 
 // REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_SafeInteropWrappersConsumingLifetimebound
 // REQUIRES: swift_feature_SafeInteropWrappersNullAsEmptySpan
 // REQUIRES: swift_feature_Lifetimes
 
@@ -222,7 +223,7 @@ module Method {
 
 // expected-experimental-expansion@+37:2{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public class final func returnPointerNullable(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
+//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public class final func returnPointerNullable(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
 //   expected-experimental-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
@@ -241,7 +242,7 @@ module Method {
 // expected-stable-note@+19{{'returnPointerNullable' declared here}}
 // expected-experimental-expansion@+18:125{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public final func returnPointerNullable(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
+//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public final func returnPointerNullable(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
 //   expected-experimental-remark@3 {{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-experimental-remark@4 {{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
@@ -262,7 +263,7 @@ module Method {
 
 // expected-experimental-expansion@+27:2{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public class final func returnPointerNonnull(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
+//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public class final func returnPointerNonnull(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
 //   expected-experimental-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
@@ -276,7 +277,7 @@ module Method {
 // expected-stable-note@+14{{'returnPointerNonnull' declared here}}
 // expected-experimental-expansion@+13:122{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public final func returnPointerNonnull(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
+//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public final func returnPointerNonnull(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
 //   expected-experimental-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
@@ -340,7 +341,7 @@ module Method {
 @end
 
 //--- method.swift
-// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Method -plugin-path %swift-plugin-dir -I %t/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -enable-experimental-feature Lifetimes > %t/Test-interface.swift && %swift-function-caller-generator Method %t/Test-interface.swift
+// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Method -plugin-path %swift-plugin-dir -I %t/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersConsumingLifetimebound -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -enable-experimental-feature Lifetimes > %t/Test-interface.swift && %swift-function-caller-generator Method %t/Test-interface.swift
 // GENERATED-HASH: aa625ed717982a6dd015712bc112d86de7b553d76c42e1b97112e0d4363daccb
 import Method
 
@@ -449,22 +450,18 @@ extension Foo {
   }
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
     @_lifetime(copy p)
-    @_lifetime(p: copy p)
-    @_alwaysEmitIntoClient @_disfavoredOverload final func call_returnPointerNullable_Foo(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
-    // expected-stable-error@+5{{missing argument for parameter #2 in call}}
-    // expected-stable-note@+4{{arguments to generic parameter 'Pointee' ('MutableSpan<CInt>' (aka 'MutableSpan<Int32>') and 'CInt' (aka 'Int32')) are expected to be equal}}
-    // expected-stable-error@+3{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<CInt>>' (aka 'UnsafeMutablePointer<MutableSpan<Int32>>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
+    @_alwaysEmitIntoClient @_disfavoredOverload final func call_returnPointerNullable_Foo(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {
+    // expected-stable-error@+3{{missing argument for parameter #2 in call}}
     // expected-stable-error@+2{{cannot convert value of type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>') to expected argument type 'CInt' (aka 'Int32')}}
     // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<CInt>?' (aka 'Optional<UnsafeMutablePointer<Int32>>') to return type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
-    return returnPointerNullable(&p)
+    return returnPointerNullable(p)
   }
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
     @_lifetime(copy p)
-    @_lifetime(p: copy p)
-    @_alwaysEmitIntoClient @_disfavoredOverload final func call_returnPointerNullable_Foo_classmethod(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
+    @_alwaysEmitIntoClient @_disfavoredOverload final func call_returnPointerNullable_Foo_classmethod(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {
     // expected-stable-error@+2{{cannot convert value of type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>') to expected argument type 'Foo'}}
     // expected-stable-error@+1{{cannot convert return expression of type '(CInt, UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<CInt>?' (aka '(Int32, Optional<UnsafeMutablePointer<Int32>>) -> Optional<UnsafeMutablePointer<Int32>>') to return type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
-    return Foo.returnPointerNullable(&p)
+    return Foo.returnPointerNullable(p)
   }
   final func call_returnPointerNullable_Foo(_ len: CInt, _ p: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<CInt>? {
     return unsafe returnPointerNullable(len, p)
@@ -474,22 +471,18 @@ extension Foo {
   }
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
     @_lifetime(copy p)
-    @_lifetime(p: copy p)
-    @_alwaysEmitIntoClient @_disfavoredOverload final func call_returnPointerNonnull_Foo(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
-    // expected-stable-error@+5{{missing argument for parameter #2 in call}}
-    // expected-stable-note@+4{{arguments to generic parameter 'Pointee' ('MutableSpan<CInt>' (aka 'MutableSpan<Int32>') and 'CInt' (aka 'Int32')) are expected to be equal}}
-    // expected-stable-error@+3{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<CInt>>' (aka 'UnsafeMutablePointer<MutableSpan<Int32>>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
+    @_alwaysEmitIntoClient @_disfavoredOverload final func call_returnPointerNonnull_Foo(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {
+    // expected-stable-error@+3{{missing argument for parameter #2 in call}}
     // expected-stable-error@+2{{cannot convert value of type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>') to expected argument type 'CInt' (aka 'Int32')}}
     // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>') to return type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
-    return returnPointerNonnull(&p)
+    return returnPointerNonnull(p)
   }
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
     @_lifetime(copy p)
-    @_lifetime(p: copy p)
-    @_alwaysEmitIntoClient @_disfavoredOverload final func call_returnPointerNonnull_Foo_classmethod(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
+    @_alwaysEmitIntoClient @_disfavoredOverload final func call_returnPointerNonnull_Foo_classmethod(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {
     // expected-stable-error@+2{{cannot convert value of type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>') to expected argument type 'Foo'}}
     // expected-stable-error@+1{{cannot convert return expression of type '(CInt, UnsafeMutablePointer<CInt>) -> UnsafeMutablePointer<CInt>' (aka '(Int32, UnsafeMutablePointer<Int32>) -> UnsafeMutablePointer<Int32>') to return type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
-    return Foo.returnPointerNonnull(&p)
+    return Foo.returnPointerNonnull(p)
   }
   final func call_returnPointerNonnull_Foo(_ len: CInt, _ p: UnsafeMutablePointer<CInt>) -> UnsafeMutablePointer<CInt> {
     return unsafe returnPointerNonnull(len, p)

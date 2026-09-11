@@ -42,7 +42,7 @@ public func constReturnDependence(_ size: CInt, _ ptr: UnsafePointer<UInt8>) -> 
 
 @_SwiftifyImport(.sizedByOrNull(pointer: .param(2), size: "size"),
                  .sizedByOrNull(pointer: .return, size: "size"),
-                 .lifetimeDependence(dependsOn: .param(2), pointer: .return, type: .copy))
+                 .lifetimeDependence(dependsOn: .param(2), pointer: .return, type: .copy), consumingLifetimebound: true)
 public func mutReturnDependence(_ size: CInt, _ ptr: UnsafeMutablePointer<UInt8>) -> UnsafeMutablePointer<UInt8> { return unsafe UnsafeMutablePointer(OpaquePointer(bitPattern: 0)!) }
 
 //--- expansions.expected
@@ -147,8 +147,8 @@ public func constReturnDependence(_ ptr: RawSpan) -> RawSpan {
 @__swiftmacro_4test19mutReturnDependence15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
-public func mutReturnDependence(_ ptr: inout MutableRawSpan) -> MutableRawSpan {
+@_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
+public func mutReturnDependence(_ ptr: consuming MutableRawSpan) -> MutableRawSpan {
     let size = CInt(exactly: ptr.byteCount)!
     let _ptrPtr = ptr.withUnsafeMutableBytes {
         unsafe $0

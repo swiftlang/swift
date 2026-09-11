@@ -20,7 +20,7 @@ public func myFunc2(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) {
 public func myFunc3(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt, _ ptr2: UnsafeMutablePointer<CInt>?, _ len2: CInt) {
 }
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true, consumingLifetimebound: true)
 public func myFunc4(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePointer<CInt>? {
 // expected-error@+1{{missing return in global function expected to return 'UnsafeMutablePointer<CInt>?' (aka 'Optional<UnsafeMutablePointer<Int32>>')}}
 }
@@ -75,8 +75,8 @@ public func myFunc3(_ ptr: inout MutableSpan<CInt>, _ ptr2: inout MutableSpan<CI
 @__swiftmacro_4test7myFunc415_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
-public func myFunc4(_ ptr: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
+@_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
+public func myFunc4(_ ptr: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {
     let len = CInt(exactly: ptr.count)!
     let _ptrPtr = ptr.withUnsafeMutableBufferPointer {
         unsafe $0

@@ -1,10 +1,11 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_SafeInteropWrappersConsumingLifetimebound
 // REQUIRES: swift_feature_Lifetimes
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersConsumingLifetimebound -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
 // RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-prefix experimental- -Rmacro-expansions -suppress-notes -eager-macro-checking
 
 // lifetimebound support is not stabilized yet. Don't generate _any_ overloads on functions with lifetimebound to prevent future sourcebreak.
@@ -194,7 +195,7 @@ uint8_t *__sized_by_or_null(size)  bytesized(int size, const uint8_t * p __sized
 
 // expected-experimental-expansion@+18:101{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func charsized(_ p: inout MutableRawSpan) -> MutableRawSpan {|}}
+//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func charsized(_ p: consuming MutableRawSpan) -> MutableRawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let size = CInt(exactly: p.byteCount)!|}}
 //   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBytes {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
@@ -220,8 +221,8 @@ module Test {
 }
 
 //--- test.swift
-// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: bc828f607531ee66a74238439370c9f68f62fac068c6e4294af725c6056d2cab
+// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersConsumingLifetimebound -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
+// GENERATED-HASH: 015177a8db1e9d0046e3da97e04643ff8e435f4f7101cbfcf48006ca167fafa9
 import Test
 
 
@@ -347,11 +348,11 @@ func call_charsized(_ p: UnsafeMutablePointer<CChar>!, _ size: CInt) -> UnsafeMu
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @_lifetime(copy p)
-@_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_charsized(_ p: inout MutableRawSpan) -> MutableRawSpan {
-  // expected-stable-error@+2{{missing argument for parameter #2 in call}}
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_charsized(_ p: consuming MutableRawSpan) -> MutableRawSpan {
+  // expected-stable-error@+3{{missing argument for parameter #2 in call}}
+  // expected-stable-error@+2{{cannot convert value of type 'MutableRawSpan' to expected argument type 'UnsafeMutablePointer<CChar>' (aka 'UnsafeMutablePointer<Int8>')}}
   // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<CChar>?' (aka 'Optional<UnsafeMutablePointer<Int8>>') to return type 'MutableRawSpan'}}
-  return charsized(&p)
+  return charsized(p)
 }
 
 func call_doublebytesized(_ p: UnsafeMutablePointer<UInt16>!, _ size: CInt) -> UnsafePointer<UInt16>! {

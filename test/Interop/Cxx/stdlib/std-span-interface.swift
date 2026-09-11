@@ -3,15 +3,16 @@
 // RUN: %FileCheck %S/Inputs/std-span.h --match-full-lines --implicit-check-not "@_alwaysEmitIntoClient" < %t/interface.swift
 
 // Test legacy wrappers
-// RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %S/Inputs -print-module -module-to-print=StdSpan -source-filename=x -enable-experimental-cxx-interop -enable-experimental-feature SafeInteropWrappers -Xcc -std=c++20 -module-cache-path %t > %t/interface-lifetimebound.swift
+// RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %S/Inputs -print-module -module-to-print=StdSpan -source-filename=x -enable-experimental-cxx-interop -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersConsumingLifetimebound -Xcc -std=c++20 -module-cache-path %t > %t/interface-lifetimebound.swift
 // RUN: %FileCheck %S/Inputs/std-span.h --match-full-lines --implicit-check-not "@_alwaysEmitIntoClient" --check-prefixes=CHECK,CHECK-LEGACY < %t/interface-lifetimebound.swift
 
 // Make sure we trigger typechecking and SIL diagnostics
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s -verify-additional-prefix default- -suppress-notes -eager-macro-checking
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s -eager-macro-checking
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersConsumingLifetimebound -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s -eager-macro-checking
 
 // REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_SafeInteropWrappersConsumingLifetimebound
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: std_span
 
@@ -33,19 +34,17 @@ func callFuncWithMutableSafeWrapper(_ span: inout MutableSpan<CInt>, ) {
     FuncWithMutableSafeWrapper(&span)
 }
 
-@_lifetime(span: copy span)
-func callFuncWithMutableSafeWrapper2(_ span: inout MutableSpan<CInt>, ) {
+func callFuncWithMutableSafeWrapper2(_ span: consuming MutableSpan<CInt>) {
     // expected-default-error@+2{{cannot convert value of type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>') to expected argument type 'SpanOfInt'}}
     // expected-default-error@+1{{cannot convert value of type 'SpanOfInt'}}
-    let _: MutableSpan<CInt> = FuncWithMutableSafeWrapper2(&span)
+    let _: MutableSpan<CInt> = FuncWithMutableSafeWrapper2(span)
 }
 
-@_lifetime(span: copy span)
-func callMixedFuncWithMutableSafeWrapper1(_ span: inout MutableSpan<CInt>, ) {
+func callMixedFuncWithMutableSafeWrapper1(_ span: consuming MutableSpan<CInt>) {
     // expected-default-error@+3{{missing argument for parameter #2 in call}}
-    // expected-default-error@+2{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<CInt>>' (aka 'UnsafeMutablePointer<MutableSpan<Int32>>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
+    // expected-default-error@+2{{cannot convert value of type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
     // expected-default-error@+1{{cannot convert value of type 'SpanOfInt'}}
-    let _: MutableSpan<CInt> = MixedFuncWithMutableSafeWrapper1(&span)
+    let _: MutableSpan<CInt> = MixedFuncWithMutableSafeWrapper1(span)
 }
 
 func MixedFuncWithMutableSafeWrapper2(_ v: VecOfInt) {

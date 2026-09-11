@@ -1,4 +1,5 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_SafeInteropWrappersConsumingLifetimebound
 // REQUIRES: swift_feature_SafeInteropWrappersNullAsEmptySpan
 // REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 
@@ -8,7 +9,7 @@
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default \
 // RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes -eager-macro-checking \
 // RUN:   -Xcc -Wno-nullability-completeness -target %target-swift-6.2-abi-triple \
-// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan \
+// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersConsumingLifetimebound -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan \
 // RUN:   -enable-experimental-feature ForeignReferenceTypeInheritance \
 // RUN:   -verify-additional-prefix %target-vendor- \
 // RUN:   %if OS_FAMILY=darwin && !OS=xros %{ -verify-additional-prefix nonxros- %}
@@ -71,8 +72,8 @@ struct ValueType {
 
   // expected-expansion@+19:103{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload|}}
-  //   expected-remark@3{{macro content: |public func valLifetimebound(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload|}}
+  //   expected-remark@3{{macro content: |public func valLifetimebound(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
   //   expected-remark@6{{macro content: |        unsafe $0|}}
@@ -202,8 +203,8 @@ struct SWIFT_REFERENCE RefType {
   // expected-expansion@+20:103{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
   //   expected-nonxros-error@2{{instance method cannot be more available than enclosing scope}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload|}}
-  //   expected-remark@3{{macro content: |public final func refLifetimebound(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload|}}
+  //   expected-remark@3{{macro content: |public final func refLifetimebound(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
   //   expected-remark@6{{macro content: |        unsafe $0|}}
