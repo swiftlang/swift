@@ -99,7 +99,12 @@ add_library(swiftDistributed
   DistributedDefaultExecutor.swift
   DistributedMacros.swift
   DistributedMetadata.swift
-  LocalTestingDistributedActorSystem.swift)
+  LocalTestingDistributedActorSystem.swift
+
+  # Tracing
+  TracingDistributed.swift
+  TracingDistributed.cpp
+  TracingDistributedSignpost.cpp)
 
 set_target_properties(swiftDistributed PROPERTIES
   Swift_MODULE_NAME Distributed)
