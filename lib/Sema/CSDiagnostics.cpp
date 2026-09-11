@@ -3606,6 +3606,26 @@ bool ContextualFailure::tryTypeCoercionFixIt(
     }
   }
 
+  // A cast from `(any P).Type` to `any P.Type` traps at runtime unless the
+  // existential conforms to its own constraint, so don't suggest one.
+  {
+    auto fromInstanceType = fromType;
+    auto toInstanceType = toType;
+    bool isMetatypeCast = false;
+    while (auto *fromMeta = fromInstanceType->getAs<MetatypeType>()) {
+      auto *toMeta = toInstanceType->getAs<ExistentialMetatypeType>();
+      if (!toMeta)
+        break;
+
+      fromInstanceType = fromMeta->getInstanceType();
+      toInstanceType = toMeta->getInstanceType();
+      isMetatypeCast = true;
+    }
+
+    if (isMetatypeCast && fromInstanceType->isExistentialType())
+      return false;
+  }
+
   CheckedCastKind Kind = TypeChecker::typeCheckCheckedCast(
       fromType, toType, CheckedCastContextKind::None, getDC());
 
