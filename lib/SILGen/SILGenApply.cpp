@@ -5849,14 +5849,29 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
   return RValue(SGF, uncurriedLoc, formalResultType, resultMV);
 }
 
+static void checkBuiltinOperandOwnership(SILGenFunction &SGF, BuiltinInst *bi,
+                                         ArrayRef<SILParameterInfo> params,
+                                         unsigned firstArgOperand) {
+#ifndef NDEBUG
+  if (!SGF.F.hasOwnership())
+    return;
+  for (auto param : llvm::enumerate(params)) {
+    const Operand &operand = bi->getOperandRef(firstArgOperand + param.index());
+    if (operand.get()->getOwnershipKind() == OwnershipKind::None)
+      continue;
+    assert(param.value().isConsumedInCaller() == operand.isConsuming() &&
+           "builtin's declared parameter ownership disagrees with its "
+           "OperandOwnership classification");
+  }
+#endif
+}
+
 RValue
 CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
                                       SGFContext C) {
   // We use the context emit-into initialization only for the
   // outermost call.
   SGFContext uncurriedContext = C;
-
-  ManagedValue mv;
 
   // Get the callee type information. We want to emit the arguments as
   // fully-substituted values because that's what the specialized emitters
@@ -5935,27 +5950,20 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   if (resultPlan.has_value())
     (*resultPlan)->gatherIndirectResultAddrs(SGF, loc, rawArgs);
 
-  // Polymorphic builtins only borrow their arguments, unlike the default
-  // +1/consuming convention assumed below. This is unobservable for their
-  // concrete, statically overloaded counterparts since those only operate
-  // on trivial types, but matters once opaque values give T real ownership.
-  const BuiltinInfo &builtinInfo = SGF.SGM.M.getBuiltinInfo(builtinName);
-  bool isPolymorphicBltn = builtinInfo.ID != BuiltinValueKind::None &&
-                       isPolymorphicBuiltin(builtinInfo.ID);
+  // Padded by the number of indirect results in the signature.
+  unsigned firstArgOperand = rawArgs.size();
 
-  // Then add all arguments to our array, copying them if they are not at +1
-  // yet.
-  for (auto arg : uncurriedArgs) {
-    // Nonescaping closures can't be forwarded so we pass them +0. Polymorphic
-    // builtins only borrow their arguments, so they are passed +0 as well.
-    if (isTrivialNoEscapeType(arg.getType()) || isPolymorphicBltn) {
-      rawArgs.push_back(arg.getValue());
+  // Then add all arguments to our array at the ownership their parameter
+  // declares. Forwarding a cleanup into a parameter the builtin does not
+  // consume leaks the value.
+  auto params = substFnType->getParameters();
+  assert(params.size() == uncurriedArgs.size() &&
+         "builtin argument does not correspond to a lowered parameter");
+  for (auto arg : llvm::enumerate(uncurriedArgs)) {
+    if (params[arg.index()].isConsumedInCaller()) {
+      rawArgs.push_back(arg.value().ensurePlusOne(SGF, loc).forward(SGF));
     } else {
-      // Named builtins are by default assumed to take other arguments at +1,
-      // as Owned or Trivial. Named builtins that don't follow this convention
-      // must use a specialized emitter.
-      auto maybePlusOne = arg.ensurePlusOne(SGF, loc);
-      rawArgs.push_back(maybePlusOne.forward(SGF));
+      rawArgs.push_back(arg.value().getValue());
     }
   }
 
@@ -5963,6 +5971,8 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
       loc, builtinName,
       substConv.getSILResultType(SGF.getTypeExpansionContext()),
       callee.getSubstitutions(), rawArgs);
+
+  checkBuiltinOperandOwnership(SGF, rawResult, params, firstArgOperand);
 
   // Handle some special cases for specific builtins.
   if (builtinName.is(getBuiltinName(BuiltinValueKind::AddTaskLocalValue))) {

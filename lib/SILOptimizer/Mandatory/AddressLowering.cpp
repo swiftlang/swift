@@ -3698,17 +3698,15 @@ protected:
   }
 
   void visitBuiltinInst(BuiltinInst *bi) {
-    auto kind = bi->getBuiltinKind().value_or(BuiltinValueKind::None);
+    switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
     // Polymorphic builtins (e.g. "generic_add") only ever borrow their
     // operands (see the InstantaneousUse classification in
     // OperandOwnershipBuiltinClassifier), so every operand is handled the
     // same way: materialize its address in place.
-    if (kind != BuiltinValueKind::None && isPolymorphicBuiltin(kind)) {
-      SILValue opAddr = addrMat.materializeAddress(use->get());
-      bi->setOperand(use->getOperandNumber(), opAddr);
-      return;
-    }
-    switch (kind) {
+#define BUILTIN(Id, Name, Attrs)
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)                         \
+    case BuiltinValueKind::Id:
+#include "swift/AST/Builtins.def"
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::AddTaskLocalValue:
@@ -4498,8 +4496,22 @@ protected:
   }
 
   void visitBuiltinInst(BuiltinInst *bi) {
-    auto kind = bi->getBuiltinKind().value_or(BuiltinValueKind::None);
-    if (kind != BuiltinValueKind::None && isPolymorphicBuiltin(kind)) {
+    switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
+    case BuiltinValueKind::ZeroInitializer: {
+      // Value-form `builtin "zeroInitializer"() : $T` with an opaque T.
+      assert(bi->getNumOperands() == 0 &&
+             "address-form zeroInitializer should not appear as an opaque def");
+      addrMat.materializeAddress(bi);
+      SILValue destAddr = storage.storageAddress;
+      builder.createZeroInitAddr(bi->getLoc(), destAddr);
+      storage.markRewritten();
+      break;
+    }
+#define BUILTIN(Id, Name, Attrs)
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)                         \
+    case BuiltinValueKind::Id:
+#include "swift/AST/Builtins.def"
+    {
       // Rewrite the value-form (with already address-converted operands,
       // see UseRewriter::visitBuiltinInst above):
       //   %result = builtin "generic_add"<T>(%0 : $*T, %1 : $*T) : $T
@@ -4522,17 +4534,6 @@ protected:
       builder.createBuiltin(bi->getLoc(), bi->getName(),
                             SILType::getEmptyTupleType(astCtx),
                             bi->getSubstitutions(), newArgs);
-      storage.markRewritten();
-      return;
-    }
-    switch (kind) {
-    case BuiltinValueKind::ZeroInitializer: {
-      // Value-form `builtin "zeroInitializer"() : $T` with an opaque T.
-      assert(bi->getNumOperands() == 0 &&
-             "address-form zeroInitializer should not appear as an opaque def");
-      addrMat.materializeAddress(bi);
-      SILValue destAddr = storage.storageAddress;
-      builder.createZeroInitAddr(bi->getLoc(), destAddr);
       storage.markRewritten();
       break;
     }
