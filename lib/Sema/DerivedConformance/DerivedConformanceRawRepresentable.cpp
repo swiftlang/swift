@@ -29,6 +29,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/QuotedString.h"
 #include "llvm/ADT/APInt.h"
 
 using namespace swift;
@@ -405,6 +406,29 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   return initDecl;
 }
 
+static ValueDecl *deriveRawRepresentableViaMacros(DerivedConformance &derived,
+                                                  ValueDecl *requirement) {
+  auto &C = requirement->getASTContext();
+  bool isStrictMemorySafety = C.LangOpts.hasFeature(
+      Feature::StrictMemorySafety, /*allowMigration=*/true);
+
+  std::string macro = "#_deriveRawRepresentable(";
+  auto os = llvm::raw_string_ostream(macro);
+  os << QuotedString(getNominalTypeInfoString(derived)) << ", ";
+
+  if (requirement->getBaseName() == C.Id_rawValue) {
+    os << QuotedString("varDef");
+  } else {
+    ASSERT(requirement->getBaseName().isConstructor());
+    os << QuotedString("initializer");
+  }
+  os << ", " << (isStrictMemorySafety ? "true" : "false") << ")";
+  os.flush();
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveRawRepresentable);
+}
+
 bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
                                                    NominalTypeDecl *type) {
   auto enumDecl = dyn_cast<EnumDecl>(type);
@@ -473,11 +497,31 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
   if (!canDeriveRawRepresentable(cast<DeclContext>(ConformanceDecl), Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() == Context.Id_rawValue)
-    return deriveRawRepresentable_raw(*this);
+  bool viaMacros =
+      Context.LangOpts.hasFeature(Feature::DeriveConformancesViaMacros);
 
-  if (requirement->getBaseName().isConstructor())
-    return deriveRawRepresentable_init(*this);
+  if (requirement->getBaseName() == Context.Id_rawValue) {
+    if (!viaMacros)
+      return deriveRawRepresentable_raw(*this);
+
+    auto *witness = deriveRawRepresentableViaMacros(*this, requirement);
+    if (!witness)
+      return nullptr;
+    maybeMarkAsInlinable(
+        *this, cast<VarDecl>(witness)->getAccessor(AccessorKind::Get));
+    return witness;
+  }
+
+  if (requirement->getBaseName().isConstructor()) {
+    if (!viaMacros)
+      return deriveRawRepresentable_init(*this);
+
+    auto *witness = deriveRawRepresentableViaMacros(*this, requirement);
+    if (!witness)
+      return nullptr;
+    maybeMarkAsInlinable(*this, cast<AbstractFunctionDecl>(witness));
+    return witness;
+  }
 
   Context.Diags.diagnose(requirement->getLoc(),
                          diag::broken_raw_representable_requirement);
