@@ -1,4 +1,4 @@
-// RUN: %scale-test --invert-result --begin 1 --end 10 --step 1 --select NumLeafScopes %s
+// RUN: %scale-test --invert-result --begin 1 --end 8 --step 1 --select NumSolverScopes %s
 // REQUIRES: asserts,no_asan
 
 func localType(s: String) -> Any.Type? {

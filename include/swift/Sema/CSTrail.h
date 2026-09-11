@@ -153,6 +153,7 @@ public:
       struct {
         Constraint *Disjunction;
         FunctionType *ArgFuncType;
+        unsigned ResultGenerationNumber;
       } Disjunction;
 
       ConstraintFix *TheFix;
@@ -276,7 +277,8 @@ public:
 
     /// Create a change that disjunction pruning was performed.
     static Change PrunedDisjunction(Constraint *disjunction,
-                                    FunctionType *argFuncType);
+                                    FunctionType *argFuncType,
+                                    unsigned resultGenerationNumber);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
