@@ -23,6 +23,9 @@
 #include "TypeInfo.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/SIL/SILType.h"
+#include "llvm/Support/ErrorHandling.h"
+
+#include <limits>
 
 namespace llvm {
   class ConstantInt;
@@ -38,7 +41,20 @@ private:
   /// The spare bit mask for this type. SpareBits[0] is the LSB of the first
   /// byte. This may be empty if the type has no spare bits.
   SpareBitVector SpareBits;
-  
+
+  /// Store the given size into the 32-bit size bitfield, failing closed if it
+  /// does not fit. The size field is only 32 bits wide, so a larger size would
+  /// be silently truncated, producing a miscompile in which layouts and
+  /// allocations disagree. We enforce this in all build configurations rather
+  /// than relying on a debug-only assert.
+  void setFixedSize(Size size) {
+    if (size.getValue() > std::numeric_limits<uint32_t>::max()) {
+      llvm::report_fatal_error(
+          "fixed-layout type size exceeds 32-bit representable maximum");
+    }
+    Bits.FixedTypeInfo.Size = size.getValue();
+  }
+
 protected:
   FixedTypeInfo(IRGenModule &IGM,
                 const SerializableFixedTypeInfoRepresentation &representation);
@@ -59,8 +75,7 @@ protected:
         SpareBits(spareBits) {
     assert(SpareBits.size() == size.getValueInBits());
     assert(isFixedSize());
-    Bits.FixedTypeInfo.Size = size.getValue();
-    assert(Bits.FixedTypeInfo.Size == size.getValue() && "truncation");
+    setFixedSize(size);
   }
 
   FixedTypeInfo(llvm::Type *type, Size size,
@@ -76,8 +91,7 @@ protected:
     // SpareBits implementation is limited to 32bits.
     assert(SpareBits.size() == (size.getValueInBits() & 0xFFFFFFFF));
     assert(isFixedSize());
-    Bits.FixedTypeInfo.Size = size.getValue();
-    assert(Bits.FixedTypeInfo.Size == size.getValue() && "truncation");
+    setFixedSize(size);
   }
 
 public:
@@ -122,8 +136,7 @@ public:
   llvm::Constant *getStaticStride(IRGenModule &IGM) const override;
 
   void completeFixed(Size size, Alignment alignment) {
-    Bits.FixedTypeInfo.Size = size.getValue();
-    assert(Bits.FixedTypeInfo.Size == size.getValue() && "truncation");
+    setFixedSize(size);
     setStorageAlignment(alignment);
   }
 

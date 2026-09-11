@@ -19,6 +19,10 @@
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "NonFixedTypeInfo.h"
+#include "swift/AST/DiagnosticsIRGen.h"
+#include "llvm/Support/MathExtras.h"
+
+#include <limits>
 
 using namespace swift;
 using namespace irgen;
@@ -726,13 +730,28 @@ TypeConverter::convertBuiltinFixedArrayType(BuiltinFixedArrayType *T) {
   if (!fixedSize.has_value() || !elementTI.isFixedSize()) {
     return new NonFixedArrayTypeInfo(IGM.OpaqueTy, elementTI);
   }
-  
+
+  // A fixed-layout type's storage size is recorded in a 32-bit field, so a
+  // fixed-size array whose total byte size does not fit in 32 bits cannot be
+  // represented. Diagnose this instead of silently truncating the size.
+  auto &fixedElementTI = cast<FixedTypeInfo>(elementTI);
+  uint64_t stride = fixedElementTI.getFixedStride().getValue();
+  // SaturatingMultiply clamps to UINT64_MAX on overflow, so an overflowing
+  // product is still caught by the 32-bit bound check below.
+  uint64_t totalSize = llvm::SaturatingMultiply(*fixedSize, stride);
+  if (totalSize > std::numeric_limits<uint32_t>::max()) {
+    IGM.Context.Diags.diagnose(SourceLoc(), diag::fixed_type_too_large,
+                               CanType(T));
+    // Fall back to an empty type info so that IRGen can continue far enough to
+    // finish diagnosing; the error prevents any object file from being emitted.
+    return &getEmptyTypeInfo();
+  }
+
   if (*fixedSize <= BuiltinFixedArrayType::MaximumLoadableSize) {
     if (auto *loadableTI = dyn_cast<LoadableTypeInfo>(&elementTI)) {
       return new LoadableArrayTypeInfo(fixedSize.value(), *loadableTI);
     }
   }
-  
-  return new FixedArrayTypeInfo(fixedSize.value(),
-                                *cast<FixedTypeInfo>(&elementTI));
+
+  return new FixedArrayTypeInfo(fixedSize.value(), fixedElementTI);
 }
