@@ -1570,6 +1570,10 @@ bool BridgedInstruction::MoveValue_isFromVarDecl() const {
   return getAs<swift::MoveValueInst>()->isFromVarDecl();
 }
 
+bool BridgedInstruction::MoveValue_getAllowDiagnostics() const {
+  return getAs<swift::MoveValueInst>()->getAllowDiagnostics();
+}
+
 SwiftInt BridgedInstruction::ProjectBoxInst_fieldIndex() const {
   return getAs<swift::ProjectBoxInst>()->getFieldIndex();
 }

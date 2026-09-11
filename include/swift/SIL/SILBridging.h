@@ -876,6 +876,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool MoveValue_isLexical() const;
   BRIDGED_INLINE bool MoveValue_hasPointerEscape() const;
   BRIDGED_INLINE bool MoveValue_isFromVarDecl() const;
+  BRIDGED_INLINE bool MoveValue_getAllowDiagnostics() const;
 
   BRIDGED_INLINE SwiftInt ProjectBoxInst_fieldIndex() const;
   BRIDGED_INLINE bool EndCOWMutationInst_doKeepUnique() const;

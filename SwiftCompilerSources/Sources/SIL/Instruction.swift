@@ -1589,6 +1589,7 @@ final public class MoveValueInst : SingleValueInstruction, UnaryInstruction {
   public override var isLexical: Bool { bridged.MoveValue_isLexical() }
   public var hasPointerEscape: Bool { bridged.MoveValue_hasPointerEscape() }
   public var isFromVarDecl: Bool { bridged.MoveValue_isFromVarDecl() }
+  public var allowsDiagnostics: Bool { bridged.MoveValue_getAllowDiagnostics() }
 }
 
 final public class DropDeinitInst : SingleValueInstruction, UnaryInstruction {
