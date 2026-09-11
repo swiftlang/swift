@@ -44,6 +44,11 @@ def DoesNotAffectIncrementalBuild : OptionFlag;
 // current working directory.
 def ArgumentIsPath : OptionFlag;
 
+// The option's argument is a combination of <key>=<path>, where
+// <path> is a file-system path that may be affected by the current
+// working directory.
+def ArgumentIsEqualKeyedPath: OptionFlag;
+
 // The option should be written into a .swiftinterface module interface file,
 // and read/parsed from there when reconstituting a .swiftmodule from it.
 def ModuleInterfaceOption : OptionFlag;
@@ -183,6 +188,11 @@ def no_strict_implicit_module_context :
   Flag<["-"], "no-strict-implicit-module-context">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable the strict forwarding of compilation context to downstream implicit module dependencies">;
+
+def swift_module_file_EQ :
+  Joined<["-"], "swift-module-file=">,
+  Flags<[FrontendOption, ArgumentIsEqualKeyedPath, NewDriverOnlyOption]>,
+  HelpText<"Specify Swift module dependency input explicitly">, MetaVarName<"<name>=<path>">;
 
 def compiler_assertions :
   Flag<["-"], "compiler-assertions">,
