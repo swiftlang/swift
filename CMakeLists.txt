@@ -952,6 +952,15 @@ if(SWIFT_PATH_TO_CMARK_BUILD)
     OUTPUT_VARIABLE _CMARK_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   message(STATUS "CMark Version: ${_CMARK_VERSION}")
+  # In unified builds (LLVM_EXTERNAL_PROJECTS=swift) `swift_common_unified_build_config`
+  # does not load the cmark exports, so pull in the libcmark-gfm target here.
+  if(NOT SWIFT_BUILT_STANDALONE AND EXISTS "${SWIFT_PATH_TO_CMARK_BUILD}/src/cmarkTargets.cmake")
+    include("${SWIFT_PATH_TO_CMARK_BUILD}/src/cmarkTargets.cmake")
+    include_directories(
+      "${SWIFT_PATH_TO_CMARK_SOURCE}/src/include"
+      "${SWIFT_PATH_TO_CMARK_BUILD}/src")
+    add_definitions(-DCMARK_STATIC_DEFINE)
+  endif()
 elseif(SWIFT_INCLUDE_TOOLS AND NOT "cmark" IN_LIST LLVM_EXTERNAL_PROJECTS)
   find_package(cmark-gfm CONFIG REQUIRED)
 endif()
@@ -1026,6 +1035,30 @@ set(SWIFT_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 set(SWIFT_MAIN_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/include")
 set(SWIFT_SHIMS_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/stdlib/public/SwiftShims")
 set(SWIFT_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
+
+# Under the unified LLVM+Swift build (LLVM_EXTERNAL_PROJECTS=swift),
+# SWIFT_BINARY_DIR is `<llvm>/tools/swift/` but the swift stdlib is actually
+# written to `<llvm>/lib/swift/...` (SWIFTLIB_DIR uses CMAKE_BINARY_DIR, the
+# LLVM root). lit substitutions (`%swift_obj_root/lib/swift/...`) and many
+# test files hardcode the standalone-layout assumption that
+# SWIFT_BINARY_DIR/lib/swift holds the built stdlib. `<llvm>/tools/swift/lib/`
+# is already populated with swift's per-library CMake build dirs
+# (AST, IRGen, Sema, …), so symlink only the `swift` and `swift_static`
+# subdirs — not the entire `lib` — over to the LLVM root's `lib/swift{,_static}`
+# where the resource dir actually lives.
+if(NOT SWIFT_BINARY_DIR STREQUAL CMAKE_BINARY_DIR)
+  file(MAKE_DIRECTORY "${SWIFT_BINARY_DIR}/lib")
+  file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/lib/swift")
+  file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/lib/swift_static")
+  if(NOT EXISTS "${SWIFT_BINARY_DIR}/lib/swift")
+    file(CREATE_LINK "${CMAKE_BINARY_DIR}/lib/swift"
+                     "${SWIFT_BINARY_DIR}/lib/swift" SYMBOLIC)
+  endif()
+  if(NOT EXISTS "${SWIFT_BINARY_DIR}/lib/swift_static")
+    file(CREATE_LINK "${CMAKE_BINARY_DIR}/lib/swift_static"
+                     "${SWIFT_BINARY_DIR}/lib/swift_static" SYMBOLIC)
+  endif()
+endif()
 
 if (NOT BOOTSTRAPPING_MODE AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
   message(FATAL_ERROR "turning off bootstrapping is not supported anymore")

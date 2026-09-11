@@ -41,6 +41,21 @@ from swift_build_support.swift_build_support.utils import fatal_error
 from swift_build_support.swift_build_support.utils import log_time_in_scope
 
 
+def _extract_impl_arg_value(impl_args, flag_name):
+    """Pull the value of a `--flag=value` (or `--flag value`) entry out of a
+    list of build-script-impl passthrough args. Later occurrences win, matching
+    build-script-impl's own last-wins parsing. Returns '' when not present."""
+    value = ''
+    prefix = flag_name + '='
+    it = iter(impl_args or [])
+    for arg in it:
+        if arg == flag_name:
+            value = next(it, '')
+        elif arg.startswith(prefix):
+            value = arg[len(prefix):]
+    return value
+
+
 class BuildScriptInvocation(object):
     """Represent a single build script invocation.
     """
@@ -167,6 +182,10 @@ class BuildScriptInvocation(object):
         # and the second is the non-build-script-impl-products. It guarantees
         # that when we concatenate these two lists together we get a valid
         # dependency graph.
+        # Also stash the swift product's cmake options so we can forward them
+        # to the LLVM cmake under the unified layout, where the standalone
+        # swift build is skipped and never sees `--swift-cmake-options`.
+        swift_product_cmake_options = []
         for product_class in sum(list(self.compute_product_pipelines()[0]), []):
             if not product_class.is_build_script_impl_product():
                 continue
@@ -201,6 +220,10 @@ class BuildScriptInvocation(object):
                     "--{}-cmake-options={}".format(
                         product_name, ' '.join(cmake_opts))
                 ]
+
+            if product_name == products.swift.Swift.product_name():
+                swift_product_cmake_options = list(cmake_opts)
+
 
         if args.build_toolchain_only:
             impl_args += [
@@ -301,6 +324,124 @@ class BuildScriptInvocation(object):
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
         # them.
+        # Under the unified LLVM+Swift+LLDB layout, swift and lldb are built
+        # as subprojects of LLVM's ninja graph (via LLVM_EXTERNAL_PROJECTS=
+        # swift and LLVM_ENABLE_PROJECTS=lldb). Their standalone build dirs
+        # don't exist and would fail cmake configure (LLDB's standalone build
+        # pulls in Swift_DIR from swift-<host>/lib/cmake/swift, which no
+        # longer exists). Keep both products in PRODUCTS so build-script-impl
+        # still runs their *test* phase (routed through llvm_build_dir by
+        # --unified-llvm-swift-lldb), but skip their standalone build+install
+        # inside build-script-impl. Swift+LLDB install is folded into the
+        # LLVM install target list via LLVM_INSTALL_COMPONENTS below.
+        if products.swift.Swift.is_unified_llvm_build(args):
+            args.build_script_impl_args.append('--unified-llvm-swift-lldb')
+            # Under unified layout, `swift-<host>/bin/swiftc` doesn't exist
+            # because the standalone swift build is skipped. Point downstream
+            # products at the swiftc we install into the built toolchain (the
+            # same one downstream tools would normally use). The raw LLVM
+            # build tree `llvm-<host>/bin` is *not* a valid target here even
+            # though swiftc is present: swiftpm's Toolchain.toolchainDir
+            # walks up from swiftCompilerPath looking for a `usr/bin` (or
+            # `usr/local/bin`) component and throws UnknownToolchainLayout
+            # if neither is found. `<install_destdir>/…/usr/bin` has that
+            # shape by construction.
+            if not args.native_swift_tools_path:
+                args.native_swift_tools_path = os.path.join(
+                    targets.toolchain_path(args.install_destdir,
+                                           args.install_prefix),
+                    'bin')
+            swift_components = _extract_impl_arg_value(
+                args.build_script_impl_args, '--swift-install-components')
+            # swift/cmake/modules/SwiftComponents.cmake auto-adds
+            # `compiler-swift-syntax-lib` and `swift-syntax-lib` whenever
+            # `compiler` is installed (the compiler dylibs live under
+            # lib/swift/host/compiler and lib/swift/host/plugins). That
+            # side-effect only runs when swift's CMake configure runs; since
+            # we're driving install from LLVM's ninja graph instead, we have
+            # to name those components explicitly so their install targets
+            # (install-compiler-swift-syntax-lib, install-swift-syntax-lib)
+            # run and populate the toolchain. Without them swift-frontend
+            # can't dlopen lib_CompilerSwiftIDEUtils.dylib etc. at first use.
+            extra_components = []
+            if swift_components and 'compiler' in swift_components.split(';'):
+                for comp in ('compiler-swift-syntax-lib', 'swift-syntax-lib'):
+                    if comp not in swift_components.split(';'):
+                        extra_components.append(comp)
+            merged_swift_components = swift_components
+            if swift_components:
+                merged_swift_components = ';'.join(
+                    [swift_components] + extra_components)
+            if merged_swift_components and args.llvm_install_components \
+                    and args.llvm_install_components != 'all':
+                args.llvm_install_components = ';'.join(
+                    [args.llvm_install_components, merged_swift_components])
+            # Also tell the swift subproject inside LLVM's cmake which
+            # components are installable. Without this, SWIFT_INSTALL_COMPONENTS
+            # falls back to a cached default that omits entries like
+            # clang-resource-dir-symlink, and their install() actions become
+            # no-ops (swift_is_installing_component() returns FALSE), so
+            # `install-<component>` runs but installs nothing.
+            if merged_swift_components:
+                args.extra_llvm_cmake_options.append(
+                    '-DSWIFT_INSTALL_COMPONENTS={}'.format(
+                        merged_swift_components))
+            # Forward the swift product's cmake options to the unified LLVM
+            # cmake. Under the standalone build these went into
+            # `--swift-cmake-options` and reached swift's cmake through
+            # build-script-impl; under unified layout swift's cmake runs
+            # inside LLVM's cmake, so they need to be applied at the LLVM
+            # level instead. Without this the `LLVM_EXTERNAL_PROJECTS=swift`
+            # build silently defaults SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY,
+            # SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING, etc. to OFF, so
+            # the built stdlib omits the autolink/link-library metadata that
+            # the driver's ExplicitModuleBuildTests expect (missing
+            # `-possible-lswift_Concurrency`, `-possible-lswift_StringProcessing`).
+            for opt in swift_product_cmake_options:
+                if opt not in args.extra_llvm_cmake_options:
+                    args.extra_llvm_cmake_options.append(opt)
+            # STRING_PROCESSING isn't in swift.py's cmake_options (that flag
+            # is set only by build-script-impl's shell code when swift's own
+            # cmake configure runs, which is skipped under unified). Forward
+            # it explicitly to match the driver-test expectations for
+            # `-possible-lswift_StringProcessing`.
+            if getattr(args, 'enable_experimental_string_processing', True):
+                sp_opt = '-DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=TRUE'
+                if sp_opt not in args.extra_llvm_cmake_options:
+                    args.extra_llvm_cmake_options.append(sp_opt)
+            # build-script-impl injects a large fan-out of `-DSWIFT_*` flags
+            # into swift's cmake configure line based on CLI args. Under
+            # unified layout that swift cmake configure step is skipped, so
+            # add-subdirectory(libexec) / add-subdirectory(swift-backtrace)
+            # etc. degrade to the CMake default (falsy) and skip the build.
+            # Forward the flags whose absence causes test breakage:
+            # SWIFT_BUILD_LIBEXEC (swift-backtrace binary — Backtracing/*
+            # tests fail with "unable to locate swift-backtrace"),
+            # SWIFT_BUILD_DYNAMIC_STDLIB / SWIFT_BUILD_STATIC_STDLIB,
+            # SWIFT_BUILD_CLANG_OVERLAYS, SWIFT_BUILD_REMOTE_MIRROR,
+            # SWIFT_BUILD_DYNAMIC_SDK_OVERLAY / SWIFT_BUILD_STATIC_SDK_OVERLAY.
+            _swift_extra_flags = [
+                ('SWIFT_BUILD_LIBEXEC',
+                 getattr(args, 'build_swift_libexec', True)),
+                ('SWIFT_BUILD_DYNAMIC_STDLIB',
+                 getattr(args, 'build_swift_dynamic_stdlib', True)),
+                ('SWIFT_BUILD_STATIC_STDLIB',
+                 getattr(args, 'build_swift_static_stdlib', False)),
+                ('SWIFT_BUILD_DYNAMIC_SDK_OVERLAY',
+                 getattr(args, 'build_swift_dynamic_sdk_overlay', True)),
+                ('SWIFT_BUILD_STATIC_SDK_OVERLAY',
+                 getattr(args, 'build_swift_static_sdk_overlay', False)),
+                ('SWIFT_BUILD_CLANG_OVERLAYS',
+                 getattr(args, 'build_swift_clang_overlays', True)),
+                ('SWIFT_BUILD_REMOTE_MIRROR',
+                 getattr(args, 'build_swift_remote_mirror', True)),
+            ]
+            for _flag, _val in _swift_extra_flags:
+                _opt = '-D{}:BOOL={}'.format(
+                    _flag, 'TRUE' if _val else 'FALSE')
+                if not any(o.startswith('-D{}'.format(_flag))
+                           for o in args.extra_llvm_cmake_options):
+                    args.extra_llvm_cmake_options.append(_opt)
         conditional_subproject_configs = [
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
