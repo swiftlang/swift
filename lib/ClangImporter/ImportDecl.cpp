@@ -1315,6 +1315,9 @@ namespace {
         Impl.ImportedDecls[{redecl, getVersion()}] = enumDecl;
 
       for (auto redecl : decl->redecls()) {
+        FrontendStatsTracer StatsTracer(
+            Impl.SwiftContext.Stats,
+            "add-namespace-redecl-to-bridging-header-lookup-table", redecl);
         // Because a namespaces's decl context is the bridging header, make sure
         // we add them to the bridging header lookup table.
         addEntryToLookupTable(*Impl.BridgingHeaderLookupTable,
