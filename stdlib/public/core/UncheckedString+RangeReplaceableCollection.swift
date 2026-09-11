@@ -66,7 +66,7 @@ extension SmallUncheckedStringStorage {
   mutating func fastAppend(contentsOf other: Self) {
     let stride = MemoryLayout<CharType>.stride
     withUnsafeMutableBytes(of: &bytes) { buf in
-      let base = unsafe buf.baseAddress!
+      let base = buf.baseAddress!
       withUnsafeBytes(of: other.bytes) { otherBuf in
         unsafe (base + Int(count) * stride).copyMemory(
           from: otherBuf.baseAddress!, byteCount: Int(other.count) * stride)
@@ -95,7 +95,7 @@ extension SmallUncheckedStringStorage {
   mutating func fastInsert(_ newElement: CharType, at i: Int) {
     let stride = MemoryLayout<CharType>.stride
     withUnsafeMutableBytes(of: &bytes) { buf in
-      let base = unsafe buf.baseAddress!
+      let base = buf.baseAddress!
       let tailByteCount = (Int(count) - i) * stride
       if tailByteCount > 0 {
         unsafe (base + (i + 1) * stride).copyMemory(
@@ -127,7 +127,7 @@ extension SmallUncheckedStringStorage {
   mutating func fastRemove(at i: Int) -> CharType {
     let stride = MemoryLayout<CharType>.stride
     let removed: CharType = withUnsafeMutableBytes(of: &bytes) { buf in
-      let base = unsafe buf.baseAddress!
+      let base = buf.baseAddress!
       let value = unsafe buf.loadUnaligned(fromByteOffset: i * stride, as: CharType.self)
       let tailByteCount = (Int(count) - i - 1) * stride
       if tailByteCount > 0 {
@@ -166,7 +166,7 @@ extension SmallUncheckedStringStorage {
     let newCount = newElements.count
     let finalCount = oldCount - subrange.count + newCount
     withUnsafeMutableBytes(of: &bytes) { buf in
-      let base = unsafe buf.baseAddress!
+      let base = buf.baseAddress!
       let tailByteCount = (oldCount - subrange.upperBound) * stride
       if tailByteCount > 0 {
         unsafe (base + (subrange.lowerBound + newCount) * stride).copyMemory(
@@ -200,7 +200,10 @@ extension UncheckedString: RangeReplaceableCollection {
     if case .dynamic(var rawStorage) = storage {
       storage = .empty
       rawStorage.characters.replaceSubrange(subrange, with: newElements)
+      // Only need to update this on 64-bit
+      #if _pointerBitWidth(_64)
       rawStorage.count = UInt32(rawStorage.characters.count - 1)
+      #endif
       storage = .dynamic(rawStorage)
       return
     }
@@ -336,7 +339,9 @@ extension UncheckedString: RangeReplaceableCollection {
         rawStorage.characters.removeLast()
         rawStorage.characters.append(contentsOf: newElements)
         rawStorage.characters.append(0)
+        #if _pointerBitWidth(_64)
         rawStorage.count = UInt32(rawStorage.characters.count - 1)
+        #endif
         storage = .dynamic(rawStorage)
       case .empty, .small(_), .immortal(_):
         replaceSubrange(endIndex..<endIndex, with: Array(newElements))
@@ -365,7 +370,9 @@ extension UncheckedString: RangeReplaceableCollection {
         rawStorage.characters.removeLast()
         rawStorage.characters.append(contentsOf: newElements)
         rawStorage.characters.append(0)
+        #if _pointerBitWidth(_64)
         rawStorage.count = UInt32(rawStorage.characters.count - 1)
+        #endif
         storage = .dynamic(rawStorage)
       case .empty, .small(_), .immortal(_):
         replaceSubrange(endIndex..<endIndex, with: newElements)
@@ -401,7 +408,9 @@ extension UncheckedString: RangeReplaceableCollection {
         rawStorage.characters.removeLast()
         rawStorage.characters.append(contentsOf: newElements)
         rawStorage.characters.append(0)
+        #if _pointerBitWidth(_64)
         rawStorage.count = UInt32(rawStorage.characters.count - 1)
+        #endif
         storage = .dynamic(rawStorage)
       case .empty, .small(_), .immortal(_):
         replaceSubrange(endIndex..<endIndex, with: newElements)
@@ -505,7 +514,9 @@ extension UncheckedString: RangeReplaceableCollection {
         storage = .empty
         rawStorage.characters.removeAll(keepingCapacity: true)
         rawStorage.characters.append(0)
+        #if _pointerBitWidth(_64)
         rawStorage.count = 0
+        #endif
         storage = .dynamic(rawStorage)
       default:
         storage = .empty

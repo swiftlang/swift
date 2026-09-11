@@ -210,11 +210,11 @@ extension UncheckedString {
   ) throws(Failure) -> R {
     switch storage {
       case .empty:
-        return try unsafe withUnsafePointer(to: Element(0)) { (nulptr) throws(Failure) in
+        return try withUnsafePointer(to: Element(0)) { (nulptr) throws(Failure) in
           return try unsafe body(nulptr)
         }
       case .small(let data):
-        return try unsafe withUnsafeTemporaryAllocation(
+        return try withUnsafeTemporaryAllocation(
           of: Element.self,
           capacity: Int(data.count) + 1
         ) { (buffer) throws(Failure) -> R in
@@ -224,7 +224,7 @@ extension UncheckedString {
         }
       case .immortal(let data):
         if !data.flags.contains(.nulTerminated) {
-          let buffer = unsafe UnsafeMutableBufferPointer<Element>.allocate(
+          let buffer = UnsafeMutableBufferPointer<Element>.allocate(
             capacity: Int(data.count) + 1
           )
           defer {
@@ -242,7 +242,7 @@ extension UncheckedString {
       case .dynamic(let data):
         // Dynamic strings are always NUL-terminated
         assert(data.flags.contains(.nulTerminated))
-        return try unsafe data.characters.withUnsafeBufferPointer { (buffer) throws(Failure) -> R in
+        return try data.characters.withUnsafeBufferPointer { (buffer) throws(Failure) -> R in
           return try unsafe body(buffer.baseAddress!)
         }
     }
@@ -400,7 +400,7 @@ extension UncheckedString {
       newStorage = .immortal(
         unsafe ImmortalUncheckedStringStorage(
           characters: immortalString,
-          count: UInt32(len),
+          count: ImmortalUncheckedStringStorage<Element>.Count(len),
           flags: [.nulTerminated]
         )
       )
@@ -437,7 +437,7 @@ extension UncheckedString {
       newStorage = .immortal(
         unsafe ImmortalUncheckedStringStorage(
           characters: immortalString.baseAddress!,
-          count: UInt32(immortalString.count),
+          count: ImmortalUncheckedStringStorage<Element>.Count(immortalString.count),
           flags: nulTerminated ? [.nulTerminated] : []
         )
       )
@@ -510,7 +510,7 @@ extension UncheckedString where Element == UInt16 {
       newStorage = .immortal(
         unsafe ImmortalUncheckedStringStorage(
           characters: immortalString,
-          count: UInt32(len),
+          count: ImmortalUncheckedStringStorage<UInt16>.Count(len),
           flags: [.nulTerminated]
         )
       )
@@ -555,7 +555,7 @@ extension UncheckedString {
       case .empty:
         return try body(Span<Element>())
       case .small(let data):
-        return try unsafe withUnsafeTemporaryAllocation(
+        return try withUnsafeTemporaryAllocation(
           of: Element.self,
           capacity: Int(data.count)
         ) { (buffer) throws(Failure) -> R in

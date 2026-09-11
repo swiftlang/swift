@@ -79,13 +79,17 @@ struct SmallUncheckedStringStorage<CharType: FixedWidthInteger> {
 @frozen
 @usableFromInline
 struct ImmortalUncheckedStringStorage<CharType: FixedWidthInteger> {
+  /// The type of the `count` field
+  @usableFromInline
+  typealias Count = UInt32
+
   /// A pointer to the permanently-alive character data.
   @usableFromInline
   var characters: UnsafePointer<CharType>
   /// The number of elements at `characters`.
   @safe
   @usableFromInline
-  var count: UInt32
+  var count: Count
   /// Flags describing this storage's character data.
   @safe
   @usableFromInline
@@ -188,13 +192,17 @@ struct SmallUncheckedStringStorage<CharType: FixedWidthInteger> {
 @frozen
 @usableFromInline
 struct ImmortalUncheckedStringStorage<CharType: FixedWidthInteger> {
+  /// The type of the `count` field.
+  @usableFromInline
+  typealias Count = UInt16
+
   /// A pointer to the permanently-alive character data.
   @usableFromInline
   var characters: UnsafePointer<CharType>
   /// The number of elements at `characters`.
   @safe
   @usableFromInline
-  var count: UInt16
+  var count: Count
   /// Flags describing this storage's character data.
   @safe
   @usableFromInline

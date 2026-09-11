@@ -869,6 +869,9 @@ public protocol ExpressibleByPossiblyUncheckedStringInterpolation {
 public protocol ExpressibleByStringInterpolation
   : ExpressibleByStringLiteral, ExpressibleByPossiblyUncheckedStringInterpolation {
 
+  // The declaration below causes a warning, but if we follow the
+  // instructions in that warning we end up with a compiler crash.
+
 #if !$Embedded
   /// The type each segment of a string literal containing interpolations
   /// should be appended to.
@@ -908,6 +911,9 @@ public protocol ExpressibleByStringInterpolation
 /// `ExpressibleByStringLiteral`'s (transitive) requirements.
 public protocol ExpressibleByUncheckedStringInterpolation
   : ExpressibleByUncheckedStringLiteral, ExpressibleByPossiblyUncheckedStringInterpolation {
+
+  // The declaration below causes a warning, but if we follow the
+  // instructions in that warning we end up with a compiler crash.
 
   /// The type each segment of a string literal containing interpolations
   /// should be appended to.

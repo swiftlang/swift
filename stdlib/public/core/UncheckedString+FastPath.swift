@@ -74,8 +74,8 @@ extension UncheckedString {
       rhs.withCharacterData { r in
         l.withUnsafeBufferPointer { lb in
           r.withUnsafeBufferPointer { rb in
-            let lRaw = unsafe UnsafeRawBufferPointer(lb)
-            let rRaw = unsafe UnsafeRawBufferPointer(rb)
+            let lRaw = UnsafeRawBufferPointer(lb)
+            let rRaw = UnsafeRawBufferPointer(rb)
             if unsafe lRaw.isEmpty { return true }
             return unsafe 0 == _swift_stdlib_memcmp(
               lRaw.baseAddress.unsafelyUnwrapped,
@@ -102,8 +102,8 @@ extension UncheckedString {
         l.withUnsafeBufferPointer { lb in
           r.withUnsafeBufferPointer { rb in
             if Element.self == UInt8.self {
-              let lRaw = unsafe UnsafeRawBufferPointer(lb)
-              let rRaw = unsafe UnsafeRawBufferPointer(rb)
+              let lRaw = UnsafeRawBufferPointer(lb)
+              let rRaw = UnsafeRawBufferPointer(rb)
               let n = Swift.min(lRaw.count, rRaw.count)
               let cmp = n == 0 ? 0 : unsafe _swift_stdlib_memcmp(
                 lRaw.baseAddress.unsafelyUnwrapped,
@@ -159,8 +159,8 @@ extension UncheckedSubString {
       rhs.withCharacterData { r in
         l.withUnsafeBufferPointer { lb in
           r.withUnsafeBufferPointer { rb in
-            let lRaw = unsafe UnsafeRawBufferPointer(lb)
-            let rRaw = unsafe UnsafeRawBufferPointer(rb)
+            let lRaw = UnsafeRawBufferPointer(lb)
+            let rRaw = UnsafeRawBufferPointer(rb)
             if unsafe lRaw.isEmpty { return true }
             return unsafe 0 == _swift_stdlib_memcmp(
               lRaw.baseAddress.unsafelyUnwrapped,
@@ -187,8 +187,8 @@ extension UncheckedSubString {
         l.withUnsafeBufferPointer { lb in
           r.withUnsafeBufferPointer { rb in
             if Element.self == UInt8.self {
-              let lRaw = unsafe UnsafeRawBufferPointer(lb)
-              let rRaw = unsafe UnsafeRawBufferPointer(rb)
+              let lRaw = UnsafeRawBufferPointer(lb)
+              let rRaw = UnsafeRawBufferPointer(rb)
               let n = Swift.min(lRaw.count, rRaw.count)
               let cmp = n == 0 ? 0 : unsafe _swift_stdlib_memcmp(
                 lRaw.baseAddress.unsafelyUnwrapped,

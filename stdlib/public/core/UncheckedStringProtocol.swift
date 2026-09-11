@@ -53,12 +53,9 @@ public protocol UncheckedStringProtocol
     CustomDebugStringConvertible, CustomUncheckedStringConvertible
   where Iterator.Element: FixedWidthInteger,
     Index == Int,
-    SubSequence: UncheckedStringProtocol,
+    SubSequence == UncheckedSubString<Element>,
     UncheckedStringElement == Element
 {
-  /// The type of a contiguous subrange of this string's elements.
-  typealias SubSequence = UncheckedSubString<Element>
-
   /// Calls the given closure with a buffer of `Element`s,
   /// which are *not* necessarily NUL-terminated.
   ///
