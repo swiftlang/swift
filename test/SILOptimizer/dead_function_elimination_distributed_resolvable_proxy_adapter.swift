@@ -36,25 +36,6 @@ distributed actor GreeterImpl: Greeter {
 }
 
 // ==== -----------------------------------------------------------------------
-// On Impl actor: adapter thunks must survive DFE.
-
-// CHECK-LABEL: GreeterImpl.$distributedProxyAdapter$sendAnyGreeter
-// CHECK: sil hidden [distributed_proxy_adapter_thunk]
-// CHECK-SAME: $@convention(method) @async (@sil_sending @guaranteed $Greeter, @guaranteed GreeterImpl) -> (@owned String, @error any Error)
-
-// CHECK-LABEL: GreeterImpl.$distributedProxyAdapter$sendSomeGreeter
-// CHECK: sil hidden [distributed_proxy_adapter_thunk]
-// CHECK-SAME: <τ_0_0 where τ_0_0 : Greeter> (@sil_sending @guaranteed $Greeter, @guaranteed GreeterImpl) -> (@owned String, @error any Error)
-
-// CHECK-LABEL: GreeterImpl.$distributedProxyAdapter$echoActor
-// CHECK: sil hidden [distributed_proxy_adapter_thunk]
-// CHECK-SAME: $@convention(method) @async (@sil_sending @guaranteed $Greeter, @guaranteed GreeterImpl) -> (@owned $Greeter, @error any Error)
-
-// CHECK-LABEL: GreeterImpl.$distributedProxyAdapter$currentSelf
-// CHECK: sil hidden [distributed_proxy_adapter_thunk]
-// CHECK-SAME: $@convention(method) @async (@guaranteed GreeterImpl) -> (@owned $Greeter, @error any Error)
-
-// ==== -----------------------------------------------------------------------
 
 // On the protocol's `_DistributedActorStub` extension:
 // adapter thunks must also survive, because
@@ -75,3 +56,22 @@ distributed actor GreeterImpl: Greeter {
 // CHECK-LABEL: Greeter<>.$distributedProxyAdapter$currentSelf
 // CHECK: sil hidden [distributed_proxy_adapter_thunk]
 // CHECK-SAME: <Self where Self : _DistributedActorStub, Self : Greeter> (@guaranteed Self) -> (@owned $Greeter, @error any Error)
+
+// ==== -----------------------------------------------------------------------
+// On Impl actor: adapter thunks must survive DFE.
+
+// CHECK-LABEL: GreeterImpl.$distributedProxyAdapter$sendAnyGreeter
+// CHECK: sil hidden [distributed_proxy_adapter_thunk]
+// CHECK-SAME: $@convention(method) @async (@sil_sending @guaranteed $Greeter, @guaranteed GreeterImpl) -> (@owned String, @error any Error)
+
+// CHECK-LABEL: GreeterImpl.$distributedProxyAdapter$sendSomeGreeter
+// CHECK: sil hidden [distributed_proxy_adapter_thunk]
+// CHECK-SAME: <τ_0_0 where τ_0_0 : Greeter> (@sil_sending @guaranteed $Greeter, @guaranteed GreeterImpl) -> (@owned String, @error any Error)
+
+// CHECK-LABEL: GreeterImpl.$distributedProxyAdapter$echoActor
+// CHECK: sil hidden [distributed_proxy_adapter_thunk]
+// CHECK-SAME: $@convention(method) @async (@sil_sending @guaranteed $Greeter, @guaranteed GreeterImpl) -> (@owned $Greeter, @error any Error)
+
+// CHECK-LABEL: GreeterImpl.$distributedProxyAdapter$currentSelf
+// CHECK: sil hidden [distributed_proxy_adapter_thunk]
+// CHECK-SAME: $@convention(method) @async (@guaranteed GreeterImpl) -> (@owned $Greeter, @error any Error)

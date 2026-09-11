@@ -8,7 +8,7 @@
 
 // RUN: %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) %s -I %t -disable-availability-checking -dump-macro-expansions > %t/expansions-dump.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-DUMP %s < %t/expansions-dump.txt
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5 -I %t
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5 -I %t -verify-ignore-unrelated
 
 // Ensure that we can serialize this file as a module.
 // RUN: %target-swift-frontend -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %s -I %t -disable-availability-checking -emit-module -o %t/MyModule.swiftmodule -enable-testing
@@ -190,6 +190,35 @@ expected-expansion@-2:2 {{
   expected-error@1:11{{cannot find type 'SomeNestedType' in scope}}
 }}
 */
+
+@attached(extension, conformances: Equatable)
+macro EquatableConformance() = #externalMacro(module: "MacroDefinition", type: "EquatableMacro")
+
+struct NonEquatableValue {}
+
+// Make sure we reject for both struct and class.
+
+struct StructOuter {
+  @EquatableConformance // expected-note 2{{in expansion of macro}}
+  struct Inner {
+    var x = NonEquatableValue() // expected-note {{stored property type 'NonEquatableValue' does not conform to protocol 'Equatable'}}
+  }
+}
+// expected-expansion@-1:2 {{
+//   expected-error@1 {{type 'StructOuter.Inner' does not conform to protocol 'Equatable'}}
+//   expected-note@1 {{add stubs for conformance}}
+// }}
+
+class ClassOuter {
+  @EquatableConformance // expected-note 2{{in expansion of macro}}
+  struct Inner {
+    var x = NonEquatableValue() // expected-note {{stored property type 'NonEquatableValue' does not conform to protocol 'Equatable'}}
+  }
+}
+// expected-expansion@-1:2 {{
+//   expected-error@1 {{type 'ClassOuter.Inner' does not conform to protocol 'Equatable'}}
+//   expected-note@1 {{add stubs for conformance}}
+// }}
 
 #endif
 

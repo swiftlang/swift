@@ -470,10 +470,9 @@ void Decl::attachParsedAttrs(DeclAttributes attrs) {
   getAttrs() = attrs;
 }
 
-void Decl::visitAuxiliaryDecls(
-    AuxiliaryDeclCallback callback,
-    bool visitFreestandingExpanded
-) const {
+void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback,
+                               bool visitFreestandingExpanded,
+                               bool visitExtensions) const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<Decl *>(this);
   SourceManager &sourceMgr = ctx.SourceMgr;
@@ -522,7 +521,29 @@ void Decl::visitAuxiliaryDecls(
     }
   }
 
+  if (visitExtensions) {
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
+      NTD->visitAuxiliaryExtensions(callback);
+  }
+
   // FIXME: fold VarDecl::visitAuxiliaryVars into this.
+}
+
+void NominalTypeDecl::visitAuxiliaryExtensions(
+    llvm::function_ref<void(Decl *)> visit) const {
+  auto &ctx = getASTContext();
+  auto &eval = ctx.evaluator;
+  auto *M = getParentModule();
+  auto *mutableNTD = const_cast<NominalTypeDecl *>(this);
+  auto buffers = evaluateOrDefault(eval, ExpandExtensionMacros{mutableNTD}, {});
+  for (auto buffer : buffers) {
+    auto startLoc = ctx.SourceMgr.getLocForBufferStart(buffer);
+    auto *SF = M->getSourceFileContainingLocation(startLoc);
+    for (auto *D : SF->getTopLevelDecls()) {
+      if (auto *ext = dyn_cast<ExtensionDecl>(D))
+        visit(ext);
+    }
+  }
 }
 
 void Decl::forEachAttachedMacro(MacroRole role,

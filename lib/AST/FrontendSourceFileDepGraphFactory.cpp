@@ -336,6 +336,7 @@ private:
                                   const ExtensionDecl *ED = nullptr) {
     allNominals.push_back(NTD);
     potentialMemberHolders.push_back(NTD);
+    // FIXME: Does not handle peer macros.
     findNominalsAndOperatorsInMembers(ED ? ED->getMembers()
                                          : NTD->getMembers());
   }
@@ -417,8 +418,9 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDecls() {
 
   // Many kinds of Decls become top-level depends.
 
-  DeclFinder declFinder(SF->getTopLevelDecls(),
-                        [this](VisibleDeclConsumer &consumer) {
+  SmallVector<Decl *, 32> TopLevelDecls;
+  SF->getTopLevelDeclsWithAuxiliaryDecls(TopLevelDecls);
+  DeclFinder declFinder(TopLevelDecls, [this](VisibleDeclConsumer &consumer) {
     SF->lookupClassMembers({}, consumer);
   });
 
@@ -603,7 +605,7 @@ void ModuleDepGraphFactory::addAllDefinedDecls() {
   // Many kinds of Decls become top-level depends.
 
   SmallVector<Decl *, 32> TopLevelDecls;
-  Mod->getTopLevelDecls(TopLevelDecls);
+  Mod->getTopLevelDeclsWithAuxiliaryDecls(TopLevelDecls);
   DeclFinder declFinder(TopLevelDecls,
                         [this](VisibleDeclConsumer &consumer) {
                           return Mod->lookupClassMembers({}, consumer);

@@ -2267,13 +2267,11 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
     emitEntryPoint(sf);
   }
 
-  for (auto *D : sf->getTopLevelDecls()) {
-    // Emit auxiliary decls.
-    D->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-      visit(auxiliaryDecl);
-    });
-
-    visit(D);
+  {
+    SmallVector<Decl *, 64> decls;
+    sf->getTopLevelDeclsWithAuxiliaryDecls(decls);
+    for (auto *D : decls)
+      visit(D);
   }
 
   // Visit extensions recorded in the synthesized file separately. The code
