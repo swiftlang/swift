@@ -305,6 +305,10 @@ bool BridgedASTContext_testCanImport(BridgedASTContext cContext,
 SWIFT_NAME("getter:BridgedASTContext.staticBuildConfigurationPtr(self:)")
 void * _Nonnull BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext);
 
+SWIFT_NAME("BridgedASTContext.hasTargetFeature(self:_:)")
+bool BridgedASTContext_hasTargetFeature(BridgedASTContext cContext,
+                                        BridgedStringRef cName);
+
 //===----------------------------------------------------------------------===//
 // MARK: AST nodes
 //===----------------------------------------------------------------------===//

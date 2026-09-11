@@ -4480,6 +4480,10 @@ clang::TargetInfo &ClangImporter::getModuleAvailabilityTarget() const {
   return Impl.Instance->getTarget();
 }
 
+bool ClangImporter::hasTargetFeature(StringRef featureName) const {
+  return getTargetInfo().hasFeature(featureName);
+}
+
 clang::TargetInfo &ClangImporter::getTargetInfo() const {
   return Impl.getCodeGenTargetInfo();
 }

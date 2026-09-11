@@ -143,6 +143,10 @@ public:
   /// for use by IRGen/CodeGen clients)
   virtual clang::TargetInfo &getModuleAvailabilityTarget() const = 0;
 
+  /// Determine whether the given ISA feature name (e.g. "avx2") is
+  /// part of the module codegen CPU/feature baseline.
+  virtual bool hasTargetFeature(StringRef featureName) const = 0;
+
   virtual clang::ASTContext &getClangASTContext() const = 0;
   virtual clang::Preprocessor &getClangPreprocessor() const = 0;
   virtual clang::Sema &getClangSema() const = 0;
