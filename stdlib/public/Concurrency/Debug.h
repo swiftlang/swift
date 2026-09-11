@@ -20,6 +20,7 @@
 #include <cstdint>
 
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/ConcurrencyDebug.h"
 
 namespace swift {
 
@@ -61,34 +62,6 @@ const void *const _swift_concurrency_debug_task_future_wait_resume_adapter;
 /// Whether the runtime we are inspecting supports priority escalation
 SWIFT_EXPORT_FROM(swift_Concurrency)
 bool _swift_concurrency_debug_supportsPriorityEscalation;
-
-/// Identifies how the runtime stores the currently executing AsyncTask.
-/// Debuggers use this to decide how to locate the current task on a thread.
-///
-/// The values are part of the debug ABI — once published, a value must
-/// never be reused for a different storage strategy. New strategies get a
-/// new value; bump _swift_concurrency_debug_internal_layout_version when
-/// adding one.
-enum class _concurrency_current_task_storage_kind : uint8_t {
-  /// The task pointer lives in TLS at offset 0 of the runtime's exported
-  /// current-task variable, `_swift_concurrency_currentTask`.
-  cxx_thread_local = 1,
-
-  /// The task pointer lives at offset 0 of the runtime's current-task variable,
-  /// `_swift_concurrency_currentTask` (no TLS resolution). Used by
-  /// single-threaded / SWIFT_THREADING_NONE builds where `SWIFT_THREAD_LOCAL`
-  /// expands to nothing.
-  global = 2,
-
-  /// Pthread thread-specific data with a *reserved* (compile-time constant)
-  /// key. Used on Darwin. The key value should be inferred by the debugger.
-  pthread_reserved_key = 3,
-
-  /// Pthread thread-specific data with a *dynamically-allocated* key. Support
-  /// for this may require writing the key value in a yet-to-be-defined global
-  /// variable.
-  pthread_allocated_key = 4,
-};
 
 /// The current version of internal data structures that lldb may decode.
 /// The version numbers used so far are:
