@@ -589,7 +589,7 @@ func foo1() {
 // https://github.com/apple/swift/issues/46665
 do {
   let x = 5
-  if x < 0, let x = Optional(1) { } // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+  if x < 0, let x = Optional(1) { } // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{13-21=}} {{32-32= != nil}}
 }
 
 struct Person {
