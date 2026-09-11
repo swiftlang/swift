@@ -11,6 +11,7 @@ add_swift_unittest(SwiftASTTests
   DiagnosticFormattingTests.cpp
   DiagnosticInfoTests.cpp
   SourceLocTests.cpp
+  SILFunctionTypeTests.cpp
   TestContext.cpp
   TypeMatchTests.cpp
   VersionRangeTests.cpp

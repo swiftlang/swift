@@ -2410,6 +2410,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     case SILFunctionTypeRepresentation::WitnessMethod:
       OpArgs.push_back('W');
       break;
+    case SILFunctionTypeRepresentation::COMMethod:
+      OpArgs.push_back('V');
+      break;
     case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
     case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
     case SILFunctionTypeRepresentation::KeyPathAccessorEquals:

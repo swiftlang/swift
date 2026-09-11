@@ -3140,7 +3140,8 @@ struct BridgedASTType {
     KeyPathAccessorGetter,
     KeyPathAccessorSetter,
     KeyPathAccessorEquals,
-    KeyPathAccessorHash
+    KeyPathAccessorHash,
+    COMMethod,
   };
 
   swift::TypeBase * _Nullable type;
