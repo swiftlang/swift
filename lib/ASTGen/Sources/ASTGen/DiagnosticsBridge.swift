@@ -197,7 +197,7 @@ extension swift.DiagnosticKind {
 public func addQueuedSourceFile(
   queuedDiagnosticsPtr: UnsafeMutableRawPointer,
   bufferID: Int,
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeMutableRawPointer,
   displayNamePtr: UnsafePointer<UInt8>,
   displayNameLength: Int,
   parentID: Int,
