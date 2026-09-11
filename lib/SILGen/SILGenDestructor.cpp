@@ -13,20 +13,16 @@
 #include "ArgumentScope.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
-#include "SILGenFunctionBuilder.h"
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/SmallSet.h"
 
 using namespace swift;
 using namespace Lowering;

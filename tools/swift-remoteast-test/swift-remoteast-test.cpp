@@ -15,15 +15,11 @@
 
 #include "swift/RemoteAST/RemoteAST.h"
 #include "swift/Remote/InProcessMemoryReader.h"
-#include "swift/Remote/MetadataReader.h"
-#include "swift/Runtime/Metadata.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/FrontendTool/FrontendTool.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/InitializeSwiftModules.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
 

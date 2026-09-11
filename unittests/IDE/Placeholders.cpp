@@ -1,5 +1,4 @@
 #include "swift/IDE/Utils.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "gtest/gtest.h"
 

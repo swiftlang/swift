@@ -13,7 +13,6 @@
 #ifndef SWIFT_SYMBOLGRAPHGEN_DECLARATIONFRAGMENTPRINTER_H
 #define SWIFT_SYMBOLGRAPHGEN_DECLARATIONFRAGMENTPRINTER_H
 
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/JSON.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/Basic/LLVM.h"

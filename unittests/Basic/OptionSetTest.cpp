@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/OptionSet.h"
-#include "swift/Basic/Range.h"
 #include "gtest/gtest.h"
 
 using namespace swift;

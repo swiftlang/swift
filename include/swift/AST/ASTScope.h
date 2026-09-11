@@ -32,7 +32,6 @@
 #include "swift/AST/CatchNode.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SimpleRequest.h"
-#include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"

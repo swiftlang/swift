@@ -19,9 +19,9 @@
 #define SWIFT_IRGEN_SWIFTTARGETINFO_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/ClusteredBitVector.h"
 #include "llvm/TargetParser/Triple.h"
 #include "IRGen.h"
+#include "swift/Basic/ClusteredBitVector.h"
 
 namespace swift {
 namespace irgen {

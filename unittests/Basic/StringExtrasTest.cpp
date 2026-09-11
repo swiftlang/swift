@@ -13,7 +13,6 @@
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "gtest/gtest.h"
-#include <algorithm>
 
 using namespace swift;
 

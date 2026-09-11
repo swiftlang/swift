@@ -18,7 +18,6 @@
 #ifndef SWIFT_IRGEN_CALLEE_H
 #define SWIFT_IRGEN_CALLEE_H
 
-#include <type_traits>
 #include "swift/AST/IRGenOptions.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/SIL/SILType.h"

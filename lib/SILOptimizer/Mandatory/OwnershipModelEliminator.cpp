@@ -26,7 +26,6 @@
 #include "swift/SIL/SILValue.h"
 #define DEBUG_TYPE "sil-ownership-model-eliminator"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"
@@ -39,7 +38,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;

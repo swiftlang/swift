@@ -11,10 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/UnresolvedMemberCompletion.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
-#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 
 using namespace swift;

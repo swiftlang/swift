@@ -22,7 +22,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include <algorithm>
 #include <vector>
 
 #include "Debug.h"

@@ -15,15 +15,11 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Identifier.h"
-#include "swift/AST/Initializer.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

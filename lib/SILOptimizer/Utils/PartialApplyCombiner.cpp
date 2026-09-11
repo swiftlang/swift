@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"

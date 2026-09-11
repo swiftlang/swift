@@ -13,9 +13,9 @@
 #ifndef SWIFT_BASIC_EDIT_H
 #define SWIFT_BASIC_EDIT_H
 
-#include "llvm/ADT/ArrayRef.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
   class SourceManager;

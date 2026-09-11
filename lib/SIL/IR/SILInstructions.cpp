@@ -14,14 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/AssertImplements.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Unicode.h"
-#include "swift/Basic/type_traits.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/Projection.h"
@@ -30,9 +27,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILSymbolVisitor.h"
-#include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;

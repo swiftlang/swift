@@ -19,7 +19,6 @@
 
 #include "Field.h"
 #include "NominalMetadataVisitor.h"
-#include "swift/AST/IRGenOptions.h"
 
 namespace swift {
 namespace irgen {

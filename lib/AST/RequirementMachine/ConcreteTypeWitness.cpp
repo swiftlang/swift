@@ -26,7 +26,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
-#include <algorithm>
 #include <vector>
 #include "PropertyMap.h"
 #include "RequirementLowering.h"

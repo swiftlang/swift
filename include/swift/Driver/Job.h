@@ -19,11 +19,8 @@
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Util.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/Program.h"
@@ -31,6 +28,9 @@
 #include <optional>
 
 #include <memory>
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 namespace driver {

@@ -15,7 +15,6 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/SearchPathOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Driver/Driver.h"

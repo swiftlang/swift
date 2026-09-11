@@ -20,9 +20,9 @@
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLFunctionalExtras.h"
 #include <optional>
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
   class AbstractFunctionDecl;

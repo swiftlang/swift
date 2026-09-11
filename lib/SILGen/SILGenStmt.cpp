@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Condition.h"
 #include "Conversion.h"

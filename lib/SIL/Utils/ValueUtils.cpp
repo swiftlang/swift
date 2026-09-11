@@ -11,9 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/ValueUtils.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/SIL/SILFunction.h"
 
 using namespace swift;
 

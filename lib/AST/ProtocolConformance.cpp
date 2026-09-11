@@ -37,7 +37,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/PrettyStackTrace.h"
-#include "llvm/Support/SaveAndRestore.h"
 
 #define DEBUG_TYPE "AST"
 

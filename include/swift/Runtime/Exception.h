@@ -21,7 +21,6 @@
 #ifndef SWIFT_RUNTIME_EXCEPTION_H
 #define SWIFT_RUNTIME_EXCEPTION_H
 
-#include "swift/Runtime/Config.h"
 
 #if defined(__ELF__) || defined(__APPLE__)
 #include <unwind.h>

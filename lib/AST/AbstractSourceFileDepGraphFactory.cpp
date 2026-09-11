@@ -14,18 +14,9 @@
 
 // may not all be needed
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencies.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/ReferenceDependencyKeys.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/VirtualOutputBackend.h"
-#include "llvm/Support/YAMLParser.h"
 
 using namespace swift;
 using namespace fine_grained_dependencies;

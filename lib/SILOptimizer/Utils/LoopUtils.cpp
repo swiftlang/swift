@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-loop-utils"
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -21,7 +20,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SIL/StackAllocation.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/Support/Debug.h"

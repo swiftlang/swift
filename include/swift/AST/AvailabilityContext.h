@@ -21,7 +21,6 @@
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/AvailabilityRestriction.h"
-#include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/raw_ostream.h"

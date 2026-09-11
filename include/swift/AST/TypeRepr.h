@@ -19,7 +19,6 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LifetimeDependence.h"
@@ -27,7 +26,6 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
-#include "swift/Basic/Located.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"

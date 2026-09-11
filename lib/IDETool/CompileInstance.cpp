@@ -19,10 +19,8 @@
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
-#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
@@ -31,10 +29,8 @@
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "clang/AST/ASTContext.h"
 #include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
 using namespace swift::ide;

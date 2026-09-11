@@ -25,14 +25,11 @@
 #include "swift/AST/SILGenRequests.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/SIL/AbstractionPattern.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILArgument.h"
@@ -46,7 +43,6 @@
 #include "swift/Subsystems.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/SaveAndRestore.h"
 
 #include <variant>
 

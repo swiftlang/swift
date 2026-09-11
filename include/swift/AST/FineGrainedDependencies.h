@@ -22,7 +22,6 @@
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"

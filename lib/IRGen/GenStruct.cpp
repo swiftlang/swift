@@ -24,13 +24,11 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/ResilienceExpansion.h"
-#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -47,8 +45,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
-#include "llvm/Support/Error.h"
-#include <iterator>
 
 #include "GenDecl.h"
 #include "GenMeta.h"

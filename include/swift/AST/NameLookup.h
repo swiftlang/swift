@@ -23,7 +23,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceLoc.h"

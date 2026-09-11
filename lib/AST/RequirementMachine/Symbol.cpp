@@ -14,10 +14,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/raw_ostream.h"
-#include <algorithm>
-#include <vector>
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"

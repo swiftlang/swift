@@ -19,7 +19,6 @@
 #include "swift/SILOptimizer/Utils/SCCVisitor.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Debug.h"
 
 namespace swift {
 

@@ -14,7 +14,6 @@
 
 #include "TestOptions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringSwitch.h"

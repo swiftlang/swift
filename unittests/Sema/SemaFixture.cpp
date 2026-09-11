@@ -14,7 +14,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/ParseRequests.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -23,7 +22,6 @@
 #include "swift/Sema/TypeVariableType.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
-#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::unittest;

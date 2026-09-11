@@ -13,19 +13,16 @@
 #define SWIFT_SEMA_PROTOCOL_H
 
 #include "TypeChecker.h"
-#include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/RequirementEnvironment.h"
 #include "swift/AST/RequirementMatch.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Witness.h"
-#include "swift/Basic/Debug.h"
-#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/ScopedHashTable.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SetVector.h"
 
 namespace swift {
 

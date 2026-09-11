@@ -11,13 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "ScanFixture.h"
-#include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/DependencyScan/StringUtils.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Option/Options.h"
 #include "llvm/ADT/StringRef.h"
 #include <vector>
-#include <unordered_set>
 #include "gtest/gtest.h"
 
 using namespace swift;

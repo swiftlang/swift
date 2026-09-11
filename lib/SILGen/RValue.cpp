@@ -21,11 +21,8 @@
 #include "Initialization.h"
 #include "SILGenFunction.h"
 #include "swift/AST/CanTypeVisitor.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/AbstractionPattern.h"
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
 
 using namespace swift;

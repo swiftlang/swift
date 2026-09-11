@@ -13,7 +13,6 @@
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 
 #include "swift/AST/Type.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -27,8 +26,6 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
 
 using namespace swift;
 

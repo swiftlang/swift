@@ -23,7 +23,6 @@
 
 #include "ImporterImpl.h"
 #include "swift/AST/ClangModuleLoader.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
 
 using namespace swift;

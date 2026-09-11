@@ -24,9 +24,9 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/Type.h"
-#include "llvm/ADT/StringRef.h"
 
 #include <memory>
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 class ASTContext;

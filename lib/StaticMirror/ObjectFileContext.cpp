@@ -11,19 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/StaticMirror/ObjectFileContext.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Unreachable.h"
-#include "swift/Demangling/Demangler.h"
 #include "swift/RemoteInspection/ReflectionContext.h"
-#include "swift/RemoteInspection/TypeLowering.h"
 #include "swift/RemoteInspection/TypeRefBuilder.h"
-#include "swift/Remote/CMemoryReader.h"
 
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Object/Archive.h"
 #include "llvm/Object/MachOUniversal.h"
 
-#include "llvm/Object/Archive.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/ELFTypes.h"
@@ -31,9 +23,7 @@
 #include "llvm/Object/RelocationResolver.h"
 #include "llvm/Object/Wasm.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/StringSaver.h"
 
-#include <sstream>
 
 using namespace llvm::object;
 

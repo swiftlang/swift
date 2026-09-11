@@ -20,7 +20,6 @@
 #include "GenericRequirement.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/SIL/SILValue.h"
 #include "llvm/IR/Value.h"
 
 namespace swift {

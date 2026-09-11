@@ -19,10 +19,8 @@
 #include "swift/Basic/Version.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
-#include "clang/CAS/CASOptions.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/MC/MCTargetOptions.h"
 #include <optional>
 
 #include <set>

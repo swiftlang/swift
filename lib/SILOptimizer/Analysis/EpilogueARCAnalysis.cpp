@@ -13,7 +13,6 @@
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SIL/SILInstruction.h"
-#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 

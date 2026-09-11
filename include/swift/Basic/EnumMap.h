@@ -33,7 +33,6 @@
 #include "swift/Basic/EnumTraits.h"
 #include "swift/Basic/SmallMap.h"
 #include "llvm/ADT/SmallVector.h"
-#include <type_traits>
 
 namespace swift {
 

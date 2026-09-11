@@ -20,10 +20,13 @@
 #ifndef LLVM_ADT_FIXEDBITSET_H
 #define LLVM_ADT_FIXEDBITSET_H
 
+#include "llvm/ADT/bit.h"
 #include <assert.h>
-#include <inttypes.h>
+#include <climits>
+#include <cstddef>
+#include <cstdint>
 #include <initializer_list>
-#include "llvm/Support/MathExtras.h"
+#include <type_traits>
 
 namespace swift {
 

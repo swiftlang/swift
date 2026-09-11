@@ -90,9 +90,6 @@
 #define DEBUG_TYPE "destroy-addr-hoisting"
 
 #include "swift/AST/Type.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/GraphNodeWorklist.h"
-#include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBasicBlock.h"

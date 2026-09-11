@@ -12,9 +12,7 @@
 
 #define DEBUG_TYPE "alloc-stack-hoisting"
 
-#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -29,7 +27,6 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 
 #include "IRGenModule.h"
-#include "NonFixedTypeInfo.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"

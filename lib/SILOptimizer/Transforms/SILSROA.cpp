@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-sroa"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/DebugUtils.h"
@@ -27,11 +26,8 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Allocator.h"
 #include "llvm/Support/Debug.h"
-#include <type_traits>
 
 using namespace swift;
 
