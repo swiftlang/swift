@@ -530,7 +530,17 @@ SWIFT_ALWAYS_INLINE static HeapObject *_swift_retain_(HeapObject *object) {
 }
 
 #ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+// We play a game with the function's asm name to hide the function body from
+// the compiler. A direct tail call to this function from swift_retain somehow
+// causes swift_retain to have a stack frame. By defining the function under a
+// different name at the C++ level, the compiler doesn't see where the call to
+// _swift_retain_adapter goes, and this prevents it from adding a stack frame.
+// The `used` attribute keeps the definition alive, otherwise the compiler would
+// see this as an unused static and eliminate it entirely.
 SWIFT_REFCOUNT_CC
+static HeapObject *_swift_retain_adapterImpl(HeapObject *object)
+    SWIFT_ASM_LABEL_WITH_PREFIX("_swift_retain_adapter");
+SWIFT_REFCOUNT_CC __attribute__((used))
 static HeapObject *_swift_retain_adapterImpl(HeapObject *object) {
   HeapObject *masked =
       (HeapObject *)((uintptr_t)object & ~heap_object_abi::UntaggedNonNativeBridgeObjectBits);
@@ -538,11 +548,8 @@ static HeapObject *_swift_retain_adapterImpl(HeapObject *object) {
   return object;
 }
 
-// This strange construct prevents the compiler from creating an unnecessary
-// stack frame in swift_retain. A direct tail call to _swift_retain_adapterImpl
-// somehow causes clang to emit a stack frame.
-static HeapObject *(*SWIFT_REFCOUNT_CC volatile _swift_retain_adapter)(
-    HeapObject *object) = _swift_retain_adapterImpl;
+extern "C" SWIFT_REFCOUNT_CC HeapObject *_swift_retain_adapter(
+    HeapObject *object);
 #endif
 
 HeapObject *swift::swift_retain(HeapObject *object) {
