@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -O -emit-sil -verify %s -disable-availability-checking
+// RUN: %target-swift-frontend -parse-as-library -O -emit-sil -verify %s -target %target-swift-6.0-abi-triple
 
 extension List {
     var peek: Element {

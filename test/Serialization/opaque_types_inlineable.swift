@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking  -module-name A -emit-module %s %S/Inputs/opaque_types_inlineable_2.swift
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple  -module-name A -emit-module %s %S/Inputs/opaque_types_inlineable_2.swift
 
 // This test case use to crash in the merge modules phase when the two partial
 // modules are merged as one deserializing the module for this file now has

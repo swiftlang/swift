@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-feature BuiltinModule -enable-experimental-feature Lifetimes -typecheck -verify %s 
+// RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -enable-experimental-feature Lifetimes -typecheck -verify %s 
 
 // REQUIRES: swift_feature_BuiltinModule
 // REQUIRES: swift_feature_Lifetimes

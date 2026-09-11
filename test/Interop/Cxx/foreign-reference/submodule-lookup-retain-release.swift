@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop -disable-availability-checking 2>&1
+// RUN: %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop -target %target-swift-5.8-abi-triple 2>&1
 
 //--- Inputs/module.modulemap
 module Test {

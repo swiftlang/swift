@@ -2,7 +2,7 @@
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-6.2-abi-triple \
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature Lifetimes
 

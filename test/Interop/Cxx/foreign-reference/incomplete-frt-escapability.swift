@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}test.swift \
 // RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -strict-memory-safety
 //
 // An incomplete reference type has no layout to ask Clang for, so check that
@@ -11,7 +11,7 @@
 // RUN: %target-swift-frontend -emit-ir -o /dev/null %t%{fs-sep}test.swift \
 // RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
-// RUN:   -disable-availability-checking
+// RUN:   -target %target-swift-5.8-abi-triple
 
 // A foreign reference type may be declared without a definition; it is still
 // imported as a Swift class, and is still escapable and safe. Importing one used

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -disable-availability-checking | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -target %target-swift-5.7-abi-triple | %IRGenFileCheck %s
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
 // REQUIRES: distributed
