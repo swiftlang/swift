@@ -537,6 +537,45 @@ bb0(%0 : $Builtin.RawPointer):
   return_borrow %3 from_scopes (%3)
 }
 
+sil @f067_borrow_accessor_trivial : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address Int
+
+// Unlike f062, this borrow accessor's @guaranteed_address result is a *trivial
+// loadable* type, so it has no storage in the valueStorageMap. The apply's
+// result still becomes the address the callee returns, so the caller reloads
+// from it for uses that expect an object.
+// CHECK-LABEL: sil [ossa] @f067_call_borrow_trivial : $@convention(thin) <T> (@inout Box<T>) -> Builtin.Int64 {
+// CHECK: bb0(%0 : $*Box<T>):
+// CHECK:   [[FN:%.*]] = function_ref @f067_borrow_accessor_trivial
+// CHECK:   [[ADR:%.*]] = apply [[FN]]<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed Box<τ_0_0>) -> @guaranteed_address Builtin.Int64
+// CHECK:   [[VAL:%.*]] = load [trivial] [[ADR]] : $*Builtin.Int64
+// CHECK:   return [[VAL]] : $Builtin.Int64
+// CHECK-LABEL: } // end sil function 'f067_call_borrow_trivial'
+sil [ossa] @f067_call_borrow_trivial : $@convention(thin) <T> (@inout Box<T>) -> Int {
+bb0(%0 : $*Box<T>):
+  %1 = function_ref @f067_borrow_accessor_trivial : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address Int
+  %2 = load_borrow %0 : $*Box<T>
+  %3 = apply %1<T>(%2) : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address Int
+  end_borrow %2 : $Box<T>
+  return %3 : $Int
+}
+
+sil @f068_borrow_accessor_direct_self : $@convention(method) (@guaranteed LoadableNontrivial) -> @guaranteed_address Int
+
+// Same as f067, but self is passed directly rather than indirectly, so the
+// call has no indirect arguments at all and only its result needs rewriting.
+// CHECK-LABEL: sil [ossa] @f068_call_borrow_direct_self : $@convention(thin) (@guaranteed LoadableNontrivial) -> Builtin.Int64 {
+// CHECK: bb0(%0 : @guaranteed $LoadableNontrivial):
+// CHECK:   [[FN:%.*]] = function_ref @f068_borrow_accessor_direct_self
+// CHECK:   [[ADR:%.*]] = apply [[FN]](%0) : $@convention(method) (@guaranteed LoadableNontrivial) -> @guaranteed_address Builtin.Int64
+// CHECK:   [[VAL:%.*]] = load [trivial] [[ADR]] : $*Builtin.Int64
+// CHECK:   return [[VAL]] : $Builtin.Int64
+sil [ossa] @f068_call_borrow_direct_self : $@convention(thin) (@guaranteed LoadableNontrivial) -> Int {
+bb0(%0 : @guaranteed $LoadableNontrivial):
+  %1 = function_ref @f068_borrow_accessor_direct_self : $@convention(method) (@guaranteed LoadableNontrivial) -> @guaranteed_address Int
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed LoadableNontrivial) -> @guaranteed_address Int
+  return %2 : $Int
+}
+
 // CHECK-LABEL: sil [ossa] @f070_mixedResult1 : $@convention(thin) <T> (@in T, @owned any C) -> (@out T, @owned any C) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : @owned $any C):
 // CHECK:   copy_addr [take] %1 to [init] %0 : $*T
