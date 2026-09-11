@@ -155,7 +155,8 @@ fileprivate struct _CapacityAndFlags {
  For "one crumb" breadcrumbs, the breadcrumbs pointer is replaced with what
  would have been the last breadcrumb itself. This allows .utf16.count to be fast
  without requiring extra storage. This is detected by checking if the breadcrumb
- pointer has a numeric value of less than or equal to Int32.max
+ pointer has a numeric value of less than or equal to Int32.max. This encoding
+ is disabled on Windows, where valid heap pointers can occupy that range.
 
  H                                                                             n
  ├─────────────────────────────────────────────────────────────────────────────┤
@@ -246,7 +247,7 @@ fileprivate func _allocateStringStorage(
   let pointerSize = MemoryLayout<Int>.stride
   let headerSize = Int(_StringObject.nativeBias)
   let codeUnitSize = capacity + 1 /* code units and null */
-#if _pointerBitWidth(_64)
+#if _pointerBitWidth(_64) && !os(Windows)
   let needBreadcrumbs = utf16Len != nil ||
     capacity >= _StringBreadcrumbs.breadcrumbStride
 #else
@@ -366,13 +367,13 @@ extension __StringStorage {
       storage._capacityAndFlags._storage == capAndFlags._storage)
     _internalInvariant(
       storage.unusedCapacity == capAndFlags.capacity - countAndFlags.count)
-#if _pointerBitWidth(_64)
+#if _pointerBitWidth(_64) && !os(Windows)
     _internalInvariant(
        ((utf16Len != nil) && storage.hasBreadcrumbs) || (utf16Len == nil)
     )
 #endif
     
-#if _pointerBitWidth(_64)
+#if _pointerBitWidth(_64) && !os(Windows)
     if let utf16Len, utf16Len <= Int32.max {
       storage._oneCrumb = utf16Len
     } else if storage.hasBreadcrumbs {
@@ -464,9 +465,10 @@ extension __StringStorage {
   internal var hasBreadcrumbs: Bool { _capacityAndFlags.hasBreadcrumbs }
   
   internal var hasOneCrumb: Bool {
-#if _pointerBitWidth(_32) || _pointerBitWidth(_16)
+#if _pointerBitWidth(_32) || _pointerBitWidth(_16) || os(Windows)
     // On 32-bit platforms, Int(Int32.max) == Int.max, so we can't distinguish
-    // a one-crumb integer from a valid pointer. Disable the optimization.
+    // a one-crumb integer from a valid pointer. Windows also permits heap
+    // pointers below Int32.max on 64-bit platforms. Disable the optimization.
     return false
 #else
     if !_capacityAndFlags.hasBreadcrumbs {
@@ -624,7 +626,7 @@ extension __StringStorage {
 #endif
     unsafe self.terminator.pointee = 0
 
-#if _pointerBitWidth(_64)
+#if _pointerBitWidth(_64) && !os(Windows)
     if let utf16Len, hasBreadcrumbs, utf16Len <= Int32.max {
       // `_oneCrumb`'s setter uses a raw `storeBytes`, so an ARC reference in
       // the slot would be leaked. Current callers only pass `utf16Len` on
@@ -930,7 +932,7 @@ extension _StringGuts {
   
   @_effects(releasenone)
   internal func getUTF16Count() -> Int {
-#if _pointerBitWidth(_64)
+#if _pointerBitWidth(_64) && !os(Windows)
     // Read the one-crumb value in a single atomic load to avoid a TOCTOU race
     // with loadUnmanagedBreadcrumbs(), which can CAS the slot to zero or
     // replace it with a real breadcrumbs pointer concurrently.
@@ -939,7 +941,8 @@ extension _StringGuts {
     // (including a breadcrumbs pointer) would pass the range check below,
     // causing a pointer address to be returned as a UTF-16 count. The
     // one-crumb optimization is already disabled on 32-bit (hasOneCrumb
-    // returns false), so skip this fast path entirely.
+    // returns false), so skip this fast path entirely. The same restriction
+    // applies on Windows, where even 64-bit pointers can occupy this range.
     if hasNativeStorage {
       let val = _object.withNativeStorage { storage -> Int in
         guard storage.hasBreadcrumbs else { return -1 }
