@@ -571,6 +571,9 @@ extension ClosedRange {
   }
 }
 
+extension ClosedRange: BitwiseCopyable where Bound: BitwiseCopyable {}
+extension ClosedRange.Index: BitwiseCopyable where Bound: BitwiseCopyable {}
+
 // Note: this is not for compatibility only, it is considered a useful
 // shorthand. TODO: Add documentation
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
