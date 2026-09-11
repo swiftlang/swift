@@ -226,7 +226,8 @@ protected:
     SHARED_FIELD(DebugValueInst, uint8_t
                  usesMoveableValueDebugInfo : 1,
                  trace : 1,
-                 prependDeref : 1);
+                 prependDeref : 1,
+                 outOfLineOperands : 1);
 
     SHARED_FIELD(AllocStackInst, uint8_t
                  dynamicLifetime : 1,
@@ -316,6 +317,9 @@ protected:
     SHARED_TEMPLATE_FIELD(typename, FieldIndexCacheBase, uint32_t fieldIndex);
     SHARED_TEMPLATE_FIELD(typename, SwitchEnumInstBase, uint32_t numCases);
     SHARED_FIELD(AllocStackInst, uint32_t numOperands);
+    SHARED_FIELD(DebugValueInst, uint32_t
+                 numOperands : 16,
+                 tailCapacity : 16);
     SHARED_FIELD(EnumInst, uint32_t caseIndex);
     SHARED_FIELD(UncheckedEnumDataInst, uint32_t caseIndex);
     SHARED_FIELD(InjectEnumAddrInst, uint32_t caseIndex);

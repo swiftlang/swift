@@ -74,13 +74,13 @@ struct MyStruct {
 
 // When a struct is removed and a debug_value with a reconstruction block
 // references it, salvageDebugInfo should prepend a struct reconstruction
-// into the debug BB using the first field + undefs for the rest.
+// into the debug BB, taking every field through an operand of its own.
 // CHECK-LABEL: sil @salvage_struct_with_debug_bb
-// CHECK: debug_value %0 : $Int64, let, name "field_x", type $Int64, transform {
-// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
-// CHECK:     %[[S:[0-9]+]] = struct $MyStruct (%[[ARG]] : $Int64, undef : $Int64)
-// CHECK:     %[[E:[0-9]+]] = struct_extract %[[S]] : $MyStruct, #MyStruct.x
-// CHECK:     return %[[E]] : $Int64
+// CHECK: debug_value (%0 : $Int64, %1 : $Int64), let, name "field_x", type $Int64, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
+// CHECK:     %2 = struct $MyStruct (%0 : $Int64, %1 : $Int64)
+// CHECK:     %3 = struct_extract %2 : $MyStruct, #MyStruct.x
+// CHECK:     return %3 : $Int64
 // CHECK:   }
 // CHECK: return %0
 sil @salvage_struct_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
@@ -115,13 +115,13 @@ bb0:
 
 // When a tuple is removed and a debug_value with a reconstruction block
 // references it, salvageDebugInfo should prepend a tuple reconstruction
-// into the debug BB using the first element + undefs for the rest.
+// into the debug BB, taking every element through an operand of its own.
 // CHECK-LABEL: sil @salvage_tuple_with_debug_bb
-// CHECK: debug_value %0 : $Int64, let, name "x", type $Int64, transform {
-// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
-// CHECK:     %[[T:[0-9]+]] = tuple (%[[ARG]] : $Int64, undef : $Int64)
-// CHECK:     %[[E:[0-9]+]] = tuple_extract %[[T]] : $(Int64, Int64), 0
-// CHECK:     return %[[E]] : $Int64
+// CHECK: debug_value (%0 : $Int64, %1 : $Int64), let, name "x", type $Int64, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
+// CHECK:     %2 = tuple (%0 : $Int64, %1 : $Int64)
+// CHECK:     %3 = tuple_extract %2 : $(Int64, Int64), 0
+// CHECK:     return %3 : $Int64
 // CHECK:   }
 // CHECK: return %0
 sil @salvage_tuple_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
@@ -162,13 +162,13 @@ struct NCPair: ~Copyable {
 }
 
 // CHECK-LABEL: sil @salvage_noncopyable_struct_with_debug_bb
-// CHECK: debug_value {{.*}} %0 : $Int64, let, name "field_x", type $Int64, transform {
-// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
+// CHECK: debug_value (%0 : $Int64, %1 : $Int64), let, name "field_x", type $Int64, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
 // CHECK-NOT:   forwarding
-// CHECK:     %[[S:[0-9]+]] = struct $NCPair (%[[ARG]] : $Int64, undef : $Int64)
+// CHECK:     %2 = struct $NCPair (%0 : $Int64, %1 : $Int64)
 // CHECK-NOT:   forwarding
-// CHECK:     %[[E:[0-9]+]] = struct_extract %[[S]] : $NCPair, #NCPair.x
-// CHECK:     return %[[E]] : $Int64
+// CHECK:     %3 = struct_extract %2 : $NCPair, #NCPair.x
+// CHECK:     return %3 : $Int64
 // CHECK:   }
 // CHECK: return %0
 sil @salvage_noncopyable_struct_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
@@ -187,13 +187,13 @@ bb0(%0 : $Int64, %1 : $Int64):
 // debug reconstruction block.
 
 // CHECK-LABEL: sil @salvage_noncopyable_tuple_with_debug_bb
-// CHECK: debug_value %0 : $Int64, let, name "x", type $Int64, transform {
-// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
+// CHECK: debug_value (%0 : $Int64, %1 : $Int64), let, name "x", type $Int64, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
 // CHECK-NOT:   forwarding
-// CHECK:     %[[T:[0-9]+]] = tuple (%[[ARG]] : $Int64, undef : $Int64)
+// CHECK:     %2 = tuple (%0 : $Int64, %1 : $Int64)
 // CHECK-NOT:   forwarding
-// CHECK:     %[[E:[0-9]+]] = tuple_extract %[[T]] : $(Int64, Int64), 0
-// CHECK:     return %[[E]] : $Int64
+// CHECK:     %3 = tuple_extract %2 : $(Int64, Int64), 0
+// CHECK:     return %3 : $Int64
 // CHECK:   }
 // CHECK: return %0
 sil @salvage_noncopyable_tuple_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
@@ -218,11 +218,15 @@ struct KlassStruct {
 
 // When SimplifyStruct removes an owned struct with begin_borrow/struct_extract
 // uses via erase(instructionIncludingAllUsers:), debug uses must be salvaged.
+// The struct is rebuilt in the reconstruction block from both of its fields.
 //
 // CHECK-LABEL: sil [ossa] @salvage_struct_erase_including_all_users
 // CHECK-NOT:     struct $KlassStruct
-// CHECK:         debug_value %0 : $Klass, let, name "s", type $KlassStruct, expr op_fragment:#KlassStruct.k
-// CHECK:         debug_value %1 : $Int64, let, name "s", type $KlassStruct, expr op_fragment:#KlassStruct.x
+// CHECK:         debug_value (%0 : $Klass, %1 : $Int64), let, name "s", transform {
+// CHECK:           bb0(%0 : $Klass, %1 : $Int64):
+// CHECK:             %2 = struct $KlassStruct (%0 : $Klass, %1 : $Int64)
+// CHECK:             return %2 : $KlassStruct
+// CHECK:         }
 // CHECK:         destroy_value %0 : $Klass
 // CHECK:         return %1 : $Int64
 // CHECK:       } // end sil function 'salvage_struct_erase_including_all_users'
