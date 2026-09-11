@@ -14,7 +14,11 @@ struct T {
 //
 // CHECK-LABEL: sil @redundant_pair : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
 // CHECK:       bb0([[VAR:%[0-9]+]] : $Builtin.Int32):
-// CHECK-NEXT:    debug_value [[VAR]] : $Builtin.Int32, let, name "var", type $T, expr op_fragment:#T.x
+// CHECK-NEXT:    debug_value [[VAR]] : $Builtin.Int32, let, name "var", transform {
+// CHECK:         bb0(%0 : $Builtin.Int32):
+// CHECK-NEXT:      %1 = struct $T (%0 : $Builtin.Int32)
+// CHECK-NEXT:      return %1 : $T
+// CHECK-NEXT:    }
 // CHECK-NEXT:    return [[VAR]]
 // CHECK-LABEL: } // end sil function 'redundant_pair'
 sil @redundant_pair : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
