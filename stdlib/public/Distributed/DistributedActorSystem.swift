@@ -836,6 +836,8 @@ internal func _validateMatchingResultHandler<
 }
 #endif // !$Embedded
 
+#if !$Embedded
+
 /// Represents a 'target' of a distributed call, such as a `distributed func` or
 /// `distributed` computed property. Identification schemes may vary between
 /// systems, and are subject to evolution.
@@ -851,7 +853,10 @@ internal func _validateMatchingResultHandler<
 /// however its exact format is not specified and may change in future versions.
 @available(SwiftStdlib 5.7, *)
 public struct RemoteCallTarget: CustomStringConvertible, Hashable {
-  private let _identifier: String
+  // '@usableFromInline' rather than 'private' because 'identifierByteCount' and
+  // 'identifierEquals' are newer than the module's minimum deployment and so
+  // are emitted into the client
+  @usableFromInline internal let _identifier: String
 
   public init(_ identifier: String) {
     self._identifier = identifier
@@ -862,21 +867,193 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
     return _identifier
   }
 
+  /// The length in bytes of the UTF-8 encoded target identifier.
+  @export(implementation)
+  @available(SwiftStdlib 6.5, *)
+  public var identifierByteCount: Int {
+    return _identifier.utf8.count
+  }
+
+  /// Whether the target identifier is byte-for-byte equal to `other`.
+  ///
+  /// Prefer this over comparing `identifier` when writing an actor system which
+  /// must also compile for Embedded Swift, where the identifier is not backed
+  /// by a `String`
+  ///
+  /// The comparison skips the leading mangling-flavor prefix ("$s" for standard
+  /// Swift, "$e" for Embedded Swift) on both sides, so a target serialized by an
+  /// Embedded peer matches the same declaration compiled in standard Swift, and
+  /// vice versa. This keeps `identifierEquals` behaving identically whether an
+  /// actor system's source is compiled for standard or Embedded Swift
+  @available(SwiftStdlib 6.5, *)
+  public func identifierEquals(_ other: StaticString) -> Bool {
+    let lhs = _identifier.utf8
+    return other.withUTF8Buffer { rhs in
+      unsafe lhs.dropFirst(_manglingFlavorPrefixLength(of: lhs))
+        .elementsEqual(rhs.dropFirst(_manglingFlavorPrefixLength(of: rhs)))
+    }
+  }
+
   /// Attempts to pretty format the underlying target identifier.
   /// If unable to, returns the raw underlying identifier.
   public var description: String {
-    #if !$Embedded
     if let name = _getFunctionFullNameFromMangledName(mangledName: _identifier) {
       return name
     } else {
       return "\(_identifier)"
     }
-    #else
-    // Embedded Swift has no runtime demangler; return the raw mangled name.
-    return _identifier
-    #endif
   }
 }
+
+/// The number of leading bytes taken by a distributed-target mangling-flavor
+/// prefix: a Swift mangled name starts with "$" followed by a single flavor
+/// letter, "s" for standard Swift or "e" for Embedded Swift. Only those two
+/// prefixes are supported. The same declaration agrees on every byte after this
+/// prefix, so target matching must skip it -- otherwise a request serialized by
+/// one mode would never match the same `distributed func` compiled in the other.
+/// Anything else is treated as having no flavor prefix, and nothing is skipped
+@available(SwiftStdlib 6.5, *)
+private func _manglingFlavorPrefixLength(
+  of bytes: some Sequence<UInt8>
+) -> Int {
+  // Skip "$", then skip "s" or "e" -- the only supported flavor prefixes
+  var iterator = bytes.makeIterator()
+  guard iterator.next() == UInt8(ascii: "$") else {
+    return 0
+  }
+  switch iterator.next() {
+  case UInt8(ascii: "s"), UInt8(ascii: "e"):
+    return 2
+  default:
+    return 0
+  }
+}
+#else
+
+/// A statically allocated value used only to launder the immortal static
+/// storage backing a `StaticString` into an immortal lifetime dependency
+private let _immortalStaticStorage: Int = 0
+
+/// Represents a 'target' of a distributed call, such as a `distributed func` or
+/// `distributed` computed property. Identification schemes may vary between
+/// systems, and are subject to evolution.
+///
+/// In Embedded Swift the identifier is a `RawSpan` of opaque bytes rather than
+/// a `String`. Target identifiers are only ever compared byte-wise -- never
+/// decoded -- and going through `String` would pull the whole of `String`, its
+/// UTF-8 view and Unicode machinery into the binary, costing roughly 18KB of
+/// `__text` for what is a memcmp. Storing a span makes `RemoteCallTarget`
+/// non-escapable, so an actor system must serialize the bytes it needs rather
+/// than store the target itself.
+///
+/// Actor systems generally should treat the `identifier` as opaque bytes, and
+/// pass them along to the remote system in their `remoteCall` implementation.
+@available(SwiftStdlib 6.5, *)
+public struct RemoteCallTarget: ~Escapable {
+  @usableFromInline internal let _identifier: RawSpan
+
+  /// Create a target from a compile-time constant mangled name.
+  ///
+  /// This is the initializer the compiler-synthesized distributed thunk calls;
+  /// a `StaticString` is backed by immortal static storage, so the resulting
+  /// target carries no scoped lifetime dependency
+  @_lifetime(immortal)
+  public init(_ identifier: StaticString) {
+    let span = unsafe RawSpan(
+      _unsafeStart: UnsafeRawPointer(identifier.utf8Start),
+      byteCount: identifier.utf8CodeUnitCount)
+    self._identifier =
+      unsafe _overrideLifetime(span, borrowing: _immortalStaticStorage)
+  }
+
+  /// Create a target from bytes received off the wire.
+  ///
+  /// The caller owns the storage the span refers to, and must keep it alive for
+  /// as long as the resulting target is in use
+  @_lifetime(copy identifier)
+  public init(_ identifier: RawSpan) {
+    self._identifier = identifier
+  }
+
+  /// The underlying identifier of the target, returned as-is.
+  public var identifier: RawSpan {
+    @_lifetime(copy self)
+    get { _identifier }
+  }
+
+  /// The length in bytes of the target identifier.
+  public var identifierByteCount: Int {
+    return _identifier.byteCount
+  }
+
+  /// Whether the target identifier matches `other`, ignoring the mangling
+  /// flavor prefix.
+  ///
+  /// This is what the compiler-synthesized `_executeDistributedTarget` calls to
+  /// match an incoming target against each `distributed func`'s mangled thunk
+  /// name. It lowers to a length check plus an inline byte loop.
+  ///
+  /// The comparison skips the leading mangling-flavor prefix ("$s" for standard
+  /// Swift, "$e" for Embedded Swift) on both sides: the same declaration mangles
+  /// to identical bytes in either mode apart from that one letter, so a target
+  /// serialized by a standard-Swift peer must still match the "$e"-mangled name
+  /// this Embedded server compares against. See `_manglingFlavorPrefixLength`
+  public func identifierEquals(_ other: StaticString) -> Bool {
+    return _identifier.withUnsafeBytes { lhs in
+      other.withUTF8Buffer { rhs in
+        unsafe _mangledTargetIdentifiersEqual(lhs, UnsafeRawBufferPointer(rhs))
+      }
+    }
+  }
+}
+
+/// The number of leading bytes taken by a distributed-target mangling-flavor
+/// prefix: a Swift mangled name starts with "$" followed by a single flavor
+/// letter, "s" for standard Swift or "e" for Embedded Swift. Only those two
+/// prefixes are supported. The same declaration agrees on every byte after this
+/// prefix, so target matching must skip it -- otherwise a request serialized by
+/// one mode would never match the same `distributed func` compiled in the other.
+/// Anything else is treated as having no flavor prefix, and nothing is skipped
+@available(SwiftStdlib 6.5, *)
+private func _manglingFlavorPrefixLength(
+  _ bytes: UnsafeRawBufferPointer
+) -> Int {
+  // Skip "$", then skip "s" or "e" -- the only supported flavor prefixes
+  guard bytes.count >= 2, unsafe bytes[0] == UInt8(ascii: "$") else {
+    return 0
+  }
+  switch unsafe bytes[1] {
+  case UInt8(ascii: "s"), UInt8(ascii: "e"):
+    return 2
+  default:
+    return 0
+  }
+}
+
+/// Compares two mangled distributed-target identifiers, treating the leading
+/// mangling-flavor prefix ("$s" vs "$e") as interchangeable. Written as a manual
+/// byte loop rather than `elementsEqual` to keep the synthesized dispatch free of
+/// `String`'s UTF-8-view / element-comparison machinery
+@available(SwiftStdlib 6.5, *)
+private func _mangledTargetIdentifiersEqual(
+  _ lhs: UnsafeRawBufferPointer, _ rhs: UnsafeRawBufferPointer
+) -> Bool {
+  let lhsPrefix = unsafe _manglingFlavorPrefixLength(lhs)
+  let rhsPrefix = unsafe _manglingFlavorPrefixLength(rhs)
+  let count = lhs.count - lhsPrefix
+  guard count == rhs.count - rhsPrefix else {
+    return false
+  }
+  var i = 0
+  while i < count {
+    if unsafe lhs[lhsPrefix + i] != rhs[rhsPrefix + i] {
+      return false
+    }
+    i += 1
+  }
+  return true
+}
+#endif // $Embedded
 
 @available(SwiftStdlib 5.7, *)
 @_unavailableInEmbedded
@@ -1205,8 +1382,10 @@ public protocol DistributedTargetInvocationResultHandler<SerializationRequiremen
 /// functions.
 @available(SwiftStdlib 6.5, *)
 public struct EmbeddedDistributedTargetNotFound: Error, Sendable {
-  public let target: String
-  public init(target: String) { self.target = target }
+  public let targetByteCount: Int
+  public init(targetByteCount: Int) {
+    self.targetByteCount = targetByteCount
+  }
 }
 #endif // $Embedded
 

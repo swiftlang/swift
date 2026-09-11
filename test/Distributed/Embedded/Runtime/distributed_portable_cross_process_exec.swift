@@ -24,27 +24,12 @@
 // REQUIRES: swift_feature_EmbeddedDistributed
 // REQUIRES: swift_feature_Extern
 
-// A cross-process, cross-mode distributed round-trip. The request is serialized
-// by an ordinary-Swift client whose actor system binds `SerializationRequirement`
-// to `Codable` and serializes with Foundation's `JSONEncoder`. That request is
-// then picked up and dispatched by a SEPARATELY built Embedded Swift server whose
-// same actor system has no `Codable` / Foundation at all - it serializes through a
-// tiny naive JSON writer (see `JSONWriter` in the shared Inputs file). Because the
-// naive writer emits bytes byte-for-byte identical to `JSONEncoder`, the request
-// the Codable side wrote decodes on the Embedded side, and the response the
-// Embedded side wrote decodes back on the Codable side.
+// A truly cross-process, cross-mode distributed round-trip.
 //
-// The same source compiles to both programs; only `@main` differs per mode. The
-// full distributed machinery is exercised on both ends: the client goes through
-// the synthesized distributed thunk (its `remoteCall` captures the mangled target
-// identifier and the argument wire), and the server dispatches through the
-// compiler-synthesized `_executeDistributedTarget` if-chain keyed on that same
-// identifier.
+// The client is ordinary-Swift client, using `Codable`.
+// The client is handled by an Embeddet Swift client that uses a minimal JSON decoder.
 //
-// Both programs are built `-module-name main` so the identifier agrees except for
-// the mangling prefix: ordinary Swift uses "$s", Embedded uses "$e" for the very
-// same declaration. The server bridges that one prefix before dispatching (a real
-// transport would ship a stable logical selector, not a raw mangled name).
+// The same source compiles to both programs - this is to prove the reuse of actor and system types.
 
 import _Concurrency
 import Distributed
@@ -61,7 +46,7 @@ distributed actor Greeter {
 
 // ==== ----------------------------------------------------------------------
 // MARK: Embedded server
-//
+
 // Embedded has no `CommandLine.arguments` and no Foundation, so the server does
 // not take a file path - it reads the request off stdin and writes the response
 // to stdout, declaring the two libc byte-I/O calls it needs itself.
@@ -76,6 +61,10 @@ func putchar(_ c: CInt) -> CInt
 @main
 struct Main {
   static func main() async {
+    // Implement how a "receive side" of an actor system would look like:
+    let system = PortableRoundtripActorSystem()
+    let greeter = Greeter(actorSystem: system) // assume we have an actor with the right actor-id
+
     // Read the whole request off stdin
     var wire: [UInt8] = []
     while true {
@@ -87,33 +76,19 @@ struct Main {
     // Field 0 is the mangled target identifier the client sent; the remaining
     // bytes are the argument wire the decoder consumes
     var offset = 0
-    guard var idBytes = takeField(wire, &offset) else { fatalError("malformed request") }
+    guard let targetIDBytes = takeField(wire, &offset) else { fatalError("malformed request") }
 
-    // The non-embedded client mangles distributed-thunk identifiers with the
-    // standard "$s" prefix; Embedded Swift mangles the very same declaration with
-    // an "$e" prefix. Everything after the prefix is identical (same module name,
-    // same symbol), so bridge the two here - the server's synthesized dispatch
-    // compares against its own "$e"-prefixed names. Done on raw bytes to stay off
-    // the Unicode tables. A production transport would agree on a stable logical
-    // selector rather than shipping a raw mangled name in the first place
-    if idBytes.count >= 2, idBytes[0] == UInt8(ascii: "$"), idBytes[1] == UInt8(ascii: "s") {
-      idBytes[1] = UInt8(ascii: "e")
-    }
-    let target = RemoteCallTarget(String(decoding: idBytes, as: UTF8.self))
+    let targetIDSpan = targetIDBytes.span
+    let target = RemoteCallTarget(targetIDSpan.bytes)
 
     let argBuffer = CallBuffer()
     argBuffer.argBytes = Array(wire[offset...])
 
-    let system = PortableRoundtripActorSystem()
-    let greeter = Greeter(actorSystem: system)
     var decoder = PortableDecoder(buffer: argBuffer, system: system)
     let responseBuffer = CallBuffer()
     let handler = PortableResultHandler(buffer: responseBuffer)
 
     do {
-      // Same entry point as non-embedded: the system's `executeDistributedTarget`
-      // dispatches the incoming call. In Embedded Swift it forwards to the actor's
-      // synthesized `_executeDistributedTarget` witness
       try await system.executeDistributedTarget(
           on: greeter, target: target, invocationDecoder: &decoder, handler: handler)
     } catch {
@@ -149,17 +124,18 @@ struct Main {
     case "send":
       system.crossProcessSimulatedMode = .writeAndExit(messageWritePath: path)
       let remoteRef = try Greeter.resolve(id: PortableActorID(id: 1), using: system)
-      // The thunk records the argument through JSONEncoder and calls remoteCall,
-      // which (in .writeAndExit mode) writes the request and exits - never returns
       _ = try await remoteRef.hello(name: "World")
 
-    default: // "recv"
+    case "recv":
       let bytes = [UInt8](try Data(contentsOf: URL(fileURLWithPath: path)))
       let buffer = CallBuffer()
       buffer.argBytes = bytes
       let decoder = PortableDecoder(buffer: buffer)
       let result: String = try decoder.decodeNextArgument()
       print("[swift] client decoded: \(result)")
+
+    default:
+      fatalError("Unknown mode: \(verb)")
     }
   }
 }

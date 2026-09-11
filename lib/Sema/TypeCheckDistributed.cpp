@@ -1314,6 +1314,13 @@ GetDistributedRemoteCallTargetInitFunctionRequest::evaluate(
           C.getRemoteCallTargetType()))
     return nullptr;
 
+  // The identifier is a `StaticString` in Embedded Swift.
+  NominalTypeDecl *expectedParamDecl =
+      C.LangOpts.hasFeature(Feature::Embedded) ? C.getStaticStringDecl()
+                                               : C.getStringDecl();
+  if (!expectedParamDecl)
+    return nullptr;
+
   for (auto value : nominal->getMembers()) {
     auto ctor = dyn_cast<ConstructorDecl>(value);
     if (!ctor)
@@ -1321,13 +1328,17 @@ GetDistributedRemoteCallTargetInitFunctionRequest::evaluate(
 
     auto params = ctor->getParameters();
     if (params->size() != 1)
-      return nullptr;
+      continue;
 
     // _ identifier
-    if (params->get(0)->getArgumentName().empty())
-      return ctor;
+    auto *param = params->get(0);
+    if (!param->getArgumentName().empty())
+      continue;
 
-    return nullptr;
+    if (param->getInterfaceType()->getAnyNominal() != expectedParamDecl)
+      continue;
+
+    return ctor;
   }
 
   return nullptr;

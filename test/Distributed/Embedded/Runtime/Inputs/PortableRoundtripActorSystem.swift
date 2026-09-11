@@ -294,7 +294,7 @@ public final class PortableRoundtripActorSystem: DistributedActorSystem, @unchec
   // has no existential-opening or metadata dispatch, so instead of storing an
   // `any DistributedActor` we store a thunk that closes over the concrete actor.
   public typealias LocalDispatch =
-    (RemoteCallTarget, inout InvocationDecoder, ResultHandler) async throws -> Void
+    (borrowing RemoteCallTarget, inout InvocationDecoder, ResultHandler) async throws -> Void
   var active: [ActorID: LocalDispatch] = [:]
   var nextID: UInt64 = 1
 

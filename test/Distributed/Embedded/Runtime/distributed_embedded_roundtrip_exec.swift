@@ -9,25 +9,7 @@
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedDistributed
 
-// End-to-end distributed round-trips in Embedded Swift, over a real serialized byte
-// wire (the actor system lives in Inputs/PortableRoundtripActorSystem.swift; the
-// `@Resolvable` types in Inputs/ResolvableWorker.swift). Each case is its own
-// `test_` method so it can be run / inspected individually.
-//
-//  - test_roundtrip: resolve a remote proxy, call a `distributed func`; the
-//    argument and result cross as bytes and come back decoded. This exercises
-//    the COMPILER-SYNTHESIZED `_executeDistributedTarget` instance method on
-//    the distributed actor: the actor system's `remoteCall` does
-//    `try await <local actor>._executeDistributedTarget(target:invocationDecoder:resultHandler:)`,
-//    whose synthesized body compares `target.identifier` against each
-//    distributed func's mangled-thunk name, decodes args via
-//    `decoder.decodeNextArgument(T.self)`, calls the local impl, and hands the
-//    result to `handler.onReturn(_:)` / `onReturnVoid()`. No hand-written
-//    switch on the user side.
-//  - test_resolvableAny: pass a distributed-actor REFERENCE (`any ResolvableWorker`,
-//    i.e. the `$ResolvableWorker` proxy) as an argument; it is serialized as its
-//    id and resolved back into a proxy on the receive side, whose `work(...)`
-//    re-enters `remoteCall` and routes by id to the hosted `WorkerImpl`.
+// End-to-end distributed round-trips in Embedded Swift.
 
 import _Concurrency
 import Distributed

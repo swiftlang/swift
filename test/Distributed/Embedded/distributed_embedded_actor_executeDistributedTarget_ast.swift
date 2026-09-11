@@ -11,9 +11,9 @@
 //     invocationDecoder: inout ActorSystem.InvocationDecoder,
 //     resultHandler: ActorSystem.ResultHandler
 //   ) async throws {
-//     switch target.identifier.utf8.count {   // length first, then compare bytes
+//     switch target.identifierByteCount { // check length first
 //     case 38: // == "$e4main7GreeterC5hello4nameS2S_tYaKFTE".utf8.count, folded at compile time
-//       if target.identifier.utf8.elementsEqual("$e4main7GreeterC5hello4nameS2S_tYaKFTE".utf8) {
+//       if target.identifierEquals("$e4main7GreeterC5hello4nameS2S_tYaKFTE") { // then exact match
 //         let arg0: String = try invocationDecoder.decodeNextArgument()
 //         let result = try await self.hello(name: arg0)
 //         try await resultHandler.onReturn(result)
@@ -22,8 +22,11 @@
 //     default:
 //       break
 //     }
-//     throw EmbeddedDistributedTargetNotFound(target: target.identifier)
+//     throw EmbeddedDistributedTargetNotFound(targetByteCount: target.identifierByteCount)
 //   }
+//
+// The comparison goes through 'RemoteCallTarget.identifierEquals(_: StaticString)'
+// in order to avoid relying on String in Embedded builds.
 //
 // The actor system lives in the shared Runtime/Inputs/EmbeddedFakeActorSystem.swift.
 
@@ -41,11 +44,16 @@ distributed actor Greeter {
 // The synthesized dispatch method.
 // CHECK: func_decl {{.*}}"_executeDistributedTarget(target:invocationDecoder:resultHandler:)"
 
-// It switches on, and compares against, the incoming target identifier.
+// It switches on the identifier's byte count and compares against it via
+// 'identifierEquals', not through String's UTF8 view.
 // CHECK: switch_stmt
-// CHECK: member_ref_expr {{.*}}decl="Distributed.(file).RemoteCallTarget.identifier"
+// CHECK: member_ref_expr {{.*}}decl="Distributed.(file).RemoteCallTarget.identifierByteCount"
+// CHECK: declref_expr {{.*}}decl="Distributed.(file).RemoteCallTarget.identifierEquals
 
 // The matched branch: decode the argument, call the local impl, deliver the result.
 // CHECK: decl="{{.*}}EmbeddedFakeInvocationDecoder extension.decodeNextArgument{{.*}}Argument -> String)]"
 // CHECK: decl="{{.*}}Greeter.hello(name:)
 // CHECK: decl="{{.*}}EmbeddedFakeResultHandler extension.onReturn{{.*}}Success -> String)]"
+
+// The dispatch must not touch String's UTF8 view for the comparison.
+// CHECK-NOT: decl="Swift.(file).String.UTF8View

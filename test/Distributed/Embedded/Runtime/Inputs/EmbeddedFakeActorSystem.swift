@@ -243,11 +243,9 @@ public final class EmbeddedFakeRoundtripActorSystem: DistributedActorSystem, @un
   public typealias InvocationDecoder = EmbeddedFakeInvocationDecoder
   public typealias ResultHandler = EmbeddedFakeResultHandler
 
-  // Each hosted actor's monomorphized receive entrypoint, keyed by id, filled in
-  // by `actorReady`. See the file comment for why this is a thunk rather than an
-  // `any DistributedActor`
+  // Each hosted actor's monomorphized receive entrypoint.
   public typealias LocalDispatch =
-    (RemoteCallTarget, inout InvocationDecoder, ResultHandler) async throws -> Void
+    (borrowing RemoteCallTarget, inout InvocationDecoder, ResultHandler) async throws -> Void
 
   var active: [ActorID: LocalDispatch] = [:]
   var nextID: UInt64 = 1

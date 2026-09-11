@@ -1080,38 +1080,18 @@ static IfStmt *buildEmbeddedDispatchBranch(
 
   // === Build the target condition
   //
-  // target.identifier.utf8.elementsEqual("<mangled>".utf8)
-  //
-  // We avoid String's `==` because it pulls in full Unicode normalization.
-
-  // target.identifier
-  Expr *targetIdentifier =
-      UnresolvedDotExpr::createImplicit(
-          C, new (C) DeclRefExpr(ConcreteDeclRef(targetVar), dloc, implicit),
-          C.getIdentifier("identifier"));
-
-  // target.identifier.utf8
-  Expr *targetIdentifierUTF8 =
-      UnresolvedDotExpr::createImplicit(
-          C, targetIdentifier, C.getIdentifier("utf8"));
-
-  // "<mangled>" string literal.
+  // target.identifierEquals("<mangled>")
   Expr *mangledLiteral =
       new (C) StringLiteralExpr(C.AllocateCopy(mangledThunkName),
                                 SourceRange(), implicit);
 
-  // "<mangled>".utf8
-  Expr *mangledLiteralUTF8 =
-      UnresolvedDotExpr::createImplicit(
-          C, mangledLiteral, C.getIdentifier("utf8"));
-
-  // target.identifier.utf8.elementsEqual("<mangled>".utf8)
   Expr *eqCheck = CallExpr::createImplicit(
       C,
       UnresolvedDotExpr::createImplicit(
-          C, targetIdentifierUTF8, C.getIdentifier("elementsEqual")),
+          C, new (C) DeclRefExpr(ConcreteDeclRef(targetVar), dloc, implicit),
+          C.getIdentifier("identifierEquals")),
       ArgumentList::createImplicit(
-          C, { Argument(sloc, Identifier(), mangledLiteralUTF8) }));
+          C, { Argument(sloc, Identifier(), mangledLiteral) }));
 
   // === Build the decode args, then invoke the target statements
   SmallVector<ASTNode, 8> thenStmts;
@@ -1339,17 +1319,15 @@ deriveBodyEmbeddedDistributedReceiveDispatch(AbstractFunctionDecl *thunk,
 
   SmallVector<ASTNode, 4> bodyStmts;
 
-  // --- let __identifierCount = target.identifier.utf8.count
-  auto *targetIdentifierExpr =
-      UnresolvedDotExpr::createImplicit(
-          C, new (C) DeclRefExpr(ConcreteDeclRef(targetParam), dloc, implicit),
-          C.getIdentifier("identifier"));
-  auto *targetIdentifierUTF8 =
-      UnresolvedDotExpr::createImplicit(
-          C, targetIdentifierExpr, C.getIdentifier("utf8"));
+  // --- switch on target.identifierByteCount
+  //
+  // A free prefilter: bucketing candidates by mangled-name length turns most
+  // of the if-chain into a single jump. 'identifierByteCount' is a stored
+  // field read on the underlying span.
   auto *targetIdentifierCount =
       UnresolvedDotExpr::createImplicit(
-          C, targetIdentifierUTF8, C.getIdentifier("count"));
+          C, new (C) DeclRefExpr(ConcreteDeclRef(targetParam), dloc, implicit),
+          C.getIdentifier("identifierByteCount"));
 
   // Build the switch cases
   SmallVector<CaseStmt *, 4> cases;
@@ -1392,18 +1370,18 @@ deriveBodyEmbeddedDistributedReceiveDispatch(AbstractFunctionDecl *thunk,
 
   // Fallthrough (no match in any case, or a case's if-chain fell
   // through with no match): throw EmbeddedDistributedTargetNotFound
-  auto *targetIdentifierForThrow =
+  auto *targetByteCountForThrow =
       UnresolvedDotExpr::createImplicit(
           C, new (C) DeclRefExpr(ConcreteDeclRef(targetParam), dloc, implicit),
-          C.getIdentifier("identifier"));
+          C.getIdentifier("identifierByteCount"));
 
   auto *notFoundTypeExpr =
       UnresolvedDeclRefExpr::createImplicit(
           C, C.getIdentifier("EmbeddedDistributedTargetNotFound"));
   auto *notFoundInitArgs =
       ArgumentList::createImplicit(
-          C, { Argument(sloc, C.getIdentifier("target"),
-                        targetIdentifierForThrow) });
+          C, { Argument(sloc, C.getIdentifier("targetByteCount"),
+                        targetByteCountForThrow) });
   Expr *notFoundExpr = CallExpr::createImplicit(C, notFoundTypeExpr,
                                                 notFoundInitArgs);
   bodyStmts.push_back(new (C) ThrowStmt(sloc, notFoundExpr));
