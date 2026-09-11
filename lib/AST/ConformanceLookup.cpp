@@ -370,6 +370,7 @@ static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
   case SILFunctionTypeRepresentation::Block:
     return false;
   case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Method:
