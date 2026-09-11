@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
@@ -40,6 +41,7 @@
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#include <memory>
 
 using namespace swift;
 using namespace importer;
@@ -71,6 +73,34 @@ namespace {
 
   using SerializedGlobalsAsMembersIndex =
     llvm::OnDiskIterableChainedHashTable<GlobalsAsMembersTableReaderInfo>;
+
+  /// If stats are enabled, times a region and adds the elapsed process time
+  /// (microseconds) to a lookup-table timing counter.
+  struct CumulativeTimer {
+    using Counter = int64_t UnifiedStatsReporter::AlwaysOnFrontendCounters::*;
+
+    UnifiedStatsReporter *Stats;
+    Counter counter;
+    llvm::TimeRecord startTime;
+
+    CumulativeTimer(UnifiedStatsReporter *Stats, Counter counter)
+        : Stats{Stats}, counter{counter} {
+      if (Stats)
+        startTime = llvm::TimeRecord::getCurrentTime();
+    }
+    ~CumulativeTimer() {
+      if (!Stats)
+        return;
+      auto endTime = llvm::TimeRecord::getCurrentTime();
+      Stats->getFrontendCounters().*counter +=
+          (endTime.getProcessTime() - startTime.getProcessTime()) * 1e6;
+    }
+
+    CumulativeTimer(const CumulativeTimer &) = delete;
+    CumulativeTimer &operator=(const CumulativeTimer &) = delete;
+    CumulativeTimer(CumulativeTimer &&) = delete;
+    CumulativeTimer &operator=(CumulativeTimer &&) = delete;
+  };
 } // end anonymous namespace
 
 namespace swift {
@@ -1314,6 +1344,9 @@ namespace {
 void SwiftLookupTableWriter::writeExtensionContents(
        clang::Sema &sema,
        llvm::BitstreamWriter &stream) {
+  auto Timer = CumulativeTimer(swiftCtx.Stats,
+                               &UnifiedStatsReporter::AlwaysOnFrontendCounters::
+                                   LookupTableWriteCumulativeUsec);
   NameImporter nameImporter(swiftCtx, availability, sema, importerImpl);
 
   // Populate the lookup table.
@@ -2180,6 +2213,9 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
 void importer::finalizeLookupTable(
     SwiftLookupTable &table, NameImporter &nameImporter,
     ClangSourceBufferImporter &buffersForDiagnostics) {
+  auto Timer = CumulativeTimer(nameImporter.getContext().Stats,
+                               &UnifiedStatsReporter::AlwaysOnFrontendCounters::
+                                   LookupTableFinalizeCumulativeUsec);
   // Resolve any unresolved entries.
   SmallVector<SwiftLookupTable::SingleEntry, 4> unresolved;
   if (table.resolveUnresolvedEntries(unresolved)) {
@@ -2268,6 +2304,9 @@ void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
 
 void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
                                            NameImporter &nameImporter) {
+  auto Timer = CumulativeTimer(swiftCtx.Stats,
+                               &UnifiedStatsReporter::AlwaysOnFrontendCounters::
+                                   LookupTablePopulateCumulativeUsec);
   auto &sema = nameImporter.getClangSema();
   for (auto decl : sema.Context.getTranslationUnitDecl()->noload_decls()) {
     populateTableWithDecl(table, nameImporter, decl);
@@ -2319,8 +2358,9 @@ SwiftNameLookupExtension::createExtensionReader(
   // Create the reader.
   std::unique_ptr<SwiftLookupTableReader> tableReader;
   {
-    FrontendStatsTracer tracer(swiftCtx.Stats,
-                               "deserialize-swift-lookup-table");
+    auto Timer = CumulativeTimer(
+        swiftCtx.Stats, &UnifiedStatsReporter::AlwaysOnFrontendCounters::
+                            LookupTableDeserializeCumulativeUsec);
     tableReader =
         SwiftLookupTableReader::create(this, reader, mod, onRemove, stream);
   }

@@ -145,6 +145,19 @@ FRONTEND_STATISTIC(ClangImporter, LookupTableResolvePasses)
 /// Distinct base names keyed in a written Swift lookup table.
 FRONTEND_STATISTIC(ClangImporter, LookupTableDistinctBaseNames)
 
+/// Total time spent writing Swift lookup tables into Clang modules
+//(whole extension write: populate + finalize + serialize).
+FRONTEND_STATISTIC(ClangImporter, LookupTableWriteCumulativeUsec)
+
+/// Time spent populating Swift lookup tables with decls and macros.
+FRONTEND_STATISTIC(ClangImporter, LookupTablePopulateCumulativeUsec)
+
+/// Time spent resolving forward references in Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableFinalizeCumulativeUsec)
+
+/// Time spent deserializing Swift lookup table headers from loaded Clang modules.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeserializeCumulativeUsec)
+
 /// Clang declarations first materialized from a lookup table during lookup.
 FRONTEND_STATISTIC(ClangImporter, LookupTableDeclResolved)
 
