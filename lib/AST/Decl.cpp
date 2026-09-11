@@ -544,6 +544,15 @@ void NominalTypeDecl::visitAuxiliaryExtensions(
         visit(ext);
     }
   }
+  // The synthesized IID property for COM interop is added with an extension.
+  if (ctx.LangOpts.EnableCOMInterop && mutableNTD->isInSwiftSourceFile()) {
+    if (auto *PD = dyn_cast<ProtocolDecl>(mutableNTD)) {
+      auto *IDVar =
+          evaluateOrDefault(eval, SynthesizeCOMInterfaceIDRequest{PD}, nullptr);
+      if (IDVar)
+        visit(IDVar->getDeclContext()->getAsDecl());
+    }
+  }
 }
 
 void Decl::forEachAttachedMacro(MacroRole role,
