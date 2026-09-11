@@ -16,10 +16,16 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
+import Builtin
 
 @available(StdlibDeploymentTarget 6.3, *)
-@_extern(c, "_swift_exit")
-internal func _exit(result: CInt)
+@_extern(c) private func _swift_exit(_ result: CInt) /* -> Never */
+
+@available(StdlibDeploymentTarget 6.3, *)
+internal func _exit(result: CInt) -> Never {
+  _swift_exit(result)
+  Builtin.unreachable()
+}
 
 #if !$Embedded
 @available(StdlibDeploymentTarget 6.3, *)

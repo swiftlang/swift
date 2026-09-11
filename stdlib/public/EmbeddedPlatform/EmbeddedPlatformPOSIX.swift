@@ -84,7 +84,7 @@ public func _swift_writeToStandardOutput(
 
 @export(interface)
 @implementation @c
-public func _swift_exit(_ code: CInt) {
+public func _swift_exit(_ code: CInt) -> Never {
   exit(code)
 }
 

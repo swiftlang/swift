@@ -606,7 +606,7 @@ __swift_ptrdiff_t _swift_thread_isMain(void);
  * This function can be implemented directly with a call to the POSIX exit()
  * function.
  */
-void _swift_exit(int code);
+void _swift_exit(int code) EMBEDDED_SWIFT_NORETURN;
 
 #if defined(__cplusplus)
 }
