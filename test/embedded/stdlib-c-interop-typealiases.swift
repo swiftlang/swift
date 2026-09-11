@@ -12,7 +12,6 @@ RUN:   -enable-experimental-feature Embedded -o - | %FileCheck %s
 
 CHECK: !DIDerivedType(tag: DW_TAG_typedef, name: "${{[se]}}s4CInta
 
-REQUIRES: swift_in_compiler
 REQUIRES: embedded_stdlib
 REQUIRES: swift_feature_Embedded
 */
