@@ -21,6 +21,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Strings.h"
 #include "clang/Lex/HeaderSearchOptions.h"
@@ -536,23 +537,6 @@ void ModuleDependencyInfo::setOutputPathAndHash(StringRef outputPath,
   }
 }
 
-SwiftDependencyScanningService::SwiftDependencyScanningService()
-    : Alloc(), Saver(Alloc) {
-  clang::dependencies::DependencyScanningServiceOptions opts;
-  // ScanningOptimizations::Default excludes the current working directory
-  // optimization. Clang needs to communicate with the build system to handle
-  // the optimization safely. Swift can handle the working directory
-  // optimizaiton already so it is safe to turn on all optimizations.
-  opts.OptimizeArgs = clang::dependencies::ScanningOptimizations::All;
-  // The Swift scanner relies on the set of Clang modules visible from each
-  // by-name module lookup to resolve Swift overlay and cross-import overlay
-  // dependencies, so opt into having Clang report them.
-  opts.ReportVisibleModules = true;
-  opts.MakeVFS = [] { return llvm::vfs::createPhysicalFileSystem(); };
-
-  ClangScanningService.emplace(std::move(opts));
-}
-
 bool
 swift::dependencies::checkImportNotTautological(const ImportPath::Module modulePath,
                                                 const SourceLoc importLoc,
@@ -655,70 +639,100 @@ swift::dependencies::registerBackDeployLibraries(
   #include "swift/Frontend/BackDeploymentLibs.def"
 }
 
-bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
-    CompilerInstance &Instance) {
-  if (!Instance.getInvocation().requiresCAS())
-    return false;
+/// Build the callback to install as
+/// \c DependencyScanningServiceOptions::MakeVFS, capturing a snapshot of the
+/// ClangImporter file system of \p ctx.
+///
+/// The Clang scanner command line refers to ClangImporter's in-memory files
+/// with plain '-ivfsoverlay' arguments -- notably the system VFS overlay on
+/// non-Darwin platforms. A worker that cannot see them ends up with fewer
+/// \c RedirectingFileSystem s than '-ivfsoverlay' options and trips an
+/// assertion in Clang's \c HeaderSearch::collectVFSUsageAndClear.
+static std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()>
+makeClangScanningVFSFactory(
+    const ASTContext &ctx, std::shared_ptr<llvm::cas::ObjectStore> cas,
+    llvm::function_ref<StringRef(StringRef)> allocateString) {
+  // Snapshot the ClangImporter file system into an owning recipe rather than
+  // capturing the ASTContext: the callback outlives the per-query
+  // CompilerInstance this came from. The overriden files' contents are
+  // allocated by \p allocateString for the same reason.
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  auto recipe = ClangImporter::computeClangImporterVFSRecipe(
+      ctx, importer->getClangFileMapping(), allocateString);
 
-  if (CASConfig) {
-    // If CASOption matches, the service is initialized already.
-    if (*CASConfig == Instance.getInvocation().getCASOptions().Config)
-      return false;
-
-    // CASOption mismatch, return error.
-    Instance.getDiags().diagnose(SourceLoc(), diag::error_cas_conflict_options);
-    return true;
-  }
-
-  // Setup CAS.
-  CASConfig = Instance.getInvocation().getCASOptions().Config;
-
-  clang::CASOptions CASOpts;
-  CASOpts.CASPath = CASConfig->CASPath;
-  CASOpts.PluginPath = CASConfig->PluginPath;
-  CASOpts.PluginOptions = CASConfig->PluginOptions;
-
-  {
-    clang::dependencies::DependencyScanningServiceOptions opts;
-    // The current working directory optimization (off by default) should not
-    // impact CAS. We set the optization to all to be consistent with the
-    // non-CAS case.
-    opts.OptimizeArgs = clang::dependencies::ScanningOptimizations::All;
-    // See the non-CAS case above.
-    opts.ReportVisibleModules = true;
-    opts.Compilation = clang::dependencies::IncludeTreeCompilation{
-        CASOpts, Instance.getSharedCASInstance(),
-        Instance.getSharedCacheInstance()};
-
-    // The base VFS is derived from the ClangImporter of the first invocation.
-    // This is usually fine since the base VFS should be the same for the same
-    // platform.
-    //
-    // Snapshot it into an owning recipe rather than capturing the ASTContext:
-    // the callback is owned by the scanning service and outlives this
-    // per-query CompilerInstance. Just as importantly, the callback must build a
-    // *separate* file system on every call -- the Clang scanner calls
+  return [recipe = std::move(recipe), cas = std::move(cas)]()
+             -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
+    // Build a *separate* file system on every call: the Clang scanner calls
     // setCurrentWorkingDirectory on the file system it is handed, and several
     // workers do so concurrently (rdar://184810704).
-    auto &ctx = Instance.getASTContext();
-    auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-    auto recipe = ClangImporter::computeClangImporterVFSRecipe(
-        ctx, importer->getClangFileMapping(),
-        [&](StringRef str) { return save(str); });
-    auto cas = Instance.getSharedCASInstance();
+    auto fs = ClangImporter::computeClangImporterFileSystem(
+        recipe, llvm::vfs::createPhysicalFileSystem());
+    if (cas)
+      return llvm::cas::createCASProvidingFileSystem(cas, std::move(fs));
+    return fs;
+  };
+}
 
-    opts.MakeVFS = [recipe = std::move(recipe),
-                    cas]() -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
-      auto fs = ClangImporter::computeClangImporterFileSystem(
-          recipe, llvm::vfs::createPhysicalFileSystem());
-      if (cas)
-        return llvm::cas::createCASProvidingFileSystem(cas, std::move(fs));
-      return fs;
-    };
+bool SwiftDependencyScanningService::setupDependencyScanningService(
+    CompilerInstance &Instance) {
+  // Serialize the check-and-create below. Several scans can start concurrently
+  // on a fresh service, and creating the Clang scanning service twice would
+  // dangle the references held by the workers of whichever scan got there
+  // first.
+  //
+  // Note that this lock must stay recursive: \c save() takes it too, and is
+  // reached from \c makeClangScanningVFSFactory below.
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
 
-    ClangScanningService.emplace(std::move(opts));
+  const auto &invocation = Instance.getInvocation();
+
+  if (ClangScanningService) {
+    // The service is reused as-is. Its base file system is not rebuilt, which
+    // is usually fine since it should be the same for the same platform, but a
+    // conflicting CAS configuration cannot be honored.
+    if (invocation.requiresCAS() &&
+        (!CASConfig || *CASConfig != invocation.getCASOptions().Config)) {
+      Instance.getDiags().diagnose(SourceLoc(),
+                                  diag::error_cas_conflict_options);
+      return true;
+    }
+    return false;
   }
 
+  clang::dependencies::DependencyScanningServiceOptions opts;
+  // ScanningOptimizations::Default excludes the current working directory
+  // optimization. Clang needs to communicate with the build system to handle
+  // the optimization safely. Swift can handle the working directory
+  // optimizaiton already so it is safe to turn on all optimizations. This also
+  // keeps the caching and non-caching cases consistent; the optimization should
+  // not impact CAS either way.
+  opts.OptimizeArgs = clang::dependencies::ScanningOptimizations::All;
+  // The Swift scanner relies on the set of Clang modules visible from each
+  // by-name module lookup to resolve Swift overlay and cross-import overlay
+  // dependencies, so opt into having Clang report them.
+  opts.ReportVisibleModules = true;
+
+  std::shared_ptr<llvm::cas::ObjectStore> cas;
+  if (invocation.requiresCAS()) {
+    CASConfig = invocation.getCASOptions().Config;
+
+    clang::CASOptions CASOpts;
+    CASOpts.CASPath = CASConfig->CASPath;
+    CASOpts.PluginPath = CASConfig->PluginPath;
+    CASOpts.PluginOptions = CASConfig->PluginOptions;
+
+    cas = Instance.getSharedCASInstance();
+    opts.Compilation = clang::dependencies::IncludeTreeCompilation{
+        CASOpts, cas, Instance.getSharedCacheInstance()};
+  }
+
+  // The base VFS is derived from the ClangImporter of this invocation, which is
+  // usually fine since it should be the same for the same platform.
+  opts.MakeVFS = makeClangScanningVFSFactory(
+      Instance.getASTContext(), std::move(cas),
+      [this](StringRef str) { return save(str); });
+
+  ClangScanningService.emplace(std::move(opts));
   return false;
 }
 
