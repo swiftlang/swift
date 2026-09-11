@@ -598,8 +598,9 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
     // Clear the op_deref, unless we have an address-only type.
     if (!addressOnly)
       sharedUInt8().DebugValueInst.prependDeref = false;
-    // As the block has no argument, drop the operand.
-    eraseLastOperand();
+    // An unused argument is left behind, as there must be the same amount
+    // of operands and arguments.
+    block->createPhiArgument(operand->getType(), OwnershipKind::None);
   } else if (hasDeref()) {
     SILArgument *arg = block->createPhiArgument(
         operand->getType().getAddressType(), OwnershipKind::None);
@@ -641,23 +642,31 @@ void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
     .cloneDebugReconstructionBlockContent(srcBB, newBB);
 }
 
-void DebugValueInst::eraseLastOperand() {
-  // The variable data is tail allocated after the operands, so shrinking the
-  // operand list moves it by one operand. It is all trivially copyable, so
-  // using memmove is safe. Nothing keeps pointers on the varinfo.
-  size_t varinfoSize = getDebugVarTrailingDataSize(
-      VarInfo.getName(getTrailingObjects<char>()).size(),
-      HasAuxDebugVariableType, hasAuxDebugLocation(), hasAuxDebugScope(),
-      NumDIExprOperands);
-  char *varinfoBegin = reinterpret_cast<char *>(getAllOperands().end());
+DebugValueInst *DebugValueInst::replaceOperands(ArrayRef<SILValue> operands) {
+  ASSERT(operands.size() <= MaxOperands &&
+         "too many operands for a debug value");
+  ASSERT(!ReconstructionBlock ||
+         ReconstructionBlock->getNumArguments() == operands.size());
 
-  eraseLastOperandInPlace();
-  std::memmove(varinfoBegin - sizeof(Operand), varinfoBegin, varinfoSize);
+  // If the operand list is not resized, the change is done in place.
+  if (operands.size() == getAllOperands().size()) {
+    for (auto [operand, value] : llvm::zip(getAllOperands(), operands))
+      operand.set(value);
+    return this;
+  }
+
+  auto *newInst = create(getDebugLocation(), operands, getModule(), *getVarInfo(),
+                         usesMoveableValueDebugInfo(), hasTrace());
+  std::swap(newInst->ReconstructionBlock, this->ReconstructionBlock);
+
+  getParent()->insert(this, newInst);
+  eraseFromParent();
+  return newInst;
 }
 
 void DebugValueInst::killOperand(unsigned operandIdx, SILType operandType) {
   // If there is a debug reconstruction block, the operand doesn't describe the
-  // variable directly, the block does. Drop the operand, keeping the rest of
+  // variable directly, the block does. Poison the operand, keeping the rest of
   // the block, as a part of the variable might be constant and still recoverable.
   if (auto *bb = getDebugReconstructionBlock()) {
     ASSERT(bb->getNumArguments() == getAllOperands().size() &&
@@ -665,16 +674,8 @@ void DebugValueInst::killOperand(unsigned operandIdx, SILType operandType) {
     ASSERT(operandIdx < bb->getNumArguments());
     auto *argument = bb->getArgument(operandIdx);
     argument->replaceAllUsesWithUndef();
-
-    // Only a trailing operand can be removed: erasing one in the middle would
-    // shift the following operands, invalidating existing Operand pointers.
-    if (operandIdx == getAllOperands().size() - 1) {
-      bb->eraseArgument(operandIdx);
-      eraseLastOperand();
-    } else {
-      // Keep an undef operand and its now unused block argument.
-      getAllOperands()[operandIdx].set(SILUndef::get(argument));
-    }
+    // Keep a dead undef operand as operand count cannot be changed in place.
+    getAllOperands()[operandIdx].set(SILUndef::get(argument));
     return;
   }
 

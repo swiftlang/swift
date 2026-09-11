@@ -1807,20 +1807,6 @@ public:
     return sharedUInt32().InstructionBaseWithTrailingOperands.numOperands;
   }
 
-protected:
-  /// Removes the last operand, shrinking the tail allocated operand list.
-  /// The other, previous, operands, remain fully valid.
-  /// If there are any OtherTrailingTypes, they need to be moved separately by
-  /// the callee.
-  void eraseLastOperandInPlace() {
-    auto operands = getAllOperands();
-    ASSERT(!operands.empty() && "no operand to erase");
-
-    operands.back().~Operand();
-    sharedUInt32().InstructionBaseWithTrailingOperands.numOperands =
-        operands.size() - 1;
-  }
-
 public:
   ArrayRef<Operand> getAllOperands() const {
     return this->template getTrailingObjectsNonStrict<Operand>(
@@ -5792,12 +5778,19 @@ class DebugValueInst final
   using InstructionBaseWithTrailingOperands::numTrailingObjects;
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
-  /// Removes the last operand, shrinking the tail allocated operand list.
-  /// Only the last operand can be removed, to avoid invalidating other
-  /// existing Operand pointers. Pointers to this last operand are invalidated.
-  void eraseLastOperand();
-
 public:
+  /// The maximum number of operands a debug value can have. Every operand has
+  /// to be kept available up to the debug value, so salvaging gives up rather
+  /// than growing the operand list beyond it.
+  static constexpr unsigned MaxOperands = 16;
+
+  /// Replaces this instruction with an equivalent one whose operand list is
+  /// \p operands.
+  /// Returns the new instruction. The reconstruction block must already
+  /// reflect the new operand list.
+  /// This erases this instruction if the change can't be done in place.
+  DebugValueInst *replaceOperands(ArrayRef<SILValue> operands);
+
   /// Returns the single operand, asserting that there is exactly one.
   /// Should only be used in contexts where it is known that there is no
   /// debug reconstruction block.
@@ -5966,16 +5959,15 @@ public:
   /// created and attached to this instruction.
   /// The newly created basic block will be well-formed, returning the SSA
   /// value of this debug_value directly.
-  /// If this debug_value has an undef operand, the reconstruction block
-  /// has no arguments and returns undef directly, and the operand is dropped.
+  /// If this debug_value has an undef operand, the reconstruction block returns
+  /// undef directly, leaving its argument unused.
   SILBasicBlock *getOrCreateDebugReconstructionBlock();
 
   /// Kills the operand from this debug value.
   /// This function must be called by passes whenever the operand of this debug
   /// value is no longer valid and cannot be salvaged.
-  /// Uses inside a debug reconstruction block are replaced with undef. If this
-  /// is the last operand, the operand list is shrunk.
-  /// Any pointers to the killed Operand are invalidated.
+  /// The operand becomes undef, and its uses inside a debug reconstruction
+  /// block are replaced with undef, leaving its argument unused.
   /// If \p operandType is specified, that undef will use that type (in the
   /// appropriate address/object form) instead of the current operand's type.
   void killOperand(unsigned operandIdx, SILType operandType = SILType());
