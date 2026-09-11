@@ -119,3 +119,28 @@ func CImplDuplicate(_: CInt) {
 func CImplDuplicate(_: CInt) {
 // expected-error@-2 {{duplicate implementation of imported global function 'CImplDuplicate'}}
 }
+
+//
+// __attribute__((overloadable)) C functions are selected by parameter type,
+// like C++ overloads
+//
+
+@implementation @c
+func CImplOverloaded(_: CInt) {
+  // OK
+}
+
+@implementation @c
+func CImplOverloaded(_: Float) {
+  // OK
+}
+
+@implementation @c
+func CImplOverloaded(_: Double) {
+  // expected-error@-2 {{could not find imported function 'CImplOverloaded' matching global function 'CImplOverloaded'; make sure you import the module or header that declares it}}
+}
+
+@implementation @c
+func CImplOverloadedMixed(_: CInt) {
+  // OK -- the one unmarked overload of an overloadable set
+}

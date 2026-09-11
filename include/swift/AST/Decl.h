@@ -1439,7 +1439,10 @@ public:
 
   /// If this is the Swift implementation of a declaration imported from ObjC,
   /// returns the imported declarations. (There may be several for a main class
-  /// body; if so, the first will be the class itself.) Otherwise return an empty list.
+  /// body; if so, the first will be the class itself. There may also be
+  /// several for an `@implementation` function whose foreign name resolves to
+  /// overloads it could equally implement; that is diagnosed as ambiguous.)
+  /// Otherwise return an empty list.
   ///
   /// \seeAlso ExtensionDecl::isObjCInterface()
   llvm::TinyPtrVector<Decl *> getAllImplementedObjCDecls() const;
