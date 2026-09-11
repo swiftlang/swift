@@ -341,7 +341,12 @@ public struct Builder {
     let cast = bridged.createUpcast(value.bridged, type.bridged)
     return notifyNew(cast.getAs(UpcastInst.self))
   }
-  
+
+  public func createRefToRawPointer(from value: Value, to type: Type) -> RefToRawPointerInst {
+    let cast = bridged.createRefToRawPointer(value.bridged, type.bridged)
+    return notifyNew(cast.getAs(RefToRawPointerInst.self))
+  }
+
   @discardableResult
   public func createCheckedCastAddrBranch(
     source: Value, sourceFormalType: CanonicalType,
@@ -619,15 +624,12 @@ public struct Builder {
     return notifyNew(enumInst.getAs(EnumInst.self))
   }
 
-  public static let optionalNoneCaseIndex = 0
-  public static let optionalSomeCaseIndex = 1
-
   public func createOptionalNone(type: Type) -> EnumInst {
-    return createEnum(caseIndex: Self.optionalNoneCaseIndex, payload: nil, enumType: type)
+    return createEnum(caseIndex: EnumDecl.optionalNoneCaseIndex, payload: nil, enumType: type)
   }
 
   public func createOptionalSome(operand: Value, type: Type) -> EnumInst {
-    return createEnum(caseIndex: Self.optionalSomeCaseIndex, payload: operand, enumType: type)
+    return createEnum(caseIndex: EnumDecl.optionalSomeCaseIndex, payload: operand, enumType: type)
   }
 
   public func createThinToThickFunction(thinFunction: Value, resultType: Type) -> ThinToThickFunctionInst {

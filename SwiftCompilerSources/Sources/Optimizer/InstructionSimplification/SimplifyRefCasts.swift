@@ -32,6 +32,12 @@ extension UncheckedRefCastInst : OnoneSimplifiable {
   }
 }
 
+extension RefToRawPointerInst : OnoneSimplifiable {
+  func simplify(_ context: SimplifyContext) {
+    simplifySourceOperandOfRefCast(context)
+  }
+}
+
 private extension CheckedCastBranchInst {
 
   /// Removes the `checked_cast_br` if it is dead:
