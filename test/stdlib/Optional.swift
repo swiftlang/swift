@@ -24,7 +24,7 @@ OptionalTests.test("nil comparison") {
   expectFalse(x != nil)
 
   switch x {
-  case .some(let y): expectUnreachable()
+  case .some(_): expectUnreachable()
   case .none: break
   }
 
@@ -32,10 +32,10 @@ OptionalTests.test("nil comparison") {
   expectTrue(x != nil)
 
   do {
-    var y1: Int? = .none
+    let y1: Int? = .none
     expectTrue(y1 == nil)
 
-    var y2: Int? = .none
+    let y2: Int? = .none
     expectTrue(y2 == nil)
   }
 
@@ -92,7 +92,7 @@ OptionalTests.test("CustomReflectable") {
     var output = ""
     dump(value, to: &output)
     expectEqual("- nil\n", output)
-    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+    expectEqual(.optional, Mirror(reflecting: value as Any).displayStyle)
   }
   do {
     let value: OpaqueValue<Int>? = OpaqueValue(1010)
@@ -104,7 +104,7 @@ OptionalTests.test("CustomReflectable") {
       "    - value: 1010\n" +
       "    - identity: 0\n"
     expectEqual(expected, output)
-    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+    expectEqual(.optional, Mirror(reflecting: value as Any).displayStyle)
   }
   // Test with a reference type.
   do {
@@ -112,7 +112,7 @@ OptionalTests.test("CustomReflectable") {
     var output = ""
     dump(value, to: &output)
     expectEqual("- nil\n", output)
-    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+    expectEqual(.optional, Mirror(reflecting: value as Any).displayStyle)
   }
   do {
     let value: LifetimeTracked? = LifetimeTracked(1010)
@@ -125,7 +125,7 @@ OptionalTests.test("CustomReflectable") {
       "    - identity: 0\n" +
       "    - serialNumber: 1\n"
     expectEqual(expected, output)
-    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+    expectEqual(.optional, Mirror(reflecting: value as Any).displayStyle)
   }
 }
 
@@ -309,7 +309,7 @@ OptionalTests.test("Casting Optional") {
 
   // https://github.com/apple/swift/issues/43076
   // Weakened optionals don't zero
-  var t = LifetimeTracked(0)
+  let t = LifetimeTracked(0)
   _ = anyToAny(Optional(t), CustomDebugStringConvertible.self)
   expectTrue(anyToAnyIs(Optional(t), CustomDebugStringConvertible.self))
 
@@ -417,39 +417,183 @@ OptionalTests.test("unsafelyUnwrapped") {
 }
 
 OptionalTests.test("unsafelyUnwrapped nil")
-  .require(.crashTesting)
-  .xfail(.custom(
-    { !_isDebugAssertConfiguration() },
-    reason: "assertions are disabled in Release and Unchecked mode"))
-  .code {
+.require(.crashTesting)
+.xfail(.custom(
+  { !_isDebugAssertConfiguration() },
+  reason: "assertions are disabled in Release and Unchecked mode"))
+.code {
   let empty: Int? = nil
   expectCrashLater()
   _blackHole(empty.unsafelyUnwrapped)
 }
 
-OptionalTests.test("_span() from Optional.none")
-.require(.stdlib_6_2).code {
+OptionalTests.test("Span from Optional.none")
+.require(.minimumStdlib(.stdlib_6_5)).code {
   var o = Optional<[Int]>.none
-  let span = o._span()
-  // o = [1, 2, 3] // Does not compile, exclusivity violation
-  expectEqual(span.count, 0)
+  do {
+    let span = o.span
+    // o = [1, 2, 3] // Does not compile, exclusivity violation
+    expectEqual(span.count, 0)
 
-  // make it fail at test time if exclusivity was violated
-  expectNil(o, "fail due to exclusivity violation")
+    // make it fail at test time if exclusivity was violated
+    expectNil(o, "fail due to exclusivity violation")
+  }
+  o = nil
 }
 
-OptionalTests.test("_span() from Optional.some")
-.require(.stdlib_6_2).code {
+OptionalTests.test("Span from Optional.some")
+.require(.minimumStdlib(.stdlib_6_5)).code {
   let a: [Int] = [1, 2, 3]
   var o: Optional = a
-  let span = o._span()
+  do {
+    let span = o.span
+    // o = nil // Does not compile, exclusivity violation
+    expectEqual(span.count, 1)
+    expectEqual(span[0], o, "accessed mysterious memory location")
+
+    expectNotNil(o, "fail due to exclusivity violation")
+
+    let b = [4, 5, 6]
+    // o = b // Does not compile, exclusivity violation
+    expectNotEqual(span[0], b, "accessed mysterious memory location")
+  }
+  o = nil
+}
+
+OptionalTests.test("MutableSpan from Optional.none")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  var o = Optional<[Int]>.none
+  let span = o.mutableSpan
+  // o = [1, 2, 3] // Does not compile, exclusivity violation
+  expectEqual(span.count, 0)
+}
+
+OptionalTests.test("MutableSpan from Optional.some")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  var a: [Int] = [1, 2, 3]
+  var o: Optional = a
+  var span = o.mutableSpan
   // o = nil // Does not compile, exclusivity violation
   expectEqual(span.count, 1)
-  expectEqual(span[0], o, "accessed mysterious memory location")
+  expectEqual(span[0], a, "accessed mysterious memory location")
 
-  expectNotNil(o, "fail due to exclusivity violation")
+  a = [4, 5, 6]
+  span[0] = a
+  _ = consume span
+  // exclusive access through `span` ends here
 
-  let b = [4, 5, 6]
-  // o = b // Does not compile, exclusivity violation
-  expectNotEqual(span[0], b, "accessed mysterious memory location")
+  expectEqual(o, a)
+}
+
+struct TestError: Error, Equatable {}
+
+OptionalTests.test("edit")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  var o = Optional<LifetimeTracked>.none
+  o.edit {
+    expectEqual($0.count, 0)
+    expectEqual($0.capacity, 1)
+  }
+  expectNil(o)
+
+  o = LifetimeTracked(1)
+  o.edit {
+    expectEqual($0.count, 1)
+    expectEqual($0.capacity, 1)
+  }
+  expectEqual(o?.value, 1)
+
+  o.edit {
+    $0.removeAll()
+  }
+  expectNil(o)
+  expectEqual(LifetimeTracked.instances, 0)
+
+  o = LifetimeTracked(2)
+  o.edit {
+    $0.removeAll()
+    $0.append(LifetimeTracked(3))
+  }
+  expectEqual(o?.value, 3)
+  expectEqual(LifetimeTracked.instances, 1)
+  o = nil
+
+  let count = o.edit { $0.count }
+  expectEqual(count, 0)
+}
+
+OptionalTests.test("edit with throwing closure")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  var o: LifetimeTracked? = LifetimeTracked(1)
+  do throws(TestError) {
+    try o.edit {
+      span throws(TestError) in
+      span.removeAll()
+      throw TestError()
+    }
+    expectUnreachable()
+  } catch {
+    expectTrue(error == TestError())
+  }
+  expectNil(o)
+
+  do throws(TestError) {
+    try o.edit {
+      span throws(TestError)  in
+      span.append(LifetimeTracked(2))
+      throw TestError()
+    }
+    expectUnreachable()
+  } catch {
+    expectTrue(error == TestError())
+  }
+  expectEqual(o?.value, 2)
+  o = nil
+}
+
+OptionalTests.test("edit: wrapped type without spare bits")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  var o = Optional<Int>.none
+  o.edit { $0.append(42) }
+  expectEqual(o, 42)
+  o.edit { $0.removeAll() }
+  expectNil(o)
+  o.edit { _ in }
+  expectNil(o)
+}
+
+struct NCInt: ~Copyable {
+  let tracker: LifetimeTracked
+  init(_ value: Int) { tracker = LifetimeTracked(value) }
+}
+
+OptionalTests.test("edit: noncopyable wrapped type")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  var o: NCInt? = NCInt(1)
+  expectEqual(LifetimeTracked.instances, 1)
+  o.edit { $0.removeAll() }
+  expectNil(o)
+  expectEqual(LifetimeTracked.instances, 0)
+
+  o.edit { $0.append(NCInt(2)) }
+  o.edit { expectEqual($0.count, 1) }
+  expectEqual(LifetimeTracked.instances, 1)
+
+  // the worst way to write o.take()
+  let nci = o.edit { $0.removeLast() }
+  expectNil(o)
+  expectEqual(nci.tracker.value, 2)
+  _ = consume nci
+}
+
+OptionalTests.test("edit: capacity is one")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  var o = Optional<Int>.none
+  expectCrashLater()
+  o.edit {
+    $0.append(1)
+    $0.append(2)
+  }
 }
