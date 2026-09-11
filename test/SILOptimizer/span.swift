@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -parse-as-library -disable-availability-checking -emit-ir -O | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend %s -parse-as-library -target %target-swift-6.2-abi-triple -emit-ir -O | %FileCheck %s --check-prefix=CHECK
 
 // Check that the MoveOnlyWrappedTypeEliminator doesn't crash
 func consumingArray(_ arr: consuming [Int]) {

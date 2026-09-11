@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -disable-availability-checking -dump-ast %s | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -dump-ast %s | %FileCheck %s
 
 struct Transaction {
   var state: Int?

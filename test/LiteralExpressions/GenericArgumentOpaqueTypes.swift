@@ -5,7 +5,7 @@
 // FIXME: SwiftParser has no 'some' rule in expression position, so it parses
 // these as tuple expressions and round-trip verification fails with
 // "unexpected code 'P' in tuple". Drop the flag once SwiftParser matches.
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature LiteralExpressions -disable-experimental-parser-round-trip
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-experimental-feature LiteralExpressions -disable-experimental-parser-round-trip
 
 protocol P {}
 struct S: P {}

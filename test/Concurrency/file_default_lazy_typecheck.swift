@@ -3,19 +3,19 @@
 // RUN: %empty-directory(%t/eager)
 // RUN: %empty-directory(%t/lazy)
 
-// RUN: %target-swift-frontend -emit-module -module-name Lib -swift-version 6 -enable-library-evolution -disable-availability-checking -enable-experimental-feature DefaultIsolationPerFile -o %t/eager/Lib.swiftmodule -emit-module-interface-path %t/eager/Lib.swiftinterface %t/lib.swift
-// RUN: %target-swift-frontend -emit-module -module-name Lib -swift-version 6 -enable-library-evolution -disable-availability-checking -enable-experimental-feature DefaultIsolationPerFile -experimental-lazy-typecheck -o %t/lazy/Lib.swiftmodule -emit-module-interface-path %t/lazy/Lib.swiftinterface %t/lib.swift
+// RUN: %target-swift-frontend -emit-module -module-name Lib -swift-version 6 -enable-library-evolution -enable-experimental-feature DefaultIsolationPerFile -o %t/eager/Lib.swiftmodule -emit-module-interface-path %t/eager/Lib.swiftinterface %t/lib.swift
+// RUN: %target-swift-frontend -emit-module -module-name Lib -swift-version 6 -enable-library-evolution -enable-experimental-feature DefaultIsolationPerFile -experimental-lazy-typecheck -o %t/lazy/Lib.swiftmodule -emit-module-interface-path %t/lazy/Lib.swiftinterface %t/lib.swift
 
 // RUN: diff %t/eager/Lib.swiftinterface %t/lazy/Lib.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t/lazy/Lib.swiftinterface) -module-name Lib
 
 // RUN: %FileCheck %t/lib.swift --input-file %t/lazy/Lib.swiftinterface
 
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -swift-version 6 -disable-availability-checking -I %t/eager %t/client.swift
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -swift-version 6 -disable-availability-checking -I %t/lazy %t/client.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -swift-version 6 -I %t/eager %t/client.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -swift-version 6 -I %t/lazy %t/client.swift
 
 // Make sure the default doesn't force typechecking...
-// RUN: %target-swift-frontend -emit-module -emit-module-path /dev/null -module-name Lib -swift-version 6 -enable-library-evolution -parse-as-library -disable-availability-checking -enable-experimental-feature DefaultIsolationPerFile -experimental-lazy-typecheck -experimental-skip-all-function-bodies -experimental-skip-non-exportable-decls -debug-forbid-typecheck-prefix NoTypecheck %t/lib.swift
+// RUN: %target-swift-frontend -emit-module -emit-module-path /dev/null -module-name Lib -swift-version 6 -enable-library-evolution -parse-as-library -enable-experimental-feature DefaultIsolationPerFile -experimental-lazy-typecheck -experimental-skip-all-function-bodies -experimental-skip-non-exportable-decls -debug-forbid-typecheck-prefix NoTypecheck %t/lib.swift
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_DefaultIsolationPerFile

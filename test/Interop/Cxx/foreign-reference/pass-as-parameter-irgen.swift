@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -fignore-exceptions -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -fignore-exceptions -target %target-swift-5.8-abi-triple | %FileCheck %s
 
 import PassAsParameter
 

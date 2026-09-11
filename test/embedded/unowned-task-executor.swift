@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -disable-availability-checking -module-name test -parse-as-library %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -module-name test -parse-as-library %s -emit-ir | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib

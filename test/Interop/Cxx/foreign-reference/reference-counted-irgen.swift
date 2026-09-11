@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=default -Xcc -fignore-exceptions -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=default -Xcc -fignore-exceptions -target %target-swift-5.8-abi-triple | %FileCheck %s
 
 import ReferenceCounted
 
