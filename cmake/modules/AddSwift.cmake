@@ -801,6 +801,8 @@ function(add_swift_host_library name)
   set_target_properties(${name} PROPERTIES
     BUILD_WITH_INSTALL_RPATH YES
     FOLDER "Swift libraries")
+  set_target_properties(${name} PROPERTIES
+    PURE_SWIFT_LIB NO)
 
   _add_host_variant_c_compile_flags(${name})
   _add_host_variant_link_flags(${name})
