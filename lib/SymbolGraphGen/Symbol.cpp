@@ -793,24 +793,15 @@ void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
     const auto &AvailabilityPlatforms =
         Graph->Walker.Options.AvailabilityPlatforms.value();
     const bool IsBlockList = Graph->Walker.Options.AvailabilityIsBlockList;
-
-    // Collect the keys to drop before erasing any of them: mutating a
-    // StringMap while walking it is invalid. llvm::StringMap::remove_if() is
-    // the idiomatic spelling of this loop, but it does not exist before
-    // LLVM 23, so spell it out instead of guarding on the LLVM version.
-    SmallVector<StringRef, 8> FilteredOutPlatforms;
-    for (const auto &Entry : Availabilities) {
+    Availabilities.remove_if([&](const auto &Entry) {
       // Universal availability, such as unconditional deprecation, is not
       // tied to a platform and is never filtered out.
       if (Entry.getKey() == "*")
-        continue;
+        return false;
 
       const bool IsListed = AvailabilityPlatforms.contains(Entry.getKey());
-      if (IsBlockList ? IsListed : !IsListed)
-        FilteredOutPlatforms.push_back(Entry.getKey());
-    }
-    for (const StringRef Platform : FilteredOutPlatforms)
-      Availabilities.erase(Platform);
+      return IsBlockList ? IsListed : !IsListed;
+    });
   }
 
   if (Availabilities.empty()) {
