@@ -424,7 +424,7 @@ extension NominalTypeKind: TypeInfoProtocol {
   }
 }
 
-private func getNamedFuncallArgs(node: ExprSyntax, name: String) throws
+func getNamedFuncallArgs(node: ExprSyntax, name: String) throws
   -> LabeledExprListSyntax
 {
   guard let fcall = node.as(FunctionCallExprSyntax.self) else {
@@ -607,7 +607,7 @@ extension TypeInfoProtocol {
 }
 
 /// Creates a string literal syntax node with `str` contents.
-private func stringlit(_ str: String) -> ExprSyntax {
+func stringlit(_ str: String) -> ExprSyntax {
   ExprSyntax(StringLiteralExprSyntax(content: str))
 }
 
