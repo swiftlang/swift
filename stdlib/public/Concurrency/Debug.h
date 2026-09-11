@@ -88,7 +88,18 @@ enum class _concurrency_current_task_storage_kind : uint8_t {
   /// for this may require writing the key value in a yet-to-be-defined global
   /// variable.
   pthread_allocated_key = 4,
+
+  /// The concrete storage kind is defined by the linked platform library in
+  /// `_swift_concurrency_debug_current_task_storage_kind`.
+  platform_defined = 5,
 };
+
+/// The concrete current-task storage kind used by a platform library when the
+/// Concurrency runtime reports `platform_defined`.
+///
+/// The value must identify a concrete `_concurrency_current_task_storage_kind`;
+/// it cannot itself be `platform_defined`.
+extern "C" uint32_t _swift_concurrency_debug_current_task_storage_kind;
 
 /// The current version of internal data structures that lldb may decode.
 /// The version numbers used so far are:
