@@ -43,6 +43,7 @@
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Transforms/AddressLowering.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
@@ -1230,14 +1231,14 @@ bool DifferentiationTransformer::emitDefaultDerivative(
   builder.emitDestroyValueOperation(loc, defaultDeriv);
   builder.createReturn(loc, vjpResult);
 
-#ifndef NDEBUG
-  fn->verify();
-#endif
-
   auto *pm = &context.getPassManager();
   pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(fn);
   completeAllLifetimes(pm, fn);
   pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
+
+#ifndef NDEBUG
+  fn->verify();
+#endif
 
   return true;
 }
@@ -1331,6 +1332,11 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
                    << *jvp);
       }
     }
+
+    auto *pm = &context.getPassManager();
+    pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(jvp);
+    lowerAddress(pm, jvp);
+    pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
   }
 
   // If the VJP doesn't exist, need to synthesize it.
@@ -1348,16 +1354,25 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     context.recordGeneratedFunction(vjp);
 
     // See, if we can delegate to default derivative
-    if (auto *defaultWitness = getDefaultDerivativeWitness(witness)) {
-      if (emitDefaultDerivative(witness, defaultWitness, vjp,
-                                AutoDiffDerivativeFunctionKind::VJP))
-        return false;
+    auto *defaultWitness = getDefaultDerivativeWitness(witness);
+    bool noDefault =
+        !defaultWitness ||
+        !emitDefaultDerivative(witness, defaultWitness, vjp,
+                               AutoDiffDerivativeFunctionKind::VJP);
+
+    if (noDefault) {
+      // Emit VJP function.
+      VJPCloner cloner(context, witness, vjp, invoker);
+      if (cloner.run())
+        return true;
     }
 
-    // Emit VJP function.
-    VJPCloner cloner(context, witness, vjp, invoker);
-    return cloner.run();
+    auto *pm = &context.getPassManager();
+    pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(vjp);
+    lowerAddress(pm, vjp);
+    pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
   }
+
   return false;
 }
 
