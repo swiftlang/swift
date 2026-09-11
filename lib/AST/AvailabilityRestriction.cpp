@@ -301,25 +301,6 @@ getSubstituteDomainForRestriction(const AvailabilityRestriction &restriction,
   return std::nullopt;
 }
 
-static bool
-shouldIgnoreRestrictionInContext(const Decl *decl,
-                                 const AvailabilityRestriction &restriction,
-                                 const AvailabilityContext &context,
-                                 const AvailabilityRestrictionFlags flags) {
-  if (!context.isUnavailable())
-    return false;
-
-  if (!canIgnoreRestrictionInUnavailableContexts(decl, restriction, flags))
-    return false;
-
-  auto domain = restriction.getDomain();
-  if (auto substituteDomain =
-          getSubstituteDomainForRestriction(restriction, decl->getASTContext()))
-    domain = *substituteDomain;
-
-  return context.isUnavailableForDomain(domain);
-}
-
 static std::optional<AvailabilityRestriction>
 getDeprecationRestrictionForAttr(const Decl *decl,
                                  const SemanticAvailableAttr &attr,
@@ -357,6 +338,50 @@ getDeprecationRestrictionForAttr(const Decl *decl,
   }
 
   return std::nullopt;
+}
+
+/// Returns true if \p restriction should not be reported for a reference to
+/// \p decl from \p context.
+static bool shouldIgnoreRestriction(const Decl *decl,
+                                    const AvailabilityRestriction &restriction,
+                                    const AvailabilityContext &context,
+                                    const AvailabilityRestrictionFlags flags) {
+  auto &ctx = decl->getASTContext();
+
+  // The caller may have opted out of diagnosing potential unavailability for
+  // some of the domains that the restriction could belong to.
+  if (restriction.getReason() ==
+      AvailabilityRestriction::Reason::Unintroduced) {
+    if (flags.contains(
+            AvailabilityRestrictionFlag::AllowUnintroducedInPlatformDomains) &&
+        restriction.getDomain().isPlatform())
+      return true;
+
+    if (flags.contains(AvailabilityRestrictionFlag::
+                           AllowUnintroducedAtOrBelowDeploymentRange)) {
+      auto domainAndRange = restriction.getDomainAndRange(ctx);
+      if (auto deploymentRange =
+              domainAndRange.getDomain().getDeploymentRange(ctx)) {
+        if (deploymentRange->isContainedIn(domainAndRange.getRange()))
+          return true;
+      }
+    }
+  }
+
+  // The remaining reasons to ignore a restriction all require the context of
+  // the reference to be unavailable.
+  if (!context.isUnavailable())
+    return false;
+
+  if (!canIgnoreRestrictionInUnavailableContexts(decl, restriction, flags))
+    return false;
+
+  auto domain = restriction.getDomain();
+  if (auto substituteDomain =
+          getSubstituteDomainForRestriction(restriction, ctx))
+    domain = *substituteDomain;
+
+  return context.isUnavailableForDomain(domain);
 }
 
 std::optional<AvailabilityRestriction> swift::getAvailabilityRestrictionForAttr(
@@ -405,7 +430,7 @@ std::optional<AvailabilityRestriction> swift::getAvailabilityRestrictionForAttr(
 
   auto restriction = getRestriction();
   if (restriction &&
-      shouldIgnoreRestrictionInContext(decl, *restriction, context, flags))
+      shouldIgnoreRestriction(decl, *restriction, context, flags))
     return std::nullopt;
 
   return restriction;
