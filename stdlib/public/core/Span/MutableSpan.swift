@@ -411,6 +411,19 @@ extension MutableSpan where Element: ~Copyable {
   internal func _checkIndex(_ position: Index) {
     _precondition(indices.contains(position), "index out of bounds")
   }
+
+  // SILOptimizer looks for fixed_storage.check_range semantics for bounds check optimizations.
+  @_semantics("fixed_storage.check_range")
+  @inline(__always)
+  @export(implementation)
+  internal func _checkRange(lowerBound: Index, upperBound: Index) {
+    _precondition(
+      UInt(bitPattern: lowerBound) <= _assumeNonNegative(_count) &&
+      UInt(bitPattern: upperBound) <= _assumeNonNegative(_count),
+      "Index range out of bounds"
+    )
+  }
+
   /// Accesses the element at the specified index in the `MutableSpan`.
   ///
   /// - Parameter position: The offset of the element to access. `position`
@@ -664,11 +677,7 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(_ bounds: Range<Index>) -> Self {
-    _precondition(
-      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
-      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Index range out of bounds"
-    )
+    _checkRange(lowerBound: bounds.lowerBound, upperBound: bounds.upperBound)
     return unsafe _mutatingExtracting(unchecked: bounds)
   }
 
@@ -706,11 +715,7 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(_ bounds: Range<Index>) -> Self {
-    _precondition(
-      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
-      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Index range out of bounds"
-    )
+    _checkRange(lowerBound: bounds.lowerBound, upperBound: bounds.upperBound)
     return unsafe _consumingExtracting(unchecked: bounds)
   }
 
