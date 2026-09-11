@@ -350,6 +350,11 @@ public:
   bool canSerializeTypesInInst(SILInstruction *inst) {
     return isInstSerializable;
   }
+
+  /// Debug info must never change what gets optimized, so debug values are not
+  /// visited. They are not serialized except in Embedded Swift, where all
+  /// types are usable anyway.
+  void visitDebugValueInst(DebugValueInst *inst) {}
 };
 
 static bool isPackageCMOEnabled(ModuleDecl *mod) {
