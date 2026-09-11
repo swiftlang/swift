@@ -121,6 +121,21 @@ public:
                                       bool shared = true) const override;
 };
 
+class LLVM_LIBRARY_VISIBILITY UEFI : public ToolChain {
+protected:
+  InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const StaticLinkJobAction &job,
+                                     const JobContext &context) const override;
+
+public:
+  UEFI(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
+  ~UEFI() = default;
+
+  std::string sanitizerRuntimeLibName(StringRef Sanitizer,
+                                      bool shared = true) const override;
+};
+
 class LLVM_LIBRARY_VISIBILITY WebAssembly : public ToolChain {
 protected:
   InvocationInfo constructInvocation(const AutolinkExtractJobAction &job,

@@ -10,6 +10,7 @@ set(swiftDriver_sources
   PrettyStackTrace.cpp
   ToolChain.cpp
   ToolChains.cpp
+  UEFIToolChains.cpp
   UnixToolChains.cpp
   WebAssemblyToolChains.cpp
   WindowsToolChains.cpp
