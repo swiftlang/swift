@@ -59,6 +59,7 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
     -parse-stdlib
     -enable-experimental-feature AllowUnsafeAttribute
     -strict-memory-safety
+    -Xfrontend -enable-sil-opaque-values
 
   LINK_FLAGS
     "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
