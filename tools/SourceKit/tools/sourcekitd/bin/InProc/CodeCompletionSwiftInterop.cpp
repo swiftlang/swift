@@ -491,7 +491,7 @@ swiftide_completion_result_get_kind(swiftide_completion_response_t _response) {
     return SWIFTIDE_COMPLETION_KIND_NONE;
   case CompletionKind::Import:
     return SWIFTIDE_COMPLETION_KIND_IMPORT;
-  case CompletionKind::Using:
+  case CompletionKind::FileDefault:
     return SWIFTIDE_COMPLETION_KIND_USING;
   case CompletionKind::UnresolvedMember:
     return SWIFTIDE_COMPLETION_KIND_UNRESOLVEDMEMBER;

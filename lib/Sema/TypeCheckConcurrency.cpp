@@ -5351,7 +5351,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true) {
 /// Determine the default isolation for the given declaration context.
 ///
 /// Only the module-level setting (`-default-isolation`) is returned here.
-/// File-level `using` defaults are inferred in `ActorIsolationRequest`.
+/// File-level `default` defaults are inferred in `ActorIsolationRequest`.
 static DefaultIsolation getDefaultIsolationForContext(const DeclContext *dc) {
   // If we're in the main module, check the language option.
   ASTContext &ctx = dc->getASTContext();
@@ -5769,7 +5769,7 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::EnumElement:
   case DeclKind::Macro:
   case DeclKind::MacroExpansion:
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
   case DeclKind::HiddenTypeLayoutInfo:
     return std::nullopt;
 
@@ -8613,7 +8613,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::PrefixOperator:
   case DeclKind::TopLevelCode:
   case DeclKind::MacroExpansion:
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
     return true;
 
   case DeclKind::EnumElement:

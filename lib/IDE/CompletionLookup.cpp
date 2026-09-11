@@ -387,7 +387,7 @@ void CompletionLookup::addImportModuleNames() {
   }
 }
 
-void CompletionLookup::addUsingSpecifiers() {
+void CompletionLookup::addFileDefaultSpecifiers() {
   for (auto specifier :
        {"@MainActor", "nonisolated", "@available", "@diagnose"}) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(

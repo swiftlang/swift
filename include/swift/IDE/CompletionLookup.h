@@ -326,7 +326,7 @@ public:
 
   void addImportModuleNames();
 
-  void addUsingSpecifiers();
+  void addFileDefaultSpecifiers();
 
   SemanticContextKind getSemanticContext(const Decl *D,
                                          DeclVisibilityKind Reason,

@@ -219,7 +219,7 @@ enum class DescriptiveDeclKind : uint8_t {
   OpaqueVarType,
   Macro,
   MacroExpansion,
-  Using,
+  FileDefault,
   BorrowAccessor,
   MutateAccessor,
   YieldingBorrowAccessor,
@@ -10356,40 +10356,42 @@ public:
   }
 };
 
-/// UsingDecl - This represents a single `using` declaration, e.g.:
-///   using @MainActor
-class UsingDecl : public Decl {
+/// FileDefaultDecl - This represents a single `default` declaration, e.g.:
+///   default @MainActor
+class FileDefaultDecl : public Decl {
   friend class Decl;
 
 private:
-  SourceLoc UsingLoc;
+  SourceLoc DefaultLoc;
 
   DeclAttributes SpecifiedAttributes;
 
-  UsingDecl(SourceLoc usingLoc, DeclAttributes specifiedAttributes,
-            DeclContext *parent);
+  FileDefaultDecl(SourceLoc defaultLoc, DeclAttributes specifiedAttributes,
+                  DeclContext *parent);
 
 public:
   DeclAttributes getSpecifiedAttributes() const { return SpecifiedAttributes; }
 
-  SourceLoc getLocFromSource() const { return UsingLoc; }
+  SourceLoc getLocFromSource() const { return DefaultLoc; }
   SourceRange getSourceRange() const {
     if (SpecifiedAttributes.isEmpty())
-      return UsingLoc;
+      return DefaultLoc;
     // Head is most recently inserted, last in source order, and there
     // should only be one except for @available where each synthetic
     // attribute should point to the same attribute.
     auto endLoc = (*SpecifiedAttributes.begin())->getEndLoc();
     if (endLoc.isInvalid())
-      return UsingLoc;
-    return {UsingLoc, endLoc};
+      return DefaultLoc;
+    return {DefaultLoc, endLoc};
   }
 
-  static UsingDecl *create(ASTContext &ctx, SourceLoc usingLoc,
-                           DeclAttributes specifiedAttributes,
-                           DeclContext *parent);
+  static FileDefaultDecl *create(ASTContext &ctx, SourceLoc defaultLoc,
+                                 DeclAttributes specifiedAttributes,
+                                 DeclContext *parent);
 
-  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Using; }
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::FileDefault;
+  }
 };
 
 inline void

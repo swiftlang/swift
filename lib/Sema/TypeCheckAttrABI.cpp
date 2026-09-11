@@ -683,7 +683,7 @@ public:
   UNSUPPORTED_DECL(PrefixOperator)
   UNSUPPORTED_DECL(PostfixOperator)
   UNSUPPORTED_DECL(MacroExpansion)
-  UNSUPPORTED_DECL(Using)
+  UNSUPPORTED_DECL(FileDefault)
   UNSUPPORTED_DECL(HiddenTypeLayoutInfo)
 
   bool visitAbstractFunctionDecl(AbstractFunctionDecl *api,

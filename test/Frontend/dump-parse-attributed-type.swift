@@ -5,8 +5,8 @@
 // `type_attributed` nodes (`visitAttributedTypeRepr` never called
 // `printFoot()`), so any dump containing an attributed type was
 // unbalanced and consumers that match parentheses silently reparented
-// every node printed after it. `type_error` and `using_decl` had the
-// same omission.
+// every node printed after it. `type_error` and `file_default_decl` had
+// the same omission.
 
 let f: (@escaping (Int) -> Void) -> Void = { _ in }
 

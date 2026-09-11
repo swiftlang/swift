@@ -22,7 +22,7 @@
 
 //--- lib.swift
 
-using @MainActor
+default @MainActor
 
 // CHECK: @_Concurrency::MainActor public func libFunc()
 public func libFunc() {}

@@ -620,7 +620,7 @@ static void diagnoseInvalidDecl(Decl *decl,
       isa<PrecedenceGroupDecl>(decl) ||
       isa<MacroDecl>(decl) ||
       isa<ExtensionDecl>(decl) ||
-      isa<UsingDecl>(decl)) {
+      isa<FileDefaultDecl>(decl)) {
     decl->diagnose(diag::invalid_decl_in_macro_expansion, decl);
     decl->setInvalid();
 

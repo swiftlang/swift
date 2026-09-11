@@ -5,7 +5,7 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_DefaultIsolationPerFile
 
-using nonisolated
+default nonisolated
 
 // CHECK: nonisolated struct S
 // CHECK: nonisolated class C

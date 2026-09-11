@@ -1760,13 +1760,13 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     swift::SourceLoc importKeywordLoc, BridgedImportKind cImportKind,
     swift::SourceLoc importKindLoc, BridgedArrayRef cImportPathElements);
 
-SWIFT_NAME("BridgedUsingDecl.createParsed(_:declContext:usingKeywordLoc:"
-           "specifiedAttributes:)")
-BridgedUsingDecl
-BridgedUsingDecl_createParsed(BridgedASTContext cContext,
-                              BridgedDeclContext cDeclContext,
-                              swift::SourceLoc usingKeywordLoc,
-                              BridgedDeclAttributes cSpecifiedAttributes);
+SWIFT_NAME("BridgedFileDefaultDecl.createParsed(_:declContext:"
+           "defaultKeywordLoc:specifiedAttributes:)")
+BridgedFileDefaultDecl
+BridgedFileDefaultDecl_createParsed(BridgedASTContext cContext,
+                                    BridgedDeclContext cDeclContext,
+                                    swift::SourceLoc defaultKeywordLoc,
+                                    BridgedDeclAttributes cSpecifiedAttributes);
 
 SWIFT_NAME("BridgedSubscriptDecl.createParsed(_:declContext:staticLoc:"
            "staticSpelling:subscriptKeywordLoc:genericParamList:parameterList:"
