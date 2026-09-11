@@ -1,0 +1,99 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-lvalue-elimination | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-temp-lvalue-elimination | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
+
+// Verifies the differences between the normal and the mandatory (debug-info
+// preserving) variant of the temp-lvalue-elimination pass.
+
+import Swift
+import Builtin
+import SwiftShims
+
+// A temporary that is not backed by a user variable is eliminated by both
+// variants. The mandatory variant inserts a debug_step to preserve stepping.
+//
+// CHECK-LABEL:      sil [ossa] @eliminate_plain_temp :
+// CHECK:            bb0(%0 : $*Optional<Any>, %1 : $*Any):
+// CHECK-NEXT:         [[E:%[0-9]+]] = init_enum_data_addr %0
+// CHECK-NEXT:         copy_addr [take] %1 to [init] [[E]]
+// CHECK-NEXT:         inject_enum_addr %0 : $*Optional<Any>, #Optional.some!enumelt
+// CHECK-ONONE-NEXT:   debug_step
+// CHECK-NOT:          alloc_stack
+// CHECK-LABEL:      } // end sil function 'eliminate_plain_temp'
+sil [ossa] @eliminate_plain_temp : $@convention(thin) (@in Any) -> @out Optional<Any> {
+bb0(%0 : $*Optional<Any>, %1 : $*Any):
+  %2 = alloc_stack $Optional<Any>
+  %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
+  copy_addr [take] %1 to [init] %3 : $*Any
+  inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
+  copy_addr [take] %2 to [init] %0 : $*Optional<Any>
+  dealloc_stack %2 : $*Optional<Any>
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// A temporary backed by a user variable is eliminated under -O (with the debug
+// variable salvaged onto the destination), but preserved by the mandatory pass.
+//
+// CHECK-LABEL: sil [ossa] @preserve_var_decl_temp :
+// CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
+// CHECK-OPT-NOT:  alloc_stack
+// CHECK-OPT:      debug_value {{.*}}name "x"
+// CHECK-ONONE:    alloc_stack [var_decl] $Optional<Any>, var, name "x"
+// CHECK-ONONE:    copy_addr [take] %{{[0-9]+}} to [init] %0
+// CHECK-LABEL: } // end sil function 'preserve_var_decl_temp'
+sil [ossa] @preserve_var_decl_temp : $@convention(thin) (@in Any) -> @out Optional<Any> {
+bb0(%0 : $*Optional<Any>, %1 : $*Any):
+  %2 = alloc_stack [var_decl] $Optional<Any>, var, name "x"
+  %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
+  copy_addr [take] %1 to [init] %3 : $*Any
+  inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
+  copy_addr [take] %2 to [init] %0 : $*Optional<Any>
+  dealloc_stack %2 : $*Optional<Any>
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// The `copy_addr` + `destroy_addr` peephole (combineWithDestroy) rewrites the
+// copy to a `[take]` and drops the now-invalid debug_value of the source under
+// -O. The mandatory pass bails when there is a debug_value on the source, to
+// preserve debug info.
+//
+// CHECK-LABEL: sil [ossa] @combine_with_destroy :
+// CHECK:      bb0(%0 : $*T):
+// CHECK-OPT:     copy_addr [take] %0 to [init] %{{[0-9]+}}
+// CHECK-OPT-NOT: destroy_addr %0
+// CHECK-ONONE:   copy_addr %0 to [init] %{{[0-9]+}}
+// CHECK-ONONE:   debug_value %0 : $*T, expr op_deref
+// CHECK-ONONE:   destroy_addr %0
+// CHECK-LABEL: } // end sil function 'combine_with_destroy'
+sil [ossa] @combine_with_destroy : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  %2 = alloc_stack $T
+  debug_value %0 : $*T, expr op_deref
+  copy_addr %0 to [init] %2 : $*T
+  debug_value %0 : $*T, expr op_deref
+  destroy_addr %0 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %78 = tuple ()
+  return %78 : $()
+}
+
+// Without any debug_value on the source, the peephole fires under both variants:
+// there is no debug info to drop.
+//
+// CHECK-LABEL: sil [ossa] @combine_with_destroy_no_debug :
+// CHECK:      bb0(%0 : $*T):
+// CHECK:        copy_addr [take] %0 to [init] %{{[0-9]+}}
+// CHECK-NOT:    destroy_addr %0
+// CHECK-LABEL: } // end sil function 'combine_with_destroy_no_debug'
+sil [ossa] @combine_with_destroy_no_debug : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  %2 = alloc_stack $T
+  copy_addr %0 to [init] %2 : $*T
+  destroy_addr %0 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %78 = tuple ()
+  return %78 : $()
+}
