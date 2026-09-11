@@ -4,7 +4,8 @@
 // RUN:   -define-availability "_iOS54:iOS 54.0" \
 // RUN:   -define-availability "_macOS51_0:macOS 51.0" \
 // RUN:   -define-availability "_myProject 1.0:macOS 51.0" \
-// RUN:   -define-availability "_myProject 2.5:macOS 52.5"
+// RUN:   -define-availability "_myProject 2.5:macOS 52.5" \
+// RUN:   -define-availability "_myProject 16.0:macOS 16.0"
 
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -enable-experimental-feature AvailabilityMacro='_iOS53Aligned:macOS 50.0, iOS 53.0' \
@@ -12,7 +13,8 @@
 // RUN:   -enable-experimental-feature AvailabilityMacro='_iOS54:iOS 54.0' \
 // RUN:   -enable-experimental-feature AvailabilityMacro="_macOS51_0:macOS 51.0" \
 // RUN:   -enable-experimental-feature AvailabilityMacro='_myProject 1.0:macOS 51.0' \
-// RUN:   -enable-experimental-feature AvailabilityMacro="_myProject 2.5:macOS 52.5"
+// RUN:   -enable-experimental-feature AvailabilityMacro="_myProject 2.5:macOS 52.5" \
+// RUN:   -enable-experimental-feature AvailabilityMacro="_myProject 16.0:macOS 16.0"
 
 // REQUIRES: OS=macosx
 
@@ -38,6 +40,10 @@ public func onMyProjectV1() {}
 
 @available(_myProject 2.5, *)
 public func onMyProjectV2_5() {}
+
+/// This should not fail when defining 16.0 and using just 16
+@available(_myProject 16, *)
+public func onMyProjectV16() {}
 
 @available(_myProject 3.0, *)// expected-error {{expected declaration}}
 // expected-error @-1 {{reference to undefined version '3.0' for availability macro '_myProject'}}

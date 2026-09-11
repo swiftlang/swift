@@ -8,6 +8,8 @@
 // RUN:   -define-availability "_noVersion: macOS" \
 // RUN:   -define-availability "_duplicateVersion 1.0:iOS 13.0" \
 // RUN:   -define-availability "_duplicateVersion 1.0:iOS 13.0" \
+// RUN:   -define-availability "_duplicateCanonicalVersion 17:macOS 16" \
+// RUN:   -define-availability "_duplicateCanonicalVersion 17.0:macOS 16.0" \
 // RUN:   -define-availability "_allowJustWildcard:*" \
 // RUN:   2>&1 | %FileCheck %s
 
@@ -35,6 +37,9 @@ public func noVersionMulti() {}
 
 // CHECK: duplicate definition of availability macro '_duplicateVersion' for version '1.0'
 // CHECK-NEXT: _duplicateVersion
+
+// CHECK: -define-availability argument:1:1: error: duplicate definition of availability macro '_duplicateCanonicalVersion' for version '17.0'
+// CHECK-NEXT: _duplicateCanonicalVersion
 
 // CHECK: -define-availability argument:1:18: warning: unrecognized platform name 'spaceOS'; did you mean 'macOS'?
 // CHECK-NEXT: _brokenPlatforms:spaceOS 10.11
