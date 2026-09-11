@@ -212,6 +212,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Suffix
     single-source/SuperChars
     single-source/TaskGroups
+    single-source/TaskIDBenchmark
     single-source/TaskLocalGet
     single-source/TaskRegistryStress
     single-source/ToddCoxeter
