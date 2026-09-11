@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import ucrt
-@_exported import _GUIDDef
 @_exported import WinSDK // Clang module
 
 // WinBase.h
@@ -61,7 +60,7 @@ public var FIONBIO: Int32 {
 
 @inlinable
 public var QS_INPUT: UINT {
-  QS_MOUSE | UINT(QS_KEY | QS_RAWINPUT | QS_TOUCH | QS_POINTER)
+  UINT(QS_MOUSE) | UINT(QS_KEY | QS_RAWINPUT | QS_TOUCH | QS_POINTER)
 }
 
 @inlinable
@@ -280,10 +279,7 @@ extension GUID {
   }
 }
 
-// These conformances are marked @retroactive because the GUID type nominally
-// comes from the _GUIDDef clang module rather than the WinSDK clang module.
-
-extension GUID: @retroactive Equatable {
+extension GUID: Equatable {
   // When C++ interop is enabled, Swift imports a == operator from guiddef.h
   // that conflicts with the definition of == here, so we've renamed it to
   // __equals to avoid the conflict.
@@ -294,7 +290,7 @@ extension GUID: @retroactive Equatable {
   }
 }
 
-extension GUID: @retroactive Hashable {
+extension GUID: Hashable {
   @_transparent
   public func hash(into hasher: inout Hasher) {
     hasher.combine(uint128Value)

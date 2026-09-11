@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 #
-# Usage: build-modules.py tmp_dir testcases_dir build_cmd lib_pattern
+# Usage: build-modules.py tmp_dir testcases_dir lib_pattern -- build_cmd...
 
 import sys
 import os
 import subprocess
-import shlex
 
 tmp = sys.argv[1]
 testcases = sys.argv[2]
-build_cmd = sys.argv[3].replace("\\", "/")
-lib_pattern = sys.argv[4]
+lib_pattern = sys.argv[3]
+separator = sys.argv.index("--", 4)
+build_cmd = sys.argv[separator + 1 :]
 
 imports = []
 body = []
@@ -24,8 +24,7 @@ for test in os.listdir(testcases):
     lib_name = lib_pattern.replace("PLACEHOLDER", modname)
     test_path = os.path.join(testcases, test)
 
-    # shlex.split handles quoted availability flags in build_cmd
-    cmd = shlex.split(build_cmd) + [
+    cmd = build_cmd + [
         "-g",
         "-static",
         "-emit-module-path",

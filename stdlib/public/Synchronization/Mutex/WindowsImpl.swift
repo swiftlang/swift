@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import WinSDK.core.synch
+import WinSDK.UM.core.synch
 
 @available(SwiftStdlib 6.0, *)
 @frozen

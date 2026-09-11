@@ -19,6 +19,8 @@ function(_report_sdk prefix)
   message(STATUS "  Static link only: ${SWIFT_SDK_${prefix}_STATIC_ONLY}")
 
   if("${prefix}" STREQUAL "WINDOWS")
+    message(STATUS "  Windows SDK Version: ${WindowsSDKVersion}")
+    message(STATUS "  Windows SDK Path: ${WindowsSdkDir}")
     message(STATUS "  UCRT Version: ${UCRTVersion}")
     message(STATUS "  UCRT SDK Path: ${UniversalCRTSdkDir}")
     message(STATUS "  VC Path: ${VCToolsInstallDir}")
@@ -547,10 +549,10 @@ macro(configure_sdk_windows name environment architectures)
     # NOTE(compnerd) workaround incorrectly extensioned import libraries from
     # the Windows SDK on case sensitive file systems.
     swift_windows_arch_spelling(${arch} WinSDKArchitecture)
-    set(WinSDK${arch}UMDir "${UniversalCRTSdkDir}/Lib/${UCRTVersion}/um/${WinSDKArchitecture}")
+    set(WinSDK${arch}UMDir "${WindowsSdkDir}/Lib/${WindowsSDKVersion}/um/${WinSDKArchitecture}")
     set(OverlayDirectory "${CMAKE_BINARY_DIR}/winsdk_lib_${arch}_symlinks")
 
-    if(NOT EXISTS "${UniversalCRTSdkDir}/Include/${UCRTVersion}/um/WINDOWS.H")
+    if(NOT EXISTS "${WindowsSdkDir}/Include/${WindowsSDKVersion}/um/WINDOWS.H")
       file(MAKE_DIRECTORY ${OverlayDirectory})
 
       file(GLOB libraries RELATIVE "${WinSDK${arch}UMDir}" "${WinSDK${arch}UMDir}/*")
@@ -597,4 +599,3 @@ function(configure_target_variant prefix name sdk build_config lib_subdir)
   set(SWIFT_VARIANT_${prefix}_STATIC_ONLY ${SWIFT_SDK_${sdk}_STATIC_ONLY})
   get_threading_package(${prefix} ${SWIFT_SDK_${sdk}_THREADING_PACKAGE} SWIFT_VARIANT_${prefix}_THREADING_PACKAGE)
 endfunction()
-

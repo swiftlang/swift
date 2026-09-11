@@ -47,6 +47,8 @@ config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_api_level = "@SWIFT_ANDROID_API_LEVEL@"
 
 # --- Windows MSVC Configuration ---
+config.windows_sdk_module_map = r'''@SWIFT_WINDOWS_MODULE_MAP@'''
+
 config.swift_stdlib_msvc_runtime = None
 if "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreaded":
     config.swift_stdlib_msvc_runtime = 'MT'

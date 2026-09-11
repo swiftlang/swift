@@ -1512,6 +1512,7 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
     $env:WindowsSdkBinPath = "$CustomWinSDKRoot\bin"
     $env:WindowsSDKLibVersion = "$WinSDKVersion\"
     $env:WindowsSdkVerBinPath = "$CustomWinSDKRoot\bin\$WinSDKVersion"
+    $env:WindowsSdkDir = $CustomWinSDKRoot
     $env:WindowsSDKVersion = "$WinSDKVersion\"
 
     $env:EXTERNAL_INCLUDE += ";$WinSDKIncludePath"
