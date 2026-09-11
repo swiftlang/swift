@@ -561,6 +561,11 @@ llvm::ErrorOr<std::unique_ptr<ModuleDependencyScanner>>
 ModuleDependencyScanner::create(SwiftDependencyScanningService &service,
                                 CompilerInstance *instance,
                                 ModuleDependenciesCache &cache) {
+  // The workers created below build their file systems from the Clang scanning
+  // service, so it must exist by now.
+  assert(service.hasClangScanningService() &&
+         "dependency scanning service was not set up");
+
   auto scanner =
       std::unique_ptr<ModuleDependencyScanner>(new ModuleDependencyScanner(
           service, cache, instance->getInvocation(), instance->getSILOptions(),
