@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated \
-// RUN:     -disable-availability-checking                      \
 // RUN:     -enable-builtin-module                              \
 // RUN:     -debug-diagnostic-names
 

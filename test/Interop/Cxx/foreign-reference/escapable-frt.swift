@@ -4,7 +4,7 @@
 // RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -Xcc -iapinotes-modules -Xcc %swift_src_root/stdlib/public/Cxx/std \
 // RUN:   -cxx-interoperability-mode=default \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -strict-memory-safety
 
 // UNSUPPORTED: OS=windows-msvc

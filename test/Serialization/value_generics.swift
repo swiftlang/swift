@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -emit-module -enable-experimental-feature RawLayout -disable-availability-checking -parse-as-library -o %t
-// RUN: %target-sil-opt -enable-sil-verify-all %t/value_generics.swiftmodule -o - | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple %s -emit-module -enable-experimental-feature RawLayout -parse-as-library -o %t
+// RUN: %target-sil-opt -target %target-swift-6.2-abi-triple -enable-sil-verify-all %t/value_generics.swiftmodule -o - | %FileCheck %s
 
 // REQUIRES: swift_feature_RawLayout
 

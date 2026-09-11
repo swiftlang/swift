@@ -1,14 +1,14 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -module-name Actor -clang-header-expose-decls=has-expose-attr -typecheck -verify -emit-clang-header-path %t/actor.h -disable-availability-checking
+// RUN: %target-swift-frontend %s -module-name Actor -clang-header-expose-decls=has-expose-attr -typecheck -verify -emit-clang-header-path %t/actor.h -target %target-swift-5.1-abi-triple
 // RUN: %FileCheck %s < %t/actor.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/actor.h)
 
-// RUN: %target-swift-frontend %s -module-name Actor  -typecheck -verify -emit-clang-header-path %t/actor-public.h -enable-experimental-cxx-interop -disable-availability-checking
+// RUN: %target-swift-frontend %s -module-name Actor  -typecheck -verify -emit-clang-header-path %t/actor-public.h -enable-experimental-cxx-interop -target %target-swift-5.1-abi-triple
 // RN: %FileCheck %s < %t/actor-public.h
 // RUN: %check-interop-cxx-header-in-clang(%t/actor-public.h)
 
-// RUN: %target-swift-frontend %s -module-name Actor -enable-library-evolution -clang-header-expose-decls=has-expose-attr -typecheck -verify -emit-clang-header-path %t/actor-evo.h -disable-availability-checking
+// RUN: %target-swift-frontend %s -module-name Actor -enable-library-evolution -clang-header-expose-decls=has-expose-attr -typecheck -verify -emit-clang-header-path %t/actor-evo.h -target %target-swift-5.1-abi-triple
 // RUN: %FileCheck %s < %t/actor-evo.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/actor-evo.h)

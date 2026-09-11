@@ -4,14 +4,14 @@
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}direct.swift \
 // RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}direct.h
 
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}apinotes.swift \
 // RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -Xcc -iapinotes-modules -Xcc %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}apinotes.h
 
 //--- Inputs/module.modulemap

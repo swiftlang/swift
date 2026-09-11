@@ -1,6 +1,6 @@
 // Error cases for literal expressions in integer generic parameter values
 // REQUIRES: swift_feature_LiteralExpressions
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature LiteralExpressions
+// RUN: %target-typecheck-verify-swift -target %target-swift-6.2-abi-triple -enable-experimental-feature LiteralExpressions
 
 struct V<let N: Int, let M: Int> {}
 // expected-note@-1 {{arguments to generic parameter 'N' ('2' and '5') are expected to be equal}}

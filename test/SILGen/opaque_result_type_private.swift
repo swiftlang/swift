@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -primary-file %s -disable-availability-checking | %FileCheck %s
-// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -primary-file %s -O -disable-availability-checking
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -primary-file %s -target %target-swift-5.1-abi-triple | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -primary-file %s -O -target %target-swift-5.1-abi-triple
 
 // CHECK-LABEL: sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 

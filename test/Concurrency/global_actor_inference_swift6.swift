@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 6 -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -strict-concurrency=complete %S/Inputs/other_global_actor_inference.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -strict-concurrency=complete %S/Inputs/other_global_actor_inference.swift
 
-// RUN: %target-swift-frontend -swift-version 6 -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -I %t %s -emit-sil -o /dev/null -verify
 
 
 // REQUIRES: concurrency
