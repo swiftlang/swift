@@ -251,12 +251,9 @@ func warnOptionalInStringInterpolationSegment(_ o : Int?) {
   // expected-note@-2 {{provide a default value to avoid this warning}} {{52-52= ?? <#default value#>}}
   // expected-note@-3 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{52-52=)}}
   
-  // Don't provide a `\(_:default:)` fix-it for interpolations that don't resolve
-  // to strings.
+  // Custom interpolations can handle optional values without producing a debug
+  // description.
   let _: CustomInterpolation = "Always some, Always some, Always some: \(o)"
-  // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
-  // expected-note@-2 {{provide a default value to avoid this warning}} {{75-75= ?? <#default value#>}}
-  // expected-note@-3 {{use 'String(describing:)' to silence this warning}} {{74-74=String(describing: }} {{75-75=)}}
 }
 
 // Make sure we don't double diagnose
