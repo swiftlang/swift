@@ -4060,6 +4060,19 @@ private:
         S.DeclTypeAbbrCodes[DifferentiationParamIndicesLayout::Code];
     DifferentiationParamIndicesLayout::emitRecord(S.Out, S.ScratchRecord,
                                                   abbrCode, paramIndicesVector);
+    }
+    
+  void WriteYieldList(const SmallVector<AnyFunctionType::Yield, 1> &yields) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionYieldLayout::Code];
+    for (auto &yield : yields) {
+      auto paramFlags = yield.getFlags();
+      auto rawOwnership =
+          getRawStableParamDeclSpecifier(paramFlags.getOwnershipSpecifier());
+      FunctionYieldLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                      S.addTypeRef(yield.getType()),
+                                      rawOwnership);
+    }
   }
 
   /// Writes an array of members for a decl context.
@@ -5097,6 +5110,14 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
+    // Write the body yields
+    {
+      SmallVector<AnyFunctionType::Yield, 1> yields;
+      fn->getYieldInterfaceTypes(yields);
+      assert(yields.empty() == !fn->isCoroutine());
+      WriteYieldList(yields);
+    }
+
     writeLifetimeDependenciesIfNeeded(fn);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
@@ -5234,6 +5255,7 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
+    // We do not write yields, these are inferred from the storage
     writeLifetimeDependenciesIfNeeded(fn);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
@@ -6169,6 +6191,19 @@ public:
     }
   }
 
+  void serializeFunctionTypeYields(const AnyFunctionType *fnTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionYieldLayout::Code];
+    for (auto &yield : fnTy->getYields()) {
+      auto paramFlags = yield.getFlags();
+      auto rawOwnership =
+          getRawStableParamDeclSpecifier(paramFlags.getOwnershipSpecifier());
+      FunctionYieldLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          S.addTypeRef(yield.getType()), rawOwnership);
+    }
+  }
+
   TypeID encodeIsolation(swift::FunctionTypeIsolation isolation) {
     switch (isolation.getKind()) {
     case swift::FunctionTypeIsolation::Kind::NonIsolated:
@@ -6224,9 +6259,11 @@ public:
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation,
         fnTy->hasSendingResult(),
-        fnTy->isCalledOnce());
+        fnTy->isCalledOnce(),
+        fnTy->isCoroutine());
 
     serializeFunctionTypeParams(fnTy);
+    serializeFunctionTypeYields(fnTy);
 
     auto lifetimeDependencies = fnTy->getLifetimeDependencies();
     if (!lifetimeDependencies.empty()) {
@@ -6247,9 +6284,11 @@ public:
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation, fnTy->hasSendingResult(), fnTy->isCalledOnce(),
+        fnTy->isCoroutine(),                                          
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
+    serializeFunctionTypeYields(fnTy);
 
     auto lifetimeDependencies = fnTy->getLifetimeDependencies();
     if (!lifetimeDependencies.empty()) {
@@ -6656,6 +6695,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TupleTypeEltLayout>();
   registerDeclTypeAbbr<FunctionTypeLayout>();
   registerDeclTypeAbbr<FunctionParamLayout>();
+  registerDeclTypeAbbr<FunctionYieldLayout>();
   registerDeclTypeAbbr<MetatypeTypeLayout>();
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
   registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();

@@ -12,7 +12,7 @@
 
 import ASTBridging
 import BasicBridging
-import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
 // MARK: - ParamDecl
 
@@ -292,6 +292,31 @@ extension ASTGenVisitor {
       leftParenLoc: nil,
       parameters: node.lazy.map(self.generate(closureShorthandParameter:)).bridgedArray(in: self),
       rightParenLoc: nil
+    )
+  }
+}
+
+// MARK: - YieldList
+
+extension ASTGenVisitor {
+
+  func generate(
+    functionYieldClause node: FunctionYieldClauseSyntax?
+  ) -> BridgedYieldList? {
+    guard let yields = node?.yields else { return nil }
+
+    var yieldTypes: [BridgedTypeRepr] = []
+    yieldTypes.reserveCapacity(yields.count)
+    for node in yields {
+      let yield = self.generate(type: node.type)
+      yieldTypes.append(yield)
+    }
+
+    return BridgedYieldList.createParsed(
+      self.ctx,
+      leftParenLoc: self.generateSourceLoc(node?.leftParen),
+      yieldTypes: yieldTypes.lazy.bridgedArray(in: self),
+      rightParenLoc: self.generateSourceLoc(node?.rightParen)
     )
   }
 }
