@@ -2054,38 +2054,51 @@ public:
     if (!doesParentFunctionHaveSendingResult(op))
       return;
 
-    auto instance = getRepresentativeValue(op.getOpArg1());
-    if (!instance)
+    auto checkAssign = [&](Element destElt, Element srcElt) -> bool {
+      auto instance = getRepresentativeValue(destElt);
+      if (!instance)
+        return false;
+
+      auto *fArg =
+          dyn_cast_or_null<SILFunctionArgument>(instance.maybeGetValue());
+      if (!fArg || !fArg->getArgumentConvention().isIndirectOutParameter())
+        return false;
+
+      auto staticRegionIsolation = getIsolationRegionInfo(srcElt);
+      Region srcRegion = p.getRegion(srcElt);
+      auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
+
+      if (dynamicRegionIsolation.isDisconnected() ||
+          staticRegionIsolation.isUnsafeNonIsolated()) {
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs()
+            << "    * Note: Eliding assign-into-sending-result error. "
+               "Reason: "
+            << (dynamicRegionIsolation.isDisconnected()
+                    ? "assigned region is disconnected"
+                    : "assigned value is nonisolated(unsafe)")
+            << "\n");
+        return false;
+      }
+
+      SILValue rep = getRepresentativeValue(srcElt).maybeGetValue();
+      if (!rep && op.getSourceOp())
+        rep = op.getSourceOp()->get();
+      if (!rep)
+        rep = fArg;
+
+      handleError(AssignNeverSendableIntoSendingResultError(
+          op, destElt, fArg, srcElt, rep, dynamicRegionIsolation,
+          getSnapshotForIsolationHistory()));
+      return true;
+    };
+
+    if (checkAssign(op.getOpArg1(), op.getOpArg2()))
       return;
 
-    auto *fArg =
-        dyn_cast_or_null<SILFunctionArgument>(instance.maybeGetValue());
-    if (!fArg || !fArg->getArgumentConvention().isIndirectOutParameter())
-      return;
-
-    auto staticRegionIsolation = getIsolationRegionInfo(op.getOpArg2());
-    Region srcRegion = p.getRegion(op.getOpArg2());
-    auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
-
-    // We can unconditionally getValue here since we can never
-    // assign an actor introducing inst.
-    auto rep = getRepresentativeValue(op.getOpArg2()).getValue();
-    if (dynamicRegionIsolation.isDisconnected() ||
-        staticRegionIsolation.isUnsafeNonIsolated()) {
-      REGIONBASEDISOLATION_VERBOSE_LOG(
-          llvm::dbgs()
-          << "    * Note: Eliding assign-into-sending-result error. "
-             "Reason: "
-          << (dynamicRegionIsolation.isDisconnected()
-                  ? "assigned region is disconnected"
-                  : "assigned value is nonisolated(unsafe)")
-          << "\n");
-      return;
+    if (op.getKind() == PartitionOpKind::Merge) {
+      checkAssign(op.getOpArg2(), op.getOpArg1());
     }
-
-    handleError(AssignNeverSendableIntoSendingResultError(
-        op, op.getOpArg1(), fArg, op.getOpArg2(), rep, dynamicRegionIsolation,
-        getSnapshotForIsolationHistory()));
   }
 
   /// Apply \p op to the partition op.
