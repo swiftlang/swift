@@ -3512,8 +3512,10 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
 
   // Handle redeclarable Clang decls by checking each redeclaration.
   bool IsTagDecl = isa<clang::TagDecl>(D);
-  if (!(IsTagDecl || isa<clang::FunctionDecl, clang::VarDecl,
-                         clang::TypedefNameDecl, clang::NamespaceDecl>(D))) {
+  if (!(IsTagDecl ||
+        isa<clang::FunctionDecl, clang::VarDecl, clang::TypedefNameDecl,
+            clang::NamespaceDecl, clang::ObjCInterfaceDecl,
+            clang::ObjCProtocolDecl>(D))) {
     return false;
   }
 
@@ -3527,6 +3529,17 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
       auto TD = cast<clang::TagDecl>(Redeclaration);
       if (!TD->isCompleteDefinition() &&
           !TD->isThisDeclarationADemotedDefinition())
+        continue;
+    } else if (auto *OCD = dyn_cast<clang::ObjCContainerDecl>(Redeclaration)) {
+      // Likewise for ObjC interfaces and protocols. We're hampered here by the
+      // lack of a straightforward way to check whether the declaration had a
+      // body: `isThisDeclarationADefinition()` only returns true for the one
+      // specific decl that should be used as the definition, and there is
+      // nothing like `isThisDeclarationADemotedDefinition()` for ObjC type
+      // decls. Checking the source location of the `@end` keyword is hacky but
+      // I haven't found a better option.
+      if (!OCD->getAtEndRange().isValid() ||
+          OCD->getAtEndRange().getBegin() == OCD->getLocation())
         continue;
     }
 
