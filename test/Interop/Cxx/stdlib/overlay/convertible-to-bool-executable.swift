@@ -66,4 +66,20 @@ CxxConvertibleToBoolTestSuite.test("PublicUsingBoolBox as CxxConvertibleToBool")
   expectTrue(Bool(fromCxx: PublicUsingBoolBox()))
 }
 
+CxxConvertibleToBoolTestSuite.test("NonCopyableBoolBox as CxxConvertibleToBool") {
+  let b1 = NonCopyableBoolBox(true)
+  expectTrue(Bool(fromCxx: b1))
+
+  let b2 = NonCopyableBoolBox(false)
+  expectFalse(Bool(fromCxx: b2))
+}
+
+CxxConvertibleToBoolTestSuite.test("NonEscapableBoolBox as CxxConvertibleToBool") {
+  let b1 = BoolBox(value: true)
+  expectTrue(Bool(fromCxx: NonEscapableBoolBox(b1)))
+
+  let b2 = BoolBox(value: false)
+  expectFalse(Bool(fromCxx: NonEscapableBoolBox(b2)))
+}
+
 runAllTests()
