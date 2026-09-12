@@ -4451,7 +4451,8 @@ private:
     if (param.getConvention() == ParameterConvention::Pack_Inout) {
       SGF.SGM.diagnose(ApplyLoc, diag::not_implemented,
                        "inout pack argument emission");
-      Args.push_back(ManagedValue::forLValue(pack));
+      Args.push_back(
+          ManagedValue::forLValue(SILUndef::get(SGF.F, pack->getType())));
       return;
     }
 

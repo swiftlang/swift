@@ -92,6 +92,15 @@ do {
     }
   }
 
+  // Parameter-pack function types cannot reabstract inout parameters.
+  do {
+    func acceptsPackFunction<each T>(_: (repeat each T) -> Void) {}
+    func takesInout(_: inout Int) {}
+
+    acceptsPackFunction(takesInout)
+    // expected-error@-1 {{cannot convert value of type '(inout Int) -> ()' to expected argument type}}
+  }
+
   func coerce(_: Int) {}
 
   func test(first: Value<Int?>, second: Value<(a: Int, b: Int)>) {
