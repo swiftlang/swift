@@ -543,8 +543,9 @@ public:
         // without symbolic references.
 
         auto addr = resolved.getResolvedAddress() + sizeof(int32_t);
-        int32_t offset;
-        Reader->readInteger(addr, &offset);
+        int32_t offset = 0;
+        if (!Reader->readInteger(addr, &offset))
+          return nullptr;
         auto addrOfTypeRef = addr + offset;
         resolved = Reader->getSymbol(addrOfTypeRef);
 
