@@ -20,6 +20,8 @@ This attribute ensures the annotated type's value is addressable in the stack-fr
 This effect requires both a `@_lifetime` annotation on the accessor and `@_addressableForDependencies` on the type.   
 This way the accessor's returned pointer is guaranteed to remain valid for the caller to read through.   
 
+Currently requires the `AddressableTypes` experimental feature. Full effect of this attribute might require further experimental features such as `Lifetimes` and `BuiltinModule`.
+
 As an example, see [`InlineArray`'s implementation](https://github.com/swiftlang/swift/blob/d8d652ce615bd350bc51ab01409fe4dfa3cbc363/stdlib/public/core/InlineArray.swift#L595) as of writing this documentation, where the type is annotated with `@_addressableForDependencies` and `InlineArray.span.getter` is annotated with `@_lifetime(borrow self)`.   
 
 ## `@_alignment(numericValue)`
