@@ -474,6 +474,16 @@ if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
   endif()
 endif()
 
+# LLVM_VERSION_MAJOR for Swift sources in the compiler, should they ever
+# need it.
+set(SWIFT_LLVM_VERSION_MAJOR_SWIFT_COMPILE_DEFINITIONS)
+foreach(version 23 24 25)
+  if(LLVM_VERSION_MAJOR GREATER_EQUAL ${version})
+    list(APPEND SWIFT_LLVM_VERSION_MAJOR_SWIFT_COMPILE_DEFINITIONS
+      "LLVM_VERSION_MAJOR_AT_LEAST_${version}")
+  endif()
+endforeach()
+
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
 if(swift_optimized)
   set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
