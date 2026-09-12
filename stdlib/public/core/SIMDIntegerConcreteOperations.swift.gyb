@@ -89,53 +89,38 @@ extension SIMD${n} where Scalar == ${Scalar} {
   }
   
 %  end
-  /// A vector mask with the result of a pointwise equality comparison.
-  @export(implementation)
-  public static func .==(a: Self, b: Self) -> SIMDMask<MaskStorage> {
+%{
+comparisons = [
+  ("==", "eq", "equal to"),
+  ("!=", "ne", "not equal to"),
+  ("<",  "lt", "less than"),
+  ("<=", "le", "less than or equal to"),
+  (">=", "ge", "greater than or equal to"),
+  (">",  "gt", "greater than")
+]
+}%
+%  for (op, bi, description) in comparisons:
+%   pred = bi if bi in ("eq", "ne") else s + bi
+  /// Pointwise compare ${description}.
+  ///
+  /// Each lane of the result is true if that lane of a is ${description} the
+  /// corresponding lane of b, and false otherwise.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in 0..<${n} {
+  ///   result[i] = (a[i] ${op} b[i])
+  /// }
+  /// ```
+  @export(implementation) @_transparent
+  public static func .${op}(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.cmp_eq_${Builtin}(a._storage._value, b._storage._value)
+      Builtin.cmp_${pred}_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
   
-  /// A vector mask with the result of a pointwise inequality comparison.
-  @export(implementation)
-  public static func .!=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.cmp_ne_${Builtin}(a._storage._value, b._storage._value)
-    ))
-  }
-  
-  /// A vector mask with the result of a pointwise less-than comparison.
-  @export(implementation)
-  public static func .<(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.cmp_${s}lt_${Builtin}(a._storage._value, b._storage._value)
-    ))
-  }
-  
-  /// A vector mask with the result of a pointwise less-than-or-equal-to comparison.
-  @export(implementation)
-  public static func .<=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.cmp_${s}le_${Builtin}(a._storage._value, b._storage._value)
-    ))
-  }
-  
-  /// A vector mask with the result of a pointwise greater-than comparison.
-  @export(implementation)
-  public static func .>(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.cmp_${s}gt_${Builtin}(a._storage._value, b._storage._value)
-    ))
-  }
-  
-  /// A vector mask with the result of a pointwise greater-than-or-equal-to comparison.
-  @export(implementation)
-  public static func .>=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.cmp_${s}ge_${Builtin}(a._storage._value, b._storage._value)
-    ))
-  }
+%  end
     
   /// The wrapping sum of two vectors.
   @export(implementation)
