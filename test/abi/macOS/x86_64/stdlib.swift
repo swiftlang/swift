@@ -1357,3 +1357,6 @@ Added: __swift_isRestrictedProcess
 
 // Setter for typed willThrow hook.
 Added: __swift_setWillThrowTypedHandler
+
+// Separate runtime for `is` tests
+Added: _swift_dynamicCastTest

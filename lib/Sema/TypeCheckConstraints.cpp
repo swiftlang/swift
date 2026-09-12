@@ -34,6 +34,7 @@
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -2134,16 +2135,18 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   // This is handled in the runtime, so it doesn't need a special cast
   // kind.
   if (Context.LangOpts.EnableObjCInterop) {
+    ConformanceCache cache;
+
     auto nsObject = Context.getNSObjectType();
     auto nsErrorTy = Context.getNSErrorType();
 
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
       if (checkConformance(toType, errorTypeProto)) {
         if (nsErrorTy) {
-          if (isSubtypeOf(fromType, nsErrorTy, dc)
+          if (canConvertTo(cache, fromType, nsErrorTy)
               // Don't mask "always true" warnings if NSError is cast to
               // Error itself.
-              && !isSubtypeOf(fromType, toType, dc))
+              && !canConvertTo(cache, fromType, toType))
             return CheckedCastKind::ValueCast;
         }
       }

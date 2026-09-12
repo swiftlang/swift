@@ -19,6 +19,7 @@
 
 #include "ClangAdapter.h"
 #include "ClangSourceBufferImporter.h"
+#include "CxxUnsafetyReason.h"
 #include "ImportEnumInfo.h"
 #include "ImportName.h"
 #include "SwiftLookupTable.h"
@@ -658,6 +659,17 @@ public:
 
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
+
+  /// Why a declaration was given an implicit '@unsafe' by the lifetime
+  /// inference in VisitFunctionDecl, for diagnostics.
+  ///
+  /// Recorded where the attribute is added rather than recomputed later: the
+  /// conditions depend on local state of the import (which annotations were
+  /// skipped, which parameters were annotated) that cannot be re-derived from
+  /// the Clang declaration alone. Recording keeps the reason and the verdict on
+  /// the same code path, as elsewhere.
+  llvm::DenseMap<const Decl *, importer::CxxUnsafetyExplanation>
+      LifetimeUnsafetyReasons;
 
   // Caches used by ObjCInterfaceAndImplementationRequest.
   llvm::DenseMap<Decl *, Decl *> ImplementationsByInterface;
@@ -2396,12 +2408,36 @@ bool isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx);
 /// derived from \c swift::RefCountedClass).
 bool isSwiftClassType(const clang::CXXRecordDecl *decl);
 
+/// Why \p recordDecl's escapability is unknown, or nothing when it is known --
+/// or when no reason could be attributed, since a note that cannot be justified
+/// is worse than none.
+///
+/// Shares the ClangTypeEscapability computation rather than repeating it.
+std::optional<CxxUnknownEscapability>
+explainUnknownEscapability(const clang::RecordDecl *recordDecl,
+                           ASTContext &ctx);
+
+/// Which part of \p recordDecl made it unsafe, or nothing when it is not.
+///
+/// Shares the ClangDeclExplicitSafety walk rather than repeating it, so the
+/// reason cannot contradict the verdict. \p isClass must match how the record is
+/// imported: a type imported as a class inherits unsafety from its bases and
+/// from nothing else, so asking under the wrong rules can answer that a record
+/// is safe when the compiler treats it as unsafe.
+std::optional<CxxUnsafetyExplanation>
+explainRecordUnsafety(const clang::RecordDecl *recordDecl, ASTContext &ctx,
+                      bool isClass);
+
 /// Whether the C++ method \p method can be safely used in Swift, i.e. it is not
 /// a projection that could yield a dangling pointer/reference/iterator. Methods
 /// that are not safe are imported under a \c __<name>Unsafe name and/or marked
 /// \c @unsafe. See also PrintOptions::SkipUnsafeCXXMethods.
-bool shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
-                                   ASTContext &ctx);
+///
+/// Returns which rule decided that, so a diagnostic can explain it, or nothing
+/// when the method needs no rename.
+std::optional<CxxUnsafetyReason>
+shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
+                              ASTContext &ctx);
 
 /// Whether \p method keeps its original Swift name, and is imported
 /// \c @unsafe(always) rather than renamed to \c __<name>Unsafe .

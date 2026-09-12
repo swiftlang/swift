@@ -21,6 +21,7 @@
 #include "TypeCheckUnsafe.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/PackConformance.h"
@@ -148,6 +149,10 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
           diag::note_reference_to_unsafe_decl,
           isCall, decl);
     }
+
+    // If this came from C++, explain why the importer judged it unsafe.
+    if (auto *loader = ctx.getClangModuleLoader())
+      loader->diagnoseCxxUnsafetyReason(decl, type, loc);
 
     return;
   }

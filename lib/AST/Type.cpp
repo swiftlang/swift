@@ -3332,6 +3332,15 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     wasOptional = true;
   }
 
+  // 'CFTypeRef' is imported as 'AnyObject', but the C type it stands for
+  // ('const void *') is representable in C and C++. Recognize it
+  // only when it is spelled as 'CFTypeRef' (or a typealias thereof): a type
+  // written as 'AnyObject' is a Swift existential, which is not.
+  //
+  // A value passed this way is reference counted the way 'AnyObject' is.
+  if (language != ForeignLanguage::ObjectiveC && type->isCFTypeRef())
+    return { ForeignRepresentableKind::Trivial, nullptr };
+
   if (auto existential = type->getAs<ExistentialType>())
     type = existential->getConstraintType();
 
@@ -3448,9 +3457,9 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   ASTContext &ctx = nominal->getASTContext();
 
-  // Unmanaged<T> can be trivially represented in Objective-C if T
-  // is trivially represented in Objective-C.
-  if (language == ForeignLanguage::ObjectiveC && type->isUnmanaged()) {
+  // Unmanaged<T> can be trivially represented in a foreign language if T
+  // is trivially represented in that language.
+  if (type->isUnmanaged()) {
     auto boundGenericType = type->getAs<BoundGenericType>();
 
     // Note: works around a broken Unmanaged<> definition.
@@ -3471,15 +3480,20 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     case ForeignLanguage::C:
     case ForeignLanguage::Cxx:
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
-        switch (classDecl->getForeignClassKind()) {
-        case ClassDecl::ForeignKind::Normal:
-        case ClassDecl::ForeignKind::RuntimeOnly:
-          // Imported classes cannot be represented in C or C++.
-          return failure();
-        case ClassDecl::ForeignKind::CFType:
-          // Imported CF types can be represented as trivial pointer types in C
-          // or C++.
-          break;
+        // Foreign reference types are imported as classes, but they are
+        // passed around as a pointer to the underlying C or C++ record, so
+        // they are representable in both languages.
+        if (!classDecl->isForeignReferenceType()) {
+          switch (classDecl->getForeignClassKind()) {
+          case ClassDecl::ForeignKind::Normal:
+          case ClassDecl::ForeignKind::RuntimeOnly:
+            // Imported classes cannot be represented in C or C++.
+            return failure();
+          case ClassDecl::ForeignKind::CFType:
+            // Imported CF types can be represented as trivial pointer types in
+            // C or C++.
+            break;
+          }
         }
       }
 
@@ -5161,6 +5175,26 @@ bool TypeBase::isForeignReferenceType() {
   if (auto *classDecl = lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
     return classDecl->isForeignReferenceType();
   return false;
+}
+
+bool TypeBase::isCFTypeRef() {
+  Type ty(this);
+
+  if (auto existential = dyn_cast<ExistentialType>(ty.getPointer()))
+    ty = existential->getConstraintType();
+
+  // Walk down to the innermost typealias, so that a typealias of 'CFTypeRef'
+  // is recognized as well.
+  const TypeAliasDecl *aliasDecl = nullptr;
+  while (auto aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
+    aliasDecl = aliasTy->getDecl();
+    ty = aliasTy->getSinglyDesugaredType();
+  }
+
+  if (!aliasDecl || !aliasDecl->hasClangNode())
+    return false;
+
+  return aliasDecl->getName() == getASTContext().Id_CFTypeRef;
 }
 
 bool TypeBase::hasSimpleTypeRepr() const {
