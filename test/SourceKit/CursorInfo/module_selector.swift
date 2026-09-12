@@ -5,6 +5,25 @@
 // RUN: %sourcekitd-test -req=cursor -pos=3:50 -print-raw-response %t/main.swift -- %t/main.swift -I %t -target %target-triple | %FileCheck %s --check-prefix=UNBOUND
 // RUN: %sourcekitd-test -req=cursor -pos=4:51 -print-raw-response %t/main.swift -- %t/main.swift -I %t -target %target-triple | %FileCheck %s --check-prefix=COMPOUND
 
+// RUN: %sourcekitd-test -req=cursor -pos=3:19 -print-raw-response %t/main.swift -- %t/main.swift -I %t -target %target-triple | %FileCheck %s --check-prefix=MODULE
+// RUN: %sourcekitd-test -req=cursor -pos=3:38 -print-raw-response %t/main.swift -- %t/main.swift -I %t -target %target-triple | %FileCheck %s --check-prefix=MODULE
+// RUN: %sourcekitd-test -req=cursor -pos=4:39 -print-raw-response %t/main.swift -- %t/main.swift -I %t -target %target-triple | %FileCheck %s --check-prefix=MODULE
+// RUN: %sourcekitd-test -req=cursor -pos=3:31 -print-raw-response %t/main.swift -- %t/main.swift -I %t -target %target-triple | %FileCheck %s --check-prefix=WIDGET
+// RUN: %sourcekitd-test -req=cursor -pos=3:29 -print-raw-response %t/main.swift -- %t/main.swift -I %t -target %target-triple | %FileCheck %s --check-prefix=NONE
+// RUN: %sourcekitd-test -req=cursor -pos=3:30 -print-raw-response %t/main.swift -- %t/main.swift -I %t -target %target-triple | %FileCheck %s --check-prefix=NONE
+// RUN: %sourcekitd-test -req=cursor -pos=4:49 -print-raw-response %t/main.swift -- %t/main.swift -I %t -target %target-triple | %FileCheck %s --check-prefix=NONE
+// RUN: %sourcekitd-test -req=cursor -pos=4:50 -print-raw-response %t/main.swift -- %t/main.swift -I %t -target %target-triple | %FileCheck %s --check-prefix=NONE
+// RUN: %sourcekitd-test -req=cursor -pos=5:14 -print-raw-response %t/main.swift -- %t/main.swift -I %t -target %target-triple | %FileCheck %s --check-prefix=MODULE
+// RUN: %sourcekitd-test -req=cursor -pos=5:25 -print-raw-response %t/main.swift -- %t/main.swift -I %t -target %target-triple | %FileCheck %s --check-prefix=WIDGET
+
+// MODULE: key.kind: source.lang.swift.ref.module
+// MODULE: key.name: "TestModule"
+// WIDGET: key.kind: source.lang.swift.ref.struct
+// WIDGET: key.name: "Widget"
+// WIDGET: key.usr: "s:10TestModule6WidgetV"
+// NONE-NOT: key.kind
+// NONE: key.internal_diagnostic: "Unable to resolve cursor info."
+
 // UNBOUND: key.kind: source.lang.swift.ref.function.method.instance
 // UNBOUND: key.name: "method(label:)"
 // UNBOUND: key.usr: "s:10TestModule6WidgetV6method5labelySi_tF"
@@ -26,3 +45,4 @@ import TestModule
 
 let unbound: () = TestModule::Widget.TestModule::method(Widget())(label: 1)
 let compound: () = TestModule::Widget.TestModule::method(label:)(Widget())(1)
+let dotted = TestModule.Widget.self
