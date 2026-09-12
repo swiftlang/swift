@@ -4,7 +4,8 @@
 // RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -target %target-swift-5.8-abi-triple \
-// RUN:   -strict-memory-safety
+// RUN:   -strict-memory-safety \
+// RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}incomplete.h
 //
 // An incomplete reference type has no layout to ask Clang for, so check that
 // lowering one does not crash either.
@@ -55,6 +56,7 @@ ViewOfIncomplete makeView();
 // Same shape without the reference annotation: not imported as a class, so this
 // one stays unsafe. Keeps the test honest about -strict-memory-safety being on.
 struct PlainFwd;
+// expected-note@+1 {{this type has unknown escapability: its member 'plain' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
 struct HoldsPlainFwd {
   PlainFwd *plain;
 };

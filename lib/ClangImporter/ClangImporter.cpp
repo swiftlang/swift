@@ -5730,9 +5730,30 @@ static bool canDeriveEscapabilityFromMembers(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
-CxxEscapability
-ClangTypeEscapability::evaluate(Evaluator &evaluator,
-                                EscapabilityLookupDescriptor desc) const {
+/// An escapability verdict, with the reason behind it when it is Unknown.
+///
+/// The reason is absent on paths that reach Unknown without recording one -- an
+/// explicit unsafe annotation short-circuits the traversal, for one -- so its
+/// presence, rather than a separate flag, tells a caller whether there is
+/// anything to explain.
+struct EscapabilityResult {
+  CxxEscapability escapability;
+  std::optional<importer::CxxUnknownEscapability> unknown;
+};
+
+/// The shared implementation of ClangTypeEscapability.
+static EscapabilityResult
+computeClangTypeEscapability(Evaluator &evaluator,
+                             EscapabilityLookupDescriptor desc) {
+  std::optional<importer::CxxUnknownEscapability> unknown;
+  auto unknownBecause = [&](importer::CxxUnknownEscapabilityReason reason,
+                            const clang::NamedDecl *blame,
+                            const clang::RecordDecl *blameOwner = nullptr) {
+    // The first reason found wins: it is the one that made the answer Unknown.
+    if (!unknown)
+      unknown = importer::CxxUnknownEscapability{reason, blame, blameOwner};
+    return true;
+  };
 
   // Escapability inference rules:
   // - array and vector types have the same escapability as their element type
@@ -5756,10 +5777,27 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
   // Keep track of Types we've seen to avoid cycles
   llvm::SmallDenseSet<const clang::Type *, 4> seen;
 
+  // Which member put a type on the stack, and which record that member belongs
+  // to. The traversal is flattened, so a reason may be found several levels below
+  // the type being explained; the owner is what lets the caller attribute the
+  // member to the right record instead of guessing.
+  struct Provenance {
+    const clang::NamedDecl *member;
+    const clang::RecordDecl *owner;
+  };
+  llvm::SmallDenseMap<const clang::Type *, Provenance, 4> pushedBy;
   auto maybePushToStack = [&](const clang::Type *type, bool unused=false) {
     auto desugared = type->getUnqualifiedDesugaredType();
     if (seen.insert(desugared).second)
       stack.push_back(desugared);
+  };
+  auto pushMember = [&](const clang::Type *type, const clang::NamedDecl *member,
+                        const clang::RecordDecl *owner) {
+    auto desugared = type->getUnqualifiedDesugaredType();
+    if (seen.insert(desugared).second) {
+      stack.push_back(desugared);
+      pushedBy[desugared] = {member, owner};
+    }
   };
 
   maybePushToStack(desc.type);
@@ -5769,7 +5807,7 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
     if (const auto *recordType = type->getAs<clang::RecordType>()) {
       auto recordDecl = recordType->getDecl();
       if (hasNonEscapableAttr(recordDecl))
-        return CxxEscapability::NonEscapable;
+        return {CxxEscapability::NonEscapable, std::nullopt};
       if (hasEscapableAttr(recordDecl))
         continue;
       // A foreign reference type is imported as a Swift class, which is always
@@ -5779,7 +5817,9 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       if (importer::isForeignReferenceRecord(recordDecl, evaluator))
         continue;
       if (hasSwiftAttribute(recordDecl, {"unsafe", "unsafe(always)"}))
-        return CxxEscapability::Unknown;
+        // Reached without recording a reason, so there is nothing to explain:
+        // the annotation in the header already says it.
+        return {CxxEscapability::Unknown, std::nullopt};
       llvm::ArrayRef<int> STLParams;
       if (recordDecl->isInStdNamespace()) {
         STLParams = getSTLConditionalParams(recordDecl->getName());
@@ -5790,9 +5830,12 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       auto conditionalParams = getConditionalEscapableAttrParams(recordDecl);
 
       if (!STLParams.empty() || !conditionalParams.empty()) {
-        hasUnknown |= checkConditionalParams<CxxEscapability>(
-            recordDecl, desc.impl, STLParams, conditionalParams,
-            maybePushToStack);
+        if (checkConditionalParams<CxxEscapability>(
+                recordDecl, desc.impl, STLParams, conditionalParams,
+                maybePushToStack))
+          hasUnknown |= unknownBecause(
+              importer::CxxUnknownEscapabilityReason::ConditionalArgument,
+              recordDecl, recordDecl);
         continue;
       }
       // Only try to infer escapability if the record doesn't have any
@@ -5802,15 +5845,19 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
           (!cxxRecordDecl || canDeriveEscapabilityFromMembers(cxxRecordDecl))) {
         if (cxxRecordDecl) {
           for (auto base : cxxRecordDecl->bases())
-            maybePushToStack(base.getType()->getUnqualifiedDesugaredType());
+            pushMember(base.getType()->getUnqualifiedDesugaredType(),
+                       base.getType()->getAsRecordDecl(), recordDecl);
         }
         for (auto field : recordDecl->fields())
-          maybePushToStack(field->getType()->getUnqualifiedDesugaredType());
+          pushMember(field->getType()->getUnqualifiedDesugaredType(), field,
+                     recordDecl);
       } else {
         // We only infer escapability for simple types, such as aggregates and
         // RecordDecls that are not CxxRecordDecls. For more complex
         // CxxRecordDecls, we rely solely on escapability annotations.
-        hasUnknown = true;
+        hasUnknown = unknownBecause(
+            importer::CxxUnknownEscapabilityReason::CannotDeriveFromMembers,
+            recordDecl, recordDecl);
       }
     } else if (type->isArrayType()) {
       auto elemTy = cast<clang::ArrayType>(type)
@@ -5823,10 +5870,33 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
                type->isMemberPointerType() || type->isReferenceType()) {
       // pointer and reference types are currently imported as unknown
       // (importing them as non-escapable broke backward compatibility)
-      hasUnknown = true;
+      auto provenance = pushedBy.lookup(type);
+      hasUnknown =
+          unknownBecause(importer::CxxUnknownEscapabilityReason::Pointer,
+                         provenance.member, provenance.owner);
     }
   }
-  return hasUnknown ? CxxEscapability::Unknown : CxxEscapability::Escapable;
+  if (!hasUnknown)
+    return {CxxEscapability::Escapable, std::nullopt};
+  return {CxxEscapability::Unknown, unknown};
+}
+
+CxxEscapability
+ClangTypeEscapability::evaluate(Evaluator &evaluator,
+                                EscapabilityLookupDescriptor desc) const {
+  return computeClangTypeEscapability(evaluator, desc).escapability;
+}
+
+std::optional<importer::CxxUnknownEscapability>
+importer::explainUnknownEscapability(const clang::RecordDecl *recordDecl,
+                                     ASTContext &ctx) {
+  EscapabilityLookupDescriptor desc{recordDecl->getTypeForDecl(), nullptr};
+  // The request caches the verdict but not the reason behind it, so ask it for
+  // the verdict and repeat the walk only when there is something to explain.
+  if (evaluateOrDefault(ctx.evaluator, ClangTypeEscapability(desc),
+                        CxxEscapability::Unknown) != CxxEscapability::Unknown)
+    return std::nullopt;
+  return computeClangTypeEscapability(ctx.evaluator, desc).unknown;
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -8780,8 +8850,27 @@ SourceLoc swift::extractNearestSourceLoc(ClangDeclExplicitSafetyDescriptor desc)
   return SourceLoc();
 }
 
-ExplicitSafety ClangDeclExplicitSafety::evaluate(
-    Evaluator &evaluator, ClangDeclExplicitSafetyDescriptor desc) const {
+/// A safety verdict, with the reason behind it when it is Unsafe.
+struct SafetyResult {
+  ExplicitSafety safety;
+  std::optional<importer::CxxUnsafetyExplanation> unsafe;
+};
+
+/// The shared implementation of ClangDeclExplicitSafety.
+///
+/// Deriving the reason here, rather than in a parallel walk, is what keeps an
+/// explanation from contradicting the verdict it explains.
+static SafetyResult
+computeClangDeclExplicitSafety(Evaluator &evaluator,
+                               ClangDeclExplicitSafetyDescriptor desc) {
+  auto unsafeBecause = [](importer::CxxUnsafetyReason reason,
+                          const clang::NamedDecl *blame) {
+    return SafetyResult{ExplicitSafety::Unsafe,
+                        importer::CxxUnsafetyExplanation{reason, blame}};
+  };
+  auto verdict = [](ExplicitSafety safety) {
+    return SafetyResult{safety, std::nullopt};
+  };
   // FIXME: Also similar to hasPointerInSubobjects
 
   // Clang record types are considered explicitly unsafe if any of their fields,
@@ -8836,7 +8925,8 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
     };
 
     if (hasAttrs({"unsafe", "unsafe(always)"}))
-      return ExplicitSafety::Unsafe;
+      return unsafeBecause(importer::CxxUnsafetyReason::ExplicitAnnotation,
+                           dyn_cast<clang::NamedDecl>(decl));
 
     if (hasAttrs({"safe"}))
       continue;
@@ -8871,7 +8961,7 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
     if (!recordDecl) {
       if (decl == desc.decl)
         // If desc.decl is not a RecordDecl or EnumDecl, safety is unspecified.
-        return ExplicitSafety::Unspecified;
+        return verdict(ExplicitSafety::Unspecified);
       // If we encountered non-Record non-Enum decl during recursive traversal,
       // we need to continue checking safety of other decls.
       continue;
@@ -8890,7 +8980,8 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
       // with more complex lifetime dependencies are imported as unsafe.
       if (importer::isDirectViewType(recordDecl->getTypeForDecl(), evaluator))
         continue;
-      return ExplicitSafety::Unsafe;
+      return unsafeBecause(importer::CxxUnsafetyReason::IndirectView,
+                           recordDecl);
     case CxxEscapability::Unknown:
       // Fall through to the field/base and template-argument checks below.
       break;
@@ -8904,13 +8995,17 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
         switch (arg.getKind()) {
         case clang::TemplateArgument::Type:
           if (isUnsafe(arg.getAsType()))
-            return ExplicitSafety::Unsafe;
+            return unsafeBecause(
+                importer::CxxUnsafetyReason::UnsafeTemplateArgument,
+                arg.getAsType()->getAsRecordDecl());
           break;
         case clang::TemplateArgument::Pack:
           for (auto pkArg : arg.getPackAsArray()) {
             if (pkArg.getKind() == clang::TemplateArgument::Type &&
                 isUnsafe(pkArg.getAsType()))
-              return ExplicitSafety::Unsafe;
+              return unsafeBecause(
+                  importer::CxxUnsafetyReason::UnsafeTemplateArgument,
+                  pkArg.getAsType()->getAsRecordDecl());
           }
           break;
         default:
@@ -8923,22 +9018,22 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
     if (!recordDecl) {
       if (decl == desc.decl)
         // If desc.decl doesn't have a definition, safety is unspecified.
-        return ExplicitSafety::Unspecified;
+        return verdict(ExplicitSafety::Unspecified);
       // If we encountered decl without definition during recursive traversal,
       // we need to continue checking safety of other decls.
       continue;
     }
 
     if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
-      for (auto base : cxxRecordDecl->bases()) {
-        if (isUnsafe(base.getType()))
-          return ExplicitSafety::Unsafe;
-      }
+      // A base is always a record, never a pointer, so it is never unsafe on
+      // its own: the call enqueues it, and it is explained by what it contains.
+      for (auto base : cxxRecordDecl->bases())
+        (void)isUnsafe(base.getType());
     }
 
     for (auto *field : recordDecl->fields()) {
       if (isUnsafe(field->getType()))
-        return ExplicitSafety::Unsafe;
+        return unsafeBecause(importer::CxxUnsafetyReason::UnsafeField, field);
     }
   }
 
@@ -8946,7 +9041,24 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
   // reachable from desc.decl are considered unsafe either. Cases where we would
   // consider desc.decl's safety unspecified should have returned early from the
   // loop. Thus, we can conclude that desc.decl is safe.
-  return ExplicitSafety::Safe;
+  return verdict(ExplicitSafety::Safe);
+}
+
+ExplicitSafety ClangDeclExplicitSafety::evaluate(
+    Evaluator &evaluator, ClangDeclExplicitSafetyDescriptor desc) const {
+  return computeClangDeclExplicitSafety(evaluator, desc).safety;
+}
+
+std::optional<importer::CxxUnsafetyExplanation>
+importer::explainRecordUnsafety(const clang::RecordDecl *recordDecl,
+                                ASTContext &ctx, bool isClass) {
+  ClangDeclExplicitSafetyDescriptor desc(recordDecl, isClass);
+  // As in explainUnknownEscapability: the cached request answers whether there
+  // is anything to explain, and only then is the walk repeated for the reason.
+  if (evaluateOrDefault(ctx.evaluator, ClangDeclExplicitSafety(desc),
+                        ExplicitSafety::Unspecified) != ExplicitSafety::Unsafe)
+    return std::nullopt;
+  return computeClangDeclExplicitSafety(ctx.evaluator, desc).unsafe;
 }
 
 bool ClangDeclExplicitSafety::isCached() const {
