@@ -629,6 +629,10 @@ extension InlineArray where Element: ~Copyable {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// MARK: - Iterable & Other Conformances
+//===----------------------------------------------------------------------===//
+
 @available(SwiftStdlib 6.2, *)
 extension InlineArray: Iterable where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
