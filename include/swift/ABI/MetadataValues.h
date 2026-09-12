@@ -1828,6 +1828,11 @@ namespace SpecialPointerAuthDiscriminators {
   /// discriminator covers all of them.
   const uint16_t ConcurrencyHook = 0xc0a1; // = 49313
 
+  /// ThreadSanitizer interop hook variables (_swift_tsan_acquire,
+  /// _swift_tsan_release). Address-diversified, so one discriminator
+  /// covers both.
+  const uint16_t ThreadSanitizerHook = 0x8f52; // = 36690
+
   /// Function pointers stored in the coro allocator struct.
   const uint16_t CoroAllocationFunction = 0x5f95;   // = 24469
   const uint16_t CoroDeallocationFunction = 0x9faf; // = 40879
