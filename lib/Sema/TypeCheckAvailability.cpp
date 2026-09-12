@@ -3039,6 +3039,17 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (ctx.LangOpts.WarnSoftDeprecated)
     restrictionFlags |= AvailabilityRestrictionFlag::IncludeSoftDeprecation;
 
+  if (Flags.contains(
+          DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol) &&
+      isa<ProtocolDecl>(D))
+    restrictionFlags |=
+        AvailabilityRestrictionFlag::AllowUnintroducedInPlatformDomains;
+
+  if (Flags.contains(DeclAvailabilityFlag::
+                         AllowPotentiallyUnavailableAtOrBelowDeploymentTarget))
+    restrictionFlags |=
+        AvailabilityRestrictionFlag::AllowUnintroducedAtOrBelowDeploymentRange;
+
   auto getAvailabilityRestriction = [&](const Decl *decl) {
     return Where.getAvailability().restrictionForDecl(decl, restrictionFlags);
   };
@@ -3073,21 +3084,9 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
     return false;
   }
 
-  if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
-        && isa<ProtocolDecl>(D))
-    return false;
-
   // Diagnose (and possibly signal) for potential unavailability
   auto domainAndRange = restriction->getDomainAndRange(ctx);
   auto fixItDomainAndRange = restriction->getFixItDomainAndRange(ctx);
-  auto domain = domainAndRange.getDomain();
-  auto requiredRange = domainAndRange.getRange();
-
-  if (Flags.contains(
-          DeclAvailabilityFlag::
-              AllowPotentiallyUnavailableAtOrBelowDeploymentTarget) &&
-      requiresDeploymentTargetOrEarlier(domain, requiredRange, ctx))
-    return false;
 
   if (accessor) {
     bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
