@@ -4695,6 +4695,47 @@ evaluate(Evaluator &evaluator, Decl *D) const {
   return evaluator::SideEffect();
 }
 
+/// Diagnose a '@c' or '@cxx' function that would define the retain or release
+/// operation of a foreign reference type it also takes as a parameter.
+///
+/// The C entry point retains and releases its foreign reference type
+/// parameters, so such a function would call itself.
+static void diagnoseForeignRefCountingOperation(FuncDecl *FD,
+                                                DeclAttribute *attr) {
+  auto cName = FD->getCDeclName();
+  if (cName.empty())
+    return;
+
+  auto *loader = FD->getASTContext().getClangModuleLoader();
+  if (!loader)
+    return;
+
+  for (auto *param : *FD->getParameters()) {
+    auto paramTy = param->getInterfaceType()->lookThroughAllOptionalTypes();
+    auto *classDecl = paramTy->getClassOrBoundGenericClass();
+
+    // Immortal foreign reference types have no retain/release to implement.
+    if (!classDecl || !classDecl->hasRefCountingAnnotations())
+      continue;
+
+    auto *record =
+        dyn_cast_or_null<clang::RecordDecl>(classDecl->getClangDecl());
+    if (!record)
+      continue;
+
+    auto ops = loader->getForeignReferenceTypeOperations(record);
+    for (auto [op, isRelease] : {std::make_pair(ops.first, false),
+                                 std::make_pair(ops.second, true)}) {
+      if (!op || !op->getIdentifier() || op->getName() != cName)
+        continue;
+
+      FD->diagnose(diag::cdecl_ref_counting_operation, attr, isRelease,
+                   paramTy);
+      return;
+    }
+  }
+}
+
 evaluator::SideEffect
 TypeCheckForeignFunctionRequest::evaluate(Evaluator &evaluator,
                                         FuncDecl *FD,
@@ -4727,8 +4768,13 @@ TypeCheckForeignFunctionRequest::evaluate(Evaluator &evaluator,
 
     // For @cxx, async/throws are hard errors that also invalidate the
     // attribute so downstream matching diagnostics do not pile on.
-    if (*lang == ForeignLanguage::Cxx && (FD->hasAsync() || FD->hasThrows()))
+    if (*lang == ForeignLanguage::Cxx && (FD->hasAsync() || FD->hasThrows())) {
       reason.setAttrInvalid();
+    } else {
+      // Check whether this is an infinitely-recursive foreign reference
+      // counting operation.
+      diagnoseForeignRefCountingOperation(FD, attr);
+    }
   } else {
     reason.setAttrInvalid();
   }
