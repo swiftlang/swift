@@ -20,6 +20,7 @@
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
+#include <climits>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -1220,15 +1221,14 @@ recur:
 int Demangler::demangleNatural() {
   if (!isDigit(peekChar()))
     return -1000;
-  int num = 0;
+  uint64_t num = 0;
   while (true) {
     char c = peekChar();
     if (!isDigit(c))
-      return num;
-    int newNum = (10 * num) + (c - '0');
-    if (newNum < num)
+      return (int)num;
+    num = (10 * num) + (c - '0');
+    if (num > INT_MAX)
       return -1000;
-    num = newNum;
     nextChar();
   }
 }
@@ -1237,7 +1237,7 @@ int Demangler::demangleIndex() {
   if (nextIf('_'))
     return 0;
   int num = demangleNatural();
-  if (num >= 0 && nextIf('_'))
+  if (num >= 0 && num < INT_MAX && nextIf('_'))
     return num + 1;
   return -1000;
 }
