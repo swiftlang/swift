@@ -110,7 +110,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   ThreadingError.cpp
   TracingSignpost.cpp
   AsyncStream.cpp
-  linker-support/magic-symbols-for-install-name.c
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
@@ -193,6 +192,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
 
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
   ExecutorImpl.cpp
+  linker-support/magic-symbols-for-install-name.c
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES)

@@ -129,7 +129,9 @@
 #error Masking ISAs are incompatible with opaque ISAs
 #endif
 
-#if defined(__APPLE__) && defined(__LP64__) && __has_include(<malloc_type_private.h>) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
+#if defined(__APPLE__) && defined(__LP64__) &&                                 \
+    __has_include(<malloc_type_private.h>) &&                                  \
+    __has_include(<TargetConditionals.h>) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
 # include <TargetConditionals.h>
 # if TARGET_OS_IOS && !TARGET_OS_SIMULATOR
 #  define SWIFT_STDLIB_HAS_MALLOC_TYPE 1
@@ -574,7 +576,7 @@ swift_auth_code(T value, unsigned extra) {
 }
 
 /// Does this platform support backtrace-on-crash?
-#ifdef __APPLE__
+#if defined(__APPLE__) && __has_include(<TargetConditionals.h>)
 #  include <TargetConditionals.h>
 #  if TARGET_OS_OSX
 #    define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 1
