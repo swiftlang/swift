@@ -2209,6 +2209,16 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   // Instructions with type dependent operands cannot be salvaged.
   if (I->getNumTypeDependentOperands() != 0)
     return;
+  
+  // TESTING: RECREATE DEBUG VALUES
+  if (auto *SVI = dyn_cast<SingleValueInstruction>(I)) {
+    llvm::SmallVector<Operand *> uses(getDebugUses(SVI));
+    for (auto *use : uses) {
+      auto *DVI = cast<DebugValueInst>(use->getUser());
+      DVI->clone(DVI);
+      DVI->eraseFromParent();
+    }
+  }
 
   if (auto *SI = dyn_cast<StoreInst>(I)) {
     if (SILValue DestVal = SI->getDest())
