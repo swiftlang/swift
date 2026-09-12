@@ -203,7 +203,7 @@ tests.test("HexFloats") {
   expectParse("0xab", 171.0)
   expectParse("0x1p+10", 1024.0)
   expectParse("0x1p+0000000000000000000000000010", 1024.0)
-  expectParse("0x1.921fb4p+1", Float32.pi)
+  expectParse("0x1.921fb6p+1", Float32.pi)
 
   // Rationale for the four assertions below:
   // * Float32.greatestFiniteMagnitude has an odd significand
