@@ -125,7 +125,10 @@ struct BridgedResultInfo {
     : type(type), convention(conv), options(options) {}
   BRIDGED_INLINE swift::SILResultInfo unbridged() const;
 
-  BRIDGED_INLINE BridgedCanType getReturnValueType(BridgedFunction f) const;
+  /// `ofFunctionType` must be the function type this result belongs to; its pattern
+  /// substitutions are applied to the result's interface type.
+  BRIDGED_INLINE BridgedCanType getReturnValueType(BridgedCanType ofFunctionType,
+                                                   BridgedFunction f) const;
 };
 
 struct OptionalBridgedResultInfo {
@@ -612,6 +615,7 @@ struct BridgedFunction {
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;
   BRIDGED_INLINE void setIsPerformanceConstraint(bool isPerfConstraint) const;
   BRIDGED_INLINE bool isResilientNominalDecl(BridgedDeclObj decl) const;
+  BRIDGED_INLINE bool isEffectivelyExhaustiveEnumDecl(BridgedDeclObj decl) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getLoweredType(BridgedASTType type, bool maximallyAbstracted) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType
   getLoweredTypeWithAbstractionPattern(BridgedCanType type) const;
