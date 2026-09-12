@@ -1374,32 +1374,61 @@ namespace {
 class TypeReprCycleCheckWalker : private ASTWalker {
   ASTContext &ctx;
   llvm::SmallDenseSet<Identifier, 2> circularNames;
+  llvm::SmallDenseSet<Identifier, 2> circularTypeAliasNames;
   ValueDecl *witness;
   bool found;
 
 public:
   TypeReprCycleCheckWalker(
       ASTContext &ctx,
-      const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved)
-    : ctx(ctx), witness(nullptr), found(false) {
+      const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
+      ValueDecl *requirement)
+      : ctx(ctx), witness(nullptr), found(false) {
     for (auto *assocType : allUnresolved) {
       circularNames.insert(assocType->getName());
     }
+
+    // A protocol type alias can indirectly refer to an unresolved associated
+    // type even when the alias itself has an unrelated name.
+    requirement->getInterfaceType().findIf([&](Type type) {
+      auto *typeAlias = dyn_cast<TypeAliasType>(type.getPointer());
+      if (!typeAlias ||
+          !typeAlias->getDecl()->getDeclContext()->getExtendedProtocolDecl())
+        return false;
+
+      if (typeAlias->getDecl()->getUnderlyingType().findIf([&](Type type) {
+            auto *dependentMember = type->getAs<DependentMemberType>();
+            auto *assocType =
+                dependentMember ? dependentMember->getAssocType() : nullptr;
+            return assocType && circularNames.count(assocType->getName());
+          })) {
+        circularTypeAliasNames.insert(typeAlias->getDecl()->getName());
+      }
+
+      return false;
+    });
   }
 
 private:
+  bool isCircularName(Identifier name) const {
+    return circularNames.count(name) || circularTypeAliasNames.count(name);
+  }
+
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     auto *declRefTyR = dyn_cast<DeclRefTypeRepr>(T);
-    if (!declRefTyR || declRefTyR->hasGenericArgList()) {
+    if (!declRefTyR) {
       return Action::Continue();
     }
+
+    auto name = declRefTyR->getNameRef().getBaseIdentifier();
+    if (declRefTyR->hasGenericArgList() && !circularTypeAliasNames.count(name))
+      return Action::Continue();
 
     auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(T);
 
     // If we're inferring `Foo`, don't look at a witness mentioning `Foo`.
     if (!qualIdentTR) {
-      if (circularNames.count(declRefTyR->getNameRef().getBaseIdentifier()) >
-          0) {
+      if (isCircularName(name)) {
         // If unqualified lookup can find a type with this name without looking
         // into protocol members, don't skip the witness, since this type might
         // be a candidate witness.
@@ -1407,8 +1436,8 @@ private:
             declRefTyR->getNameRef(), witness->getDeclContext(),
             declRefTyR->getLoc(), UnqualifiedLookupOptions());
 
-        auto results =
-            evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
+        auto results = evaluateOrDefault(ctx.evaluator,
+                                         UnqualifiedLookupRequest{desc}, {});
 
         // Ok, resolving this name would trigger associated type inference
         // recursively. We're going to skip this witness.
@@ -1426,7 +1455,7 @@ private:
       return Action::Continue();
     }
 
-    if (circularNames.count(declRefTyR->getNameRef().getBaseIdentifier()) > 0) {
+    if (isCircularName(name)) {
       // But if qualified lookup can find a type with this name without looking
       // into protocol members, don't skip the witness, since this type might
       // be a candidate witness.
@@ -1779,7 +1808,7 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
     }
   }
 
-  TypeReprCycleCheckWalker cycleCheck(dc->getASTContext(), allUnresolved);
+  TypeReprCycleCheckWalker cycleCheck(dc->getASTContext(), allUnresolved, req);
 
   InferredAssociatedTypesByWitnesses result;
 
