@@ -1,6 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=Upcast -I %S/Inputs -I %swift_src_root/lib/ClangImporter/SwiftBridging -source-filename=x -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature ForeignReferenceTypeInheritance -print-implicit-attrs | %FileCheck %s
-
-// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
+// RUN: %target-swift-ide-test -print-module -module-to-print=Upcast -I %S/Inputs -I %swift_src_root/lib/ClangImporter/SwiftBridging -source-filename=x -cxx-interoperability-mode=upcoming-swift -print-implicit-attrs | %FileCheck %s
 
 // CHECK: class Base {
 // CHECK:   var baseValue: CInt

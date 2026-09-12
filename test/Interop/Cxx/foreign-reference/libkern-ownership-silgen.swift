@@ -42,4 +42,4 @@ _ = OSCollectionIterator.getCollectionIterator()
 
 let derived = DerivedService.derivedWithID(19)
 _ = derived.getProvider()
-// CHECK: sil {{.*}}[clang DerivedService.__synthesizedBaseCall___synthesizedVirtualCall_getProvider{{.*}} -> Optional<Service>
+// CHECK: sil {{.*}}[clang DerivedService.derivedWithID] {{.*}} -> @owned DerivedService

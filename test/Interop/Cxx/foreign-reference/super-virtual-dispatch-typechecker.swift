@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeInheritance -target %target-swift-5.8-abi-triple
-
-// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -disable-availability-checking -target %target-swift-5.8-abi-triple
 
 import SuperVirtualDispatch
 
