@@ -13,6 +13,7 @@
 // RUN: %target-run-stdlib-swift
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Blocked by rdar://181604244 (opaque values borrow accessors)
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
@@ -41,6 +42,8 @@ suite.test("Basic Initializer")
     expectEqual(b.byteCount, 0)
   }
 }
+
+enum MyTestError: Error { case error }
 
 private struct Padded: BitwiseCopyable {
   var storage: (Int64, Int8)
@@ -164,6 +167,58 @@ suite.test("withUnsafeMutableBytes")
     }
   }
   expectEqual(Int(a[i]), i+1)
+}
+
+suite.test("consumeWithUnsafeMutableBytes to a MutableRef")
+.require(.stdlib_6_5)
+.skip(.custom({
+  if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+}, reason: "MutableRef requires Swift stdlib 6.4"))
+.code {
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
+
+  var array = ContiguousArray<UInt8>(0..<4)
+  array.withUnsafeMutableBytes {
+    var ref = unsafe MutableRawSpan(_unsafeBytes: $0)
+      .consumeWithUnsafeMutableBytes { bytes in
+        unsafe MutableRef(
+          unsafeAddress: bytes.baseAddress!.assumingMemoryBound(to: UInt8.self) + 1,
+          mutating: &bytes
+        )
+      }
+    expectEqual(ref.value, 1)
+    ref.value = 99
+  }
+  expectEqual(array, [0, 99, 2, 3])
+}
+
+suite.test("consumeWithUnsafeMutableBytes traps on buffer region change")
+.require(.stdlib_6_5)
+.require(.crashTesting)
+.code {
+  var array = ContiguousArray<UInt8>(0..<4)
+
+  array.withUnsafeMutableBytes {
+    unsafe MutableRawSpan(_unsafeBytes: $0)
+      .consumeWithUnsafeMutableBytes { bytes in
+        let exactRegion = unsafe UnsafeMutableRawBufferPointer(
+          start: bytes.baseAddress, count: bytes.count
+        )
+        bytes = exactRegion
+      }
+
+    expectCrashLater()
+    do throws(MyTestError) {
+      try unsafe MutableRawSpan(_unsafeBytes: $0)
+        .consumeWithUnsafeMutableBytes { bytes throws(MyTestError) in
+          let otherRegion = unsafe UnsafeMutableRawBufferPointer(
+            start: bytes.baseAddress, count: bytes.count - 1
+          )
+          bytes = otherRegion
+          throw MyTestError.error
+        }
+    } catch {}
+  }
 }
 
 suite.test("bytes property")
