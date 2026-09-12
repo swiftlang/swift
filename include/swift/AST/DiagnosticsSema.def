@@ -2236,6 +2236,11 @@ ERROR(cdecl_throws,none,
 ERROR(cdecl_incompatible_with_objc,none,
       "cannot apply both '@c' and '@objc' to %kindonly0",
       (const Decl *))
+ERROR(cdecl_ref_counting_operation,none,
+      "%0 function implementing the %select{retain|release}1 operation of "
+      "foreign reference type %2 will cause infinite recursion; "
+      "use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`",
+      (DeclAttribute, unsigned, Type))
 
 // @cxx
 ERROR(cxx_attr_requires_cxx_interop,none,
