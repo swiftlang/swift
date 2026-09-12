@@ -2714,6 +2714,16 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       SmallVector<AnyFunctionType::Param, 4> argTy;
       PL->getParams(argTy);
 
+      // An enum case payload cannot be isolated, and Sema diagnoses the
+      // 'isolated' specifier separately. The flag is derived from the type
+      // repr, though, so drop it here: the type below is built with a default
+      // ExtInfo, which cannot record parameter isolation, and a payload
+      // carrying the flag would break FunctionType's isolation invariant.
+      for (auto &param : argTy) {
+        if (param.isIsolated())
+          param = param.withFlags(param.getParameterFlags().withIsolated(false));
+      }
+
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
       resultTy = FunctionType::get(argTy, resultTy, info);
