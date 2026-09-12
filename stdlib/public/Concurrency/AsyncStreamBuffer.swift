@@ -52,805 +52,493 @@ func _lock(_ ptr: UnsafeRawPointer)
 func _unlock(_ ptr: UnsafeRawPointer)
 #endif
 
-/// The state machine backing the continuation-based variant of `Async{Throwing}Stream`.
-///
-/// States:
-///
-///   - `idle`:  The stream is active with **no consumers present**,
-///      and may accept new elements (depending on the `BufferingPolicy`).
-///   - `waiting`: The stream is active with **at least one consumer present**,
-///      and new elements are directly delivered to the next consumer.
-///   - `draining`: The stream **no longer accepts new elements**,
-///      new consumers drain the buffered elements.
-///   - `terminating`: The stream is terminating,
-///      and is currently running the termination handler, before moving on to terminated.
-///   - `terminated`: The stream is in a terminal state,
-///   **no new elements are accepted**, and **new consumers return immediately**.
-///
-/// Transitions:
-///
-/// ```text
-/// Current State   Possible Next State
-/// -------------   -------------------
-/// idle          ->  idle, waiting, draining, terminating
-/// waiting       ->  idle, waiting, terminating
-/// draining      ->  draining, terminating
-/// terminating   ->  terminated
-/// terminated    ->  terminated
-/// ```
-///
-/// Actions:
-///
-/// - `YieldAction`:
-///   - `resume`:  The next consumer is resumed with the newly yielded value.
-///   - `none`:  No action is taken.
-///
-/// - `NextAction`:
-///   - `resume`: The new consumer is resumed.
-///   - `throw`: The new consumer is resumed by throwing an error of type `Failure`.
-///   - `suspend`:  The new consumer is enqueued. No action is taken.
-///
-/// - `TerminateAction`:
-///   - `callAndResume`: The `TerminationHandler` is invoked, and all consumers are resumed afterward.
-///   - `call`: The `TerminationHandler` is invoked; any consumer parked during termination is resumed afterward.
-///   - `none`: No action is taken.
-///
-/// Behavior:
-/// The state machine is single-consumer–based. However, instead of crashing on concurrent iteration,
-/// the consumer that “loses” the race to `next()` is enqueued in a **FIFO queue** and **eventually resumed**.
-///
-/// Furthermore, when the stream reaches its terminal state and an onTermination closure is set,
-/// the closure is invoked **exactly once, after which it is cleared**.
-///
-/// Once the stream has reached its terminal state, all subsequent consumers will **immediately return nil**,
-/// and any **new values are rejected**.
-@safe
-internal final class _AsyncStreamStorage<
-  Element, Failure: Error, PublicTermination
->: @unchecked Sendable {
-  struct Continuation {
-    enum BufferingPolicy {
-      case unbounded
-
-      case bufferingOldest(Int)
-
-      case bufferingNewest(Int)
-    }
-
-    enum YieldResult {
-      case enqueued(remaining: Int)
-
-      case dropped(Element)
-
-      case terminated
-    }
-
-    enum Termination {
-      case finished(Failure?)
-
-      case cancelled
-    }
-  }
-
+@available(SwiftStdlib 5.1, *)
+extension AsyncStream {
   @safe
-  struct StateMachine: ~Copyable {
-    typealias Buffer = _Deque<Element>
-    typealias Consumer = UnsafeContinuation<Result<Element?, Failure>, Never> // TODO: Switch to ~Copyable Continuation
-    typealias Consumers = _Deque<Consumer> // TODO: Switch to UniqueDeque
-    typealias TerminationHandler = _AsyncStreamTerminationHandlerBox<Element, Failure, PublicTermination>
+  internal final class _Storage: @unchecked Sendable {
+    typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
 
-    @unsafe
-    enum State: ~Copyable {
-      struct Idle: ~Copyable {
-        var buffer: Buffer
-        let bufferingPolicy: Continuation.BufferingPolicy
-        var terminationHandler: TerminationHandler?
+    @unsafe struct State {
+      var continuations = unsafe [UnsafeContinuation<Element?, Never>]()
+      var pending = _Deque<Element>()
+      let limit: Continuation.BufferingPolicy
+      var onTermination: TerminationHandler?
+      var terminal: Bool = false
+
+      init(limit: Continuation.BufferingPolicy) {
+        unsafe self.limit = limit
       }
+    }
+    // Stored as a singular structured assignment for initialization
+    var state: State
 
-      @unsafe
-      struct Waiting: ~Copyable {
-        var consumers: Consumers
-        let bufferingPolicy: Continuation.BufferingPolicy
-        var terminationHandler: TerminationHandler?
+    private init(_doNotCallMe: ()) {
+      fatalError("Storage must be initialized by create")
+    }
+
+    deinit {
+      unsafe state.onTermination?(.cancelled)
+    }
+
+    private func lock() {
+      let ptr =
+        unsafe UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
+      unsafe _lock(ptr)
+    }
+
+    private func unlock() {
+      let ptr =
+        unsafe UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
+      unsafe _unlock(ptr)
+    }
+
+    func getOnTermination() -> TerminationHandler? {
+      lock()
+      let handler = unsafe state.onTermination
+      unlock()
+      return handler
+    }
+
+    func setOnTermination(_ newValue: TerminationHandler?) {
+      lock()
+      unsafe withExtendedLifetime(state.onTermination) {
+        unsafe state.onTermination = newValue
+        unlock()
       }
+    }
 
-      struct Draining: ~Copyable {
-        var buffer: Buffer
-        var failure: Failure?
-        var terminationHandler: TerminationHandler?
-      }
+    @Sendable func cancel() {
+      lock()
+      // swap out the handler before we invoke it to prevent double cancel
+      let handler = unsafe state.onTermination
+      unsafe state.onTermination = nil
+      unlock()
 
-      // A transient state entered on the cancellation path.
-      // The stream is terminating but the outcome is not yet finalized:
-      // the termination handler still has to run and may call `finish(throwing:)`
-      // to set a failure.
-      @unsafe
-      struct Terminating: ~Copyable {
-        var buffer: Buffer
-        var consumers: Consumers
-        private(set) var failure: Failure?
-        var terminationHandler: TerminationHandler?
+      // handler must be invoked before yielding nil for termination
+      handler?(.cancelled)
 
-        /// Returns true if the value was set, false otherwise.
-        @export(implementation)
-        mutating func setFailureOnce(_ failure: Failure?) -> Bool {
-          guard unsafe self.failure == nil else {
-            return false
+      finish()
+    }
+
+    func yield(_ value: __owned Element) -> Continuation.YieldResult {
+      var result: Continuation.YieldResult
+      lock()
+      let limit = unsafe state.limit
+      let count = unsafe state.pending.count
+
+      if unsafe !state.continuations.isEmpty {
+        let continuation = unsafe state.continuations.removeFirst()
+        if count > 0 {
+          if unsafe !state.terminal {
+            switch limit {
+            case .unbounded:
+              unsafe state.pending.append(value)
+              result = .enqueued(remaining: .max)
+            case .bufferingOldest(let limit):
+              if count < limit {
+                unsafe state.pending.append(value)
+                result = .enqueued(remaining: limit - (count + 1))
+              } else {
+                result = .dropped(value)
+              }
+            case .bufferingNewest(let limit):
+              if count < limit {
+                unsafe state.pending.append(value)
+                result = .enqueued(remaining: limit - (count + 1))
+              } else if count > 0 {
+                result = unsafe .dropped(state.pending.removeFirst())
+                unsafe state.pending.append(value)
+              } else {
+                result = .dropped(value)
+              }
+            }
+          } else {
+            result = .terminated
           }
-          unsafe self.failure = failure
-          return true
-        }
-        @export(implementation)
-        mutating func takeFailure() -> Failure? {
-          unsafe self.failure.take()
-        }
-      }
-
-      struct Terminated: ~Copyable {
-        var failure: Failure?
-        var terminationHandler: TerminationHandler? // TODO: Remove this in a follow-up PR
-      }
-
-      case idle(Idle)
-
-      case waiting(Waiting)
-
-      case draining(Draining)
-
-      case terminating(Terminating)
-
-      case terminated(Terminated)
-    }
-
-    @unsafe
-    enum YieldAction {
-      case resume(
-        consumer: Consumer,
-        element: Element,
-        yieldResult: Continuation.YieldResult
-      )
-
-      case none(yieldResult: Continuation.YieldResult)
-    }
-
-    @unsafe
-    enum NextAction {
-      case resume(
-        consumer: Consumer,
-        element: Element?
-      )
-
-      case `throw`(
-        consumer: Consumer,
-        failure: Failure
-      )
-
-      case suspend
-    }
-
-    @unsafe
-    enum TerminateAction: ~Copyable {
-      @unsafe
-      struct CallAndResume: ~Copyable {
-        var consumers: Consumers
-        let terminationHandler: TerminationHandler?
-      }
-
-      case callAndResume(CallAndResume)
-
-      case call(terminationHandler: TerminationHandler?)
-
-      case none
-    }
-
-    private var state: State
-
-    init(state: consuming State) {
-      unsafe self.state = unsafe state
-    }
-
-    init(bufferingPolicy: Continuation.BufferingPolicy) {
-      unsafe self.state = unsafe .idle(.init(
-        buffer: [],
-        bufferingPolicy: bufferingPolicy
-      ))
-    }
-  }
-
-  private let lock: UnsafeMutableRawPointer
-  private var stateMachine: StateMachine
-
-  init(bufferingPolicy: Continuation.BufferingPolicy) {
-    unsafe self.lock = unsafe UnsafeMutableRawPointer.allocate(
-      byteCount: _lockWordCount() * MemoryLayout<UnsafeRawPointer>.stride,
-      alignment: MemoryLayout<UnsafeRawPointer>.alignment
-    )
-    unsafe _lockInit(self.lock)
-
-    self.stateMachine = StateMachine(
-      bufferingPolicy: bufferingPolicy
-    )
-  }
-
-  deinit {
-    self.terminate(.cancelled)
-    unsafe self.lock.deallocate()
-  }
-}
-
-extension _AsyncStreamStorage.StateMachine {
-  enum BufferingNewestDecision {
-    case append
-    case dropOldestValue
-    case dropNewValue
-
-    init(bufferCount: Int, limit: Int) {
-      if bufferCount < limit && limit > .zero {
-        self = .append
-      } else if bufferCount >= limit && limit > .zero {
-        self = .dropOldestValue
-      } else {
-        self = .dropNewValue
-      }
-    }
-  }
-
-  func getOnTermination() -> TerminationHandler? {
-    switch unsafe self.state { // TODO: Return a TerminationHandler only in certain states
-    case .idle(let idle):
-      return idle.terminationHandler
-
-    case .waiting(let waiting):
-      return unsafe waiting.terminationHandler
-
-    case .draining(let draining):
-      return draining.terminationHandler
-
-    case .terminating(let terminating):
-      return unsafe terminating.terminationHandler
-
-    case .terminated(let terminated):
-      return terminated.terminationHandler
-    }
-  }
-
-  mutating func setOnTermination(_ newValue: TerminationHandler?) -> TerminationHandler? {
-    let previous: TerminationHandler?
-
-    switch unsafe consume self.state { // TODO: Set a TerminationHandler only in certain states
-    case .idle(var idle):
-      previous = idle.terminationHandler
-      idle.terminationHandler = newValue
-      unsafe self = .init(state: .idle(idle))
-
-    case .waiting(var waiting):
-      previous = unsafe waiting.terminationHandler
-      unsafe waiting.terminationHandler = newValue
-      unsafe self = .init(state: .waiting(waiting))
-
-    case .draining(var draining):
-      previous = draining.terminationHandler
-      draining.terminationHandler = newValue
-      unsafe self = .init(state: .draining(draining))
-
-    case .terminating(var terminating):
-      previous = unsafe terminating.terminationHandler
-      unsafe terminating.terminationHandler = newValue
-      unsafe self = .init(state: .terminating(terminating))
-
-    case .terminated(var terminated):
-      previous = terminated.terminationHandler
-      terminated.terminationHandler = newValue
-      unsafe self = .init(state: .terminated(terminated))
-    }
-
-    return previous
-  }
-
-  mutating func yield(_ value: consuming sending Element) -> YieldAction {
-    switch unsafe consume self.state {
-    case .idle(var idle):
-      switch idle.bufferingPolicy {
-      case .unbounded:
-        idle.buffer.append(value)
-        unsafe self = .init(state: .idle(idle))
-        return unsafe .none(yieldResult: .enqueued(remaining: .max))
-
-      case .bufferingOldest(let limit):
-        if idle.buffer.count < limit {
-          idle.buffer.append(value)
-          let count = idle.buffer.count
-          unsafe self = .init(state: .idle(idle))
-          return unsafe .none(yieldResult: .enqueued(remaining: limit - count))
-
+          let toSend = unsafe state.pending.removeFirst()
+          unlock()
+          unsafe continuation.resume(returning: toSend)
+        } else if unsafe state.terminal {
+          result = .terminated
+          unlock()
+          unsafe continuation.resume(returning: nil)
         } else {
-          unsafe self = .init(state: .idle(idle))
-          return unsafe .none(yieldResult: .dropped(value))
+          switch limit {
+          case .unbounded:
+            result = .enqueued(remaining: .max)
+          case .bufferingNewest(let limit):
+            result = .enqueued(remaining: limit)
+          case .bufferingOldest(let limit):
+            result = .enqueued(remaining: limit)
+          }
+
+          unlock()
+          unsafe continuation.resume(returning: value)
         }
-
-      case .bufferingNewest(let limit):
-        let decision = BufferingNewestDecision(
-          bufferCount: idle.buffer.count,
-          limit: limit
-        )
-
-        switch decision {
-        case .append:
-          idle.buffer.append(value)
-          let count = idle.buffer.count
-          unsafe self = .init(state: .idle(idle))
-          return unsafe .none(yieldResult: .enqueued(remaining: limit - count))
-
-        case .dropOldestValue:
-          let droppedValue = idle.buffer.removeFirst()
-          idle.buffer.append(value)
-          unsafe self = .init(state: .idle(idle))
-          return unsafe .none(yieldResult: .dropped(droppedValue))
-
-        case .dropNewValue:
-          unsafe self = .init(state: .idle(idle))
-          return unsafe .none(yieldResult: .dropped(value))
-        }
-      }
-
-    case .waiting(var waiting):
-      let bufferingPolicy = unsafe waiting.bufferingPolicy
-      let consumer = unsafe waiting.consumers.removeFirst()
-
-      if unsafe waiting.consumers.isEmpty {
-        unsafe self = .init(state: .idle(.init(
-          buffer: [],
-          bufferingPolicy: waiting.bufferingPolicy,
-          terminationHandler: waiting.terminationHandler.take()
-        )))
-
       } else {
-        unsafe self = .init(state: .waiting(waiting))
-      }
-
-      switch bufferingPolicy {
-      case .unbounded:
-        return unsafe .resume(
-          consumer: consumer,
-          element: value,
-          yieldResult: .enqueued(remaining: .max)
-        )
-
-      case .bufferingOldest(let limit), .bufferingNewest(let limit):
-        return unsafe .resume(
-          consumer: consumer,
-          element: value,
-          yieldResult: .enqueued(remaining: limit)
-        )
-      }
-
-    case .draining(let draining):
-      unsafe self = .init(state: .draining(draining))
-      return unsafe .none(yieldResult: .terminated)
-
-    case .terminating(let terminating):
-      unsafe self = .init(state: .terminating(terminating))
-      return unsafe .none(yieldResult: .terminated)
-
-    case .terminated(let terminated):
-      unsafe self = .init(state: .terminated(terminated))
-      return unsafe .none(yieldResult: .terminated)
-    }
-  }
-
-  mutating func next(_ consumer: consuming Consumer) -> NextAction {
-    switch unsafe consume self.state {
-    case .idle(var idle):
-      if idle.buffer.isEmpty {
-        unsafe self = .init(state: .waiting(.init(
-          consumers: [consumer],
-          bufferingPolicy: idle.bufferingPolicy,
-          terminationHandler: idle.terminationHandler.take()
-        )))
-        return unsafe .suspend
-
-      } else {
-        let element = idle.buffer.removeFirst()
-        unsafe self = .init(state: .idle(idle))
-        return unsafe .resume(
-          consumer: consumer,
-          element: element
-        )
-      }
-
-    case .waiting(var waiting):
-      unsafe waiting.consumers.append(consumer)
-      unsafe self = .init(state: .waiting(waiting))
-      return unsafe .suspend
-
-    case .draining(var draining):
-      guard let element = draining.buffer.popFirst() else {
-        unsafe self = .init(state: .terminated(.init(
-          terminationHandler: draining.terminationHandler.take()
-        )))
-
-        switch draining.failure {
-        case .some(let failure):
-          return unsafe .throw(
-            consumer: consumer,
-            failure: failure
-          )
-
-        case .none:
-          return unsafe .resume(
-            consumer: consumer,
-            element: nil
-          )
-        }
-      }
-
-      if draining.buffer.isEmpty {
-        unsafe self = .init(state: .terminated(.init(
-          failure: draining.failure,
-          terminationHandler: draining.terminationHandler.take()
-        )))
-        return unsafe .resume(
-          consumer: consumer,
-          element: element
-        )
-
-      } else {
-        unsafe self = .init(state: .draining(draining))
-        return unsafe .resume(
-          consumer: consumer,
-          element: element
-        )
-      }
-
-    case .terminating(var terminating):
-      // The stream is terminating but the outcome is not yet final.
-      // Deliver any remaining buffered elements just like `draining`; the failure thrown
-      // once the buffer empties is finalized by the caller of `terminate` after
-      // the handler returns
-      guard let element = unsafe terminating.buffer.popFirst() else {
-        // The buffer is empty but we have not reached the terminal state yet:
-        // the termination handler is still running and may call `finish(throwing:)`
-        // to set a failure we must deliver to the consumer. Park it until the
-        // outcome is finalized rather than resuming it with a premature `nil`.
-        unsafe terminating.consumers.append(consumer)
-        unsafe self = .init(state: .terminating(terminating))
-        return unsafe .suspend
-      }
-
-      unsafe self = .init(state: .terminating(terminating))
-      return unsafe .resume(
-        consumer: consumer,
-        element: element
-      )
-
-    case .terminated(let terminated):
-      // Reaching the terminal state drops the termination handler, per the
-      // documented `onTermination` contract: the handler is released once the
-      // stream has terminated
-      unsafe self = .init(state: .terminated(.init()))
-
-      switch terminated.failure {
-      case .some(let failure):
-        return unsafe .throw(
-          consumer: consumer,
-          failure: failure
-        )
-
-      case .none:
-        return unsafe .resume(
-          consumer: consumer,
-          element: nil
-        )
-      }
-    }
-  }
-
-  /// Terminates the stream with a final outcome.
-  mutating func terminate(
-    _ failure: consuming Failure?
-  ) -> TerminateAction {
-    switch unsafe consume self.state {
-    case .idle(var idle):
-      if idle.buffer.isEmpty {
-        unsafe self = .init(state: .terminated(.init(failure: failure)))
-      } else {
-        unsafe self = .init(state: .draining(.init(
-          buffer: idle.buffer,
-          failure: failure,
-        )))
-      }
-      return unsafe .call(
-        terminationHandler: idle.terminationHandler.take()
-      )
-
-    case .waiting(var waiting):
-      unsafe self = .init(state: .terminated(.init(failure: failure)))
-      return unsafe .callAndResume(.init(
-        consumers: waiting.consumers,
-        terminationHandler: waiting.terminationHandler.take(),
-      ))
-
-    case .draining(let draining):
-      unsafe self = .init(state: .draining(draining))
-      return unsafe .none
-
-    case .terminating(var terminating):
-      // A re-entrant `finish(throwing:)` from within the termination handler,
-      // while the cancellation outcome is not yet final.
-      _ = unsafe terminating.setFailureOnce(failure)
-      unsafe self = .init(state: .terminating(terminating))
-      return unsafe .none
-
-    case .terminated(let terminated):
-      // Already final: later terminations are ignored (first finish wins)
-      unsafe self = .init(state: .terminated(terminated))
-      return unsafe .none
-    }
-  }
-
-  /// Begins terminating the stream on the cancellation path.
-  ///
-  /// Enters the transient `terminating` state so the termination handler can
-  /// still supply a failure via `finish(throwing:)`.
-  mutating func beginTerminating() -> TerminateAction {
-    switch unsafe consume self.state {
-    case .idle(var idle):
-      unsafe self = .init(state: .terminating(.init(
-        buffer: idle.buffer,
-        consumers: [],
-        failure: nil,
-      )))
-      return unsafe .call(
-        terminationHandler: idle.terminationHandler.take()
-      )
-
-    case .waiting(var waiting):
-      unsafe self = .init(state: .terminating(.init(
-        buffer: [],
-        consumers: [],
-        failure: nil
-      )))
-      return unsafe .callAndResume(.init(
-        consumers: waiting.consumers,
-        terminationHandler: waiting.terminationHandler.take(),
-      ))
-
-    case .draining(let draining):
-      // Already final: later terminations are ignored (first finish wins)
-      unsafe self = .init(state: .draining(draining))
-      return unsafe .none
-
-    case .terminating(let terminating):
-      // Already terminating: nothing to do, the cancellation path carries no
-      // failure of its own (a failure can only be set via `finish(throwing:)`)
-      unsafe self = .init(state: .terminating(terminating))
-      return unsafe .none
-
-    case .terminated(let terminated):
-      // Already final: later terminations are ignored (first finish wins)
-      unsafe self = .init(state: .terminated(terminated))
-      return unsafe .none
-    }
-  }
-
-  /// Reads the failure recorded in the terminal state after the termination
-  /// handler has run, and finalizes to `terminated`.
-  ///
-  /// Returns the recorded failure together with any consumers that were parked
-  /// while the stream was `terminating`. The caller must resume these after releasing the lock.
-  mutating func takeTerminalFailure() -> (failure: Failure?, consumers: Consumers) {
-    switch unsafe consume self.state {
-    case .idle:
-      preconditionFailure("takeTerminalFailure() called in a non-terminal state")
-
-    case .waiting:
-      preconditionFailure("takeTerminalFailure() called in a non-terminal state")
-
-    case .draining:
-      preconditionFailure("takeTerminalFailure() called in a non-terminal state")
-
-    case .terminating(var terminating):
-      let failure = unsafe terminating.takeFailure()
-      let consumers = unsafe terminating.consumers
-      unsafe self = .init(state: .terminated(.init(
-        terminationHandler: terminating.terminationHandler.take()
-      )))
-      return unsafe (failure, consumers)
-
-    case .terminated(var terminated):
-      let failure = terminated.failure.take()
-      unsafe self = .init(state: .terminated(terminated))
-      return unsafe (failure, [])
-    }
-  }
-
-  /// Finalizes the `terminating` state to `terminated` preserving any recorded failure.
-  ///
-  /// Returns any consumers parked while `terminating`, together with
-  /// the failure to deliver to them; the caller must resume these after releasing the lock.
-  mutating func finalizeTermination() -> (failure: Failure?, consumers: Consumers) {
-    switch unsafe consume self.state {
-    case .idle:
-      preconditionFailure("finalizeTermination() called in a non-terminal state")
-
-    case .waiting:
-      preconditionFailure("finalizeTermination() called in a non-terminal state")
-
-    case .draining(let draining):
-      // `finish` with buffered elements left us draining
-      unsafe self = .init(state: .draining(draining))
-      return unsafe (nil, [])
-
-    case .terminating(var terminating):
-      if unsafe terminating.consumers.isEmpty {
-        // No consumers, store the outcome for a future `next()`
-        if unsafe terminating.buffer.isEmpty {
-          unsafe self = .init(state: .terminated(.init(
-            failure: terminating.failure,
-            terminationHandler: terminating.terminationHandler.take()
-          )))
+        if unsafe !state.terminal {
+          switch limit {
+          case .unbounded:
+            result = .enqueued(remaining: .max)
+            unsafe state.pending.append(value)
+          case .bufferingOldest(let limit):
+            if count < limit {
+              result = .enqueued(remaining: limit - (count + 1))
+              unsafe state.pending.append(value)
+            } else {
+              result = .dropped(value)
+            }
+          case .bufferingNewest(let limit):
+            if count < limit {
+              unsafe state.pending.append(value)
+              result = .enqueued(remaining: limit - (count + 1))
+            } else if count > 0 {
+              result = unsafe .dropped(state.pending.removeFirst())
+              unsafe state.pending.append(value)
+            } else {
+              result = .dropped(value)
+            }
+          }
         } else {
-          unsafe self = .init(state: .draining(.init(
-            buffer: terminating.buffer,
-            failure: terminating.failure,
-            terminationHandler: terminating.terminationHandler.take()
-          )))
+          result = .terminated
         }
-        return unsafe (nil, [])
+        unlock()
+      }
+      return result
+    }
+
+    func finish() {
+      lock()
+      let handler = unsafe state.onTermination
+      unsafe state.onTermination = nil
+      unsafe state.terminal = true
+
+      guard unsafe !state.continuations.isEmpty else {
+        unlock()
+        handler?(.finished)
+        return
+      }
+
+      // Hold on to the continuations to resume outside the lock.
+      let continuations = unsafe state.continuations
+      unsafe state.continuations.removeAll()
+
+      unlock()
+      handler?(.finished)
+
+      for unsafe continuation in unsafe continuations {
+        unsafe continuation.resume(returning: nil)
+      }
+    }
+
+    func next(_ continuation: UnsafeContinuation<Element?, Never>) {
+      lock()
+      unsafe state.continuations.append(continuation)
+      if unsafe state.pending.count > 0 {
+        let cont = unsafe state.continuations.removeFirst()
+        let toSend = unsafe state.pending.removeFirst()
+        unlock()
+        unsafe cont.resume(returning: toSend)
+      } else if unsafe state.terminal {
+        let cont = unsafe state.continuations.removeFirst()
+        unlock()
+        unsafe cont.resume(returning: nil)
       } else {
-        // Consumers waiting for the outcome
-        let failure = unsafe terminating.takeFailure()
-        let consumers = unsafe terminating.consumers
-        unsafe self = .init(state: .terminated(.init(
-          terminationHandler: terminating.terminationHandler.take()
-        )))
-        return unsafe (failure, consumers)
+        unlock()
       }
 
-    case .terminated(let terminated):
-      unsafe self = .init(state: .terminated(terminated))
-      return unsafe (nil, [])
+    }
+
+    func next() async -> Element? {
+      await withTaskCancellationHandler {
+        unsafe await withUnsafeContinuation {
+          unsafe next($0)
+        }
+      } onCancel: { [cancel] in
+        cancel()
+      }
+    }
+
+    static func create(limit: Continuation.BufferingPolicy) -> _Storage {
+      let minimumCapacity = _lockWordCount()
+      let storage = unsafe Builtin.allocWithTailElems_1(
+        _Storage.self,
+          minimumCapacity._builtinWordValue,
+          UnsafeRawPointer.self
+      )
+
+      let state =
+        unsafe UnsafeMutablePointer<State>(Builtin.addressof(&storage.state))
+      unsafe state.initialize(to: State(limit: limit))
+      let ptr = unsafe UnsafeRawPointer(
+        Builtin.projectTailElems(storage, UnsafeRawPointer.self))
+      unsafe _lockInit(ptr)
+      return storage
     }
   }
 }
 
-extension _AsyncStreamStorage {
-  func getOnTermination() -> StateMachine.TerminationHandler? {
-    return withLock { state in
-      return state.getOnTermination()
-    }
-  }
-
-  func setOnTermination(_ newValue: StateMachine.TerminationHandler?) {
-    // The handler we're replacing must be released after the lock is
-    // dropped: an adopter may have composed a chain of handlers, and releasing
-    // that chain can run arbitrary `deinit` code
-    let previous = withLock { state in
-      return state.setOnTermination(newValue)
-    }
-    withExtendedLifetime(previous) {}
-  }
-
-  func yield(_ value: consuming sending Element) -> Continuation.YieldResult {
-    unsafe _lock(self.lock)
-    let action = unsafe self.stateMachine.yield(value)
-    unsafe _unlock(self.lock)
-
-    switch unsafe action {
-    case .resume(let consumer, let element, let yieldResult):
-      unsafe consumer.resume(returning: .success(element))
-      return yieldResult
-
-    case .none(let yieldResult):
-      return yieldResult
-    }
-  }
-
-  func next(_ consumer: consuming StateMachine.Consumer) {
-    let action = withLock { state in
-      return unsafe state.next(consumer)
-    }
-
-    switch unsafe action {
-    case .resume(let consumer, let element):
-      unsafe consumer.resume(returning: .success(element))
-
-    case .throw(let consumer, let failure):
-      unsafe consumer.resume(returning: .failure(failure))
-
-    case .suspend:
-      return
-    }
-  }
-
-  nonisolated(nonsending) func next() async throws(Failure) -> Element? {
-    return try await withTaskCancellationHandler {
-      return unsafe await withUnsafeContinuation { consumer in
-        unsafe self.next(consumer)
-      }
-    } onCancel: {
-      self.terminate(.cancelled)
-    }.get()
-  }
-
-  func terminate(_ terminationReason: Continuation.Termination) {
-    let action =
-      switch terminationReason {
-      case .finished(let withFailure):
-        withLock { state in
-          return unsafe state.terminate(withFailure)
-        }
-
-      case .cancelled:
-        // Only "begin" terminating here, next we'll trigger the cancellation handler,
-        // which must be allowed to `finish(throwing:)` to finalize the termination with an error.
-        withLock { state in
-         return unsafe state.beginTerminating()
-        }
-      }
-
-    switch unsafe consume action {
-    case .callAndResume(var callAndResume):
-      unsafe callAndResume.terminationHandler?.invoke(terminationReason)
-
-      let outcome = withLock { state in
-        // Reload the failure, in case the termination handler has set one using `finish(throwing:)`,
-        // and collect any consumers parked by a `next()` that raced the termination.
-        return unsafe state.takeTerminalFailure()
-      }
-      let failure = unsafe outcome.failure
-      var parked = unsafe outcome.consumers
-
-      // Carry along any consumers from the parked state so that triggered the termination still receives the failure first.
-      while let consumer = unsafe parked.popFirst() {
-        unsafe callAndResume.consumers.append(consumer)
-      }
-
-      if let failure {
-        let consumer = unsafe callAndResume.consumers.removeFirst()
-        unsafe consumer.resume(returning: .failure(failure))
-      }
-
-      while let consumer = unsafe callAndResume.consumers.popFirst() {
-        unsafe consumer.resume(returning: .success(nil))
-      }
-
-    case .call(let terminationHandler):
-      terminationHandler?.invoke(terminationReason)
-      let outcome = withLock { state in
-        return unsafe state.finalizeTermination()
-      }
-      let failure = unsafe outcome.failure
-      var parked = unsafe outcome.consumers
-
-      if let failure {
-        let consumer = unsafe parked.removeFirst()
-        unsafe consumer.resume(returning: .failure(failure))
-      }
-
-      while let consumer = unsafe parked.popFirst() {
-        unsafe consumer.resume(returning: .success(nil))
-      }
-
-    case .none:
-      return
-    }
-  }
-}
-
-extension _AsyncStreamStorage {
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingStream {
   @safe
-  private func withLock<Value: ~Copyable>(
-    _ body: (inout StateMachine) -> Value
-  ) -> Value {
-    unsafe _lock(self.lock)
+  internal final class _Storage: @unchecked Sendable {
+    typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
+    enum Terminal {
+      case finished
+      case failed(Failure)
+    }
 
-    defer { unsafe _unlock(self.lock) }
+    @unsafe struct State {
+      var continuation: UnsafeContinuation<Element?, Error>?
+      var pending = _Deque<Element>()
+      let limit: Continuation.BufferingPolicy
+      var onTermination: TerminationHandler?
+      var terminal: Terminal?
 
-    return body(&self.stateMachine)
+      init(limit: Continuation.BufferingPolicy) {
+        unsafe self.limit = limit
+      }
+    }
+    // Stored as a singular structured assignment for initialization
+    var state: State
+
+    private init(_doNotCallMe: ()) {
+      fatalError("Storage must be initialized by create")
+    }
+
+    deinit {
+      unsafe state.onTermination?(.cancelled)
+    }
+
+    private func lock() {
+      let ptr =
+        unsafe UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
+      unsafe _lock(ptr)
+    }
+
+    private func unlock() {
+      let ptr =
+        unsafe UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
+      unsafe _unlock(ptr)
+    }
+
+    func getOnTermination() -> TerminationHandler? {
+      lock()
+      let handler = unsafe state.onTermination
+      unlock()
+      return handler
+    }
+
+    func setOnTermination(_ newValue: TerminationHandler?) {
+      lock()
+      unsafe withExtendedLifetime(state.onTermination) {
+        unsafe state.onTermination = newValue
+        unlock()
+      }
+    }
+
+    @Sendable func cancel() {
+      lock()
+      // swap out the handler before we invoke it to prevent double cancel
+      let handler = unsafe state.onTermination
+      unsafe state.onTermination = nil
+      unlock()
+
+      // handler must be invoked before yielding nil for termination
+      handler?(.cancelled)
+
+      finish()
+    }
+
+    func yield(_ value: __owned Element) -> Continuation.YieldResult {
+      var result: Continuation.YieldResult
+      lock()
+      let limit = unsafe state.limit
+      let count = unsafe state.pending.count
+      if let continuation = unsafe state.continuation {
+        if count > 0 {
+          if unsafe state.terminal == nil {
+            switch limit {
+            case .unbounded:
+              result = .enqueued(remaining: .max)
+              unsafe state.pending.append(value)
+            case .bufferingOldest(let limit):
+              if count < limit {
+                result = .enqueued(remaining: limit - (count + 1))
+                unsafe state.pending.append(value)
+              } else {
+                result = .dropped(value)
+              }
+            case .bufferingNewest(let limit):
+              if count < limit {
+                unsafe state.pending.append(value)
+                result = .enqueued(remaining: limit - (count + 1))
+              } else if count > 0 {
+                result = unsafe .dropped(state.pending.removeFirst())
+                unsafe state.pending.append(value)
+              } else {
+                result = .dropped(value)
+              }
+            }
+          } else {
+            result = .terminated
+          }
+          unsafe state.continuation = nil
+          let toSend = unsafe state.pending.removeFirst()
+          unlock()
+          unsafe continuation.resume(returning: toSend)
+        } else if let terminal = unsafe state.terminal {
+          result = .terminated
+          unsafe state.continuation = nil
+          unsafe state.terminal = .finished
+          unlock()
+          switch terminal {
+          case .finished:
+            unsafe continuation.resume(returning: nil)
+          case .failed(let error):
+            unsafe continuation.resume(throwing: error)
+          }
+        } else {
+          switch limit {
+          case .unbounded:
+            result = .enqueued(remaining: .max)
+          case .bufferingOldest(let limit):
+            result = .enqueued(remaining: limit)
+          case .bufferingNewest(let limit):
+            result = .enqueued(remaining: limit)
+          }
+
+          unsafe state.continuation = nil
+          unlock()
+          unsafe continuation.resume(returning: value)
+        }
+      } else {
+        if unsafe state.terminal == nil {
+          switch limit {
+          case .unbounded:
+            result = .enqueued(remaining: .max)
+            unsafe state.pending.append(value)
+          case .bufferingOldest(let limit):
+            if count < limit {
+              result = .enqueued(remaining: limit - (count + 1))
+              unsafe state.pending.append(value)
+            } else {
+              result = .dropped(value)
+            }
+          case .bufferingNewest(let limit):
+            if count < limit {
+              unsafe state.pending.append(value)
+              result = .enqueued(remaining: limit - (count + 1))
+            } else if count > 0 {
+              result = unsafe .dropped(state.pending.removeFirst())
+              unsafe state.pending.append(value)
+            } else {
+              result = .dropped(value)
+            }
+          }
+        } else {
+          result = .terminated
+        }
+        unlock()
+      }
+      return result
+    }
+
+    func finish(throwing error: __owned Failure? = nil) {
+      lock()
+      let handler = unsafe state.onTermination
+      unsafe state.onTermination = nil
+      if unsafe state.terminal == nil {
+        if let failure = error {
+          unsafe state.terminal = .failed(failure)
+        } else {
+          unsafe state.terminal = .finished
+        }
+      }
+
+      if let continuation = unsafe state.continuation {
+        if unsafe state.pending.count > 0 {
+          unsafe state.continuation = nil
+          let toSend = unsafe state.pending.removeFirst()
+          unlock()
+          handler?(.finished(error))
+          unsafe continuation.resume(returning: toSend)
+        } else if let terminal = unsafe state.terminal {
+          unsafe state.continuation = nil
+          unlock()
+          handler?(.finished(error))
+          switch terminal {
+          case .finished:
+            unsafe continuation.resume(returning: nil)
+          case .failed(let error):
+            unsafe continuation.resume(throwing: error)
+          }
+        } else {
+          unlock()
+          handler?(.finished(error))
+        }
+      } else {
+        unlock()
+        handler?(.finished(error))
+      }
+    }
+
+    func next(_ continuation: UnsafeContinuation<Element?, Error>) {
+      lock()
+      if unsafe state.continuation == nil {
+        if unsafe state.pending.count > 0 {
+          let toSend = unsafe state.pending.removeFirst()
+          unlock()
+          unsafe continuation.resume(returning: toSend)
+        } else if let terminal = unsafe state.terminal {
+          unsafe state.terminal = .finished
+          unlock()
+          switch terminal {
+          case .finished:
+            unsafe continuation.resume(returning: nil)
+          case .failed(let error):
+            unsafe continuation.resume(throwing: error)
+          }
+        } else {
+          unsafe state.continuation = unsafe continuation
+          unlock()
+        }
+      } else {
+        unlock()
+        fatalError("attempt to await next() on more than one task")
+      }
+    }
+
+    func next() async throws -> Element? {
+      try await withTaskCancellationHandler {
+        try unsafe await withUnsafeThrowingContinuation {
+          unsafe next($0)
+        }
+      } onCancel: { [cancel] in
+        cancel()
+      }
+    }
+
+    static func create(limit: Continuation.BufferingPolicy) -> _Storage {
+      let minimumCapacity = _lockWordCount()
+      let storage = unsafe Builtin.allocWithTailElems_1(
+        _Storage.self,
+          minimumCapacity._builtinWordValue,
+          UnsafeRawPointer.self
+      )
+
+      let state =
+        unsafe UnsafeMutablePointer<State>(Builtin.addressof(&storage.state))
+      unsafe state.initialize(to: State(limit: limit))
+      let ptr = unsafe UnsafeRawPointer(
+        Builtin.projectTailElems(storage, UnsafeRawPointer.self))
+      unsafe _lockInit(ptr)
+      return storage
+    }
   }
 }
 
+// this is used to store closures; which are two words
 final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
   var _value: Contents
   private init(_doNotCallMe: ()) {
