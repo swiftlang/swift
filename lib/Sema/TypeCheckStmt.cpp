@@ -3774,6 +3774,7 @@ class DesugarForEachStmt {
   bool isAsync;
   bool isBorrowing = false;
   VarDecl *makeIteratorVar = nullptr;
+  VarDecl *sequenceVar = nullptr;
   ProtocolDecl *sequenceProto = nullptr;
   ProtocolConformanceRef seqConformanceRef;
   WhileStmt *innerLoop = nullptr;
@@ -3818,8 +3819,11 @@ public:
     }
 
     buildMakeIteratorVar();
+    buildOpaqueSequenceExpr();
 
-    SmallVector<ASTNode, 2> stmts;
+    SmallVector<ASTNode, 3> stmts;
+    if (auto *sequenceBinding = buildSequenceBinding())
+      stmts.push_back(sequenceBinding);
     stmts.push_back(buildMakeIterator());
     stmts.push_back(buildWhileStmt());
 
@@ -3968,12 +3972,95 @@ private:
     return nextCall;
   }
 
-  PatternBindingDecl *buildMakeIterator() {
+  void buildOpaqueSequenceExpr() {
     auto *sequence = stmt->getSequence();
-    auto seqType = sequence->getType();
-    auto *opaqueSeqExpr =
-        new (ctx) OpaqueValueExpr(sequence->getSourceRange(), seqType);
+    auto *opaqueSeqExpr = new (ctx)
+        OpaqueValueExpr(sequence->getSourceRange(), sequence->getType());
     stmt->setOpaqueSequenceExpr(opaqueSeqExpr);
+  }
+
+  /// Whether the sequence expression reads a binding that cannot be implicitly
+  /// copied, i.e. a `borrowing` or `consuming` parameter or a borrow binding.
+  bool sequenceReadsNoImplicitCopyBinding() const {
+    auto *expr = stmt->getSequence()->getSemanticsProvidingExpr();
+    // A mutable binding is loaded before it is used as an rvalue.
+    if (auto *load = dyn_cast<LoadExpr>(expr))
+      expr = load->getSubExpr()->getSemanticsProvidingExpr();
+
+    auto *declRef = dyn_cast<DeclRefExpr>(expr);
+    if (!declRef)
+      return false;
+
+    if (auto *param = dyn_cast<ParamDecl>(declRef->getDecl())) {
+      switch (param->getSpecifier()) {
+      case ParamSpecifier::Borrowing:
+      case ParamSpecifier::Consuming:
+        return true;
+      case ParamSpecifier::Default:
+      case ParamSpecifier::InOut:
+      case ParamSpecifier::LegacyShared:
+      case ParamSpecifier::LegacyOwned:
+      case ParamSpecifier::ImplicitlyCopyableConsuming:
+        return false;
+      }
+    }
+
+    if (auto *var = dyn_cast<VarDecl>(declRef->getDecl()))
+      return var->getIntroducer() == VarDecl::Introducer::Borrowing;
+
+    return false;
+  }
+
+  /// Bind the sequence to an implicit local whose scope encloses the loop.
+  ///
+  /// The borrowing iterator returned by `makeBorrowingIterator()` is
+  /// lifetime-dependent on the sequence, and it is used for the entire duration
+  /// of the loop. If the sequence expression produces a temporary, e.g.
+  /// `array.span` or the result of a getter, that temporary's lifetime ends as
+  /// soon as the iterator has been formed, so every use of the iterator in the
+  /// loop would be outside of the sequence's scope.
+  ///
+  /// The sequence is bound either way; a sequence that already lives in storage
+  /// does not mind being bound again. As in pattern matching, a copyable
+  /// sequence is bound by value and a noncopyable one is borrowed, since it
+  /// cannot be copied out of storage.
+  ///
+  /// Returns `nullptr` if no binding is needed.
+  PatternBindingDecl *buildSequenceBinding() {
+    // Only a borrowing iterator holds onto the sequence for the duration of
+    // the loop.
+    if (!isBorrowing)
+      return nullptr;
+
+    // A sequence read from a binding that cannot be implicitly copied needs no
+    // binding of its own: that binding's scope already covers the loop, and
+    // binding it again would copy it.
+    if (sequenceReadsNoImplicitCopyBinding())
+      return nullptr;
+
+    std::string name;
+    {
+      if (auto np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
+        name = "$" + np->getBoundName().str().str();
+      name += "$sequence";
+    }
+
+    auto introducer = stmt->getSequence()->getType()->isNoncopyable()
+                          ? VarDecl::Introducer::Borrowing
+                          : VarDecl::Introducer::Let;
+    sequenceVar = new (ctx) VarDecl(/*isStatic=*/false, introducer,
+                                    stmt->getSequence()->getStartLoc(),
+                                    ctx.getIdentifier(name), dc);
+    sequenceVar->setImplicit();
+
+    Pattern *pattern = NamedPattern::createImplicit(ctx, sequenceVar);
+    return PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, pattern, stmt->getOpaqueSequenceExpr(),
+        dc);
+  }
+
+  PatternBindingDecl *buildMakeIterator() {
+    auto seqType = stmt->getSequence()->getType();
 
     // First, let's form a call from sequence to `.makeIterator()` and save
     // that in a special variable which is going to be used by SILGen.
@@ -3989,8 +4076,18 @@ private:
       witness = seqConformanceRef.getWitnessByName(makeIterator->getName());
     }
 
+    // Call `makeIterator()` on the sequence binding when there is one, so that
+    // the iterator depends on that binding's scope rather than on a temporary.
+    Expr *base;
+    if (sequenceVar) {
+      base = new (ctx) DeclRefExpr(sequenceVar, DeclNameLoc(stmt->getForLoc()),
+                                   /*Implicit=*/true);
+    } else {
+      base = stmt->getOpaqueSequenceExpr();
+    }
+
     auto *makeIteratorRef = new (ctx)
-        MemberRefExpr(opaqueSeqExpr, stmt->getForLoc(), witness,
+        MemberRefExpr(base, stmt->getForLoc(), witness,
                       DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
 
     Expr *makeIteratorCall =
