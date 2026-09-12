@@ -9337,6 +9337,10 @@ namespace {
     // or will be lazy loaded from the 'fromDC' context otherwise.
     mutable std::optional<ActorIsolation> isolation;
 
+    // Tracks the isolated global actor seen in a nonisolated(nonsending) context,
+    // to detect conflicting isolated conformances.
+    mutable std::optional<ActorIsolation> nonisolatedNonsendingIsolation;
+
   public:
     MismatchedIsolatedConformances(const DeclContext *fromDC,
                                    HandleConformanceIsolationFn handleBad)
@@ -9378,12 +9382,19 @@ namespace {
       auto conformanceIsolation = concrete->getIsolation();
       if (!conformanceIsolation.isGlobalActor() ||
           conformanceIsolation == getIsolation())
-        return true;
+        return false;
 
       // In a nonisolated(nonsending) context the conformance is valid because
       // effectively always is on the caller's isolation.
-      if (getIsolation().isNonisolatedNonsending())
-        return true;
+      if (getIsolation().isNonisolatedNonsending()) {
+        if (!nonisolatedNonsendingIsolation) {
+          nonisolatedNonsendingIsolation = conformanceIsolation;
+          return false;
+        }
+
+        if (*nonisolatedNonsendingIsolation == conformanceIsolation)
+          return false;
+      }
 
       badIsolatedConformances.push_back(concrete);
       return false;
@@ -9406,14 +9417,24 @@ namespace {
       }
 
       ASTContext &ctx = fromDC->getASTContext();
-      auto firstConformance = badIsolatedConformances.front();
-      ctx.Diags
-          .diagnose(
-              loc, diag::isolated_conformance_wrong_domain,
-              firstConformance->getIsolation(), firstConformance->getType(),
-              firstConformance->getProtocol()->getName(),
-              getIsolation())
-          .warnUntilLanguageMode(LanguageMode::v6);
+      auto targetDomain = (getIsolation().isNonisolatedNonsending() &&
+                           nonisolatedNonsendingIsolation)
+                              ? *nonisolatedNonsendingIsolation
+                              : getIsolation();
+
+      llvm::SmallPtrSet<ProtocolConformance *, 4> diagnosed;
+      for (auto *conformance : badIsolatedConformances) {
+        if (!diagnosed.insert(conformance).second)
+          continue;
+
+        ctx.Diags
+            .diagnose(
+                loc, diag::isolated_conformance_wrong_domain,
+                conformance->getIsolation(), conformance->getType(),
+                conformance->getProtocol()->getName(),
+                targetDomain)
+            .warnUntilLanguageMode(LanguageMode::v6);
+      }
       return true;
     }
   };
