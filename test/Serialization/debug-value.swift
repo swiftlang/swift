@@ -49,15 +49,17 @@ let _ = fooCaller(1, 2)
 
 let _ = constantFolded()
 // CHECK-LABEL: sil {{.*}} @$s8MyModule14constantFoldedSiyF
-// CHECK: debug_value (), let, name "a", type $Int
+// CHECK: debug_value (), let, name "a"
 // CHECK-SAME: transform {
-// CHECK:   [[LIT1:%[0-9]+]] = integer_literal $Builtin.Int{{[0-9]+}}, 2
-// CHECK:   return [[LIT1]]
+// CHECK:   %0 = integer_literal $Builtin.Int{{[0-9]+}}, 2
+// CHECK:   %1 = struct $Int (%0
+// CHECK:   return %1
 // CHECK: }
-// CHECK: debug_value (), let, name "b", type $Int
+// CHECK: debug_value (), let, name "b"
 // CHECK-SAME: transform {
-// CHECK:   [[LIT2:%[0-9]+]] = integer_literal $Builtin.Int{{[0-9]+}}, 3
-// CHECK:   return [[LIT2]]
+// CHECK:   %0 = integer_literal $Builtin.Int{{[0-9]+}}, 3
+// CHECK:   %1 = struct $Int (%0
+// CHECK:   return %1
 // CHECK: }
 
 func test() {
