@@ -113,7 +113,6 @@ def build_stdlib(args, toolchain, source_dir, build_dir, host_target,
     opts.define('SWIFT_STDLIB_HAS_ASLR:BOOL', 'FALSE')
     opts.define('SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS:BOOL', 'FALSE')
     opts.define('SWIFT_RUNTIME_CRASH_REPORTER_CLIENT:BOOL', 'FALSE')
-    opts.define('SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL', 'TRUE')
     opts.define('SWIFT_ENABLE_DISPATCH:BOOL', 'FALSE')
     opts.define('SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING:BOOL', 'FALSE')
     opts.define('SWIFT_STDLIB_HAS_DLADDR:BOOL', 'FALSE')

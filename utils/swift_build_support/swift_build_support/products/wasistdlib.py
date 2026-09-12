@@ -97,6 +97,11 @@ class WASIStdlib(cmake_product.CMakeProduct):
 
     def _append_threading_options(self, cmake_options):
         cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
+        # No threads: the Concurrency runtime may assume every thread is the
+        # main thread (SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY), and the
+        # cooperative global executor runs everything on it.
+        cmake_options.define(
+            'SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL', 'TRUE')
 
     def test(self, host_target):
         self._test(host_target, 'wasm32-wasip1')
@@ -193,3 +198,15 @@ class WASIThreadsStdlib(WASIStdlib):
                              '-Xcc;-mthread-model;-Xcc;posix;'
                              '-Xcc;-pthread;-Xcc;-ftls-model=local-exec')
         cmake_options.define('SWIFT_ENABLE_WASI_THREADS:BOOL', 'TRUE')
+        # The threads triple has real OS threads, so the Concurrency runtime
+        # must NOT be compiled single-threaded: with that define
+        # `isExecutingOnMainThread()` returns true on every thread, and the
+        # actor runtime treats any pthread as the main actor (e.g.
+        # `MainActor.assumeIsolated` passes off the main thread). The global
+        # executor stays the cooperative one — async work is still serial by
+        # default; a multithreaded executor is opt-in via
+        # `DefaultExecutorFactory`.
+        cmake_options.define(
+            'SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL', 'FALSE')
+        cmake_options.define(
+            'SWIFT_CONCURRENCY_GLOBAL_EXECUTOR:STRING', 'singlethreaded')
