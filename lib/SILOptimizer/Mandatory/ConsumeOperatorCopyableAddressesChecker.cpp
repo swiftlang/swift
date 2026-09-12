@@ -2581,7 +2581,7 @@ class ConsumeOperatorCopyableAddressesCheckerPass
     if (getFunction()->wasDeserializedCanonical())
       return;
 
-    assert(fn->getModule().getStage() == SILStage::Raw &&
+    assert(fn->getModule().getStageFloor() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
     llvm::SmallSetVector<SILValue, 32> addressesToCheck;

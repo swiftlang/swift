@@ -746,6 +746,9 @@ ERROR(expected_sil_stage_name, none,
       "expected 'raw' or 'canonical' after 'sil_stage'", ())
 ERROR(multiple_sil_stage_decls, none,
       "sil_stage declared multiple times", ())
+ERROR(sil_function_stage_below_module_stage, none,
+      "function stage '%0' is below the module stage '%1'", (StringRef,
+      StringRef))
 
 // SIL VTable
 ERROR(expected_sil_vtable_colon,none,

@@ -249,7 +249,8 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
   //
   // TODO: This logic subtly anticipates SILGen behavior. In the future, change
   // SILGen to avoid emitting the full load and never delete loads in Raw SIL.
-  if (projections.empty() && loadInst->getModule().getStage() == SILStage::Raw)
+  if (projections.empty() &&
+      loadInst->getFunction()->getFunctionStage() == SILStage::Raw)
     return nextII;
 
   // Create a new address projection instruction and load instruction for each
@@ -455,19 +456,22 @@ eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
   //     they may be needed for diagnostic.
   // (2) They can never be eliminated if there is no enclosing lexical scope
   //     which guarantees the lifetime of the value.
-  if (bbi->isLexical() && (bbi->getModule().getStage() == SILStage::Raw ||
-                           !isNestedLexicalBeginBorrow(bbi)))
+  if (bbi->isLexical() &&
+      (bbi->getModule().getStageFloor() == SILStage::Raw ||
+       !isNestedLexicalBeginBorrow(bbi)))
     return next;
     
   // Fixed borrow scopes can't be eliminated during the raw stage since they
   // control move checker behavior.
-  if (bbi->isFixed() && bbi->getModule().getStage() == SILStage::Raw) {
+  if (bbi->isFixed() &&
+      bbi->getModule().getStageFloor() == SILStage::Raw) {
     return next;
   }
 
   // Borrow scopes representing a VarDecl can't be eliminated during the raw
   // stage because they may be needed for diagnostics.
-  if (bbi->isFromVarDecl() && bbi->getModule().getStage() == SILStage::Raw) {
+  if (bbi->isFromVarDecl() &&
+      bbi->getModule().getStageFloor() == SILStage::Raw) {
     return next;
   }
 
@@ -575,7 +579,7 @@ CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
   // TODO: fix tryEliminateUnneededForwardingInst to handle debug uses.
   auto *fn = inst->getFunction();
   if (!preserveDebugInfo && fn->hasOwnership()
-      && fn->getModule().getStage() != SILStage::Raw) {
+      && fn->getFunctionStage() != SILStage::Raw) {
     if (ForwardingInstruction::isa(inst))
       if (auto newNext = tryEliminateUnneededForwardingInst(inst, *this))
         return *newNext;

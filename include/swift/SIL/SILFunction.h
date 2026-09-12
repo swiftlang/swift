@@ -38,6 +38,7 @@ class ActorIsolation;
 enum class CodeGenerationModel: uint8_t;
 class SILInstruction;
 class SILModule;
+enum class SILStage;
 class SILFunctionBuilder;
 class SILProfiler;
 class BasicBlockBitfield;
@@ -498,6 +499,10 @@ private:
   /// address form by the AddressLowering function pass.
   unsigned HasLoweredAddresses : 1;
 
+  /// This function's pipeline stage. Seeded at creation to the module's stage
+  /// floor, so it is never below the floor. It may be ahead of the floor.
+  unsigned FunctionStage : 2;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -783,6 +788,28 @@ public:
   bool hasLoweredAddresses() const;
 
   void setHasLoweredAddresses(bool val = true) { HasLoweredAddresses = val; }
+
+  /// This function's SIL stage. Read this for a per-function legality query,
+  /// such as whether an instruction is still legal here. It is never below the
+  /// module's stage floor, and may be ahead of it.
+  SILStage getFunctionStage() const;
+
+  /// Advance this function's stage. A stage only ever moves forward.
+  ///
+  /// Do not advance an individual function past Raw before AddressLowering has
+  /// visited it. Its skip test reads hasLoweredAddresses(). Under
+  /// -enable-sil-opaque-values that would report address form for a body which
+  /// still holds opaque values.
+  void setFunctionStage(SILStage stage);
+
+  /// Take the facts a whole-function clone inherits from the function it was
+  /// derived from: the address-lowering form and the SIL stage.
+  ///
+  /// Call this where the derived function's declaration is created, which is
+  /// the only place that knows the clone is a whole-function clone rather than
+  /// a partial one such as an inline. Keeping the two facts in one call is
+  /// deliberate: they were propagated separately once, and they drifted.
+  void inheritDerivedFrom(const SILFunction *from);
 
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
     return ForceEnableLexicalLifetimes_t(ForceEnableLexicalLifetimes);

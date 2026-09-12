@@ -40,29 +40,29 @@ public class CircleManager : ShapeManager {
   public override func manage() {}
 }
 
-// CHECK-LABEL: sil [canonical] @$s4test14publicFunctionyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [canonical] [stage=canonical] @$s4test14publicFunctionyyF : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil [serialized] [canonical] [ossa] @$s4test17inlinableFunctionyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @$s4test17inlinableFunctionyyF : $@convention(thin) () -> () {
 // CHECK: function_ref @$s4test17inlinableFunctionyyFyycfU_
 // CHECK: }
 
-// CHECK-LABEL: sil shared [serialized] [canonical] [ossa] @$s4test17inlinableFunctionyyFyycfU_ : $@convention(thin) () -> () {
+// CHECK-LABEL: sil shared [serialized] [canonical] [stage=canonical] [ossa] @$s4test17inlinableFunctionyyFyycfU_ : $@convention(thin) () -> () {
 // CHECK: function_ref @$s4test17versionedFunctionyyF
 // CHECK: }
 
-// CHECK-LABEL: sil [canonical] @$s4test17versionedFunctionyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [canonical] [stage=canonical] @$s4test17versionedFunctionyyF : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil [canonical] @$s4test9RectangleV4areaSfvg : $@convention(method) (Rectangle) -> Float
+// CHECK-LABEL: sil [canonical] [stage=canonical] @$s4test9RectangleV4areaSfvg : $@convention(method) (Rectangle) -> Float
 
-// CHECK-LABEL: sil [serialized] [canonical] [ossa] @$s4test9RectangleV4drawyyF : $@convention(method) (Rectangle) -> () {
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @$s4test9RectangleV4drawyyF : $@convention(method) (Rectangle) -> () {
 // CHECK: function_ref @$s4test14publicFunctionyyF
 // CHECK: }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s4test9RectangleVAA5ShapeA2aDP4areaSfvgTW :
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [canonical] [stage=canonical] [ossa] @$s4test9RectangleVAA5ShapeA2aDP4areaSfvgTW :
 // CHECK: function_ref @$s4test9RectangleV4areaSfvg
 // CHECK: }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s4test9RectangleVAA5ShapeA2aDP4drawyyFTW :
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [canonical] [stage=canonical] [ossa] @$s4test9RectangleVAA5ShapeA2aDP4drawyyFTW :
 // CHECK: function_ref @$s4test9RectangleV4drawyyF
 // CHECK: }
 

@@ -1595,7 +1595,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto &module = context.getModule();
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
-  pullback->setHasLoweredAddresses(original->hasLoweredAddresses());
+  pullback->inheritDerivedFrom(original);
 
   return pullback;
 }

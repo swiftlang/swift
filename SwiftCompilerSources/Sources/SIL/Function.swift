@@ -64,6 +64,15 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     parentModule == context.currentModuleContext
   }
 
+  /// This function's SIL stage. Prefer this over `Context.stageFloor` for a
+  /// per-function query.
+  public var silStage: SILStage {
+    guard let stage = SILStage(rawValue: bridged.getStage()) else {
+      fatalError("unhandled SILStage")
+    }
+    return stage
+  }
+
   public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
 
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }

@@ -150,6 +150,16 @@ enum class SILStage {
   Lowered,
 };
 
+/// The textual spelling of \p stage, as it appears in a `sil_stage` line and in
+/// a function's `[stage=...]` attribute.
+///
+/// This and getSILStageByName are the only two places that know how a stage is
+/// spelled. Adding a stage means extending them, not hunting for switches.
+StringRef getSILStageName(SILStage stage);
+
+/// The stage spelled \p name, or None if \p name spells no stage.
+std::optional<SILStage> getSILStageByName(StringRef name);
+
 /// A SIL module. The SIL module owns all of the SILFunctions generated
 /// when a Swift compilation context is lowered to SIL.
 class SILModule {
@@ -349,8 +359,9 @@ private:
   llvm::DenseMap<std::pair<Decl *, VarDecl *>, unsigned> fieldIndices;
   llvm::DenseMap<EnumElementDecl *, unsigned> enumCaseIndices;
 
-  /// The stage of processing this module is at.
-  SILStage Stage;
+  /// A lower bound on the stage of every function in the module. This is a
+  /// module-wide commitment, not a per-function stage.
+  SILStage StageFloor;
 
   /// The set of deserialization notification handlers.
   DeserializationNotificationHandlerSet deserializationNotificationHandlers;
@@ -1000,13 +1011,61 @@ public:
       const ClassDecl *decl, SILLinkage linkage,
       ArrayRef<SILDefaultOverrideTable::Entry> entries);
 
-  /// Return the stage of processing this module is at.
-  SILStage getStage() const { return Stage; }
+  /// Return a lower bound on the stage of every function in the function list.
+  /// SILFunction::create() seeds a new function from it and commitStage() sweeps
+  /// the list up to it.
+  ///
+  /// Read the floor only for a module-wide question, such as the Lowered cutoff
+  /// for deserialization and linking. For a per-function query, read
+  /// SILFunction::getFunctionStage(), which may be ahead of the floor. The
+  /// hasCommitted* helpers below cover the Canonical and Lowered thresholds.
+  /// Compare the floor directly only for the still-Raw case.
+  SILStage getStageFloor() const { return StageFloor; }
 
-  /// Advance the module to a further stage of processing.
-  void setStage(SILStage s) {
-    assert(s >= Stage && "regressing stage?!");
-    Stage = s;
+  /// True once the module has committed to at least Canonical, so the mandatory
+  /// pipeline will not run. It may have completed, or the input may have been
+  /// canonical already. Every function in the list is then at least Canonical.
+  bool hasCommittedCanonical() const {
+    return StageFloor >= SILStage::Canonical;
+  }
+
+  /// True once the module has committed the module-wide SIL stage floor to
+  /// Lowered. Read this only for a question about the Lowered stage itself,
+  /// such as whether an instruction is legal here.
+  bool hasCommittedLowered() const { return StageFloor >= SILStage::Lowered; }
+
+  /// True once every function's types have been rewritten by a lowering pass,
+  /// so a type-equality check in the verifier must be skipped.
+  ///
+  /// Two passes rewrite types: AddressLowering is a
+  /// SILFunctionTransform: it rewrites one function at a time under
+  /// `-enable-sil-opaque-values` and records that in SILFunction's
+  /// HasLoweredAddresses bit. LoadableByAddress is a SILModuleTransform: it
+  /// rewrites large loadable types for the ABI across the module, and it runs
+  /// later, during IRGen preparation.
+  ///
+  /// This is module-wide for a scheduling reason. The SIL stage
+  /// floor commits to Lowered at the end of runSILLoweringPasses, by which
+  /// point AddressLowering has visited every function. The verifier sites
+  /// whose compared types all belong to the enclosing function could key on
+  /// HasLoweredAddresses instead. The sites comparing a callee or witness
+  /// type, and the deserialization cutoffs, cannot.
+  bool haveFunctionTypesBeenRewritten() const {
+    return StageFloor >= SILStage::Lowered;
+  }
+
+  /// Advance the module to s and sweep every function behind it up to it.
+  /// The stage only ever moves forward.
+  ///
+  /// The sweep is what makes the floor a lower bound over the function list. A
+  /// per-function query therefore never has to be reconciled against the
+  /// module.
+  void commitStage(SILStage s) {
+    assert(s >= StageFloor && "regressing stage floor?!");
+    StageFloor = s;
+    for (SILFunction &f : *this)
+      if (f.getFunctionStage() < s)
+        f.setFunctionStage(s);
   }
 
   /// True if -enable-sil-opaque-values was passed. Address-only types are
@@ -1210,7 +1269,7 @@ void verificationFailure(
     llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
 
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
-  switch (mod.getStage()) {
+  switch (mod.getStageFloor()) {
   case SILStage::Raw:
     // In raw SIL, lexical markers are used for diagnostics and are always
     // present.
