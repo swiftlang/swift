@@ -12531,7 +12531,7 @@ LiteralExpr *EnumElementDecl::getRawValueExpr() const {
 }
 
 void EnumElementDecl::setRawValueExpr(Expr *e) {
-  assert((!RawValueExpr || e == RawValueExpr || e->getType()) &&
+  assert((!RawValueExpr || e == RawValueExpr || !e || e->getType()) &&
          "Illegal mutation of raw value expr");
   RawValueExpr = e;
 }

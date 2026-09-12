@@ -1219,6 +1219,108 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   }
 }
 
+static SourceLoc rawValueDiagLoc(EnumElementDecl *elt) {
+  auto *rawValue = elt->getRawValueUnchecked();
+  return rawValue->isImplicit() ? elt->getLoc() : rawValue->getLoc();
+}
+
+static void
+diagnoseDuplicateRawValue(EnumDecl *ED, EnumElementDecl *elt,
+                          const RawValueSource &prevSource,
+                          EnumElementDecl *lastExplicitValueElt,
+                          std::optional<AutomaticEnumValueKind> valueKind) {
+  auto &Diags = ED->getASTContext().Diags;
+  const bool counting = valueKind == AutomaticEnumValueKind::Integer;
+
+  Diags.diagnose(rawValueDiagLoc(elt), diag::enum_raw_value_not_unique);
+  if (lastExplicitValueElt != elt && counting)
+    Diags.diagnose(lastExplicitValueElt->getRawValueUnchecked()->getLoc(),
+                   diag::enum_raw_value_incrementing_from_here);
+
+  auto *foundElt = prevSource.sourceElt;
+  Diags.diagnose(rawValueDiagLoc(foundElt), diag::enum_raw_value_used_here);
+  if (foundElt != prevSource.lastExplicitValueElt && counting) {
+    if (prevSource.lastExplicitValueElt)
+      Diags.diagnose(
+          prevSource.lastExplicitValueElt->getRawValueUnchecked()->getLoc(),
+          diag::enum_raw_value_incrementing_from_here);
+    else
+      Diags.diagnose(ED->getAllElements().front()->getLoc(),
+                     diag::enum_raw_value_incrementing_from_zero);
+  }
+}
+
+/// Drop a written raw value whose literal kind can never be one: a regex
+/// literal, a magic identifier such as #file, or an object literal. Diagnosing
+/// before type checking avoids a spurious conversion error, and clearing it
+/// lets the case fall back to an automatic value.
+static void dropUnusableRawValueLiteral(EnumElementDecl *elt) {
+  auto *litExpr = dyn_cast_or_null<LiteralExpr>(elt->getRawValueUnchecked());
+  if (!litExpr || isValidEnumRawValueLiteral(litExpr) ||
+      isa<NilLiteralExpr>(litExpr))
+    return;
+
+  elt->getASTContext().Diags.diagnose(litExpr->getLoc(),
+                                      diag::nonliteral_enum_case_raw_value);
+  elt->setRawValueExpr(nullptr);
+}
+
+/// Type-check an enum case's raw value expression against rawTy, installing the
+/// checked expression on the element when it succeeds.
+///
+/// Returns the type-checked expression to the caller.
+static Expr *typeCheckRawValueExpr(EnumDecl *ED, EnumElementDecl *elt,
+                                   Type rawTy) {
+  Expr *value = elt->getRawValueUnchecked();
+  if (TypeChecker::typeCheckExpression(
+          value, ED, /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
+    checkEnumElementActorIsolation(elt, value);
+    TypeChecker::checkEnumElementEffects(elt, value);
+    if (auto *seqExpr = dyn_cast<SequenceExpr>(value))
+      value = TypeChecker::foldSequence(seqExpr, ED);
+    elt->setRawValueExpr(value);
+  }
+  return value;
+}
+
+/// Takes the expression, not the element, so the folded literal cannot be
+/// written back: printing tells a written raw value from a synthesised one by
+/// the implicit bit on the original, and folding always sets it.
+static LiteralExpr *reduceRawValueToLiteral(Expr *value, ASTContext &ctx,
+                                           bool foldIntegerRawValue) {
+  if (!foldIntegerRawValue)
+    return dyn_cast<LiteralExpr>(value);
+  return dyn_cast<LiteralExpr>(foldLiteralExpression(value, &ctx));
+}
+
+/// Synthesise the automatic value the case would have had, keeping the enum
+/// conforming. Null means none is available, and the caller must invalidate.
+static LiteralExpr *
+recoverWithAutomaticRawValue(EnumDecl *ED, EnumElementDecl *elt, Type rawTy,
+                             LiteralExpr *prevValue,
+                             std::optional<AutomaticEnumValueKind> &valueKind) {
+  if (!valueKind)
+    valueKind = computeAutomaticEnumValueKind(ED);
+  if (!valueKind)
+    return nullptr;
+
+  // getAutomaticRawValueExpr diagnoses and fails on a non-integer seed under
+  // integer numbering, so drop an unusable one rather than pass it on.
+  LiteralExpr *seed = prevValue;
+  if (*valueKind == AutomaticEnumValueKind::Integer &&
+      !isa_and_nonnull<IntegerLiteralExpr>(seed))
+    seed = nullptr;
+
+  Expr *automatic = getAutomaticRawValueExpr(*valueKind, elt, seed);
+  if (!automatic ||
+      !TypeChecker::typeCheckExpression(
+          automatic, ED, /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue}))
+    return nullptr;
+
+  elt->setRawValueExpr(automatic);
+  return dyn_cast<LiteralExpr>(automatic);
+}
+
 evaluator::SideEffect
 EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
   Type rawTy = ED->getRawType();
@@ -1242,26 +1344,44 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
   if (rawTy->hasError())
     return std::make_tuple<>();
 
-  // Check the raw values of the cases.
+  // The sequence cursor until the assignment near the end of the body, and this
+  // element's own literal after it. The early continues leave it untouched, so
+  // it can predate the immediately preceding element.
   LiteralExpr *prevValue = nullptr;
+
+  // Snapshotted into uniqueRawValues and read back later for a different
+  // element, so it cannot be recomputed from the current one.
   EnumElementDecl *lastExplicitValueElt = nullptr;
 
   // Keep a map we can use to check for duplicate case values.
   llvm::SmallDenseMap<RawValueKey, RawValueSource, 8> uniqueRawValues;
 
-  // Make the raw member accesses explicit.
-  auto uncheckedRawValueOf = [](EnumElementDecl *EED) -> Expr * {
-    return EED->RawValueExpr;
-  };
+  // Queries that do not vary across elements. rawTy is fixed above, and the
+  // language option cannot change mid-request.
+  auto &ctx = ED->getASTContext();
+  auto &Diags = ctx.Diags;
+  const bool literalExprEnabled =
+      ctx.LangOpts.hasFeature(Feature::LiteralExpressions);
+  // Literal expressions are folded only for integer raw types; other raw types
+  // use the written literal directly.
+  const bool foldIntegerRawValue =
+      literalExprEnabled && rawTy->isStdlibInteger();
 
+  // Left empty until an element needs an automatic value. Emptiness gates the
+  // provenance notes on a duplicate, so do not compute this eagerly.
   std::optional<AutomaticEnumValueKind> valueKind;
   for (auto elt : ED->getAllElements()) {
     // If the element has been diagnosed up to now, skip it.
     if (elt->isInvalid())
       continue;
 
-    if (uncheckedRawValueOf(elt)) {
-      if (!uncheckedRawValueOf(elt)->isImplicit())
+    // Restored below if this element's written value turns out to be unusable.
+    auto *lastExplicitValueEltOnEntry = lastExplicitValueElt;
+
+    dropUnusableRawValueLiteral(elt);
+
+    if (elt->getRawValueUnchecked()) {
+      if (!elt->getRawValueUnchecked()->isImplicit())
         lastExplicitValueElt = elt;
     } else if (!ED->SemanticFlags.contains(EnumDecl::HasFixedRawValues)) {
       // Try to pull out the automatic enum value kind.  If that fails, bail.
@@ -1284,42 +1404,39 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
       elt->setRawValueExpr(nextValue);
     }
 
-    auto value = uncheckedRawValueOf(elt);
-    {
-      if (TypeChecker::typeCheckExpression(
-              value, ED,
-              /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
-        checkEnumElementActorIsolation(elt, value);
-        TypeChecker::checkEnumElementEffects(elt, value);
-        if (auto *seqExpr = dyn_cast<SequenceExpr>(value))
-          value = TypeChecker::foldSequence(seqExpr, ED);
-        elt->setRawValueExpr(value);
-      }
-    }
+    Expr *value = typeCheckRawValueExpr(ED, elt, rawTy);
 
-    // Literal expressions are folded only for integer raw types; other raw
-    // types use the written literal directly.
-    bool literalExprEnabled =
-        ED->getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
-    bool foldIntegerRawValue =
-        literalExprEnabled && rawTy && rawTy->isStdlibInteger();
-    // We must reduce the expression to a LiteralExpr here so that:
-    // 1. We validate the expression *is* a usable raw value.
-    // 2. We can use it to compute the next automatic raw value expression.
-    prevValue = foldIntegerRawValue
-                    ? dyn_cast<LiteralExpr>(
-                          foldLiteralExpression(value, &ED->getASTContext()))
-                    : dyn_cast<LiteralExpr>(value);
-    if (!prevValue) {
-      // When the feature is disabled, non-literal raw values are already
-      // rejected during parsing; only diagnose here when it is enabled.
+    // Into a local, not prevValue: this can fail, and the recovery below needs
+    // prevValue intact so the automatic value continues the sequence.
+    LiteralExpr *reduced =
+        reduceRawValueToLiteral(value, ctx, foldIntegerRawValue);
+    if (!reduced) {
+      // When the LiteralExpressions feature is disabled, non-literal raw values
+      // are already rejected during parsing; only diagnose here when it is
+      // enabled.
       if (literalExprEnabled && value)
-        ED->getASTContext().Diags.diagnose(
+        Diags.diagnose(
             value->getLoc(), foldIntegerRawValue
                                  ? diag::nonliteral_int_expr_enum_case_raw_value
                                  : diag::nonliteral_enum_case_raw_value);
-      continue;
+
+      // The automatic-value path above ran before this element's raw value was
+      // known to be unusable, so recover by assigning an automatic value here.
+      reduced =
+          recoverWithAutomaticRawValue(ED, elt, rawTy, prevValue, valueKind);
+      if (!reduced) {
+        elt->setInvalid();
+        continue;
+      }
+
+      // The written value was discarded, so this element is not what the
+      // sequence counts from.
+      lastExplicitValueElt = lastExplicitValueEltOnEntry;
+
+      // Fall through, so the recovered value is checked and registered for
+      // uniqueness like any other value.
     }
+    prevValue = reduced;
 
     // If we didn't find a valid initializer (maybe the initial value was
     // incompatible with the raw value type) mark the entry as being erroneous.
@@ -1335,54 +1452,25 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
     if (ED->SemanticFlags.contains(EnumDecl::HasFixedRawValues))
       continue;
 
-    // Using magic literals like #file as raw value is not supported right now.
+    // Only Integer/Float/String/Bool have a RawValueKey arm. Reachable, not
+    // defensive: 'nil' is exempt from the screen above and arrives here. Its
+    // crasher test uses a 'not %target-swift-frontend' RUN line, which a crash
+    // also satisfies, so it will not catch a regression here.
     // TODO: We could potentially support #file, #function, #line and #column.
-    auto &Diags = ED->getASTContext().Diags;
-    SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
-                            ? elt->getLoc()
-                            : uncheckedRawValueOf(elt)->getLoc();
-
-    // Only Integer/Float/String/Bool literals can serve as raw values. Reject
-    // any other literal here.
     if (!isValidEnumRawValueLiteral(prevValue)) {
-      Diags.diagnose(diagLoc, diag::nonliteral_enum_case_raw_value);
+      Diags.diagnose(rawValueDiagLoc(elt),
+                     diag::nonliteral_enum_case_raw_value);
       prevValue = nullptr;
+      elt->setInvalid();
       continue;
     }
 
     // Check that the raw value is unique.
-    RawValueKey key{prevValue};
-    RawValueSource source{elt, lastExplicitValueElt};
-
-    auto insertIterPair = uniqueRawValues.insert({key, source});
-    if (insertIterPair.second)
-      continue;
-
-    // Diagnose the duplicate value.
-    Diags.diagnose(diagLoc, diag::enum_raw_value_not_unique);
-
-    if (lastExplicitValueElt != elt &&
-        valueKind == AutomaticEnumValueKind::Integer) {
-      Diags.diagnose(uncheckedRawValueOf(lastExplicitValueElt)->getLoc(),
-                     diag::enum_raw_value_incrementing_from_here);
-    }
-
-    RawValueSource prevSource = insertIterPair.first->second;
-    auto foundElt = prevSource.sourceElt;
-    diagLoc = uncheckedRawValueOf(foundElt)->isImplicit()
-        ? foundElt->getLoc() : uncheckedRawValueOf(foundElt)->getLoc();
-    Diags.diagnose(diagLoc, diag::enum_raw_value_used_here);
-
-    if (foundElt != prevSource.lastExplicitValueElt &&
-        valueKind == AutomaticEnumValueKind::Integer) {
-      if (prevSource.lastExplicitValueElt)
-        Diags.diagnose(uncheckedRawValueOf(prevSource.lastExplicitValueElt)
-                         ->getLoc(),
-                       diag::enum_raw_value_incrementing_from_here);
-      else
-        Diags.diagnose(ED->getAllElements().front()->getLoc(),
-                       diag::enum_raw_value_incrementing_from_zero);
-    }
+    auto insertIterPair = uniqueRawValues.insert(
+        {RawValueKey{prevValue}, RawValueSource{elt, lastExplicitValueElt}});
+    if (!insertIterPair.second)
+      diagnoseDuplicateRawValue(ED, elt, insertIterPair.first->second,
+                                lastExplicitValueElt, valueKind);
   }
   return std::make_tuple<>();
 }
