@@ -1145,3 +1145,26 @@ TEST(TypeRefTest, ReadTypeRefRemoteAddressWraparound) {
 
   munmap(pages, pageSize * 2);
 }
+
+// A SILBoxTypeWithLayout mangling carries the generic signature's parameter
+// counts and the substitution list length as independent fields, so a mangled
+// name can declare zero parameters and still supply substitutions. Decoding
+// must reject the mismatch instead of indexing past the end of the decoded
+// parameter list.
+TEST(TypeRefTest, SILBoxSubstitutionCountMismatchIsRejected) {
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
+  Demangle::Demangler Dem;
+
+  // One mutable field of the generic parameter, one Builtin.Int32
+  // substitution, and a signature declaring one parameter at depth 0.
+  auto *WellFormed = Dem.demangleType("xz_Bi32__lXX");
+  ASSERT_NE(WellFormed, nullptr);
+  EXPECT_NE(Builder.decodeMangledType(WellFormed), nullptr);
+
+  // Same, but the signature declares zero generic parameters while the
+  // substitution list still holds one type.
+  Demangle::Demangler Dem2;
+  auto *Mismatched = Dem2.demangleType("xz_Bi32__rzlXX");
+  ASSERT_NE(Mismatched, nullptr);
+  EXPECT_EQ(Builder.decodeMangledType(Mismatched), nullptr);
+}
