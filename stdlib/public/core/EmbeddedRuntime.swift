@@ -982,6 +982,18 @@ public func swift_deletedMethodError() -> Never {
   Builtin.int_trap()
 }
 
+/// Stub declarations for `_swift_willThrow` and `_swift_willThrowTyped`
+/// so Swift Testing can successfully link (as it cannot currently tell at
+/// compile time if these symbols exist or not).
+///
+/// These symbols are never actually used in Embedded Swift.
+@_silgen_name("_swift_willThrow") nonisolated(unsafe)
+var _swift_willThrow: (@convention(c) (UnsafeRawPointer) -> Void)?
+@_silgen_name("_swift_willThrowTypedImpl") nonisolated(unsafe)
+var _swift_willThrowTypedImpl: (
+  @convention(c) (UnsafeRawPointer, UnsafeRawPointer, UnsafeRawPointer) -> Void
+)?
+
 @_silgen_name("swift_willThrow") // This is actually expected to be swiftcc (@_silgen_name and not @c).
 public func swift_willThrow() throws {
 }
