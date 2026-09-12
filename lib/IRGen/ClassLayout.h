@@ -205,6 +205,8 @@ public:
             Options.contains(ClassMetadataFlags::ClassIsGeneric));
   }
 
+  ArrayRef<ElementLayout> getElements() const { return AllElements; }
+
   std::pair<FieldAccess, ElementLayout>
   getFieldAccessAndElement(Field field) const {
     // FIXME: This is algorithmically terrible.

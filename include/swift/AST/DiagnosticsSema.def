@@ -6309,6 +6309,36 @@ ERROR(distributed_actor_func_param_not_codable,none,
       "parameter %0 of type %1 in %kindonly2 does not conform to "
       "serialization requirement '%3'",
       (Identifier, Type, const AbstractFunctionDecl *, StringRef))
+
+ERROR(distributed_embedded_any_some_param_not_supported,none,
+      "parameter %0 of type %1 in %kindonly2 is not supported in Embedded Swift; "
+      "only concrete types, or 'any'/'some' types of an '@Resolvable protocol' "
+      "may appear in 'distributed func' signatures",
+      (Identifier, Type, const AbstractFunctionDecl *))
+ERROR(distributed_embedded_any_some_result_not_supported,none,
+      "return type %0 of %kindonly1 is not supported in Embedded Swift; "
+      "only concrete types, or 'any'/'some' types of an '@Resolvable' protocol may "
+      "appear in 'distributed func' signatures",
+      (Type, const AbstractFunctionDecl *))
+ERROR(distributed_embedded_some_result_not_supported,none,
+      "'some' return type %0 of %kindonly1 is not supported in Embedded Swift; "
+      "use 'any %2' instead",
+      (Type, const AbstractFunctionDecl *, StringRef))
+ERROR(distributed_embedded_generic_func_not_supported,none,
+      "generic 'distributed func' is not supported in Embedded Swift; "
+      "use concrete parameter and return types in %kindonly0",
+      (const AbstractFunctionDecl *))
+ERROR(distributed_embedded_generic_actor_system_not_supported,none,
+      "distributed actor cannot be generic over its actor system in Embedded Swift; "
+      "specify a concrete 'ActorSystem'",
+      ())
+ERROR(distributed_embedded_distributed_var_not_supported,none,
+      "'distributed' computed properties are not supported in Embedded Swift; "
+      "use a 'distributed func' instead",
+      (DeclName))
+ERROR(distributed_embedded_requires_feature,none,
+      "'distributed actor' in Embedded Swift requires '-enable-experimental-feature EmbeddedDistributed'",
+      ())
 ERROR(distributed_actor_func_param_resolvable_actor_system_mismatch,none,
       "parameter %0 of type %1 in %kindonly2 must match the enclosing actor's "
       "ActorSystem (%5)",

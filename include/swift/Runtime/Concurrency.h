@@ -1055,9 +1055,25 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *actor);
 
 /// Create and initialize the runtime storage for a distributed remote actor.
+/// This is dynamic because a distributed actor may have dynamic size,
+/// dependent on generic parameters etc.
+///
+/// Unavailable in Embedded: the size and alignment cannot be computed from
+/// minimal class metadata, so in Embedded we compute them in IRGen
+/// and use `swift_distributedActor_remote_initialize_embedded` instead.
+#if !SWIFT_CONCURRENCY_EMBEDDED
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
 swift_distributedActor_remote_initialize(const Metadata *actorType);
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
+
+#if SWIFT_CONCURRENCY_EMBEDDED
+/// Embedded-only variant of `swift_distributedActor_remote_initialize`.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+OpaqueValue*
+swift_distributedActor_remote_initialize_embedded(
+    const Metadata *actorType, size_t allocSize, size_t alignMask);
+#endif // SWIFT_CONCURRENCY_EMBEDDED
 
 /// Enqueue a job on the default actor implementation.
 ///

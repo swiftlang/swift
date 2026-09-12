@@ -26,6 +26,7 @@
 #include "swift/AST/SynthesizedDeclBuilder.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/STLExtras.h"
@@ -404,6 +405,20 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       if (argumentNames.size() == 2 &&
           argumentNames[0] == ctx.Id_id &&
           argumentNames[1] == ctx.Id_using) {
+        return getRequirement(KnownProtocolKind::DistributedActor);
+      }
+    }
+
+    // Embedded Swift only:
+    // DistributedActor._executeDistributedTarget(target:invocationDecoder:resultHandler:)
+    if (ctx.LangOpts.hasFeature(Feature::Embedded) &&
+        name.isCompoundName() &&
+        name.getBaseName() == ctx.Id_executeDistributedTarget) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 3 &&
+          argumentNames[0] == ctx.getIdentifier("target") &&
+          argumentNames[1] == ctx.getIdentifier("invocationDecoder") &&
+          argumentNames[2] == ctx.getIdentifier("resultHandler")) {
         return getRequirement(KnownProtocolKind::DistributedActor);
       }
     }

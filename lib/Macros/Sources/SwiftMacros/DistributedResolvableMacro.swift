@@ -115,7 +115,7 @@ extension DistributedResolvableMacro {
       for binding in variable.bindings {
         if let accessorBlock = binding.accessorBlock {
           for accessor in accessorBlock.accessors.children(viewMode: .all) {
-            let accessorStub = "\(accessor) { \(stubFunctionBody()) }"
+            let accessorStub = "\(accessor) { \(stubFunctionBody())\n }"
             accessorStubs.append(accessorStub)
           }
         }
@@ -152,11 +152,13 @@ extension DistributedResolvableMacro {
 
   static func stubFunctionBody() -> DeclSyntax {
     """
+    #if !$Embedded
     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
       Distributed._distributedStubFatalError()
-    } else {
-      fatalError()
     }
+    #endif
+
+    fatalError()
     """
   }
 }
