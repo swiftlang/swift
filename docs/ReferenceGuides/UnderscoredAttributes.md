@@ -13,6 +13,17 @@ go through the Swift evolution process before being stabilized.
 
 The attributes are organized in alphabetical order.
 
+
+## `@_addressableForDependencies`
+
+This attribute ensures the annotated type's value is addressable in the stack-frame of the caller of an accessor or such, by passing it to the accessor as an address instead of possibly an address-less value in a register, so then accessor can point at that storage that is guaranteed to outlive accessor's stack-frame.   
+This effect requires both a `@_lifetime` annotation on the accessor and `@_addressableForDependencies` on the type.   
+This way the accessor's returned pointer is guaranteed to remain valid for the caller to read through.   
+
+Currently requires the `AddressableTypes` experimental feature. Full effect of this attribute might require further experimental features such as `Lifetimes` and `BuiltinModule`.
+
+As an example, see [`InlineArray`'s implementation](https://github.com/swiftlang/swift/blob/d8d652ce615bd350bc51ab01409fe4dfa3cbc363/stdlib/public/core/InlineArray.swift#L595) as of writing this documentation, where the type is annotated with `@_addressableForDependencies` and `InlineArray.span.getter` is annotated with `@_lifetime(borrow self)`.   
+
 ## `@_alignment(numericValue)`
 
 Allows controlling the alignment of a type.
