@@ -895,6 +895,15 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   if (!Opts.ClangIncludeTree.empty() || !Opts.ClangIncludeTreeFileList.empty())
     Opts.HasImmutableFileSystem = true;
 
+  Opts.CASFSInputOverlay |= Args.hasArg(OPT_cas_fs_input_overlay);
+  if (Opts.CASFSInputOverlay && Opts.EnableCaching) {
+    // The content of the input files is read from disk, so it no longer
+    // contributes to the cache key.
+    Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+                   "-cas-fs-input-overlay", "-cache-compile-job");
+    return true;
+  }
+
   return false;
 }
 
