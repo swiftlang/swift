@@ -1169,6 +1169,12 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPushDeadline)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)
 
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, CreateSplitContinuation)
+// The resume buffer is passed by address, and address operands are trivial at
+// the SIL level.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, GetSplitContinuationAddr)
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, DestroySplitContinuation)
+
 #undef BUILTIN_OPERAND_OWNERSHIP
 
 #define SHOULD_NEVER_VISIT_BUILTIN(ID)                                         \
