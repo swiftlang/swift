@@ -471,6 +471,15 @@ private extension AccessBase {
   }
 }
 
+private extension Value {
+  var lookThroughAddressCast: Value {
+    if let addrCast = self as? UncheckedAddrCastInst {
+      return addrCast.fromAddress.lookThroughAddressCast
+    }
+    return self
+  }
+}
+
 private extension Instruction {
   /// If the instruction needs stack protection, return the relevant access base and scope.
   var accessBaseToProtect: (AccessBase, scope: BeginAccessInst?)? {
@@ -503,7 +512,7 @@ private extension Instruction {
       default:
         return nil
     }
-    let (accessPath, scope) = baseAddr.accessPathWithScope
+    let (accessPath, scope) = baseAddr.lookThroughAddressCast.accessPathWithScope
 
     if case .tail = accessPath.base, self is IndexAddrInst {
       // `index_addr` for tail-allocated elements is the usual case (most likely coming from

@@ -410,6 +410,49 @@ bb0(%0 : $Int64):
   return %r : $()
 }
 
+// CHECK-LABEL: sil [stack_protection] @unchecked_addr_cast_base_with_store
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'unchecked_addr_cast_base_with_store'
+sil @unchecked_addr_cast_base_with_store : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $S
+  %2 = unchecked_addr_cast %1 : $*S to $*Int64
+  %3 = address_to_pointer [stack_protection] %2 : $*Int64 to $Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to $*Int64
+  store %0 to %4 : $*Int64
+  dealloc_stack %1 : $*S
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @unchecked_addr_cast_base_with_only_loads
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'unchecked_addr_cast_base_with_only_loads'
+sil @unchecked_addr_cast_base_with_only_loads : $@convention(thin) () -> Int64 {
+bb0:
+  %1 = alloc_stack $S
+  %2 = unchecked_addr_cast %1 : $*S to $*Int64
+  %3 = address_to_pointer [stack_protection] %2 : $*Int64 to $Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to $*Int64
+  %5 = load %4 : $*Int64
+  dealloc_stack %1 : $*S
+  return %5 : $Int64
+}
+
+// CHECK-LABEL: sil [stack_protection] @unchecked_addr_cast_base_of_index_addr
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'unchecked_addr_cast_base_of_index_addr'
+sil @unchecked_addr_cast_base_of_index_addr : $@convention(thin) (Int64, Builtin.Word) -> () {
+bb0(%0 : $Int64, %1 : $Builtin.Word):
+  %2 = alloc_stack $S
+  %3 = unchecked_addr_cast %2 : $*S to $*Int64
+  %4 = index_addr [stack_protection] %3 : $*Int64, %1 : $Builtin.Word
+  store %0 to %4 : $*Int64
+  dealloc_stack %2 : $*S
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [stack_protection] @stack_alloc_builtin
 // CHECK-NOT:     copy_addr
 // CHECK:       } // end sil function 'stack_alloc_builtin'

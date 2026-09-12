@@ -113,6 +113,29 @@ public func storeToFieldAtOffset(value: Int) -> Int {
   return s.a
 }
 
+// CHECK-LABEL: sil @$s4test24onlyLoadsAtReboundOffset5indexS2i_tF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test24onlyLoadsAtReboundOffset5indexS2i_tF'
+public func onlyLoadsAtReboundOffset(index: Int) -> Int {
+  var t = (1, 2)
+  return withUnsafeMutablePointer(to: &t) {
+    let p = UnsafeMutableRawPointer($0).assumingMemoryBound(to: Int.self)
+    return p[index]
+  }
+}
+
+// CHECK-LABEL: sil [stack_protection] @$s4test20storeAtReboundOffset5value5indexS2i_SitF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test20storeAtReboundOffset5value5indexS2i_SitF'
+public func storeAtReboundOffset(value: Int, index: Int) -> Int {
+  var t = (0, 0)
+  return withUnsafeMutablePointer(to: &t) {
+    let p = UnsafeMutableRawPointer($0).assumingMemoryBound(to: Int.self)
+    p[index] = value
+    return p[0]
+  }
+}
+
 // CHECK-LABEL: sil @$s4test22unprotectedUnsafeBytesyyF
 // CHECK-NOT:     copy_addr
 // CHECK:       } // end sil function '$s4test22unprotectedUnsafeBytesyyF'
