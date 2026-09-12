@@ -27,6 +27,11 @@ func testDowncast(x: FRTBase) -> FRTDerived? {
   return downcast(x)
 }
 
+// CHECK-LABEL: define {{.*}}@{{.*}}testNullableDowncast
+func testNullableDowncast(x: FRTBase) -> FRTDerived? {
+  return nullableDowncast(x)
+}
+
 // CHECK-LABEL: define {{.*}}@{{.*}}testPassThroughLet
 func testPassThroughLet(base: FRTBase) {
   let _: FRTBase = passThrough(base)
@@ -49,4 +54,10 @@ func testDynamicCastLet(base: FRTBase) {
 func testDowncastLet(base: FRTBase) {
   let _: FRTDerived = downcast(base)
   let _: FRTDerived? = downcast(base)
+}
+
+// CHECK-LABEL: define {{.*}}@{{.*}}testNullableDowncastLet
+func testNullableDowncastLet(base: FRTBase) {
+  let _: FRTDerived? = nullableDowncast(base)
+  let _: FRTDerived = nullableDowncast(base)!
 }

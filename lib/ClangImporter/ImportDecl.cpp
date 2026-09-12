@@ -9306,7 +9306,10 @@ bool importer::hasSameUnderlyingType(const clang::Type *a,
                                      const clang::TemplateTypeParmDecl *b) {
   while (a->isPointerType() || a->isReferenceType())
     a = a->getPointeeType().getTypePtr();
-  return a == b->getTypeForDecl();
+  // Compare canonical types to look through sugar such as a nullability
+  // specifier on the template type parameter.
+  return a->getCanonicalTypeInternal() ==
+         b->getTypeForDecl()->getCanonicalTypeInternal();
 }
 
 SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
