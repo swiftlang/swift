@@ -14,6 +14,21 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
+// Regression test for sourcekit-lsp #2696: lazy typechecking + skip-all-function-bodies
+//
+// The SwiftPM `--experimental-prepare-for-indexing` combo) must not drop
+// macro-synthesized extension conformances from the produced .swiftmodule.
+// RUN: %empty-directory(%t/lazy)
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/lazy/ModuleWithEquatable.swiftmodule %s -DMODULE_EXPORTING_TYPE -module-name ModuleWithEquatable -load-plugin-library %t/%target-library-name(MacroDefinition) -experimental-lazy-typecheck -experimental-skip-all-function-bodies
+// RUN: %target-swift-ide-test -print-module -module-to-print=ModuleWithEquatable -source-filename %s -I %t/lazy -load-plugin-library %t/%target-library-name(MacroDefinition) | %FileCheck -check-prefix CHECK-LAZY %s
+
+// CHECK-LAZY: struct Outer
+// CHECK-LAZY: struct Generated
+// CHECK-LAZY: extension Outer.Generated : MyProtocol
+// CHECK-LAZY: struct PublicEquatable
+// CHECK-LAZY: extension PublicEquatable : Equatable
+// CHECK-LAZY: extension PublicEquatable.Inner : Equatable
+
 #if TEST_DIAGNOSTICS
 @attached(conformance) // expected-error{{conformance macros are replaced by extension macros}}
 macro InvalidEquatable() = #externalMacro(module: "MacroDefinition", type: "EquatableMacro")
@@ -31,9 +46,30 @@ public struct PublicEquatable {
   public init() { }
 }
 
+extension PublicEquatable {
+  @Equatable
+  public struct Inner {
+    public init() { }
+  }
+}
+
+public protocol MyProtocol {}
+
+@attached(extension, conformances: MyProtocol)
+macro AddMyProtocol() = #externalMacro(module: "MacroDefinition", type: "ConformanceViaExtensionMacro")
+
+@attached(member, names: named(Generated))
+macro AddGeneratedMember() = #externalMacro(module: "MacroDefinition", type: "ConformingMemberStructMacro")
+
+@AddGeneratedMember
+public struct Outer {
+  public init() {}
+}
+
 // INTERFACE-NOT: @Equatable
 // INTERFACE: public struct PublicEquatable
 // INTERFACE: extension ModuleWithEquatable::PublicEquatable : Swift::Equatable
+// INTERFACE: extension ModuleWithEquatable::PublicEquatable.ModuleWithEquatable::Inner : Swift::Equatable
 
 #else
 import ModuleWithEquatable

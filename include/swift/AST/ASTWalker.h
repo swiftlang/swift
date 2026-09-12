@@ -683,6 +683,16 @@ public:
   /// type-checked yet.
   virtual bool shouldWalkIntoUncheckedMacroDefinitions() { return false; }
 
+  /// Whether to walk the top-level auxiliary decls for a SourceFile, including
+  /// peer and extension macro expansions. Note this does not control the
+  /// walking of expansions for freestanding macros.
+  ///
+  /// FIXME: This ought to just be controlled by
+  /// `shouldWalkMacroArgumentsAndExpansion`, but we currently have a bunch of
+  /// misconfigured walkers that are currently relying on phase ordering to not
+  /// expand macros too early.
+  virtual bool shouldWalkTopLevelAuxiliaryDecls() const { return false; }
+
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.
   ///

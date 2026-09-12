@@ -1402,10 +1402,10 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   if (role == MacroRole::Peer) {
     dc = attachedTo->getDeclContext();
   } else if (role == MacroRole::Conformance || role == MacroRole::Extension) {
-    // Conformance macros always expand to extensions at file-scope.
+    // Conformance macros always expand to extensions at top-level file-scope.
     dc = attachedTo->getDeclContext();
     if (!isa<ClangModuleUnit>(dc->getModuleScopeContext()))
-      dc = dc->getParentSourceFile();
+      dc = dc->getOutermostParentSourceFile();
     else
       ASSERT(isa<FileUnit>(dc) && !isa<SourceFile>(dc) && "decls imported from Clang should not have a SourceFile");
   } else {
@@ -2180,17 +2180,6 @@ std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
     // Bind the extension to the original nominal type.
     extension->setExtendedNominal(nominal);
     nominal->addExtension(extension);
-
-    // Most other macro-generated declarations are visited through calling
-    // 'visitAuxiliaryDecls' on the original declaration the macro is attached
-    // to. We don't do this for macro-generated extensions, because the
-    // extension is not a peer of the original declaration. Instead of
-    // requiring all callers of 'visitAuxiliaryDecls' to understand the
-    // hoisting behavior of macro-generated extensions, we make the
-    // extension accessible through 'getTopLevelDecls()'.
-    if (auto file = dyn_cast<FileUnit>(
-            decl->getDeclContext()->getModuleScopeContext()))
-      file->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
 
     // Don't validate documented conformances for the 'conformance' role.
     if (role == MacroRole::Conformance)

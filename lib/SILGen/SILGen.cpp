@@ -2267,32 +2267,11 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
     emitEntryPoint(sf);
   }
 
-  for (auto *D : sf->getTopLevelDecls()) {
-    // Emit auxiliary decls.
-    D->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-      visit(auxiliaryDecl);
-    });
-
-    visit(D);
-  }
-
-  // Visit extensions recorded in the synthesized file separately. The code
-  // above that visits auxiliary decls of the top-level decls in the source
-  // file does not work for nested types with attached conformance macros:
-  // ```
-  // struct Outer {
-  //   @AddConformance struct Inner {}
-  // }
-  // ```
-  // Because the attached-to decl is not at the top level. Other compiler
-  // features can also add extensions directly to the synthesized file.
-  if (auto *synthesizedFile = sf->getSynthesizedFile()) {
-    for (auto *D : synthesizedFile->getTopLevelDecls()) {
-      if (!isa<ExtensionDecl>(D))
-        continue;
-
+  {
+    SmallVector<Decl *, 64> decls;
+    sf->getTopLevelDeclsWithAuxiliaryDecls(decls);
+    for (auto *D : decls)
       visit(D);
-    }
   }
 
   for (Decl *D : sf->getHoistedDecls()) {

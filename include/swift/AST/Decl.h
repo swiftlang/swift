@@ -1174,10 +1174,14 @@ public:
   ///
   /// When \p visitFreestandingExpanded is true (the default), this will also
   /// visit the declarations produced by a freestanding macro expansion.
-  void visitAuxiliaryDecls(
-      AuxiliaryDeclCallback callback,
-      bool visitFreestandingExpanded = true
-  ) const;
+  ///
+  /// When \p visitExtensions is true (currently `false` by default), this
+  /// will also visit the top-level extensions for any expanded extension
+  /// macros. Use this with care since in an ASTWalker it would cause a
+  /// non-source-order walk.
+  void visitAuxiliaryDecls(AuxiliaryDeclCallback callback,
+                           bool visitFreestandingExpanded = true,
+                           bool visitExtensions = false) const;
 
   using MacroCallback = llvm::function_ref<void(CustomAttr *, MacroDecl *)>;
 
@@ -4912,6 +4916,10 @@ public:
   /// Return a collection of the stored member variables of this type, along
   /// with placeholders for unimportable stored properties.
   ArrayRef<Decl *> getStoredPropertiesAndMissingMemberPlaceholders() const;
+
+  /// Visit the auxiliary extensions for the given nominal. This includes both
+  /// those expanded by macros as well as others synthesized by the compiler.
+  void visitAuxiliaryExtensions(llvm::function_ref<void(Decl *)> visit) const;
 
   /// Whether this nominal type qualifies as an actor, meaning that it is
   /// either an actor type or a protocol whose `Self` type conforms to the

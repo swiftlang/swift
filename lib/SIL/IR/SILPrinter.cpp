@@ -4313,7 +4313,7 @@ static void printSILLinearMapTypes(SILPrintContext &Ctx,
   Options.PrintInSILBody = false;
 
   SmallVector<Decl *, 32> topLevelDecls;
-  M->getTopLevelDecls(topLevelDecls);
+  M->getTopLevelDeclsWithAuxiliaryDecls(topLevelDecls);
   for (const Decl *D : topLevelDecls) {
     if (D->getDeclContext() == M)
       continue;
@@ -4478,7 +4478,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     bool WholeModuleMode = (M == AssociatedDeclContext);
 
     SmallVector<Decl *, 32> topLevelDecls;
-    M->getTopLevelDecls(topLevelDecls);
+    M->getTopLevelDeclsWithAuxiliaryDecls(topLevelDecls);
     for (const Decl *D : topLevelDecls) {
       if (!WholeModuleMode && !(D->getDeclContext() == AssociatedDeclContext))
           continue;

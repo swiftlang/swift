@@ -79,7 +79,8 @@ public:
   visitAuxiliaryDecls:
     // Visit peers expanded from macros
     D->visitAuxiliaryDecls([&](Decl *decl) { decl->walk(*this); },
-                           /*visitFreestandingExpanded=*/false);
+                           /*visitFreestandingExpanded=*/false,
+                           /*visitExtensions*/ true);
     return Action::Continue();
   }
 
@@ -702,12 +703,6 @@ gatherConstValuesForModule(const std::unordered_set<std::string> &Protocols,
   NominalTypeConformanceCollector ConformanceCollector(Protocols,
                                                        ConformanceDecls);
   Module->walk(ConformanceCollector);
-  // Visit macro expanded extensions
-  for (auto *FU : Module->getFiles())
-    if (auto *synthesizedSF = FU->getSynthesizedFile())
-      for (auto D : synthesizedSF->getTopLevelDecls())
-        if (isa<ExtensionDecl>(D))
-          D->walk(ConformanceCollector);
 
   for (auto *CD : ConformanceDecls)
     Result.emplace_back(evaluateOrDefault(CD->getASTContext().evaluator,
@@ -724,13 +719,8 @@ gatherConstValuesForPrimary(const std::unordered_set<std::string> &Protocols,
   std::vector<NominalTypeDecl *> ConformanceDecls;
   NominalTypeConformanceCollector ConformanceCollector(Protocols,
                                                        ConformanceDecls);
-  for (auto D : SF->getTopLevelDecls())
-    D->walk(ConformanceCollector);
-  // Visit macro expanded extensions
-  if (auto *synthesizedSF = SF->getSynthesizedFile())
-    for (auto D : synthesizedSF->getTopLevelDecls())
-      if (isa<ExtensionDecl>(D))
-        D->walk(ConformanceCollector);
+  auto *mutableSF = const_cast<SourceFile *>(SF);
+  mutableSF->walk(ConformanceCollector);
 
   for (auto *CD : ConformanceDecls)
     Result.emplace_back(evaluateOrDefault(
