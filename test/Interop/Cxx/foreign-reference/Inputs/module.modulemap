@@ -154,3 +154,8 @@ module LibkernOwnership {
   header "libkern-ownership.hpp"
   requires cplusplus
 }
+
+module FRTProtocolSuperclass {
+  header "frt-protocol-superclass.h"
+  requires cplusplus
+}
