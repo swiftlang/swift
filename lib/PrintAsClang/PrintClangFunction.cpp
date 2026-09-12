@@ -1740,6 +1740,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     modifiers.qualifierContext = typeDeclContext;
   modifiers.isStatic = (isStatic || isConstructor) && !isDefinition;
   modifiers.isInline = true;
+  modifiers.isNoexcept = !FD->hasThrows();
   bool isMutating =
       isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false;
   modifiers.isConst = !isa<ClassDecl>(typeDeclContext) && !isMutating &&
@@ -1817,6 +1818,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
     modifiers.qualifierContext = typeDeclContext;
   modifiers.isStatic = isStatic && !isDefinition;
   modifiers.isInline = true;
+  modifiers.isNoexcept = !accessor->hasThrows();
   modifiers.isConst =
       !isStatic && accessor->isGetter() && !isa<ClassDecl>(typeDeclContext);
   modifiers.hasSymbolUSR = !isDefinition;
@@ -1859,6 +1861,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
   modifiers.isInline = true;
+  modifiers.isNoexcept = !accessor->hasThrows();
   modifiers.isConst = true;
   auto result =
       printFunctionSignature(accessor, signature, "operator []", resultTy,

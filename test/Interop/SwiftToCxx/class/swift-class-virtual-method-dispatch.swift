@@ -116,7 +116,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
   return DerivedDerivedClass()
 }
 
-// CHECK:      void BaseClass::virtualMethod() {
+// CHECK:      void BaseClass::virtualMethod() noexcept {
 // CHECK-NEXT: void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: #ifdef __arm64e__
 // CHECK-NEXT: void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -130,7 +130,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT: (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
 
-// CHECK:      swift::Int BaseClass::virtualMethodIntInt(swift::Int x) {
+// CHECK:      swift::Int BaseClass::virtualMethodIntInt(swift::Int x) noexcept {
 // CHECK-NEXT: void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: #ifdef __arm64e__
 // CHECK-NEXT: void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -144,11 +144,11 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:   return (* fptrptr_->func)(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
-// CHECK:        swift::Int BaseClass::finalMethodInBase(swift::Int x) {
+// CHECK:        swift::Int BaseClass::finalMethodInBase(swift::Int x) noexcept {
 // CHECK-NEXT:   return Class::_impl::$s5Class04BaseA0C013finalMethodInB0yS2iF(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
-// CHECK:        swift::Int BaseClass::getVirtualComputedProp() {
+// CHECK:        swift::Int BaseClass::getVirtualComputedProp() noexcept {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   #ifdef __arm64e__
 // CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -162,7 +162,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:     return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
-// CHECK:        int64_t BaseClass::getVirtualComputedGetSet() {
+// CHECK:        int64_t BaseClass::getVirtualComputedGetSet() noexcept {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   #ifdef __arm64e__
 // CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -176,7 +176,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:     return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
-// CHECK:        void BaseClass::setVirtualComputedGetSet(int64_t newValue) {
+// CHECK:        void BaseClass::setVirtualComputedGetSet(int64_t newValue) noexcept {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   #ifdef __arm64e__
 // CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -190,7 +190,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:   (* fptrptr_->func)(newValue, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
-// CHECK:        swift::Int BaseClass::getStoredProp() {
+// CHECK:        swift::Int BaseClass::getStoredProp() noexcept {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   #ifdef __arm64e__
 // CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -204,7 +204,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:   return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
-// CHECK:        void BaseClass::setStoredProp(swift::Int value) {
+// CHECK:        void BaseClass::setStoredProp(swift::Int value) noexcept {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   #ifdef __arm64e__
 // CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -232,7 +232,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:    return (* fptrptr_->func)(i, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:    }
 
-// CHECK:        void DerivedClass::virtualMethod() {
+// CHECK:        void DerivedClass::virtualMethod() noexcept {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   #ifdef __arm64e__
 // CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -246,7 +246,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:   (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
-// CHECK:        swift::Int DerivedClass::virtualMethodIntInt(swift::Int x) {
+// CHECK:        swift::Int DerivedClass::virtualMethodIntInt(swift::Int x) noexcept {
 // CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     #ifdef __arm64e__
 // CHECK-NEXT:     void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -260,7 +260,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:     return (* fptrptr_->func)(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
 
-// CHECK:        BaseClass DerivedClass::virtualMethodInDerived(const BaseClass& x) {
+// CHECK:        BaseClass DerivedClass::virtualMethodInDerived(const BaseClass& x) noexcept {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   #ifdef __arm64e__
 // CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -274,7 +274,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:   return _impl::_impl_BaseClass::makeRetained((* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
 // CHECK-NEXT:   }
 
-// CHECK:         swift::Int DerivedClass::getVirtualComputedProp() {
+// CHECK:         swift::Int DerivedClass::getVirtualComputedProp() noexcept {
 // CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     #ifdef __arm64e__
 // CHECK-NEXT:     void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -288,7 +288,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:       return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:       }
 
-// CHECK:         int64_t DerivedClass::getVirtualComputedGetSet() {
+// CHECK:         int64_t DerivedClass::getVirtualComputedGetSet() noexcept {
 // CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     #ifdef __arm64e__
 // CHECK-NEXT:     void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -302,7 +302,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:     return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
 
-// CHECK:         void DerivedClass::setVirtualComputedGetSet(int64_t newValue) {
+// CHECK:         void DerivedClass::setVirtualComputedGetSet(int64_t newValue) noexcept {
 // CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     #ifdef __arm64e__
 // CHECK-NEXT:     void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -316,7 +316,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:     (* fptrptr_->func)(newValue, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
 
-// CHECK:         swift::Int DerivedClass::getStoredProp() {
+// CHECK:         swift::Int DerivedClass::getStoredProp() noexcept {
 // CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     #ifdef __arm64e__
 // CHECK-NEXT:     void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -330,7 +330,7 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:       return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:       }
 
-// CHECK:         void DerivedClass::setStoredProp(swift::Int newValue) {
+// CHECK:         void DerivedClass::setStoredProp(swift::Int newValue) noexcept {
 // CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     #ifdef __arm64e__
 // CHECK-NEXT:     void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -357,22 +357,22 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:    FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM10]] / sizeof(void *));
 // CHECK-NEXT:      return (* fptrptr_->func)(i, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 
-// CHECK:        void DerivedDerivedClass::virtualMethod() {
+// CHECK:        void DerivedDerivedClass::virtualMethod() noexcept {
 // CHECK-NEXT:     _impl::$s5Class07DerivedbA0C13virtualMethodyyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
 
-// CHECK:        BaseClass DerivedDerivedClass::virtualMethodInDerived(const BaseClass& x) {
+// CHECK:        BaseClass DerivedDerivedClass::virtualMethodInDerived(const BaseClass& x) noexcept {
 // CHECK-NEXT:     return _impl::_impl_BaseClass::makeRetained(Class::_impl::$s5Class07DerivedbA0C015virtualMethodInB0yAA04BaseA0CAFF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
 // CHECK-NEXT:     }
 
-// CHECK:        void DerivedDerivedClass::methodInDerivedDerived() {
+// CHECK:        void DerivedDerivedClass::methodInDerivedDerived() noexcept {
 // CHECK-NEXT:     _impl::$s5Class07DerivedbA0C08methodInbB0yyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
 
-// CHECK:          swift::Int DerivedDerivedClass::getStoredProp() {
+// CHECK:          swift::Int DerivedDerivedClass::getStoredProp() noexcept {
 // CHECK-NEXT:     return Class::_impl::$s5Class07DerivedbA0C10storedPropSivg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
 
-// CHECK:          swift::Int DerivedDerivedClass::getComputedPropInDerivedDerived() {
+// CHECK:          swift::Int DerivedDerivedClass::getComputedPropInDerivedDerived() noexcept {
 // CHECK-NEXT:     return Class::_impl::$s5Class07DerivedbA0C014computedPropInbB0Sivg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }

@@ -8,7 +8,7 @@
 
 // note: uses swift-class-virtual-method-dispatch.swift
 
-// CHECK:      void BaseClass::virtualMethod() {
+// CHECK:      void BaseClass::virtualMethod() noexcept {
 // CHECK-NEXT: void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: #ifdef __arm64e__
 // CHECK-NEXT: void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
