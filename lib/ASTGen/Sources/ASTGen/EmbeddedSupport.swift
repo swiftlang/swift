@@ -128,6 +128,10 @@ struct EmbeddedBuildConfiguration: BuildConfiguration {
     return try configuration.isActiveTargetObjectFormat(name: name)
   }
 
+  func hasTargetFeature(name: String) throws -> Bool {
+    return try configuration.hasTargetFeature(name: name)
+  }
+
   var targetAtomicBitWidths: [Int] {
     return configuration.targetAtomicBitWidths
   }

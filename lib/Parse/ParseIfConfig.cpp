@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/Assertions.h"
@@ -394,6 +395,18 @@ public:
       return E;
     }
 
+    if (*KindName == "_hasTargetFeature" &&
+        Ctx.LangOpts.hasFeature(Feature::TargetFeaturePredicate)) {
+      auto SLE = dyn_cast<StringLiteralExpr>(Arg);
+      if (!SLE || SLE->getValue().empty()) {
+        D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
+                   "target feature name");
+        return nullptr;
+      }
+
+      return E;
+    }
+
     // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' | '_hasAtomicBitWidth' | 'objectFormat' ) '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.has_value()) {
@@ -629,6 +642,9 @@ public:
     } else if (KindName == "hasAttribute") {
       auto attributeName = getDeclRefStr(Arg);
       return hasAttribute(Ctx.LangOpts, attributeName);
+    } else if (KindName == "_hasTargetFeature") {
+      auto featureName = cast<StringLiteralExpr>(Arg)->getValue();
+      return Ctx.getClangModuleLoader()->hasTargetFeature(featureName);
     }
 
     auto Val = getDeclRefStr(Arg);

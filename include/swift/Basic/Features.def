@@ -686,6 +686,9 @@ EXPERIMENTAL_FEATURE(DistributedActorResignRemoteID, false)
 /// Enable @_target, a per-function target-features/CPU override.
 EXPERIMENTAL_FEATURE(TargetAttribute, true)
 
+/// Enable `#if _hasTargetFeature(...)`, a build-time ISA feature query.
+EXPERIMENTAL_FEATURE(TargetFeaturePredicate, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
