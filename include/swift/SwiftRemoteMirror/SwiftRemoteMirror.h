@@ -346,11 +346,13 @@ void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
 
 /// Demangle a type name.
 ///
-/// Copies at most `MaxLength` bytes from the demangled name string into
-/// `OutDemangledName`.
+/// Copies at most `MaxLength` bytes, including the terminating NUL, from the
+/// demangled name string into `OutDemangledName`. The result is always
+/// NUL-terminated when `MaxLength` is nonzero, truncating the name if
+/// necessary.
 ///
 /// Returns the length of the demangled string this function tried to copy
-/// into `OutDemangledName`.
+/// into `OutDemangledName`, not including the terminating NUL.
 SWIFT_REMOTE_MIRROR_LINKAGE
 size_t swift_reflection_demangle(const char *MangledName, size_t Length,
                                  char *OutDemangledName, size_t MaxLength);
