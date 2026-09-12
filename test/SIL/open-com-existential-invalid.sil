@@ -1,0 +1,105 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/native.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=NATIVE
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/operand-address.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=OPERAND-ADDRESS
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/result-address.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=RESULT-ADDRESS
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/not-opened.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=NOT-OPENED
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/mismatched.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=MISMATCHED
+
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/metatype.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=METATYPE
+
+// REQUIRES: asserts
+
+// NATIVE: open_com_existential operand must be a COM existential
+
+//--- native.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface {}
+
+protocol Native: AnyObject {}
+sil @invalid : $@convention(thin) (@guaranteed Native) -> () {
+bb0(%value : $Native):
+  %opened = open_com_existential %value : $Native to $@opened(1, Native) Self
+  unreachable
+}
+
+// OPERAND-ADDRESS: Operand must be an object.
+
+//--- operand-address.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface {}
+
+sil @invalid : $@convention(thin) (@in_guaranteed IInterface) -> () {
+bb0(%value : $*IInterface):
+  %opened = open_com_existential %value : $*IInterface to $@opened(1, IInterface) Self
+  unreachable
+}
+
+// RESULT-ADDRESS: Result type must be an object type.
+
+//--- result-address.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface {}
+
+sil @invalid : $@convention(thin) (@guaranteed IInterface) -> () {
+bb0(%value : $IInterface):
+  %opened = open_com_existential %value : $IInterface to $*@opened(1, IInterface) Self
+  unreachable
+}
+
+// NOT-OPENED: Type should be a root opened archetype
+
+//--- not-opened.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface {}
+
+sil @invalid : $@convention(thin) (@guaranteed IInterface) -> () {
+bb0(%value : $IInterface):
+  %opened = open_com_existential %value : $IInterface to $Builtin.RawPointer
+  unreachable
+}
+
+// MISMATCHED: open_com_existential result must open the operand existential type
+
+//--- mismatched.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface {}
+
+@com(interface: "10000000-0000-0000-0000-000000000002")
+protocol IOther {}
+sil @invalid : $@convention(thin) (@guaranteed IInterface) -> () {
+bb0(%value : $IInterface):
+  %opened = open_com_existential %value : $IInterface to $@opened(1, IOther) Self
+  unreachable
+}
+
+// METATYPE: open_com_existential result must be an opened existential archetype
+
+//--- metatype.sil
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+protocol IInterface {}
+
+sil @invalid : $@convention(thin) (@guaranteed IInterface) -> () {
+bb0(%value : $IInterface):
+  %opened = open_com_existential %value : $IInterface to $@thick (@opened(1, IInterface) Self).Type
+  unreachable
+}

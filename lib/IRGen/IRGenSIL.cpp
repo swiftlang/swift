@@ -1401,12 +1401,14 @@ public:
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
   void visitObjCMethodInst(ObjCMethodInst *i);
+  void visitCOMMethodInst(COMMethodInst *i);
   void visitObjCSuperMethodInst(ObjCSuperMethodInst *i);
   void visitWitnessMethodInst(WitnessMethodInst *i);
 
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *i);
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
+  void visitOpenCOMExistentialInst(OpenCOMExistentialInst *i);
   void visitOpenExistentialValueInst(OpenExistentialValueInst *i);
   void visitInitExistentialAddrInst(InitExistentialAddrInst *i);
   void visitInitExistentialValueInst(InitExistentialValueInst *i);
@@ -8451,6 +8453,10 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
   setLoweredExplosion(i, result);
 }
 
+void IRGenSILFunction::visitOpenCOMExistentialInst(OpenCOMExistentialInst *i) {
+  llvm_unreachable("open_com_existential lowering is not implemented");
+}
+
 void IRGenSILFunction::visitOpenExistentialMetatypeInst(
                                               OpenExistentialMetatypeInst *i) {
   SILType baseTy = i->getOperand()->getType();
@@ -8996,6 +9002,10 @@ void IRGenSILFunction::visitObjCMethodInst(swift::ObjCMethodInst *i) {
   // to happen when the method is called.
   assert(i->getMember().isForeign);
   setLoweredObjCMethod(i, i->getMember());
+}
+
+void IRGenSILFunction::visitCOMMethodInst(swift::COMMethodInst *i) {
+  llvm_unreachable("com_method lowering is not implemented");
 }
 
 void IRGenSILFunction::visitGetAsyncContinuationInst(

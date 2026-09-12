@@ -2524,6 +2524,21 @@ ObjCMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                                        Member, Ty);
 }
 
+COMMethodInst *COMMethodInst::create(SILDebugLocation DL, SILValue Operand,
+                                     SILDeclRef Member, SILType Ty,
+                                     SILFunction *F) {
+  SILModule &M = F->getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, *F, Ty.getASTType(),
+                               Operand->getType().getASTType());
+
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+  void *Buffer = M.allocateInst(size, alignof(COMMethodInst));
+  return ::new (Buffer)
+      COMMethodInst(DL, Operand, TypeDependentOperands, Member, Ty);
+}
+
 static void checkExistentialPreconditions(SILType ExistentialType,
                                           CanType ConcreteType,
                                 ArrayRef<ProtocolConformanceRef> Conformances) {
@@ -2652,6 +2667,14 @@ OpenExistentialRefInst::OpenExistentialRefInst(
     SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
     ValueOwnershipKind forwardingOwnershipKind)
     : UnaryInstructionBase(DebugLoc, Operand, Ty, forwardingOwnershipKind) {
+  assert(Operand->getType().isObject() && "Operand must be an object.");
+  assert(Ty.isObject() && "Result type must be an object type.");
+}
+
+OpenCOMExistentialInst::OpenCOMExistentialInst(SILDebugLocation DebugLoc,
+                                               SILValue Operand, SILType Ty,
+                                               ValueOwnershipKind ownership)
+    : UnaryInstructionBase(DebugLoc, Operand, Ty, ownership) {
   assert(Operand->getType().isObject() && "Operand must be an object.");
   assert(Ty.isObject() && "Result type must be an object type.");
 }

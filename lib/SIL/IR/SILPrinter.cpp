@@ -2786,6 +2786,12 @@ public:
     *this << ", ";
     *this << AMI->getType();
   }
+  void visitCOMMethodInst(COMMethodInst *CMI) {
+    printMethodInst(CMI, CMI->getOperand());
+    *this << " : " << CMI->getMember().getDecl()->getInterfaceType();
+    *this << ", ";
+    *this << CMI->getType();
+  }
   void visitObjCSuperMethodInst(ObjCSuperMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
@@ -2815,6 +2821,10 @@ public:
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitOpenExistentialRefInst(OpenExistentialRefInst *OI) {
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+    printForwardingOwnershipKind(OI, OI->getOperand());
+  }
+  void visitOpenCOMExistentialInst(OpenCOMExistentialInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
     printForwardingOwnershipKind(OI, OI->getOperand());
   }

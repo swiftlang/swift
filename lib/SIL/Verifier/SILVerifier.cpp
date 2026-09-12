@@ -4801,6 +4801,35 @@ public:
 #endif
   }
 
+  void checkCOMMethodInst(COMMethodInst *CMI) {
+    auto member = CMI->getMember();
+    auto *protocol = dyn_cast<ProtocolDecl>(member.getDecl()->getDeclContext());
+    require(protocol && protocol->isCOMInterface(),
+            "com_method must reference a COM interface requirement");
+
+    auto methodType =
+        requireObjectType(SILFunctionType, CMI, "result of com_method");
+    require(!methodType->getExtInfo().hasContext(),
+            "result method must be of a context-free function type");
+    require(methodType->getRepresentation() ==
+                SILFunctionTypeRepresentation::COMMethod,
+            "wrong function type representation");
+
+    auto operandType = CMI->getOperand()->getType();
+    // The receiver may be a value or the address of a materialized interface
+    // value.
+    auto archetype = operandType.getASTType()->getAs<ArchetypeType>();
+    require(archetype &&
+                llvm::any_of(archetype->getConformsTo(),
+                             [&](ProtocolDecl *constraint) {
+                               return constraint == protocol ||
+                                      constraint->inheritsFrom(protocol);
+                             }),
+            "com_method operand must be an archetype constrained to the "
+            "declaring COM interface");
+    verifyLocalArchetype(CMI, operandType.getASTType());
+  }
+
   void checkObjCSuperMethodInst(ObjCSuperMethodInst *OMI) {
     auto member = OMI->getMember();
     auto overrideTy =
@@ -4881,6 +4910,31 @@ public:
     require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_ref should be registered in "
+            "SILFunction");
+  }
+
+  void checkOpenCOMExistentialInst(OpenCOMExistentialInst *OCE) {
+    SILType operandType = OCE->getOperand()->getType();
+    require(operandType.isObject(),
+            "open_com_existential operand must not be address");
+    require(operandType.canUseExistentialRepresentation(
+                ExistentialRepresentation::COM),
+            "open_com_existential operand must be a COM existential");
+
+    require(OCE->getType().isObject(),
+            "open_com_existential result must not be an address");
+
+    auto archetype =
+        dyn_cast<ExistentialArchetypeType>(OCE->getType().getASTType());
+    require(
+        archetype,
+        "open_com_existential result must be an opened existential archetype");
+    require(
+        archetype->getExistentialType()->isEqual(operandType.getASTType()),
+        "open_com_existential result must open the operand existential type");
+    require(OCE->getModule().getRootLocalArchetypeDefInst(
+                archetype, OCE->getFunction()) == OCE,
+            "Archetype opened by open_com_existential should be registered in "
             "SILFunction");
   }
 

@@ -1167,10 +1167,10 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
 
     auto *user = op->getUser();
     if (isa<DebugValueInst>(user) || isa<SuperMethodInst>(user) ||
-        isa<ClassMethodInst>(user) || isa<CopyValueInst>(user) ||
-        isa<EndBorrowInst>(user) || isa<ApplyInst>(user) ||
-        isa<StoreInst>(user) || isa<PartialApplyInst>(user) ||
-        isa<UnmanagedRetainValueInst>(user) ||
+        isa<ClassMethodInst>(user) || isa<COMMethodInst>(user) ||
+        isa<CopyValueInst>(user) || isa<EndBorrowInst>(user) ||
+        isa<ApplyInst>(user) || isa<StoreInst>(user) ||
+        isa<PartialApplyInst>(user) || isa<UnmanagedRetainValueInst>(user) ||
         isa<UnmanagedReleaseValueInst>(user) ||
         isa<UnmanagedAutoreleaseValueInst>(user)) {
       continue;
