@@ -1560,6 +1560,8 @@ sil @c_convention : $@convention(c) () -> ()
 sil @method_convention : $@convention(method) (Int) -> ()
 sil @objc_method_convention : $@convention(objc_method) (Int) -> ()
 sil @witness_method_convention : $@convention(witness_method: Bendable) (Fork) -> ()
+// CHECK-LABEL: sil @com_method_convention : $@convention(com_method) (Builtin.RawPointer) -> ()
+sil @com_method_convention : $@convention(com_method) (Builtin.RawPointer) -> ()
 
 // CHECK-LABEL: sil @conventions : $@convention(thin) (() -> (), @convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(method) () -> (), @convention(objc_method) () -> (), @convention(witness_method: Bendable) (Fork) -> ()) -> () {
 sil @conventions : $@convention(thin) (@convention(thick) () -> (),

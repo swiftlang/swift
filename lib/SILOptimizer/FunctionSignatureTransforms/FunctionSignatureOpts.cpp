@@ -96,6 +96,7 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
   case SILFunctionTypeRepresentation::WitnessMethod:
     return OptForPartialApply;
   case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::Block:
     return false;
   }

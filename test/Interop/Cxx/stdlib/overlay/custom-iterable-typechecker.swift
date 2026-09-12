@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -enable-experimental-cxx-interop -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -enable-experimental-cxx-interop -target %target-swift-6.4-abi-triple
 
 import CustomIterable
 

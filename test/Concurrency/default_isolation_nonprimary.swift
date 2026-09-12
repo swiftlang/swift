@@ -2,16 +2,16 @@
 // RUN: split-file %s %t
 
 // Non-primary's default is respected.
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -disable-availability-checking -verify -primary-file %t/dir_np_respected/plain.swift %t/dir_np_respected/withUsing.swift
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -verify -primary-file %t/dir_np_respected/plain.swift %t/dir_np_respected/withUsing.swift
 
 // Primary's default doesn't leak to non-primary.
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -disable-availability-checking -verify -primary-file %t/dir_p_no_bleed/withUsing.swift %t/dir_p_no_bleed/plain.swift
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -verify -primary-file %t/dir_p_no_bleed/withUsing.swift %t/dir_p_no_bleed/plain.swift
 
 // Non-primary's default doesn't leak to primary.
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -disable-availability-checking -verify -primary-file %t/dir_np_no_bleed/plain.swift %t/dir_np_no_bleed/withUsing.swift
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -verify -primary-file %t/dir_np_no_bleed/plain.swift %t/dir_np_no_bleed/withUsing.swift
 
 // Both files have defaults.
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -disable-availability-checking -verify -primary-file %t/dir_both/primary.swift %t/dir_both/nonprimary.swift
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -verify -primary-file %t/dir_both/primary.swift %t/dir_both/nonprimary.swift
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_DefaultIsolationPerFile

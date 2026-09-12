@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -disable-availability-checking -module-name field_order | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -target %target-swift-5.7-abi-triple -module-name field_order | %FileCheck %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency

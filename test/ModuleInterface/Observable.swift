@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -package-name Library -module-name Library -plugin-path %swift-plugin-dir -disable-availability-checking
-// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -package-name Library -module-name Library -disable-availability-checking
+// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -package-name Library -module-name Library -plugin-path %swift-plugin-dir -target %target-swift-5.9-abi-triple
+// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -package-name Library -module-name Library -target %target-swift-5.9-abi-triple
 // RUN: %FileCheck %s < %t/Library.swiftinterface
 
 // REQUIRES: swift_swift_parser

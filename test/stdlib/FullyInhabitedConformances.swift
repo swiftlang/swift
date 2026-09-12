@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated \
-// RUN:     -disable-availability-checking
+// RUN:     -target %target-swift-6.2-abi-triple
 
 func toBytes<T: ConvertibleToBytes>(_: T) {}
 func fromBytes<T: ConvertibleFromBytes>(_: T) {} // expected-note 4 {{where 'T'}}

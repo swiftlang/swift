@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking -parse-as-library
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -parse-as-library
+// RUN: %target-run-simple-swift( -parse-as-library)
+// RUN: %target-run-simple-swift( -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
@@ -38,7 +38,7 @@ class NotSendable {}
 
 @main struct Main {
   static func main() async {
-    if #available(SwiftStdlib 5.5, *) {
+    if #available(SwiftStdlib 6.2, *) {
       final class Expectation: @unchecked Sendable {
         var fulfilled = false
       }
@@ -171,7 +171,7 @@ class NotSendable {}
 
       tests.test("yield with no awaiting next detached") {
         _ = AsyncStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
           }
         }
@@ -179,7 +179,7 @@ class NotSendable {}
 
       tests.test("yield with no awaiting next detached throwing") {
         _ = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
           }
         }
@@ -187,7 +187,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next detached") {
         let series = AsyncStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
           }
         }
@@ -197,7 +197,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next detached throwing") {
         let series = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
           }
         }
@@ -211,7 +211,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next 2 detached") {
         let series = AsyncStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
           }
@@ -223,7 +223,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next 2 detached throwing") {
         let series = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
           }
@@ -239,7 +239,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next 2 and finish detached") {
         let series = AsyncStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
             continuation.finish()
@@ -253,7 +253,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next 2 and finish detached throwing") {
         let series = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
             continuation.finish()
@@ -272,7 +272,7 @@ class NotSendable {}
       tests.test("yield with awaiting next 2 and throw detached") {
         let thrownError = SomeError()
         let series = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
             continuation.finish(throwing: thrownError)
@@ -295,7 +295,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next 2 and finish detached with value after finish") {
         let series = AsyncStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
             continuation.finish()
@@ -311,7 +311,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next 2 and finish detached with value after finish throwing") {
         let series = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
             continuation.finish()
@@ -332,7 +332,7 @@ class NotSendable {}
       tests.test("yield with awaiting next 2 and finish detached with throw after finish throwing") {
         let thrownError = SomeError()
         let series = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
             continuation.finish()

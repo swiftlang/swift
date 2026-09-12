@@ -4964,26 +4964,26 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   auto conventionAttr = claim<ConventionTypeAttr>(attrs);
   if (conventionAttr) {
     auto parsedRep =
-      llvm::StringSwitch<std::optional<SILFunctionType::Representation>>(
+        llvm::StringSwitch<std::optional<SILFunctionType::Representation>>(
             conventionAttr->getConventionName())
-        .Case("thick", SILFunctionType::Representation::Thick)
-        .Case("block", SILFunctionType::Representation::Block)
-        .Case("thin", SILFunctionType::Representation::Thin)
-        .Case("c", SILFunctionType::Representation::CFunctionPointer)
-        .Case("method", SILFunctionType::Representation::Method)
-        .Case("objc_method",
-              SILFunctionType::Representation::ObjCMethod)
-        .Case("witness_method",
-              SILFunctionType::Representation::WitnessMethod)
-        .Case("keypath_accessor_getter",
-              SILFunctionType::Representation::KeyPathAccessorGetter)
-        .Case("keypath_accessor_setter",
-              SILFunctionType::Representation::KeyPathAccessorSetter)
-        .Case("keypath_accessor_equals",
-              SILFunctionType::Representation::KeyPathAccessorEquals)
-        .Case("keypath_accessor_hash",
-              SILFunctionType::Representation::KeyPathAccessorHash)
-        .Default(std::nullopt);
+            .Case("thick", SILFunctionType::Representation::Thick)
+            .Case("block", SILFunctionType::Representation::Block)
+            .Case("thin", SILFunctionType::Representation::Thin)
+            .Case("c", SILFunctionType::Representation::CFunctionPointer)
+            .Case("method", SILFunctionType::Representation::Method)
+            .Case("com_method", SILFunctionType::Representation::COMMethod)
+            .Case("objc_method", SILFunctionType::Representation::ObjCMethod)
+            .Case("witness_method",
+                  SILFunctionType::Representation::WitnessMethod)
+            .Case("keypath_accessor_getter",
+                  SILFunctionType::Representation::KeyPathAccessorGetter)
+            .Case("keypath_accessor_setter",
+                  SILFunctionType::Representation::KeyPathAccessorSetter)
+            .Case("keypath_accessor_equals",
+                  SILFunctionType::Representation::KeyPathAccessorEquals)
+            .Case("keypath_accessor_hash",
+                  SILFunctionType::Representation::KeyPathAccessorHash)
+            .Default(std::nullopt);
     if (!parsedRep) {
       conventionAttr->setInvalid();
       diagnoseInvalid(repr, conventionAttr->getAtLoc(),

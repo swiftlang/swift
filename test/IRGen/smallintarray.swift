@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -disable-availability-checking %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-vendor
+// RUN: %target-swift-frontend -emit-ir -target %target-swift-6.2-abi-triple %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-vendor
 enum SmallIntArray<let count: Int> {
   case inline([count of Int], Int)
   case spilled([Int])

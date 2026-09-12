@@ -11,6 +11,9 @@ let f4c: @convention(c, cType: "int (*)(int)") (Int32) -> Int32 = { $0 }
 
 let f5: @convention(INTERCAL) (Int) -> Int = { $0 } // expected-error{{convention 'INTERCAL' not supported}}
 
+// COM method conventions are only spelled in SIL.
+let comMethod: @convention(com_method) (Int) -> Int = { $0 } // expected-error{{convention 'com_method' not supported}}
+
 // https://github.com/apple/swift/issues/53417
 
 do {

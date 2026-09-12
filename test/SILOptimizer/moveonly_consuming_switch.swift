@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s -disable-availability-checking
+// RUN: %target-swift-frontend -emit-sil -verify %s -target %target-swift-6.0-abi-triple
 
 struct Box<Wrapped: ~Copyable>: ~Copyable {
     private let _pointer: UnsafeMutablePointer<Wrapped>

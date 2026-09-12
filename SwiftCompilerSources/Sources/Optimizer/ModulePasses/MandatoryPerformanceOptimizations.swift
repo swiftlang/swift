@@ -426,15 +426,16 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return true
   }
 
+  if callee.mayBindDynamicSelf {
+    // We don't support inlining a function that binds dynamic self, e.g. into a
+    // global-init function, because the caller cannot provide the self metadata
+    // for the cloner to rewrite the callee's references to.
+    return false
+  }
+
   if apply is BeginApplyInst {
     // Avoid co-routines because they might allocate (their context).
     return true
-  }
-
-  if callee.mayBindDynamicSelf {
-    // We don't support inlining a function that binds dynamic self into a global-init function
-    // because the global-init function cannot provide the self metadata.
-    return false
   }
 
   if apply.parentFunction.isGlobalInitOnceFunction && (

@@ -698,6 +698,10 @@ extension Function {
         let e = f.function.getSideEffects()
         return e.getMemBehavior(observeRetains: observeRetains)
       },
+      // hasComputedSideEffects  (used by the MemoryLifetimeVerifier)
+      { (f: BridgedFunction) -> Bool in
+        return f.function.effects.sideEffects != nil
+      },
       // argumentMayRead  (used by the MemoryLifetimeVerifier)
       { (f: BridgedFunction, bridgedArgOp: BridgedOperand, bridgedAddr: BridgedValue) -> Bool in
         let argOp = Operand(bridged: bridgedArgOp)

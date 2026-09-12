@@ -6,8 +6,7 @@
 // definition isn't reachable (only forward-declared) at the import site.
 
 // RUN: %target-swift-frontend -typecheck %t/use.swift \
-// RUN:   -I %t/Inputs -cxx-interoperability-mode=default \
-// RUN:   -disable-availability-checking
+// RUN:   -I %t/Inputs -cxx-interoperability-mode=default
 
 //--- Inputs/module.modulemap
 module CxxModule {

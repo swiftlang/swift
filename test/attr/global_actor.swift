@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %s  -disable-availability-checking -package-name myPkg
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %s  -target %target-swift-6.1-abi-triple -package-name myPkg
 // REQUIRES: concurrency
 
 actor SomeActor { }

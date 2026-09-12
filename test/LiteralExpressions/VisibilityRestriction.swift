@@ -3,7 +3,6 @@
 // REQUIRES: swift_feature_LiteralExpressions
 // RUN: %target-swift-frontend -typecheck %s -verify \
 // RUN:   -package-name myPkg \
-// RUN:   -disable-availability-checking \
 // RUN:   -enable-experimental-feature LiteralExpressions
 
 public let publicPageSize = 4096
