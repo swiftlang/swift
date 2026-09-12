@@ -767,6 +767,47 @@ namespace {
       return visitLiteralExpr(expr);
     }
 
+    Type visitStringLiteralExpr(StringLiteralExpr *expr) {
+      // If the expression has already been assigned a type; just use that
+      // type.
+      if (expr->getType())
+        return expr->getType();
+
+      // `visitLiteralExpr` adds a `LiteralConformsTo` constraint against
+      // whatever `TypeChecker::getLiteralProtocol` returns for this literal
+      // -- for any ordinary string literal, that's the
+      // `ExpressibleByPossiblyUncheckedStringLiteral` umbrella, letting
+      // ordinary constraint solving pick between `ExpressibleByStringLiteral`
+      // and `ExpressibleByUncheckedStringLiteral` based on whatever context
+      // eventually pins the type variable down.
+      auto tv = visitLiteralExpr(expr);
+      if (!tv)
+        return tv;
+
+      // A literal with a `\x{hh}` raw code unit escape must resolve to
+      // something that can actually represent one. Add an *additional*,
+      // more specific constraint on top of the umbrella one above, so that
+      // a type unable to represent raw splices (like `String`) gets ruled
+      // out via ordinary constraint contradiction once context pins the
+      // type variable down, rather than by guessing the literal's protocol
+      // eagerly here (which is what prevented this literal from ever
+      // routing through `UncheckedString` as an operator operand or as an
+      // interpolation's literal segment).
+      if (expr->hasRawSplices()) {
+        auto &ctx = CS.getASTContext();
+        auto *uncheckedProto = TypeChecker::getProtocol(
+            ctx, expr->getLoc(),
+            KnownProtocolKind::ExpressibleByUncheckedStringLiteral);
+        if (uncheckedProto) {
+          CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
+                           uncheckedProto->getDeclaredInterfaceType(),
+                           CS.getConstraintLocator(expr));
+        }
+      }
+
+      return tv;
+    }
+
     Type visitLiteralExpr(LiteralExpr *expr) {
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType())
@@ -787,11 +828,16 @@ namespace {
 
     Type
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
-      // Dig out the ExpressibleByStringInterpolation protocol.
+      // Dig out the ExpressibleByPossiblyUncheckedStringInterpolation
+      // umbrella protocol -- letting the constraint system defer the choice
+      // between `ExpressibleByStringInterpolation` and
+      // `ExpressibleByUncheckedStringInterpolation` until enough context is
+      // available, the same way `visitStringLiteralExpr` does for plain
+      // literals via `ExpressibleByPossiblyUncheckedStringLiteral`.
       auto &ctx = CS.getASTContext();
       auto interpolationProto = TypeChecker::getProtocol(
           ctx, expr->getLoc(),
-          KnownProtocolKind::ExpressibleByStringInterpolation);
+          KnownProtocolKind::ExpressibleByPossiblyUncheckedStringInterpolation);
       if (!interpolationProto) {
         ctx.Diags.diagnose(expr->getStartLoc(),
                            diag::interpolation_missing_proto);
@@ -2902,10 +2948,20 @@ namespace {
 
     Type getTypeForCast(ExplicitCastExpr *E) {
       if (auto *const repr = E->getCastTypeRepr()) {
+        // If this has already been resolved (e.g. by an earlier, narrow
+        // pre-order lookup of a `CoerceExpr`'s target type -- see
+        // `ConstraintWalker::walkToExprPre`'s handling of `CoerceExpr`),
+        // reuse that instead of re-resolving, since resolution mints fresh
+        // type variables for unbound generics and isn't safe to repeat.
+        if (CS.hasType(repr))
+          return CS.getType(repr);
+
         // Validate the resulting type.
-        return resolveTypeReferenceInExpression(
+        auto toType = resolveTypeReferenceInExpression(
             repr, TypeResolverContext::ExplicitCastExpr,
             CS.getConstraintLocator(E));
+        CS.setType(repr, toType);
+        return toType;
       }
       assert(E->isImplicit());
       return E->getCastType();

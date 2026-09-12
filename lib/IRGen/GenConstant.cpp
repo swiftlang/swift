@@ -38,6 +38,42 @@
 using namespace swift;
 using namespace irgen;
 
+namespace {
+/// Build a global constant array of \p T, given a `StringLiteralInst`'s
+/// raw byte payload holding one \p T value per element in the compiling
+/// host's native byte order (that's how SILGen packs these -- see
+/// `emitUncheckedStringLiteralArgs` in SILGenApply.cpp). Reconstructing the
+/// values via a host-native `memcpy` here, then handing those *values* (not
+/// raw bytes) to `llvm::ConstantDataArray::get`, means LLVM itself takes
+/// care of serializing them correctly for the target's actual endianness
+/// when the module is emitted -- this code never needs to know or assume
+/// what that target endianness is.
+///
+/// A trailing zero-valued \p T is always appended past \p data's elements,
+/// matching `getAddrOfGlobalString`'s guarantee for 8-bit string literals;
+/// the stdlib's literal initializer relies on this to mark the resulting
+/// `UncheckedString` as NUL-terminated without a separate copy.
+template <typename T>
+llvm::Constant *emitAddrOfConstantIntArray(IRGenModule &IGM, StringRef data) {
+  assert(data.size() % sizeof(T) == 0);
+  size_t count = data.size() / sizeof(T);
+  SmallVector<T, 64> values(count + 1, T(0));
+  memcpy(values.data(), data.data(), data.size());
+
+  auto *init = llvm::ConstantDataArray::get(IGM.getLLVMContext(),
+                                            llvm::ArrayRef<T>(values));
+  auto *global = new llvm::GlobalVariable(
+      *IGM.getModule(), init->getType(), /*isConstant*/ true,
+      llvm::GlobalValue::PrivateLinkage, init, ".bytes");
+  global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+
+  auto zero = llvm::ConstantInt::get(IGM.SizeTy, 0);
+  llvm::Constant *indices[] = { zero, zero };
+  return llvm::ConstantExpr::getInBoundsGetElementPtr(
+      global->getValueType(), global, indices);
+}
+} // end anonymous namespace
+
 llvm::Constant *irgen::emitConstantInt(IRGenModule &IGM,
                                        IntegerLiteralInst *ILI) {
   BuiltinIntegerWidth width
@@ -82,6 +118,11 @@ llvm::Constant *irgen::emitAddrOfConstantString(IRGenModule &IGM,
     return IGM.getAddrOfGlobalString(
         SLI->getValue(), useOSLogEncoding ? CStringSectionType::OSLogString
                                           : CStringSectionType::Default);
+
+  case StringLiteralInst::Encoding::Bytes16:
+    return emitAddrOfConstantIntArray<uint16_t>(IGM, SLI->getValue());
+  case StringLiteralInst::Encoding::Bytes32:
+    return emitAddrOfConstantIntArray<uint32_t>(IGM, SLI->getValue());
 
   case StringLiteralInst::Encoding::ObjCSelector:
     llvm_unreachable("cannot get the address of an Objective-C selector");

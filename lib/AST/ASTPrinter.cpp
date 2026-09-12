@@ -5883,6 +5883,10 @@ void PrintAST::visitOpenExistentialExpr(OpenExistentialExpr *expr) {
 void PrintAST::visitStringToPointerExpr(StringToPointerExpr *expr) {
 }
 
+void PrintAST::visitUncheckedStringToPointerExpr(
+    UncheckedStringToPointerExpr *expr) {
+}
+
 void PrintAST::visitVarargExpansionExpr(VarargExpansionExpr *expr) {
   visit(expr->getSubExpr());
 }

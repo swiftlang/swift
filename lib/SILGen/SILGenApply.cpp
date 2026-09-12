@@ -56,6 +56,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/ConvertUTF.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -1892,6 +1893,175 @@ public:
 
 } // end anonymous namespace
 
+/// Returns the bit width (8, 16, or 32) of the `Element` type that a
+/// `_builtinUncheckedStringLiteral(start:unitCount:)` witness was resolved
+/// against, or \c std::nullopt if it isn't one of the widths this transcoder
+/// knows how to produce a constant for.
+static std::optional<unsigned>
+getUncheckedStringLiteralElementWidth(ConcreteDeclRef builtinInit,
+                                      ASTContext &ctx) {
+  auto replacementTypes = builtinInit.getSubstitutions().getReplacementTypes();
+  if (replacementTypes.empty())
+    return std::nullopt;
+
+  auto *nominal = replacementTypes[0]->getAnyNominal();
+  if (!nominal)
+    return std::nullopt;
+
+  if (nominal == ctx.getUInt8Decl() || nominal == ctx.getInt8Decl())
+    return 8;
+  if (nominal == ctx.getUInt16Decl() || nominal == ctx.getInt16Decl())
+    return 16;
+  if (nominal == ctx.getUInt32Decl() || nominal == ctx.getInt32Decl())
+    return 32;
+  return std::nullopt;
+}
+
+/// Build the arguments for a call to `_builtinUncheckedStringLiteral(
+/// start:unitCount:)`: transcode \p literal's UTF-8 text to the resolved
+/// `Element` width, splicing in each `\x{hh}` raw code unit escape's value
+/// (recorded out-of-band in `getRawSplices()`) at its recorded offset in
+/// place of the U+FFFD placeholder the lexer left there, and package the
+/// resulting bytes as a `StringLiteralInst` with `Encoding::Bytes`.
+static PreparedArguments
+emitUncheckedStringLiteralArgs(SILGenFunction &SGF, StringLiteralExpr *literal,
+                               SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  StringRef Val = literal->getValue();
+  ArrayRef<StringLiteralExpr::RawCodeUnitSplice> splices =
+      literal->getRawSplices();
+
+  auto widthOpt = getUncheckedStringLiteralElementWidth(
+      literal->getBuiltinInitializer(), ctx);
+  if (!widthOpt) {
+    auto replacementTypes =
+        literal->getBuiltinInitializer().getSubstitutions().getReplacementTypes();
+    Type elementType =
+        replacementTypes.empty() ? Type() : replacementTypes[0];
+    ctx.Diags.diagnose(
+        literal->getLoc(),
+        diag::unchecked_string_literal_unsupported_element_width,
+        elementType);
+    // Recover by treating this as an empty literal, rather than crashing.
+    widthOpt = 8;
+    Val = StringRef();
+    splices = {};
+  }
+  unsigned unitSize = *widthOpt / 8;
+
+  SmallVector<char, 64> bytes;
+  auto appendUnit = [&](uint32_t value) {
+    // Write in host-endian order: IRGen will reinterpret these bytes back
+    // into native `uint16_t`/`uint32_t` values (to hand to LLVM, which
+    // itself takes care of encoding them correctly for the target's
+    // endianness), so this must match the compiling host's native
+    // in-memory representation, not a fixed byte order.
+    switch (unitSize) {
+    case 1: {
+      uint8_t v = uint8_t(value);
+      bytes.push_back(char(v));
+      break;
+    }
+    case 2: {
+      uint16_t v = uint16_t(value);
+      auto *p = reinterpret_cast<const char *>(&v);
+      bytes.append(p, p + sizeof(v));
+      break;
+    }
+    case 4: {
+      uint32_t v = value;
+      auto *p = reinterpret_cast<const char *>(&v);
+      bytes.append(p, p + sizeof(v));
+      break;
+    }
+    default:
+      llvm_unreachable("unexpected unit size");
+    }
+  };
+
+  size_t spliceIdx = 0;
+  size_t cursor = 0;
+  while (cursor < Val.size()) {
+    if (spliceIdx < splices.size() && splices[spliceIdx].Offset == cursor) {
+      // Skip the 3-byte U+FFFD placeholder the lexer left in `Val`, and
+      // splice in the raw value instead.
+      appendUnit(splices[spliceIdx].Value);
+      cursor += 3;
+      ++spliceIdx;
+      continue;
+    }
+
+    const auto *sourceStart =
+        reinterpret_cast<const llvm::UTF8 *>(Val.data() + cursor);
+    const auto *sourceNext = sourceStart;
+    const auto *sourceEnd =
+        reinterpret_cast<const llvm::UTF8 *>(Val.data() + Val.size());
+    llvm::UTF32 scalar;
+    llvm::UTF32 *targetStart = &scalar;
+    llvm::ConvertUTF8toUTF32(&sourceNext, sourceEnd, &targetStart,
+                             targetStart + 1, llvm::strictConversion);
+    size_t consumed = sourceNext - sourceStart;
+    if (targetStart == &scalar || consumed == 0) {
+      // `Val` is always well-formed UTF-8 by construction; this shouldn't
+      // happen, but don't loop forever if it somehow does.
+      break;
+    }
+
+    switch (*widthOpt) {
+    case 8:
+      // Pass the original UTF-8 bytes through unchanged.
+      bytes.append(Val.data() + cursor, Val.data() + cursor + consumed);
+      break;
+    case 16:
+      if (scalar <= 0xFFFF) {
+        appendUnit(scalar);
+      } else {
+        uint32_t v = scalar - 0x10000;
+        appendUnit(0xD800 + (v >> 10));
+        appendUnit(0xDC00 + (v & 0x3FF));
+      }
+      break;
+    case 32:
+      appendUnit(scalar);
+      break;
+    default:
+      llvm_unreachable("unexpected element width");
+    }
+
+    cursor += consumed;
+  }
+
+  unsigned unitCount = bytes.size() / unitSize;
+  StringLiteralInst::Encoding instEncoding;
+  switch (*widthOpt) {
+  case 8: instEncoding = StringLiteralInst::Encoding::Bytes; break;
+  case 16: instEncoding = StringLiteralInst::Encoding::Bytes16; break;
+  case 32: instEncoding = StringLiteralInst::Encoding::Bytes32; break;
+  default: llvm_unreachable("unexpected element width");
+  }
+  StringRef bytesRef(bytes.data(), bytes.size());
+  auto *stringInst = SGF.B.createStringLiteral(literal, bytesRef, instEncoding);
+
+  auto wordTy = SILType::getBuiltinWordType(ctx);
+  auto *unitCountInst =
+      SGF.B.createIntegerLiteral(literal, wordTy, unitCount);
+
+  ManagedValue EltsArray[] = {
+      ManagedValue::forObjectRValueWithoutOwnership(stringInst),
+      ManagedValue::forObjectRValueWithoutOwnership(unitCountInst)};
+
+  AnyFunctionType::Param TypeEltsArray[] = {
+      AnyFunctionType::Param(EltsArray[0].getType().getASTType()),
+      AnyFunctionType::Param(EltsArray[1].getType().getASTType())};
+
+  PreparedArguments args(TypeEltsArray);
+  for (unsigned i = 0, e = std::size(EltsArray); i != e; ++i) {
+    args.add(literal, RValue(SGF, EltsArray[i],
+                             CanType(TypeEltsArray[i].getPlainType())));
+  }
+  return args;
+}
+
 // TODO: move onto SGF directly and reuse in SILGenDistributed and other places
 static PreparedArguments emitStringLiteralArgs(SILGenFunction &SGF, SILLocation E,
                                            StringRef Str, SGFContext C,
@@ -1918,6 +2088,14 @@ static PreparedArguments emitStringLiteralArgs(SILGenFunction &SGF, SILLocation 
                            UnicodeScalarValue)));
     return args;
   }
+
+  case StringLiteralExpr::UTF8WithRawSplices:
+    // Literals with this encoding are intercepted earlier, in
+    // `buildBuiltinLiteralArgs(SILGenFunction &, SGFContext, StringLiteralExpr *)`,
+    // which routes them to `emitUncheckedStringLiteralArgs` instead (its
+    // arguments have a different shape: `_builtinUncheckedStringLiteral`
+    // takes `(start:unitCount:)`, not `(start:utf8CodeUnitCount:isASCII:)`).
+    llvm_unreachable("handled in buildBuiltinLiteralArgs, not here");
   }
 
   // The string literal provides the data.
@@ -1951,6 +2129,8 @@ static PreparedArguments emitStringLiteralArgs(SILGenFunction &SGF, SILLocation 
     break;
 
   case StringLiteralInst::Encoding::Bytes:
+  case StringLiteralInst::Encoding::Bytes16:
+  case StringLiteralInst::Encoding::Bytes32:
   case StringLiteralInst::Encoding::UTF8_OSLOG:
   case StringLiteralInst::Encoding::ObjCSelector:
     llvm_unreachable("these cannot be formed here");
@@ -2209,6 +2389,9 @@ static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
 static inline PreparedArguments
 buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
                         StringLiteralExpr *stringLiteral) {
+  if (stringLiteral->getEncoding() == StringLiteralExpr::UTF8WithRawSplices)
+    return emitUncheckedStringLiteralArgs(SGF, stringLiteral, C);
+
   return emitStringLiteralArgs(SGF, stringLiteral, stringLiteral->getValue(), C,
                            stringLiteral->getEncoding());
 }
@@ -2668,6 +2851,9 @@ public:
     /// A string r-value needs to be converted to a pointer type.
     RValueStringToPointer,
 
+    /// An UncheckedString r-value needs to be converted to a pointer type.
+    RValueUncheckedStringToPointer,
+
     /// A function conversion needs to occur.
     FunctionConversion,
 
@@ -2748,6 +2934,7 @@ private:
       return ValueMembers::indexOf<LValueStorage>();
     case RValueArrayToPointer:
     case RValueStringToPointer:
+    case RValueUncheckedStringToPointer:
     case FunctionConversion:
       return ValueMembers::indexOf<RValueStorage>();
     case DefaultArgument:
@@ -2925,6 +3112,7 @@ public:
     case LValueArrayToPointer:
     case RValueArrayToPointer:
     case RValueStringToPointer:
+    case RValueUncheckedStringToPointer:
     case FunctionConversion:
       args[argIndex++] = finishOriginalArgument(SGF);
       return;
@@ -3026,6 +3214,7 @@ private:
     assert(isa<InOutToPointerExpr>(expr) ||
            isa<ArrayToPointerExpr>(expr) ||
            isa<StringToPointerExpr>(expr) ||
+           isa<UncheckedStringToPointerExpr>(expr) ||
            isa<FunctionConversionExpr>(expr));
 
     switch (Kind) {
@@ -3060,6 +3249,15 @@ private:
         emitBindOptionals(SGF, optStringValue, pointerExpr->getSubExpr());
       return SGF.emitStringToPointer(pointerExpr, stringValue,
                                      pointerExpr->getType());
+    }
+    case RValueUncheckedStringToPointer: {
+      auto pointerExpr = cast<UncheckedStringToPointerExpr>(expr);
+      auto optStringValue = RV().RV;
+      auto stringValue =
+        emitBindOptionals(SGF, optStringValue, pointerExpr->getSubExpr());
+      return SGF.emitUncheckedStringToPointer(
+          pointerExpr, stringValue, pointerExpr->getSubExpr()->getType(),
+          pointerExpr->getType());
     }
     case FunctionConversion: {
       auto funcConv = cast<FunctionConversionExpr>(expr);
@@ -4692,7 +4890,13 @@ private:
     if (auto stringToPointer = dyn_cast<StringToPointerExpr>(expr)) {
       return emitDelayedConversion(stringToPointer, original);
     }
-    
+
+    // Delay accessing unchecked-string-to-pointer arguments until the call.
+    if (auto uncheckedStringToPointer =
+            dyn_cast<UncheckedStringToPointerExpr>(expr)) {
+      return emitDelayedConversion(uncheckedStringToPointer, original);
+    }
+
     // Delay function conversions involving the opened Self type of an
     // existential whose opening is itself delayed.
     //
@@ -4804,7 +5008,19 @@ private:
     Args.push_back(ManagedValue());
     return true;
   }
-  
+
+  /// Emit an rvalue-unchecked-string-to-pointer conversion as a delayed
+  /// argument.
+  bool emitDelayedConversion(UncheckedStringToPointerExpr *pointerExpr,
+                             OriginalArgument original) {
+    auto rvalueExpr = lookThroughBindOptionals(pointerExpr->getSubExpr());
+    ManagedValue value = SGF.emitRValueAsSingleValue(rvalueExpr);
+    DelayedArguments.emplace_back(
+        DelayedArgument::RValueUncheckedStringToPointer, value, original);
+    Args.push_back(ManagedValue());
+    return true;
+  }
+
   bool emitDelayedConversion(FunctionConversionExpr *funcConv,
                              OriginalArgument original) {
     auto rvalueExpr = lookThroughBindOptionals(funcConv->getSubExpr());

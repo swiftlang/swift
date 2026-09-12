@@ -4861,6 +4861,12 @@ public:
     /// UTF-8 encoding of an Objective-C selector.
     ObjCSelector = 2,
     UTF8_OSLOG = 3,
+    /// Arbitrary 16-bit code units, stored little-endian; used by
+    /// `UncheckedString<UInt16>`'s literal initializer.
+    Bytes16 = 4,
+    /// Arbitrary 32-bit code units, stored little-endian; used by
+    /// `UncheckedString<UInt32>`'s literal initializer.
+    Bytes32 = 5,
   };
 
 private:

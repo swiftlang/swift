@@ -2307,11 +2307,30 @@ BridgedSingleValueStmtExpr BridgedSingleValueStmtExpr_createWithWrappedBranches(
     BridgedASTContext cContext, BridgedStmt S, BridgedDeclContext cDeclContext,
     bool mustBeExpr);
 
-SWIFT_NAME("BridgedStringLiteralExpr.createParsed(_:value:loc:)")
+/// A single `\x{hh}` raw code unit escape found while decoding a string
+/// literal's segments, to be turned into a
+/// `swift::StringLiteralExpr::RawCodeUnitSplice`. Mirrors
+/// `StringSegmentSyntax.RawCodeUnitEscape` on the swift-syntax side, except
+/// `Loc` is already a real, absolute source location (computed by the
+/// caller, which alone knows how to turn a segment-relative source offset
+/// into one).
+struct BridgedRawCodeUnitSplice {
+  SWIFT_NAME("loc")
+  swift::SourceLoc Loc;
+
+  SWIFT_NAME("offset")
+  SwiftInt Offset;
+
+  SWIFT_NAME("value")
+  uint32_t Value;
+};
+
+SWIFT_NAME("BridgedStringLiteralExpr.createParsed(_:value:loc:splices:)")
 BridgedStringLiteralExpr
 BridgedStringLiteralExpr_createParsed(BridgedASTContext cContext,
                                       BridgedStringRef cStr,
-                                      swift::SourceLoc tokenLoc);
+                                      swift::SourceLoc tokenLoc,
+                                      BridgedArrayRef cSplices);
 
 SWIFT_NAME("BridgedSuperRefExpr.createParsed(_:superLoc:)")
 BridgedSuperRefExpr BridgedSuperRefExpr_createParsed(BridgedASTContext cContext,

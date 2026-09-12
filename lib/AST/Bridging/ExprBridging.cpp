@@ -548,10 +548,21 @@ BridgedSingleValueStmtExpr BridgedSingleValueStmtExpr_createWithWrappedBranches(
 }
 
 BridgedStringLiteralExpr BridgedStringLiteralExpr_createParsed(
-    BridgedASTContext cContext, BridgedStringRef cStr, SourceLoc tokenLoc) {
+    BridgedASTContext cContext, BridgedStringRef cStr, SourceLoc tokenLoc,
+    BridgedArrayRef cSplices) {
   ASTContext &context = cContext.unbridged();
   auto str = context.AllocateCopy(cStr.unbridged());
-  return new (context) StringLiteralExpr(str, tokenLoc);
+
+  auto bridgedSplices = cSplices.unbridged<BridgedRawCodeUnitSplice>();
+  SmallVector<StringLiteralExpr::RawCodeUnitSplice, 4> splices;
+  splices.reserve(bridgedSplices.size());
+  for (const auto &splice : bridgedSplices) {
+    splices.push_back({splice.Loc, static_cast<unsigned>(splice.Offset),
+                       splice.Value});
+  }
+
+  return new (context) StringLiteralExpr(str, tokenLoc, /*Implicit=*/false,
+                                         context.AllocateCopy(splices));
 }
 
 BridgedTapExpr BridgedTapExpr_create(BridgedASTContext cContext,

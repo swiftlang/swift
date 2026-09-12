@@ -1269,10 +1269,11 @@ void Lexer::lexNumber() {
   return formToken(tok::floating_literal, TokStart);
 }
 
-///   unicode_character_escape ::= [\]u{hex+}
-///   hex                      ::= [0-9a-fA-F]
-unsigned Lexer::lexUnicodeEscape(const char *&CurPtr, Lexer *Diags) {
-  assert(CurPtr[0] == '{' && "Invalid unicode escape");
+///   hex_escape ::= [\](u|x){hex+}
+///   hex        ::= [0-9a-fA-F]
+Lexer::HexEscapeLexResult Lexer::lexHexEscape(const char *&CurPtr,
+                                              char EscapeChar, Lexer *Diags) {
+  assert(CurPtr[0] == '{' && "Invalid hex escape");
   ++CurPtr;
 
   const char *DigitStart = CurPtr;
@@ -1283,18 +1284,20 @@ unsigned Lexer::lexUnicodeEscape(const char *&CurPtr, Lexer *Diags) {
 
   if (CurPtr[0] != '}') {
     if (Diags)
-      Diags->diagnose(CurPtr, diag::lex_invalid_u_escape_rbrace);
-    return ~1U;
+      Diags->diagnose(CurPtr, diag::lex_invalid_hex_escape_rbrace,
+                      StringRef(&EscapeChar, 1));
+    return HexEscapeLexResult::invalid();
   }
   ++CurPtr;
 
   if (NumDigits < 1 || NumDigits > 8) {
     if (Diags)
-      Diags->diagnose(CurPtr, diag::lex_invalid_u_escape);
-    return ~1U;
+      Diags->diagnose(CurPtr, diag::lex_invalid_hex_escape,
+                      StringRef(&EscapeChar, 1));
+    return HexEscapeLexResult::invalid();
   }
 
-  unsigned CharValue = 0;
+  uint32_t CharValue = 0;
   StringRef(DigitStart, NumDigits).getAsInteger(16, CharValue);
   return CharValue;
 }
@@ -1416,15 +1419,18 @@ static bool advanceIfMultilineDelimiter(unsigned CustomDelimiterLen,
 
 /// lexCharacter - Read a character and return its UTF32 code.  If this is the
 /// end of enclosing string/character sequence (i.e. the character is equal to
-/// 'StopQuote'), this returns ~0U and advances 'CurPtr' pointing to the end of
-/// terminal quote.  If this is a malformed character sequence, it emits a
-/// diagnostic (when EmitDiagnostics is true) and returns ~1U.
-/// 
+/// 'StopQuote'), this returns an EndOfString result and advances 'CurPtr'
+/// pointing to the end of terminal quote.  If this is a malformed character
+/// sequence, it emits a diagnostic (when EmitDiagnostics is true) and
+/// returns an Invalid result.
+///
 ///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]' | [\]0
 ///   character_escape  ::= unicode_character_escape
-unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
-                             bool EmitDiagnostics, bool IsMultilineString,
-                             unsigned CustomDelimiterLen) {
+///   character_escape  ::= raw_code_unit_escape
+Lexer::CharacterLexResult
+Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
+                    bool EmitDiagnostics, bool IsMultilineString,
+                    unsigned CustomDelimiterLen) {
   const char *CharStart = CurPtr;
 
   switch (*CurPtr++) {
@@ -1436,23 +1442,23 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
         if (!(IsMultilineString && (CurPtr[-1] == '\t')))
           if (EmitDiagnostics)
             diagnose(CharStart, diag::lex_unprintable_ascii_character);
-      return CurPtr[-1];
+      return (unsigned char)CurPtr[-1];
     }
     --CurPtr;
     unsigned CharValue = validateUTF8CharacterAndAdvance(CurPtr, BufferEnd);
     if (CharValue != ~0U) return CharValue;
     if (EmitDiagnostics)
       diagnose(CharStart, diag::lex_invalid_utf8);
-    return ~1U;
+    return CharacterLexResult::invalid();
   }
   case '"':
   case '\'':
     if (CurPtr[-1] == StopQuote) {
       // Multiline and custom escaping are only enabled for " quote.
       if (LLVM_UNLIKELY(StopQuote != '"'))
-        return ~0U;
+        return CharacterLexResult::endOfString();
       if (!IsMultilineString && !CustomDelimiterLen)
-        return ~0U;
+        return CharacterLexResult::endOfString();
 
       DiagnosticEngine *D = EmitDiagnostics ? getTokenDiags() : nullptr;
       auto TmpPtr = CurPtr;
@@ -1463,27 +1469,27 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
           !delimiterMatches(CustomDelimiterLen, TmpPtr, D, /*IsClosing=*/true))
         return '"';
       CurPtr = TmpPtr;
-      return ~0U;
+      return CharacterLexResult::endOfString();
     }
     // Otherwise, this is just a character.
-    return CurPtr[-1];
+    return (unsigned char)CurPtr[-1];
 
   case 0:
     assert(CurPtr - 1 != BufferEnd && "Caller must handle EOF");
     if (EmitDiagnostics)
       diagnose(CurPtr-1, diag::lex_nul_character);
-    return CurPtr[-1];
+    return (unsigned char)CurPtr[-1];
   case '\n':  // String literals cannot have \n or \r in them.
   case '\r':
     assert(IsMultilineString && "Caller must handle newlines in non-multiline");
-    return CurPtr[-1];
+    return (unsigned char)CurPtr[-1];
   case '\\':  // Escapes.
     if (!delimiterMatches(CustomDelimiterLen, CurPtr,
                           EmitDiagnostics ? getTokenDiags() : nullptr))
       return '\\';
     break;
   }
-  
+
   unsigned CharValue = 0;
   // Escape processing.  We already ate the "\".
   switch (*CurPtr) {
@@ -1497,8 +1503,8 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     // If this looks like a plausible escape character, recover as though this
     // is an invalid escape.
     if (isAlphanumeric(*CurPtr)) ++CurPtr;
-    return ~1U;
-      
+    return CharacterLexResult::invalid();
+
   // Simple single-character escapes.
   case '0': ++CurPtr; return '\0';
   case 'n': ++CurPtr; return '\n';
@@ -1512,13 +1518,34 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     ++CurPtr;
     if (*CurPtr != '{') {
       if (EmitDiagnostics)
-        diagnose(CurPtr-1, diag::lex_unicode_escape_braces);
-      return ~1U;
+        diagnose(CurPtr-1, diag::lex_hex_escape_braces, StringRef("u"));
+      return CharacterLexResult::invalid();
     }
 
-    CharValue = lexUnicodeEscape(CurPtr, EmitDiagnostics ? this : nullptr);
-    if (CharValue == ~1U) return ~1U;
+    auto EscapeResult = lexHexEscape(CurPtr, 'u', EmitDiagnostics ? this : nullptr);
+    if (EscapeResult.Kind == HexEscapeLexResult::Invalid)
+      return CharacterLexResult::invalid();
+    CharValue = EscapeResult.Value;
     break;
+  }
+
+  case 'x': {  //  \x{HEX+} -- a raw code unit escape, not a Unicode scalar.
+    ++CurPtr;
+    if (*CurPtr != '{') {
+      if (EmitDiagnostics)
+        diagnose(CurPtr-1, diag::lex_hex_escape_braces, StringRef("x"));
+      return CharacterLexResult::invalid();
+    }
+
+    auto EscapeResult = lexHexEscape(CurPtr, 'x', EmitDiagnostics ? this : nullptr);
+    if (EscapeResult.Kind == HexEscapeLexResult::Invalid)
+      return CharacterLexResult::invalid();
+
+    // Unlike \u{hh}, \x{hh} denotes a raw code unit, not a Unicode scalar,
+    // so it bypasses the scalar-validity check below entirely -- its legal
+    // range depends on the not-yet-known Element width of the eventual
+    // UncheckedString<Element>.
+    return EscapeResult.Value;
   }
   }
 
@@ -1527,9 +1554,9 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   if (CharValue >= 0x80 && EncodeToUTF8(CharValue, TempString)) {
     if (EmitDiagnostics)
       diagnose(CharStart, diag::lex_invalid_unicode_scalar);
-    return ~1U;
+    return CharacterLexResult::invalid();
   }
-  
+
   return CharValue;
 }
 
@@ -1999,14 +2026,14 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
       return formToken(tok::unknown, TokStart);
     }
 
-    unsigned CharValue = lexCharacter(CurPtr, QuoteChar, true,
-                                      IsMultilineString, CustomDelimiterLen);
+    auto CharResult = lexCharacter(CurPtr, QuoteChar, true,
+                                   IsMultilineString, CustomDelimiterLen);
     // This is the end of string, we are done.
-    if (CharValue == ~0U)
+    if (CharResult.Kind == CharacterLexResult::EndOfString)
       break;
 
     // Remember we had already-diagnosed invalid characters.
-    wasErroneous |= CharValue == ~1U;
+    wasErroneous |= CharResult.Kind == CharacterLexResult::Invalid;
   }
 
   if (QuoteChar == '\'') {
@@ -2042,18 +2069,18 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
 
     // Get the next character.
     const char *CharStart = Body;
-    unsigned CharValue = lexCharacter(Body, '\0', /*EmitDiagnostics=*/false);
+    auto CharResult = lexCharacter(Body, '\0', /*EmitDiagnostics=*/false);
     // If the character was incorrectly encoded, give up.
-    if (CharValue == ~1U) return nullptr;
-    
+    if (CharResult.Kind == CharacterLexResult::Invalid) return nullptr;
+
     // If we found a straight-quote, then we're done.  Just return the spot
     // to continue.
-    if (CharValue == '"')
+    if (CharResult.Value == '"')
       return Body;
-    
+
     // If we found an ending curly quote (common since this thing started with
     // an opening curly quote) diagnose it with a fixit and then return.
-    if (CharValue == 0x0000201D) {
+    if (CharResult.Value == 0x0000201D) {
       if (EmitDiagnostics) {
         diagnose(CharStart, diag::lex_invalid_curly_quote)
             .fixItReplaceChars(getSourceLoc(CharStart), getSourceLoc(Body),
@@ -2513,12 +2540,10 @@ void Lexer::tryLexEditorPlaceholder() {
   lexOperatorIdentifier();
 }
 
-StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
-                                             SmallVectorImpl<char> &TempString,
-                                             bool IsFirstSegment,
-                                             bool IsLastSegment,
-                                             unsigned IndentToStrip,
-                                             unsigned CustomDelimiterLen) {
+StringRef Lexer::getEncodedStringSegmentImpl(
+    StringRef Bytes, SmallVectorImpl<char> &TempString, bool IsFirstSegment,
+    bool IsLastSegment, unsigned IndentToStrip, unsigned CustomDelimiterLen,
+    SmallVectorImpl<RawCodeUnitEscape> *RawEscapes) {
 
   TempString.clear();
   // Note that it is always safe to read one over the end of "Bytes" because we
@@ -2557,14 +2582,17 @@ StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
       TempString.push_back(CurChar);
       continue;
     }
-    
+
+    // The backslash that begins this escape, for RawEscapes bookkeeping.
+    const char *EscapeStart = BytesPtr - 1;
+
     // Invalid escapes are accepted by the lexer but diagnosed as an error.  We
     // just ignore them here.
     unsigned CharValue = 0; // Unicode character value for \x, \u, \U.
     switch (*BytesPtr++) {
     default:
       continue;   // Invalid escape, ignore it.
-          
+
       // Simple single-character escapes.
     case '0': TempString.push_back('\0'); continue;
     case 'n': TempString.push_back('\n'); continue;
@@ -2584,24 +2612,48 @@ StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
     // String interpolation.
     case '(':
       llvm_unreachable("string contained interpolated segments");
-        
+
       // Unicode escapes of various lengths.
-    case 'u':  //  \u HEX HEX HEX HEX
+    case 'u': {  //  \u HEX HEX HEX HEX
       if (BytesPtr[0] != '{')
         continue;       // Ignore invalid escapes.
 
-      CharValue = lexUnicodeEscape(BytesPtr, /*no diagnostics*/nullptr);
+      auto EscapeResult = lexHexEscape(BytesPtr, 'u', /*no diagnostics*/nullptr);
       // Ignore invalid escapes.
-      if (CharValue == ~1U) continue;
+      if (EscapeResult.Kind == HexEscapeLexResult::Invalid) continue;
+      CharValue = EscapeResult.Value;
       break;
     }
-    
-    if (CharValue < 0x80) 
+
+    // Raw code unit escapes: these are not Unicode scalars, so instead of
+    // encoding their own value below, a U+FFFD replacement character is
+    // written into the decoded buffer in their place. This gives consumers
+    // unaware of \x{hh} a visible marker rather than silently wrong or
+    // corrupted text; RawEscapes (if non-null) records the raw value and
+    // the placeholder's offset for splice-aware callers.
+    case 'x': {  //  \x{HEX+}
+      if (BytesPtr[0] != '{')
+        continue;       // Ignore invalid escapes.
+
+      auto EscapeResult = lexHexEscape(BytesPtr, 'x', /*no diagnostics*/nullptr);
+      // Ignore invalid escapes.
+      if (EscapeResult.Kind == HexEscapeLexResult::Invalid) continue;
+
+      if (RawEscapes)
+        RawEscapes->push_back({(unsigned)TempString.size(),
+                               (unsigned)(EscapeStart - Bytes.begin()),
+                               EscapeResult.Value});
+      CharValue = 0xFFFD;
+      break;
+    }
+    }
+
+    if (CharValue < 0x80)
       TempString.push_back(CharValue);
     else
       EncodeToUTF8(CharValue, TempString);
   }
-  
+
   // If we didn't escape or reprocess anything, then we don't need to use the
   // temporary string, just point to the original one. We know that this
   // is safe because unescaped strings are always shorter than their escaped

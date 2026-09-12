@@ -248,6 +248,13 @@ protected:
     Value : 1
   );
 
+  // StringEncoding reuses StringLiteralExpr::Encoding, but is only 1 bit
+  // wide -- it can only ever represent StringLiteralExpr::UTF8 (value 0).
+  // This is safe: OneUnicodeScalar/UTF8WithRawSplices are structurally
+  // unreachable here, since TypeChecker::getLiteralProtocol hardcodes
+  // ExpressibleByStringLiteral for every magic string identifier kind, and
+  // magic literals have no parsed source text (hence no Splices) to begin
+  // with. Widen this field if that ever changes.
   SWIFT_INLINE_BITFIELD(MagicIdentifierLiteralExpr, LiteralExpr, 3+1,
     Kind : 3,
     StringEncoding : 1
@@ -869,8 +876,32 @@ public:
 
 /// StringLiteralExpr - String literal, like '"foo"'.
 class StringLiteralExpr : public BuiltinLiteralExpr {
+public:
+  /// A single `\x{hh}` raw code unit escape found in the literal. Unlike
+  /// `\u{hh}`, this denotes a raw code unit value, not a Unicode scalar, so
+  /// it cannot be losslessly folded into `Val`'s UTF-8 bytes -- an arbitrary
+  /// raw byte either isn't valid UTF-8, or could be misread as continuing a
+  /// multi-byte sequence, corrupting the string. Instead, `Val` has a
+  /// U+FFFD replacement character at `Offset` in its place (so that
+  /// consumers unaware of splices still see a visible marker rather than
+  /// silently wrong or corrupted text), and splice-aware consumers replace
+  /// that placeholder with `Value`, re-encoded to whatever code unit width
+  /// is ultimately resolved for this literal's type.
+  struct RawCodeUnitSplice {
+    /// Where the escape appears in the original source, for diagnostics.
+    SourceLoc Loc;
+
+    /// The byte offset of the placeholder U+FFFD within `Val`.
+    unsigned Offset;
+
+    /// The escape's raw value.
+    uint32_t Value;
+  };
+
+private:
   StringRef Val;
   SourceRange Range;
+  ArrayRef<RawCodeUnitSplice> Splices;
 
 public:
   /// The encoding that should be used for the string literal.
@@ -879,13 +910,25 @@ public:
     UTF8,
 
     /// A single UnicodeScalar, passed as an integer.
-    OneUnicodeScalar
+    OneUnicodeScalar,
+
+    /// A UTF-8 string (as `Val`) with one or more `\x{hh}` raw code unit
+    /// escapes recorded out-of-band in `Splices`.
+    UTF8WithRawSplices
   };
 
-  StringLiteralExpr(StringRef Val, SourceRange Range, bool Implicit = false);
+  StringLiteralExpr(StringRef Val, SourceRange Range, bool Implicit = false,
+                    ArrayRef<RawCodeUnitSplice> Splices = {});
 
   StringRef getValue() const { return Val; }
   SourceRange getSourceRange() const { return Range; }
+
+  /// The `\x{hh}` raw code unit escapes found in this literal, if any. See
+  /// `RawCodeUnitSplice`.
+  ArrayRef<RawCodeUnitSplice> getRawSplices() const { return Splices; }
+
+  /// Whether this literal contains any `\x{hh}` raw code unit escapes.
+  bool hasRawSplices() const { return !Splices.empty(); }
 
   /// Determine the encoding that should be used for this string literal.
   Encoding getEncoding() const {
@@ -3178,12 +3221,23 @@ class StringToPointerExpr : public ImplicitConversionExpr {
 public:
   StringToPointerExpr(Expr *subExpr, Type ty)
     : ImplicitConversionExpr(ExprKind::StringToPointer, subExpr, ty) {}
-  
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::StringToPointer;
   }
 };
-  
+
+/// Convert an UncheckedString to an UnsafePointer of matching element type.
+class UncheckedStringToPointerExpr : public ImplicitConversionExpr {
+public:
+  UncheckedStringToPointerExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::UncheckedStringToPointer, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UncheckedStringToPointer;
+  }
+};
+
 /// Convert a pointer to a different kind of pointer.
 class PointerToPointerExpr : public ImplicitConversionExpr {
 public:

@@ -1,0 +1,44 @@
+// RUN: %swift_frontend_plain -emit-object -parse-sil %s -module-name Swift -parse-stdlib -target x86_64-apple-macosx10.9 -o %t.little.o
+// RUN: llvm-objdump -s -j __literal4 -j __literal8 %t.little.o | %FileCheck %s --check-prefix=LITTLE
+
+// RUN: %swift_frontend_plain -emit-object -parse-sil %s -module-name Swift -parse-stdlib -target s390x-unknown-linux-gnu -o %t.big.o
+// RUN: llvm-objdump -s -j .rodata.cst4 -j .rodata.cst8 %t.big.o | %FileCheck %s --check-prefix=BIG
+
+// REQUIRES: CODEGENERATOR=X86
+// REQUIRES: CODEGENERATOR=SystemZ
+
+// Regression test: `string_literal bytes16`/`bytes32` (produced by
+// `UncheckedString<UInt16/UInt32>`'s literal initializer) must be lowered
+// to a constant array of genuinely-typed `i16`/`i32` elements, not a raw
+// `i8` blob -- so that LLVM serializes each element's bytes in the
+// *target's* actual endianness, regardless of the endianness of the
+// machine running the compiler itself. Verified here directly against the
+// emitted object file's bytes on both a little-endian (x86_64) and a
+// big-endian (s390x) target.
+
+import Builtin
+
+// The same logical values (1, 258) must appear byte-swapped between the
+// two targets: `01 00 02 01` (little) vs. `00 01 01 02` (big).
+// LITTLE: Contents of section __TEXT,__literal4:
+// LITTLE-NEXT: {{.*}} 01000201
+// BIG: Contents of section .rodata.cst4:
+// BIG-NEXT: {{.*}} 00010102
+sil @test_bytes16 : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = string_literal bytes16 "01000201"
+  return %0 : $Builtin.RawPointer
+}
+
+// The same logical values (1, 67305985) must appear byte-swapped between
+// the two targets: `01 00 00 00 01 02 03 04` (little) vs.
+// `00 00 00 01 04 03 02 01` (big).
+// LITTLE: Contents of section __TEXT,__literal8:
+// LITTLE-NEXT: {{.*}} 01000000 01020304
+// BIG: Contents of section .rodata.cst8:
+// BIG-NEXT: {{.*}} 00000001 04030201
+sil @test_bytes32 : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = string_literal bytes32 "0100000001020304"
+  return %0 : $Builtin.RawPointer
+}

@@ -457,24 +457,49 @@ public:
 
   };
 
+  /// A `\x{hh}` raw code unit escape found while decoding a string segment's
+  /// escapes into final bytes. The decoded output has a U+FFFD replacement
+  /// character written at \c Offset in its place, so that consumers which
+  /// are not aware of raw code unit escapes still get a visible marker
+  /// rather than silently wrong or corrupted text; consumers that do
+  /// understand these escapes should splice \c Value in at \c Offset instead
+  /// once the target code unit width is known.
+  struct RawCodeUnitEscape {
+    /// The byte offset within the decoded output at which the placeholder
+    /// U+FFFD was written.
+    unsigned Offset;
+
+    /// The byte offset of the escape within the source text that was passed
+    /// to \c getEncodedStringSegmentImpl. Callers working with real source
+    /// text (as opposed to an arbitrary, non-source \c StringRef) can turn
+    /// this into a \c SourceLoc for diagnostics; this type has no way to
+    /// know whether that's meaningful, so it doesn't attempt it itself.
+    unsigned SourceOffset;
+
+    /// The escape's raw value.
+    uint32_t Value;
+  };
+
   /// Implementation of getEncodedStringSegment. Note that \p Str must support
-  /// reading one byte past the end.
-  static StringRef getEncodedStringSegmentImpl(StringRef Str,
-                                               SmallVectorImpl<char> &Buffer,
-                                               bool IsFirstSegment,
-                                               bool IsLastSegment,
-                                               unsigned IndentToStrip,
-                                               unsigned CustomDelimiterLen);
+  /// reading one byte past the end. If \p RawEscapes is non-null, any
+  /// `\x{hh}` raw code unit escapes found are appended to it (see
+  /// \c RawCodeUnitEscape); otherwise their value is discarded and a U+FFFD
+  /// replacement character is written into the decoded output in its place.
+  static StringRef getEncodedStringSegmentImpl(
+      StringRef Str, SmallVectorImpl<char> &Buffer, bool IsFirstSegment,
+      bool IsLastSegment, unsigned IndentToStrip, unsigned CustomDelimiterLen,
+      SmallVectorImpl<RawCodeUnitEscape> *RawEscapes = nullptr);
 
   /// Compute the bytes that the actual string literal should codegen to.
   /// If a copy needs to be made, it will be allocated out of the provided
   /// \p Buffer.
-  StringRef getEncodedStringSegment(StringSegment Segment,
-                                    SmallVectorImpl<char> &Buffer) const {
+  StringRef getEncodedStringSegment(
+      StringSegment Segment, SmallVectorImpl<char> &Buffer,
+      SmallVectorImpl<RawCodeUnitEscape> *RawEscapes = nullptr) const {
     return getEncodedStringSegmentImpl(
         StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
         Buffer, Segment.IsFirstSegment, Segment.IsLastSegment,
-        Segment.IndentToStrip, Segment.CustomDelimiterLen);
+        Segment.IndentToStrip, Segment.CustomDelimiterLen, RawEscapes);
   }
 
   /// Given a string encoded with escapes like a string literal, compute
@@ -567,6 +592,49 @@ private:
     CodeCompletion
   };
 
+  /// The result of scanning a hex digit escape, e.g. the `{hex+}` part of
+  /// `\u{...}` or `\x{...}`.
+  struct HexEscapeLexResult {
+    enum : char { Valid, Invalid } Kind;
+
+    /// The parsed value. Only meaningful when \c Kind is \c Valid.
+    uint32_t Value = 0;
+
+    /// Implicit on purpose: lets callers just `return value;` for the
+    /// common case.
+    HexEscapeLexResult(uint32_t value) : Kind(Valid), Value(value) {}
+
+    static HexEscapeLexResult invalid() {
+      HexEscapeLexResult Result(0);
+      Result.Kind = Invalid;
+      return Result;
+    }
+  };
+
+  /// The result of lexing a single character (which may be an escape
+  /// sequence) from within a string or character literal.
+  struct CharacterLexResult {
+    enum : char { Valid, EndOfString, Invalid } Kind;
+
+    /// The lexed code point. Only meaningful when \c Kind is \c Valid.
+    uint32_t Value = 0;
+
+    /// Implicit on purpose: lets callers just `return value;` for the
+    /// common case.
+    CharacterLexResult(uint32_t value) : Kind(Valid), Value(value) {}
+
+    static CharacterLexResult endOfString() {
+      CharacterLexResult Result(0);
+      Result.Kind = EndOfString;
+      return Result;
+    }
+    static CharacterLexResult invalid() {
+      CharacterLexResult Result(0);
+      Result.Kind = Invalid;
+      return Result;
+    }
+  };
+
   /// For a source location in the current buffer, returns the corresponding
   /// pointer.
   const char *getBufferPtrForSourceLoc(SourceLoc Loc) const {
@@ -607,9 +675,10 @@ private:
   void lexNumber();
 
   void lexTrivia();
-  static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
+  static HexEscapeLexResult lexHexEscape(const char *&CurPtr, char EscapeChar,
+                                         Lexer *Diags);
 
-  unsigned lexCharacter(const char *&CurPtr, char StopQuote,
+  CharacterLexResult lexCharacter(const char *&CurPtr, char StopQuote,
                         bool EmitDiagnostics, bool IsMultilineString = false,
                         unsigned CustomDelimiterLen = 0);
   void lexStringLiteral(unsigned CustomDelimiterLen = 0);

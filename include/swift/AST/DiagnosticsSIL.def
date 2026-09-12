@@ -1388,5 +1388,8 @@ ERROR(invalid_multiple_return_borrow_accessor, none,
 ERROR(unsupported_borrow_abstraction, none,
       "cannot witness borrow requirement for result type %0",
       (Type))
+ERROR(unchecked_string_literal_unsupported_element_width, none,
+      "unchecked string literal is not supported for element type %0",
+      (Type))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

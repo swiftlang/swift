@@ -432,6 +432,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(InOutToPointer, getSubExpr);
   PASS_THROUGH_REFERENCE(ArrayToPointer, getSubExpr);
   PASS_THROUGH_REFERENCE(StringToPointer, getSubExpr);
+  PASS_THROUGH_REFERENCE(UncheckedStringToPointer, getSubExpr);
   PASS_THROUGH_REFERENCE(PointerToPointer, getSubExpr);
   PASS_THROUGH_REFERENCE(ForeignObjectConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(UnevaluatedInstance, getSubExpr);
@@ -799,6 +800,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::InOutToPointer:
   case ExprKind::ArrayToPointer:
   case ExprKind::StringToPointer:
+  case ExprKind::UncheckedStringToPointer:
   case ExprKind::PointerToPointer:
   case ExprKind::ForeignObjectConversion:
   case ExprKind::UnevaluatedInstance:
@@ -1012,6 +1014,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::InOutToPointer:
   case ExprKind::ArrayToPointer:
   case ExprKind::StringToPointer:
+  case ExprKind::UncheckedStringToPointer:
   case ExprKind::PointerToPointer:
   case ExprKind::ForeignObjectConversion:
   case ExprKind::UnevaluatedInstance:
@@ -1220,9 +1223,10 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
 }
 
 StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
-                                     bool Implicit)
+                                     bool Implicit,
+                                     ArrayRef<RawCodeUnitSplice> Splices)
     : BuiltinLiteralExpr(ExprKind::StringLiteral, Implicit), Val(Val),
-      Range(Range) {
+      Range(Range), Splices(Splices) {
   Bits.StringLiteralExpr.Encoding = static_cast<unsigned>(UTF8);
   Bits.StringLiteralExpr.IsSingleUnicodeScalar =
       unicode::isSingleUnicodeScalar(Val);
