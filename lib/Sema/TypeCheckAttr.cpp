@@ -2097,6 +2097,76 @@ static bool hasValidDynamicCallableMethod(NominalTypeDecl *decl,
   return true;
 }
 
+enum class DynamicAttributeRequirementKind : unsigned {
+  CallableWithArguments,
+  CallableWithDictionary,
+  CallableWithKeyValuePairs,
+  MemberLookupWithString,
+  MemberLookupWithKeyPath,
+};
+
+static llvm::SmallString<192> generateDynamicAttributeRequirementText(
+    ASTContext &ctx, NominalTypeDecl *parentDecl,
+    DynamicAttributeRequirementKind requirement) {
+  StringRef extraIndent;
+  StringRef currentIndent = Lexer::getIndentationForLine(
+      ctx.SourceMgr, parentDecl->getStartLoc(), &extraIndent);
+  std::string memberIndent = (currentIndent + extraIndent).str();
+
+  llvm::SmallString<192> text;
+  llvm::raw_svector_ostream out(text);
+  ExtraIndentStreamPrinter printer(out, memberIndent);
+
+  printer.printNewline();
+
+  bool isProtocol = isa<ProtocolDecl>(parentDecl);
+  if (!isProtocol) {
+    auto access = parentDecl->getFormalAccess();
+    if (access == AccessLevel::Package)
+      printer << "package ";
+    else if (access >= AccessLevel::Public)
+      printer << "public ";
+  }
+
+  switch (requirement) {
+  case DynamicAttributeRequirementKind::CallableWithArguments:
+    printer << "func dynamicallyCall(withArguments arguments: [Any])";
+    break;
+  case DynamicAttributeRequirementKind::CallableWithDictionary:
+    printer << "func dynamicallyCall(withKeywordArguments arguments: "
+               "[String: Any])";
+    break;
+  case DynamicAttributeRequirementKind::CallableWithKeyValuePairs:
+    printer << "func dynamicallyCall(withKeywordArguments arguments: "
+               "KeyValuePairs<String, Any>)";
+    break;
+  case DynamicAttributeRequirementKind::MemberLookupWithString:
+    printer << "subscript(dynamicMember member: String) -> <#Type#>";
+    break;
+  case DynamicAttributeRequirementKind::MemberLookupWithKeyPath:
+    printer << "subscript(dynamicMember member: KeyPath<<#Base#>, <#Type#>>) "
+               "-> <#Type#>";
+    break;
+  }
+
+  if (isProtocol) {
+    if (requirement ==
+            DynamicAttributeRequirementKind::MemberLookupWithString ||
+        requirement ==
+            DynamicAttributeRequirementKind::MemberLookupWithKeyPath)
+      printer << " { get }";
+    printer.printNewline();
+    return text;
+  }
+
+  printer << " {\n";
+  printer.printIndent();
+  printer << extraIndent << getCodePlaceholder();
+  printer.printNewline();
+  printer << "}\n";
+  return text;
+}
+
 void AttributeChecker::
 visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   // This attribute is only allowed on nominal types.
@@ -2112,6 +2182,20 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
                                   /*hasKeywordArgs*/ true);
   if (!hasValidMethod) {
     diagnose(attr->getLocation(), diag::invalid_dynamic_callable_type, type);
+    auto fixLocation = decl->getBraces().Start;
+    auto addRequirementFixIt = [&](DynamicAttributeRequirementKind kind,
+                                   unsigned choice) {
+      diagnose(decl->getLoc(), diag::add_dynamic_callable_method, choice)
+          .fixItInsertAfter(
+              fixLocation,
+              generateDynamicAttributeRequirementText(Ctx, decl, kind));
+    };
+    addRequirementFixIt(
+        DynamicAttributeRequirementKind::CallableWithArguments, 0);
+    addRequirementFixIt(
+        DynamicAttributeRequirementKind::CallableWithDictionary, 1);
+    addRequirementFixIt(
+        DynamicAttributeRequirementKind::CallableWithKeyValuePairs, 2);
     attr->setInvalid();
   }
 }
@@ -2221,8 +2305,22 @@ void AttributeChecker::visitDynamicMemberLookupAttr(
   }
 
   attr->setInvalid();
-  if (!diagnosed)
+  if (!diagnosed) {
     diagnose(attr->getStartLoc(), diag::invalid_dynamic_member_lookup_type, type);
+    auto fixLocation = decl->getBraces().Start;
+    auto addRequirementFixIt = [&](DynamicAttributeRequirementKind kind,
+                                   unsigned choice) {
+      diagnose(decl->getLoc(), diag::add_dynamic_member_lookup_subscript,
+               choice)
+          .fixItInsertAfter(
+              fixLocation,
+              generateDynamicAttributeRequirementText(ctx, decl, kind));
+    };
+    addRequirementFixIt(
+        DynamicAttributeRequirementKind::MemberLookupWithString, 0);
+    addRequirementFixIt(
+        DynamicAttributeRequirementKind::MemberLookupWithKeyPath, 1);
+  }
 }
 
 /// Get the innermost enclosing declaration for a declaration.
