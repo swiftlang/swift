@@ -853,10 +853,7 @@ internal func _validateMatchingResultHandler<
 /// however its exact format is not specified and may change in future versions.
 @available(SwiftStdlib 5.7, *)
 public struct RemoteCallTarget: CustomStringConvertible, Hashable {
-  // '@usableFromInline' rather than 'private' because 'identifierByteCount' and
-  // 'identifierEquals' are newer than the module's minimum deployment and so
-  // are emitted into the client
-  @usableFromInline internal let _identifier: String
+  private let _identifier: String
 
   public init(_ identifier: String) {
     self._identifier = identifier
@@ -867,33 +864,6 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
     return _identifier
   }
 
-  /// The length in bytes of the UTF-8 encoded target identifier.
-  @export(implementation)
-  @available(SwiftStdlib 6.5, *)
-  public var identifierByteCount: Int {
-    return _identifier.utf8.count
-  }
-
-  /// Whether the target identifier is byte-for-byte equal to `other`.
-  ///
-  /// Prefer this over comparing `identifier` when writing an actor system which
-  /// must also compile for Embedded Swift, where the identifier is not backed
-  /// by a `String`
-  ///
-  /// The comparison skips the leading mangling-flavor prefix ("$s" for standard
-  /// Swift, "$e" for Embedded Swift) on both sides, so a target serialized by an
-  /// Embedded peer matches the same declaration compiled in standard Swift, and
-  /// vice versa. This keeps `identifierEquals` behaving identically whether an
-  /// actor system's source is compiled for standard or Embedded Swift
-  @available(SwiftStdlib 6.5, *)
-  public func identifierEquals(_ other: StaticString) -> Bool {
-    let lhs = _identifier.utf8
-    return other.withUTF8Buffer { rhs in
-      unsafe lhs.dropFirst(_manglingFlavorPrefixLength(of: lhs))
-        .elementsEqual(rhs.dropFirst(_manglingFlavorPrefixLength(of: rhs)))
-    }
-  }
-
   /// Attempts to pretty format the underlying target identifier.
   /// If unable to, returns the raw underlying identifier.
   public var description: String {
@@ -902,30 +872,6 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
     } else {
       return "\(_identifier)"
     }
-  }
-}
-
-/// The number of leading bytes taken by a distributed-target mangling-flavor
-/// prefix: a Swift mangled name starts with "$" followed by a single flavor
-/// letter, "s" for standard Swift or "e" for Embedded Swift. Only those two
-/// prefixes are supported. The same declaration agrees on every byte after this
-/// prefix, so target matching must skip it -- otherwise a request serialized by
-/// one mode would never match the same `distributed func` compiled in the other.
-/// Anything else is treated as having no flavor prefix, and nothing is skipped
-@available(SwiftStdlib 6.5, *)
-private func _manglingFlavorPrefixLength(
-  of bytes: some Sequence<UInt8>
-) -> Int {
-  // Skip "$", then skip "s" or "e" -- the only supported flavor prefixes
-  var iterator = bytes.makeIterator()
-  guard iterator.next() == UInt8(ascii: "$") else {
-    return 0
-  }
-  switch iterator.next() {
-  case UInt8(ascii: "s"), UInt8(ascii: "e"):
-    return 2
-  default:
-    return 0
   }
 }
 #else
