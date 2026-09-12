@@ -126,6 +126,9 @@ PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
 PASS(DeinitDevirtualizer, "deinit-devirtualizer",
      "Devirtualizes destroys of non-copyable values")
+PASS(ClassDestroyDevirtualizer, "class-destroy-devirtualizer",
+     "Devirtualizes final destroys of classes")
+// TODO: remove the ReleaseDevirtualizer once the ClassDestroyDevirtualizer runs on OSSA
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(LetPropertyLowering, "let-property-lowering",
