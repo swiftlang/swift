@@ -38,6 +38,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SerializableHiddenTypeInfoRepresentation.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
@@ -941,6 +942,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, PROTOCOL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, PACK_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
+  BLOCK_RECORD(index_block, HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS);
+  BLOCK_RECORD(index_block, HIDDEN_TYPE_FALLBACK_TABLE);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
   BLOCK_RECORD(index_block, NESTED_TYPE_DECLS);
   BLOCK_RECORD(index_block, DECL_MEMBER_NAMES);
@@ -2650,6 +2653,25 @@ void Serializer::writeCrossReference(const Decl *D) {
                                        D->hasClangNode(), val->isStatic());
 }
 
+void Serializer::writeHiddenTypeXRef(
+    const HiddenTypeLayoutInfoDecl *hidden) {
+  using namespace decls_block;
+  unsigned abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
+  ModuleID moduleID = hidden->OriginalModuleIsObjCHeader
+                          ? ModuleID(OBJC_HEADER_MODULE_ID)
+                          : addDeclBaseNameRef(hidden->OriginalModuleName);
+  XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                         moduleID, hidden->OriginalXRefPath.size());
+
+  abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
+  for (const auto &piece : hidden->OriginalXRefPath) {
+    XRefTypePathPieceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addDeclBaseNameRef(piece.Name),
+        /*privateDiscriminator=*/0, piece.InProtocolExtension,
+        piece.ImportedFromClang);
+  }
+}
+
 /// Translate from the AST associativity enum to the Serialization enum
 /// values, which are guaranteed to be stable.
 static uint8_t getRawStableAssociativity(swift::Associativity assoc) {
@@ -2663,6 +2685,20 @@ static uint8_t getRawStableAssociativity(swift::Associativity assoc) {
   }
 
   llvm_unreachable("Unhandled Associativity in switch.");
+}
+
+static const TypeDecl *getHiddenTypeLayoutDeclParentDecl(const Decl *decl) {
+  if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(decl))
+    return hidden->ParentDecl;
+
+  auto *typeDecl = dyn_cast<TypeDecl>(decl);
+  if (!typeDecl)
+    return nullptr;
+
+  auto *parentDC = typeDecl->getDeclContext();
+  if (!parentDC || !parentDC->isTypeContext())
+    return nullptr;
+  return parentDC->getSelfNominalTypeDecl();
 }
 
 static serialization::StaticSpellingKind
@@ -5624,6 +5660,14 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
     }
   };
 
+  if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(D)) {
+    assert((hidden->OriginalModuleIsObjCHeader ||
+            !hidden->OriginalModuleName.empty()) &&
+           "cannot reserialize a hidden type without its original XREF");
+    writeHiddenTypeXRef(hidden);
+    return;
+  }
+
   if (isDeclXRef(D)) {
     writeCrossReference(D);
     return;
@@ -6478,6 +6522,13 @@ public:
 
   void visitHiddenType(const HiddenType *hidden) {
     using namespace decls_block;
+    if (auto *layoutDecl = hidden->getLayoutInfoDecl()) {
+      unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
+      NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                    S.addDeclRef(layoutDecl),
+                                    S.addTypeRef(hidden->getParent()));
+      return;
+    }
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[HiddenTypeLayout::Code];
     HiddenTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -6642,6 +6693,253 @@ bool Serializer::writeASTBlockEntitiesIfNeeded(
   return true;
 }
 
+static decls_block::SerializableLLVMTypeKind
+getStableSerializableLLVMTypeKind(llvm::Type::TypeID kind) {
+  using Kind = decls_block::SerializableLLVMTypeKind;
+  switch (kind) {
+  case llvm::Type::HalfTyID: return Kind::Half;
+  case llvm::Type::BFloatTyID: return Kind::BFloat;
+  case llvm::Type::FloatTyID: return Kind::Float;
+  case llvm::Type::DoubleTyID: return Kind::Double;
+  case llvm::Type::X86_FP80TyID: return Kind::X86FP80;
+  case llvm::Type::FP128TyID: return Kind::FP128;
+  case llvm::Type::PPC_FP128TyID: return Kind::PPCFP128;
+  case llvm::Type::IntegerTyID: return Kind::Integer;
+  case llvm::Type::PointerTyID: return Kind::Pointer;
+  case llvm::Type::ArrayTyID: return Kind::Array;
+  case llvm::Type::FixedVectorTyID: return Kind::FixedVector;
+  case llvm::Type::StructTyID: return Kind::Struct;
+  case llvm::Type::VoidTyID:
+  case llvm::Type::LabelTyID:
+  case llvm::Type::MetadataTyID:
+  case llvm::Type::X86_AMXTyID:
+  case llvm::Type::TokenTyID:
+  case llvm::Type::FunctionTyID:
+  case llvm::Type::ScalableVectorTyID:
+  case llvm::Type::TypedPointerTyID:
+  case llvm::Type::TargetExtTyID:
+    llvm_unreachable("unsupported serialized LLVM type");
+  }
+  llvm_unreachable("unhandled LLVM type kind");
+}
+
+static decls_block::SerializableReferenceCountingKind
+getStableSerializableReferenceCountingKind(
+    std::optional<ReferenceCounting> referenceCounting) {
+  using Kind = decls_block::SerializableReferenceCountingKind;
+  if (!referenceCounting)
+    return Kind::Absent;
+
+  switch (*referenceCounting) {
+  case ReferenceCounting::Native: return Kind::Native;
+  case ReferenceCounting::ObjC: return Kind::ObjC;
+  case ReferenceCounting::None: return Kind::None;
+  case ReferenceCounting::Custom: return Kind::Custom;
+  case ReferenceCounting::Block: return Kind::Block;
+  case ReferenceCounting::Unknown: return Kind::Unknown;
+  case ReferenceCounting::Bridge: return Kind::Bridge;
+  case ReferenceCounting::Error: return Kind::Error;
+  }
+  llvm_unreachable("unhandled reference counting kind");
+}
+
+void Serializer::writeSerializableLLVMType(
+    const SerializableLLVMTypeRepresentation &type) {
+  using namespace decls_block;
+
+  auto kind = getStableSerializableLLVMTypeKind(type.kind);
+  unsigned abbrCode = DeclTypeAbbrCodes[SerializableLLVMTypeLayout::Code];
+  SerializableLLVMTypeLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, static_cast<unsigned>(kind), type.payload,
+      type.packed, type.children.size());
+  for (const auto &child : type.children)
+    writeSerializableLLVMType(*child);
+}
+
+void Serializer::writeSerializableTypeInfoBase(
+    const SerializableHiddenTypeInfoRepresentation &representation) {
+  using namespace decls_block;
+
+  auto kind = representation.getKind();
+  unsigned abbrCode = DeclTypeAbbrCodes[SerializableTypeInfoLayout::Code];
+  SerializableTypeInfoLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, static_cast<unsigned>(kind),
+      representation.alignment, representation.triviallyDestroyable,
+      representation.bitwiseTakable, representation.bitwiseBorrowable,
+      representation.copyable, representation.alwaysFixedSize,
+      representation.abiAccessible);
+  writeSerializableLLVMType(*representation.storageType);
+}
+
+void Serializer::writeSerializableFixedTypeInfo(
+    const SerializableFixedTypeInfoRepresentation &representation) {
+  using namespace decls_block;
+
+  writeSerializableTypeInfoBase(representation);
+  ArrayRef<uint64_t> spareBitWords;
+  unsigned abbrCode = DeclTypeAbbrCodes[SerializableFixedTypeInfoLayout::Code];
+  if (!representation.spareBits.empty()) {
+    auto spareBits = representation.spareBits.asAPInt();
+    spareBitWords = ArrayRef(spareBits.getRawData(), spareBits.getNumWords());
+  }
+  SerializableFixedTypeInfoLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, representation.size,
+      representation.spareBits.size(), spareBitWords);
+}
+
+void Serializer::writeSerializableLoadableTypeInfo(
+    const SerializableLoadableTypeInfoRepresentation &representation) {
+  using namespace decls_block;
+
+  writeSerializableFixedTypeInfo(representation);
+  unsigned abbrCode =
+      DeclTypeAbbrCodes[SerializableLoadableTypeInfoLayout::Code];
+  SerializableLoadableTypeInfoLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, representation.schema.size());
+  for (const auto &element : representation.schema) {
+    abbrCode =
+        DeclTypeAbbrCodes[SerializableExplosionSchemaElementLayout::Code];
+    SerializableExplosionSchemaElementLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, element.aggregateAlignment);
+    writeSerializableLLVMType(*element.type);
+  }
+}
+
+void Serializer::writeSerializableRecordTypeInfo(
+    const SerializableLoadableRecordTypeInfoRepresentation &representation) {
+  using namespace decls_block;
+
+  writeSerializableLoadableTypeInfo(representation);
+  unsigned abbrCode =
+      DeclTypeAbbrCodes[SerializableRecordTypeInfoLayout::Code];
+  SerializableRecordTypeInfoLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, representation.fieldsAreABIAccessible,
+      representation.explosionSize, representation.fields.size());
+  for (const auto &field : representation.fields) {
+    abbrCode = DeclTypeAbbrCodes[SerializableRecordFieldLayout::Code];
+    SerializableRecordFieldLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addTypeRef(field.type),
+        field.layout.ByteOffset, field.layout.ByteOffsetForLayout,
+        field.layout.Index, field.layout.IsTriviallyDestroyable,
+        field.layout.TheKind, field.storage.Begin, field.storage.End);
+    writeSerializableTypeInfo(*field.typeInfo);
+  }
+}
+
+void Serializer::writeSerializableClangRecordTypeInfo(
+    const SerializableLoadableClangRecordTypeInfoRepresentation
+        &representation) {
+  using namespace decls_block;
+
+  writeSerializableRecordTypeInfo(representation);
+  unsigned abbrCode = DeclTypeAbbrCodes[
+      SerializableLoadableClangRecordTypeInfoLayout::Code];
+  SerializableLoadableClangRecordTypeInfoLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, representation.hasReferenceField,
+      representation.aggLoweringInputs.size());
+  for (const auto &input : representation.aggLoweringInputs) {
+    abbrCode = DeclTypeAbbrCodes[SerializableAggLoweringInputLayout::Code];
+    SerializableAggLoweringInputLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, input.begin, input.end,
+        input.type != nullptr);
+    if (input.type)
+      writeSerializableLLVMType(*input.type);
+  }
+}
+
+void Serializer::writeSerializableTypeInfo(
+    const SerializableHiddenTypeInfoRepresentation &representation) {
+  // The TYPE_INFO record written by every path preserves the concrete kind.
+  // Kinds without additional state share the writer for their deepest base.
+  switch (representation.getKind()) {
+  case SerializableHiddenTypeInfoKind::TypeInfo:
+    return writeSerializableTypeInfoBase(representation);
+  case SerializableHiddenTypeInfoKind::Fixed:
+    return writeSerializableFixedTypeInfo(
+        static_cast<const SerializableFixedTypeInfoRepresentation &>(
+            representation));
+  case SerializableHiddenTypeInfoKind::Loadable:
+  case SerializableHiddenTypeInfoKind::Primitive:
+  case SerializableHiddenTypeInfoKind::OpaqueStorage:
+    return writeSerializableLoadableTypeInfo(
+        static_cast<const SerializableLoadableTypeInfoRepresentation &>(
+            representation));
+  case SerializableHiddenTypeInfoKind::LoadableRecord:
+  case SerializableHiddenTypeInfoKind::LoadableStruct:
+    return writeSerializableRecordTypeInfo(
+        static_cast<const SerializableLoadableRecordTypeInfoRepresentation &>(
+            representation));
+  case SerializableHiddenTypeInfoKind::LoadableClangRecord:
+    return writeSerializableClangRecordTypeInfo(
+        static_cast<
+            const SerializableLoadableClangRecordTypeInfoRepresentation &>(
+            representation));
+  }
+  llvm::report_fatal_error("unhandled serializable TypeInfo kind");
+}
+
+IRABIDetailsProvider &Serializer::getLayoutProvider() {
+  if (!LayoutProvider) {
+    if (!Options.IRGenOpts)
+      llvm::report_fatal_error(
+          "IRGen options are required to serialize hidden type layouts");
+    LayoutProvider = std::make_unique<IRABIDetailsProvider>(*M,
+                                                            *Options.IRGenOpts);
+  }
+  return *LayoutProvider;
+}
+
+void Serializer::writeHiddenTypeLayout(const Decl *decl) {
+  using namespace decls_block;
+
+  AbstractTypeLayout computedLayout;
+  const AbstractTypeLayout *layout;
+  std::string mangledName;
+  if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(decl)) {
+    if (!hidden->Layout)
+      llvm::report_fatal_error(
+          "hidden type declaration has no abstract layout");
+    layout = hidden->Layout;
+    mangledName = hidden->MangledName.str();
+  } else if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    computedLayout = getLayoutProvider().getAbstractTypeLayout(nominal);
+    layout = &computedLayout;
+    mangledName =
+        Mangle::ASTMangler(nominal->getASTContext()).mangleNominalType(nominal);
+  } else {
+    llvm::report_fatal_error(
+        "cannot serialize a hidden layout for a non-type declaration");
+  }
+
+  if (!layout->typeInfoRepresentation)
+    llvm::report_fatal_error(
+        "abstract type layout has no serializable TypeInfo representation");
+
+  auto mangledNameID = addUniquedString(mangledName).second;
+  auto *parentDecl = getHiddenTypeLayoutDeclParentDecl(decl);
+  auto parentDeclID = parentDecl ? addDeclRef(parentDecl) : DeclID();
+
+  unsigned abbrCode = DeclTypeAbbrCodes[HiddenTypeLayoutInfoLayout::Code];
+  HiddenTypeLayoutInfoLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, mangledNameID, parentDeclID,
+      static_cast<unsigned>(getStableSerializableReferenceCountingKind(
+          layout->referenceCountingSystem)));
+
+  const auto &properties = layout->typeProperties;
+  abbrCode = DeclTypeAbbrCodes[SerializableSILTypePropertiesLayout::Code];
+  SerializableSILTypePropertiesLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, properties.isTrivial,
+      properties.isFixedABI, properties.isAddressOnly, properties.isResilient,
+      properties.isTypeExpansionSensitive, properties.hasRawPointer,
+      properties.isLexical, properties.hasPack,
+      properties.isAddressableForDependencies, properties.hasRawLayout,
+      properties.mayHaveCustomDeinit, properties.isVeryLargeType,
+      properties.definitelyIsAddressableForDependencies,
+      properties.definitelyHasRawLayout, properties.isEscapable);
+
+  writeSerializableTypeInfo(*layout->typeInfoRepresentation);
+}
+
 void Serializer::writeAllDeclsAndTypes() {
   BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 9);
   using namespace decls_block;
@@ -6782,6 +7080,16 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<DifferentiationParamIndicesLayout>();
   registerDeclTypeAbbr<HiddenTypeLayoutInfoLayout>();
+  registerDeclTypeAbbr<SerializableSILTypePropertiesLayout>();
+  registerDeclTypeAbbr<SerializableTypeInfoLayout>();
+  registerDeclTypeAbbr<SerializableFixedTypeInfoLayout>();
+  registerDeclTypeAbbr<SerializableLoadableTypeInfoLayout>();
+  registerDeclTypeAbbr<SerializableExplosionSchemaElementLayout>();
+  registerDeclTypeAbbr<SerializableRecordTypeInfoLayout>();
+  registerDeclTypeAbbr<SerializableRecordFieldLayout>();
+  registerDeclTypeAbbr<SerializableLoadableClangRecordTypeInfoLayout>();
+  registerDeclTypeAbbr<SerializableAggLoweringInputLayout>();
+  registerDeclTypeAbbr<SerializableLLVMTypeLayout>();
 
 #define DECL_ATTR(X, NAME, ...) \
   registerDeclTypeAbbr<NAME##DeclAttrLayout>();
@@ -6816,16 +7124,11 @@ void Serializer::writeAllDeclsAndTypes() {
 }
 
 bool Serializer::writeHiddenTypeLayoutInformationIfNeeded() {
-  if (HiddenTypeLayoutsToSerialize.empty())
+  if (!HiddenTypeLayoutsToSerialize.hasMoreToSerialize())
     return false;
 
-  using namespace decls_block;
-  unsigned abbrCode = DeclTypeAbbrCodes[HiddenTypeLayoutInfoLayout::Code];
-  while (!HiddenTypeLayoutsToSerialize.empty()) {
-    const Decl *decl = HiddenTypeLayoutsToSerialize.pop_back_val();
-    HiddenTypeLayoutInfoLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addDeclRef(decl));
-  }
+  while (auto next = HiddenTypeLayoutsToSerialize.popNext(Out.GetCurrentBitNo()))
+    writeHiddenTypeLayout(next.value());
   return true;
 }
 
@@ -7285,9 +7588,7 @@ static void collectInterestingNestedDeclarations(
   }
 }
 
-static bool scheduleHiddenTypeLayoutSerialization(
-    const Decl *D,
-    llvm::SmallSetVector<const Decl *, 16> &layoutsToSerialize) {
+bool Serializer::scheduleHiddenTypeLayoutSerialization(const Decl *D) {
   // We assume the standard library will always be available,
   // so no need to serialize hidden representations of types defined within.
   if (D->isStdlibDecl())
@@ -7296,21 +7597,23 @@ static bool scheduleHiddenTypeLayoutSerialization(
   if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
     if (auto *parentNominal =
             nominal->getDeclContext()->getSelfNominalTypeDecl())
-      scheduleHiddenTypeLayoutSerialization(parentNominal,
-                                            layoutsToSerialize);
+      scheduleHiddenTypeLayoutSerialization(parentNominal);
   } else if (auto *hiddenDecl = dyn_cast<HiddenTypeLayoutInfoDecl>(D)) {
     if (auto *parentTypeDecl = hiddenDecl->ParentDecl)
-      scheduleHiddenTypeLayoutSerialization(parentTypeDecl,
-                                            layoutsToSerialize);
+      scheduleHiddenTypeLayoutSerialization(parentTypeDecl);
   }
 
-  return layoutsToSerialize.insert(D);
+  if (HiddenTypeLayoutsToSerialize.hasRef(D))
+    return false;
+  auto hiddenLayoutID = HiddenTypeLayoutsToSerialize.addRef(D);
+  HiddenTypeFallbackTable.push_back(
+      {DeclsToSerialize.addRef(D), hiddenLayoutID});
+  return true;
 }
 
 void Serializer::handleHiddenTypeLayoutRequirement(
     const HiddenTypeLayoutRequirement &requirement) {
-  if (!scheduleHiddenTypeLayoutSerialization(
-          requirement.LayoutDecl, HiddenTypeLayoutsToSerialize) ||
+  if (!scheduleHiddenTypeLayoutSerialization(requirement.LayoutDecl) ||
       !Options.EnableHiddenTypeLayoutSerializationRemarks)
     return;
 
@@ -7523,6 +7826,15 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, AbstractConformancesToSerialize);
     writeOffsets(Offsets, PackConformancesToSerialize);
     writeOffsets(Offsets, SILLayoutsToSerialize);
+    writeOffsets(Offsets, HiddenTypeLayoutsToSerialize);
+
+    SmallVector<uint32_t, 32> fallbackPairs;
+    for (auto [xrefID, layoutID] : HiddenTypeFallbackTable) {
+      fallbackPairs.push_back(xrefID);
+      fallbackPairs.push_back(layoutID);
+    }
+    Offsets.emit(ScratchRecord, index_block::HIDDEN_TYPE_FALLBACK_TABLE,
+                 fallbackPairs);
 
     Offsets.emit(ScratchRecord, index_block::IDENTIFIER_OFFSETS,
                  identifierOffsets);

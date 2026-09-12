@@ -27,8 +27,10 @@
 #include "../SILGen/SILGen.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SerializableHiddenTypeInfoRepresentation.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
@@ -102,6 +104,38 @@ public:
     return IRABIDetailsProvider::SizeAndAlignment{
         fixedTI->getFixedSize().getValue(),
         fixedTI->getFixedAlignment().getValue()};
+  }
+
+  AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
+    auto &typeInfo =
+        IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
+
+    AbstractTypeLayout layout;
+    auto type = TD->getDeclaredInterfaceType();
+    auto properties = typeConverter.getTypeProperties(
+        TD->getDeclaredTypeInContext(), TypeExpansionContext::minimal());
+    layout.typeProperties = {
+        bool(properties.isTrivial()),
+        bool(properties.isFixedABI()),
+        bool(properties.isAddressOnly()),
+        bool(properties.isResilient()),
+        bool(properties.isTypeExpansionSensitive()),
+        bool(properties.isOrContainsRawPointer()),
+        bool(properties.isLexical()),
+        bool(properties.isOrContainsPack()),
+        bool(properties.isAddressableForDependencies()),
+        bool(properties.isOrContainsRawLayout()),
+        bool(properties.mayHaveCustomDeinit()),
+        bool(properties.isVeryLargeType()),
+        bool(properties.definitelyIsAddressableForDependencies()),
+        bool(properties.definitelyIsOrContainsRawLayout()),
+        bool(properties.isEscapable()),
+    };
+    if (type->hasReferenceSemantics())
+      layout.referenceCountingSystem = type->getReferenceCounting();
+    layout.typeInfoRepresentation =
+        typeInfo.createSerializableHiddenTypeInfoRepresentation(IGM);
+    return layout;
   }
 
   IRABIDetailsProvider::FunctionABISignature
@@ -473,6 +507,11 @@ IRABIDetailsProvider::~IRABIDetailsProvider() {}
 std::optional<IRABIDetailsProvider::SizeAndAlignment>
 IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
   return impl->getTypeSizeAlignment(TD);
+}
+
+AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(
+    const NominalTypeDecl *TD) {
+  return impl->getAbstractTypeLayout(TD);
 }
 
 std::optional<LoweredFunctionSignature>

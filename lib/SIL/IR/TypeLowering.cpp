@@ -201,6 +201,33 @@ classifyType(AbstractionPattern origType, CanType type,
              TypeConverter &TC, TypeExpansionContext expansion);
 
 namespace {
+  static SILTypeProperties
+  decodeAbstractSILTypeProperties(const AbstractSILTypeProperties &serialized) {
+    return {
+        serialized.isTrivial ? IsTrivial : IsNotTrivial,
+        serialized.isFixedABI ? IsFixedABI : IsNotFixedABI,
+        serialized.isAddressOnly ? IsAddressOnly : IsNotAddressOnly,
+        serialized.isResilient ? IsResilient : IsNotResilient,
+        serialized.isTypeExpansionSensitive ? IsTypeExpansionSensitive
+                                            : IsNotTypeExpansionSensitive,
+        serialized.hasRawPointer ? HasRawPointer : DoesNotHaveRawPointer,
+        serialized.isLexical ? IsLexical : IsNotLexical,
+        serialized.hasPack ? HasPack : HasNoPack,
+        serialized.isAddressableForDependencies
+            ? IsAddressableForDependencies
+            : IsNotAddressableForDependencies,
+        serialized.hasRawLayout ? HasRawLayout : DoesNotHaveRawLayout,
+        serialized.mayHaveCustomDeinit ? MayHaveCustomDeinit
+                                       : HasOnlyDefaultDeinit,
+        serialized.isVeryLargeType ? IsVeryLargeType : IsNotVeryLargeType,
+        serialized.definitelyIsAddressableForDependencies
+            ? IsAddressableForDependencies
+            : IsNotAddressableForDependencies,
+        serialized.definitelyHasRawLayout ? HasRawLayout
+                                          : DoesNotHaveRawLayout,
+        serialized.isEscapable ? IsEscapable : IsNonEscapable};
+  }
+
   /// A CRTP helper class for doing things that depends on type
   /// classification.
   template <class Impl, class RetTy>
@@ -364,9 +391,13 @@ namespace {
     IMPL(AnyMetatype, Trivial)
     IMPL(Module, Trivial)
     IMPL(Integer, Trivial)
-    IMPL(Hidden, Trivial)
 
 #undef IMPL
+
+    RetTy visitHiddenType(CanHiddenType type, AbstractionPattern origType,
+                          IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("must be implemented by derived class");
+    }
 
     RetTy visitBuiltinUnboundGenericType(CanBuiltinUnboundGenericType type,
                                          AbstractionPattern origType,
@@ -1030,6 +1061,22 @@ namespace {
       // Consult the type properties.
       auto props = TC.getTypeProperties(origType, type, Expansion);
       return handleClassificationFromLowering(type, props, isSensitive);
+    }
+
+    SILTypeProperties
+    visitHiddenType(CanHiddenType type, AbstractionPattern origType,
+                    IsTypeExpansionSensitive_t isSensitive) {
+      auto *layoutInfo = type->getLayoutInfoDecl();
+      // TODO: Remove this legacy fallback once every HiddenType carries an
+      // abstract layout.
+      if (!layoutInfo)
+        return getTrivialSILTypeProperties(isSensitive);
+
+      assert(layoutInfo->Layout &&
+             "HiddenTypeLayoutInfoDecl should have abstract layout");
+      return mergeIsTypeExpansionSensitive(
+          isSensitive,
+          decodeAbstractSILTypeProperties(layoutInfo->Layout->typeProperties));
     }
 
   private:
@@ -2503,6 +2550,35 @@ namespace {
       properties = mergeHasPack(HasPack_t(T->hasAnyPack()), properties);
       auto type = SILType::getPrimitiveObjectType(T);
       return new (TC) MiscNontrivialTypeLowering(type, properties, Expansion);
+    }
+
+    TypeLowering *
+    visitHiddenType(CanHiddenType type, AbstractionPattern origType,
+                    IsTypeExpansionSensitive_t isSensitive) {
+      auto *layoutInfo = type->getLayoutInfoDecl();
+      // TODO: Remove this legacy fallback once every HiddenType carries an
+      // abstract layout.
+      if (!layoutInfo)
+        return handleTrivial(type,
+                             getTrivialSILTypeProperties(isSensitive));
+
+      assert(layoutInfo->Layout &&
+             "HiddenTypeLayoutInfoDecl should have abstract layout");
+      auto properties = mergeIsTypeExpansionSensitive(
+          isSensitive,
+          decodeAbstractSILTypeProperties(layoutInfo->Layout->typeProperties));
+      if (layoutInfo->Layout->referenceCountingSystem) {
+        if (*layoutInfo->Layout->referenceCountingSystem ==
+            ReferenceCounting::None)
+          return handleTrivial(type, properties);
+        return handleReference(type, properties);
+      }
+      if (properties.isAddressOnly())
+        return handleAddressOnly(type, properties);
+      assert(properties.isFixedABI() && "unsupported combination for now");
+      if (properties.isTrivial())
+        return handleTrivial(type, properties);
+      return handleNonTrivialAggregate(type, properties);
     }
 
     TypeLowering *handleInfinite(CanType type,

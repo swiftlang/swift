@@ -59,6 +59,8 @@ protected:
 public:
   const TypeInfo &getTypeInfo() const { return Layout.getType(); }
 
+  Type getInterfaceTypeForSerialization() const { return {}; }
+
   void completeFrom(const ElementLayout &layout) {
     Layout.completeFrom(layout);
   }
@@ -146,6 +148,7 @@ protected:
 
     for (const auto &field : getFields()) {
       SerializableRecordFieldRepresentation fieldRepresentation;
+      fieldRepresentation.type = field.getInterfaceTypeForSerialization();
       fieldRepresentation.typeInfo = field.getTypeInfo()
                                          .createSerializableHiddenTypeInfoRepresentation(
                                              IGM);
@@ -909,14 +912,6 @@ private:
 
 public:
   using super::getFields;
-
-  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const override {
-    auto representation =
-        std::make_unique<SerializableLoadableRecordTypeInfoRepresentation>();
-    populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
-    return representation;
-  }
 
   void loadAsCopy(IRGenFunction &IGF, Address addr,
                   Explosion &out) const override {

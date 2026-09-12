@@ -2169,6 +2169,35 @@ findNestedTypeDeclInModule(ModuleDecl *extensionModule,
   return findNestedTypeDeclInModule(nullptr, extensionModule, name, parent);
 }
 
+void ModuleFile::consumeHiddenTypeXRefPathPieces(
+    llvm::BitstreamCursor &cursor, uint32_t pathLen,
+    SmallVectorImpl<HiddenTypeLayoutInfoDecl::XRefPathPiece> &pieces) {
+  using namespace decls_block;
+  for (uint32_t index = 0; index < pathLen; ++index) {
+    auto entry = fatalIfUnexpected(
+        cursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      fatal(diagnoseFatal());
+
+    SmallVector<uint64_t, 8> scratch;
+    StringRef blobData;
+    unsigned recordID = fatalIfUnexpected(
+        cursor.readRecord(entry.ID, scratch, &blobData));
+    if (recordID != XREF_TYPE_PATH_PIECE)
+      fatal(diagnoseFatal());
+
+    IdentifierID nameID, privateDiscriminator;
+    bool inProtocolExtension, importedFromClang;
+    XRefTypePathPieceLayout::readRecord(
+        scratch, nameID, privateDiscriminator, inProtocolExtension,
+        importedFromClang);
+    if (privateDiscriminator)
+      fatal(diagnoseFatal());
+    pieces.push_back({getIdentifier(nameID), inProtocolExtension,
+                      importedFromClang});
+  }
+}
+
 Expected<Decl *>
 ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   using namespace decls_block;
@@ -3506,6 +3535,7 @@ class DeclDeserializer {
   ModuleFile &MF;
   ASTContext &ctx;
   Serialized<Decl *> &declOrOffset;
+  DeclID thisDeclID;
 
   bool IsInvalid = false;
 
@@ -3568,8 +3598,10 @@ class DeclDeserializer {
   llvm::Error finishRecursiveAttrs();
 
 public:
-  DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset)
-      : MF(MF), ctx(MF.getContext()), declOrOffset(declOrOffset) {}
+  DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset,
+                   DeclID declID)
+      : MF(MF), ctx(MF.getContext()), declOrOffset(declOrOffset),
+        thisDeclID(declID) {}
 
   ~DeclDeserializer() {
     if (!declOrOffset.isComplete()) {
@@ -5793,7 +5825,7 @@ ModuleFile::getDeclChecked(
       return std::move(error);
 
     Expected<Decl *> deserialized =
-      DeclDeserializer(*this, declOrOffset).getDeclCheckedImpl(
+      DeclDeserializer(*this, declOrOffset, DID).getDeclCheckedImpl(
         matchAttributes);
     if (!deserialized)
       return deserialized;
@@ -5822,6 +5854,435 @@ ModuleFile::getDeclChecked(
     });
 
   return declOrOffset;
+}
+
+namespace {
+static std::optional<llvm::Type::TypeID>
+getLLVMTypeID(uint64_t rawKind) {
+  using Kind = decls_block::SerializableLLVMTypeKind;
+  if (rawKind > static_cast<uint64_t>(Kind::Struct))
+    return std::nullopt;
+
+  switch (static_cast<Kind>(rawKind)) {
+  case Kind::Half: return llvm::Type::HalfTyID;
+  case Kind::BFloat: return llvm::Type::BFloatTyID;
+  case Kind::Float: return llvm::Type::FloatTyID;
+  case Kind::Double: return llvm::Type::DoubleTyID;
+  case Kind::X86FP80: return llvm::Type::X86_FP80TyID;
+  case Kind::FP128: return llvm::Type::FP128TyID;
+  case Kind::PPCFP128: return llvm::Type::PPC_FP128TyID;
+  case Kind::Integer: return llvm::Type::IntegerTyID;
+  case Kind::Pointer: return llvm::Type::PointerTyID;
+  case Kind::Array: return llvm::Type::ArrayTyID;
+  case Kind::FixedVector: return llvm::Type::FixedVectorTyID;
+  case Kind::Struct: return llvm::Type::StructTyID;
+  }
+  llvm_unreachable("unhandled serialized LLVM type kind");
+}
+
+static bool decodeSerializableReferenceCountingKind(
+    uint64_t rawKind, std::optional<ReferenceCounting> &result) {
+  using Kind = decls_block::SerializableReferenceCountingKind;
+  if (rawKind > static_cast<uint64_t>(Kind::Error))
+    return false;
+
+  switch (static_cast<Kind>(rawKind)) {
+  case Kind::Absent:
+    result = std::nullopt;
+    return true;
+  case Kind::Native: result = ReferenceCounting::Native; return true;
+  case Kind::ObjC: result = ReferenceCounting::ObjC; return true;
+  case Kind::None: result = ReferenceCounting::None; return true;
+  case Kind::Custom: result = ReferenceCounting::Custom; return true;
+  case Kind::Block: result = ReferenceCounting::Block; return true;
+  case Kind::Unknown: result = ReferenceCounting::Unknown; return true;
+  case Kind::Bridge: result = ReferenceCounting::Bridge; return true;
+  case Kind::Error: result = ReferenceCounting::Error; return true;
+  }
+  llvm_unreachable("unhandled serialized reference counting kind");
+}
+
+class SerializableTypeInfoReader {
+  struct BaseRecord {
+    uint64_t alignment;
+    bool triviallyDestroyable;
+    bool bitwiseTakable;
+    bool bitwiseBorrowable;
+    bool copyable;
+    bool alwaysFixedSize;
+    bool abiAccessible;
+  };
+
+  ModuleFile &MF;
+  llvm::BitstreamCursor &Cursor;
+  SmallVector<uint64_t, 64> Scratch;
+  bool Invalid = false;
+
+  template <typename Layout, typename... Values>
+  bool readRecord(Values &...values) {
+    Scratch.clear();
+    auto entry = Cursor.advance(AF_DontPopBlockAtEnd);
+    if (!entry) {
+      llvm::consumeError(entry.takeError());
+      Invalid = true;
+      return false;
+    }
+    if (entry->Kind != llvm::BitstreamEntry::Record) {
+      Invalid = true;
+      return false;
+    }
+
+    auto recordID = Cursor.readRecord(entry->ID, Scratch);
+    if (!recordID) {
+      llvm::consumeError(recordID.takeError());
+      Invalid = true;
+      return false;
+    }
+    if (*recordID != Layout::Code) {
+      Invalid = true;
+      return false;
+    }
+
+    if constexpr (sizeof...(Values) == 0) {
+      if (!Scratch.empty()) {
+        Invalid = true;
+        return false;
+      }
+    } else {
+      Layout::readRecord(Scratch, values...);
+    }
+    return true;
+  }
+
+  std::unique_ptr<SerializableLLVMTypeRepresentation> readLLVMType() {
+    using namespace decls_block;
+    uint64_t rawKind;
+    uint64_t payload;
+    bool packed;
+    uint64_t childCount;
+    if (!readRecord<SerializableLLVMTypeLayout>(rawKind, payload, packed,
+                                                childCount))
+      return nullptr;
+
+    auto kind = getLLVMTypeID(rawKind);
+    if (!kind) {
+      Invalid = true;
+      return nullptr;
+    }
+
+    auto result =
+        std::make_unique<SerializableLLVMTypeRepresentation>(*kind);
+    result->payload = payload;
+    result->packed = packed;
+    for (uint64_t childIndex = 0; childIndex < childCount; ++childIndex) {
+      auto child = readLLVMType();
+      if (!child)
+        return nullptr;
+      result->children.push_back(std::move(child));
+    }
+    return result;
+  }
+
+  bool readSerializableTypeInfoBase(
+      SerializableHiddenTypeInfoRepresentation &result,
+      const BaseRecord &record) {
+    result.alignment = record.alignment;
+    if (result.alignment == 0 ||
+        !llvm::isPowerOf2_64(result.alignment))
+      Invalid = true;
+    result.triviallyDestroyable = record.triviallyDestroyable;
+    result.bitwiseTakable = record.bitwiseTakable;
+    result.bitwiseBorrowable = record.bitwiseBorrowable;
+    result.copyable = record.copyable;
+    result.alwaysFixedSize = record.alwaysFixedSize;
+    result.abiAccessible = record.abiAccessible;
+    result.storageType = readLLVMType();
+    return result.storageType != nullptr;
+  }
+
+  bool readSerializableFixedTypeInfo(
+      SerializableFixedTypeInfoRepresentation &result,
+      const BaseRecord &baseRecord) {
+    using namespace decls_block;
+    if (!readSerializableTypeInfoBase(result, baseRecord))
+      return false;
+
+    uint64_t size;
+    uint64_t bitCount;
+    ArrayRef<uint64_t> spareBitWords;
+    if (!readRecord<SerializableFixedTypeInfoLayout>(
+            size, bitCount, spareBitWords))
+      return false;
+    result.size = size;
+    if (bitCount) {
+      if (spareBitWords.size() != llvm::APInt::getNumWords(bitCount)) {
+        Invalid = true;
+        return false;
+      }
+      result.spareBits = irgen::SpareBitVector::fromAPInt(
+          llvm::APInt(bitCount, spareBitWords));
+    } else if (!spareBitWords.empty()) {
+      Invalid = true;
+      return false;
+    }
+    return true;
+  }
+
+  bool readSerializableLoadableTypeInfo(
+      SerializableLoadableTypeInfoRepresentation &result,
+      const BaseRecord &baseRecord) {
+    using namespace decls_block;
+    if (!readSerializableFixedTypeInfo(result, baseRecord))
+      return false;
+
+    uint64_t schemaCount;
+    if (!readRecord<SerializableLoadableTypeInfoLayout>(schemaCount))
+      return false;
+    for (uint64_t schemaIndex = 0; schemaIndex < schemaCount; ++schemaIndex) {
+      SerializableExplosionSchemaElement element;
+      if (!readRecord<SerializableExplosionSchemaElementLayout>(
+              element.aggregateAlignment))
+        return false;
+      element.type = readLLVMType();
+      if (!element.type)
+        return false;
+      result.schema.push_back(std::move(element));
+    }
+    return true;
+  }
+
+  bool readSerializableRecordTypeInfo(
+      SerializableLoadableRecordTypeInfoRepresentation &result,
+      const BaseRecord &baseRecord) {
+    using namespace decls_block;
+    if (!readSerializableLoadableTypeInfo(result, baseRecord))
+      return false;
+
+    uint64_t explosionSize;
+    uint64_t fieldCount;
+    if (!readRecord<SerializableRecordTypeInfoLayout>(
+            result.fieldsAreABIAccessible, explosionSize, fieldCount))
+      return false;
+    result.explosionSize = explosionSize;
+    for (uint64_t fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex) {
+      SerializableRecordFieldRepresentation field;
+      swift::serialization::TypeID fieldTypeID;
+      uint64_t index;
+      bool isTriviallyDestroyable;
+      uint64_t layoutKind;
+      if (!readRecord<SerializableRecordFieldLayout>(
+              fieldTypeID, field.layout.ByteOffset,
+              field.layout.ByteOffsetForLayout, index,
+              isTriviallyDestroyable, layoutKind,
+              field.storage.Begin, field.storage.End))
+        return false;
+      if (fieldTypeID) {
+        auto fieldType = MF.getTypeChecked(fieldTypeID);
+        if (fieldType)
+          field.type = *fieldType;
+        else
+          llvm::consumeError(fieldType.takeError());
+      }
+      field.layout.Index = index;
+      field.layout.IsTriviallyDestroyable = isTriviallyDestroyable;
+      field.layout.TheKind = layoutKind;
+      field.typeInfo = readTypeInfo();
+      if (!field.typeInfo)
+        return false;
+      result.fields.push_back(std::move(field));
+    }
+    return true;
+  }
+
+  bool readSerializableClangRecordTypeInfo(
+      SerializableLoadableClangRecordTypeInfoRepresentation &result,
+      const BaseRecord &baseRecord) {
+    using namespace decls_block;
+    if (!readSerializableRecordTypeInfo(result, baseRecord))
+      return false;
+
+    uint64_t inputCount;
+    if (!readRecord<SerializableLoadableClangRecordTypeInfoLayout>(
+            result.hasReferenceField, inputCount))
+      return false;
+    for (uint64_t inputIndex = 0; inputIndex < inputCount; ++inputIndex) {
+      SerializableAggLoweringInputRepresentation input;
+      bool hasType;
+      if (!readRecord<SerializableAggLoweringInputLayout>(
+              input.begin, input.end, hasType))
+        return false;
+      if (hasType) {
+        input.type = readLLVMType();
+        if (!input.type)
+          return false;
+      }
+      result.aggLoweringInputs.push_back(std::move(input));
+    }
+    return true;
+  }
+
+public:
+  SerializableTypeInfoReader(ModuleFile &moduleFile,
+                             llvm::BitstreamCursor &cursor)
+      : MF(moduleFile), Cursor(cursor) {}
+
+  std::optional<AbstractSILTypeProperties> readSILTypeProperties() {
+    using namespace decls_block;
+    AbstractSILTypeProperties properties;
+    if (!readRecord<SerializableSILTypePropertiesLayout>(
+            properties.isTrivial, properties.isFixedABI,
+            properties.isAddressOnly, properties.isResilient,
+            properties.isTypeExpansionSensitive, properties.hasRawPointer,
+            properties.isLexical, properties.hasPack,
+            properties.isAddressableForDependencies, properties.hasRawLayout,
+            properties.mayHaveCustomDeinit, properties.isVeryLargeType,
+            properties.definitelyIsAddressableForDependencies,
+            properties.definitelyHasRawLayout, properties.isEscapable))
+      return std::nullopt;
+    return properties;
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation> readTypeInfo() {
+    using namespace decls_block;
+    uint64_t rawKind;
+    BaseRecord baseRecord;
+    if (!readRecord<SerializableTypeInfoLayout>(
+            rawKind, baseRecord.alignment, baseRecord.triviallyDestroyable,
+            baseRecord.bitwiseTakable, baseRecord.bitwiseBorrowable,
+            baseRecord.copyable, baseRecord.alwaysFixedSize,
+            baseRecord.abiAccessible))
+      return nullptr;
+
+    if (rawKind > static_cast<uint64_t>(
+                      SerializableHiddenTypeInfoKind::LoadableClangRecord)) {
+      Invalid = true;
+      return nullptr;
+    }
+    auto kind = static_cast<SerializableHiddenTypeInfoKind>(rawKind);
+    switch (kind) {
+    case SerializableHiddenTypeInfoKind::TypeInfo: {
+      auto result =
+          std::make_unique<SerializableHiddenTypeInfoRepresentation>();
+      if (!readSerializableTypeInfoBase(*result, baseRecord) || Invalid)
+        return nullptr;
+      return result;
+    }
+    case SerializableHiddenTypeInfoKind::Fixed: {
+      auto result =
+          std::make_unique<SerializableFixedTypeInfoRepresentation>();
+      if (!readSerializableFixedTypeInfo(*result, baseRecord) || Invalid)
+        return nullptr;
+      return result;
+    }
+    case SerializableHiddenTypeInfoKind::Loadable: {
+      auto result =
+          std::make_unique<SerializableLoadableTypeInfoRepresentation>();
+      if (!readSerializableLoadableTypeInfo(*result, baseRecord) || Invalid)
+        return nullptr;
+      return result;
+    }
+    case SerializableHiddenTypeInfoKind::Primitive: {
+      auto result =
+          std::make_unique<SerializablePrimitiveTypeInfoRepresentation>();
+      if (!readSerializableLoadableTypeInfo(*result, baseRecord) || Invalid)
+        return nullptr;
+      return result;
+    }
+    case SerializableHiddenTypeInfoKind::OpaqueStorage: {
+      auto result = std::make_unique<
+          SerializableOpaqueStorageTypeInfoRepresentation>();
+      if (!readSerializableLoadableTypeInfo(*result, baseRecord) || Invalid)
+        return nullptr;
+      return result;
+    }
+    case SerializableHiddenTypeInfoKind::LoadableRecord: {
+      auto result =
+          std::make_unique<SerializableLoadableRecordTypeInfoRepresentation>();
+      if (!readSerializableRecordTypeInfo(*result, baseRecord) || Invalid)
+        return nullptr;
+      return result;
+    }
+    case SerializableHiddenTypeInfoKind::LoadableStruct: {
+      auto result =
+          std::make_unique<SerializableLoadableStructTypeInfoRepresentation>();
+      if (!readSerializableRecordTypeInfo(*result, baseRecord) || Invalid)
+        return nullptr;
+      return result;
+    }
+    case SerializableHiddenTypeInfoKind::LoadableClangRecord: {
+      auto result = std::make_unique<
+          SerializableLoadableClangRecordTypeInfoRepresentation>();
+      if (!readSerializableClangRecordTypeInfo(*result, baseRecord) || Invalid)
+        return nullptr;
+      return result;
+    }
+    }
+    llvm_unreachable("unhandled serializable TypeInfo kind");
+  }
+};
+} // namespace
+
+llvm::Expected<HiddenTypeLayoutInfoDecl *>
+ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
+  using namespace decls_block;
+  if (!DID)
+    return nullptr;
+
+  assert(DID <= HiddenTypeLayoutInfoDecls.size() &&
+         "invalid hidden type layout decl ID");
+  auto &declOrOffset = HiddenTypeLayoutInfoDecls[DID - 1];
+  if (declOrOffset.isComplete())
+    return cast<HiddenTypeLayoutInfoDecl>(declOrOffset.get());
+
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  if (auto error =
+          diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(declOrOffset)))
+    return std::move(error);
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  auto entry = fatalIfUnexpected(
+      DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return diagnoseFatal();
+  unsigned recordID = fatalIfUnexpected(
+      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+  if (recordID != HIDDEN_TYPE_LAYOUT_INFO)
+    return diagnoseFatal();
+
+  IdentifierID mangledNameID;
+  DeclID parentDeclID;
+  uint64_t rawReferenceCounting;
+  HiddenTypeLayoutInfoLayout::readRecord(
+      scratch, mangledNameID, parentDeclID, rawReferenceCounting);
+
+  std::optional<ReferenceCounting> referenceCounting;
+  if (!decodeSerializableReferenceCountingKind(rawReferenceCounting,
+                                               referenceCounting))
+    return diagnoseFatal();
+
+  SerializableTypeInfoReader reader(*this, DeclTypeCursor);
+  auto typeProperties = reader.readSILTypeProperties();
+  if (!typeProperties)
+    return diagnoseFatal();
+  auto representation = reader.readTypeInfo();
+  if (!representation)
+    return diagnoseFatal();
+
+  auto *decl = HiddenTypeLayoutInfoDecl::create(getContext(),
+                                                 getAssociatedModule());
+  decl->MangledName = getIdentifierText(mangledNameID);
+  if (parentDeclID)
+    decl->ParentDecl = dyn_cast<TypeDecl>(getDecl(parentDeclID));
+
+  auto layout = std::make_unique<AbstractTypeLayout>();
+  layout->typeProperties = *typeProperties;
+  layout->referenceCountingSystem = referenceCounting;
+  layout->typeInfoRepresentation = std::move(representation);
+  decl->Layout = layout.get();
+  DeserializedHiddenTypeLayouts.push_back(std::move(layout));
+  declOrOffset = decl;
+  return decl;
 }
 
 static std::optional<AvailabilityDomainKind>
@@ -7022,6 +7483,45 @@ DeclDeserializer::getDeclCheckedImpl(
     ModuleID baseModuleID;
     uint32_t pathLen;
     decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
+
+    auto fallback = MF.HiddenTypeFallbackMap.find(thisDeclID);
+    bool canUseHiddenTypeFallback =
+        fallback != MF.HiddenTypeFallbackMap.end() &&
+        MF.getContext().LangOpts.hasFeature(
+            Feature::SerializeAbstractTypeLayoutForHiddenTypes);
+    if (canUseHiddenTypeFallback) {
+      SmallVector<HiddenTypeLayoutInfoDecl::XRefPathPiece, 2> originalPath;
+      auto pathCursor = MF.DeclTypeCursor;
+      MF.consumeHiddenTypeXRefPathPieces(pathCursor, pathLen, originalPath);
+
+      auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
+      if (resolved) {
+        declOrOffset = resolved.get();
+        break;
+      }
+
+      auto hidden = MF.getHiddenTypeLayoutInfoDecl(fallback->second);
+      if (!hidden) {
+        llvm::consumeError(resolved.takeError());
+        return hidden.takeError();
+      }
+      if (!hidden.get())
+        return resolved;
+
+      if (baseModuleID == OBJC_HEADER_MODULE_ID) {
+        hidden.get()->OriginalModuleIsObjCHeader = true;
+      } else {
+        assert(baseModuleID >= NUM_SPECIAL_IDS &&
+               "unexpected special module in hidden type XREF");
+        hidden.get()->OriginalModuleName = MF.getIdentifier(baseModuleID);
+      }
+      hidden.get()->OriginalXRefPath =
+          MF.getContext().AllocateCopy(originalPath);
+      declOrOffset = hidden.get();
+      llvm::consumeError(resolved.takeError());
+      break;
+    }
+
     auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
     if (!resolved)
       return resolved;
@@ -7424,12 +7924,20 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
   if (!parentTy)
     return parentTy.takeError();
 
-  auto nominalOrError = MF.getDeclChecked(declID);
-  if (!nominalOrError)
-    return nominalOrError.takeError();
+  auto declOrError = MF.getDeclChecked(declID);
+  if (!declOrError)
+    return declOrError.takeError();
+
+  if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(declOrError.get())) {
+    CanType parent = parentTy.get()
+                         ? parentTy.get()->getCanonicalType()
+                         : CanType();
+    return HiddenType::get(MF.getContext(), hidden->MangledName,
+                           MF.getAssociatedModule(), hidden, parent);
+  }
 
   // Look through compatibility aliases.
-  if (auto *alias = dyn_cast<TypeAliasDecl>(nominalOrError.get())) {
+  if (auto *alias = dyn_cast<TypeAliasDecl>(declOrError.get())) {
     // Reminder: TypeBase::getAs will look through sugar. But we don't want to
     // do that here, so we do isa<> checks on the TypeBase itself instead of
     // using the Type wrapper.
@@ -7448,15 +7956,15 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
     // We only want to use the type we found if it's a simple non-generic
     // nominal type.
     if (auto simpleNominalTy = dyn_cast_or_null<NominalType>(underlyingTy)) {
-      nominalOrError = simpleNominalTy->getDecl();
-      (void)!nominalOrError; // "Check" the llvm::Expected<> value.
+      declOrError = simpleNominalTy->getDecl();
+      (void)!declOrError; // "Check" the llvm::Expected<> value.
     }
   }
 
-  auto nominal = dyn_cast<NominalTypeDecl>(nominalOrError.get());
+  auto nominal = dyn_cast<NominalTypeDecl>(declOrError.get());
   if (!nominal) {
-    XRefTracePath tinyTrace{*nominalOrError.get()->getModuleContext()};
-    const DeclName fullName = cast<ValueDecl>(nominalOrError.get())->getName();
+    XRefTracePath tinyTrace{*declOrError.get()->getModuleContext()};
+    const DeclName fullName = cast<ValueDecl>(declOrError.get())->getName();
     tinyTrace.addValue(fullName.getBaseIdentifier());
     return llvm::make_error<XRefError>("declaration is not a nominal type",
                                        tinyTrace, fullName);
