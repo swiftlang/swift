@@ -101,6 +101,32 @@ extension MutableSpan where Element: ~Copyable {
     self = unsafe _overrideLifetime(ms, borrowing: buffer)
   }
 
+  /// Unsafely create a `MutableSpan` over the given elements, based on the
+  /// mutating lifetime of `owner` rather than that of `buffer`.
+  ///
+  /// Use this initializer when the memory referenced by `buffer` is also
+  /// referenced by another longer-lived value.
+  ///
+  /// The memory referenced by `buffer` must remain valid for as long as this
+  /// span exists, and `owner` must be a value that keeps that memory alive.
+  /// This initializer can verify neither requirement; therefore, it is an unsafe
+  /// operation.
+  ///
+  /// - Parameters:
+  ///   - buffer: An `UnsafeMutableBufferPointer` to initialized elements.
+  ///   - owner: The value whose mutating lifetime the new span depends on.
+  @unsafe
+  @export(implementation)
+  @_transparent
+  @_lifetime(&owner)
+  public init<Owner: ~Copyable & ~Escapable>(
+    _unsafeElements buffer: UnsafeMutableBufferPointer<Element>,
+    mutating owner: inout Owner
+  ) {
+    let ms = unsafe MutableSpan(_unsafeElements: buffer)
+    self = unsafe _overrideLifetime(ms, mutating: &owner)
+  }
+
   @unsafe
   @export(implementation)
   @_transparent
@@ -540,7 +566,9 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The buffer pointer passed as an argument to `body` is valid only
   /// during the execution of `withUnsafeMutableBufferPointer(_:)`.
-  /// Do not store or return the pointer for later use.
+  /// Do not store or return the pointer for later use. To derive a value that
+  /// stores the pointer and outlives the call, use
+  /// `consumeWithUnsafeMutableBufferPointer(_:)`.
   ///
   /// - Parameter body: A closure with an `UnsafeMutableBufferPointer`
   ///   parameter that points to the viewed contiguous storage. If `body`
@@ -565,6 +593,55 @@ extension MutableSpan where Element: ~Copyable {
       buffer throws(E) -> Result in
       try unsafe body(buffer)
     }
+  }
+
+  /// Consume this span and call a closure with a pointer to the viewed mutable
+  /// contiguous storage.
+  ///
+  /// Use this method to derive a new non-escapable value with exclusive access to
+  /// the memory represented by this span. It is an alternative to `MutableSpan`'s
+  /// `extracting` methods for deriving values of types other than `MutableSpan`.
+  ///
+  /// The pointer is passed as `inout` so that `body` has a mutating scope to
+  /// construct against: a non-escapable value with a checked exclusive dependence
+  /// (i.e., not `@_lifetime(immortal)`) must be initialized from an `inout`
+  /// argument, and an exclusive access created inside `body` would not outlive
+  /// the closure. On return, that dependency is replaced by this span's own. An
+  /// escapable result has no dependency; hence, return an escapable value only
+  /// if it does not store the pointer.
+  ///
+  /// On return from `body` or throwing, `buffer` must still address the same
+  /// region it was given. Changing its base address or count traps, and any
+  /// pointer `body` derives must also lie within that region. This method can
+  /// verify none of these requirements; therefore, it is an unsafe operation.
+  ///
+  /// - Parameter body: A closure with an `UnsafeMutableBufferPointer`
+  ///   parameter that points to the viewed contiguous storage. If `body`
+  ///   has a return value, that value is also used as the return value
+  ///   for the `consumeWithUnsafeMutableBufferPointer(_:)` method.
+  /// - Returns: The return value of the `body` closure parameter.
+  @unsafe
+  @export(implementation)
+  @_transparent
+  @_lifetime(copy self)
+  public consuming func consumeWithUnsafeMutableBufferPointer<
+    E: Error, Result: ~Copyable & ~Escapable
+  >(
+    _ body: @_lifetime(&buffer) (
+      _ buffer: inout UnsafeMutableBufferPointer<Element>
+    ) throws(E) -> Result
+  ) throws(E) -> Result {
+    var buffer = unsafe UnsafeMutableBufferPointer<Element>(
+      start: _pointer?.assumingMemoryBound(to: Element.self), count: _count
+    )
+    let original = unsafe buffer
+    defer {
+      _precondition(
+        original.isTriviallyIdentical(to: buffer),
+        "buffer must address the same region on return from consumeWithUnsafeMutableBufferPointer(_:)"
+      )
+    }
+    return unsafe _overrideLifetime(try unsafe body(&buffer), copying: self)
   }
 }
 
@@ -622,6 +699,55 @@ extension MutableSpan where Element: BitwiseCopyable {
       start: _pointer, count: _count &* MemoryLayout<Element>.stride
     )
     return try unsafe body(bytes)
+  }
+
+  /// Consume this span and call a closure with a mutable pointer to the
+  /// underlying bytes of the viewed contiguous storage.
+  ///
+  /// Use this method to derive a new non-escapable value with exclusive access to
+  /// the memory represented by this span. It is an alternative to `MutableSpan`'s
+  /// `extracting` methods for deriving values of types other than `MutableSpan`.
+  ///
+  /// The pointer is passed as `inout` so that `body` has a mutating scope to
+  /// construct against: a non-escapable value with a checked exclusive dependence
+  /// (i.e., not `@_lifetime(immortal)`) must be initialized from an `inout`
+  /// argument, and an exclusive access created inside `body` would not outlive
+  /// the closure. On return, that dependency is replaced by this span's own. An
+  /// escapable result has no dependency; hence, return an escapable value only
+  /// if it does not store the pointer.
+  ///
+  /// On return from `body` or throwing, `bytes` must still address the same
+  /// region it was given. Changing its base address or count traps, and any
+  /// pointer `body` derives must also lie within that region. This method can
+  /// verify none of these requirements; therefore, it is an unsafe operation.
+  ///
+  /// - Parameter body: A closure with an `UnsafeMutableRawBufferPointer`
+  ///   parameter that points to the viewed contiguous storage. If `body`
+  ///   has a return value, that value is also used as the return value
+  ///   for the `consumeWithUnsafeMutableBytes(_:)` method.
+  /// - Returns: The return value of the `body` closure parameter.
+  @unsafe
+  @export(implementation)
+  @_transparent
+  @_lifetime(copy self)
+  public consuming func consumeWithUnsafeMutableBytes<
+    E: Error, Result: ~Copyable & ~Escapable
+  >(
+    _ body: @_lifetime(&bytes) (
+      _ bytes: inout UnsafeMutableRawBufferPointer
+    ) throws(E) -> Result
+  ) throws(E) -> Result {
+    var bytes = unsafe UnsafeMutableRawBufferPointer(
+      start: _pointer, count: _count &* MemoryLayout<Element>.stride
+    )
+    let original = unsafe bytes
+    defer {
+      _precondition(
+        original.isTriviallyIdentical(to: bytes),
+        "bytes must address the same region on return from consumeWithUnsafeMutableBytes(_:)"
+      )
+    }
+    return unsafe _overrideLifetime(try unsafe body(&bytes), copying: self)
   }
 }
 
