@@ -371,15 +371,6 @@ function(add_pure_swift_host_library name)
     # NOTE: workaround for CMake not setting up include flags.
     INTERFACE_INCLUDE_DIRECTORIES ${module_dir})
 
-  # Workaround to touch the library and its objects so that we don't
-  # continually rebuild (again, see corresponding change in swift-syntax).
-  add_custom_command(
-      TARGET ${name}
-      POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}> "${module_file}"
-      COMMAND_EXPAND_LISTS
-      COMMENT "Update mtime of library outputs workaround")
-
   # Downstream linking should include the swiftmodule in debug builds to allow lldb to
   # work correctly. Only do this on Darwin since neither gold (currently used by default
   # on Linux), nor the default Windows linker 'link' support '-add_ast_path'.
@@ -516,25 +507,6 @@ function(add_pure_swift_host_tool name)
     target_link_options(${name} PRIVATE
       "SHELL:-Xlinker --build-id=sha1")
   endif()
-
-  # Workaround to touch the library and its objects so that we don't
-  # continually rebuild (again, see corresponding change in swift-syntax).
-  add_custom_command(
-      TARGET ${name}
-      POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}>
-      COMMAND_EXPAND_LISTS
-      COMMENT "Update mtime of executable outputs workaround")
-
-  # Even worse hack - ${name}.swiftmodule is added as an output, even though
-  # this is an executable target. Just touch it all the time to avoid having
-  # to rebuild it every time.
-  add_custom_command(
-      TARGET ${name}
-      POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/${name}.swiftmodule"
-      COMMAND_EXPAND_LISTS
-      COMMENT "Update mtime of executable outputs workaround")
 
   if(NOT APSHT_SWIFT_COMPONENT STREQUAL no_component)
     add_dependencies(${APSHT_SWIFT_COMPONENT} ${name})

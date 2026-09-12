@@ -26,4 +26,5 @@ add_swift_macro_library(SwiftMacros
     SwiftSyntax
     SwiftSyntaxBuilder
     SwiftSyntaxMacros
+    SwiftOperators
 )

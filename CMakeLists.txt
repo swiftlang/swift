@@ -1,29 +1,11 @@
-cmake_minimum_required(VERSION 3.24)
-
+cmake_minimum_required(VERSION 3.29)
 
 #  set_property(GLOBAL PROPERTY GLOBAL_DEPENDS_DEBUG_MODE 1)
 
 # TODO: Fix RPATH usage to be CMP0068 compliant
 # Disable Policy CMP0068 for CMake 3.9
 # rdar://37725888
-if(POLICY CMP0068)
-  cmake_policy(SET CMP0068 OLD)
-endif()
-
-# Honour CMAKE_CXX_STANDARD in try_compile(), needed for check_cxx_native_regex.
-if(POLICY CMP0067)
-  cmake_policy(SET CMP0067 NEW)
-endif()
-
-# Convert relative paths to absolute for subdirectory `target_sources`
-if(POLICY CMP0076)
-  cmake_policy(SET CMP0076 NEW)
-endif()
-
-# Don't clobber existing variable values when evaluating `option()` declarations.
-if(POLICY CMP0077)
-  cmake_policy(SET CMP0077 NEW)
-endif()
+cmake_policy(SET CMP0068 OLD)
 
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
