@@ -165,6 +165,8 @@ ERROR(escaping_inout_capture,none,
       (unsigned, Identifier))
 NOTE(inout_param_defined_here,none,
      "parameter %0 is declared 'inout'", (Identifier))
+NOTE(escaping_inout_capture_copy_fixit,none,
+     "capture %0 explicitly to copy the value", (Identifier))
 ERROR(escaping_mutable_self_capture,none,
       SELECT_ESCAPING_CLOSURE_KIND
       " captures mutating 'self' parameter", (unsigned))
