@@ -18,4 +18,16 @@ StdStringOptTestSuite.test("std::string with Hashable conformance optimized") {
     expectEqual(dict.count, 0)
 }
 
+StdStringOptTestSuite.test("Dictionary with std::string Key") {
+  var r = [std.string: Int]()
+  r[std.string("x")] = 1
+  expectEqual(r[std.string("x")], 1)
+}
+
+StdStringOptTestSuite.test("Set with std::string Element") {
+  var s = Set<std.string>()
+  s.insert(std.string("x"))
+  expectTrue(s.contains(std.string("x")))
+}
+
 runAllTests()
