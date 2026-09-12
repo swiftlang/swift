@@ -177,7 +177,7 @@ protocol P_44221 {}
 class C_44221: NSObject, P_44221 {}
 // Existentials
 func is_foreign_anyobject(a: AnyObject) -> Bool {
-  return a is CGColor // expected-warning {{'is' test is always true because 'CGColor' is a Core Foundation type}}
+  return a is CGColor // expected-warning {{'is' test is always true because 'CGColor' is a Core Foundation type}} {{group-name=DynamicCast}}
 }
 
 func is_foreign_any(a: Any) -> Bool {

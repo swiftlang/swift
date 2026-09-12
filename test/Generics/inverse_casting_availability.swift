@@ -63,7 +63,7 @@ func noAvailabilityNeeded<T>(_ generic: NCG<T>, _ concrete: NCG<All>) {
   _ = concrete as? any P // expected-warning {{conditional_downcast_coercion}}
   _ = generic as? any P  // expected-warning {{conditional_downcast_coercion}}
 
-  _ = concrete is any P  // expected-warning {{isa_is_always_true}}
+  _ = concrete is any P  // expected-warning {{isa_is_always_true}} {{group-name=DynamicCast}}
   _ = generic is any P   // expected-warning {{isa_is_always_true}}
 
   _ = concrete as! any P // expected-warning {{forced_downcast_coercion}}
