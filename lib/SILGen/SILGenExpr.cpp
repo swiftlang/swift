@@ -1199,6 +1199,84 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
                                              enterDestroyCleanup(buffer));
 }
 
+static ManagedValue emitForcedErrorCast(SILGenFunction &SGF, SILLocation loc,
+                                        ManagedValue erasedError,
+                                        CanType typedErrorType) {
+  auto &typedErrorTL = SGF.getTypeLowering(typedErrorType);
+  auto castOptions = CheckedCastInstOptions();
+  auto erasedErrorType = erasedError.getType().getASTType();
+  bool requiresAddressCast = !canSILUseScalarCheckedCastInstructions(
+      SGF.SGM.M, SGF.F.hasLoweredAddresses(), erasedErrorType, typedErrorType);
+
+  if (requiresAddressCast) {
+    // If an address cast is required, move the erased error into
+    // a temporary buffer and initialize the typed error in a new one.
+    auto erasedErrorAddr = erasedError.materialize(SGF, loc);
+    auto typedErrorAddr =
+        SGF.emitTemporaryAllocation(loc, typedErrorTL.getLoweredType());
+
+    SGF.B.createUnconditionalCheckedCastAddr(
+        loc, castOptions, erasedErrorAddr.forward(SGF), erasedErrorType,
+        typedErrorAddr, typedErrorType);
+
+    ManagedValue typedError =
+        SGF.emitManagedBufferWithCleanup(typedErrorAddr, typedErrorTL);
+    return typedError;
+  }
+
+  // Otherwise, cast the erased error directly to the typed error.
+  ManagedValue typedError = SGF.B.createUnconditionalCheckedCast(
+      loc, castOptions, std::move(erasedError), typedErrorTL.getLoweredType(),
+      typedErrorType);
+  return typedError;
+}
+
+SILGenFunction::AsyncLetTypedErrorEmission::AsyncLetTypedErrorEmission(
+    SILGenFunction &SGF, SILLocation loc, CanType errorType)
+    : SGF(SGF), Loc(loc), ErrorType(errorType), OldThrowDest(SGF.ThrowDest),
+      ErasedErrorBB(SGF.createBasicBlock(FunctionSection::Postmatter)) {
+  assert(loc && "cannot pass a null location");
+
+  // Make the error block receive the erased error as an argument.
+  auto erasedErrorType = SILType::getExceptionType(SGF.getASTContext());
+  ErasedErrorBB->createPhiArgument(erasedErrorType, OwnershipKind::Owned);
+
+  // Route thrown errors to the temporary error block.
+  SGF.ThrowDest = JumpDest(ErasedErrorBB, SGF.Cleanups.getCleanupsDepth(),
+                           CleanupLocation(loc), ThrownErrorInfo(SILValue()));
+}
+
+void SILGenFunction::AsyncLetTypedErrorEmission::finish() {
+  assert(ErasedErrorBB && "emission already finished");
+
+  auto erasedErrorBB = ErasedErrorBB;
+  SGF.ThrowDest = OldThrowDest;
+
+  // If there are no uses of the catch block, just drop it.
+  if (erasedErrorBB->pred_empty()) {
+    SGF.eraseBasicBlock(erasedErrorBB);
+  } else {
+    // Otherwise, we need to emit it.
+    SILGenSavedInsertionPoint scope(SGF, erasedErrorBB,
+                                    FunctionSection::Postmatter);
+    FullExpr catchCleanups(SGF.Cleanups, CleanupLocation(Loc));
+
+    // Cast the captured erased error back to the typed error.
+    assert(erasedErrorBB->getNumArguments() == 1 &&
+           "typed async-let error block must receive one erased error");
+    auto erasedError =
+        ManagedValue::forForwardedRValue(SGF, erasedErrorBB->getArgument(0));
+    auto typedError =
+        emitForcedErrorCast(SGF, Loc, std::move(erasedError), ErrorType);
+
+    // Propagate the typed error to the original throw destination.
+    SGF.emitThrow(Loc, std::move(typedError));
+  }
+
+  // Prevent double-finishing and make the destructor a no-op.
+  ErasedErrorBB = nullptr;
+}
+
 SILGenFunction::ForceTryEmission::ForceTryEmission(SILGenFunction &SGF,
                                                    ForceTryExpr *loc)
     : SGF(SGF), Loc(loc), OldThrowDest(SGF.ThrowDest) {
