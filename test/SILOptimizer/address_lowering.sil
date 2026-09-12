@@ -35,6 +35,11 @@ struct I {}
 
 class Klass {}
 
+struct BigRef<T> {
+  var a: T
+  var ref: Klass
+}
+
 struct LoadableTrivialExtractable {
     var i: I
 }
@@ -901,9 +906,9 @@ bb0(%0 : @owned $SRef<T>):
 // CHECK:   [[L:%.*]] = load_borrow [[E0]] : $*AnyObject
 // CHECK:   apply %{{.*}}([[L]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
 // CHECK:   [[C:%.*]] = copy_value [[L]] : $AnyObject
+// CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   [[E1:%.*]] = struct_element_addr %2 : $*SRef<T>, #SRef.element
 // CHECK:   copy_addr [[E1]] to [init] %1 : $*T
-// CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   destroy_addr %2 : $*SRef<T>
 // CHECK:   store [[C]] to [init] %0 : $*AnyObject
 // CHECK-NOT: dealloc_stack
@@ -953,9 +958,9 @@ bb0(%0 : @owned $(AnyObject, T)):
 // CHECK:   [[L:%.*]] = load_borrow [[E0]] : $*AnyObject
 // CHECK:   apply %{{.*}}([[L]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
 // CHECK:   [[C:%.*]] = copy_value [[L]] : $AnyObject
+// CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   [[E1:%.*]] = tuple_element_addr %2 : $*(AnyObject, T), 1
 // CHECK:   copy_addr [[E1]] to [init] %1 : $*T
-// CHECK:   end_borrow [[L]] : $AnyObject
 // CHECK:   destroy_addr %2 : $*(AnyObject, T)
 // CHECK:   store [[C]] to [init] %0 : $*AnyObject
 // CHECK-NOT: dealloc_stack
@@ -3842,3 +3847,53 @@ bb0:
   return %0 : $T
 }
 
+
+sil hidden [ossa] @zzaMultiResultPair : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
+bb0(%0 : @guaranteed $T):
+  %1 = copy_value %0 : $T
+  %2 = copy_value %0 : $T
+  %3 = tuple (%1 : $T, %2 : $T)
+  return %3 : $(T, T)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @zzaMultiResultReturnsCallResult : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
+// CHECK:       bb0(%0 : $*T, %1 : $*T, %2 : $*T):
+// CHECK:         [[F:%[^ ]+]] = function_ref @zzaMultiResultPair
+// CHECK:         apply [[F]]<T>(%0, %1, %2)
+// CHECK:       } // end sil function 'zzaMultiResultReturnsCallResult'
+sil hidden [ossa] @zzaMultiResultReturnsCallResult : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
+bb0(%0 : @guaranteed $T):
+  %1 = function_ref @zzaMultiResultPair : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
+  %2 = apply %1<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
+  return %2 : $(T, T)
+}
+
+sil @zzbExtractUseKlass : $@convention(thin) (@guaranteed Klass) -> ()
+
+// CHECK-LABEL: sil hidden [ossa] @zzbExtractLoadableFieldConditional : $@convention(thin) <T> (@in_guaranteed BigRef<T>, Builtin.Int1) -> () {
+// CHECK:       bb0(%0 : $*BigRef<T>, %1 : $Builtin.Int1):
+// CHECK:         cond_br %1, bb2, bb1
+// CHECK:       bb2:
+// CHECK:         [[FIELD:%[^ ]+]] = struct_element_addr %0 : $*BigRef<T>, #BigRef.ref
+// CHECK:         [[LB:%[^ ]+]] = load_borrow [[FIELD]]
+// CHECK:         apply {{.*}}([[LB]])
+// CHECK:         end_borrow [[LB]]
+// CHECK:         br bb3
+// CHECK:       } // end sil function 'zzbExtractLoadableFieldConditional'
+sil hidden [ossa] @zzbExtractLoadableFieldConditional : $@convention(thin) <T> (@in_guaranteed BigRef<T>, Bool) -> () {
+bb0(%0 : @guaranteed $BigRef<T>, %1 : $Bool):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %3 = struct_extract %0, #BigRef.ref
+  %4 = function_ref @zzbExtractUseKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %8 = tuple ()
+  return %8 : $()
+}
