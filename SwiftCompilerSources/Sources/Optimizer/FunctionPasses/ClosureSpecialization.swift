@@ -475,7 +475,7 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
     return partialApply
 
   case let tttfi as ThinToThickFunctionInst:
-    guard let callee = tttfi.referencedFunction,
+    guard let callee = tttfi.referencedFunctionThroughConversions,
           callee.specializationLevel <= specializationLevelLimit
     else {
       return nil
@@ -1276,10 +1276,21 @@ private func getBTEPayloadArgOfPbBBInfo(_ bb: BasicBlock, vjp: Function)
   return nil
 }
 
+private extension ThinToThickFunctionInst {
+  var referencedFunctionThroughConversions: Function? {
+    var value = callee
+    while let cfi = value as? ConvertFunctionInst {
+      value = cfi.fromFunction
+    }
+    return (value as? FunctionRefInst)?.referencedFunction
+  }
+}
+
 private extension Instruction {
   var asSupportedClosure: SingleValueInstruction? {
     switch self {
-    case let tttf as ThinToThickFunctionInst where tttf.callee is FunctionRefInst:
+    case let tttf as ThinToThickFunctionInst
+    where tttf.referencedFunctionThroughConversions != nil:
       return tttf
     // TODO: figure out what to do with non-inout indirect arguments
     // https://forums.swift.org/t/non-inout-indirect-types-not-supported-in-closure-specialization-optimization/70826

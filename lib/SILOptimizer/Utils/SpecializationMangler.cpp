@@ -248,7 +248,10 @@ FunctionSignatureSpecializationMangler::mangleClosureProp(SILInstruction *Inst) 
   // restriction is removed, the assert here will fire.
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(Inst)) {
     ArgOpBuffer << 'c';
-    auto *FRI = cast<FunctionRefInst>(TTTFI->getCallee());
+    SILValue Callee = TTTFI->getCallee();
+    while (auto *CFI = dyn_cast<ConvertFunctionInst>(Callee))
+      Callee = CFI->getOperand();
+    auto *FRI = cast<FunctionRefInst>(Callee);
     appendIdentifier(FRI->getReferencedFunction()->getName());
     return;
   }
