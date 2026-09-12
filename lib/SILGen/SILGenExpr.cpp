@@ -2209,7 +2209,15 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     if (srcType->getRepresentation() == FunctionTypeRepresentation::Swift
         && srcType->withExtInfo(destType->getExtInfo())->isEqual(destType)) {
       auto value = SGF.emitRValueAsSingleValue(e->getSubExpr());
-      auto expectedTy = SGF.getLoweredType(destType);
+      auto expectedTy = SGF.getLoweredType(destType).castTo<SILFunctionType>();
+
+      // Sendable doesn't matter for this conversion.
+      if (auto *conv = dyn_cast<ConvertFunctionInst>(value.getValue())) {
+        if (conv->onlyConvertsSendable())
+          value =
+              ManagedValue::forObjectRValueWithoutOwnership(conv->getOperand());
+      }
+
       if (auto thinToThick =
             dyn_cast<ThinToThickFunctionInst>(value.getValue())) {
         value = ManagedValue::forObjectRValueWithoutOwnership(
@@ -2219,8 +2227,10 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
                          "nontrivial thin function reference");
         value = SGF.emitUndef(expectedTy);
       }
-      
-      if (value.getType() != expectedTy) {
+
+      auto valueTy = value.getType().castTo<SILFunctionType>();
+      // Besides conversion, a declaration can have an explicit `@Sendable`.
+      if (valueTy->withSendable(false) != expectedTy->withSendable(false)) {
         SGF.SGM.diagnose(e->getLoc(), diag::not_implemented,
                          "nontrivial thin function reference");
         value = SGF.emitUndef(expectedTy);
