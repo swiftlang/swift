@@ -5538,8 +5538,13 @@ Address IRGenFunction::createErrorResultSlot(SILType errorType, bool isAsync,
 
   // Initialize at the alloca point.
   if (setSwiftErrorFlag) {
-    auto nullError = llvm::ConstantPointerNull::get(
-        cast<llvm::PointerType>(errorStorageType));
+    // errorStorageType is a pointer for the swifterror flag, but on targets
+    // that do not reserve a swifterror register a typed error slot has the
+    // error's concrete (possibly non-pointer aggregate) storage type.
+    // getNullValue produces the correct zero for either case; a
+    // ConstantPointerNull carrying an aggregate type is ill-formed and gets
+    // scalarized into invalid `extractvalue <agg> null` stores downstream.
+    auto *nullError = llvm::Constant::getNullValue(errorStorageType);
     builder.CreateStore(nullError, addr);
   }
 
