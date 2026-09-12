@@ -77,3 +77,24 @@ struct MyString: Comparable {
 }
 
 let _: (MyString, MyString) -> Bool = false ? (<) : (>)
+
+/////////////
+
+// https://github.com/swiftlang/swift/issues/91997
+
+typealias CFunction = @convention(c) () -> Int32
+
+func performCall(msgh: CFunction?) {}
+func performCall(overload: Int) {}
+
+func defaultTracebackFn() -> Int32 { return 0 }
+
+func testCFunctionPointerTernary(cond: Bool) {
+  performCall(msgh: cond ? defaultTracebackFn : nil)
+}
+
+func performCall2(msgh: CFunction?) {}
+
+func testCFunctionPointerTernaryNoOverload(cond: Bool) {
+  performCall2(msgh: cond ? defaultTracebackFn : nil)
+}

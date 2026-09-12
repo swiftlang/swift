@@ -1577,16 +1577,25 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
       // Prefer the "stripped" form of a type. See getStrippedType()
       // for the definition.
-      auto stripped1 = getStrippedType(type1, cs.getASTContext());
-      auto stripped2 = getStrippedType(type2, cs.getASTContext());
-      if (stripped1->isEqual(stripped2)) {
-        if (type1->isEqual(stripped1) && !types.Type1WasLabeled) {
-          ++score1;
-          continue;
-        }
-        if (type2->isEqual(stripped2) && !types.Type2WasLabeled) {
-          ++score2;
-          continue;
+      //
+      // Only do this when the types are mutually subtypes of one another;
+      // if the subtype relationship only holds in one direction, the
+      // subtype is genuinely better, and the stripped-form check would
+      // cancel that out. For example, with `@convention(c) () -> Int` vs.
+      // `() -> Int`, only the former is a subtype of the other, even
+      // though their stripped forms are equal.
+      if (type1Better && type2Better) {
+        auto stripped1 = getStrippedType(type1, cs.getASTContext());
+        auto stripped2 = getStrippedType(type2, cs.getASTContext());
+        if (stripped1->isEqual(stripped2)) {
+          if (type1->isEqual(stripped1) && !types.Type1WasLabeled) {
+            ++score1;
+            continue;
+          }
+          if (type2->isEqual(stripped2) && !types.Type2WasLabeled) {
+            ++score2;
+            continue;
+          }
         }
       }
 
