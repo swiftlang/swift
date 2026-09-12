@@ -16,7 +16,9 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
+#if canImport(Builtin)
 import Builtin
+#endif
 
 @available(StdlibDeploymentTarget 6.3, *)
 @_extern(c) private func _swift_exit(_ result: CInt) /* -> Never */
@@ -24,7 +26,11 @@ import Builtin
 @available(StdlibDeploymentTarget 6.3, *)
 internal func _exit(result: CInt) -> Never {
   _swift_exit(result)
+#if canImport(Builtin)
   Builtin.unreachable()
+#else
+  fatalError("Unreachable")
+#endif
 }
 
 #if !$Embedded
