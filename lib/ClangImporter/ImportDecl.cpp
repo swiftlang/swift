@@ -3046,7 +3046,8 @@ namespace {
           Impl.diagnose(HeaderLoc(ann.second),
                         diag::private_fileid_attr_format_invalid,
                         decl->getName());
-          Impl.diagnose({}, diag::private_fileid_attr_format_specification);
+          Impl.diagnose(HeaderLoc(ann.second),
+                        diag::private_fileid_attr_format_specification);
 
           if (ann.first.count('/') > 1) {
             // Try to construct a suggestion from predictable mistakes.
@@ -3063,7 +3064,8 @@ namespace {
               suggestion.append(".swift");
 
             if (SourceFile::FileIDStr::parse(suggestion))
-              Impl.diagnose({}, diag::private_fileid_attr_format_suggestion,
+              Impl.diagnose(HeaderLoc(ann.second),
+                            diag::private_fileid_attr_format_suggestion,
                             suggestion);
           }
         }

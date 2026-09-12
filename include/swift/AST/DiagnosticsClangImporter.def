@@ -311,7 +311,7 @@ ERROR(private_fileid_attr_repeated, none,
  GROUPED_WARNING(private_fileid_attr_format_invalid, ClangDeclarationImport, none,
      "SWIFT_PRIVATE_FILEID annotation on '%0' does not have a valid file ID",
      (StringRef))
- REMARK(private_fileid_attr_format_specification, none,
+ NOTE(private_fileid_attr_format_specification, none,
      "file IDs have the following format: 'ModuleName/FileName.swift'", ())
  NOTE(private_fileid_attr_format_suggestion, none,
      "did you mean '%0'?", (StringRef))
