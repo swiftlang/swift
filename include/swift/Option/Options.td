@@ -785,6 +785,11 @@ def no_verify_emitted_module_interface :
         FrontendOption, ModuleInterfaceOptionIgnorable]>,
   HelpText<"Don't check that module interfaces emitted during compilation typecheck">;
 
+def avoid_emit_module_doc :
+  Flag<["-"], "avoid-emit-module-doc">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"don't emit Swift module documentation file">;
+
 def avoid_emit_module_source_info :
   Flag<["-"], "avoid-emit-module-source-info">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
