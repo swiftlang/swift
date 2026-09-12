@@ -365,3 +365,8 @@ public struct TestGlobalActorAndSendable<V: Q> : Q {
     compute(test2) // Ok
   }
 }
+
+func testConversionToThin() {
+  let _: @convention(thin) () -> Int = doWork // Ok
+  let _: @Sendable @convention(thin) () -> Int = doWork // Ok
+}
