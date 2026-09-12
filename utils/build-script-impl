@@ -2765,16 +2765,67 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
                 fi
 
+                # macOS 26.5 intermittently refuses to attach to a process when
+                # many debuggers are launched in parallel. Detect the resulting
+                # error message in the test output and re-run the failed tests
+                # serially.
+                RETRY_LLDB_TESTS_SERIALLY=""
+                if [[ "$(uname -s)" == "Darwin" ]]; then
+                    case "$(sw_vers -productVersion)" in
+                        26.5*)
+                            RETRY_LLDB_TESTS_SERIALLY=1
+                            ;;
+                    esac
+                fi
+
                 echo "--- Running LLDB unit tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
                 echo "--- Running LLDB tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
-                with_pushd ${results_dir} \
-                    call "${llvm_build_dir}/bin/llvm-lit" \
-                         "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
+                # Run in a subshell so the results can be inspected before failing.
+                lldb_lit_exit_code=0
+                (cd "${results_dir}" &&
+                     call "${llvm_build_dir}/bin/llvm-lit" \
+                          "${lldb_build_dir}/test" \
+                          ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}) \
+                    || lldb_lit_exit_code=$?
+                if [[ "${lldb_lit_exit_code}" -ne 0 ]] &&
+                       [[ "${RETRY_LLDB_TESTS_SERIALLY}" ]] &&
+                       grep -qs "This is a non-interactive session" "${results_dir}/results.xml"; then
+                    echo "--- Re-running the failed LLDB tests single-threaded ---"
+                    # Re-run every test that failed, not just the ones hitting
+                    # the error above, so that a genuine failure still fails.
+                    # A failure here is expected in that case; the merged
+                    # report below is what decides the outcome.
+                    (cd "${results_dir}" &&
+                         call "${llvm_build_dir}/bin/llvm-lit" \
+                              "${lldb_build_dir}/test" \
+                              ${LLVM_LIT_ARGS} -j 1 --filter-failed \
+                              "--xunit-xml-output=${results_dir}/results-serial.xml" \
+                              ${LLVM_LIT_FILTER_ARG}) \
+                        || true
+                    # Fold the re-run into the report of the full test run,
+                    # dropping the failures that it was started for. This
+                    # exits with 1 if any test is still failing.
+                    lldb_merge_exit_code=0
+                    call python3 "${LLDB_SOURCE_DIR}/scripts/merge-junit-xml.py" \
+                         "${results_dir}/results.xml" \
+                         "${results_dir}/results-serial.xml" \
+                         --ignore-lhs-failures-matching "This is a non-interactive session" \
+                         --output "${results_dir}/results.xml" \
+                        || lldb_merge_exit_code=$?
+                    if [[ "${lldb_merge_exit_code}" -le 1 ]]; then
+                        # The merged report has superseded the re-run's.
+                        call rm -f "${results_dir}/results-serial.xml"
+                    fi
+                    if [[ "${lldb_merge_exit_code}" -ne 0 ]]; then
+                        exit "${lldb_merge_exit_code}"
+                    fi
+                elif [[ "${lldb_lit_exit_code}" -ne 0 ]]; then
+                    exit "${lldb_lit_exit_code}"
+                fi
                 continue
                 ;;
             llbuild)
