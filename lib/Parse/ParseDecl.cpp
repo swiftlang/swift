@@ -8943,8 +8943,7 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
   if (!typedPattern) {
     if (accessors.Get || accessors.Set || accessors.Address ||
         accessors.MutableAddress) {
-      SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
-        pattern->getBoundName().getLength());
+      SourceLoc locAfterPattern = Lexer::getLocForEndOfToken(Context.SourceMgr, pattern->getEndLoc());
       diagnose(pattern->getLoc(), diag::computed_property_missing_type)
         .fixItInsert(locAfterPattern, ": <# Type #>");
       Invalid = true;
