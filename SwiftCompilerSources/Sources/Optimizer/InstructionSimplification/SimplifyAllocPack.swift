@@ -87,7 +87,7 @@ extension AllocPackInst : Simplifiable, SILCombineSimplifiable {
         deallocPacks.append(dealloc)
 
       case is DebugValueInst:
-        // TODO: Salvage debug info.
+        // Debug info is salvaged by salvageDebugInfo.
         continue
 
       default:
@@ -135,16 +135,8 @@ extension AllocPackInst : Simplifiable, SILCombineSimplifiable {
       peg.replace(with: packElementSets[index].instruction.valueOperand.value, context)
     }
 
-    // Salvage any debug info by creating a debug_value with an
-    // op_tuple_fragment for each pack_element set.
-    //
-    // TODO: Bridge the APIs for building DI expressions so we can do this
-    // directly within the pass, rather than calling out to salvageDebugInfo.
-    for (_, pes) in packElementSets {
-      context.salvageDebugInfo(of: pes)
-    }
-
     // Erase the alloc_pack and all its associated instructions.
+    // salvageDebugInfo will create a debug_value for each pack_element_set.
     context.erase(instructionIncludingAllUsers: self)
   }
 }
