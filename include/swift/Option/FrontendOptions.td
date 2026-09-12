@@ -1693,6 +1693,11 @@ def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
 def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
   HelpText<"Clang Include Tree FileList CASID">, MetaVarName<"<cas-id>">;
 
+def cas_fs_input_overlay: Flag<["-"], "cas-fs-input-overlay">,
+  HelpText<"Read the input files from disk and overlay them on the CAS file "
+           "system. This disables caching, since the content of the input "
+           "files no longer contributes to the cache key">;
+
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
   HelpText<"Enable use of @_spiOnly imports">;

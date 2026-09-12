@@ -5574,7 +5574,8 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedConcurrent:
       if (inferredIsolation.source.effectivelyExplicit() &&
-          explicitNonisolatedIsSpecial(nominal)) {
+          getDefaultIsolationForContext(nominal) ==
+              DefaultIsolation::Nonisolated) {
         if (!foundIsolation) {
           // We found an explicitly 'nonisolated' protocol.
           foundIsolation = {
