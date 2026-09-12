@@ -2125,16 +2125,6 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         clangFn, decl->getDeclContext());
     if (returnType)
       return *returnType;
-    // Mark the imported Swift function as unavailable.
-    // That will ensure that the function will not be
-    // usable from Swift, even though it is imported.
-    if (!decl->isUnavailable()) {
-      StringRef unavailabilityMsgRef = "return type is unavailable in Swift";
-      auto ua = AvailableAttr::createUniversallyUnavailable(
-          ctx, unavailabilityMsgRef);
-      decl->addAttribute(ua);
-    }
-
     return ctx.getNeverType();
   }
 

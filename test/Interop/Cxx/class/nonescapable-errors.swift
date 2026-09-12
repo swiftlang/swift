@@ -357,6 +357,7 @@ DoubleEscapableNonEscapable n6();
 
 EscapableIfEscapable<NonEscapable> n7();
 
+// expected-warning@+3 {{the returned type 'NonEscapableIfEscapable<Owner>' is annotated as non-escapable; its lifetime dependencies must be annotated}}
 // expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 NonEscapableIfEscapable<Owner> n8();
