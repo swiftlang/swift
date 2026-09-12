@@ -82,9 +82,9 @@ protected:
   /// A helpful little wrapper for an integer value that should be mangled
   /// in a particular, compressed value.
   class Index {
-    unsigned N;
+    uint64_t N;
   public:
-    explicit Index(unsigned n) : N(n) {}
+    explicit Index(uint64_t n) : N(n) {}
     friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out, Index n) {
       if (n.N != 0) out << (n.N - 1);
       return (out << '_');
