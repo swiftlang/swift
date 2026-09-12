@@ -30,6 +30,8 @@
             "remote": { "id": "apple/swift-log" } },
         "swift-numerics": {
             "remote": { "id": "apple/swift-numerics" } },
+        "swift-toolchain-sarif": {
+            "remote": { "id": "swiftlang/swift-toolchain-sarif" } },
         "swift-toolchain-sqlite": {
             "remote": { "id": "swiftlang/swift-toolchain-sqlite" } },
         "swift-tools-protocols": {
@@ -150,6 +152,7 @@
                 "cmark": "gfm",
                 "llbuild": "main",
                 "swift-build": "main",
+                "swift-toolchain-sarif": "main",
                 "swift-toolchain-sqlite": "1.0.9",
                 "swift-tools-protocols": "main",
                 "swift-tools-support-core": "main",
@@ -883,6 +886,7 @@
                 "cmark": "gfm",
                 "llbuild": "main",
                 "swift-build": "main",
+                "swift-toolchain-sarif": "main",
                 "swift-toolchain-sqlite": "1.0.9",
                 "swift-tools-protocols": "main",
                 "swift-tools-support-core": "main",
@@ -945,6 +949,7 @@
                 "cmark": "gfm",
                 "llbuild": "main",
                 "swift-build": "main",
+                "swift-toolchain-sarif": "main",
                 "swift-toolchain-sqlite": "1.0.9",
                 "swift-tools-protocols": "main",
                 "swift-tools-support-core": "main",

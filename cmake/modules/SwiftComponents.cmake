@@ -67,11 +67,12 @@
 # * testsuite-tools -- extra tools required to run the Swift testsuite.
 # * static-mirror-lib -- Build the static mirror library used by SwiftStaticMirror.
 # * swift-syntax-lib -- install swift-syntax libraries
+# * compiler-swift-toolchain-sarif-lib -- install swift-toolchain-sarif libraries for the compiler.
 # * toolchain-dev-tools -- install development tools useful in a shared toolchain
 # * llvm-toolchain-dev-tools -- install LLVM development tools useful in a shared toolchain
 # * dev -- headers and libraries required to use Swift compiler as a library.
 set(_SWIFT_DEFINED_COMPONENTS
-  "autolink-driver;back-deployment;compiler;compiler-swift-syntax-lib;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;libexec;stdlib;stdlib-experimental;sdk-overlay;static-mirror-lib;swift-syntax-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;llvm-toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
+  "autolink-driver;back-deployment;compiler;compiler-swift-toolchain-sarif-lib;compiler-swift-syntax-lib;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;libexec;stdlib;stdlib-experimental;sdk-overlay;static-mirror-lib;swift-syntax-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;llvm-toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
 # The default install components include all of the defined components, except
 # for the following exceptions.
@@ -101,6 +102,14 @@ macro(swift_configure_components)
       NOT "compiler-swift-syntax-lib" IN_LIST SWIFT_INSTALL_COMPONENTS)
     list(APPEND SWIFT_INSTALL_COMPONENTS "compiler-swift-syntax-lib")
   endif()
+
+  # 'compiler' depends on 'compiler-swift-toolchain-sarif-lib' component when SARIF is enabled.
+  if (SWIFT_BUILD_SARIF AND
+      "compiler" IN_LIST SWIFT_INSTALL_COMPONENTS AND
+      NOT "compiler-swift-toolchain-sarif-lib" IN_LIST SWIFT_INSTALL_COMPONENTS)
+    list(APPEND SWIFT_INSTALL_COMPONENTS "compiler-swift-toolchain-sarif-lib")
+  endif()
+
   # 'compiler' depends on 'swift-syntax-lib' component.
   # FIXME: Remove this. Clients should specify the components explicitly.
   if ("compiler" IN_LIST SWIFT_INSTALL_COMPONENTS AND
