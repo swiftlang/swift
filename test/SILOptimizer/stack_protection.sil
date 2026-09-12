@@ -19,6 +19,11 @@ struct S {
   @_hasStorage var b: Int64
 }
 
+struct SpanLike {
+  @_hasStorage var _pointer: Optional<UnsafeRawPointer>
+  @_hasStorage var _count: Int
+}
+
 sil @unknown : $@convention(thin) (Builtin.RawPointer) -> ()
 sil @unknown_addr : $@convention(thin) (@in Int64) -> ()
 
@@ -133,6 +138,276 @@ bb0:
   %4 = load %3 : $*Int64
   dealloc_stack %0 : $*Int64
   return %4 : $Int64
+}
+
+// A store through a sub-object projection of the addressed memory is still a store to that
+// memory, no matter which projection it goes through.
+
+// CHECK-LABEL: sil [stack_protection] @store_to_struct_element_addr
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'store_to_struct_element_addr'
+sil @store_to_struct_element_addr : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $S
+  %2 = address_to_pointer [stack_protection] %1 : $*S to $Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*S
+  %4 = struct_element_addr %3 : $*S, #S.b
+  store %0 to %4 : $*Int64
+  dealloc_stack %1 : $*S
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @load_from_struct_element_addr
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'load_from_struct_element_addr'
+sil @load_from_struct_element_addr : $@convention(thin) () -> Int64 {
+bb0:
+  %1 = alloc_stack $S
+  %2 = address_to_pointer [stack_protection] %1 : $*S to $Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*S
+  %4 = struct_element_addr %3 : $*S, #S.b
+  %5 = load %4 : $*Int64
+  dealloc_stack %1 : $*S
+  return %5 : $Int64
+}
+
+// CHECK-LABEL: sil [stack_protection] @store_to_tuple_element_addr
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'store_to_tuple_element_addr'
+sil @store_to_tuple_element_addr : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $(Int64, Int64)
+  %2 = address_to_pointer [stack_protection] %1 : $*(Int64, Int64) to $Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*(Int64, Int64)
+  %4 = tuple_element_addr %3 : $*(Int64, Int64), 1
+  store %0 to %4 : $*Int64
+  dealloc_stack %1 : $*(Int64, Int64)
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @projection_index_addr_with_only_loads
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'projection_index_addr_with_only_loads'
+sil @projection_index_addr_with_only_loads : $@convention(thin) () -> Int64 {
+bb0:
+  %1 = alloc_stack $Int64
+  %2 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int64
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = index_addr [projection] %3 : $*Int64, %4 : $Builtin.Word
+  %6 = load %5 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %6 : $Int64
+}
+
+// CHECK-LABEL: sil [stack_protection] @projection_index_addr_with_store
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'projection_index_addr_with_store'
+sil @projection_index_addr_with_store : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  %2 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int64
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = index_addr [projection] %3 : $*Int64, %4 : $Builtin.Word
+  store %0 to %5 : $*Int64
+  dealloc_stack %1 : $*Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [stack_protection] @index_addr_with_store_to_field
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'index_addr_with_store_to_field'
+sil @index_addr_with_store_to_field : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $S
+  %2 = address_to_pointer %1 : $*S to $Builtin.RawPointer
+  %3 = integer_literal $Builtin.Word, 1
+  %4 = index_addr [stack_protection] %1 : $*S, %3 : $Builtin.Word
+  %5 = struct_element_addr %4 : $*S, #S.b
+  store %0 to %5 : $*Int64
+  dealloc_stack %1 : $*S
+  %r = tuple ()
+  return %r : $()
+}
+
+// The read-only bailout must not be defeated by debug instructions or by pointer arithmetic,
+// neither of which can store anything by itself.
+
+// CHECK-LABEL: sil @only_loads_with_debug_value_on_pointer
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'only_loads_with_debug_value_on_pointer'
+sil @only_loads_with_debug_value_on_pointer : $@convention(thin) () -> Int64 {
+bb0:
+  %1 = alloc_stack $Int64
+  %2 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  debug_value %2 : $Builtin.RawPointer, let, name "p"
+  %4 = pointer_to_address %2 : $Builtin.RawPointer to $*Int64
+  %5 = load %4 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %5 : $Int64
+}
+
+// CHECK-LABEL: sil @only_loads_with_debug_value_on_address
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'only_loads_with_debug_value_on_address'
+sil @only_loads_with_debug_value_on_address : $@convention(thin) () -> Int64 {
+bb0:
+  %1 = alloc_stack $Int64
+  %2 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int64
+  debug_value %3 : $*Int64, let, name "a", expr op_deref
+  %5 = load %3 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %5 : $Int64
+}
+
+// CHECK-LABEL: sil @span_like_only_loads
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'span_like_only_loads'
+sil @span_like_only_loads : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  store %0 to %1 : $*Int64
+  %3 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  %4 = struct $UnsafeRawPointer (%3 : $Builtin.RawPointer)
+  %5 = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt, %4 : $UnsafeRawPointer
+  %6 = integer_literal $Builtin.Int64, 8
+  %7 = struct $Int (%6 : $Builtin.Int64)
+  %8 = struct $SpanLike (%5 : $Optional<UnsafeRawPointer>, %7 : $Int)
+  %9 = mark_dependence %8 : $SpanLike on %1 : $*Int64
+  debug_value %9 : $SpanLike, let, name "b"
+  %11 = struct_extract %9 : $SpanLike, #SpanLike._count
+  %12 = struct_extract %9 : $SpanLike, #SpanLike._pointer
+  %13 = unchecked_enum_data %12 : $Optional<UnsafeRawPointer>, #Optional.some!enumelt
+  %14 = struct_extract %13 : $UnsafeRawPointer, #UnsafeRawPointer._rawValue
+  %15 = pointer_to_address %14 : $Builtin.RawPointer to $*Int64
+  %16 = load %15 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %16 : $Int64
+}
+
+// CHECK-LABEL: sil [stack_protection] @span_like_with_store
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'span_like_with_store'
+sil @span_like_with_store : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  store %0 to %1 : $*Int64
+  %3 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  %4 = struct $UnsafeRawPointer (%3 : $Builtin.RawPointer)
+  %5 = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt, %4 : $UnsafeRawPointer
+  %6 = integer_literal $Builtin.Int64, 8
+  %7 = struct $Int (%6 : $Builtin.Int64)
+  %8 = struct $SpanLike (%5 : $Optional<UnsafeRawPointer>, %7 : $Int)
+  %9 = mark_dependence %8 : $SpanLike on %1 : $*Int64
+  debug_value %9 : $SpanLike, let, name "b"
+  %11 = struct_extract %9 : $SpanLike, #SpanLike._pointer
+  %12 = unchecked_enum_data %11 : $Optional<UnsafeRawPointer>, #Optional.some!enumelt
+  %13 = struct_extract %12 : $UnsafeRawPointer, #UnsafeRawPointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int64
+  store %0 to %14 : $*Int64
+  dealloc_stack %1 : $*Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @index_raw_pointer_with_only_loads
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'index_raw_pointer_with_only_loads'
+sil @index_raw_pointer_with_only_loads : $@convention(thin) () -> Int64 {
+bb0:
+  %1 = alloc_stack $Int64
+  %2 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  %3 = integer_literal $Builtin.Word, 1
+  %4 = index_raw_pointer %2 : $Builtin.RawPointer, %3 : $Builtin.Word
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to $*Int64
+  %6 = load %5 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %6 : $Int64
+}
+
+// CHECK-LABEL: sil [stack_protection] @index_raw_pointer_with_store
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'index_raw_pointer_with_store'
+sil @index_raw_pointer_with_store : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  %2 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  %3 = integer_literal $Builtin.Word, 1
+  %4 = index_raw_pointer %2 : $Builtin.RawPointer, %3 : $Builtin.Word
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to $*Int64
+  store %0 to %5 : $*Int64
+  dealloc_stack %1 : $*Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [stack_protection] @index_raw_pointer_escapes
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'index_raw_pointer_escapes'
+sil @index_raw_pointer_escapes : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $Int64
+  %2 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  %3 = integer_literal $Builtin.Word, 1
+  %4 = index_raw_pointer %2 : $Builtin.RawPointer, %3 : $Builtin.Word
+  %5 = function_ref @unknown : $@convention(thin) (Builtin.RawPointer) -> ()
+  apply %5(%4) : $@convention(thin) (Builtin.RawPointer) -> ()
+  dealloc_stack %1 : $*Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @non_projection_index_addr_with_only_loads
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'non_projection_index_addr_with_only_loads'
+sil @non_projection_index_addr_with_only_loads : $@convention(thin) () -> Int64 {
+bb0:
+  %1 = alloc_stack $Int64
+  %2 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int64
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = index_addr %3 : $*Int64, %4 : $Builtin.Word
+  %6 = load %5 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %6 : $Int64
+}
+
+// CHECK-LABEL: sil [stack_protection] @non_projection_index_addr_with_store_to_field
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'non_projection_index_addr_with_store_to_field'
+sil @non_projection_index_addr_with_store_to_field : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $S
+  %2 = address_to_pointer [stack_protection] %1 : $*S to $Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*S
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = index_addr %3 : $*S, %4 : $Builtin.Word
+  %6 = struct_element_addr %5 : $*S, #S.b
+  store %0 to %6 : $*Int64
+  dealloc_stack %1 : $*S
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [stack_protection] @non_projection_index_addr_with_store
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'non_projection_index_addr_with_store'
+sil @non_projection_index_addr_with_store : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  %2 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int64
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = index_addr %3 : $*Int64, %4 : $Builtin.Word
+  store %0 to %5 : $*Int64
+  dealloc_stack %1 : $*Int64
+  %r = tuple ()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil [stack_protection] @stack_alloc_builtin
