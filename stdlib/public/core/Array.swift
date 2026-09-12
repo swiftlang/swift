@@ -799,11 +799,13 @@ extension Array: RandomAccessCollection, MutableCollection {
   @inlinable
   public subscript(bounds: Range<Int>) -> ArraySlice<Element> {
     get {
+      bounds._assumeValid()
       _checkIndex(bounds.lowerBound)
       _checkIndex(bounds.upperBound)
       return ArraySlice(_buffer: _buffer[bounds])
     }
     set(rhs) {
+      bounds._assumeValid()
       _checkIndex(bounds.lowerBound)
       _checkIndex(bounds.upperBound)
       // If the replacement buffer has same identity, and the ranges match,

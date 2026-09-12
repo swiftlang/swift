@@ -250,7 +250,7 @@ private struct CollectedEffects {
       is CondFailInst:
       break
 
-    case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
+    case let bi as BuiltinInst where bi.id == .TSanInoutAccess || bi.id == .AssumeTrue:
       break
 
     case is BeginCOWMutationInst:

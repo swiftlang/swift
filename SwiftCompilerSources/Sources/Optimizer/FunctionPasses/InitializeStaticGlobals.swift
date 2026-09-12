@@ -567,7 +567,7 @@ private extension Function {
         return !store.destination.lookThroughRawLayoutAddress.isAddressOfStack(orGlobal: global)
       case let injectEnum as InjectEnumAddrInst:
         return !injectEnum.enum.isAddressOfStack(orGlobal: global)
-      case let bi as BuiltinInst where bi.id == .PrepareInitialization:
+      case let bi as BuiltinInst where bi.id == .PrepareInitialization || bi.id == .AssumeTrue:
         return false
       default:
         return inst.hasUnspecifiedSideEffects
