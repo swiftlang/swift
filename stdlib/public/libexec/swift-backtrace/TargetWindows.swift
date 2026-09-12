@@ -231,9 +231,7 @@ class Target {
     self.pid = pid
 
     guard let hProcess = OpenProcess(
-            PROCESS_VM_READ
-              | PROCESS_QUERY_LIMITED_INFORMATION
-              | PROCESS_SUSPEND_RESUME,
+            PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SUSPEND_RESUME,
             false,
             pid
           ) else {
@@ -258,11 +256,7 @@ class Target {
 
     for thread in threads {
       guard let hThread = OpenThread(
-              DWORD(
-                THREAD_GET_CONTEXT
-                  | THREAD_QUERY_LIMITED_INFORMATION
-                  | THREAD_SUSPEND_RESUME
-              ),
+              THREAD_GET_CONTEXT | THREAD_QUERY_LIMITED_INFORMATION | THREAD_SUSPEND_RESUME,
               false,
               thread
             ) else {
@@ -493,9 +487,7 @@ class Target {
                                 nil,
                                 nil,
                                 false,
-                                DWORD(NORMAL_PRIORITY_CLASS
-                                      | CREATE_NEW_CONSOLE
-                                      | CREATE_NEW_PROCESS_GROUP),
+                                NORMAL_PRIORITY_CLASS | CREATE_NEW_CONSOLE | CREATE_NEW_PROCESS_GROUP,
                                 nil,
                                 nil,
                                 &startupInfo,
