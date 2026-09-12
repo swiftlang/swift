@@ -30,6 +30,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/ParseDeclName.h"
@@ -52,11 +53,6 @@
 #include <algorithm>
 #include <memory>
 #include <optional>
-
-#include "llvm/ADT/Statistic.h"
-#define DEBUG_TYPE "Import Name"
-STATISTIC(ImportNameNumCacheHits, "# of times the import name cache was hit");
-STATISTIC(ImportNameNumCacheMisses, "# of times the import name cache was missed");
 
 using namespace swift;
 using namespace importer;
@@ -2660,11 +2656,13 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   CacheKeyType key(decl, version);
   if (!givenName) {
     if (auto cachedRes = importNameCache[key]) {
-      ++ImportNameNumCacheHits;
+      if (auto *Stats = swiftCtx.Stats)
+        ++Stats->getFrontendCounters().ClangNameImportCacheHit;
       return cachedRes;
     }
   }
-  ++ImportNameNumCacheMisses;
+  if (auto *Stats = swiftCtx.Stats)
+    ++Stats->getFrontendCounters().ClangNameImportCacheMiss;
   auto res = importNameImpl(decl, version, givenName);
 
   // Add information about the async version of the name to the non-async

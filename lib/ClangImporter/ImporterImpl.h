@@ -1390,6 +1390,9 @@ private:
                                  Version version,
                                  bool UseCanonicalDecl = true);
 
+  /// Recursion depth of importDecl[Real] calls.
+  int64_t importDeclRecursionDepth = 0;
+
 public:
   /// Import the declaration context of a given Clang declaration into
   /// Swift.

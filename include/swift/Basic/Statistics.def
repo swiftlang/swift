@@ -121,6 +121,97 @@ FRONTEND_STATISTIC(ClangImporter, NumLoadedClangModules)
 /// (clang-module-memory.json / -print-clang-stats).
 FRONTEND_STATISTIC(ClangImporter, NumMaterializedClangDecls)
 
+/// Clang declarations examined while building a module's Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeclsVisited)
+
+/// Examined declarations dropped without contributing any lookup table entry.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeclsSkipped)
+
+/// Name-to-declaration records inserted into a module's Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableEntriesAdded)
+
+/// Distinct Swift name variants produced for the declarations being tabulated.
+FRONTEND_STATISTIC(ClangImporter, LookupTableNameVariants)
+
+/// C++ class template specializations recorded in the lookup table by mangled name.
+FRONTEND_STATISTIC(ClangImporter, LookupTableTemplateSpecs)
+
+/// Macros recorded in a module's Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableMacrosAdded)
+
+/// Passes over import-as-member entries whose contexts were forward-referenced.
+FRONTEND_STATISTIC(ClangImporter, LookupTableResolvePasses)
+
+/// Distinct base names keyed in a written Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDistinctBaseNames)
+
+/// Total time spent writing Swift lookup tables into Clang modules
+//(whole extension write: populate + finalize + serialize).
+FRONTEND_STATISTIC(ClangImporter, LookupTableWriteCumulativeUsec)
+
+/// Time spent populating Swift lookup tables with decls and macros.
+FRONTEND_STATISTIC(ClangImporter, LookupTablePopulateCumulativeUsec)
+
+/// Time spent resolving forward references in Swift lookup table.
+FRONTEND_STATISTIC(ClangImporter, LookupTableFinalizeCumulativeUsec)
+
+/// Time spent deserializing Swift lookup table headers from loaded Clang modules.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeserializeCumulativeUsec)
+
+/// Clang declarations first materialized from a lookup table during lookup.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeclResolved)
+
+/// Lookup-table hits for declarations already materialized.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDeclCached)
+
+/// Declarations considered as candidate members during qualified record lookup.
+FRONTEND_STATISTIC(ClangImporter, ClangRecordMemberLookupCandidates)
+
+/// Candidate members that actually belong to the record being looked up in.
+FRONTEND_STATISTIC(ClangImporter, ClangRecordMemberLookupMatched)
+
+/// Members whose names were imported to search a class template specialization.
+FRONTEND_STATISTIC(ClangImporter, ClangRecordMemberLookupTemplateMembersScanned)
+
+/// Namespace members added to the __ObjC SwiftLookupTable.
+FRONTEND_STATISTIC(ClangImporter, ClangNamespaceMembersAddedToLookupTable)
+
+/// Declarations considered as candidate members during namespace lookup.
+FRONTEND_STATISTIC(ClangImporter, ClangNamespaceMemberLookupCandidates)
+
+/// Candidate members that actually belong to the namespace being looked up in.
+FRONTEND_STATISTIC(ClangImporter, ClangNamespaceMemberLookupMatched)
+
+/// Reuses of a previously computed Swift name for a Clang declaration.
+FRONTEND_STATISTIC(ClangImporter, ClangNameImportCacheHit)
+
+/// Swift names computed for a Clang declaration for the first time.
+FRONTEND_STATISTIC(ClangImporter, ClangNameImportCacheMiss)
+
+/// Reuses of a previously computed enum classification.
+FRONTEND_STATISTIC(ClangImporter, ClangEnumInfoCacheHit)
+
+/// Enum classifications computed for the first time.
+FRONTEND_STATISTIC(ClangImporter, ClangEnumInfoCacheMiss)
+
+/// Reuses of an already-imported Clang declaration (import-decl cache hit).
+FRONTEND_STATISTIC(ClangImporter, ClangImportDeclCacheHit)
+
+/// Clang declarations imported for the first time (import-decl cache miss).
+FRONTEND_STATISTIC(ClangImporter, ClangImportDeclCacheMiss)
+
+/// Maximum recursion depth when importing Clang declarations.
+FRONTEND_STATISTIC(ClangImporter, ClangImportDeclRecursionDepth)
+
+/// Clang types imported.
+FRONTEND_STATISTIC(ClangImporter, ClangImportType)
+
+/// Reuses of an already-imported Clang macro (macro cache hit).
+FRONTEND_STATISTIC(ClangImporter, ClangImportMacroCacheHit)
+
+/// Clang macros imported for the first time (macro cache miss).
+FRONTEND_STATISTIC(ClangImporter, ClangImportMacroCacheMiss)
+
 /// Number of source buffers visible in the source manager.
 FRONTEND_STATISTIC(AST, NumSourceBuffers)
 

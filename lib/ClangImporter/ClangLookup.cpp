@@ -35,6 +35,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -121,7 +122,8 @@ public:
 
 static SmallVector<const clang::NamedDecl *, 4>
 directRecordMemberLookup(ClangImporter &Importer,
-                         const clang::RecordDecl *whereDecl, DeclName name) {
+                         const clang::RecordDecl *whereDecl, DeclName name,
+                         UnifiedStatsReporter *stats) {
   SmallVector<const clang::NamedDecl *, 4> result;
 
   // Class template instances aren't in the lookup table.
@@ -134,6 +136,10 @@ directRecordMemberLookup(ClangImporter &Importer,
       auto *namedDecl = dyn_cast<clang::NamedDecl>(member);
       if (!namedDecl)
         continue;
+
+      if (stats)
+        ++stats->getFrontendCounters()
+              .ClangRecordMemberLookupTemplateMembersScanned;
 
       auto memberName = Importer.importName(namedDecl);
       if (!memberName)
@@ -169,11 +175,17 @@ directRecordMemberLookup(ClangImporter &Importer,
     if (!seen.insert(found).second)
       continue; // Already saw this Clang decl via a different context entry
 
+    if (stats)
+      ++stats->getFrontendCounters().ClangRecordMemberLookupCandidates;
+
     auto *foundCtx = found->getNonTransparentDeclContext();
     if (auto *foundCtxDecl = dyn_cast<clang::RecordDecl>(foundCtx)) {
       // Context of found decl is also a decl; compare canonical decl of each
-      if (foundCtxDecl->getCanonicalDecl() == whereCanonical)
+      if (foundCtxDecl->getCanonicalDecl() == whereCanonical) {
+        if (stats)
+          ++stats->getFrontendCounters().ClangRecordMemberLookupMatched;
         result.push_back(found);
+      }
     }
   }
 
@@ -203,6 +215,9 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     if (!foundDecl)
       continue; // What we found wasn't a NamedDecl
 
+    if (auto *stats = ctx.Stats)
+      ++stats->getFrontendCounters().ClangNamespaceMemberLookupCandidates;
+
     auto *foundCtx = foundDecl->getNonTransparentDeclContext();
 
     bool wasFound = false;
@@ -222,6 +237,9 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
 
     if (!wasFound)
       continue;
+
+    if (auto *stats = ctx.Stats)
+      ++stats->getFrontendCounters().ClangNamespaceMemberLookupMatched;
 
     if (!seenDecls.insert(foundDecl).second)
       continue; // We've already seen this; a re-declaration?
@@ -340,7 +358,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       cxxRecordDecl && importer::getPrivateFileIDAttrs(cxxRecordDecl).empty();
 
   auto directResults =
-      directRecordMemberLookup(Importer, clangRecordDecl, name);
+      directRecordMemberLookup(Importer, clangRecordDecl, name, ctx.Stats);
 
   // It's possible that there are entries in the lookup table that end up
   // getting mangled as unsafe, but were not added to the look up table as
@@ -356,8 +374,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     if (id.starts_with("__") && id.ends_with("Unsafe") && id != "__Unsafe") {
       auto unUnsafeId = id.drop_front(2).drop_back(6);
       DeclName unUnsafeName(ctx.getIdentifier(unUnsafeId));
-      auto moreResults =
-          directRecordMemberLookup(Importer, clangRecordDecl, unUnsafeName);
+      auto moreResults = directRecordMemberLookup(Importer, clangRecordDecl,
+                                                  unUnsafeName, ctx.Stats);
       directResults.append(moreResults.begin(), moreResults.end());
     }
   }

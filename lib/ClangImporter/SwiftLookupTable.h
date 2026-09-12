@@ -272,6 +272,7 @@ static_assert(sizeof(EffectiveClangContext) <= 2 * sizeof(void *),
 
 class SwiftLookupTableReader;
 class SwiftLookupTableWriter;
+class UnifiedStatsReporter;
 
 /// Lookup table major version number.
 ///
@@ -493,6 +494,9 @@ private:
   /// The reader responsible for lazily loading the contents of this table.
   SwiftLookupTableReader *Reader;
 
+  /// Optional stats reporter for build/lookup instrumentation. May be null.
+  UnifiedStatsReporter *Stats;
+
   /// Entries whose effective contexts could not be resolved, and
   /// therefore will need to be added later.
   SmallVector<std::tuple<DeclName, SingleEntry, EffectiveClangContext>, 4>
@@ -515,7 +519,9 @@ private:
                      SmallVectorImpl<StoredSingleEntry> &entries);
 
 public:
-  explicit SwiftLookupTable(SwiftLookupTableReader *reader) : Reader(reader) { }
+  explicit SwiftLookupTable(SwiftLookupTableReader *reader,
+                            UnifiedStatsReporter *stats = nullptr)
+      : Reader(reader), Stats(stats) { }
 
   /// Maps a stored declaration entry to an actual Clang declaration.
   clang::NamedDecl *mapStoredDecl(StoredSingleEntry &entry);
