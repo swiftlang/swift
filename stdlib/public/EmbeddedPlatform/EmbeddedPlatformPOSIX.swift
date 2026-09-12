@@ -14,7 +14,7 @@ func arc4random_buf(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 func putchar(_: CInt) -> CInt
 
 @_extern(c, "exit")
-func exit(_: CInt)
+func exit(_: CInt) /* -> Never */
 
 @_extern(c, "malloc_type_malloc")
 func malloc_type_malloc(_ : Int, _ : UInt64) -> UnsafeMutableRawPointer
@@ -86,6 +86,7 @@ public func _swift_writeToStandardOutput(
 @implementation @c
 public func _swift_exit(_ code: CInt) -> Never {
   exit(code)
+  Builtin.unreachable()
 }
 
 /// The human-readable prefix that precedes an error message, chosen by the
