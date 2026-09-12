@@ -2899,8 +2899,8 @@ Expr *PreCheckTarget::wrapMemberChainIfNeeded(Expr *E) {
   return wrapped;
 }
 
-TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
-                                                       Expr *E) {
+TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E,
+                                                       bool preferTypeLookup) {
   /// An ASTWalker for simplifying type expressions inside generic argument
   /// positions.
   /// The inner expression of a GenericArgumentExprTypeRepr is not walked by
@@ -2908,8 +2908,102 @@ TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
   /// so we use this walker to resolve names and fold type sugar.
   class GenericArgumentSimplifierWalker : public ASTWalker {
     DeclContext *DC;
+    bool PreferTypeLookup;
+
+    /// Whether \p name can be written as a component of a type repr. The
+    /// 'DeclRefTypeRepr' constructor asserts on any other name.
+    static bool canNameTypeComponent(DeclNameRef name) {
+      return name.isSimpleName() && !name.getBaseName().isSpecial() &&
+             !name.isOperator();
+    }
+
+    /// Look \p name up as a type in this context. Unlike value lookup this
+    /// never needs the enclosing protocol's requirement signature, so it is
+    /// safe at the structural stage.
+    TypeDecl *lookupTypeDecl(DeclNameRef name, SourceLoc loc) {
+      if (!canNameTypeComponent(name))
+        return nullptr;
+
+      auto lookup = TypeChecker::lookupUnqualifiedType(
+          DC, name, loc, defaultUnqualifiedLookupOptions);
+      if (lookup.empty())
+        return nullptr;
+
+      auto *typeDecl = dyn_cast<TypeDecl>(lookup.front().getValueDecl());
+
+      // A value generic parameter is a 'TypeDecl', but a reference to one, such
+      // as 'N' or 'N.magnitude', is a value rather than a type. Leave it on the
+      // value path, where 'resolveDeclRefExpr' builds a 'TypeValueExpr'.
+      if (auto *paramDecl = dyn_cast_or_null<GenericTypeParamDecl>(typeDecl))
+        if (paramDecl->isValue())
+          return nullptr;
+
+      return typeDecl;
+    }
+
+    /// Resolve \p UDRE as a type reference, or return null if it does not name
+    /// a type.
+    TypeExpr *resolveAsTypeRef(UnresolvedDeclRefExpr *UDRE) {
+      auto name = UDRE->getName();
+      if (!lookupTypeDecl(name, UDRE->getLoc()))
+        return nullptr;
+
+      auto &ctx = DC->getASTContext();
+      auto *repr = UnqualifiedIdentTypeRepr::create(ctx, UDRE->getNameLoc(),
+                                                    name);
+      return new (ctx) TypeExpr(repr);
+    }
+
+    /// Fold a dotted name rooted at a dependent type, such as 'A.Inner' or
+    /// 'Self.Inner', into a member type repr without resolving the base.
+    ///
+    /// The general fold in 'TypeExprSimplifier::simplifyNestedTypeExpr'
+    /// resolves the base at the interface stage so that it can check that the
+    /// member names a type. Inside a protocol that resolution needs the
+    /// requirement signature, which is what a structural requirement is
+    /// computing. The base's conformances do not exist yet at this stage, so
+    /// the member cannot be checked here.
+    ///
+    /// Build the repr and leave checking to the caller's own type resolution,
+    /// which is what an unparenthesized 'A.Inner' already does.
+    TypeExpr *resolveAsDependentMemberTypeRef(UnresolvedDotExpr *UDE) {
+      auto &ctx = DC->getASTContext();
+
+      SmallVector<UnresolvedDotExpr *, 4> members;
+      Expr *base = UDE;
+      while (auto *dot = dyn_cast<UnresolvedDotExpr>(base)) {
+        auto name = dot->getName();
+        if (!canNameTypeComponent(name))
+          return nullptr;
+        // 'T.Type' and 'T.Protocol' are metatype sugar, not member types. The
+        // general fold builds the right repr for them.
+        if (name.isSimpleName(ctx.Id_Type) ||
+            name.isSimpleName(ctx.Id_Protocol))
+          return nullptr;
+        members.push_back(dot);
+        base = dot->getBase();
+      }
+
+      auto *root = dyn_cast<UnresolvedDeclRefExpr>(base);
+      if (!root)
+        return nullptr;
+
+      auto *rootDecl = lookupTypeDecl(root->getName(), root->getLoc());
+      if (!isa_and_nonnull<GenericTypeParamDecl>(rootDecl) &&
+          !isa_and_nonnull<AssociatedTypeDecl>(rootDecl))
+        return nullptr;
+
+      TypeRepr *repr = UnqualifiedIdentTypeRepr::create(
+          ctx, root->getNameLoc(), root->getName());
+      for (auto *dot : llvm::reverse(members))
+        repr = QualifiedIdentTypeRepr::create(ctx, repr, dot->getNameLoc(),
+                                              dot->getName());
+      return new (ctx) TypeExpr(repr);
+    }
+
   public:
-    GenericArgumentSimplifierWalker(DeclContext *dc) : DC(dc) {}
+    GenericArgumentSimplifierWalker(DeclContext *dc, bool preferTypeLookup)
+        : DC(dc), PreferTypeLookup(preferTypeLookup) {}
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::ArgumentsAndExpansion;
     }
@@ -2927,8 +3021,22 @@ TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
         return Action::SkipNode(folded);
       }
 
+      // Fold a dotted name rooted at a dependent type, such as 'A.Inner', into
+      // a member type. The general fold cannot run at the structural stage
+      // because it resolves the base first.
+      if (PreferTypeLookup) {
+        if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(expr)) {
+          if (auto *typeExpr = resolveAsDependentMemberTypeRef(dotExpr))
+            return Action::SkipNode(typeExpr);
+        }
+      }
+
       // Resolve unqualified name references
       if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+        if (PreferTypeLookup) {
+          if (auto *typeExpr = resolveAsTypeRef(unresolved))
+            return Action::SkipNode(typeExpr);
+        }
         auto *resolved = TypeChecker::resolveDeclRefExpr(unresolved, DC);
         if (!resolved)
           return Action::Stop();
@@ -2948,7 +3056,7 @@ TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
     }
   };
 
-  GenericArgumentSimplifierWalker walker(DC);
+  GenericArgumentSimplifierWalker walker(DC, preferTypeLookup);
   auto *walked = E->walk(walker);
   if (!walked)
     return nullptr;
