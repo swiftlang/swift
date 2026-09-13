@@ -50,11 +50,39 @@ using namespace irgen;
 
 llvm::Value *irgen::emitDistributedActorInitializeRemote(
     IRGenFunction &IGF, SILType selfType, llvm::Value *actorMetatype, Explosion &out) {
-  auto fn = IGF.IGM.getDistributedActorInitializeRemoteFunctionPointer();
   actorMetatype =
       IGF.Builder.CreateBitCast(actorMetatype, IGF.IGM.TypeMetadataPtrTy);
 
-  auto call = IGF.Builder.CreateCall(fn, {actorMetatype});
+  llvm::CallInst *call;
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    // In Embedded Swift the runtime cannot derive the remote-proxy trim size
+    // or alignment mask from class metadata at runtime. Compute both at
+    // IRGen and pass them to an embedded-only entry point.
+    auto &classTI = IGF.IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+    auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
+                                               /*forBackwardDeployment=*/false);
+
+    // Distributed actor field layout is:
+    //   [0] id,
+    //   [1] actorSystem,
+    //   [2] DefaultActorStorage,
+    //   [3+] user props
+    // A remote proxy instance never has user props.
+    Size trimSize = classLayout.getSize();
+    auto elements = classLayout.getElements();
+    if (elements.size() > 3 && elements[3].hasByteOffset())
+      trimSize = elements[3].getByteOffset();
+
+    llvm::Value *allocSize = IGF.IGM.getSize(trimSize);
+    llvm::Value *alignMask = IGF.IGM.getSize(classLayout.getAlignMask());
+
+    auto fn =
+        IGF.IGM.getDistributedActorInitializeRemoteEmbeddedFunctionPointer();
+    call = IGF.Builder.CreateCall(fn, {actorMetatype, allocSize, alignMask});
+  } else {
+    auto fn = IGF.IGM.getDistributedActorInitializeRemoteFunctionPointer();
+    call = IGF.Builder.CreateCall(fn, {actorMetatype});
+  }
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->setDoesNotThrow();
 
@@ -427,6 +455,10 @@ IRGenModule::getAddrOfDistributedTargetAccessor(LinkEntity accessor,
 }
 
 void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
+  // Embedded Swift, dispatch is handled without accessible records, skip emitting them.
+  if (Context.LangOpts.hasFeature(Feature::Embedded))
+    return;
+
   LinkEntity accessorRef = getAccessorLinking(target);
   auto *f = getAddrOfDistributedTargetAccessor(accessorRef,
                                                ForDefinition);

@@ -290,6 +290,10 @@ deriveBodyDistributed_invokeHandlerOnReturn(AbstractFunctionDecl *afd,
   const SourceLoc sloc = SourceLoc();
   const DeclNameLoc dloc = DeclNameLoc();
 
+  // `invokeHandlerOnReturn` requirement is not present in Embedded Swift.
+  ASSERT(!C.LangOpts.hasFeature(Feature::Embedded) &&
+         "invokeHandlerOnReturn is unavailable in Embedded Swift; ");
+
   NominalTypeDecl *nominal = dyn_cast<NominalTypeDecl>(DC);
   assert(nominal);
 
@@ -745,6 +749,26 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 }
 
 /******************************************************************************/
+/*********** EXECUTE-DISTRIBUTED-TARGET FUNCTION (EMBEDDED ONLY) **************/
+/******************************************************************************/
+
+/// Derive the witness for the Embedded-only
+/// `_executeDistributedTarget(target:invocationDecoder:resultHandler:)`
+/// requirement.
+static FuncDecl *
+deriveDistributedActor_executeDistributedTarget(DerivedConformance &derived) {
+  auto *classDecl = dyn_cast<ClassDecl>(derived.Nominal);
+  assert(classDecl && classDecl->isDistributedActor());
+
+  auto *fn = createEmbeddedDistributedReceiveDispatch(classDecl);
+  if (!fn)
+    return nullptr;
+
+  derived.addMembersToConformanceContext({fn});
+  return fn;
+}
+
+/******************************************************************************/
 /**************************** ENTRY POINTS ************************************/
 /******************************************************************************/
 
@@ -762,10 +786,12 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   }
 
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
-    // just a simple name check is enough here,
-    // if we are invoked here we know for sure it is for the "right" function
     if (func->getName().getBaseName() == Context.Id_resolve) {
       return deriveDistributedActor_resolve(*this);
+    }
+
+    if (func->getName().getBaseName() == Context.Id_executeDistributedTarget) {
+      return deriveDistributedActor_executeDistributedTarget(*this);
     }
   }
 

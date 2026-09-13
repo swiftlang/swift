@@ -960,6 +960,34 @@ bool BridgedFunction::isGeneric() const {
   return getFunction()->isGeneric();
 }
 
+bool BridgedFunction::isDistributedAdHocSerializationRequirementWitness() const {
+  auto *DC = getFunction()->getDeclContext();
+  while (DC) {
+    if (auto *funcDecl = llvm::dyn_cast<swift::AbstractFunctionDecl>(DC)) {
+      if (funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
+        return true;
+
+      auto &ctx = funcDecl->getASTContext();
+      if (funcDecl->getBaseName() == ctx.Id_invokeHandlerOnReturn) {
+        auto *parentDC = funcDecl->getDeclContext();
+        if (parentDC && parentDC->isTypeContext()) {
+          if (auto *systemProto = ctx.getDistributedActorSystemDecl()) {
+            auto *selfNominal = parentDC->getSelfNominalTypeDecl();
+            if (selfNominal &&
+                !swift::lookupConformance(
+                     selfNominal->getDeclaredInterfaceType(), systemProto)
+                     .isInvalid()) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    DC = DC->getParent();
+  }
+  return false;
+}
+
 bool BridgedFunction::hasSemanticsAttr(BridgedStringRef attrName) const {
   return getFunction()->hasSemanticsAttr(attrName.unbridged());
 }

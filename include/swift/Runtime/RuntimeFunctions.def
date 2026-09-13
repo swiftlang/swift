@@ -2695,6 +2695,18 @@ FUNCTION(DistributedActorInitializeRemote,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
+// OpaqueValue* swift_distributedActor_remote_initialize_embedded(
+//    const Metadata *actorType, size_t allocSize, size_t alignMask
+// );
+FUNCTION(DistributedActorInitializeRemoteEmbedded,
+         _Concurrency, swift_distributedActor_remote_initialize_embedded, SwiftCC,
+         EmbeddedDistributedSwiftAvailability,
+         RETURNS(OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
 /// void swift_asyncLet_begin(
 ///     AsyncLet *alet,
 ///     TaskOptionRecord *options,

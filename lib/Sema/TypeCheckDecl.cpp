@@ -871,8 +871,16 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     }
 
     case DeclKind::Func: {
+      auto *FD = cast<FuncDecl>(decl);
+
+      // Distributed actor methods are effectively final because actors don't allow subclassing.
+      // We enable this inference just in Embedded for now, but could enable globally perhaps.
+      if (cls->isDistributedActor() &&
+          decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+        return true;
+
       // Methods declared 'static' are final.
-      auto staticSpelling = cast<FuncDecl>(decl)->getStaticSpelling();
+      auto staticSpelling = FD->getStaticSpelling();
       if (inferFinalAndDiagnoseIfNeeded(decl, cls, explicitFinalAttr,
                                         staticSpelling))
         return true;
