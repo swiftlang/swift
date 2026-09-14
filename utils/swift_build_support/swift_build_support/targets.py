@@ -290,7 +290,7 @@ class StdlibDeploymentTarget(object):
         "riscv64",
         "s390x"])
 
-    FreeBSD = Platform("freebsd", archs=["x86_64", "aarch64"])
+    FreeBSD = Platform("freebsd", archs=["x86_64", "aarch64", "powerpc64le"])
 
     LinuxStatic = Platform('linux-static', sdk_name='LINUX_STATIC', archs=[
         'x86_64',
@@ -400,6 +400,8 @@ class StdlibDeploymentTarget(object):
                 return StdlibDeploymentTarget.FreeBSD.x86_64
             elif machine == 'arm64':
                 return StdlibDeploymentTarget.FreeBSD.aarch64
+            elif machine == 'powerpc' and platform.processor() == 'powerpc64le':
+                return StdlibDeploymentTarget.FreeBSD.powerpc64le
 
         elif system == 'OpenBSD':
             if machine == 'amd64':
