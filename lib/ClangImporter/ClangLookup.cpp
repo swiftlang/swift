@@ -214,6 +214,8 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     auto *foundDecl = foundEntry.dyn_cast<clang::NamedDecl *>();
     if (!foundDecl)
       continue; // What we found wasn't a NamedDecl
+    if (!seenDecls.insert(foundDecl).second)
+      continue; // We've already seen this; a re-declaration?
 
     if (auto *stats = ctx.Stats)
       ++stats->getFrontendCounters().ClangNamespaceMemberLookupCandidates;
@@ -241,8 +243,6 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     if (auto *stats = ctx.Stats)
       ++stats->getFrontendCounters().ClangNamespaceMemberLookupMatched;
 
-    if (!seenDecls.insert(foundDecl).second)
-      continue; // We've already seen this; a re-declaration?
     if (auto *importedDecl =
             ctx.getClangModuleLoader()->importDeclDirectly(foundDecl))
       collector.add(cast<ValueDecl>(importedDecl));
