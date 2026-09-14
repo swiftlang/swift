@@ -4152,13 +4152,10 @@ function Write-PlatformInfoPlist($PlatformOrOS) {
 }
 
 function Get-SelectedSDKBuilds() {
-  return $KnownPlatforms.Values | Where-Object {
-    switch ($_.OS) {
-      Windows { $Windows }
-      Android { $Android }
-      default { $false }
-    }
-  }
+  $Builds = @()
+  if ($Windows) { $Builds += $WindowsSDKBuilds }
+  if ($Android) { $Builds += $AndroidSDKBuilds }
+  return $Builds
 }
 
 # Promotes C module header directories that libdispatch and Foundation install
