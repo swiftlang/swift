@@ -25,8 +25,8 @@ internal func _swift_stdlib_wait(
 @_extern(c, "llvm.wasm.memory.atomic.notify")
 internal func _swift_stdlib_wake(on: UnsafePointer<UInt32>, count: UInt32) -> UInt32
 
-extension Atomic where Value == _MutexHandle.State {
-  internal borrowing func _wait(expected: _MutexHandle.State) {
+extension Atomic where Value == UInt32 {
+  internal borrowing func _wait(expected: UInt32) {
     #if _runtime(_multithreaded)
     #if os(WASI)
     if _swift_stdlib_wasilibc_use_busy_futex_get() != 0 {
@@ -46,7 +46,7 @@ extension Atomic where Value == _MutexHandle.State {
     #endif
     _ = unsafe _swift_stdlib_wait(
       on: .init(_rawAddress),
-      expected: expected.rawValue,
+      expected: expected,
 
       // A timeout of < 0 means indefinitely.
       timeout: -1
@@ -63,29 +63,24 @@ extension Atomic where Value == _MutexHandle.State {
 }
 
 @available(SwiftStdlib 6.0, *)
-extension _MutexHandle {
-  @available(SwiftStdlib 6.0, *)
-  @frozen
-  @usableFromInline
-  internal enum State: UInt32, AtomicRepresentable {
-    case unlocked
-    case locked
-    case contended
-  }
-}
-
-@available(SwiftStdlib 6.0, *)
 @frozen
 @_staticExclusiveOnly
 public struct _MutexHandle: ~Copyable {
+  @usableFromInline internal static var unlocked: UInt32 { 0 }
+  @usableFromInline internal static var locked: UInt32 { 1 }
+  @usableFromInline internal static var contended: UInt32 { 2 }
+
   @usableFromInline
-  let storage: Atomic<State>
+  let storage: Atomic<UInt32>
 
   @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   public init() {
-    storage = Atomic(.unlocked)
+    // A literal rather than `Self.unlocked`: reading the accessor cross-module
+    // leaves a call in the initializer and `Mutex` stops being statically
+    // initialized (test/SILOptimizer/static_atomics.swift).
+    storage = Atomic(0)
   }
 
   @available(SwiftStdlib 6.0, *)
@@ -96,8 +91,8 @@ public struct _MutexHandle: ~Copyable {
     // ones in the loop.
 
     var (exchanged, state) = storage.compareExchange(
-      expected: .unlocked,
-      desired: .locked,
+      expected: Self.unlocked,
+      desired: Self.locked,
       successOrdering: .acquiring,
       failureOrdering: .relaxed
     )
@@ -112,14 +107,14 @@ public struct _MutexHandle: ~Copyable {
       // into being contended. If when we do this that the value stored there
       // was unlocked, then we know we unintentionally acquired the lock. A
       // weird quirk that occurs if this happens is that we go directly from
-      // .unlocked -> .contended when in fact the lock may not be contended.
-      // We may be able to do another atomic access and change it to .locked if
+      // unlocked -> contended when in fact the lock may not be contended.
+      // We may be able to do another atomic access and change it to locked if
       // acquired it, but it may cause more problems than just potentially
       // calling wake with no waiters.
-      if state != .contended, storage.exchange(
-        .contended,
+      if state != Self.contended, storage.exchange(
+        Self.contended,
         ordering: .acquiring
-      ) == .unlocked {
+      ) == Self.unlocked {
         // Locked!
         return
       }
@@ -127,11 +122,11 @@ public struct _MutexHandle: ~Copyable {
       // Block until unlock has been called. This will return early if the call
       // to unlock happened between attempting to acquire and attempting to
       // wait while nobody else managed to acquire it yet.
-      storage._wait(expected: .contended)
+      storage._wait(expected: Self.contended)
 
       (exchanged, state) = storage.weakCompareExchange(
-        expected: .unlocked,
-        desired: .locked,
+        expected: Self.unlocked,
+        desired: Self.locked,
         successOrdering: .acquiring,
         failureOrdering: .relaxed
       )
@@ -144,8 +139,8 @@ public struct _MutexHandle: ~Copyable {
   @usableFromInline
   internal borrowing func _tryLock() -> Bool {
     storage.compareExchange(
-      expected: .unlocked,
-      desired: .locked,
+      expected: Self.unlocked,
+      desired: Self.locked,
       successOrdering: .acquiring,
       failureOrdering: .relaxed
     ).exchanged
@@ -154,11 +149,12 @@ public struct _MutexHandle: ~Copyable {
   @available(SwiftStdlib 6.0, *)
   @usableFromInline
   internal borrowing func _unlock() {
-    // Transition our state from being either .locked or .contended to .unlocked.
+    // Transition our state from being either locked or contended to unlocked.
     // At this point the mutex is freely acquirable. If the value that was
-    // stored in the mutex was .locked, then no one else was waiting on this
+    // stored in the mutex was locked, then no one else was waiting on this
     // mutex so we can just skip trying to wake up a thread.
-    guard storage.exchange(.unlocked, ordering: .releasing) == .contended else {
+    let previous = storage.exchange(Self.unlocked, ordering: .releasing)
+    guard previous == Self.contended else {
       // Unlocked!
       return
     }
