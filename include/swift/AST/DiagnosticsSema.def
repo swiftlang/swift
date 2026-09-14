@@ -1790,6 +1790,10 @@ GROUPED_ERROR(invalid_dynamic_callable_type,DynamicCallable,none,
       "'@dynamicCallable' requires %0 to have either a valid "
       "'dynamicallyCall(withArguments:)' method or "
       "'dynamicallyCall(withKeywordArguments:)' method", (Type))
+NOTE(add_dynamic_callable_method,none,
+     "add 'dynamicallyCall(%select{withArguments:|withKeywordArguments:|"
+     "withKeywordArguments:}0)' method%select{| with 'Dictionary'| with "
+     "'KeyValuePairs'}0", (unsigned))
 GROUPED_ERROR(missing_dynamic_callable_kwargs_method,DynamicCallable,none,
       "'@dynamicCallable' type %0 cannot be applied with keyword arguments; "
       "missing 'dynamicCall(withKeywordArguments:)' method", (Type))
@@ -1798,6 +1802,9 @@ ERROR(invalid_dynamic_member_lookup_type,none,
       "'@dynamicMemberLookup' requires %0 to have a "
       "'subscript(dynamicMember:)' method that accepts either "
       "'ExpressibleByStringLiteral' or a key path", (Type))
+NOTE(add_dynamic_member_lookup_subscript,none,
+     "add 'subscript(dynamicMember:)' method with %select{'String'|a key path}0",
+     (unsigned))
 ERROR(invalid_dynamic_member_subscript_missing_param_label, none,
       "'@dynamicMemberLookup' requires %0 to have an explicit parameter label",
       (ParamDecl *))

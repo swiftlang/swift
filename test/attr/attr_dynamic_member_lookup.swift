@@ -6,9 +6,17 @@ var global = 42
 
 // expected-error@+1 {{'@dynamicMemberLookup' requires 'S' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 @dynamicMemberLookup
+// expected-note@+1 {{add 'subscript(dynamicMember:)' method with 'String'}} {{11-11=\n    subscript(dynamicMember member: String) -> <#Type#> {\n        <#code#>\n    }\n}}
+// expected-note@+1 {{add 'subscript(dynamicMember:)' method with a key path}} {{11-11=\n    subscript(dynamicMember member: KeyPath<<#Base#>, <#Type#>>) -> <#Type#> {\n        <#code#>\n    }\n}}
 struct S {
   subscript(bogus: Int) -> Void { () }
 }
+
+// expected-error@+1 {{'@dynamicMemberLookup' requires 'PublicLookup' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+@dynamicMemberLookup
+// expected-note@+1 {{add 'subscript(dynamicMember:)' method with 'String'}} {{29-29=\n    public subscript(dynamicMember member: String) -> <#Type#> {\n        <#code#>\n    }\n}}
+// expected-note@+1 {{add 'subscript(dynamicMember:)' method with a key path}} {{29-29=\n    public subscript(dynamicMember member: KeyPath<<#Base#>, <#Type#>>) -> <#Type#> {\n        <#code#>\n    }\n}}
+public struct PublicLookup {}
 
 @dynamicMemberLookup
 struct Gettable {
@@ -413,7 +421,7 @@ func NotAllowedOnFunc() {}
 
 // expected-error @+1 {{'@dynamicMemberLookup' requires 'InvalidBase' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 @dynamicMemberLookup
-class InvalidBase {}
+class InvalidBase {} // expected-note {{add 'subscript(dynamicMember:)' method with 'String'}} expected-note {{add 'subscript(dynamicMember:)' method with a key path}}
 
 class InvalidDerived : InvalidBase { subscript(dynamicMember: String) -> Int { get {}} }
 
