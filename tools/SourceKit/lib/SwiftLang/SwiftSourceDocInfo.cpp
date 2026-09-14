@@ -118,6 +118,8 @@ static StringRef getTagForParameter(PrintStructureKind context) {
   case PrintStructureKind::DeclResultTypeClause:
   case PrintStructureKind::FunctionParameterList:
   case PrintStructureKind::FunctionParameterType:
+  case PrintStructureKind::CoroutineYieldsTypes:
+  case PrintStructureKind::CoroutineYield:
     // These kinds are ignored by 'isIgnoredPrintStructureKind()'
     llvm_unreachable("ignored structure kind");
   }
@@ -257,6 +259,8 @@ private:
     case PrintStructureKind::DeclResultTypeClause:
     case PrintStructureKind::FunctionParameterList:
     case PrintStructureKind::FunctionParameterType:
+    case PrintStructureKind::CoroutineYieldsTypes:
+    case PrintStructureKind::CoroutineYield:
       return true;
     default:
       return false;

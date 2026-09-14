@@ -305,7 +305,7 @@ namespace {
                                                     const Type &pointeeType) {
     auto funcTy = pointeeType->castTo<FunctionType>();
     return {FunctionType::get(
-                funcTy->getParams(), funcTy->getResult(),
+                funcTy->getParams(), funcTy->getYields(), funcTy->getResult(),
                 funcTy->getExtInfo()
                     .intoBuilder()
                     .withRepresentation(
@@ -631,8 +631,8 @@ namespace {
               .withRepresentation(FunctionType::Representation::Block)
               .withClangFunctionType(type)
               .build();
-      auto funcTy =
-          FunctionType::get(fTy->getParams(), fTy->getResult(), extInfo);
+      auto funcTy = FunctionType::get(fTy->getParams(), fTy->getYields(),
+                                      fTy->getResult(), extInfo);
       return { funcTy, ImportHint::Block };
     }
 
@@ -824,7 +824,7 @@ namespace {
       }
 
       // Form the function type.
-      return FunctionType::get(params, resultTy, extInfo);
+      return FunctionType::get(params, /* yields */ {}, resultTy, extInfo);
     }
 
     ImportResult
@@ -838,7 +838,7 @@ namespace {
 
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      return FunctionType::get({}, resultTy, info);
+      return FunctionType::get({}, /* yields */ {}, resultTy, info);
     }
 
     ImportResult VisitParenType(const clang::ParenType *type) {

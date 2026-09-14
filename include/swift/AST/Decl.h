@@ -44,6 +44,7 @@
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/YieldList.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
@@ -8170,7 +8171,10 @@ public:
   };
 
 private:
-  ParameterList *Params;
+  ParameterList *Params = nullptr;
+  // Yield list is nullable: it is non-null only for coroutines (functions and
+  // coroutine accessors) and then cannot be empty.
+  YieldList *Yields = nullptr;
 
 private:
   /// The generation at which we last loaded derivative function configurations.
@@ -8297,6 +8301,8 @@ public:
   /// Should this declaration be treated as if annotated with transparent
   /// attribute.
   bool isTransparent() const;
+
+  bool isCoroutine() const;
 
   // Expose our import as member status
   ImportAsMemberStatus getImportAsMemberStatus() const {
@@ -8719,6 +8725,13 @@ public:
 
   void setParameters(ParameterList *Params);
 
+  /// Retrieve the function's explicit (as spelled in the source code) yield
+  /// list
+  YieldList *getYields() { return Yields; }
+  const YieldList *getYields() const { return Yields; }
+
+  void setYields(YieldList *Yields);
+
   bool hasImplicitSelfDecl() const {
     return Bits.AbstractFunctionDecl.HasImplicitSelfDecl;
   }
@@ -8853,6 +8866,7 @@ class FuncDecl : public AbstractFunctionDecl {
   friend class SelfAccessKindRequest;
   friend class IsStaticRequest;
   friend class ResultTypeRequest;
+  friend class YieldsTypeRequest;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
@@ -8930,10 +8944,9 @@ public:
                           StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
                           DeclName Name, SourceLoc NameLoc, bool Async,
                           SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
-                          TypeRepr *ThrownTyR,
-                          GenericParamList *GenericParams,
-                          ParameterList *BodyParams, TypeRepr *ResultTyR,
-                          DeclContext *Parent);
+                          TypeRepr *ThrownTyR, GenericParamList *GenericParams,
+                          ParameterList *BodyParams, YieldList *BodyYields,
+                          TypeRepr *ResultTyR, DeclContext *Parent);
 
   static FuncDecl *
   createImplicit(ASTContext &Context, StaticSpellingKind StaticSpelling,
@@ -8992,8 +9005,12 @@ public:
     return FnRetType.getSourceRange();
   }
 
-  /// Retrieve the result interface type of this function.
+  /// Retrieve the result interface type of this function
   Type getResultInterfaceType() const;
+
+  /// Same as above, but only yields
+  void
+  getYieldInterfaceTypes(SmallVectorImpl<AnyFunctionType::Yield> &yields) const;
 
   /// Returns the result interface type of this function if it has already been
   /// computed, otherwise `nullopt`. This should only be used for dumping.
@@ -9112,6 +9129,8 @@ class AccessorDecl final : public FuncDecl {
       return Bits.AccessorDecl.IsTransparent;
     return std::nullopt;
   }
+
+  void inferYieldType();
 
   friend class IsAccessorTransparentRequest;
 
