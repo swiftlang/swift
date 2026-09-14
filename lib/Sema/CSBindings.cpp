@@ -1627,8 +1627,12 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
         if (binding.BindingType->hasTypeVariable())
           return SubsumeBindingResult::ExistingIsBetter;
 
-        ASSERT(existing.BindingType->hasTypeVariable());
-        return SubsumeBindingResult::NewIsBetter;
+        if (existing.BindingType->hasTypeVariable())
+          return SubsumeBindingResult::NewIsBetter;
+
+        // If neither one has a type variable, we have the 'Any' vs
+        // 'any Sendable' situation. We leave both bindings in place
+        // for now.
       }
     }
   }
@@ -1654,8 +1658,8 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       if (binding.BindingType->hasTypeVariable())
         return SubsumeBindingResult::ExistingIsBetter;
 
-      ASSERT(existing.BindingType->hasTypeVariable());
-      return SubsumeBindingResult::NewIsBetter;
+      if (existing.BindingType->hasTypeVariable())
+        return SubsumeBindingResult::NewIsBetter;
     }
 
     if (auto result = dedupCGFloatDoubleHack())

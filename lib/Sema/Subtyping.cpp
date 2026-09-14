@@ -207,6 +207,34 @@ std::optional<bool>
 swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {
   if (!lhs->hasTypeVariable() && !lhs->hasTypeParameter() &&
       !rhs->hasTypeVariable() && !rhs->hasTypeParameter()) {
+    // Hack to deal with matchSendableExistentialToAnyInGenericArgumentPosition().
+    {
+      auto hasAnySendable = [](Type t) -> bool {
+        return t.findIf([](Type t) -> bool {
+          // Don't recurse into protocol compositions.
+          if (t->is<ProtocolCompositionType>())
+            return false;
+          return t->getKnownProtocol() == KnownProtocolKind::Sendable;
+        });
+      };
+
+      auto rewriteAnySendableToAny = [](Type t) -> Type {
+        return t.transformRec([](TypeBase *t) -> std::optional<Type> {
+          // Don't recurse into protocol compositions.
+          if (t->is<ProtocolCompositionType>())
+            return t;
+          if (t->getKnownProtocol() == KnownProtocolKind::Sendable)
+            return t->getASTContext().TheAnyType;
+          return std::nullopt;
+        });
+      };
+
+      if (hasAnySendable(lhs))
+        lhs = rewriteAnySendableToAny(lhs);
+      if (hasAnySendable(rhs))
+        rhs = rewriteAnySendableToAny(rhs);
+    }
+
     return lhs->isEqual(rhs);
   }
 
