@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage-
-// RUN: %target-typecheck-verify-swift -solver-disable-diagnose-valid-salvage
+// RUN: %target-typecheck-verify-swift -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage- -swift-version 5
+// RUN: %target-typecheck-verify-swift -solver-disable-diagnose-valid-salvage -swift-version 5
 
 // REQUIRES: objc_interop
 
@@ -163,4 +163,71 @@ func testLeadingDotAmbiguity() {
     f15(max(.y, z), max(.x, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
     f16(max(.y, z), max(.x, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
   }
+}
+
+// Optional-to-optional conversion
+func optional_to_optional(x: CGFloat?) -> Double? {
+  return x
+}
+
+func test_joins_requiring_optional_to_optional_conversion(_ x1: Double, _ x2: CGFloat,
+                                                          _ y1: Double?, _ y2: CGFloat?) {
+  if x1 != y1 {}
+  if x1 != y2 {}
+  if x2 != y1 {}
+  if x2 != y2 {}
+
+  if y1 != x1 {}
+  if y1 != x2 {}
+  if y2 != x1 {}
+  if y2 != x2 {}
+}
+
+// Unapplied references to operators
+func test_unapplied_1(_ x: [CGFloat], y: Double) {
+  let _ = x.reduce(0, +) / y
+  let _ = x.reduce(0, *) / y
+  let _ = x.reduce(0, -) / y
+  let _ = x.reduce(0, /) / y
+}
+
+func test_unapplied_2(_ x: [Double], y: CGFloat) {
+  let _ = x.reduce(0, +) / y
+  let _ = x.reduce(0, *) / y
+  let _ = x.reduce(0, -) / y
+  let _ = x.reduce(0, /) / y
+}
+
+struct Blob {
+  let area: Double
+  let circumference: CGFloat
+}
+
+func test_unapplied_3(_ blobs: [Blob]) {
+  let _: Double = blobs.map(\.area).reduce(0, +)
+  let _: Double = blobs.map(\.area).reduce(0.0, +)
+
+  let _: CGFloat = blobs.map(\.area).reduce(0, +)
+  let _: CGFloat = blobs.map(\.area).reduce(0.0, +)
+
+  // FIXME
+  let _: Double = blobs.map(\.circumference).reduce(0, +)
+  // expected-error@-1 {{cannot convert value of type '(Double) -> Double' to expected argument type '(Double, CGFloat) throws -> Double'}}
+  let _: Double = blobs.map(\.circumference).reduce(0.0, +)
+  // expected-error@-1 {{cannot convert value of type '(Double) -> Double' to expected argument type '(Double, CGFloat) throws -> Double'}}
+
+  let _: CGFloat = blobs.map(\.circumference).reduce(0, +)
+  let _: CGFloat = blobs.map(\.circumference).reduce(0.0, +)
+
+  let _: Double = blobs.map { $0.area }.reduce(0, +)
+  let _: Double = blobs.map { $0.area }.reduce(0.0, +)
+
+  let _: CGFloat = blobs.map { $0.area }.reduce(0, +)
+  let _: CGFloat = blobs.map { $0.area }.reduce(0.0, +)
+
+  let _: Double = blobs.map { $0.circumference }.reduce(0, +)
+  let _: Double = blobs.map { $0.circumference }.reduce(0.0, +)
+
+  let _: CGFloat = blobs.map { $0.circumference }.reduce(0, +)
+  let _: CGFloat = blobs.map { $0.circumference }.reduce(0.0, +)
 }
