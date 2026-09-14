@@ -22,6 +22,7 @@
 #include "SILBridging.h"
 #include "swift/AST/Builtins.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/StorageImpl.h"
