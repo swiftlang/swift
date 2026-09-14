@@ -378,8 +378,11 @@ irgen::expandCallingConv(IRGenModule &IGM,
                          bool isCalleeAllocatedCoro) {
   switch (convention) {
   case SILFunctionTypeRepresentation::COMMethod:
-    llvm_unreachable(
-        "COM method calling convention lowering is not implemented");
+    if (IGM.Context.LangOpts.COMModel ==
+            LangOptions::COMInteropModel::Microsoft &&
+        IGM.Triple.getArch() == llvm::Triple::x86)
+      return llvm::CallingConv::X86_StdCall;
+    return IGM.getOptions().PlatformCCallingConvention;
 
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
