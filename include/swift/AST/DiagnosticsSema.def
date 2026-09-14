@@ -1792,7 +1792,7 @@ GROUPED_ERROR(invalid_dynamic_callable_type,DynamicCallable,none,
       "'dynamicallyCall(withKeywordArguments:)' method", (Type))
 GROUPED_ERROR(missing_dynamic_callable_kwargs_method,DynamicCallable,none,
       "'@dynamicCallable' type %0 cannot be applied with keyword arguments; "
-      "missing 'dynamicCall(withKeywordArguments:)' method", (Type))
+      "missing 'dynamicallyCall(withKeywordArguments:)' method", (Type))
 
 ERROR(invalid_dynamic_member_lookup_type,none,
       "'@dynamicMemberLookup' requires %0 to have a "
