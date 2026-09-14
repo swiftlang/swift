@@ -35,7 +35,7 @@ extension Box where T == E {
 // emitted. The closure's IR signature has no swifterror register — it
 // returns void and writes to its sret, matching the non-throwing SIL type.
 // CHECK-LABEL: define {{.*}} @"$s39typed_throws_nested_error_closure_870303BoxVA2A1EORszlE2idACyAEGvgZ"
-// CHECK-LABEL: define internal swiftcc void @"$s39typed_throws_nested_error_closure_870303BoxVA2A1EORszlE2idACyAEGvgZA2EcfU_"(ptr noalias sret(%T39typed_throws_nested_error_closure_870301EO) captures(none) {{%.*}}, ptr noalias captures(none) {{%.*}})
+// CHECK-LABEL: define internal swiftcc void @"$s39typed_throws_nested_error_closure_870303BoxVA2A1EORszlE2idACyAEGvgZA2EcfU_"(ptr noalias sret(%T39typed_throws_nested_error_closure_870301EO) captures(none) {{%.*}}, ptr noalias align 1 captures(none) {{%.*}})
 
 // --- Issue #73641 sibling: generic class ----------------------------------
 

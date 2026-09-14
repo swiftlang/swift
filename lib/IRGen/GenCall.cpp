@@ -311,6 +311,17 @@ static void addDereferenceableAttributeToBuilder(IRGenModule &IGM,
   }
 }
 
+static void addAlignmentAttributeToBuilder(IRGenModule &IGM,
+                                           llvm::AttrBuilder &b,
+                                           const TypeInfo &ti) {
+  // If we know the type to have a fixed alignment, then the pointer is
+  // guaranteed to be aligned to at least that alignment.
+  if (auto fixedTI = dyn_cast<FixedTypeInfo>(&ti)) {
+    auto align = fixedTI->getFixedAlignment().getValue();
+    b.addAlignmentAttr(align);
+  }
+}
+
 static void addIndirectValueParameterAttributes(IRGenModule &IGM,
                                                 llvm::AttributeList &attrs,
                                                 const TypeInfo &ti,
@@ -325,6 +336,7 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
     b.addCapturesAttr(llvm::CaptureInfo::none());
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
+  addAlignmentAttributeToBuilder(IGM, b, ti);
 
   attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
@@ -363,6 +375,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM, SILType paramSILType,
     b.addCapturesAttr(llvm::CaptureInfo::none());
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
+  addAlignmentAttributeToBuilder(IGM, b, ti);
 
   attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
