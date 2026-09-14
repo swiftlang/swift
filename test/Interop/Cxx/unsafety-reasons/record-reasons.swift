@@ -45,11 +45,10 @@ struct HasPointerField {
   int *p;
 };
 
-// An unsafe annotation settles escapability without recording a reason for it --
-// the annotation already says everything -- so here the safety walk's own
-// reasons are what surface. The pointer field is found before the annotated
-// member type is popped, so it is the one named.
-// expected-note@+1 {{this type has an unsafe field 'p'}}
+// An unsafe annotation makes escapability unknown too, and the recorded reason
+// still wins over the safety walk's own reasons, so the pointer member is what
+// surfaces rather than the annotation on 'bad'.
+// expected-note@+1 {{this type has unknown escapability: its member 'p' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
 struct MixedField {
   Bad bad;
   int *p;
@@ -57,13 +56,14 @@ struct MixedField {
 
 // A base is only ever unsafe transitively, so the pointer field is named here
 // too, not the base.
-// expected-note@+1 {{this type has an unsafe field 'p'}}
+// expected-note@+1 {{this type has unknown escapability: its member 'p' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
 struct MixedBase : Bad {
   int *p;
 };
 
-// Template arguments are checked before fields.
-// expected-note@+1 {{this type has an unsafe template argument}}
+// The escapability reason is reported ahead of the safety walk's
+// template-argument check, so the pointer member is named rather than 'Bad'.
+// expected-note@+1 {{this type has unknown escapability: its member 'a' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
 template <class T, class U> struct Pair { T a; U b; };
 using UnsafePair = Pair<int *, Bad>;
 
