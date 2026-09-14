@@ -20,6 +20,7 @@ struct View {
   NestedExplicitSelfContained explicitNested() const;
 };
 
+// expected-strict-note@+1 {{this type has unknown escapability: Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
 struct SelfContained {
   void *ptr;
   SelfContained(const SelfContained&);
@@ -29,7 +30,9 @@ struct SelfContained {
   NestedSelfContained nested() const;
   Empty empty() const;
   int value() const;
+  // expected-note@+1 {{this returns a view into a type that owns its storage}}
   View view() const;
+  // expected-default-note@+1 {{this returns a pointer or reference into a type that owns its storage}}
   int *pointer() const;
   ExplicitSelfContained explicitSelfContained() const;
   NestedExplicitSelfContained explicitNested() const;
