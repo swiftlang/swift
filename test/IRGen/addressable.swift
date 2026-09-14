@@ -21,14 +21,14 @@ func getMutNE(_ holder: inout Holder) -> NE
 
 // The parameter cannot be 'captures(none)'.
 //
-// CHECK-LABEL: define{{.*}} swiftcc void @"$s1A17testAddressableInyAA2NEVAA6HolderVF"(ptr noalias %0)
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s1A17testAddressableInyAA2NEVAA6HolderVF"(ptr noalias align 1 %0)
 public func testAddressableIn(_ holder: Holder) -> NE {
   getNE(holder)
 }
 
 // The parameter cannot be 'captures(none)'.
 //
-// CHECK-LABEL: define{{.*}} swiftcc void @"$s1A20testAddressableInoutyAA2NEVAA6HolderVzF"(ptr noalias %0)
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s1A20testAddressableInoutyAA2NEVAA6HolderVzF"(ptr noalias align 1 %0)
 public func testAddressableInout(_ holder: inout Holder) -> NE {
   getMutNE(&holder)
 }
