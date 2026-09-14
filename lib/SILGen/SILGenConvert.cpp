@@ -1008,7 +1008,8 @@ SILGenFunction::emitOpenExistential(
   SILType existentialType = existentialValue.getType();
   switch (existentialType.getPreferredExistentialRepresentation()) {
   case ExistentialRepresentation::COM:
-    llvm_unreachable("opening a COM existential is not implemented");
+    assert(existentialType.isObject());
+    return B.createOpenCOMExistential(loc, existentialValue, loweredOpenedType);
   case ExistentialRepresentation::Opaque: {
     // With CoW existentials we can't consume the boxed value inside of
     // the existential. (We could only do so after a uniqueness check on
