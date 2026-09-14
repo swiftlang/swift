@@ -1647,7 +1647,7 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
 
   public var hasUnknownResultIsolation: Bool { bridged.PartialApplyInst_hasUnknownResultIsolation() }
   public var unappliedArgumentCount: Int { bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() }
-  public var calleeConvention: ArgumentConvention { type.bridged.getCalleeConvention().convention }
+  public var calleeConvention: ArgumentConvention { type.calleeConvention }
 
   /// True if this `partial_apply [on_stack]` follows proper stack allocation nesting rules.
   /// When true, the closure and its corresponding destroy instructions must be properly nested
