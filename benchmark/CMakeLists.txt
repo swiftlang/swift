@@ -132,6 +132,8 @@ set(SWIFT_BENCH_MODULES
     single-source/NSErrorTest
     single-source/NSStringConversion
     single-source/NaiveRangeReplaceableCollectionConformance
+    single-source/NestedEnumValueTypes
+    single-source/NestedStructValueTypes
     single-source/NibbleSort
     single-source/NIOChannelPipeline
     single-source/NopDeinit
