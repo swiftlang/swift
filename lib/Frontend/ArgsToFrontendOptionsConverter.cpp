@@ -165,6 +165,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.ParallelDependencyScan = Args.hasFlag(OPT_parallel_scan,
                                              OPT_no_parallel_scan,
                                              true);
+  Opts.ShareClangCompilerInstance =
+      !Args.hasArg(OPT_no_clang_compiler_instance_sharing);
   Opts.GenReproducer |= Args.hasArg(OPT_gen_reproducer);
   Opts.GenReproducerDir = Args.getLastArgValue(OPT_gen_reproducer_dir);
 
