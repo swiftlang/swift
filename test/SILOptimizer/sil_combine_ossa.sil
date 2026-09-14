@@ -265,6 +265,31 @@ bb0(%0 : $Int64):
   return %2 : $Int64
 }
 
+// Don't fold `tuple_extract(tuple(x, y), 0)` to the owned element `x` here. The
+// tuple has another use, so the RAUW would have to compensate by inserting a
+// `copy_value` at the definition of `x` and a `destroy_value` at the use. If the
+// use is in a block which SILCombine orphaned earlier in the same run, the
+// destroy is deleted along with the dead block and the copy leaks.
+//
+// CHECK-LABEL: sil [ossa] @dont_fold_owned_tuple_extract
+// CHECK-NOT:     copy_value
+// CHECK:         [[T:%.*]] = tuple (%0
+// CHECK:         [[B:%.*]] = begin_borrow [[T]]
+// CHECK:         [[E:%.*]] = tuple_extract [[B]]
+// CHECK:         apply {{%.*}}([[E]])
+// CHECK-NOT:     copy_value
+// CHECK-LABEL: } // end sil function 'dont_fold_owned_tuple_extract'
+sil [ossa] @dont_fold_owned_tuple_extract : $@convention(thin) (@owned Klass, @owned Klass) -> @owned (Klass, Klass) {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = tuple (%0 : $Klass, %1 : $Klass)
+  %3 = begin_borrow %2 : $(Klass, Klass)
+  %4 = tuple_extract %3 : $(Klass, Klass), 0
+  %5 = function_ref @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %3 : $(Klass, Klass)
+  return %2 : $(Klass, Klass)
+}
+
 // CHECK-LABEL: sil [ossa] @do_not_fold_integer_literal
 // CHECK: bb
 // CHECK: cond_br
