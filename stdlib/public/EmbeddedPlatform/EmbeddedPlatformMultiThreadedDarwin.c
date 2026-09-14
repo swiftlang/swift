@@ -37,6 +37,11 @@
 
 #define SWIFT_EMBEDDED_PLATFORM_DARWIN_TLS_KEY_BASE __PTK_FRAMEWORK_SWIFT_KEY0
 
+// Darwin stores the current task in a reserved pthread TLS slot.
+// Must match `pthread_reserved_key` in Concurrency/Debug.h.
+__attribute__((used, retain))
+uint32_t _swift_concurrency_debug_current_task_storage_kind = 3;
+
 extern int pthread_key_init_np(int, void (*)(void *));
 
 // Storage layout for the non-recursive `_swift_mutex_*` family, backed by an
