@@ -787,6 +787,16 @@ static bool stripOwnership(SILFunction &func) {
   for (auto &it : lifetimeEnds) {
     auto *pai = it.first;
     for (auto *lifetimeEnd : it.second) {
+      // A `@called(once)` closure's context can be consumed directly by a
+      // `try_apply`, which is a terminator, so the `dealloc_stack` has to
+      // go at the start of every successor block instead.
+      if (auto *term = dyn_cast<TermInst>(lifetimeEnd)) {
+        for (auto *successor : term->getSuccessorBlocks()) {
+          SILBuilderWithScope(successor->begin())
+              .createDeallocStack(lifetimeEnd->getLoc(), pai);
+        }
+        continue;
+      }
       SILBuilderWithScope(lifetimeEnd->getNextInstruction())
           .createDeallocStack(lifetimeEnd->getLoc(), pai);
     }
