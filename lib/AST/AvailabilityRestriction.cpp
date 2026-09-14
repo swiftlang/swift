@@ -171,7 +171,8 @@ bool AvailabilityRestriction::shouldHideDomainNameInDiagnostics() const {
 }
 
 StringRef AvailabilityRestriction::getDiagnosticDescription(
-    llvm::SmallString<64> &scratch, const ASTContext &ctx) const {
+    llvm::SmallString<64> &scratch, const ASTContext &ctx,
+    bool includeMessage) const {
   auto domainAndRange = getDomainAndRange(ctx);
   auto domain = domainAndRange.getDomain();
   llvm::raw_svector_ostream os(scratch);
@@ -185,9 +186,11 @@ StringRef AvailabilityRestriction::getDiagnosticDescription(
       os << " in " << domain.getNameForDiagnostics();
 
     // Include the message from the `@available` attribute, if there is one.
-    EncodedDiagnosticMessage encodedMessage(getAttr().getMessage());
-    if (!encodedMessage.Message.empty())
-      os << ": " << encodedMessage.Message;
+    if (includeMessage) {
+      EncodedDiagnosticMessage encodedMessage(getAttr().getMessage());
+      if (!encodedMessage.Message.empty())
+        os << ": " << encodedMessage.Message;
+    }
     break;
   }
   case Reason::Unintroduced: {

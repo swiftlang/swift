@@ -2021,14 +2021,9 @@ ERROR(attr_objc_implementation_raise_minimum_deployment_target,none,
       "'@implementation' of an Objective-C class requires a minimum deployment "
       "target of at least %0 %1",
       (AvailabilityDomain, AvailabilityRange))
-ERROR(objc_implementation_extension_only_available_in,none,
-      "'@objc @implementation' extension cannot implement %kind0 because it is "
-      "only available in %1%select{| %3 or newer}2",
-      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
-ERROR(objc_implementation_extension_unavailable,none,
-      "'@objc @implementation' extension cannot implement %kind0 because it is "
-      "unavailable%select{ in %2|}1",
-      (const ValueDecl *, bool, AvailabilityDomain))
+ERROR(objc_implementation_extension_restricted,none,
+      "'@objc @implementation' extension cannot implement %kind0 because it %1",
+      (const ValueDecl *, StringRef))
 ERROR(attr_implementation_requires_language,none,
       "'@implementation' used without specifying the language being "
       "implemented",
@@ -7645,8 +7640,8 @@ GROUPED_WARNING(attr_availability_domain_always_available,
                 (AvailabilityDomain))
 
 ERROR(availability_decl_unavailable, none,
-      "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
-      (const ValueDecl *, bool, AvailabilityDomain, StringRef))
+      "%0 %1",
+      (const ValueDecl *, StringRef))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
@@ -7698,8 +7693,8 @@ NOTE(availability_decl_more_than_enclosing_here, none,
      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_decl_only_in, none,
-      "%0 is only available in %1%select{| %3 or newer}2",
-      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
+      "%0 %1",
+      (const ValueDecl *, StringRef))
 
 ERROR(availability_decl_only_in_for_clients, none,
       "%0 is only available in %1%select{| %3 or newer}2"
@@ -7751,9 +7746,8 @@ NOTE(availability_add_attribute, none,
      "add '@available' attribute to enclosing %kindonly0", (const Decl *))
 
 ERROR(availability_inout_accessor_only_in, none,
-      "cannot pass as inout because %0 is only available in %1"
-      "%select{| %3 or newer}2",
-      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
+      "cannot pass as inout because %0 %1",
+      (const ValueDecl *, StringRef))
 
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))

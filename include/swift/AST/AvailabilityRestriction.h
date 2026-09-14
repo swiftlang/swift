@@ -221,10 +221,14 @@ public:
   ///   - "is only available in <domain>"
   ///   - "is only available in <domain> <version> or newer"
   ///
-  /// If there is a `message:` on the attribute that creates the restriction
-  /// then that message's body is appended to the result.
+  /// If \p includeMessage is true and there is a `message:` on the attribute
+  /// that creates the restriction, then that message's body is appended to the
+  /// result. The message advises the reader on how to stop using the
+  /// declaration, so pass false when the diagnostic describes something other
+  /// than a use of it.
   StringRef getDiagnosticDescription(llvm::SmallString<64> &scratch,
-                                     const ASTContext &ctx) const;
+                                     const ASTContext &ctx,
+                                     bool includeMessage = true) const;
 
   void print(raw_ostream &os) const;
 };
