@@ -16,13 +16,37 @@ The attributes are organized in alphabetical order.
 
 ## `@_addressableForDependencies`
 
-This attribute ensures the annotated type's value is addressable in the stack-frame of the caller of an accessor or such, by passing it to the accessor as an address instead of possibly an address-less value in a register, so then accessor can point at that storage that is guaranteed to outlive accessor's stack-frame.   
-This effect requires both a `@_lifetime` annotation on the accessor and `@_addressableForDependencies` on the type.   
+Let's take the following code which is the [`InlineArray`'s implementation](https://github.com/swiftlang/swift/blob/d8d652ce615bd350bc51ab01409fe4dfa3cbc363/stdlib/public/core/InlineArray.swift#L595) of a `span` accessor as of writing this documentation, slightly simplified for brevity:
+
+```swift
+@_addressableForDependencies
+public struct InlineArray<let count: Int, Element: ~Copyable>: ~Copyable {
+  internal var _storage: Builtin.FixedArray<count, Element>
+
+  /// Returns a pointer to the first element in the array while performing stack
+  /// checking.
+  internal var _protectedAddress: UnsafePointer<Element> {
+    unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(_storage))
+  }
+
+  /// A span over the elements of this array.
+  public var span: Span<Element> {
+    @_lifetime(borrow self)
+    borrowing get {
+      let span = unsafe Span(_unchecked: _protectedAddress, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+  }
+}
+```
+
+The `@_addressableForDependencies` attribute ensures the annotated type's value (here `InlineArray`'s value) is addressable in the stack-frame of the caller of an accessor (here the accessor is `span`, the caller is whatever other function that calls `myInlineArray.span`) or such.   
+This is possible by passing the type's value to the accessor (`span`) as an address instead of possibly an address-less value in a register, so then the accessor can point at that storage that is guaranteed to outlive accessor's stack-frame.
+
+This effect requires both a `@_lifetime` annotation on the accessor (on `span`, here specifically `@_lifetime(borrow self)`) and `@_addressableForDependencies` on the type (here `InlineArray`).   
 This way the accessor's returned pointer is guaranteed to remain valid for the caller to read through.   
 
-Currently requires the `AddressableTypes` experimental feature. Full effect of this attribute might require further experimental features such as `Lifetimes` and `BuiltinModule`.
-
-As an example, see [`InlineArray`'s implementation](https://github.com/swiftlang/swift/blob/d8d652ce615bd350bc51ab01409fe4dfa3cbc363/stdlib/public/core/InlineArray.swift#L595) as of writing this documentation, where the type is annotated with `@_addressableForDependencies` and `InlineArray.span.getter` is annotated with `@_lifetime(borrow self)`.   
+Currently requires the `AddressableTypes` experimental feature. Full effect of this attribute might require further experimental features such as `Lifetimes` (here, for `@_lifetime(borrow self)`) and `BuiltinModule` (here, for `Builtin.addressOfBorrow`).   
 
 ## `@_alignment(numericValue)`
 
