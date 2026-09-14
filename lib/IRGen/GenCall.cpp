@@ -1630,8 +1630,16 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangCtx.VoidPtrTy);
     break;
 
-  case SILFunctionTypeRepresentation::COMMethod:
-    llvm_unreachable("COM method signature lowering is not implemented");
+  case SILFunctionTypeRepresentation::COMMethod: {
+    // COM methods take their interface pointer first.
+
+    // The SIL self parameter is an archetype opened from the interface
+    // existential. It has no corresponding Clang type; its foreign ABI is the
+    // opaque interface pointer carried by that existential.
+    paramTys.push_back(clangCtx.VoidPtrTy);
+    params = params.drop_back();
+    break;
+  }
 
   case SILFunctionTypeRepresentation::CXXMethod: {
     // Cxx methods take their 'self' argument first.
@@ -1937,6 +1945,9 @@ bool SignatureExpansion::isAddressableParam(unsigned paramIdx) {
 bool irgen::hasSelfContextParameter(CanSILFunctionType fnType) {
   if (!fnType->hasSelfParam())
     return false;
+
+  if (fnType->getRepresentation() == SILFunctionTypeRepresentation::COMMethod)
+    return true;
 
   SILParameterInfo param = fnType->getSelfParameter();
 
@@ -3022,7 +3033,10 @@ public:
       break;
 
     case SILFunctionTypeRepresentation::COMMethod:
-      llvm_unreachable("COM method argument lowering is not implemented");
+      adjusted.add(getCallee().getCOMMethodSelf());
+      externalizeArguments(IGF, getCallee(), original, adjusted, Temporaries,
+                           isOutlined);
+      break;
 
     case SILFunctionTypeRepresentation::Block:
     case SILFunctionTypeRepresentation::CXXMethod:
@@ -4291,6 +4305,14 @@ llvm::Value *Callee::getBlockObject() const {
   return FirstData;
 }
 
+llvm::Value *Callee::getCOMMethodSelf() const {
+  assert(Info.OrigFnType->getRepresentation() ==
+             SILFunctionTypeRepresentation::COMMethod &&
+         "not a COM method");
+  assert(FirstData && "no interface pointer set on callee");
+  return FirstData;
+}
+
 llvm::Value *Callee::getCXXMethodSelf() const {
   assert(Info.OrigFnType->getRepresentation() ==
              SILFunctionTypeRepresentation::CXXMethod &&
@@ -4654,7 +4676,8 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
     break;
 
   case SILFunctionTypeRepresentation::CXXMethod:
-    // Skip the "self" param.
+  case SILFunctionTypeRepresentation::COMMethod:
+    // Skip the physical and logical "self" parameters.
     firstParam += 1;
     params = params.drop_back();
     break;

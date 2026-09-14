@@ -2460,9 +2460,24 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   unsigned nextArgTyIdx = 0;
 
-  // Handle the arguments of an ObjC method.
-  if (IGF.CurSILFn->getRepresentation() ==
-        SILFunctionTypeRepresentation::ObjCMethod) {
+  // COM puts self first in the foreign ABI, while SIL puts it last.
+  if (funcTy->getRepresentation() == SILFunctionTypeRepresentation::COMMethod) {
+    SILArgument *selfArg = args.back();
+    args = args.drop_back();
+    auto *selfValue = params.claimNext();
+    if (selfArg->getType().isAddress()) {
+      auto storage = IGF.createAlloca(
+          IGF.IGM.Int8PtrTy, IGF.IGM.getPointerAlignment(), "com.self");
+      IGF.Builder.CreateStore(selfValue, storage);
+      IGF.setLoweredAddress(selfArg, storage);
+    } else {
+      Explosion self;
+      self.add(selfValue);
+      IGF.setLoweredExplosion(selfArg, self);
+    }
+    nextArgTyIdx = 1;
+  } else if (IGF.CurSILFn->getRepresentation() ==
+             SILFunctionTypeRepresentation::ObjCMethod) {
     // Claim the self argument from the end of the formal arguments.
     SILArgument *selfArg = args.back();
     args = args.slice(0, args.size() - 1);
@@ -3950,6 +3965,13 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
     if (selfArg->getType().isObject()) {
       selfValue = getLoweredSingletonExplosion(selfArg);
+    } else if (origCalleeType->getRepresentation() ==
+               SILFunctionTypeRepresentation::COMMethod) {
+      // The foreign receiver is the interface pointer in the temporary,
+      // rather than the address used to pass self in SIL.
+      Address storage(getLoweredAddress(selfArg).getAddress(), IGM.Int8PtrTy,
+                      IGM.getPointerAlignment());
+      selfValue = Builder.CreateLoad(storage, "com.self");
     } else {
       selfValue = getLoweredAddress(selfArg).getAddress();
     }
