@@ -145,6 +145,21 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     bridged.getFunctionTypeWithNoEscape(withNoEscape).type
   }
 
+  /// Returns a function type with the given representation.
+  public func getFunctionType(withRepresentation representation: FunctionTypeRepresentation) -> Type {
+    bridged.getFunctionTypeWithRepresentation(representation.bridged).type
+  }
+
+  /// The convention under which the callee is passed.
+  public var calleeConvention: ArgumentConvention {
+    bridged.getCalleeConvention().convention
+  }
+
+  /// Returns a function type with the given callee convention.
+  public func getFunctionType(withCalleeConvention convention: ArgumentConvention) -> Type {
+    return bridged.getFunctionTypeWithCalleeConvention(convention.bridged).type
+  }
+
   /// True if a function with this type can be code-generated in Embedded Swift.
   /// These are basically all non-generic functions. But also certain generic functions are supported:
   /// Generic function arguments which have a class-bound type are valid in Embedded Swift, because for
