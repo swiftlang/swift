@@ -330,17 +330,6 @@ bb0(%0 : @owned $(Builtin.NativeObject, Builtin.Int32), %1 : @owned $TestArray2)
   return %7 : $(Builtin.NativeObject, TestArrayStorage, TestArrayStorage)
 }
 
-// CHECK-LABEL: sil [canonical] @test_simplify_instruction : $@convention(thin) (@owned Builtin.NativeObject, Builtin.Int32) -> @owned Builtin.NativeObject {
-// CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject,
-// CHECK:   return [[ARG]]
-// CHECK: } // end sil function 'test_simplify_instruction'
-sil [canonical] [ossa] @test_simplify_instruction : $@convention(thin) (@owned Builtin.NativeObject, Builtin.Int32) -> @owned Builtin.NativeObject {
-bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.Int32):
-  %2 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32)
-  (%3, %4) = destructure_tuple %2 : $(Builtin.NativeObject, Builtin.Int32)
-  return %3 : $Builtin.NativeObject
-}
-
 // Just make sure that we do not crash on this function.
 //
 // CHECK-LABEL: sil @do_not_crash_due_to_debug_value_use : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> () {

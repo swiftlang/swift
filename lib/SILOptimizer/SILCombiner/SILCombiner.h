@@ -275,7 +275,6 @@ public:
   SILInstruction *visitAllocExistentialBoxInst(AllocExistentialBoxInst *S);
   SILInstruction *visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI);
   SILInstruction *visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI);
-  SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);
   SILInstruction *visitSwitchValueInst(SwitchValueInst *SVI);
   SILInstruction *
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
