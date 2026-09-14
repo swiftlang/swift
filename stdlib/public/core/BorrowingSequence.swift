@@ -100,27 +100,35 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
   @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_lifetime(self: copy self)
-  public mutating func skip(by offset: Int) throws(Failure) -> Int {
-    _precondition(offset >= 0, "Can't skip by a negative offset")
-    var remainder = offset
-    while remainder > 0 {
-      let span = try nextSpan(maxCount: remainder)
-      if span.isEmpty { break }
-      remainder &-= span.count
-    }
-    return offset &- remainder
-  }
-  
-  @available(SwiftStdlib 6.4, *)
-  @export(implementation)
-  @_lifetime(self: copy self)
-  public mutating func skip(by offset: inout Int) throws(Failure) {
+  internal mutating func _skip(by offset: inout Int) throws(Failure) {
     _precondition(offset >= 0, "Can't skip by a negative offset")
     while offset > 0 {
       let span = try nextSpan(maxCount: offset)
       if span.isEmpty { break }
       offset &-= span.count
     }
+  }
+  
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func skip(by offset: Int) throws(Failure) -> Int {
+    var remainder = offset
+    // TODO: Use correct availability for protocol-based skip(by:)
+    if #available(anyAppleOS 27.0, *) {
+      try skip(by: &remainder)
+    } else {
+      try _skip(by: &remainder)
+    }
+    return offset &- remainder
+  }
+  
+  // TODO: Use correct availability
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func skip(by offset: inout Int) throws(Failure) {
+    try _skip(by: &offset)
   }
 }
 
