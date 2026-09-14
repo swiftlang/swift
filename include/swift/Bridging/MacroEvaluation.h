@@ -54,6 +54,7 @@ ptrdiff_t swift_Macros_expandAttachedMacro(
     const void *_Nullable customAttrSourceLocation,
     void *_Nonnull declarationSourceFile,
     const void *_Nullable declarationSourceLocation,
+    BridgedStringRef typeCheckedAttachedTo,
     void *_Nullable parentDeclSourceFile,
     const void *_Nullable parentDeclSourceLocation,
     BridgedStringRef *_Nonnull evaluatedSourceOut);
