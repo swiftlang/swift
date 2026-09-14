@@ -1366,3 +1366,9 @@ Added: __swift_setWillThrowTypedHandler
 
 // Separate runtime for `is` tests
 Added: _swift_dynamicCastTest
+
+// Prespecialized tuple metadata witness tables
+Added: _swift_tupleWitnesses_nonpod_inline
+Added: _swift_tupleWitnesses_nonpod_noninline
+Added: _swift_tupleWitnesses_pod_inline
+Added: _swift_tupleWitnesses_pod_noninline
