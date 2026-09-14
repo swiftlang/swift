@@ -1389,6 +1389,10 @@ diagnoseUnknownEscapability(ClangImporter::Implementation &Impl, HeaderLoc loc,
                 culprit);
   case importer::CxxUnknownEscapabilityReason::CannotDeriveFromMembers:
     return note(diag::cxx_unknown_escapability_cannot_derive);
+  case importer::CxxUnknownEscapabilityReason::NonEscapableMember:
+    // Named only when the member belongs to the type being explained, as below.
+    return note(diag::cxx_unknown_escapability_nonescapable_member, named,
+                culprit);
   case importer::CxxUnknownEscapabilityReason::Pointer:
     // Named only when the member belongs to the type being explained; the
     // traversal is flattened, so otherwise the caller follows the chain to the
