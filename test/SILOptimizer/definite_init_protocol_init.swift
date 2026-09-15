@@ -93,14 +93,10 @@ struct AddressOnlyStruct : TriviallyConstructible {
 // CHECK-LABEL: sil hidden @$s023definite_init_protocol_B017AddressOnlyStructV5upperACSi_tcfC
 // CHECK:     bb0(%0 : $*AddressOnlyStruct, %1 : $Int, %2 : $@thin AddressOnlyStruct.Type):
 // CHECK-NEXT: [[SELF:%.*]] = alloc_stack [var_decl] $AddressOnlyStruct
-// CHECK:      [[SELF_BOX:%.*]] = alloc_stack $AddressOnlyStruct
-// CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick AddressOnlyStruct.Type
+// CHECK:      [[METATYPE:%.*]] = metatype $@thick AddressOnlyStruct.Type
 // CHECK:      [[FN:%.*]] = function_ref @$s023definite_init_protocol_B022TriviallyConstructiblePAAE6middlexSi_tcfC
-// CHECK-NEXT: apply [[FN]]<AddressOnlyStruct>([[SELF_BOX]], %1, [[METATYPE]])
-// CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [init] [[SELF]]
-// CHECK-NEXT: dealloc_stack [[SELF_BOX]]
-// CHECK-NEXT: copy_addr [[SELF]] to [init] %0
-// CHECK-NEXT: destroy_addr [[SELF]]
+// CHECK-NEXT: apply [[FN]]<AddressOnlyStruct>([[SELF]], %1, [[METATYPE]])
+// CHECK-NEXT: copy_addr [take] [[SELF]] to [init] %0
 // CHECK-NEXT: dealloc_stack [[SELF]]
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]]

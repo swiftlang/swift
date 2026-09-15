@@ -1112,6 +1112,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // Even at Onone it's important to remove copies of structs, especially if they are large.
   P.addMandatoryTempRValueElimination();
+  P.addMandatoryTempLValueElimination();
 
   // If we are asked to stop optimizing before lowering ownership, do so now.
   if (P.Options.StopOptimizationBeforeLoweringOwnership)
