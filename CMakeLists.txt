@@ -87,6 +87,8 @@ set(CMAKE_CXX_STANDARD ${SWIFT_MIN_CXX_STANDARD} CACHE STRING "C++ standard to c
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS NO)
 
+define_property(TARGET PROPERTY PURE_SWIFT_LIB)
+
 # First include general CMake utilities.
 include(SwiftUtils)
 include(CheckSymbolExists)
@@ -251,6 +253,10 @@ option(SWIFT_STDLIB_ENABLE_SOURCE_INFO
 option(SWIFT_BUILD_CLANG_OVERLAYS
   "Build Swift overlays for the clang builtin modules"
   TRUE)
+
+option(SWIFT_BUILD_COMPILER_DYLIB
+  "Builds a swift compiler dylib for tools to link against"
+  FALSE)
 
 # The SDK overlay is provided by the SDK itself on Darwin platforms.
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
