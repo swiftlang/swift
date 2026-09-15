@@ -24,6 +24,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -692,6 +693,32 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
                  functionKind, param->getName());
         diagnose(Context, param->getLoc(), diag::inout_param_defined_here,
                  param->getName());
+        if (auto *closure = PAI->getLoc().getAsASTNode<ClosureExpr>()) {
+          auto diag = diagnose(Context, PAI->getLoc(),
+                               diag::escaping_inout_capture_copy_fixit,
+                               param->getName());
+          const auto brackets = closure->getBracketRange();
+          if (brackets.isValid()) {
+            const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
+            const auto nextAfterBracket =
+                Lexer::getTokenAtLocation(Context.SourceMgr, locAfterBracket,
+                                          CommentRetentionMode::AttachToNextToken);
+            if (nextAfterBracket.getLoc() != brackets.End)
+              diag.fixItInsertAfter(brackets.Start, param->getName().str().str() + ", ");
+            else
+              diag.fixItInsertAfter(brackets.Start, param->getName().str().str());
+          } else {
+            if (closure->getInLoc().isValid()) {
+              diag.fixItInsertAfter(closure->getLoc(), " [" + param->getName().str().str() + "]");
+            } else {
+              const auto nextLoc = closure->getLoc().getAdvancedLoc(1);
+              const auto next = Lexer::getTokenAtLocation(
+                  Context.SourceMgr, nextLoc, CommentRetentionMode::AttachToNextToken);
+              std::string trailing = next.getLoc() == nextLoc ? " " : "";
+              diag.fixItInsertAfter(closure->getLoc(), " [" + param->getName().str().str() + "] in" + trailing);
+            }
+          }
+        }
       }
     }
     if (functionKind != EscapingAutoClosure) {
