@@ -72,6 +72,8 @@ public:
   virtual void addObjCMethod(AbstractFunctionDecl *AFD) {}
   virtual void addProtocolWitnessThunk(RootProtocolConformance *C,
                                        ValueDecl *requirementDecl) {}
+  virtual void addCOMMethodWitnessThunk(RootProtocolConformance *C,
+                                        ValueDecl *requirementDecl) {}
 };
 
 } // end namespace irgen

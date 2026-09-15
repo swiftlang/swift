@@ -282,6 +282,9 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
     // 'Self' type).
     return nullptr;
 
+  case Symbol::Kind::Metatype:
+    return nullptr;
+
   case Symbol::Kind::Name:
   case Symbol::Kind::Layout:
   case Symbol::Kind::Superclass:

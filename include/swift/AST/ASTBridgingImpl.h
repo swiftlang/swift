@@ -271,6 +271,10 @@ bool BridgedDeclObj::Class_isForeign() const {
   return getAs<swift::ClassDecl>()->isForeign();
 }
 
+bool BridgedDeclObj::Class_isCOMImplementation() const {
+  return getAs<swift::ClassDecl>()->isCOMImplementation();
+}
+
 bool BridgedDeclObj::ProtocolDecl_requiresClass() const {
   return getAs<swift::ProtocolDecl>()->requiresClass();
 }

@@ -872,6 +872,15 @@ ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
   return cloner.clone(openedExistential);
 }
 
+ManagedValue SILGenBuilder::createOpenCOMExistential(SILLocation loc,
+                                                     ManagedValue original,
+                                                     SILType type) {
+  CleanupCloner cloner(*this, original);
+  SILValue openedCOMExistential =
+      createOpenCOMExistential(loc, original.forward(SGF), type);
+  return cloner.clone(openedCOMExistential);
+}
+
 ManagedValue SILGenBuilder::createOpenExistentialValue(SILLocation loc,
                                                        ManagedValue original,
                                                        SILType type) {

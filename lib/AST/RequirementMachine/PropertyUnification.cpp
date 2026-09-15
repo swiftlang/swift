@@ -668,6 +668,7 @@ void PropertyMap::addProperty(
   case Symbol::Kind::AssociatedType:
   case Symbol::Kind::Shape:
   case Symbol::Kind::PackElement:
+  case Symbol::Kind::Metatype:
     break;
   }
 

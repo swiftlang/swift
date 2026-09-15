@@ -17,6 +17,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LazyResolver.h"
@@ -2726,6 +2727,11 @@ TypeConverter::convert##Name##StorageType(Name##StorageType *refType) { \
     referent = referentObj; \
     isOptional = true; \
   } \
+  if (refType->getOwnership() == ReferenceOwnership::Unmanaged && \
+      referent->isExistentialType() && \
+      referent.getExistentialLayout().getCOMInterface()) \
+    return createUnmanagedStorageType(IGM.Int8PtrTy, \
+                                      ReferenceCounting::None, isOptional); \
   assert(referent->allowsOwnership()); \
   auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent)); \
   return referentTI.create##Name##StorageType(*this, isOptional); \

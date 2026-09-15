@@ -1790,6 +1790,15 @@ FUNCTION(GetDynamicType, Swift, swift_getDynamicType, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::MetaData),
          MEMEFFECTS(ReadOnly))
 
+// Metadata *swift_getCOMDynamicType(void *interface, Metadata *staticType);
+FUNCTION(GetCOMDynamicType, Swift, swift_getCOMDynamicType, C_CC,
+         AlwaysAvailable,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Casting),
+         UNKNOWN_MEMEFFECTS)
+
 // void *swift_dynamicCastClass(void*, void*);
 FUNCTION(DynamicCastClass, Swift, swift_dynamicCastClass, C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
