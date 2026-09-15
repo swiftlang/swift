@@ -1906,6 +1906,44 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
       });
 }
 
+/// Turns \p debugValue into a variable of empty tuple type.
+/// Used when the type of the variable can no longer be described, when it uses
+/// an archetype that will be removed.
+/// \p debugValue is erased as a new instruction is created.
+static void makeVoidVariable(DebugValueInst *debugValue) {
+  SILFunction *function = debugValue->getFunction();
+  SILType voidTy = SILType::getEmptyTupleType(function->getASTContext());
+
+  SILDebugVariable var = *debugValue->getVarInfo();
+  var.Type = voidTy;
+  var.DIExpr.clear();
+
+  SILBuilder builder(debugValue, debugValue->getDebugScope());
+  builder.createDebugValue(debugValue->getLoc(),
+                           SILUndef::get(function, voidTy), var,
+                           debugValue->usesMoveableValueDebugInfo(),
+                           debugValue->hasTrace());
+  debugValue->eraseFromParent();
+}
+
+/// Kills every debug use of \p value. A variable whose type cannot be written
+/// becomes an empty tuple placeholder instead.
+static void killDebugUses(SILValue value) {
+  while (Operand *use = getAnyDebugUse(value)) {
+    auto *debugValue = cast<DebugValueInst>(use->getUser());
+    if (debugValue->getVarType().hasLocalArchetype())
+      makeVoidVariable(debugValue);
+    else
+      debugValue->killOperand(use->getOperandNumber());
+  }
+}
+
+/// Kills every debug use of any result of \p inst.
+static void killDebugUses(SILInstruction *inst) {
+  for (SILValue result : inst->getResults())
+    killDebugUses(result);
+}
+
 /// Canonicalizes the operand list of \p debugValue, minimizing the amount of
 /// live operands. Merges duplicates, and kills dead or undef operands.
 static void canonicalizeDebugValue(DebugValueInst *debugValue) {
@@ -2044,7 +2082,7 @@ static void salvageCheckedTruncFromLiteral(BuiltinInst *builtin) {
   std::optional<bool> ResultsInError;
   SILValue folded = constantFoldBuiltin(builtin, ResultsInError);
   if (!folded)
-    return;
+    return killDebugUses(builtin);
 
   auto *tupleFolded = cast<SingleValueInstruction>(folded);
 
@@ -2225,15 +2263,19 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
 // TODO: whenever a debug_value is inserted at a new location, check that no
 // other debug_value instructions exist between the old and new location for
 // the same variable.
-//
-// TODO: Kill all debug uses when the salvage fails.
 void swift::salvageDebugInfo(SILInstruction *I) {
   if (!I)
     return;
 
+  // Stores to an allocation are salvaged: debug values are cloned at each
+  // store. The debug values on the allocation itself are deleted rather than
+  // killed, as the clones describe the variable now.
+  if (isa<AllocStackInst>(I) || isa<AllocPackInst>(I))
+    return deleteAllDebugUses(I, /*salvage=*/false);
+
   // Instructions with type dependent operands cannot be salvaged.
   if (I->getNumTypeDependentOperands() != 0)
-    return;
+    return killDebugUses(I);
 
   switch (I->getKind()) {
   case SILInstructionKind::StoreInst: {
@@ -2285,6 +2327,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
     return salvageIdentityInst(cast<SingleValueInstruction>(I));
 
   case SILInstructionKind::BuiltinInst: {
@@ -2292,7 +2335,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     // Only salvage side-effects free SIL builtins.
     BuiltinInfo info = builtin->getBuiltinInfo();
     if (info.ID == BuiltinValueKind::None || !info.isReadNone())
-      return;
+      return killDebugUses(I);
 
     if ((info.ID == BuiltinValueKind::SToSCheckedTrunc ||
          info.ID == BuiltinValueKind::UToUCheckedTrunc ||
@@ -2309,9 +2352,10 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     // or, and, xor, cmp_*, ...
     return salvageMultiOperandInst(builtin);
   }
+
   default:
-    // TODO: Kill all debug uses when the salvage fails.
-    return;
+    // Any instruction that cannot be salvaged has its debug uses killed.
+    return killDebugUses(I);
   }
 }
 
