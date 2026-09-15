@@ -164,6 +164,57 @@ bb1:
   return %9999 : $()
 }
 
+// An @unowned result is returned at +0: release the owned value before
+// returning it. The caller's retain is inserted after the apply.
+//
+// CHECK-LABEL: sil @unowned_result : $@convention(thin) (@guaranteed C) -> C {
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK-NEXT:   strong_retain [[ARG]] : $C
+// CHECK-NEXT:   strong_release [[ARG]] : $C
+// CHECK-NEXT:   return [[ARG]] : $C
+// CHECK: } // end sil function 'unowned_result'
+sil [ossa] @unowned_result : $@convention(thin) (@guaranteed C) -> C {
+bb0(%0 : @guaranteed $C):
+  %1 = copy_value %0 : $C
+  return %1 : $C
+}
+
+// CHECK-LABEL: sil @owned_result : $@convention(thin) (@guaranteed C) -> @owned C {
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK-NEXT:   strong_retain [[ARG]] : $C
+// CHECK-NEXT:   return [[ARG]] : $C
+// CHECK: } // end sil function 'owned_result'
+sil [ossa] @owned_result : $@convention(thin) (@guaranteed C) -> @owned C {
+bb0(%0 : @guaranteed $C):
+  %1 = copy_value %0 : $C
+  return %1 : $C
+}
+
+// CHECK-LABEL: sil @trivial_unowned_result : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+// CHECK: bb0([[ARG:%.*]] : $Builtin.Int32):
+// CHECK-NEXT:   return [[ARG]] : $Builtin.Int32
+// CHECK: } // end sil function 'trivial_unowned_result'
+sil [ossa] @trivial_unowned_result : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  return %0 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @unowned_tuple_result : $@convention(thin) (@guaranteed C, @owned C) -> (C, @owned C) {
+// CHECK: bb0([[ARG0:%.*]] : $C, [[ARG1:%.*]] : $C):
+// CHECK-NEXT:   strong_retain [[ARG0]] : $C
+// CHECK-NEXT:   [[TUPLE:%.*]] = tuple ([[ARG0]] : $C, [[ARG1]] : $C)
+// CHECK-NEXT:   [[UNOWNED:%.*]] = tuple_extract [[TUPLE]] : $(C, C), 0
+// CHECK-NEXT:   strong_release [[UNOWNED]] : $C
+// CHECK-NOT:    strong_release
+// CHECK:        return [[TUPLE]] : $(C, C)
+// CHECK: } // end sil function 'unowned_tuple_result'
+sil [ossa] @unowned_tuple_result : $@convention(thin) (@guaranteed C, @owned C) -> (C, @owned C) {
+bb0(%0 : @guaranteed $C, %1 : @owned $C):
+  %2 = copy_value %0 : $C
+  %3 = tuple (%2 : $C, %1 : $C)
+  return %3 : $(C, C)
+}
+
 // CHECK-LABEL: sil @checked_cast_br_lowered : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject):
 // CHECK:   checked_cast_br Builtin.NativeObject in [[ARG]] : $Builtin.NativeObject to C, [[SUCCBB:bb[0-9]+]], [[FAILBB:bb[0-9]+]]
