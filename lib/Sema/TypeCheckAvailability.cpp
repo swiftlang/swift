@@ -3567,14 +3567,24 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
   if (decl->getDeclContext()->isInSwiftinterface())
     return false;
 
-  // Skip non-public decls.
   if (auto valueDecl = dyn_cast<const ValueDecl>(decl)) {
     AccessScope scope =
       valueDecl->getFormalAccessScope(/*useDC*/nullptr,
                                       /*treatUsableFromInlineAsPublic*/true);
+    // Skip non-public decls.
     if (!scope.isPublic())
       return false;
+
+    // Skip implementations of members of Obj-C decls since their availability
+    // would be declared in a header.
+    if (valueDecl->isObjCMemberImplementation())
+      return false;
   }
+
+  // Skip @implementation decls since their availability would be declared in
+  // a header.
+  if (decl->isObjCImplementation())
+    return false;
 
   // Skip functions emitted into clients, SPI or implicit.
   if (decl->isAlwaysEmittedIntoClient() || decl->isSPI() || decl->isImplicit())
