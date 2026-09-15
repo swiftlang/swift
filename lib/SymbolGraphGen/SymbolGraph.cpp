@@ -851,7 +851,10 @@ bool SymbolGraph::isImplicitlyPrivate(
 /// FIXME: [availability] This should use Decl::getUnavailableAttr() or similar.
 bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) const {
   for (auto Attr : D->getSemanticAvailableAttrs()) {
-    if (!Attr.isPlatformSpecific() && Attr.isUnconditionallyUnavailable())
+    // Unconditional unavailability in a single domain, such as a custom
+    // domain or Embedded Swift, says nothing about the other domains, so only
+    // the universal domain hides the declaration from the graph.
+    if (Attr.getDomain().isUniversal() && Attr.isUnconditionallyUnavailable())
       return true;
   }
 
