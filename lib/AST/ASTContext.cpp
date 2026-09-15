@@ -330,6 +330,10 @@ struct ASTContext::Implementation {
   DECL_CLASS *NAME##Decl = nullptr;
 #include "swift/AST/KnownSDKTypes.def"
 
+  /// The declaration of the CGFloat struct, which is not vended by a fixed
+  /// module and so cannot live in KnownSDKTypes.def.
+  StructDecl *CGFloatDecl = nullptr;
+
   /// The declaration of '+' function for two RangeReplaceableCollection.
   FuncDecl *PlusFunctionOnRangeReplaceableCollection = nullptr;
 
@@ -1908,6 +1912,49 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
   return ConcreteDeclRef(foundDecl, subs);
 }
 
+StructDecl *ASTContext::getCGFloatDecl() const {
+  if (getImpl().CGFloatDecl)
+    return getImpl().CGFloatDecl;
+
+  // CGFloat is declared by the CoreFoundation overlay on Darwin, and by
+  // Foundation on other platforms. Keep this list in sync with
+  // TypeBase::isCGFloat().
+  const Identifier moduleNames[] = {Id_CoreFoundation, Id_Foundation,
+                                    Id_CoreGraphics};
+
+  for (auto moduleName : moduleNames) {
+    ModuleDecl *M = getLoadedModule(moduleName);
+    if (!M)
+      continue;
+
+    // Note: lookupQualified() will search both the Swift overlay and the
+    // Clang module it imports. On platforms where CGFloat is a C typedef
+    // rather than a Swift struct, we skip the result and try the next
+    // module.
+    SmallVector<ValueDecl *, 2> decls;
+    M->lookupQualified(M, DeclNameRef(Id_CGFloat), SourceLoc(),
+                       NLFlags::OnlyTypes, decls);
+
+    for (auto *found : decls) {
+      auto *decl = dyn_cast<StructDecl>(found);
+      if (!decl || !decl->getDeclContext()->isModuleScopeContext())
+        continue;
+
+      getImpl().CGFloatDecl = decl;
+      return decl;
+    }
+  }
+
+  return nullptr;
+}
+
+Type ASTContext::getCGFloatType() const {
+  auto *decl = getCGFloatDecl();
+  if (!decl)
+    return Type();
+
+  return decl->getDeclaredInterfaceType();
+}
 
 static ConcreteDeclRef getCGFloatOrDoubleInitDecl(
     ASTContext &ctx, Type fromType, Type toType) {
