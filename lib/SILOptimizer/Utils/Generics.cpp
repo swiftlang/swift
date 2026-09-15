@@ -3498,6 +3498,35 @@ static bool usePrespecialized(
   return false;
 }
 
+/// Checks if the type contains any foreign Clang-imported nominal types (C or C++).
+///
+/// When generic functions or collections (such as Dictionary or Set) are specialized
+/// with optimizations (-O), the GenericSpecializer attempts to optimize collection
+/// operations using lazy metadata instantiation via
+/// __swift_instantiateConcreteTypeFromMangledName(V2). However, foreign types
+/// (types imported from Clang, including both C and C++) do not have standard
+/// Swift runtime type metadata records in __swift5_types, causing the mangled-name
+/// lookup to return nullptr. The generated code then dereferences this null pointer
+/// to access the Value Witness Table, triggering an EXC_BAD_ACCESS crash.
+///
+/// Bypassing generic specialization forces the compiler to fall back to passing
+/// type metadata pointers explicitly at runtime (mimicking the safe -Onone behavior),
+/// completely avoiding the doomed mangled-name lookup while keeping generic
+/// specialization fully active for native Swift types.
+///
+/// TODO: Investigate enabling safe specialization for foreign types without relying
+/// on demangling lookup, to recover performance on specialized collection operations.
+static bool containsForeignClangType(Type replacementType) {
+  return replacementType.findIf([](Type t) -> bool {
+    if (auto *nominal = t->getAnyNominal()) {
+      if (nominal->hasClangNode()) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
 void swift::trySpecializeApplyOfGeneric(
     SILOptFunctionBuilder &FuncBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
@@ -3505,6 +3534,13 @@ void swift::trySpecializeApplyOfGeneric(
     OptRemark::Emitter &ORE,
     bool isMandatory) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
+
+  for (Type repTy : Apply.getSubstitutionMap().getReplacementTypes()) {
+    if (containsForeignClangType(repTy)) {
+      return; 
+    }
+  }
+
   auto *F = Apply.getFunction();
   auto *RefF =
       cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
