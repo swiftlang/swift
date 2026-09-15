@@ -297,7 +297,9 @@ extension UncheckedString: RangeReplaceableCollection {
         storage = .empty
         rawStorage.characters[rawStorage.characters.count - 1] = newElement
         rawStorage.characters.append(0)
+        #if _pointerBitWidth(_64)
         rawStorage.count += 1
+        #endif
         storage = .dynamic(rawStorage)
       case .empty:
         storage = .small(SmallUncheckedStringStorage(CollectionOfOne(newElement)))

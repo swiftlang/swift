@@ -867,7 +867,8 @@ public protocol ExpressibleByPossiblyUncheckedStringInterpolation {
 }
 
 public protocol ExpressibleByStringInterpolation
-  : ExpressibleByStringLiteral, ExpressibleByPossiblyUncheckedStringInterpolation {
+  : ExpressibleByStringLiteral, ExpressibleByPossiblyUncheckedStringInterpolation
+  where StringInterpolation.StringLiteralType == StringLiteralType {
 
   // The declaration below causes a warning, but if we follow the
   // instructions in that warning we end up with a compiler crash.
@@ -880,10 +881,6 @@ public protocol ExpressibleByStringInterpolation
   /// `StringLiteralType` of the conforming type.
   associatedtype StringInterpolation: StringInterpolationProtocol
     = DefaultStringInterpolation
-    where StringInterpolation.StringLiteralType == StringLiteralType
-#else
-  associatedtype StringInterpolation: StringInterpolationProtocol
-    where StringInterpolation.StringLiteralType == StringLiteralType
 #endif
 
   /// Creates an instance from a string interpolation.
