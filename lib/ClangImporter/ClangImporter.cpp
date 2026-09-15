@@ -2317,9 +2317,14 @@ static void publishBuiltPCH(clang::CompilerInstance &instance,
   auto status = fs.status(pchPath);
   if (!status)
     return;
+  // The VFS buffer may otherwise be a (read-only, private) mapping of the
+  // file on disk that aliases the page cache and would silently change if
+  // the file is later replaced; \c IsVolatile=true asks the file system to
+  // read the PCH into an owned buffer instead, so the cache holds the PCH as
+  // written by this process even if it is replaced on disk.
   auto buffer = fs.getBufferForFile(pchPath, /*FileSize=*/-1,
                                     /*RequiresNullTerminator=*/false,
-                                    /*IsVolatile=*/false, /*IsText=*/false);
+                                    /*IsVolatile=*/true, /*IsText=*/false);
   if (!buffer)
     return;
 
