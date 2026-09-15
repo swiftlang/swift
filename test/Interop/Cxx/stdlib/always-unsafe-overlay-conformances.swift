@@ -34,14 +34,16 @@ func useVector(_ v: inout Vector) {
 }
 
 func useOptional(_ o: StdOptionalInt) {
-  // 'value' keeps the rename, so CxxOptional.value is not shadowed.
+  // 'value' keeps its name as a disfavored '@unsafe(always)' overload, so
+  // CxxOptional.value is still what this resolves to.
   _ = o.value
   _ = o.hasValue
   _ = Int32?(fromCxx: o)
 }
 
 func useString(_ s: inout std.string) {
-  // 'append' keeps the rename, so the overlay's append(_:) is not ambiguated.
+  // Likewise 'append': the overlay's append(_:) wins over the disfavored
+  // unsafe import rather than being ambiguated by it.
   s.append(s)
   _ = s + s
   _ = String(s)

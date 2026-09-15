@@ -46,3 +46,10 @@ module AlwaysUnsafeProjections {
 
   export *
 }
+
+module AlwaysUnsafeSafeWrapper {
+  header "always-unsafe-safe-wrapper.h"
+  requires cplusplus
+
+  export *
+}
