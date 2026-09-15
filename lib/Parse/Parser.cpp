@@ -521,7 +521,7 @@ bool Parser::shouldEvaluatePoundIfDecls() const {
 }
 
 bool Parser::allowTopLevelCode() const {
-  return SF.isScriptMode();
+  return SF.Kind == SourceFileKind::Main;
 }
 
 bool Parser::isInMacroExpansion(SourceLoc loc) const {

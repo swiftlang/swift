@@ -391,6 +391,10 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   // regions cache.
   swift_ASTGen_evaluateConfiguredRegionsForDiagnostics(Ctx, exportedSourceFile);
 
+  if (SF.isScriptMode() &&
+      swift_ASTGen_sourceFileHasMainTypeDecl(Ctx, exportedSourceFile))
+    SF.disableTopLevelCode();
+
   // Emit parser diagnostics.
   (void)swift_ASTGen_emitParserDiagnostics(
       Ctx, &Diags, exportedSourceFile, /*emitOnlyErrors=*/false,
@@ -569,12 +573,21 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
   diags.setSuppressWarnings(didSuppressWarnings || shouldSuppress);
   SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
 
+  auto result = [&] {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (shouldParseViaASTGen(*SF))
-    return parseSourceFileViaASTGen(*SF);
+    if (shouldParseViaASTGen(*SF))
+      return parseSourceFileViaASTGen(*SF);
 #endif
 
-  return parseSourceFile(*SF);
+    return parseSourceFile(*SF);
+  }();
+
+  if (SF->isScriptMode()) {
+    (void)SF->getParentModule()->registerEntryPointFile(
+        SF, SourceLoc(), /*kind=*/std::nullopt);
+  }
+
+  return result;
 }
 
 evaluator::DependencySource ParseSourceFileRequest::readDependencySource(
