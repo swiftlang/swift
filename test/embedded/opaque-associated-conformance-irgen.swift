@@ -4,6 +4,8 @@
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
 
+// UNSUPPORTED: CPU=arm64e
+
 // Check that IRGen looks through opaque result types when it emits the
 // associated-conformance entry of a witness table. In Embedded Swift such an entry
 // directly points to the witness table of the associated conformance, so the abstract
