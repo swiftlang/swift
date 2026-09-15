@@ -2285,6 +2285,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
     return salvageIdentityInst(cast<SingleValueInstruction>(I));
 
   case SILInstructionKind::BuiltinInst: {
