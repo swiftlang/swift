@@ -251,6 +251,10 @@ BridgedASTType BridgedDeclObj::Enum_getRawType() const {
   return {nullptr};
 }
 
+bool BridgedDeclObj::Enum_hasCasesUnavailableDuringLowering() const {
+  return getAs<swift::EnumDecl>()->hasCasesUnavailableDuringLowering();
+}
+
 bool BridgedDeclObj::Struct_hasUnreferenceableStorage() const {
   return getAs<swift::StructDecl>()->hasUnreferenceableStorage();
 }
@@ -718,6 +722,10 @@ bool BridgedASTType::isBuiltinFixedWidthInteger(SwiftInt width) const {
 
 bool BridgedASTType::isOptional() const {
   return unbridged()->getCanonicalType()->isOptional();
+}
+
+bool BridgedASTType::isStructurallyUninhabited() const {
+  return unbridged()->isStructurallyUninhabited();
 }
 
 bool BridgedASTType::isUnownedStorageType() const {
