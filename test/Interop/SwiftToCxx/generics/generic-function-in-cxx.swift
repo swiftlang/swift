@@ -114,12 +114,12 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK T_0_0 genericMethodPassThrough(const T_0_0& x) const SWIFT_SYMBOL("s:9Functions15TestSmallStructV24genericMethodPassThroughyxxlF");
+// CHECK-NEXT: SWIFT_INLINE_THUNK T_0_0 genericMethodPassThrough(const T_0_0& x) const noexcept SWIFT_SYMBOL("s:9Functions15TestSmallStructV24genericMethodPassThroughyxxlF");
 // CHECK-NEXT: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK void genericMethodMutTake(const T_0_0& x) SWIFT_SYMBOL("s:9Functions15TestSmallStructV20genericMethodMutTakeyyxlF");
+// CHECK-NEXT: SWIFT_INLINE_THUNK void genericMethodMutTake(const T_0_0& x) noexcept SWIFT_SYMBOL("s:9Functions15TestSmallStructV20genericMethodMutTakeyyxlF");
 // CHECK:      template<class T>
 // CHECK-NEXT: returnNewValue
 
@@ -207,7 +207,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK T_0_0 TestSmallStruct::genericMethodPassThrough(const T_0_0& x) const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK T_0_0 TestSmallStruct::genericMethodPassThrough(const T_0_0& x) const noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
@@ -239,7 +239,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK void TestSmallStruct::genericMethodMutTake(const T_0_0& x) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void TestSmallStruct::genericMethodMutTake(const T_0_0& x) noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
