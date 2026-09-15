@@ -344,6 +344,15 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     return false;
   }
 
+  // An implicit Objective-C protocol requirement that is inherited onto a
+  // conforming type keeps the protocol requirement's own USR, regardless of
+  // the type it appears on. That requirement is already explicitly documented
+  // under the protocol itself. Skip the inherited copies.
+  if (VD->isImplicit() && VD->getClangDecl() &&
+      isa<clang::ObjCProtocolDecl>(VD->getClangDecl()->getDeclContext())) {
+    return true;
+  }
+
   // If this symbol extends a type from another module, record it in that
   // module's symbol graph, which will be emitted separately.
   if (const auto *Extension
