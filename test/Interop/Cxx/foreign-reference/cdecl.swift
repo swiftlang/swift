@@ -73,3 +73,17 @@ func retainOpaque(_ o: Opaque) { }
 @implementation @c
 func releaseOpaque(_ o: Opaque) { }
 // expected-error@-1 {{@c function implementing the release operation of foreign reference type 'Opaque' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
+
+// A reference-counted foreign reference type can be returned only where the C
+// declaration returns it retained (+1): the Swift body always produces a
+// retained value, which would leak against an unretained (+0) result.
+@implementation @c
+func CImplReturnsRetainedShared(_ s: Shared) -> Shared { s }
+
+@implementation @c
+func CImplReturnsUnretainedShared(_ s: Shared) -> Shared { s }
+// expected-error@-1 {{global function 'CImplReturnsUnretainedShared' cannot implement C function 'CImplReturnsUnretainedShared' because it returns a foreign reference type unretained ('SWIFT_RETURNS_UNRETAINED'), which is not yet supported}}
+
+@implementation @c
+func CImplReturnsUnannotatedShared(_ s: Shared) -> Shared { s }
+// expected-error@-1 {{global function 'CImplReturnsUnannotatedShared' cannot implement C function 'CImplReturnsUnannotatedShared' because it returns a foreign reference type without a 'SWIFT_RETURNS_RETAINED' annotation, which is not yet supported}}

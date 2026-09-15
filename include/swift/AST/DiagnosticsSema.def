@@ -2241,6 +2241,12 @@ ERROR(cdecl_ref_counting_operation,none,
       "foreign reference type %2 will cause infinite recursion; "
       "use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`",
       (DeclAttribute, unsigned, Type))
+ERROR(cdecl_unretained_result_unsupported,none,
+      "%kind0 cannot implement %select{C|C++}1 function '%2' because it "
+      "returns a foreign reference type %select{without a "
+      "'SWIFT_RETURNS_RETAINED' annotation|unretained "
+      "('SWIFT_RETURNS_UNRETAINED')}3, which is not yet supported",
+      (ValueDecl *, bool, StringRef, unsigned))
 
 // @cxx
 ERROR(cxx_attr_requires_cxx_interop,none,

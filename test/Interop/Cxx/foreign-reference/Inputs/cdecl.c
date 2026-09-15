@@ -42,5 +42,9 @@ int callSwiftImplementations(struct Shared *s, struct Opaque *o) {
   CImplTakesImmortal(getImmortal());
   printf("CImplReturnsImmortal: %d\n", CImplReturnsImmortal()->value);
   printf("CImplGetOpaqueValue: %d\n", CImplGetOpaqueValue(o));
+  struct Shared *retained = CImplReturnsRetainedShared(s);
+  printf("CImplReturnsRetainedShared: %d refCount=%d\n", retained->value,
+         sharedRefCount(retained));
+  releaseShared(retained);
   return CImplGetSharedValue(s);
 }

@@ -47,6 +47,14 @@ struct Immortal *_Nonnull CImplReturnsImmortal(void);
 int CImplGetSharedValue(struct Shared *_Nonnull s);
 int CImplGetOpaqueValue(struct Opaque *_Nonnull o);
 
+// Only a result returned retained (+1) can be implemented in Swift.
+struct Shared *_Nonnull CImplReturnsRetainedShared(struct Shared *_Nonnull s)
+    __attribute__((swift_attr("returns_retained")));
+struct Shared *_Nonnull CImplReturnsUnretainedShared(struct Shared *_Nonnull s)
+    __attribute__((swift_attr("returns_unretained")));
+struct Shared *_Nonnull
+CImplReturnsUnannotatedShared(struct Shared *_Nonnull s);
+
 // Calls the Swift implementations above through the C ABI.
 int callSwiftImplementations(struct Shared *_Nonnull s,
                              struct Opaque *_Nonnull o);
