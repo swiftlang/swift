@@ -1,0 +1,227 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -closure-specialization %s | %FileCheck %s
+
+// This SIL corresponds to the following Swift:
+//
+//   public class C {
+//     public init() {}
+//   }
+//
+//   public protocol P {
+//     func value() -> C
+//     func throwingValue() throws -> C
+//   }
+//
+//   @inline(never)
+//   public func invokeTwice(_ body: () -> C) -> C {
+//     _ = body()
+//     return body()
+//   }
+//
+//   @inline(never)
+//   public func invokeThrowing(_ body: () throws -> C) throws -> C {
+//     try body()
+//   }
+//
+//   @inline(never)
+//   public func makeLocal(_ input: any P) -> any P { input }
+//
+//   public func local(_ input: any P) -> C {
+//     let p = makeLocal(input)
+//     return invokeTwice { p.value() }
+//   }
+//
+//   public func throwing(_ input: any P) throws -> C {
+//     let p = makeLocal(input)
+//     return try invokeThrowing { try p.throwingValue() }
+//   }
+//
+//   public func heap(_ input: any P) -> (C, () -> C) {
+//     let body = { input.value() }
+//     let value = invokeTwice(body)
+//     return (value, body)
+//   }
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class C {
+  public init()
+  deinit
+}
+
+public protocol P {
+  func value() -> C
+  func throwingValue() throws -> C
+}
+
+// CHECK-LABEL: {{^}}// specialized invokeTwice(_:)
+// CHECK:       sil shared [noinline] [ossa] @$s7Derived11invokeTwiceyAA1CCADyXEF37$s7Derived5localyAA1CCAA1P_pFADyXEfU_4main1P_pTf1c_n : $@convention(thin) (@in_guaranteed any P) -> @owned C {
+// CHECK:       bb0(%[[#A0:]] : $*any P):
+// CHECK:         %[[#A1:]] = function_ref @$s7Derived5localyAA1CCAA1P_pFADyXEfU_ : $@convention(thin) (@in_guaranteed any P) -> @owned C
+// CHECK:         %[[#A2:]] = apply %[[#A1]](%[[#A0]]) : $@convention(thin) (@in_guaranteed any P) -> @owned C
+// CHECK:         destroy_value %[[#A2]] : $C
+// CHECK:         %[[#A3:]] = apply %[[#A1]](%[[#A0]]) : $@convention(thin) (@in_guaranteed any P) -> @owned C
+// CHECK:         return %[[#A3]] : $C
+// CHECK-NEXT:  }
+
+sil [noinline] [ossa] @$s7Derived11invokeTwiceyAA1CCADyXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned C) -> @owned C {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> @owned C):
+  %2 = apply %0() : $@noescape @callee_guaranteed () -> @owned C
+  destroy_value %2 : $C
+  %4 = apply %0() : $@noescape @callee_guaranteed () -> @owned C
+  return %4 : $C
+}
+
+// CHECK-LABEL: {{^}}// specialized invokeThrowing(_:)
+// CHECK:       sil shared [noinline] [ossa] @$s7Derived14invokeThrowingyAA1CCADyKXEKF42$s7Derived8throwingyAA1CCAA1P_pKFADyKXEfU_4main1P_pTf1c_n : $@convention(thin) (@in_guaranteed any P) -> (@owned C, @error any Error) {
+// CHECK:       bb0(%[[#B0:]] : $*any P):
+// CHECK:         %[[#B1:]] = function_ref @$s7Derived8throwingyAA1CCAA1P_pKFADyKXEfU_ : $@convention(thin) (@in_guaranteed any P) -> (@owned C, @error any Error)
+// CHECK:         try_apply %[[#B1]](%[[#B0]]) : $@convention(thin) (@in_guaranteed any P) -> (@owned C, @error any Error), normal bb[[#B2:]], error bb[[#B3:]]
+// CHECK:       bb[[#B2]](%[[#B4:]] : @owned $C):
+// CHECK:         return %[[#B4]] : $C
+// CHECK:       bb[[#B3]](%[[#B5:]] : @owned $any Error):
+// CHECK:         throw %[[#B5]] : $any Error
+// CHECK-NEXT: }
+
+sil [noinline] [ossa] @$s7Derived14invokeThrowingyAA1CCADyKXEKF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (@owned C, @error any Error)) -> (@owned C, @error any Error) {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> (@owned C, @error any Error)):
+  try_apply %0() : $@noescape @callee_guaranteed () -> (@owned C, @error any Error), normal bb1, error bb2
+bb1(%4 : @owned $C):
+  return %4 : $C
+bb2(%6 : @owned $any Error):
+  throw %6 : $any Error
+}
+
+sil [noinline] [ossa] @$s7Derived9makeLocalyAA1P_pAaC_pF : $@convention(thin) (@in_guaranteed any P) -> @out any P {
+bb0(%0 : $*any P, %1 : $*any P):
+  copy_addr %1 to [init] %0 : $*any P
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @$s7Derived5localyAA1CCAA1P_pF :
+// CHECK:         %[[#C1:]] = alloc_stack {{.*}}$any P
+// CHECK:         %[[#C2:]] = function_ref @$s7Derived9makeLocalyAA1P_pAaC_pF :
+// CHECK:         apply %[[#C2]](%[[#C1]], %[[#]])
+// CHECK:         %[[#C3:]] = function_ref @$s7Derived11invokeTwiceyAA1CCADyXEF37$s7Derived5localyAA1CCAA1P_pFADyXEfU_4main1P_pTf1c_n : $@convention(thin) (@in_guaranteed any P) -> @owned C
+// CHECK:         %[[#C4:]] = apply %[[#C3]](%[[#C1]]) : $@convention(thin) (@in_guaranteed any P) -> @owned C
+// CHECK:         destroy_addr %[[#C1]] : $*any P
+// CHECK-NEXT:    dealloc_stack %[[#C1]] : $*any P
+// CHECK-NEXT:    return %[[#C4]] : $C
+// CHECK-NEXT:  }
+
+sil [ossa] @$s7Derived5localyAA1CCAA1P_pF : $@convention(thin) (@in_guaranteed any P) -> @owned C {
+bb0(%0 : $*any P):
+  %2 = alloc_stack [lexical] [var_decl] $any P, let, name "p"
+  %3 = function_ref @$s7Derived9makeLocalyAA1P_pAaC_pF : $@convention(thin) (@in_guaranteed any P) -> @out any P
+  %4 = apply %3(%2, %0) : $@convention(thin) (@in_guaranteed any P) -> @out any P
+  %5 = function_ref @$s7Derived5localyAA1CCAA1P_pFADyXEfU_ : $@convention(thin) (@in_guaranteed any P) -> @owned C
+  %6 = partial_apply [callee_guaranteed] [on_stack] %5(%2) : $@convention(thin) (@in_guaranteed any P) -> @owned C
+  %7 = mark_dependence [nonescaping] %6 : $@noescape @callee_guaranteed () -> @owned C on %2 : $*any P
+  %8 = function_ref @$s7Derived11invokeTwiceyAA1CCADyXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned C) -> @owned C
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned C) -> @owned C
+  destroy_value %7 : $@noescape @callee_guaranteed () -> @owned C
+  destroy_addr %2 : $*any P
+  dealloc_stack %2 : $*any P
+  return %9 : $C
+}
+
+sil private [ossa] @$s7Derived5localyAA1CCAA1P_pFADyXEfU_ : $@convention(thin) (@in_guaranteed any P) -> @owned C {
+bb0(%0 : @closureCapture $*any P):
+  %2 = open_existential_addr immutable_access %0 : $*any P to $*@opened(1, any P) Self
+  %3 = witness_method $@opened(1, any P) Self, #P.value : <Self where Self : P> (Self) -> () -> C, %2 : $*@opened(1, any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned C
+  %4 = apply %3<@opened(1, any P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned C
+  return %4 : $C
+}
+
+sil private [ossa] @$s7Derived8throwingyAA1CCAA1P_pKFADyKXEfU_ : $@convention(thin) (@in_guaranteed any P) -> (@owned C, @error any Error) {
+bb0(%0 : @closureCapture $*any P):
+  %3 = open_existential_addr immutable_access %0 : $*any P to $*@opened(2, any P) Self
+  %4 = witness_method $@opened(2, any P) Self, #P.throwingValue : <Self where Self : P> (Self) -> () throws -> C, %3 : $*@opened(2, any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (@owned C, @error any Error)
+  try_apply %4<@opened(2, any P) Self>(%3) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (@owned C, @error any Error), normal bb1, error bb2
+bb1(%6 : @owned $C):
+  return %6 : $C
+bb2(%8 : @owned $any Error):
+  throw %8 : $any Error
+}
+
+// CHECK-LABEL: sil [ossa] @$s7Derived8throwingyAA1CCAA1P_pKF :
+// CHECK:       bb0(%0 : $*any P):
+// CHECK:         %[[#D1:]] = alloc_stack {{.*}}$any P
+// CHECK:         %[[#D2:]] = function_ref @$s7Derived9makeLocalyAA1P_pAaC_pF :
+// CHECK:         apply %[[#D2]](%[[#D1]], %0)
+// CHECK:         %[[#D3:]] = function_ref @$s7Derived14invokeThrowingyAA1CCADyKXEKF42$s7Derived8throwingyAA1CCAA1P_pKFADyKXEfU_4main1P_pTf1c_n : $@convention(thin) (@in_guaranteed any P) -> (@owned C, @error any Error)
+// CHECK:         try_apply %[[#D3]](%[[#D1]]) : $@convention(thin) (@in_guaranteed any P) -> (@owned C, @error any Error), normal bb[[#D4:]], error bb[[#D5:]]
+// CHECK:       bb[[#D4]](%[[#D6:]] : @owned $C):
+// CHECK:         destroy_addr %[[#D1]] : $*any P
+// CHECK-NEXT:    dealloc_stack %[[#D1]] : $*any P
+// CHECK-NEXT:    return %[[#D6]] : $C
+// CHECK:       bb[[#D5]](%[[#D7:]] : @owned $any Error):
+// CHECK:         destroy_addr %[[#D1]] : $*any P
+// CHECK-NEXT:    dealloc_stack %[[#D1]] : $*any P
+// CHECK-NEXT:    throw %[[#D7]] : $any Error
+// CHECK-NEXT:  }
+
+sil [ossa] @$s7Derived8throwingyAA1CCAA1P_pKF : $@convention(thin) (@in_guaranteed any P) -> (@owned C, @error any Error) {
+bb0(%0 : $*any P):
+  %3 = alloc_stack [lexical] [var_decl] $any P, let, name "p"
+  %4 = function_ref @$s7Derived9makeLocalyAA1P_pAaC_pF : $@convention(thin) (@in_guaranteed any P) -> @out any P
+  %5 = apply %4(%3, %0) : $@convention(thin) (@in_guaranteed any P) -> @out any P
+  %6 = function_ref @$s7Derived8throwingyAA1CCAA1P_pKFADyKXEfU_ : $@convention(thin) (@in_guaranteed any P) -> (@owned C, @error any Error)
+  %7 = partial_apply [callee_guaranteed] [on_stack] %6(%3) : $@convention(thin) (@in_guaranteed any P) -> (@owned C, @error any Error)
+  %8 = mark_dependence [nonescaping] %7 : $@noescape @callee_guaranteed () -> (@owned C, @error any Error) on %3 : $*any P
+  %9 = function_ref @$s7Derived14invokeThrowingyAA1CCADyKXEKF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (@owned C, @error any Error)) -> (@owned C, @error any Error)
+  try_apply %9(%8) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (@owned C, @error any Error)) -> (@owned C, @error any Error), normal bb1, error bb2
+bb1(%11 : @owned $C):
+  destroy_value %8 : $@noescape @callee_guaranteed () -> (@owned C, @error any Error)
+  destroy_addr %3 : $*any P
+  dealloc_stack %3 : $*any P
+  return %11 : $C
+bb2(%16 : @owned $any Error):
+  destroy_value %8 : $@noescape @callee_guaranteed () -> (@owned C, @error any Error)
+  destroy_addr %3 : $*any P
+  dealloc_stack %3 : $*any P
+  throw %16 : $any Error
+}
+
+// CHECK-LABEL: sil [ossa] @$s7Derived4heapyAA1CC_ADyctAA1P_pF :
+// CHECK:       bb0(%0 : $*any P):
+// CHECK:         %[[#E1:]] = function_ref @$s7Derived4heapyAA1CC_ADyctAA1P_pFADycfU_ :
+// CHECK:         %[[#E2:]] = alloc_stack $any P
+// CHECK:         copy_addr %0 to [init] %[[#E2]] : $*any P
+// CHECK:         %[[#E3:]] = partial_apply [callee_guaranteed] %[[#E1]](%[[#E2]]) : $@convention(thin) (@in_guaranteed any P) -> @owned C
+// CHECK:         %[[#E4:]] = convert_escape_to_noescape %[[#]] : $@callee_guaranteed () -> @owned C to $@noescape @callee_guaranteed () -> @owned C
+// CHECK:         %[[#E5:]] = function_ref @$s7Derived11invokeTwiceyAA1CCADyXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned C) -> @owned C
+// CHECK:         apply %[[#E5]](%[[#E4]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned C) -> @owned C
+// CHECK:         return %[[#]] : $(C, @callee_guaranteed () -> @owned C)
+// CHECK-NEXT:  }
+
+sil [ossa] @$s7Derived4heapyAA1CC_ADyctAA1P_pF : $@convention(thin) (@in_guaranteed any P) -> (@owned C, @owned @callee_guaranteed () -> @owned C) {
+bb0(%0 : $*any P):
+  %2 = function_ref @$s7Derived4heapyAA1CC_ADyctAA1P_pFADycfU_ : $@convention(thin) (@in_guaranteed any P) -> @owned C
+  %3 = alloc_stack $any P
+  copy_addr %0 to [init] %3 : $*any P
+  %5 = partial_apply [callee_guaranteed] %2(%3) : $@convention(thin) (@in_guaranteed any P) -> @owned C
+  %6 = move_value [lexical] [var_decl] %5 : $@callee_guaranteed () -> @owned C
+  dealloc_stack %3 : $*any P
+  %9 = copy_value %6 : $@callee_guaranteed () -> @owned C
+  %10 = convert_escape_to_noescape %9 : $@callee_guaranteed () -> @owned C to $@noescape @callee_guaranteed () -> @owned C
+  %11 = function_ref @$s7Derived11invokeTwiceyAA1CCADyXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned C) -> @owned C
+  %12 = apply %11(%10) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned C) -> @owned C
+  destroy_value %10 : $@noescape @callee_guaranteed () -> @owned C
+  destroy_value %9 : $@callee_guaranteed () -> @owned C
+  %15 = move_value [lexical] [var_decl] %12 : $C
+  %17 = tuple (%15 : $C, %6 : $@callee_guaranteed () -> @owned C)
+  return %17 : $(C, @callee_guaranteed () -> @owned C)
+}
+
+sil private [ossa] @$s7Derived4heapyAA1CC_ADyctAA1P_pFADycfU_ : $@convention(thin) (@in_guaranteed any P) -> @owned C {
+bb0(%0 : @closureCapture $*any P):
+  %2 = open_existential_addr immutable_access %0 : $*any P to $*@opened(3, any P) Self
+  %3 = witness_method $@opened(3, any P) Self, #P.value : <Self where Self : P> (Self) -> () -> C, %2 : $*@opened(3, any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned C
+  %4 = apply %3<@opened(3, any P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned C
+  return %4 : $C
+}
