@@ -4399,17 +4399,21 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //    if <expr> != nil {
       //
       if (auto SC = StmtConditionForVD[var]) {
-        // We only handle the "if let" case right now, since it is vastly the
-        // most common situation that people run into.
-        if (SC->getCond().size() == 1) {
-          auto pattern = SC->getCond()[0].getPattern();
+        bool handled = false;
+        for (const auto &cond : SC->getCond()) {
+          auto pattern = cond.getPattern();
+          if (!pattern || !pattern->containsVarDecl(var))
+            continue;
+
           if (auto OSP = dyn_cast<OptionalSomePattern>(pattern))
             if (auto LP = dyn_cast<BindingPattern>(OSP->getSubPattern()))
               if (isa<NamedPattern>(LP->getSubPattern())) {
-                auto initExpr = SC->getCond()[0].getInitializer();
+                auto initExpr = cond.getInitializer();
                 if (initExpr->getStartLoc().isValid()) {
-                  if (isUsedInInactive(var))
-                    continue;
+                  if (isUsedInInactive(var)) {
+                    handled = true;
+                    break;
+                  }
 
                   unsigned noParens = initExpr->canAppendPostfixExpression();
 
@@ -4443,7 +4447,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                   auto diagIF = Diags.diagnose(var->getLoc(),
                                                diag::pbd_never_used_stmtcond,
                                             var->getName());
-                  auto introducerLoc = SC->getCond()[0].getIntroducerLoc();
+                  auto introducerLoc = cond.getIntroducerLoc();
                   diagIF.fixItReplaceChars(introducerLoc,
                                            initExpr->getStartLoc(),
                                            &"("[noParens]);
@@ -4457,10 +4461,12 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                     diagIF.fixItInsertAfter(initExpr->getEndLoc(),
                                             &") != nil"[noParens]);
                   }
-                  continue;
+                  handled = true;
+                  break;
                 }
               }
         }
+        if (handled) continue;
       }
 
       // If the variable is defined in a pattern that isn't one of the usual

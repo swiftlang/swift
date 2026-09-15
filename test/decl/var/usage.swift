@@ -584,3 +584,13 @@ final class A {
 
  func f() {}
 }
+
+func issue89131() {
+  func sync() -> Int? { return nil }
+  
+  if let x = sync(), true {} 
+  // expected-warning@-1 {{value 'x' was defined but never used; consider replacing with boolean test}}
+  
+  if true, let x = sync() {} 
+  // expected-warning@-1 {{value 'x' was defined but never used; consider replacing with boolean test}}
+}
