@@ -2188,10 +2188,21 @@ private:
 
     CanType loweredType = substTL.getLoweredType().getASTType();
 
+    // A C++ method takes 'this' as a pointer, so self must be passed
+    // indirectly even when the Swift value type is loadable. An lvalue 'this'
+    // already lands there via isClangTypeMoreIndirectThanSubstType.
+    // A type imported as a class is itself the reference, so it stays direct.
+    bool isCxxMethodSelf =
+        Convs.getKind() == ConventionsKind::CXXMethod &&
+        Foreign.self.isInstance() &&
+        formalParamIndex == (int)Foreign.self.getSelfIndex() &&
+        !substType->hasReferenceSemantics();
+
     ParameterConvention convention;
     if (ownership == ValueOwnership::InOut) {
       convention = ParameterConvention::Indirect_Inout;
-    } else if (isFormallyPassedIndirectly(origType, substType, substTLConv)) {
+    } else if (isCxxMethodSelf ||
+               isFormallyPassedIndirectly(origType, substType, substTLConv)) {
       convention = Convs.getIndirect(ownership, forSelf, origParamIndex,
                                      origType, substTLConv);
       assert(isIndirectFormalParameter(convention));
@@ -4339,6 +4350,11 @@ public:
         TheDecl(decl), isMutating(isMutating), Ctx(ctx) {}
   ParameterConvention
   getIndirectSelfParameter(const AbstractionPattern &type) const override {
+    // The callee may move from '*this', but the caller still owns and destroys
+    // it: the same convention an rvalue-reference parameter gets from
+    // getIndirectCParameterConvention.
+    if (TheDecl->getRefQualifier() == clang::RefQualifierKind::RQ_RValue)
+      return ParameterConvention::Indirect_In_CXX;
     if (isMutating)
       return ParameterConvention::Indirect_Inout;
     return ParameterConvention::Indirect_In_Guaranteed;
