@@ -10,11 +10,11 @@
 
 import def_always_inline
 
-// SIL-LABEL: sil public_external [serialized] [heuristic_always_inline] [canonical] [ossa] @$s17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool {
+// SIL-LABEL: sil public_external [serialized] [heuristic_always_inline] [canonical] [stage=canonical] [ossa] @$s17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool {
 
-// SIL-LABEL: sil public_external [serialized] [heuristic_always_inline] [canonical] [ossa] @$s17def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
+// SIL-LABEL: sil public_external [serialized] [heuristic_always_inline] [canonical] [stage=canonical] [ossa] @$s17def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
 
-// SIL-LABEL: sil [ossa] @main
+// SIL-LABEL: sil [stage=canonical] [ossa] @main
 // SIL: [[RAW:%.+]] = global_addr @$s13always_inline3rawSbvp : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @$s17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool

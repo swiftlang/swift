@@ -13,7 +13,7 @@ bb0:
   return %0 : $()
 }
 
-// CHECK-LABEL: sil @asyncCallee1 : $@convention(thin) @async () -> () {
+// CHECK-LABEL: sil [stage=canonical] @asyncCallee1 : $@convention(thin) @async () -> () {
 // CHECK: apply [callee_isolation=actor_instance] [caller_isolation=actor_instance] %0() : $@convention(thin) @async () -> ()
 // CHECK: } // end sil function 'asyncCallee1'
 sil @asyncCallee1 : $@convention(thin) @async () -> () {
@@ -24,7 +24,7 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @asyncCallee2 : $@convention(thin) @async () -> () {
+// CHECK-LABEL: sil [stage=canonical] @asyncCallee2 : $@convention(thin) @async () -> () {
 // CHECK: apply [callee_isolation=actor_instance] %0() : $@convention(thin) @async () -> ()
 // CHECK: } // end sil function 'asyncCallee2'
 sil @asyncCallee2 : $@convention(thin) @async () -> () {
@@ -35,7 +35,7 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @asyncCallee3 : $@convention(thin) @async () -> () {
+// CHECK-LABEL: sil [stage=canonical] @asyncCallee3 : $@convention(thin) @async () -> () {
 // CHECK: apply [caller_isolation=actor_instance] %0() : $@convention(thin) @async () -> ()
 // CHECK: } // end sil function 'asyncCallee3'
 sil @asyncCallee3 : $@convention(thin) @async () -> () {
@@ -46,7 +46,7 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @asyncCallee4 : $@convention(thin) @async () -> () {
+// CHECK-LABEL: sil [stage=canonical] @asyncCallee4 : $@convention(thin) @async () -> () {
 // CHECK: apply [caller_isolation=global_actor] %0() : $@convention(thin) @async () -> ()
 // CHECK: } // end sil function 'asyncCallee4'
 sil @asyncCallee4 : $@convention(thin) @async () -> () {

@@ -8,7 +8,7 @@ sil_stage canonical
 
 import Builtin
 
-// CHECK-LABEL: sil [serialized] [ossa] @begin_borrow_test
+// CHECK-LABEL: sil [serialized] [stage=canonical] [ossa] @begin_borrow_test
 // CHECK: begin_borrow [lexical] {{%[^,]+}}
 // CHECK: begin_borrow {{%[^,]+}}
 // CHECK: begin_borrow [var_decl] {{%[^,]+}}
@@ -26,7 +26,7 @@ sil [serialized] [ossa] @begin_borrow_test : $@convention(thin) () -> () {
   return %res : $()
 }
 
-// CHECK-LABEL: sil [serialized] [ossa] @alloc_stack_test
+// CHECK-LABEL: sil [serialized] [stage=canonical] [ossa] @alloc_stack_test
 // CHECK: alloc_stack $Builtin.NativeObject
 // CHECK: alloc_stack [dynamic_lifetime]
 // CHECK: alloc_stack [lexical]
@@ -58,7 +58,7 @@ sil [serialized] [ossa] @alloc_stack_test : $@convention(thin) () -> () {
 }
 
 // We do not verify here, but just make sure that all of the combinations parse and print correctly.
-// CHECK-LABEL: sil [serialized] [ossa] @borrow_test : $@convention(thin) (@in Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [serialized] [stage=canonical] [ossa] @borrow_test : $@convention(thin) (@in Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : @guaranteed $Builtin.NativeObject):
 // CHECK: [[BORROWED_ARG2:%.*]] = begin_borrow [[ARG2]]
 // CHECK: end_borrow [[BORROWED_ARG2]]

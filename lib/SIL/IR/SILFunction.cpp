@@ -333,6 +333,15 @@ void SILFunction::setFunctionStage(SILStage stage) {
   FunctionStage = unsigned(stage);
 }
 
+void SILFunction::inheritDerivedFrom(const SILFunction *from) {
+  setHasLoweredAddresses(from->hasLoweredAddresses());
+  // Only ever move forward. The clone was born at the module's stage floor,
+  // which can already be ahead of a source that predates a commit, such as a
+  // snapshot.
+  if (from->getFunctionStage() > getFunctionStage())
+    setFunctionStage(from->getFunctionStage());
+}
+
 SILAddressConventions SILAddressConventions::forRawSIL(SILModule &M) {
   // The module's Raw-stage representation: opaque values under opaque-values
   // mode, raw addresses otherwise. No function in scope, so this is keyed to

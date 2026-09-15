@@ -431,6 +431,7 @@ namespace sil_block {
                      BCFixed<1>,  // is runtime accessible
                      BCFixed<1>,  // are lexical lifetimes force-enabled
                      BCFixed<1>,  // only referenced by debug info
+                     BCFixed<2>,  // SIL stage
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
