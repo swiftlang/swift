@@ -445,3 +445,116 @@ The distributed-target accessor's *linking identity* is always the regular distr
 The SIL function the accessor actually dispatches to is selected by `IRGenModule::emitDistributedTargetAccessor` and passed to `DistributedAccessor` / `AccessorTarget` as `dispatchTo`. When the target has a `@Resolvable` parameter or result, the accessor needs to dispatch through the proxy-adapter thunk; we locate it and pass it as `dispatchTo`. When no adapter is needed, `dispatchTo` is `nil` and the accessor calls the regular distributed thunk directly.
 
 There is one residual IRGen-side fixup: `argumentTypesBuffer` on the recipient is filled by `__getParameterTypeInfo` from demangling the regular distributed thunk's mangled name, which still says `any P` / `some P`. Since `any P` does not conform to `Codable`, `decodeNextArgument` would trap if invoked with that metadata. The accessor therefore overrides the runtime-loaded `argumentTy` with a compile-time reference to `$P`'s metadata before calling `decodeNextArgument` (see the `@Resolvable protocol param: override runtime-loaded metadata` block in `decodeArguments`).
+
+# Distributed in Embedded Swift (experimental)
+
+Distributed is available in Embedded Swift, however Embedded comes with a number of limitations 
+that are necessary for Embedded platforms that make the existing non-Embedded runtime not compatible as-is.
+
+Currently Embedded Distributed is experimental, and you can enable like this: 
+
+```
+-enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed
+```
+
+In Embedded Embedded, distributed actors use the same `DistributedActorSystem` protocol as usual, 
+though some of its requirements are slightly modified. It should be possible for most `DistributedActorSystem` 
+implementations to conform to the protocol with a single implementation in both embedded and not.
+
+The only difference is the `remoteCall` function which must be implemented differently in Embedded Swift.
+
+Actual `distributed actor` and resolvable protocol implementations are able to be shared 
+between embedded and not-embedded builds, 
+because the runtime differences are handled at the actor system layer.
+
+### SerializationRequirement on Embedded systems
+
+The `DistributedActorSystem` does not prescribe using any specific serialization mechanism.
+Most non-Embedded systems use `Codable` because its ease of use for end-users,
+however this protocol is not available in Embedded Swift so you may need to choose a different mechanism in embedded.
+
+Thankfully, it is possible to write an actor system that simply uses a different serialization _mechanism_
+while retaining wire-compatibility with even an potentially non-Embedded client by conditionalizing
+the `SerializationRequirement`:
+
+```swift
+protocol EmbeddedSerializationRequirement { ... }
+
+extension PortableActorSystem { 
+  #if $Embedded
+  public typealias SerializationRequirement = EmbeddedSerializationRequirement
+  #else
+  public typealias SerializationRequirement = Codable
+}
+```
+
+Or you may write an actor system that just utilizes some portable SerializationRequirement
+on all platforms instead.
+
+Only the `SerializationRequirement` might potentially be different between platforms, 
+if a system was using `Codable` on non-Embedded, 
+because `Codable` is not supported on embedded platforms.
+This can be handled easily by introducing a new protocol which handles serialization 
+in embedded builds, and conforming types to it when necessary.
+
+```
+public struct ComplexRequest: Sendable {
+  public let id: Int
+  public init(id: Int) { self.id = id }
+}
+
+#if $Embedded
+extension ComplexRequest: EmbeddedFakeRoundtripActorSystem.SerializationRequirement {
+  public var serializedByteCount: Int { 8 }
+  public func encode(into output: inout OutputSpan<UInt8>) {
+    for byte in asciiDigits(id) { output.append(byte) }
+  }
+  public static func decode(from input: inout Span<UInt8>) throws -> ComplexRequest {
+    guard let id = parseInt(drain(&input)[...]) else { throw WireError.badValue }
+    return ComplexRequest(id: id)
+  }
+}
+#else // if !$Embedded
+extension ComplexRequest: Codable { }
+#endif
+```
+
+Since `Codable` is merely the "how" and not the specific details of the serialization, 
+as long as both sides of the protocol can serialize/de-serialize the same payloads, 
+this difference does not matter 
+and the wire protocol can remain stable and compatible between platforms.
+
+Most of the rest of the distributed actor machinery (the `distributed actor` keyword, `distributed func` synthesis, `is-remote` check, 
+`Greeter.resolve(id:using:)`) is reused as-is, with small compiler branches where the embedded shape differs.
+
+## Embedded Distributed Swift Limitations
+
+Some distributed actor features are not supported yet in Embedded Swift.
+
+- Custom executors are not supported yet.
+- `distributed var` is not supported yet.
+
+## Receiver-side: compiler-synthesized `_executeDistributedTarget`
+
+In Embedded Swift, Distributed does not use the accessible function records approach because it would
+necessitate the use of dynamic runtime metadata for executing the target functions.
+
+Instead, every `distributed actor` synthesizes an `_executeDistributedTarget` instance method on the actor
+that performs the method dispatch on `self`:
+
+```swift
+extension Greeter {
+  nonisolated(nonsending) public func _executeDistributedTarget(
+    target: RemoteCallTarget,
+    invocationDecoder: inout Self.ActorSystem.InvocationDecoder,
+    resultHandler: Self.ActorSystem.ResultHandler
+  ) async throws { ... }
+}
+```
+
+This is wired into the implementation of `DistributedActorSystem/executeDistributedTarget`, 
+so how actor systems implement the execute does not need to change in any way.
+
+The execute is effectively a big switch over the identifier and then calling all the usual
+`decodeArgument` and similar functions, before calling the actual target function.
+This has the benefit that there is no existentials involved at all, and it can be optimized well.

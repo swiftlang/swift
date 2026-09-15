@@ -28,7 +28,7 @@ using namespace swift;
 #if !SWIFT_CONCURRENCY_EMBEDDED || !SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
 // When using the Embedded Swift Platform Abstraction Layer, _swift_exit is
 // provided by the platform, so we don't define it here.
-extern "C"
+extern "C" __attribute__((noreturn))
 void _swift_exit(int result) {
   exit(result);
 }

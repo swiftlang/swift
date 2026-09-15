@@ -1357,6 +1357,12 @@ Added: _swift_distributed_getGenericEnvironmentKeyArgumentCount
 Added: _concurrencyEnableTaskRegistry
 Added: __swift_concurrency_task_registry_addr
 
+// InlineArray: Equatable, Hashable (SE-0543)
+Added: _$ss11InlineArrayVsSHR_Ri__rlE9hashValueSivg
+Added: _$ss11InlineArrayVsSHR_Ri__rlE9hashValueSivpMV
+Added: _$ss11InlineArrayVyxq_GSHsSHR_Ri__rlMc
+Added: _$ss11InlineArrayVyxq_GSQsSQR_Ri__rlMc
+
 // Privilege gating for environment variables
 Added: __swift_isRestrictedProcess
 
@@ -1366,3 +1372,9 @@ Added: _swift_dynamicCastTest
 
 // Setter for typed willThrow hook.
 Added: __swift_setWillThrowTypedHandler
+
+// Prespecialized tuple metadata witness tables
+Added: _swift_tupleWitnesses_nonpod_inline
+Added: _swift_tupleWitnesses_nonpod_noninline
+Added: _swift_tupleWitnesses_pod_inline
+Added: _swift_tupleWitnesses_pod_noninline

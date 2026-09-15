@@ -902,6 +902,13 @@ namespace {
              X->getType()    == RHS->getType();
     }
 
+    bool visitCOMMethodInst(COMMethodInst *RHS) {
+      auto *X = cast<COMMethodInst>(LHS);
+      return X->getMember() == RHS->getMember() &&
+             X->getOperand() == RHS->getOperand() &&
+             X->getType() == RHS->getType();
+    }
+
     bool visitObjCSuperMethodInst(ObjCSuperMethodInst *RHS) {
       auto *X = cast<ObjCSuperMethodInst>(LHS);
       return X->getMember()  == RHS->getMember() &&
@@ -929,6 +936,10 @@ namespace {
     }
 
     bool visitOpenExistentialRefInst(const OpenExistentialRefInst *RHS) {
+      return true;
+    }
+
+    bool visitOpenCOMExistentialInst(const OpenCOMExistentialInst *RHS) {
       return true;
     }
 
@@ -1635,6 +1646,7 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   }
 
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
+      isa<OpenCOMExistentialInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) ||
       isa<OpenExistentialBoxInst>(this) ||
@@ -1931,6 +1943,7 @@ void SILInstruction::forEachDefinedLocalEnvironment(
   }
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialAddrInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialRefInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenCOMExistentialInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxValueInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialMetatypeInst)
@@ -2403,3 +2416,12 @@ ApplyInstBase<TryApplyInst, TryApplyInstBase, false>::getCalleeDeclRef() const;
 #include "swift/SIL/SILNodes.def"
 
 #endif
+
+namespace swift::test {
+static FunctionTest InstructionsIdentical(
+    "instructions-identical", [](auto &function, auto &arguments, auto &test) {
+      auto *lhs = arguments.takeInstruction();
+      auto *rhs = arguments.takeInstruction();
+      llvm::outs() << (lhs->isIdenticalTo(rhs) ? "true" : "false") << '\n';
+    });
+} // namespace swift::test

@@ -2471,6 +2471,28 @@ Performs Objective-C method dispatch using `objc_msgSend()`.
 
 Objective-C method calls are never candidates for de-virtualization.
 
+### com_method
+
+```
+sil-instruction ::= 'com_method' sil-operand ',' sil-decl-ref ',' sil-type
+
+%method = com_method %self : $@opened(1, any P) Self, #P.method,
+    $@convention(com_method) (@guaranteed @opened(1, any P) Self) -> ()
+```
+
+Looks up an instance requirement in a COM interface's vtable. The receiver is
+an archetype constrained to the declaring interface or an interface that
+inherits from it; it may be a value or an address. Extension helpers do not
+occupy interface vtable slots and cannot be referenced by this instruction.
+
+The result is a context-free function with the `com_method` convention. A
+lookup does not consume its receiver. The receiver remains the final SIL
+argument when applying the resulting function.
+
+The lookup carries type-dependent operands for opened archetypes in both its
+receiver type and its result type. A generic callee type can omit the receiver's
+opened archetype, so the result type alone does not determine these dependencies.
+
 ### super_method
 
 ```
@@ -4097,6 +4119,22 @@ container are associated directly with the archetype `@opened P`. This
 pointer can be used with any operation on archetypes, such as
 [witness_method](#witness_method). When the operand is of metatype type,
 the result will be the metatype of the opened archetype.
+
+### open_com_existential
+
+```
+sil-instruction ::= 'open_com_existential' sil-operand 'to' sil-type
+
+%1 = open_com_existential %0 : $any P to $@opened(1, any P) Self
+```
+
+Opens a COM existential value as a fresh archetype with the same interface
+constraints. Both operand and result are object values. The result preserves
+the existential's interface-pointer representation and forwards ownership of
+the operand. It is a nontrivial, loadable value, not a Swift class reference.
+
+The instruction defines the opened archetype for subsequent instructions in
+the function. Cloning an opening creates a fresh archetype and remaps its uses.
 
 ### init_existential_metatype
 

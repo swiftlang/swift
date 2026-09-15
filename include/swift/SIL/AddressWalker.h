@@ -209,11 +209,11 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<LoadWeakInst>(user) || isa<StoreWeakInst>(user) ||
         isa<AssignOrInitInst>(user) || isa<BeginUnpairedAccessInst>(user) ||
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
-        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
-        isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user) ||
-        isa<DebugValueInst>(user) || isa<EndBorrowInst>(user) ||
-        isa<ExplicitCopyAddrInst>(user) || isa<DeallocStackInst>(user) ||
-        isa<InitBlockStorageHeaderInst>(user) ||
+        isa<COMMethodInst>(user) || isa<SelectEnumAddrInst>(user) ||
+        isa<InjectEnumAddrInst>(user) || isa<IsUniqueInst>(user) ||
+        isa<ValueMetatypeInst>(user) || isa<DebugValueInst>(user) ||
+        isa<EndBorrowInst>(user) || isa<ExplicitCopyAddrInst>(user) ||
+        isa<DeallocStackInst>(user) || isa<InitBlockStorageHeaderInst>(user) ||
         isa<GetAsyncContinuationAddrInst>(user) ||
         isa<ExistentialMetatypeInst>(user) ||
         isa<UncheckedRefCastAddrInst>(user) || isa<KeyPathInst>(user) ||
@@ -222,8 +222,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
         isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user) ||
         isa<MergeIsolationRegionInst>(user) ||
-        isa<EndCOWMutationAddrInst>(user) ||
-        isa<EndFormalScopeInst>(user) ||
+        isa<EndCOWMutationAddrInst>(user) || isa<EndFormalScopeInst>(user) ||
         isa<MakeBorrowInst>(user) || isa<DereferenceBorrowInst>(user) ||
         isa<MakeAddrBorrowInst>(user) || isa<DereferenceAddrBorrowInst>(user) ||
         isa<InitBorrowAddrInst>(user) || isa<DereferenceBorrowAddrInst>(user)) {

@@ -2785,6 +2785,12 @@ public:
     *this << ", ";
     *this << AMI->getType();
   }
+  void visitCOMMethodInst(COMMethodInst *CMI) {
+    printMethodInst(CMI, CMI->getOperand());
+    *this << " : " << CMI->getMember().getDecl()->getInterfaceType();
+    *this << ", ";
+    *this << CMI->getType();
+  }
   void visitObjCSuperMethodInst(ObjCSuperMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
@@ -2814,6 +2820,10 @@ public:
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitOpenExistentialRefInst(OpenExistentialRefInst *OI) {
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+    printForwardingOwnershipKind(OI, OI->getOperand());
+  }
+  void visitOpenCOMExistentialInst(OpenCOMExistentialInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
     printForwardingOwnershipKind(OI, OI->getOperand());
   }
@@ -4312,7 +4322,7 @@ static void printSILLinearMapTypes(SILPrintContext &Ctx,
   Options.PrintInSILBody = false;
 
   SmallVector<Decl *, 32> topLevelDecls;
-  M->getTopLevelDecls(topLevelDecls);
+  M->getTopLevelDeclsWithAuxiliaryDecls(topLevelDecls);
   for (const Decl *D : topLevelDecls) {
     if (D->getDeclContext() == M)
       continue;
@@ -4477,7 +4487,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     bool WholeModuleMode = (M == AssociatedDeclContext);
 
     SmallVector<Decl *, 32> topLevelDecls;
-    M->getTopLevelDecls(topLevelDecls);
+    M->getTopLevelDeclsWithAuxiliaryDecls(topLevelDecls);
     for (const Decl *D : topLevelDecls) {
       if (!WholeModuleMode && !(D->getDeclContext() == AssociatedDeclContext))
           continue;

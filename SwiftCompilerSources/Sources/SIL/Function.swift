@@ -186,6 +186,12 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isGeneric: Bool { bridged.isGeneric() }
 
+  /// SIL-level counterpart of
+  /// `AbstractFunctionDecl.isDistributedWitnessWithAdHocSerializationRequirement`.
+  public var isDistributedAdHocSerializationRequirementWitness: Bool {
+    bridged.isDistributedAdHocSerializationRequirementWitness()
+  }
+
   public var linkage: Linkage { bridged.getLinkage().linkage }
 
   /// True, if the linkage of the function indicates that it is visible outside the current

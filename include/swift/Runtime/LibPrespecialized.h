@@ -51,11 +51,18 @@ struct LibPrespecializedData {
   /// against those.
   TargetPointer<Runtime, const void> functionMetadataMap;
 
+  /// Tuple type metadata map. Keys are the element metadata. Values are a
+  /// TargetPrespecializedMetadataCandidates listing every prespecialized tuple
+  /// sharing that key. Candidates under one key differ in their labels, which
+  /// the key does not carry, so the caller must check each candidate against
+  /// those.
+  TargetPointer<Runtime, const void> tupleMetadataMap;
+
   // Existing fields are above, add new fields below this point.
 
   // The major/minor version numbers for this version of the struct.
   static constexpr uint32_t currentMajorVersion = 1;
-  static constexpr uint32_t currentMinorVersion = 6;
+  static constexpr uint32_t currentMinorVersion = 7;
 
   // Version numbers where various fields were introduced.
   static constexpr uint32_t minorVersionWithDisabledProcessesTable = 2;
@@ -64,6 +71,7 @@ struct LibPrespecializedData {
   static constexpr uint32_t minorVersionWithDescriptorMap = 4;
   static constexpr uint32_t minorVersionWithPointerKeyedWitnessTableMap = 5;
   static constexpr uint32_t minorVersionWithFunctionMetadataMap = 6;
+  static constexpr uint32_t minorVersionWithTupleMetadataMap = 7;
 
   // Option flags values.
   enum : typename Runtime::StoredSize {
@@ -130,6 +138,12 @@ struct LibPrespecializedData {
       return nullptr;
     return functionMetadataMap;
   }
+
+  const void *getTupleMetadataMap() const {
+    if (minorVersion < minorVersionWithTupleMetadataMap)
+      return nullptr;
+    return tupleMetadataMap;
+  }
 };
 
 /// The value of an entry in a prespecialized metadata table whose key does not
@@ -174,6 +188,18 @@ const PrespecializedMetadataCandidates *
 getLibPrespecializedFunctionTypeMetadata(const Metadata *result,
                                          const Metadata *const *parameters,
                                          unsigned numParameters);
+
+/// Look up the prespecialized tuple type metadata sharing the key of the given
+/// element types. The key does not capture the labels, so the caller must check
+/// the returned candidates against those. Returns nullptr when there are none.
+///
+/// Each metadata returned is tail-allocated on a complete tuple cache entry the
+/// library emitted, so it can be adopted into the runtime's tuple cache as is.
+/// See the comment on TupleCacheEntry for the layout guarantee that rests on
+/// minorVersionWithTupleMetadataMap.
+const PrespecializedMetadataCandidates *
+getLibPrespecializedTupleTypeMetadata(const Metadata *const *elements,
+                                      unsigned numElements);
 
 std::pair<LibPrespecializedLookupResult, const TypeContextDescriptor *>
 getLibPrespecializedTypeDescriptor(Demangle::NodePointer node);

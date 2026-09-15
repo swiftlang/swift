@@ -509,6 +509,7 @@ UNINTERESTING_FEATURE(CxxImplementation)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 UNINTERESTING_FEATURE(DistributedActorResignRemoteID)
+UNINTERESTING_FEATURE(EmbeddedDistributed)
 
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
@@ -532,6 +533,13 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
   default:
     return false;
   }
+}
+
+static bool usesFeatureCoroutineFunctions(Decl *decl) {
+  if (auto *FD = dyn_cast<FuncDecl>(decl))
+    return FD->isCoroutine() && !isa<AccessorDecl>(FD);
+  
+  return false;
 }
 
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)

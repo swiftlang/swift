@@ -1252,7 +1252,7 @@ SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *SEI) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
+SILInstruction *SILCombiner::legacyVisitTupleExtractInst(TupleExtractInst *TEI) {
   // tuple_extract(apply([add|sub|...]overflow(x, 0)), 1) -> 0
   // if it can be proven that no overflow can happen.
   if (TEI->getFieldIndex() == 1) {

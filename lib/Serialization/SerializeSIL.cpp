@@ -2328,6 +2328,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::Name##ToRefInst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialBoxInst:
   case SILInstructionKind::OpenExistentialValueInst:
@@ -2362,6 +2363,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         attrs |= 0x01;
     } else if (auto *refCast = dyn_cast<UncheckedRefCastInst>(&SI)) {
       attrs = encodeValueOwnership(refCast->getOwnershipKind());
+    } else if (auto *opening = dyn_cast<OpenCOMExistentialInst>(&SI)) {
+      attrs = encodeValueOwnership(opening->getForwardingOwnershipKind());
     } else if (auto *atp = dyn_cast<AddressToPointerInst>(&SI)) {
       attrs = atp->needsStackProtection() ? 1 : 0;
     }
@@ -2949,6 +2952,18 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
         (unsigned)SI.getKind(), S.addTypeRef(Ty.getRawASTType()),
         (unsigned)Ty.getCategory(), ListOfValues);
+    break;
+  }
+  case SILInstructionKind::COMMethodInst: {
+    const COMMethodInst *CMI = cast<COMMethodInst>(&SI);
+    SILType Ty = CMI->getType();
+    SmallVector<uint64_t, 8> ListOfValues;
+    handleMethodInst(CMI, CMI->getOperand(), ListOfValues);
+
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        static_cast<unsigned>(SI.getKind()), S.addTypeRef(Ty.getRawASTType()),
+        static_cast<unsigned>(Ty.getCategory()), ListOfValues);
     break;
   }
   case SILInstructionKind::ObjCSuperMethodInst: {

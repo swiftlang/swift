@@ -1,7 +1,6 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_SafeInteropWrappersNullAsEmptySpan
-// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
-
+ 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
@@ -9,7 +8,6 @@
 // RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes -eager-macro-checking \
 // RUN:   -Xcc -Wno-nullability-completeness -target %target-swift-6.2-abi-triple \
 // RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan \
-// RUN:   -enable-experimental-feature ForeignReferenceTypeInheritance \
 // RUN:   -verify-additional-prefix %target-vendor- \
 // RUN:   %if OS_FAMILY=darwin && !OS=xros %{ -verify-additional-prefix nonxros- %}
 

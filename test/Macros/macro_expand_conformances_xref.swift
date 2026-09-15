@@ -18,9 +18,9 @@ protocol P2 {}
 macro ListConformances() = #externalMacro(module: "MacroDefinition", type: "ListConformancesMacro")
 
 
-// CHECK-DUMP: [ "Root": [ "P1", "P2" ] ]
 // CHECK-DUMP: extension Root: P1
 // CHECK-DUMP: extension Root: P2
+// CHECK-DUMP: [ "Root": [ "P1", "P2" ] ]
 @ListConformances
 class Root {
 // CHECK-DUMP: extension OtherRoot: P1
@@ -28,9 +28,9 @@ class Root {
   var other: OtherRoot?
 }
 
-// CHECK-DUMP: [ "P1Root": [ "P2" ] ]
 // CHECK-DUMP-NOT: extension P1Root: P1
 // CHECK-DUMP: extension P1Root: P2
+// CHECK-DUMP: [ "P1Root": [ "P2" ] ]
 @ListConformances
 class P1Root: P1 { }
 

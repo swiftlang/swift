@@ -349,6 +349,7 @@ struct LibPrespecializedState {
     LOG("  pointerKeyedWitnessTableMap=%p",
         data->getPointerKeyedWitnessTableMap());
     LOG("  functionMetadataMap=%p", data->getFunctionMetadataMap());
+    LOG("  tupleMetadataMap=%p", data->getTupleMetadataMap());
 
     return data;
   }
@@ -649,6 +650,44 @@ swift::getLibPrespecializedFunctionTypeMetadata(
             reinterpret_cast<const void *const *>(parameters))));
     LOG("Function type lookup (result=%p, %u parameters) -> %p.",
         (const void *)result, numParameters, value);
+    return reinterpret_cast<const PrespecializedMetadataCandidates *>(value);
+  }
+#endif
+  return nullptr;
+}
+
+const PrespecializedMetadataCandidates *
+swift::getLibPrespecializedTupleTypeMetadata(const Metadata *const *elements,
+                                             unsigned numElements) {
+#if DYLD_FIND_POINTER_HASH_TABLE_ENTRY_DEFINED
+  auto &state = LibPrespecialized.get();
+
+  auto *data = state.data;
+  if (!data)
+    return nullptr;
+
+  if (state.mapConfiguration ==
+      LibPrespecializedState::MapConfiguration::Disabled)
+    return nullptr;
+
+  // The empty tuple has statically emitted metadata and never reaches here, so
+  // there is always at least one element to key on.
+  if (numElements == 0)
+    return nullptr;
+
+  auto *map = data->getTupleMetadataMap();
+  if (!map)
+    return nullptr;
+
+  if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_find_pointer_hash_table_entry)) {
+    // The dyld call takes the first pointer of the key separately from the
+    // rest. Our keys are the element types.
+    auto value = SWIFT_RUNTIME_WEAK_USE(_dyld_find_pointer_hash_table_entry(
+        map, elements[0], numElements - 1,
+        const_cast<const void **>(
+            reinterpret_cast<const void *const *>(elements + 1))));
+    LOG("Tuple type lookup (%u elements, first=%p) -> %p.", numElements,
+        (const void *)elements[0], value);
     return reinterpret_cast<const PrespecializedMetadataCandidates *>(value);
   }
 #endif
