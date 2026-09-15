@@ -33,6 +33,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -5651,6 +5652,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     result = validateCOMExistential(result, repr, options);
     if (result->hasError())
       return result;
+
     return ExistentialType::get(result);
   }
 
@@ -6792,6 +6794,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     composition = validateCOMExistential(composition, repr, options);
     if (composition->hasError())
       return composition;
+
     return ExistentialType::get(composition);
   }
 
@@ -6814,6 +6817,7 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
     constraintType = validateCOMExistential(constraintType, repr, options);
     if (constraintType->hasError())
       return constraintType;
+
     return ExistentialType::get(constraintType);
   }
 
@@ -7435,12 +7439,91 @@ public:
 
 } // end anonymous namespace
 
+namespace {
+/// An existential type that has no representation, and the foreign reference
+/// type that bounds it.
+struct ForeignReferenceExistential {
+  Type existential;
+  Type constraint;
+  Type bound;
+};
+
+} // end anonymous namespace
+
+/// Search \p type for an existential whose class bound is a foreign reference
+/// type, recording the first one found in \p found.
+static bool
+findForeignReferenceExistential(Type type, ForeignReferenceExistential &found) {
+  return type.findIf([&](Type nested) {
+    // N.B. `any P.Type` stores a bare constraint type, which does not contain
+    // an `ExistentialType`.
+    auto *existential = nested->getAs<ExistentialType>();
+    if (!existential)
+      return false;
+
+    auto constraint = existential->getConstraintType();
+    auto bound = constraint->getExistentialLayout()
+                     .getExplicitSuperclassOrProtocolSuperclass();
+    if (!bound || !bound->isForeignReferenceType())
+      return false;
+
+    found = {existential, constraint, bound};
+    return true;
+  });
+}
+
+/// Diagnose an existential type whose class bound is a foreign reference type,
+/// which lacks a mechanism to recover type metadata from an existential value.
+///
+/// This should only be checked after the declaration is type checked, because
+/// a protocol's class bound comes from its generic signature, which cannot be
+/// requested while resolving that protocol's own requirements.
+///
+/// \returns true if a diagnostic was emitted.
+static bool diagnoseForeignReferenceExistential(Decl *decl) {
+  auto *VD = dyn_cast<ValueDecl>(decl);
+  // Only check and diagnose user-written value decls
+  if (!VD || VD->isImplicit())
+    return false;
+
+  // Only check for existentials in storage and function decls, also excluding
+  // accessors whose storage decl should already be checked.
+  if (!isa<AbstractStorageDecl, AbstractFunctionDecl, EnumElementDecl>(VD) ||
+      isa<AccessorDecl>(VD))
+    return false;
+
+  auto interfaceType = VD->getInterfaceType();
+  if (interfaceType->hasError())
+    return false;
+
+  ForeignReferenceExistential found;
+
+  // Search the type as written first, so that the diagnostic names the
+  // existential the way it was spelled.
+  if (!findForeignReferenceExistential(interfaceType, found))
+    findForeignReferenceExistential(interfaceType->getCanonicalType(), found);
+
+  if (!found.existential)
+    return false;
+
+  VD->setInvalid();
+
+  VD->diagnose(diag::existential_foreign_reference_type_bound,
+                      found.existential, found.bound);
+  VD->diagnose(diag::existential_foreign_reference_type_bound_note,
+                      found.constraint);
+  return true;
+}
+
 void TypeChecker::checkExistentialTypes(Decl *decl) {
   if (!decl || decl->isInvalid())
     return;
 
   // Skip diagnosing existential `any` requirements in swiftinterfaces.
   if (decl->getDeclContext()->isInSwiftinterface())
+    return;
+
+  if (diagnoseForeignReferenceExistential(decl))
     return;
 
   auto &ctx = decl->getASTContext();
