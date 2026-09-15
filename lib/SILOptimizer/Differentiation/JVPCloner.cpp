@@ -306,7 +306,7 @@ private:
   //--------------------------------------------------------------------------//
 
   /// Returns a next insertion point for creating a local allocation: either
-  /// before the previous local allocation, or at the start of the pullback
+  /// before the previous local allocation, or at the start of the differential
   /// entry if no local allocations exist.
   ///
   /// Helper for `createFunctionLocalAllocation`.
