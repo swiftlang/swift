@@ -18,6 +18,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
@@ -203,12 +204,14 @@ void autodiff::getFunctionSemanticResults(
     // Separate tuple elements into individual results.
     if (formalResultType->is<TupleType>()) {
       for (auto elt : formalResultType->castTo<TupleType>()->getElements()) {
-        resultTypes.emplace_back(elt.getType(), resultIdx++,
-                                 /*isParameter*/ false);
+        resultTypes.emplace_back(
+            elt.getType(), resultIdx++,
+            AutoDiffSemanticFunctionResultType::ResultKind::Result);
       }
     } else {
-      resultTypes.emplace_back(formalResultType, resultIdx++,
-                               /*isParameter*/ false);
+      resultTypes.emplace_back(
+          formalResultType, resultIdx++,
+          AutoDiffSemanticFunctionResultType::ResultKind::Result);
     }
   }
 
@@ -225,7 +228,9 @@ void autodiff::getFunctionSemanticResults(
              "invalid parameter index");
       if (parameterIndices->contains(idx))
         resultTypes.emplace_back(paramAndIndex.value().getPlainType(),
-                                 resultIdx, /*isParameter*/ true);
+                                 resultIdx,
+                                 AutoDiffSemanticFunctionResultType::
+                                     ResultKind::SemanticResultParameter);
       resultIdx += 1;
     }
   };
@@ -239,6 +244,21 @@ void autodiff::getFunctionSemanticResults(
     collectSemanticResults(functionType, resultFnType->getNumParams());
   } else
     collectSemanticResults(functionType);
+
+  // All yields are considered as results for the purposes of autodiff
+  ArrayRef<AnyFunctionType::Yield> yields;
+  if (auto *resultFnType =
+          functionType->getResult()->getAs<AnyFunctionType>()) {
+    assert(functionType->getNumYields() == 0 && "unexpected coroutine type");
+    yields = resultFnType->getYields();
+  } else
+    yields = functionType->getYields();
+  for (const auto &yield : yields)
+    resultTypes.emplace_back(
+        yield.getType(), resultIdx++,
+        yield.isInOut()
+            ? AutoDiffSemanticFunctionResultType::ResultKind::IndirectYield
+            : AutoDiffSemanticFunctionResultType::ResultKind::DirectYield);
 }
 
 IndexSubset *
@@ -304,7 +324,7 @@ autodiff::getLoweredParameterIndices(IndexSubset *parameterIndices,
 
 /// Collects the semantic results of the given function type in
 /// `originalResults`. The semantic results are formal results followed by
-/// semantic result parameters, in type order.
+/// semantic result parameters, folowed by yields, in type order.
 void
 autodiff::getSemanticResults(SILFunctionType *functionType,
                              IndexSubset *parameterIndices,
@@ -320,6 +340,14 @@ autodiff::getSemanticResults(SILFunctionType *functionType,
       continue;
     if (!param.hasOption(SILParameterInfo::NotDifferentiable))
       originalResults.emplace_back(param.getInterfaceType(), ResultConvention::Indirect);
+  }
+
+  for (const auto &yield : functionType->getYields()) {
+    if (!yield.isAutoDiffSemanticResult())
+      continue;
+    if (!yield.hasOption(SILParameterInfo::NotDifferentiable))
+      originalResults.emplace_back(yield.getInterfaceType(),
+                                   ResultConvention::Indirect);
   }
 }
 
@@ -521,6 +549,12 @@ void DerivativeFunctionTypeError::log(raw_ostream &OS) const {
     auto nonDiffResult = getNonDifferentiableTypeAndIndex();
     OS << "has non-differentiable result " << nonDiffResult.second << ": "
        << nonDiffResult.first;
+    break;
+  }
+  case Kind::NonDifferentiableYield: {
+    auto nonDiffYield = getNonDifferentiableTypeAndIndex();
+    OS << "has non-differentiable yield " << nonDiffYield.second << ": "
+       << nonDiffYield.first;
     break;
   }
   }
