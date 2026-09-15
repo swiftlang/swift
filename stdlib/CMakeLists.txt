@@ -203,9 +203,17 @@ function(swift_create_stdlib_targets name variant define_all_alias)
   endif()
 endfunction()
 
+# The cooperative ("singlethreaded") global executor needs no threads, so a
+# runtime without a threading package can only pair it with
+# SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY. A runtime that HAS threads (e.g.
+# wasm32-unknown-wasip1-threads with the pthreads package) may still use the
+# cooperative executor — async work is serial on the main thread — but must
+# not be compiled single-threaded, or the actor runtime treats every thread
+# as the main thread.
 if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded"
-   AND NOT SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
-  message(SEND_ERROR "Cannot enable the single-threaded global executor without enabling SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
+   AND NOT SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+   AND "${SWIFT_THREADING_PACKAGE}" STREQUAL "none")
+  message(SEND_ERROR "Cannot enable the single-threaded global executor without enabling SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY (no threading package)")
 endif()
 
 if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
