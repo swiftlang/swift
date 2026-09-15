@@ -326,9 +326,9 @@ func testFixitsInStatementsWithPatterns(_ a : Int?) {
 
 // <rdar://22774938> QoI: "never used" in an "if let" should rewrite expression to use != nil
 func test(_ a : Int?, b : Any) {
-  if true == true, let x = a {   // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{20-25=_}}
+  if true == true, let x = a {   // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{20-28=}} {{29-29= != nil}}
   }
-  if let x = a, let y = a {  // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{6-11=_}}
+  if let x = a, let y = a {  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=}} {{15-15= != nil}}
     _ = y
   }
 
