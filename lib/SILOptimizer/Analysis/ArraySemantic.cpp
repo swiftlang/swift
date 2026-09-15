@@ -391,9 +391,6 @@ static SILValue copySelfValue(SILValue ArrayStructValue,
   auto *func = InsertBefore->getFunction();
   if (DT->dominates(ArrayStructValue->getParentBlock(),
                     InsertBefore->getParent())) {
-    assert(!func->hasOwnership() ||
-           ArrayStructValue->getOwnershipKind() == OwnershipKind::Owned ||
-           ArrayStructValue->getOwnershipKind() == OwnershipKind::Guaranteed);
     return ArrayStructValue;
   }
 
