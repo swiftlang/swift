@@ -767,6 +767,11 @@ bool DebugValueInst::isExprTypeValid() const {
       return false;
   }
 
+  // Cannot have an object category value of an address-only type.
+  if (valueType.isObject() && !valueType.isLoadableOrOpaque(*getFunction())) {
+    return false;
+  }
+
   // Fragments are in the opposite direction, process from right to left.
   SILType RunningType = *varInfo.Type;
   unsigned derefCount = 0;
