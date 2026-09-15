@@ -10513,6 +10513,11 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   if (!ClangDecl)
     return nullptr;
 
+  if (UseCanonicalDecl)
+    if (auto *fn = dyn_cast<clang::FunctionDecl>(ClangDecl))
+      if (fn->getFirstDecl() != fn->getMostRecentDecl())
+        ClangDecl = mostRefinedFunctionRedecl(fn);
+
   FrontendStatsTracer StatsTracer(SwiftContext.Stats,
                                   "import-clang-decl", ClangDecl);
   clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
