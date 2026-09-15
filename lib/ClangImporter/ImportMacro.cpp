@@ -26,6 +26,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
@@ -1022,8 +1023,11 @@ ValueDecl *ClangImporter::Implementation::importMacro(
   } else {
     // Check whether this macro has already been imported.
     for (const auto &entry : known->second) {
-      if (entry.first == macro)
+      if (entry.first == macro) {
+        if (auto *Stats = SwiftContext.Stats)
+          ++Stats->getFrontendCounters().ClangImportMacroCacheHit;
         return entry.second;
+      }
     }
 
     // Otherwise, check whether this macro is identical to a macro that has
@@ -1035,6 +1039,8 @@ ValueDecl *ClangImporter::Implementation::importMacro(
       if (macro->isIdenticalTo(*entry.first, clangPP, true)) {
         ValueDecl *result = entry.second;
         known->second.push_back({macro, result});
+        if (auto *Stats = SwiftContext.Stats)
+          ++Stats->getFrontendCounters().ClangImportMacroCacheHit;
         return result;
       }
     }
@@ -1042,6 +1048,9 @@ ValueDecl *ClangImporter::Implementation::importMacro(
     // If not, push in a placeholder to break circularity.
     known->second.push_back({macro, nullptr});
   }
+
+  if (auto *Stats = SwiftContext.Stats)
+    ++Stats->getFrontendCounters().ClangImportMacroCacheMiss;
 
   startedImportingEntity();
 

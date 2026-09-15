@@ -2939,7 +2939,7 @@ ClangImporter::Implementation::Implementation(
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       Walker(DiagnosticWalker(*this)), BuffersForDiagnostics(ctx.SourceMgr),
-      BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
+      BridgingHeaderLookupTable(new SwiftLookupTable(nullptr, ctx)),
       platformAvailability(ctx.LangOpts), nameImporter(),
       DisableSourceImport(ctx.ClangImporterOpts.DisableSourceImport),
       SwiftDependencyTracker(dependencyTracker) {}
