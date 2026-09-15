@@ -26,6 +26,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_dependencies(embedded-libraries embedded-multi-threaded-posix-shim)
   add_custom_target(embedded-multi-threaded-darwin-shim)
   add_dependencies(embedded-libraries embedded-multi-threaded-darwin-shim)
+  add_custom_target(embedded-clock-posix-shim)
+  add_dependencies(embedded-libraries embedded-clock-posix-shim)
 
   # The bridging header annotates its C declarations with Clang bounds-safety
   # attributes (EMBEDDED_SWIFT_COUNTED_BY / EMBEDDED_SWIFT_SIZED_BY, i.e.
@@ -127,4 +129,31 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       INSTALL_IN_COMPONENT stdlib
     )
   endif()
+
+  # The POSIX clock shim implements the platform clock hooks with
+  # `clock_gettime`/`clock_getres`/`nanosleep`.
+  #
+  # It cannot live in `swiftEmbeddedPlatformPOSIX`: that library is written in
+  # Swift against `@_extern(c)` declarations, so it needs no headers and is
+  # built for bare-metal triples too, whereas the clocks need `struct timespec`
+  # and `clockid_t` from `<time.h>`. Their layouts are not portably expressible
+  # from Swift either -- on wasm32 `tv_sec` is 64-bit while `tv_nsec` is 32-bit
+  # and padded -- so this is C, and like the pthread shim above it shares that
+  # shim's skip list: bare-metal targets provide their own clock hooks.
+  add_embedded_swift_target_library(
+    embedded-clock-posix-shim
+    swiftEmbeddedPlatformClockPOSIX
+    PARTIAL_SOURCES_INTENDED
+    INSTALL_BINARY
+    NON_EMPTY_OBJECT_FILE
+
+    EmbeddedPlatformClockPOSIX.c
+
+    C_COMPILE_FLAGS -nostdinc++ -I${CMAKE_CURRENT_SOURCE_DIR}/swift
+    SKIP_MOD_REGEX "-windows-msvc$"
+    SKIP_ARCH_REGEX "avr"
+    SKIP_TRIPLE_REGEX ${_mt_posix_skip_triple}
+    ARCHITECTURE_KEY mod
+    INSTALL_IN_COMPONENT stdlib
+  )
 endif()
