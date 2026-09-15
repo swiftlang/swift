@@ -482,8 +482,8 @@ extension String.UTF16View {
     @inlinable
     public mutating func next() -> UInt16? {
       if _slowPath(_nextIsTrailingSurrogate != nil) {
-        let trailing = self._nextIsTrailingSurrogate._unsafelyUnwrappedUnchecked
-        self._nextIsTrailingSurrogate = nil
+        let trailing = unsafe _nextIsTrailingSurrogate._unsafelyUnwrappedUnchecked
+        _nextIsTrailingSurrogate = nil
         return trailing
       }
       guard _fastPath(_position < _end) else { return nil }
@@ -492,7 +492,7 @@ extension String.UTF16View {
       _position &+= len
 
       if _slowPath(scalar.value > UInt16.max) {
-        self._nextIsTrailingSurrogate = scalar.utf16[1]
+        _nextIsTrailingSurrogate = scalar.utf16[1]
         return scalar.utf16[0]
       }
       return UInt16(truncatingIfNeeded: scalar.value)
