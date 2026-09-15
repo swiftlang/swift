@@ -3237,8 +3237,21 @@ namespace {
         }
       }
 
+      // `ExpressibleByStringInterpolation` and
+      // `ExpressibleByUncheckedStringInterpolation` don't necessarily
+      // redeclare `StringInterpolation` themselves -- it may only be
+      // declared on the `ExpressibleByPossiblyUncheckedStringInterpolation`
+      // umbrella protocol they both inherit from, so look there too.
       auto associatedTypeDecl =
           interpolationProto->getAssociatedType(ctx.Id_StringInterpolation);
+      if (associatedTypeDecl == nullptr) {
+        if (auto *umbrellaProto = TypeChecker::getProtocol(
+                ctx, expr->getLoc(),
+                KnownProtocolKind::ExpressibleByPossiblyUncheckedStringInterpolation)) {
+          associatedTypeDecl =
+              umbrellaProto->getAssociatedType(ctx.Id_StringInterpolation);
+        }
+      }
       if (associatedTypeDecl == nullptr) {
         ctx.Diags.diagnose(expr->getStartLoc(),
                            diag::interpolation_broken_proto);

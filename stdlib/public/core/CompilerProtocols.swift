@@ -909,19 +909,13 @@ public protocol ExpressibleByStringInterpolation
 /// from `ExpressibleByStringLiteral`: raw code units have no meaningful
 /// Unicode interpretation, so a conforming type can't also satisfy
 /// `ExpressibleByStringLiteral`'s (transitive) requirements.
+///
+/// The `StringInterpolation` type inherited from
+/// `ExpressibleByPossiblyUncheckedStringInterpolation` must have a
+/// `StringLiteralType` matching this protocol's `UncheckedStringLiteralType`.
 public protocol ExpressibleByUncheckedStringInterpolation
-  : ExpressibleByUncheckedStringLiteral, ExpressibleByPossiblyUncheckedStringInterpolation {
-
-  // The declaration below causes a warning, but if we follow the
-  // instructions in that warning we end up with a compiler crash.
-
-  /// The type each segment of a string literal containing interpolations
-  /// should be appended to.
-  ///
-  /// The `StringLiteralType` of an interpolation type must match the
-  /// `UncheckedStringLiteralType` of the conforming type.
-  associatedtype StringInterpolation: StringInterpolationProtocol
-    where StringInterpolation.StringLiteralType == UncheckedStringLiteralType
+  : ExpressibleByUncheckedStringLiteral, ExpressibleByPossiblyUncheckedStringInterpolation
+  where StringInterpolation.StringLiteralType == UncheckedStringLiteralType {
 
   /// Creates an instance from a string interpolation.
   ///
