@@ -475,6 +475,34 @@ OptionalTests.test("Span from Optional as a function argument")
   expectEqual(array[0], 42)
 }
 
+OptionalTests.test("Optional.span shadows the wrapped type's span")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var iuo: [Int]! = [1, 2, 3]
+  expectEqual(iuo.span.count, 1)     // Span<[Int]>, not Span<Int>
+  expectEqual(iuo.span[0].count, 3)
+
+  expectEqual(iuo!.span.count, 3)
+
+  iuo = nil
+  expectEqual(iuo.span.count, 0)
+}
+
+OptionalTests.test("Optional.edit shadows the wrapped type's edit")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  var iou: UniqueArray<Int>! = .init(copying: [1, 2, 3])
+  iou.edit {
+    expectEqual($0.count, 1)
+  }
+
+  iou!.edit {
+    expectEqual($0.count, 3)
+  }
+}
+
 OptionalTests.test("MutableSpan from Optional.none")
 .require(.minimumStdlib(.stdlib_6_5)).code {
   var o = Optional<[Int]>.none
