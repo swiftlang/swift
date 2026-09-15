@@ -3719,7 +3719,8 @@ protected:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::AddTaskLocalValue:
     case BuiltinValueKind::TaskLocalValuePush:
-    case BuiltinValueKind::GetEnumTag: {
+    case BuiltinValueKind::GetEnumTag:
+    case BuiltinValueKind::AddressOfRawLayout: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
       bi->setOperand(use->getOperandNumber(), opAddr);
       break;
