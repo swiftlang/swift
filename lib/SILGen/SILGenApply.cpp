@@ -3953,6 +3953,12 @@ private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType,
             bool isAddressable,
             std::optional<AnyFunctionType::Param> origParam = std::nullopt) {
+    // An @in_cxx argument is consumed, so it cannot borrow a variable's storage
+    // in place; materialize a temporary the caller destroys instead.
+    if (isAddressable && ParamInfos.front().getConvention() ==
+                             ParameterConvention::Indirect_In_CXX)
+      isAddressable = false;
+
     if (isAddressable) {
       // If the function takes an addressable parameter, and its argument is
       // a reference to an addressable declaration with compatible ownership,
