@@ -3628,6 +3628,19 @@ public:
           CD->diagnose(diag::superclass_of_open_not_open, superclassTy);
           Super->diagnose(diag::superclass_here);
         }
+
+        // A Swift class that subclasses a C++ foreign reference type has no
+        // Swift type metadata, and therefore no vtable: its members cannot be
+        // dynamically dispatched. Require the class to be 'final', which also
+        // means the foreign reference type is always the immediate superclass.
+        if (!isInvalidSuperclass &&
+            Ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
+            !CD->isSemanticallyFinal() &&
+            CD->getForeignReferenceSuperclassOrSelf()) {
+          CD->diagnose(diag::foreign_reference_subclass_must_be_final, CD)
+              .fixItInsert(CD->getAttributeInsertionLoc(/*forModifier=*/true),
+                           "final ");
+        }
       }
     }
 
