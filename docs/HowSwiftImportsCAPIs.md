@@ -227,7 +227,7 @@ Swift types.  This table is based on
 | `wchar_t`, regardless if the target defines it as signed or unsigned | `typealias CWideChar = Unicode.Scalar`<br>`Unicode.Scalar` is a wrapper around `UInt32` |
 | `char8_t` (proposed for C++20) | Not mapped |
 | `char16_t`                           | `typealias CChar16 = UInt16` |
-| `char32_t`                           | `typealias CChar32 = Unicode.Scalar` |
+| `char32_t`                           | `typealias CChar32 = UInt32` |
 | `float`                              | `typealias CFloat = Float` |
 | `double`                             | `typealias CDouble = Double` |
 | `long double`                        | `CLongDouble`, which is a typealias to `Float80` or `Double`, depending on the platform.<br>There is no support for 128-bit floating point. |

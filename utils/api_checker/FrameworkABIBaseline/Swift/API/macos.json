@@ -31664,9 +31664,9 @@
       "children": [
         {
           "kind": "TypeNominal",
-          "name": "Scalar",
-          "printedName": "Swift.Unicode.Scalar",
-          "usr": "s:s7UnicodeO6ScalarV"
+          "name": "UInt32",
+          "printedName": "Swift.UInt32",
+          "usr": "s:s6UInt32V"
         }
       ],
       "declKind": "TypeAlias",
