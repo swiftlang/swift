@@ -346,7 +346,7 @@ static void copyOrInitValuesInto(Initialization *init,
 
   if (init->canPerformInPlaceInitialization() &&
       init->isInPlaceInitializationOfGlobal() &&
-      SGF.getTypeLowering(type).isTrivial()) {
+      SGF.getTypeLowering(type).isTrivial(&SGF.F)) {
     // Implode tuples in initialization of globals if they are
     // of trivial types.
     implodeTuple = true;

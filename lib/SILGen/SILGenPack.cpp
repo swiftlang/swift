@@ -395,7 +395,7 @@ void SILGenFunction::emitDestroyPack(SILLocation loc, SILValue packAddr,
 
     // We can skip this if the whole thing is trivial.
     auto &eltTL = getTypeLowering(eltTy);
-    if (eltTL.isTrivial()) continue;
+    if (eltTL.isTrivial(&F)) continue;
 
     // If it's an expansion component, emit a "partial"-destroy loop.
     if (auto expansion = eltTy.getAs<PackExpansionType>()) {
@@ -417,7 +417,7 @@ ManagedValue
 SILGenFunction::emitManagedPackWithCleanup(SILValue addr,
                                            CanPackType formalPackType) {
   // If the pack type is trivial, we're done.
-  if (getTypeLowering(addr->getType()).isTrivial())
+  if (getTypeLowering(addr->getType()).isTrivial(&F))
     return ManagedValue::forTrivialAddressRValue(addr);
 
   // If we weren't given a formal pack type, construct one induced from
@@ -619,7 +619,7 @@ void SILGenFunction::emitDestroyRemainingTupleElements(
 
     // We can skip this if the whole thing is trivial.
     auto &eltTL = getTypeLowering(eltTy);
-    if (eltTL.isTrivial()) continue;
+    if (eltTL.isTrivial(&F)) continue;
 
     // If it's an expansion component, emit a "partial"-destroy loop.
     if (auto expansion = eltTy.getAs<PackExpansionType>()) {
@@ -953,7 +953,7 @@ void InPlacePackExpansionInitialization::
 
   // Enter a dormant cleanup to destroy the pack expansion elements
   // if they're non-trivial.
-  if (!SGF.getTypeLowering(loweredPatternTy).isTrivial()) {
+  if (!SGF.getTypeLowering(loweredPatternTy).isTrivial(&SGF.F)) {
     ExpansionCleanup = enterPartialDestroyCleanup(SGF, /*limit*/SILValue());
     SGF.Cleanups.setCleanupState(ExpansionCleanup, CleanupState::Dormant);
   }
@@ -1107,7 +1107,7 @@ SILGenFunction::emitPackTransform(SILLocation loc,
                       {&inputEltTy, &outputEltTy});
 
   auto &outputEltTL = getTypeLowering(outputEltTy);
-  bool outputNeedsCleanup = (canForwardOutput && !outputEltTL.isTrivial());
+  bool outputNeedsCleanup = (canForwardOutput && !outputEltTL.isTrivial(&F));
 
   // If the transformation is not a simple projection, we need to
   // create a tuple to hold the transformed values.

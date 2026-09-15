@@ -60,12 +60,24 @@ llvm::cl::opt<bool> TypeLoweringDisableVerification(
     "type-lowering-disable-verification", llvm::cl::init(false),
     llvm::cl::desc("Disable the asserts-only verification of lowerings"));
 
+// Treat trivial types like regular loadable types with ownership.
+llvm::cl::opt<bool> TypeLoweringNoTrivialTypes(
+    "type-lowering-no-trivial-types", llvm::cl::init(false),
+    llvm::cl::desc("Force TypeLowering to treat trivial types as nontrivial"));
+
+bool TypeLowering::isTrivial(SILFunction *inFunction) const {
+  if (inFunction->hasOwnershipForTrivialValues())
+    return false;
+  
+  return isTrivial();
+}
+
 namespace {
   /// A CRTP type visitor for deciding whether the metatype for a type
   /// is a singleton type, i.e. whether there can only ever be one
   /// such value.
   struct HasSingletonMetatype : CanTypeVisitor<HasSingletonMetatype, bool> {
-    /// Class metatypes have non-trivial representation due to the
+    /// Class metatypes have non-empty representation due to the
     /// possibility of subclassing.
     bool visitClassType(CanClassType type) {
       if (type->isForeignReferenceType())
@@ -79,7 +91,7 @@ namespace {
       return false;
     }
 
-    /// Dependent types have non-trivial representation in case they
+    /// Dependent types have non-empty representation in case they
     /// instantiate to a class metatype.
     bool visitGenericTypeParamType(CanGenericTypeParamType type) {
       return false;
@@ -91,7 +103,7 @@ namespace {
       return false;
     }
     
-    /// Archetype metatypes have non-trivial representation in case
+    /// Archetype metatypes have non-empty representation in case
     /// they instantiate to a class metatype.
     bool visitArchetypeType(CanArchetypeType type) {
       return false;
@@ -102,7 +114,7 @@ namespace {
       return visit(type.getInstanceType());
     }
 
-    /// Everything else is trivial.  Note that ordinary metatypes of
+    /// Everything else is empty.  Note that ordinary metatypes of
     /// existential types are still singleton.
     bool visitType(CanType type) {
       return true;
@@ -1108,6 +1120,9 @@ namespace {
 
   /// A class for trivial, fixed-layout, loadable types.
   class TrivialTypeLowering final : public LoadableTypeLowering {
+    bool hasOwnershipForTrivialValues(SILBuilder &B) const {
+      return B.getFunction().hasOwnershipForTrivialValues();
+    }
   public:
     TrivialTypeLowering(SILType type, SILTypeProperties properties,
                         TypeExpansionContext forExpansion)
@@ -1120,77 +1135,115 @@ namespace {
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
                             IsTake_t isTake) const override {
-      return emitLoad(B, loc, addr, LoadOwnershipQualifier::Trivial);
+      LoadOwnershipQualifier qual;
+      if (hasOwnershipForTrivialValues(B)) {
+        qual = isTake ? LoadOwnershipQualifier::Take
+                      : LoadOwnershipQualifier::Copy;
+      } else {
+        qual = LoadOwnershipQualifier::Trivial;
+      }
+      return emitLoad(B, loc, addr, qual);
     }
 
     void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
                          SILValue value, SILValue addr,
                          IsInitialization_t isInit) const override {
-      emitStore(B, loc, value, addr, StoreOwnershipQualifier::Trivial);
+      StoreOwnershipQualifier qual;
+      if (hasOwnershipForTrivialValues(B)) {
+        qual = isInit ? StoreOwnershipQualifier::Init
+                      : StoreOwnershipQualifier::Assign;
+      } else {
+        qual = StoreOwnershipQualifier::Trivial;
+      }
+      emitStore(B, loc, value, addr, qual);
     }
 
     void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
                    SILValue addr, StoreOwnershipQualifier qual) const override {
-      if (B.getFunction().hasOwnership()) {
-        B.createStore(loc, value, addr, StoreOwnershipQualifier::Trivial);
-        return;
+      if (B.getFunction().hasOwnershipForTrivialValues()) {
+        // take qualifier as given
+      } else if (B.getFunction().hasOwnership()) {
+        qual = StoreOwnershipQualifier::Trivial;
+      } else {
+        qual = StoreOwnershipQualifier::Unqualified;
       }
-      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+      B.createStore(loc, value, addr, qual);
     }
 
     SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                       LoadOwnershipQualifier qual) const override {
-      if (B.getFunction().hasOwnership())
-        return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
-      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      if (B.getFunction().hasOwnershipForTrivialValues()) {
+        // take qualifier as given
+      } else if (B.getFunction().hasOwnership()) {
+        qual = LoadOwnershipQualifier::Trivial;
+      } else {
+        qual = LoadOwnershipQualifier::Unqualified;
+      }
+      return B.createLoad(loc, addr, qual);
     }
 
     SILValue emitLoweredLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                              LoadOwnershipQualifier qual,
                              TypeExpansionKind) const override {
-      if (B.getFunction().hasOwnership())
-        return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
-      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      return emitLoad(B, loc, addr, qual);
     }
 
     void emitLoweredStore(SILBuilder &B, SILLocation loc, SILValue value,
                           SILValue addr, StoreOwnershipQualifier qual,
                           Lowering::TypeLowering::TypeExpansionKind
                               expansionKind) const override {
-      auto storeQual = [&]() -> StoreOwnershipQualifier {
-        if (B.getFunction().hasOwnership())
-          return StoreOwnershipQualifier::Trivial;
-        return StoreOwnershipQualifier::Unqualified;
-      }();
-      B.createStore(loc, value, addr, storeQual);
+      emitStore(B, loc, value, addr, qual);
     }
 
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
-      // Trivial
+      // Trivial types don't need to do any work to destroy, but we mark the
+      // end of value lifetime when trivial value ownership is enabled.
+      if (hasOwnershipForTrivialValues(B)) {
+        SILValue value = emitLoad(B, loc, addr, LoadOwnershipQualifier::Take);
+        emitDestroyValue(B, loc, value);
+      }
     }
 
     void
     emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                             TypeExpansionKind loweringStyle) const override {
-      // Trivial
+      // Trivial types don't need to do any work to destroy, but we mark the
+      // end of value lifetime when trivial value ownership is enabled.
+      if (hasOwnershipForTrivialValues(B)) {
+        emitDestroyValue(B, loc, value);
+      }
     }
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
                                   TypeExpansionKind style) const override {
-      // Trivial
+      // Trivial types don't need to do any work to destroy, but we mark the
+      // introduction of a new value lifetime when trivial value ownership is
+      // enabled.
+      if (hasOwnershipForTrivialValues(B)) {
+        return emitCopyValue(B, loc, value);
+      }
       return value;
     }
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      // Trivial
+      // Trivial types don't need to do any work to destroy, but we mark the
+      // introduction of a new value lifetime when trivial value ownership is
+      // enabled.
+      if (hasOwnershipForTrivialValues(B)) {
+        return B.createCopyValue(loc, value);
+      }
       return value;
     }
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
+      if (hasOwnershipForTrivialValues(B)) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
       if (B.getFunction().hasOwnership()
           && B.getModule().getStage() == SILStage::Raw
           && value->isFromVarDecl()) {
@@ -2454,6 +2507,13 @@ namespace {
                                 SILTypeProperties properties) {
       properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       auto silType = SILType::getPrimitiveObjectType(type);
+      
+      if (TypeLoweringNoTrivialTypes.getValue()) {
+        properties.setNonTrivial();
+        properties.setLexical(IsLexical);
+        return new (TC) MiscNontrivialTypeLowering(silType, properties, Expansion);
+      }
+      
       return new (TC) TrivialTypeLowering(silType, properties, Expansion);
     }
 
@@ -3545,6 +3605,9 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                                           AbstractionPattern origType,
                                           CanType substType,
                                           TypeExpansionContext forExpansion) {
+  if (TypeLoweringNoTrivialTypes) {
+    return;
+  }
   auto *bitwiseCopyableProtocol =
       Context.getProtocol(KnownProtocolKind::BitwiseCopyable);
   if (!bitwiseCopyableProtocol)

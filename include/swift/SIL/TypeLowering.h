@@ -174,9 +174,12 @@ public:
   
   /// Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
+  SWIFT_DEPRECATED_IN_SILGEN_MSG("should check whether function being emitted has ownership for trivial values enabled")
   bool isTrivial() const {
     return Properties.isTrivial();
   }
+  
+  bool isTrivial(SILFunction *inFunction) const;
   
   bool isOrContainsRawPointer() const {
     return Properties.isOrContainsRawPointer();

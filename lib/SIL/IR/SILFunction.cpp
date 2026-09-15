@@ -293,6 +293,7 @@ void SILFunction::init(
   // born after the module advances past Raw are reported lowered by the
   // module-stage term in hasLoweredAddresses(), so no creation-time seed is needed.
   this->HasLoweredAddresses = false;
+  this->HasOwnershipForTrivialValues = false;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
