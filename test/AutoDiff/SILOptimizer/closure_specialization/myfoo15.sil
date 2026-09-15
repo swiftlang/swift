@@ -1,0 +1,362 @@
+/// Multi basic block VJP, pullback accepting branch tracing enum argument.
+
+// RUN: %target-sil-opt -sil-print-types -autodiff-closure-specialization -sil-combine %s -o -
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+sil @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+sil @$sSf16_DifferentiationE12_vjpSubtract3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+sil @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+sil @$sSf16_DifferentiationE10_vjpDivide3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+sil @$sSf16_DifferentiationE10_vjpNegate1xSf5value_S2fc8pullbacktSf_tFZS2fcfU_ : $@convention(thin) (Float) -> Float
+
+sil [transparent] [thunk] @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+
+struct FloatPair : Differentiable {
+  @_hasStorage var first: Float { get set }
+  @_hasStorage var second: Float { get set }
+  init(_ first: Float, _ second: Float)
+  struct TangentVector : AdditiveArithmetic, Differentiable {
+    @_hasStorage var first: Float { get set }
+    @_hasStorage var second: Float { get set }
+    init(first: Float, second: Float)
+    typealias TangentVector = FloatPair.TangentVector
+    static var zero: FloatPair.TangentVector { get }
+    static func + (lhs: FloatPair.TangentVector, rhs: FloatPair.TangentVector) -> FloatPair.TangentVector
+    static func - (lhs: FloatPair.TangentVector, rhs: FloatPair.TangentVector) -> FloatPair.TangentVector
+    static func == (lhs: FloatPair.TangentVector, rhs: FloatPair.TangentVector) -> Bool
+  }
+  mutating func move(by offset: FloatPair.TangentVector)
+}
+
+struct Pair<T, U> : Differentiable where T : Differentiable, U : Differentiable {
+  @_hasStorage var first: T { get set }
+  @_hasStorage var second: U { get set }
+  init(_ first: T, _ second: U)
+  struct TangentVector : AdditiveArithmetic, Differentiable where T : Differentiable, U : Differentiable {
+    @_hasStorage var first: T.TangentVector { get set }
+    @_hasStorage var second: U.TangentVector { get set }
+    init(first: T.TangentVector, second: U.TangentVector)
+    typealias TangentVector = Pair<T, U>.TangentVector
+    static var zero: Pair<T, U>.TangentVector { get }
+    static func + (lhs: Pair<T, U>.TangentVector, rhs: Pair<T, U>.TangentVector) -> Pair<T, U>.TangentVector
+    static func - (lhs: Pair<T, U>.TangentVector, rhs: Pair<T, U>.TangentVector) -> Pair<T, U>.TangentVector
+    static func == (lhs: Pair<T, U>.TangentVector, rhs: Pair<T, U>.TangentVector) -> Bool
+  }
+  mutating func move(by offset: Pair<T, U>.TangentVector)
+}
+
+enum _AD__$s3outyycfU11_7myfoo15L_yS2fF_bb1__Pred__src_0_wrt_0 {
+  case bb0(((Float) -> (Float, Float), (Float) -> (Float, Float), (FloatPair.TangentVector) -> (Float, Float), (Pair<FloatPair, Float>.TangentVector) -> (FloatPair.TangentVector, Float)))
+}
+enum _AD__$s3outyycfU11_7myfoo15L_yS2fF_bb2__Pred__src_0_wrt_0 {
+  case bb0(((Float) -> (Float, Float), (Float) -> (Float, Float), (FloatPair.TangentVector) -> (Float, Float), (Pair<FloatPair, Float>.TangentVector) -> (FloatPair.TangentVector, Float)))
+}
+enum _AD__$s3outyycfU11_7myfoo15L_yS2fF_bb3__Pred__src_0_wrt_0 {
+  case bb2((predecessor: _AD__$s3outyycfU11_7myfoo15L_yS2fF_bb2__Pred__src_0_wrt_0, (Float) -> (Float, Float), (Float) -> (Float, Float), (FloatPair.TangentVector) -> (Float, Float), (Pair<FloatPair, Float>.TangentVector) -> (FloatPair.TangentVector, Float)))
+  case bb1((predecessor: _AD__$s3outyycfU11_7myfoo15L_yS2fF_bb1__Pred__src_0_wrt_0, (FloatPair.TangentVector) -> (Float, Float), (Float) -> (Float, Float), (Float) -> (Float, Float)))
+}
+
+sil @$s3outyycfU11_4PairL_VyACyxq_Gx_q_tcfCAAyycfU11_05FloatB0L_V_SfTG5 : $@convention(method) (@in FloatPair, @in Float, @thin Pair<FloatPair, Float>.Type) -> @out Pair<FloatPair, Float>
+sil @$s3outyycfU11_4PairL_V13TangentVectorVyAAyycfU11_05FloatB0L_VSf_GAgDVSfIegnrr_AhISfIegydd_TR : $@convention(thin) (Pair<FloatPair, Float>.TangentVector, @guaranteed @callee_guaranteed (@in_guaranteed Pair<FloatPair, Float>.TangentVector) -> (@out FloatPair.TangentVector, @out Float)) -> (FloatPair.TangentVector, Float)
+sil @$s3outyycfU11_4PairL_VyACyxq_Gx_q_tcfC16_Differentiation14DifferentiableRzAeFR_r0_lTJfSSUpSrAAyycfU11_05FloatB0L_V_SfTG5 : $@convention(method) (@in FloatPair, @in Float, @thin Pair<FloatPair, Float>.Type) -> (@out Pair<FloatPair, Float>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in τ_0_0, @in τ_0_1) -> @out τ_0_2 for <FloatPair.TangentVector, Float, Pair<FloatPair, Float>.TangentVector>)
+sil @$s3outyycfU11_4PairL_VyACyxq_Gx_q_tcfC16_Differentiation14DifferentiableRzAeFR_r0_lTJrSSUpSrAAyycfU11_05FloatB0L_V_SfTG5 : $@convention(method) (@in FloatPair, @in Float, @thin Pair<FloatPair, Float>.Type) -> (@out Pair<FloatPair, Float>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Pair<FloatPair, Float>.TangentVector, FloatPair.TangentVector, Float>)
+sil @$s3outyycfU11_9FloatPairL_VyACSf_SftcfCTJpSSUpSr : $@convention(thin) (FloatPair.TangentVector) -> (Float, Float)
+sil @$s3outyycfU11_4PairL_VyACyxq_Gx_q_tcfC16_Differentiation14DifferentiableRzAeFR_r0_lTJpSSUpSrAAyycfU11_05FloatB0L_V_SfTG5 : $@convention(thin) (@in_guaranteed Pair<FloatPair, Float>.TangentVector) -> (@out FloatPair.TangentVector, @out Float)
+
+// reverse-mode derivative of myfoo15 #1 (_:) in closure #13 in 
+// Isolation: nonisolated
+sil private [ossa] @$s3outyycfU11_7myfoo15L_yS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+// %0                                             // users: %48, %47, %50, %51, %70, %71, %67, %66, %45, %46, %33, %32, %31, %2, %44, %43, %1
+bb0(%0 : $Float):
+  %2 = struct_extract %0, #Float._value           // users: %56, %56, %79, %78, %39, %11, %11, %3, %3
+  %3 = builtin "fadd_FPIEEE32"(%2, %2) : $Builtin.FPIEEE32 // users: %74, %8, %7, %6, %5, %21, %22, %4, %78
+  // function_ref closure #1 in static Float._vjpAdd(lhs:rhs:)
+  %9 = function_ref @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float) // users: %59, %53, %10
+  %10 = thin_to_thick_function %9 to $@callee_guaranteed (Float) -> (Float, Float) // user: %40; ownership: none
+  %11 = builtin "fsub_FPIEEE32"(%2, %2) : $Builtin.FPIEEE32 // users: %74, %16, %15, %14, %13, %12, %79
+  // function_ref closure #1 in static Float._vjpSubtract(lhs:rhs:)
+  %17 = function_ref @$sSf16_DifferentiationE12_vjpSubtract3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float) // users: %58, %52, %18
+  %18 = thin_to_thick_function %17 to $@callee_guaranteed (Float) -> (Float, Float) // user: %40; ownership: none
+  // function_ref pullback of init(_:_:) in FloatPair #1 in closure #13 in 
+  %19 = function_ref @$s3outyycfU11_9FloatPairL_VyACSf_SftcfCTJpSSUpSr : $@convention(thin) (FloatPair.TangentVector) -> (Float, Float) // users: %60, %49, %20
+  %20 = thin_to_thick_function %19 to $@callee_guaranteed (FloatPair.TangentVector) -> (Float, Float) // user: %40; ownership: none
+  // function_ref specialized init(_:_:) in Pair #1 in closure #13 in 
+  %23 = function_ref @$s3outyycfU11_4PairL_VyACyxq_Gx_q_tcfCAAyycfU11_05FloatB0L_V_SfTG5 : $@convention(method) (@in FloatPair, @in Float, @thin Pair<FloatPair, Float>.Type) -> @out Pair<FloatPair, Float> // users: %61, %24
+  %24 = partial_apply [callee_guaranteed] %23() : $@convention(method) (@in FloatPair, @in Float, @thin Pair<FloatPair, Float>.Type) -> @out Pair<FloatPair, Float> // user: %29
+  // function_ref specialized forward-mode derivative of init(_:_:) in Pair #1 in closure #13 in 
+  %25 = function_ref @$s3outyycfU11_4PairL_VyACyxq_Gx_q_tcfC16_Differentiation14DifferentiableRzAeFR_r0_lTJfSSUpSrAAyycfU11_05FloatB0L_V_SfTG5 : $@convention(method) (@in FloatPair, @in Float, @thin Pair<FloatPair, Float>.Type) -> (@out Pair<FloatPair, Float>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in τ_0_0, @in τ_0_1) -> @out τ_0_2 for <FloatPair.TangentVector, Float, Pair<FloatPair, Float>.TangentVector>) // users: %62, %26
+  %26 = partial_apply [callee_guaranteed] %25() : $@convention(method) (@in FloatPair, @in Float, @thin Pair<FloatPair, Float>.Type) -> (@out Pair<FloatPair, Float>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in τ_0_0, @in τ_0_1) -> @out τ_0_2 for <FloatPair.TangentVector, Float, Pair<FloatPair, Float>.TangentVector>) // user: %29
+  // function_ref specialized reverse-mode derivative of init(_:_:) in Pair #1 in closure #13 in 
+  %27 = function_ref @$s3outyycfU11_4PairL_VyACyxq_Gx_q_tcfC16_Differentiation14DifferentiableRzAeFR_r0_lTJrSSUpSrAAyycfU11_05FloatB0L_V_SfTG5 : $@convention(method) (@in FloatPair, @in Float, @thin Pair<FloatPair, Float>.Type) -> (@out Pair<FloatPair, Float>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Pair<FloatPair, Float>.TangentVector, FloatPair.TangentVector, Float>) // users: %63, %28
+  %28 = partial_apply [callee_guaranteed] %27() : $@convention(method) (@in FloatPair, @in Float, @thin Pair<FloatPair, Float>.Type) -> (@out Pair<FloatPair, Float>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Pair<FloatPair, Float>.TangentVector, FloatPair.TangentVector, Float>) // user: %29
+  %29 = differentiable_function [parameters 0 1] [results 0] %24 with_derivative {%26, %28} // user: %30
+  destroy_value %29                               // id: %30
+  // function_ref specialized pullback of init(_:_:) in Pair #1 in closure #13 in 
+  %34 = function_ref @$s3outyycfU11_4PairL_VyACyxq_Gx_q_tcfC16_Differentiation14DifferentiableRzAeFR_r0_lTJpSSUpSrAAyycfU11_05FloatB0L_V_SfTG5 : $@convention(thin) (@in_guaranteed Pair<FloatPair, Float>.TangentVector) -> (@out FloatPair.TangentVector, @out Float) // users: %68, %35
+  %35 = thin_to_thick_function %34 to $@callee_guaranteed (@in_guaranteed Pair<FloatPair, Float>.TangentVector) -> (@out FloatPair.TangentVector, @out Float) // user: %37; ownership: none
+  // function_ref thunk for @escaping @callee_guaranteed (@in_guaranteed Pair #1 in closure #13 in <FloatPair #1 in closure #13 in , Float>.TangentVector) -> (@out TangentVector in FloatPair #1 in closure #13 in , @out Float)
+  %36 = function_ref @$s3outyycfU11_4PairL_V13TangentVectorVyAAyycfU11_05FloatB0L_VSf_GAgDVSfIegnrr_AhISfIegydd_TR : $@convention(thin) (Pair<FloatPair, Float>.TangentVector, @guaranteed @callee_guaranteed (@in_guaranteed Pair<FloatPair, Float>.TangentVector) -> (@out FloatPair.TangentVector, @out Float)) -> (FloatPair.TangentVector, Float) // users: %69, %37
+  %37 = partial_apply [callee_guaranteed] %36(%35) : $@convention(thin) (Pair<FloatPair, Float>.TangentVector, @guaranteed @callee_guaranteed (@in_guaranteed Pair<FloatPair, Float>.TangentVector) -> (@out FloatPair.TangentVector, @out Float)) -> (FloatPair.TangentVector, Float) // user: %40
+  %38 = float_literal $Builtin.FPIEEE32, 0x0 // 0 // user: %39
+  %39 = builtin "fcmp_olt_FPIEEE32"(%38, %2) : $Builtin.Int1 // user: %41
+  %40 = tuple (%10, %18, %20, %37)                // users: %57, %42
+  cond_br %39, bb1, bb2                           // id: %41
+
+bb1:                                              // Preds: bb0
+  %42 = enum $_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb1__Pred__src_0_wrt_0, #_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %40 // user: %54
+  %49 = thin_to_thick_function %19 to $@callee_guaranteed (FloatPair.TangentVector) -> (Float, Float) // user: %54; ownership: none
+  %52 = thin_to_thick_function %17 to $@callee_guaranteed (Float) -> (Float, Float) // user: %54; ownership: none
+  %53 = thin_to_thick_function %9 to $@callee_guaranteed (Float) -> (Float, Float) // user: %54; ownership: none
+  %54 = tuple $(predecessor: _AD__$s3outyycfU11_7myfoo15L_yS2fF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (FloatPair.TangentVector) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float)) (%42, %49, %52, %53) // user: %55
+  %55 = enum $_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb3__Pred__src_0_wrt_0, #_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb3__Pred__src_0_wrt_0.bb1!enumelt, %54 // user: %56
+  br bb3(%55, %2, %2)                             // id: %56
+
+bb2:                                              // Preds: bb0
+  %57 = enum $_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb2__Pred__src_0_wrt_0, #_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %40 // user: %72
+  %58 = thin_to_thick_function %17 to $@callee_guaranteed (Float) -> (Float, Float) // user: %72; ownership: none
+  %59 = thin_to_thick_function %9 to $@callee_guaranteed (Float) -> (Float, Float) // user: %72; ownership: none
+  %60 = thin_to_thick_function %19 to $@callee_guaranteed (FloatPair.TangentVector) -> (Float, Float) // user: %72; ownership: none
+  %61 = partial_apply [callee_guaranteed] %23() : $@convention(method) (@in FloatPair, @in Float, @thin Pair<FloatPair, Float>.Type) -> @out Pair<FloatPair, Float> // user: %64
+  %62 = partial_apply [callee_guaranteed] %25() : $@convention(method) (@in FloatPair, @in Float, @thin Pair<FloatPair, Float>.Type) -> (@out Pair<FloatPair, Float>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in τ_0_0, @in τ_0_1) -> @out τ_0_2 for <FloatPair.TangentVector, Float, Pair<FloatPair, Float>.TangentVector>) // user: %64
+  %63 = partial_apply [callee_guaranteed] %27() : $@convention(method) (@in FloatPair, @in Float, @thin Pair<FloatPair, Float>.Type) -> (@out Pair<FloatPair, Float>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Pair<FloatPair, Float>.TangentVector, FloatPair.TangentVector, Float>) // user: %64
+  %64 = differentiable_function [parameters 0 1] [results 0] %61 with_derivative {%62, %63} // user: %65
+  destroy_value %64                               // id: %65
+  %68 = thin_to_thick_function %34 to $@callee_guaranteed (@in_guaranteed Pair<FloatPair, Float>.TangentVector) -> (@out FloatPair.TangentVector, @out Float) // user: %69; ownership: none
+  %69 = partial_apply [callee_guaranteed] %36(%68) : $@convention(thin) (Pair<FloatPair, Float>.TangentVector, @guaranteed @callee_guaranteed (@in_guaranteed Pair<FloatPair, Float>.TangentVector) -> (@out FloatPair.TangentVector, @out Float)) -> (FloatPair.TangentVector, Float) // user: %72
+  %72 = tuple $(predecessor: _AD__$s3outyycfU11_7myfoo15L_yS2fF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (FloatPair.TangentVector) -> (Float, Float), @callee_guaranteed (Pair<FloatPair, Float>.TangentVector) -> (FloatPair.TangentVector, Float)) (%57, %58, %59, %60, %69) // user: %73
+  %73 = enum $_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb3__Pred__src_0_wrt_0, #_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb3__Pred__src_0_wrt_0.bb2!enumelt, %72 // user: %74
+  br bb3(%73, %11, %3)                            // id: %74
+
+// %75                                            // user: %86
+// %76                                            // user: %80
+// %77                                            // user: %80
+bb3(%75 : @owned $_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb3__Pred__src_0_wrt_0, %76 : $Builtin.FPIEEE32, %77 : $Builtin.FPIEEE32): // Preds: bb2 bb1
+  %78 = builtin "fsub_FPIEEE32"(%3, %2) : $Builtin.FPIEEE32 // user: %81
+  %79 = builtin "fadd_FPIEEE32"(%11, %2) : $Builtin.FPIEEE32 // user: %82
+  %80 = builtin "fadd_FPIEEE32"(%77, %76) : $Builtin.FPIEEE32 // user: %81
+  %81 = builtin "fsub_FPIEEE32"(%80, %78) : $Builtin.FPIEEE32 // user: %82
+  %82 = builtin "fadd_FPIEEE32"(%81, %79) : $Builtin.FPIEEE32 // user: %83
+  %83 = struct $Float (%82)                       // user: %87
+  // function_ref specialized pullback of myfoo15 #1 (_:) in closure #13 in 
+  %85 = function_ref @$s3outyycfU11_7myfoo15L_yS2fFTJpSpSr067$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_0cd1_e4E12_g16Subtract3lhs3rhsi1_j1_klj1_km1_kN2U_ACTf1nnccc_n : $@convention(thin) (Float, @owned _AD__$s3outyycfU11_7myfoo15L_yS2fF_bb3__Pred__src_0_wrt_0) -> Float // user: %86
+  %86 = partial_apply [callee_guaranteed] %85(%75) : $@convention(thin) (Float, @owned _AD__$s3outyycfU11_7myfoo15L_yS2fF_bb3__Pred__src_0_wrt_0) -> Float // user: %87
+  %87 = tuple (%83, %86)                          // user: %88
+  return %87                                      // id: %88
+} // end sil function '$s3outyycfU11_7myfoo15L_yS2fFTJrSpSr'
+
+// specialized pullback of myfoo15 #1 (_:) in closure #13 in 
+// Isolation: nonisolated
+sil private [ossa] @$s3outyycfU11_7myfoo15L_yS2fFTJpSpSr067$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_0cd1_e4E12_g16Subtract3lhs3rhsi1_j1_klj1_km1_kN2U_ACTf1nnccc_n : $@convention(thin) (Float, @owned _AD__$s3outyycfU11_7myfoo15L_yS2fF_bb3__Pred__src_0_wrt_0) -> Float {
+// %0                                             // user: %22
+// %1                                             // user: %67
+bb0(%0 : $Float, %1 : @owned $_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb3__Pred__src_0_wrt_0):
+  // function_ref closure #1 in static Float._vjpAdd(lhs:rhs:)
+  %2 = function_ref @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float) // users: %6, %3
+  %3 = thin_to_thick_function %2 to $@callee_guaranteed (Float) -> (Float, Float) // users: %39, %38; ownership: none
+  // function_ref closure #1 in static Float._vjpSubtract(lhs:rhs:)
+  %4 = function_ref @$sSf16_DifferentiationE12_vjpSubtract3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float) // user: %5
+  %5 = thin_to_thick_function %4 to $@callee_guaranteed (Float) -> (Float, Float) // users: %31, %30; ownership: none
+  %6 = thin_to_thick_function %2 to $@callee_guaranteed (Float) -> (Float, Float) // users: %23, %22; ownership: none
+  %7 = float_literal $Builtin.FPIEEE32, 0x0 // 0  // users: %235, %235, %229, %228, %224, %216, %214, %211, %210, %209, %206, %205, %204, %201, %198, %196, %190, %188, %185, %182, %180, %174, %172, %289, %286, %276, %274, %265, %264, %260, %259, %258, %257, %256, %154, %144, %137, %134, %126, %124, %121, %120, %119, %118, %117, %116, %100, %99, %93, %92, %91, %90, %89, %85, %84, %83, %82, %81, %80, %79, %78, %66, %65, %64, %63, %57, %56, %55, %54, %52, %51, %48, %46, %43, %35, %27, %12, %11, %10, %9, %8
+  %12 = struct $Float (%7)                        // users: %233, %231, %164, %162, %104, %88, %86, %86, %62, %53, %13
+  %22 = apply %6(%0) : $@callee_guaranteed (Float) -> (Float, Float) // users: %25, %24
+  destroy_value %6                                // id: %23
+  %24 = tuple_extract %22, 0                      // user: %30
+  %25 = tuple_extract %22, 1                      // user: %26
+  %26 = struct_extract %25, #Float._value         // user: %27
+  %27 = builtin "fadd_FPIEEE32"(%7, %26) : $Builtin.FPIEEE32 // users: %172, %85, %77, %76, %61, %29, %28
+  %30 = apply %5(%24) : $@callee_guaranteed (Float) -> (Float, Float) // users: %33, %32
+  destroy_value %5                                // id: %31
+  %32 = tuple_extract %30, 0                      // user: %38
+  %33 = tuple_extract %30, 1                      // user: %34
+  %34 = struct_extract %33, #Float._value         // user: %35
+  %35 = builtin "fadd_FPIEEE32"(%7, %34) : $Builtin.FPIEEE32 // users: %188, %84, %75, %74, %60, %37, %36
+  %38 = apply %3(%32) : $@callee_guaranteed (Float) -> (Float, Float) // users: %41, %40
+  destroy_value %3                                // id: %39
+  %40 = tuple_extract %38, 0                      // user: %45
+  %41 = tuple_extract %38, 1                      // user: %42
+  %42 = struct_extract %41, #Float._value         // user: %43
+  %43 = builtin "fadd_FPIEEE32"(%7, %42) : $Builtin.FPIEEE32 // users: %204, %147, %59, %50, %44
+  %45 = struct_extract %40, #Float._value         // user: %46
+  %46 = builtin "fadd_FPIEEE32"(%7, %45) : $Builtin.FPIEEE32 // users: %183, %157, %58, %49, %47
+  switch_enum %1, case #_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb3__Pred__src_0_wrt_0.bb2!enumelt: bb1, case #_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb3__Pred__src_0_wrt_0.bb1!enumelt: bb2 // id: %67
+
+// %68                                            // user: %69
+bb1(%68 : @owned $(predecessor: _AD__$s3outyycfU11_7myfoo15L_yS2fF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (FloatPair.TangentVector) -> (Float, Float), @callee_guaranteed (Pair<FloatPair, Float>.TangentVector) -> (FloatPair.TangentVector, Float))): // Preds: bb0
+  (%69, %70, %71, %72, %73) = destructure_tuple %68 // users: %165, %150, %149, %140, %139, %130, %129, %106, %105
+  %84 = builtin "fadd_FPIEEE32"(%35, %7) : $Builtin.FPIEEE32 // users: %99, %95, %94
+  %85 = builtin "fadd_FPIEEE32"(%27, %7) : $Builtin.FPIEEE32 // users: %100, %97, %96
+  %86 = struct $FloatPair.TangentVector (%12, %12) // users: %163, %162, %87
+  %99 = builtin "fadd_FPIEEE32"(%7, %84) : $Builtin.FPIEEE32 // user: %101
+  %100 = builtin "fadd_FPIEEE32"(%7, %85) : $Builtin.FPIEEE32 // user: %102
+  %101 = struct $Float (%99)                      // user: %103
+  %102 = struct $Float (%100)                     // user: %103
+  %103 = struct $FloatPair.TangentVector (%101, %102) // user: %104
+  %104 = struct $Pair<FloatPair, Float>.TangentVector (%103, %12) // user: %105
+  %105 = apply %73(%104) : $@callee_guaranteed (Pair<FloatPair, Float>.TangentVector) -> (FloatPair.TangentVector, Float) // users: %108, %107
+  destroy_value %73                               // id: %106
+  %107 = tuple_extract %105, 0                    // users: %111, %110
+  %108 = tuple_extract %105, 1                    // user: %109
+  %109 = struct_extract %108, #Float._value       // user: %120
+  %110 = struct_extract %107, #FloatPair.TangentVector.first // user: %112
+  %111 = struct_extract %107, #FloatPair.TangentVector.second // user: %114
+  %112 = struct_extract %110, #Float._value       // users: %118, %113
+  %114 = struct_extract %111, #Float._value       // users: %119, %115
+  %118 = builtin "fadd_FPIEEE32"(%7, %112) : $Builtin.FPIEEE32 // users: %124, %122
+  %119 = builtin "fadd_FPIEEE32"(%7, %114) : $Builtin.FPIEEE32 // users: %126, %123
+  %120 = builtin "fadd_FPIEEE32"(%7, %109) : $Builtin.FPIEEE32 // user: %121
+  %121 = builtin "fadd_FPIEEE32"(%120, %7) : $Builtin.FPIEEE32 // user: %146
+  %124 = builtin "fadd_FPIEEE32"(%118, %7) : $Builtin.FPIEEE32 // user: %125
+  %125 = struct $Float (%124)                     // user: %128
+  %126 = builtin "fadd_FPIEEE32"(%119, %7) : $Builtin.FPIEEE32 // user: %127
+  %127 = struct $Float (%126)                     // user: %128
+  %128 = struct $FloatPair.TangentVector (%125, %127) // user: %129
+  %129 = apply %72(%128) : $@callee_guaranteed (FloatPair.TangentVector) -> (Float, Float) // users: %132, %131
+  destroy_value %72                               // id: %130
+  %131 = tuple_extract %129, 0                    // user: %133
+  %132 = tuple_extract %129, 1                    // user: %136
+  %133 = struct_extract %131, #Float._value       // user: %134
+  %134 = builtin "fadd_FPIEEE32"(%133, %7) : $Builtin.FPIEEE32 // user: %135
+  %135 = struct $Float (%134)                     // user: %149
+  %136 = struct_extract %132, #Float._value       // user: %137
+  %137 = builtin "fadd_FPIEEE32"(%136, %7) : $Builtin.FPIEEE32 // user: %138
+  %138 = struct $Float (%137)                     // user: %139
+  %139 = apply %71(%138) : $@callee_guaranteed (Float) -> (Float, Float) // users: %142, %141
+  destroy_value %71                               // id: %140
+  %141 = tuple_extract %139, 0                    // user: %143
+  %142 = tuple_extract %139, 1                    // user: %145
+  %143 = struct_extract %141, #Float._value       // user: %144
+  %144 = builtin "fadd_FPIEEE32"(%143, %7) : $Builtin.FPIEEE32 // user: %147
+  %145 = struct_extract %142, #Float._value       // user: %146
+  %146 = builtin "fadd_FPIEEE32"(%145, %121) : $Builtin.FPIEEE32 // user: %156
+  %147 = builtin "fadd_FPIEEE32"(%43, %144) : $Builtin.FPIEEE32 // users: %166, %161, %148
+  %149 = apply %70(%135) : $@callee_guaranteed (Float) -> (Float, Float) // users: %152, %151
+  destroy_value %70                               // id: %150
+  %151 = tuple_extract %149, 0                    // user: %153
+  %152 = tuple_extract %149, 1                    // user: %155
+  %153 = struct_extract %151, #Float._value       // user: %154
+  %154 = builtin "fadd_FPIEEE32"(%153, %7) : $Builtin.FPIEEE32 // user: %157
+  %155 = struct_extract %152, #Float._value       // user: %156
+  %156 = builtin "fadd_FPIEEE32"(%155, %146) : $Builtin.FPIEEE32 // user: %166
+  %157 = builtin "fadd_FPIEEE32"(%46, %154) : $Builtin.FPIEEE32 // users: %166, %160, %158
+  %162 = struct $Pair<FloatPair, Float>.TangentVector (%86, %12) // user: %166
+  %165 = unchecked_enum_data %69, #_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb2__Pred__src_0_wrt_0.bb0!enumelt // user: %166
+  br bb3(%156, %165, %162, %147, %157)            // id: %166
+
+// %167                                           // user: %168
+bb2(%167 : @owned $(predecessor: _AD__$s3outyycfU11_7myfoo15L_yS2fF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (FloatPair.TangentVector) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float))): // Preds: bb0
+  (%168, %169, %170, %171) = destructure_tuple %167 // users: %234, %220, %219, %192, %191, %176, %175
+  %172 = builtin "fadd_FPIEEE32"(%27, %7) : $Builtin.FPIEEE32 // user: %173
+  %173 = struct $Float (%172)                     // user: %175
+  %175 = apply %171(%173) : $@callee_guaranteed (Float) -> (Float, Float) // users: %178, %177
+  destroy_value %171                              // id: %176
+  %177 = tuple_extract %175, 0                    // user: %179
+  %178 = tuple_extract %175, 1                    // user: %181
+  %179 = struct_extract %177, #Float._value       // user: %180
+  %180 = builtin "fadd_FPIEEE32"(%179, %7) : $Builtin.FPIEEE32 // user: %185
+  %181 = struct_extract %178, #Float._value       // user: %182
+  %182 = builtin "fadd_FPIEEE32"(%181, %7) : $Builtin.FPIEEE32 // user: %183
+  %183 = builtin "fadd_FPIEEE32"(%46, %182) : $Builtin.FPIEEE32 // users: %199, %184
+  %185 = builtin "fadd_FPIEEE32"(%7, %180) : $Builtin.FPIEEE32 // users: %187, %186
+  %186 = struct $Float (%185)                     // user: %230
+  %188 = builtin "fadd_FPIEEE32"(%35, %7) : $Builtin.FPIEEE32 // user: %189
+  %189 = struct $Float (%188)                     // user: %191
+  %191 = apply %170(%189) : $@callee_guaranteed (Float) -> (Float, Float) // users: %194, %193
+  destroy_value %170                              // id: %192
+  %193 = tuple_extract %191, 0                    // user: %195
+  %194 = tuple_extract %191, 1                    // user: %197
+  %195 = struct_extract %193, #Float._value       // user: %196
+  %196 = builtin "fadd_FPIEEE32"(%195, %7) : $Builtin.FPIEEE32 // user: %201
+  %197 = struct_extract %194, #Float._value       // user: %198
+  %198 = builtin "fadd_FPIEEE32"(%197, %7) : $Builtin.FPIEEE32 // user: %199
+  %199 = builtin "fadd_FPIEEE32"(%183, %198) : $Builtin.FPIEEE32 // users: %209, %200
+  %201 = builtin "fadd_FPIEEE32"(%7, %196) : $Builtin.FPIEEE32 // users: %203, %202
+  %202 = struct $Float (%201)                     // user: %230
+  %204 = builtin "fadd_FPIEEE32"(%43, %7) : $Builtin.FPIEEE32 // user: %206
+  %206 = builtin "fadd_FPIEEE32"(%7, %204) : $Builtin.FPIEEE32 // users: %214, %208, %207
+  %209 = builtin "fadd_FPIEEE32"(%199, %7) : $Builtin.FPIEEE32 // user: %211
+  %211 = builtin "fadd_FPIEEE32"(%7, %209) : $Builtin.FPIEEE32 // users: %216, %213, %212
+  %214 = builtin "fadd_FPIEEE32"(%206, %7) : $Builtin.FPIEEE32 // user: %215
+  %215 = struct $Float (%214)                     // user: %218
+  %216 = builtin "fadd_FPIEEE32"(%211, %7) : $Builtin.FPIEEE32 // user: %217
+  %217 = struct $Float (%216)                     // user: %218
+  %218 = struct $FloatPair.TangentVector (%215, %217) // user: %219
+  %219 = apply %169(%218) : $@callee_guaranteed (FloatPair.TangentVector) -> (Float, Float) // users: %222, %221
+  destroy_value %169                              // id: %220
+  %221 = tuple_extract %219, 0                    // user: %223
+  %222 = tuple_extract %219, 1                    // user: %225
+  %223 = struct_extract %221, #Float._value       // user: %224
+  %224 = builtin "fadd_FPIEEE32"(%223, %7) : $Builtin.FPIEEE32 // user: %226
+  %225 = struct_extract %222, #Float._value       // user: %226
+  %226 = builtin "fadd_FPIEEE32"(%225, %224) : $Builtin.FPIEEE32 // user: %235
+  %230 = struct $FloatPair.TangentVector (%202, %186) // users: %232, %231
+  %231 = struct $Pair<FloatPair, Float>.TangentVector (%230, %12) // user: %235
+  %234 = unchecked_enum_data %168, #_AD__$s3outyycfU11_7myfoo15L_yS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt // user: %235
+  br bb3(%226, %234, %231, %7, %7)                // id: %235
+
+// %236                                           // user: %261
+// %237                                           // user: %241
+// %238                                           // user: %245
+// %239                                           // users: %271, %269
+// %240                                           // users: %270, %268
+bb3(%236 : $Builtin.FPIEEE32, %237 : @owned $(@callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (FloatPair.TangentVector) -> (Float, Float), @callee_guaranteed (Pair<FloatPair, Float>.TangentVector) -> (FloatPair.TangentVector, Float)), %238 : $Pair<FloatPair, Float>.TangentVector, %239 : $Builtin.FPIEEE32, %240 : $Builtin.FPIEEE32): // Preds: bb2 bb1
+  (%241, %242, %243, %244) = destructure_tuple %237 // users: %300, %299, %292, %291, %282, %281, %246, %245
+  %245 = apply %244(%238) : $@callee_guaranteed (Pair<FloatPair, Float>.TangentVector) -> (FloatPair.TangentVector, Float) // users: %248, %247
+  destroy_value %244                              // id: %246
+  %247 = tuple_extract %245, 0                    // users: %251, %250
+  %248 = tuple_extract %245, 1                    // user: %249
+  %249 = struct_extract %248, #Float._value       // user: %260
+  %250 = struct_extract %247, #FloatPair.TangentVector.first // user: %252
+  %251 = struct_extract %247, #FloatPair.TangentVector.second // user: %254
+  %252 = struct_extract %250, #Float._value       // users: %258, %253
+  %254 = struct_extract %251, #Float._value       // users: %259, %255
+  %258 = builtin "fadd_FPIEEE32"(%7, %252) : $Builtin.FPIEEE32 // users: %264, %262
+  %259 = builtin "fadd_FPIEEE32"(%7, %254) : $Builtin.FPIEEE32 // users: %265, %263
+  %260 = builtin "fadd_FPIEEE32"(%7, %249) : $Builtin.FPIEEE32 // user: %261
+  %261 = builtin "fadd_FPIEEE32"(%260, %236) : $Builtin.FPIEEE32 // user: %296
+  %264 = builtin "fadd_FPIEEE32"(%258, %7) : $Builtin.FPIEEE32 // users: %270, %266
+  %265 = builtin "fadd_FPIEEE32"(%259, %7) : $Builtin.FPIEEE32 // users: %271, %267
+  %270 = builtin "fadd_FPIEEE32"(%240, %264) : $Builtin.FPIEEE32 // users: %274, %272
+  %271 = builtin "fadd_FPIEEE32"(%239, %265) : $Builtin.FPIEEE32 // users: %276, %273
+  %274 = builtin "fadd_FPIEEE32"(%270, %7) : $Builtin.FPIEEE32 // user: %275
+  %275 = struct $Float (%274)                     // user: %278
+  %276 = builtin "fadd_FPIEEE32"(%271, %7) : $Builtin.FPIEEE32 // user: %277
+  %277 = struct $Float (%276)                     // user: %278
+  %278 = struct $FloatPair.TangentVector (%275, %277) // user: %281
+  %281 = apply %243(%278) : $@callee_guaranteed (FloatPair.TangentVector) -> (Float, Float) // users: %284, %283
+  destroy_value %243                              // id: %282
+  %283 = tuple_extract %281, 0                    // user: %285
+  %284 = tuple_extract %281, 1                    // user: %288
+  %285 = struct_extract %283, #Float._value       // user: %286
+  %286 = builtin "fadd_FPIEEE32"(%285, %7) : $Builtin.FPIEEE32 // user: %287
+  %287 = struct $Float (%286)                     // user: %299
+  %288 = struct_extract %284, #Float._value       // user: %289
+  %289 = builtin "fadd_FPIEEE32"(%288, %7) : $Builtin.FPIEEE32 // user: %290
+  %290 = struct $Float (%289)                     // user: %291
+  %291 = apply %242(%290) : $@callee_guaranteed (Float) -> (Float, Float) // users: %294, %293
+  destroy_value %242                              // id: %292
+  %293 = tuple_extract %291, 0                    // user: %295
+  %294 = tuple_extract %291, 1                    // user: %297
+  %295 = struct_extract %293, #Float._value       // user: %296
+  %296 = builtin "fadd_FPIEEE32"(%295, %261) : $Builtin.FPIEEE32 // user: %298
+  %297 = struct_extract %294, #Float._value       // user: %298
+  %298 = builtin "fadd_FPIEEE32"(%297, %296) : $Builtin.FPIEEE32 // user: %304
+  %299 = apply %241(%287) : $@callee_guaranteed (Float) -> (Float, Float) // users: %302, %301
+  destroy_value %241                              // id: %300
+  %301 = tuple_extract %299, 0                    // user: %303
+  %302 = tuple_extract %299, 1                    // user: %305
+  %303 = struct_extract %301, #Float._value       // user: %304
+  %304 = builtin "fadd_FPIEEE32"(%303, %298) : $Builtin.FPIEEE32 // user: %306
+  %305 = struct_extract %302, #Float._value       // user: %306
+  %306 = builtin "fadd_FPIEEE32"(%305, %304) : $Builtin.FPIEEE32 // user: %307
+  %307 = struct $Float (%306)                     // users: %309, %308
+  return %307                                     // id: %309
+} // end sil function '$s3outyycfU11_7myfoo15L_yS2fFTJpSpSr067$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_0cd1_e4E12_g16Subtract3lhs3rhsi1_j1_klj1_km1_kN2U_ACTf1nnccc_n'
