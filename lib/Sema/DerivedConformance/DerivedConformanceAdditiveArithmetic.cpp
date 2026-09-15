@@ -34,6 +34,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/QuotedString.h"
 
 using namespace swift;
 
@@ -313,11 +314,48 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   return propDecl;
 }
 
+static std::optional<std::string> getAdditiveArithmeticMacroText(DerivedConformance &derived,
+                                                  ValueDecl *requirement) {
+  std::string req;
+  if (requirement->getBaseName() == derived.Context.getIdentifier("+"))
+    req = "op(+)";
+  else if (requirement->getBaseName() == derived.Context.getIdentifier("-"))
+    req = "op(-)";
+  else if (requirement->getBaseName() == derived.Context.Id_zero)
+    req = "zero";
+  else
+    return std::nullopt;
+
+  std::string code;
+  auto os = llvm::raw_string_ostream(code);
+  os << "#_deriveAdditiveArithmetic("
+     << QuotedString(getNominalTypeInfoString(derived)) << ", "
+     << QuotedString(req) << ")";
+
+  return code;
+}
+
+static ValueDecl *deriveAdditiveArithmeticViaMacro(DerivedConformance &derived,
+                                                   ValueDecl *requirement) {
+  auto text = getAdditiveArithmeticMacroText(derived, requirement);
+  if (!text) {
+    derived.Context.Diags.diagnose(requirement->getLoc(),
+                           diag::broken_additive_arithmetic_requirement);
+    return nullptr;
+  }
+  return deriveRequirementViaMacro(derived, requirement, *text, BuiltinDerivedConformanceMacroKind::AdditiveArithmetic);
+}
+
 ValueDecl *
 DerivedConformance::deriveAdditiveArithmetic(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
+
+  if (requirement->getASTContext().LangOpts.hasFeature(
+          Feature::DeriveConformancesViaMacros))
+    return deriveAdditiveArithmeticViaMacro(*this, requirement);
+
   if (requirement->getBaseName() == Context.getIdentifier("+"))
     return deriveMathOperator(*this, Add);
   if (requirement->getBaseName() == Context.getIdentifier("-"))

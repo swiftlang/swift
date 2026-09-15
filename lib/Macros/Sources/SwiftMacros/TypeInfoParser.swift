@@ -424,7 +424,7 @@ extension NominalTypeKind: TypeInfoProtocol {
   }
 }
 
-private func getNamedFuncallArgs(node: ExprSyntax, name: String) throws
+func getNamedFuncallArgs(node: ExprSyntax, name: String) throws
   -> LabeledExprListSyntax
 {
   guard let fcall = node.as(FunctionCallExprSyntax.self) else {
