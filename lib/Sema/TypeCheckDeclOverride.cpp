@@ -1129,9 +1129,10 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
       diags.diagnose(decl, diag::override_of_non_open, decl);
     }
   } else if (baseHasOpenAccess &&
-             classDecl->hasOpenAccess(dc) &&
              decl->getFormalAccess() < AccessLevel::Public &&
-             !decl->isSemanticallyFinal()) {
+             !decl->isSemanticallyFinal() &&
+             classDecl->hasOpenAccess(dc) &&
+             classDecl->getFormalAccessScope(dc).isPublic()) {
     {
       auto diag = diags.diagnose(decl, diag::override_not_accessible,
                                  /*setter*/ false, decl,
