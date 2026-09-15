@@ -4638,15 +4638,27 @@ namespace {
     /// Matching is on the stub name rather than the C++ base name because
     /// '__beginMutatingUnsafe' derives from the imported name 'beginMutating',
     /// not from 'begin'.
-    static bool overlayStillSpellsUnsafeStub(DeclBaseName stubName) {
+    static bool overlayStillSpellsUnsafeStub(DeclBaseName stubName,
+                                             const clang::CXXMethodDecl *decl) {
       if (stubName.isSpecial())
         return false;
-      return llvm::StringSwitch<bool>(stubName.getIdentifier().str())
-          .Cases({"__beginUnsafe", "__endUnsafe", "__beginMutatingUnsafe",
-                  "__endMutatingUnsafe", "__findUnsafe", "__findMutatingUnsafe",
-                  "__eraseUnsafe", "__dataUnsafe"},
-                 true)
-          .Default(false);
+      auto name = stubName.getIdentifier().str();
+      // Spelled in protocol requirements, so they can be witnessed by any
+      // conforming type.
+      if (llvm::StringSwitch<bool>(name)
+              .Cases({"__beginUnsafe", "__endUnsafe", "__beginMutatingUnsafe",
+                      "__endMutatingUnsafe", "__findUnsafe",
+                      "__findMutatingUnsafe", "__eraseUnsafe", "__dataUnsafe"},
+                     true)
+              .Default(false))
+        return true;
+      // Spelled by the overlay only for standard library types
+      // ('CxxSet.insert(_:)', 'std.string.append(_:)'), so a user type's stub
+      // is still deprecated.
+      return decl->getParent()->isInStdNamespace() &&
+             llvm::StringSwitch<bool>(name)
+                 .Cases({"__insertUnsafe", "__appendUnsafe"}, true)
+                 .Default(false);
     }
 
     /// Apply the __Unsafe-method rename to \a imported, imported from \a decl.
@@ -4704,6 +4716,14 @@ namespace {
         return;
       }
 
+      // Keeping the original name collides with the same-named safe wrapper
+      // that callers are encouraged to hand-write around the '__<name>Unsafe'
+      // spelling (the C++ standard library overlay does this for, e.g.,
+      // 'CxxSet.insert(_:)'). Disfavor the unsafe import so such a wrapper
+      // wins overload resolution instead of becoming ambiguous with it.
+      swiftDecl->addAttribute(new (Impl.SwiftContext)
+                                  DisfavoredOverloadAttr(/*Implicit=*/true));
+
       // Keep the original name, and import the method a second time under the
       // renamed spelling as a migration stub.
       //
@@ -4739,7 +4759,7 @@ namespace {
 
       // A method that C++ already deprecates keeps that deprecation; Clang's
       // message wins at the use site either way.
-      if (!overlayStillSpellsUnsafeStub(unsafeName.getBaseName()) &&
+      if (!overlayStillSpellsUnsafeStub(unsafeName.getBaseName(), clangDecl) &&
           !clangDecl->isDeprecated()) {
         ImportedName primaryName = importedName;
         primaryName.setDeclName(currentName);

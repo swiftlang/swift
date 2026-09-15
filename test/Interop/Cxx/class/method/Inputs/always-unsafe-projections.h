@@ -20,9 +20,9 @@ struct InheritedBase {
 // clone has to keep '@unsafe(always)'.
 struct InheritedDerived : InheritedBase {};
 
-// 'value', 'insert' and 'append' are only carved out for the C++ standard
-// library, where the overlay provides same-named safe wrappers. A user type
-// gets the ordinary treatment.
+// 'value', 'insert' and 'append' used to be carved out of the rename for the
+// C++ standard library, where the overlay provides same-named safe wrappers.
+// Every type now gets the ordinary treatment.
 struct NotStd {
   int x;
   NotStd(const NotStd &);
