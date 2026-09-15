@@ -470,6 +470,8 @@ struct AliasAnalysis {
         return .init(read: true)
       }
       return .noEffects
+    case .AssumeTrue:
+      return .noEffects
     default:
       if builtin.memoryEffects == .noEffects {
         return .noEffects
