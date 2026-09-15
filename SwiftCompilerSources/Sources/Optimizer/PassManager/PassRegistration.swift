@@ -133,6 +133,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })
   registerForSILCombine(BuiltinInst.self,          { run(BuiltinInst.self, $0) })
   registerForSILCombine(CondFailInst.self,         { run(CondFailInst.self, $0) })
+  registerForSILCombine(ThinToThickFunctionInst.self, { run(ThinToThickFunctionInst.self, $0) })
   registerForSILCombine(ExplicitCopyAddrInst.self, { run(ExplicitCopyAddrInst.self, $0) })
   registerForSILCombine(ExplicitCopyValueInst.self,{ run(ExplicitCopyValueInst.self, $0) })
   registerForSILCombine(FixLifetimeInst.self,      { run(FixLifetimeInst.self, $0) })

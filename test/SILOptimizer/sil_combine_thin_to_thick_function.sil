@@ -1,0 +1,133 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-combine %s | %FileCheck %s --check-prefix=COMBINE
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-combine -closure-specialization %s | %FileCheck %s --check-prefix=SPECIALIZE
+
+// This SIL is derived from the following Swift:
+//
+//   public class A {}
+//   public class B: A {}
+//
+//   @inline(never)
+//   public func impl(_ a: A) -> B { B() }
+//
+//   @inline(never)
+//   public func use(_ f: (B) -> A, _ b: B) -> A { f(b) }
+//
+//   @inline(never)
+//   public func test(_ b: B) -> (A, A) {
+//     let first = use(impl, b)
+//     let f = impl
+//     return (first, use(f, b))
+//   }
+//
+//   @inline(never)
+//   public func escaping_result() -> (B) -> A {
+//     let f: @convention(thin) (A) -> B = impl
+//     return f
+//   }
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class A {
+  deinit
+  init()
+}
+
+public class B : A {
+  override init()
+  deinit
+}
+
+sil [noinline] [ossa] @$s2CS4implyAA1BCAA1ACF : $@convention(thin) (@guaranteed A) -> @owned B {
+bb0(%0 : @guaranteed $A):
+  %1 = alloc_ref $B
+  %2 = move_value [lexical] %1 : $B
+  %3 = upcast %2 : $B to $A
+  %4 = move_value [lexical] %3 : $A
+  %5 = end_init_let_ref %4 : $A
+  %6 = unchecked_ref_cast %5 : $A to $B
+  %7 = move_value [lexical] %6 : $B
+  return %7 : $B
+}
+
+// SPECIALIZE-LABEL: {{^}}// specialized use(_:_:)
+// SPECIALIZE:       sil shared [noinline] [ossa] @$s2CS3useyAA1ACAdA1BCXE_AFtF22$s2CS4implyAA1BCAA1ACFTf1cn_n : $@convention(thin) (@guaranteed B) -> @owned A {
+// SPECIALIZE:       bb0(%0 : @guaranteed $B):
+// SPECIALIZE:         // function_ref impl(_:)
+// SPECIALIZE-NEXT:    %[[#S1:]] = function_ref @$s2CS4implyAA1BCAA1ACF : $@convention(thin) (@guaranteed A) -> @owned B
+// SPECIALIZE:         %[[#S2:]] = upcast %0 : $B to $A
+// SPECIALIZE:         %[[#S3:]] = apply %[[#S1]](%[[#S2]]) : $@convention(thin) (@guaranteed A) -> @owned B
+// SPECIALIZE:         %[[#S4:]] = upcast %[[#S3]] : $B to $A
+// SPECIALIZE:         return %[[#S4]] : $A
+// SPECIALIZE-NEXT:  } // end sil function
+
+sil [noinline] [ossa] @$s2CS3useyAA1ACAdA1BCXE_AFtF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed B) -> @owned A, @guaranteed B) -> @owned A {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed (@guaranteed B) -> @owned A, %1 : @guaranteed $B):
+  %2 = apply %0(%1) : $@noescape @callee_guaranteed (@guaranteed B) -> @owned A
+  return %2 : $A
+}
+
+// COMBINE-LABEL:    sil [noinline] [ossa] @$s2CS4testyAA1AC_ADtAA1BCF : $@convention(thin) (@guaranteed B) -> (@owned A, @owned A) {
+// COMBINE:          bb0(%0 : @guaranteed $B):
+// COMBINE:            // function_ref impl(_:)
+// COMBINE-NEXT:       %[[#C1:]] = function_ref @$s2CS4implyAA1BCAA1ACF : $@convention(thin) (@guaranteed A) -> @owned B
+// COMBINE:            %[[#C2:]] = thin_to_thick_function %[[#C1]] : $@convention(thin) (@guaranteed A) -> @owned B to $@noescape @callee_guaranteed (@guaranteed A) -> @owned B
+// COMBINE:            %[[#C3:]] = convert_function %[[#C2]] : $@noescape @callee_guaranteed (@guaranteed A) -> @owned B to $@noescape @callee_guaranteed (@guaranteed B) -> @owned A
+// COMBINE:            // function_ref use(_:_:)
+// COMBINE-NEXT:       %[[#C4:]] = function_ref @$s2CS3useyAA1ACAdA1BCXE_AFtF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed B) -> @owned A, @guaranteed B) -> @owned A
+// COMBINE:            apply %[[#C4]](%[[#C3]], %0) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed B) -> @owned A, @guaranteed B) -> @owned A
+// COMBINE:          } // end sil function
+
+// SPECIALIZE-LABEL: sil [noinline] [ossa] @$s2CS4testyAA1AC_ADtAA1BCF : $@convention(thin) (@guaranteed B) -> (@owned A, @owned A) {
+// SPECIALIZE:       bb0(%0 : @guaranteed $B):
+// SPECIALIZE:         // function_ref specialized use(_:_:)
+// SPECIALIZE-NEXT:    %[[#B1:]] = function_ref @$s2CS3useyAA1ACAdA1BCXE_AFtF22$s2CS4implyAA1BCAA1ACFTf1cn_n : $@convention(thin) (@guaranteed B) -> @owned A
+// SPECIALIZE:         %[[#B2:]] = apply %[[#B1]](%0) : $@convention(thin) (@guaranteed B) -> @owned A
+// SPECIALIZE:         // function_ref specialized use(_:_:)
+// SPECIALIZE-NEXT:    %[[#B4:]] = function_ref @$s2CS3useyAA1ACAdA1BCXE_AFtF22$s2CS4implyAA1BCAA1ACFTf1cn_n : $@convention(thin) (@guaranteed B) -> @owned A
+// SPECIALIZE:         %[[#B5:]] = apply %[[#B4]](%0) : $@convention(thin) (@guaranteed B) -> @owned A
+// SPECIALIZE:         %[[#B6:]] = tuple (%[[#B2]] : $A, %[[#B5]] : $A)
+// SPECIALIZE-NEXT:    return %[[#B6]] : $(A, A)
+// SPECIALIZE-NEXT:  } // end sil function
+
+sil [noinline] [ossa] @$s2CS4testyAA1AC_ADtAA1BCF : $@convention(thin) (@guaranteed B) -> (@owned A, @owned A) {
+bb0(%0 : @guaranteed $B):
+  %1 = function_ref @$s2CS4implyAA1BCAA1ACF : $@convention(thin) (@guaranteed A) -> @owned B
+  %2 = convert_function %1 : $@convention(thin) (@guaranteed A) -> @owned B to $@convention(thin) (@guaranteed B) -> @owned B
+  %3 = convert_function %2 : $@convention(thin) (@guaranteed B) -> @owned B to $@convention(thin) (@guaranteed B) -> @owned A
+  %4 = thin_to_thick_function %3 : $@convention(thin) (@guaranteed B) -> @owned A to $@noescape @callee_guaranteed (@guaranteed B) -> @owned A
+  %5 = function_ref @$s2CS3useyAA1ACAdA1BCXE_AFtF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed B) -> @owned A, @guaranteed B) -> @owned A
+  %6 = apply %5(%4, %0) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed B) -> @owned A, @guaranteed B) -> @owned A
+  %7 = move_value [lexical] [var_decl] %6 : $A
+  %8 = thin_to_thick_function %1 : $@convention(thin) (@guaranteed A) -> @owned B to $@callee_guaranteed (@guaranteed A) -> @owned B
+  %9 = move_value [lexical] [var_decl] %8 : $@callee_guaranteed (@guaranteed A) -> @owned B
+  %10 = copy_value %9 : $@callee_guaranteed (@guaranteed A) -> @owned B
+  %11 = convert_function %10 : $@callee_guaranteed (@guaranteed A) -> @owned B to $@callee_guaranteed (@guaranteed B) -> @owned A
+  %12 = convert_escape_to_noescape %11 : $@callee_guaranteed (@guaranteed B) -> @owned A to $@noescape @callee_guaranteed (@guaranteed B) -> @owned A
+  %13 = apply %5(%12, %0) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed B) -> @owned A, @guaranteed B) -> @owned A
+  destroy_value %12 : $@noescape @callee_guaranteed (@guaranteed B) -> @owned A
+  destroy_value %11 : $@callee_guaranteed (@guaranteed B) -> @owned A
+  destroy_value %9 : $@callee_guaranteed (@guaranteed A) -> @owned B
+  %14 = tuple (%7 : $A, %13 : $A)
+  return %14 : $(A, A)
+}
+
+// COMBINE-LABEL:    sil [noinline] [ossa] @$s2CS15escaping_resultAA1ACAA1BCcyF : $@convention(thin) () -> @owned @callee_guaranteed (@guaranteed B) -> @owned A {
+// COMBINE:          bb0:
+// COMBINE:            // function_ref impl(_:)
+// COMBINE-NEXT:       %[[#E0:]] = function_ref @$s2CS4implyAA1BCAA1ACF : $@convention(thin) (@guaranteed A) -> @owned B
+// COMBINE:            %[[#E1:]] = thin_to_thick_function %[[#E0]] : $@convention(thin) (@guaranteed A) -> @owned B to $@callee_guaranteed (@guaranteed A) -> @owned B
+// COMBINE:            %[[#E2:]] = convert_function %[[#E1]] : $@callee_guaranteed (@guaranteed A) -> @owned B to $@callee_guaranteed (@guaranteed B) -> @owned A
+// COMBINE-NEXT:       return %[[#E2]] : $@callee_guaranteed (@guaranteed B) -> @owned A
+// COMBINE-NEXT:     } // end sil function
+
+sil [noinline] [ossa] @$s2CS15escaping_resultAA1ACAA1BCcyF : $@convention(thin) () -> @owned @callee_guaranteed (@guaranteed B) -> @owned A {
+bb0:
+  %0 = function_ref @$s2CS4implyAA1BCAA1ACF : $@convention(thin) (@guaranteed A) -> @owned B
+  %2 = convert_function %0 : $@convention(thin) (@guaranteed A) -> @owned B to $@convention(thin) (@guaranteed B) -> @owned A
+  %3 = thin_to_thick_function %2 : $@convention(thin) (@guaranteed B) -> @owned A to $@callee_guaranteed (@guaranteed B) -> @owned A
+  return %3 : $@callee_guaranteed (@guaranteed B) -> @owned A
+}
