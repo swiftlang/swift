@@ -807,6 +807,10 @@ public:
   /// Advance this function's stage. A stage only ever moves forward.
   void setFunctionStage(SILStage stage);
 
+  /// Take the facts a whole-function clone inherits from the function it was
+  /// derived from: the address-lowering form and the SIL stage.
+  void inheritDerivedFrom(const SILFunction *from);
+
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
     return ForceEnableLexicalLifetimes_t(ForceEnableLexicalLifetimes);
   }

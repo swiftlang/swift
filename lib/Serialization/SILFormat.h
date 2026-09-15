@@ -209,7 +209,14 @@ namespace sil_block {
     SIL_DEBUG_VALUE,
     SIL_EXTRA_STRING,
     SIL_DEBUG_RECONSTRUCTION_BLOCK,
+    SIL_STAGE,
   };
+
+  /// The module's SIL stage floor, written once at the head of the block, as a
+  /// single unabbreviated value. A function record carries its own stage, which
+  /// may be ahead of this one.
+  ///
+  /// The block has no abbrev ID left for this record. See writeSILBlock.
 
   using SILInstNoOperandLayout = BCRecordLayout<
     SIL_INST_NO_OPERAND,
@@ -431,6 +438,7 @@ namespace sil_block {
                      BCFixed<1>,  // is runtime accessible
                      BCFixed<1>,  // are lexical lifetimes force-enabled
                      BCFixed<1>,  // only referenced by debug info
+                     BCFixed<2>,  // SIL stage
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
