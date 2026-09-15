@@ -436,6 +436,22 @@ extension DistributedActorSystem {
     let targetName = target.identifier
     let targetNameUTF8 = Array(targetName.utf8)
 
+    // Swift 6.4.2 adds the pre-check `_getDistributedAccessibleRecord` function,
+    // so we don't re-fetch the same record multiple times below.
+    let accessorRecord: UnsafeRawPointer?
+    if #available(StdlibDeploymentTarget 6.4, *) {
+      unsafe accessorRecord = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+        unsafe _getDistributedAccessibleRecord(
+          targetNameUTF8.baseAddress!,
+          UInt(targetNameUTF8.endIndex))
+      }
+
+      // Reject an unknown target before demangling or instantiating any metadata.
+      if unsafe accessorRecord == nil {
+        throw _makeDistributedTargetAccessorNotFoundError()
+      }
+    }
+
     // Gen the generic environment (if any) associated with the target.
     let genericEnv =
       targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in

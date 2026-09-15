@@ -112,6 +112,14 @@ func _getWitnessTablesFor(
   genericArguments: UnsafeRawPointer
 ) -> (UnsafeRawPointer, Int)
 
+@available(StdlibDeploymentTarget 6.4, *) // 6.4.2
+@usableFromInline
+@_silgen_name("swift_distributed_getAccessibleRecord")
+internal func _getDistributedAccessibleRecord(
+  _ targetNameStart: UnsafePointer<UInt8>,
+  _ targetNameLength: UInt
+) -> UnsafeRawPointer?
+
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_makeDistributedTargetAccessorNotFoundError")
 internal // SPI Distributed
