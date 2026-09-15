@@ -1,3 +1,15 @@
+# SARIF diagnostic serialization support is optional; the libraries only exist
+# when SWIFT_BUILD_SARIF is enabled.
+set(ASTGEN_SARIF_DEPENDENCIES)
+set(ASTGEN_SARIF_SOURCES)
+if(SWIFT_BUILD_SARIF)
+  list(APPEND ASTGEN_SARIF_SOURCES SARIFDiagnostics.swift)
+  list(APPEND ASTGEN_SARIF_DEPENDENCIES
+    _CompilerSARIF
+    _CompilerSARIFRecords
+    _CompilerImmutableJSON)
+endif()
+
 add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   ASTGen.swift
   ASTGen+CompilerBuildConfiguration.swift
@@ -24,6 +36,7 @@ add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   TypeAttrs.swift
   Types.swift
   WarningGroupBehaviorConfiguration.swift
+  ${ASTGEN_SARIF_SOURCES}
 
   DEPENDENCIES
     swiftAST
@@ -39,5 +52,6 @@ add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
     _CompilerSwiftParser
     _CompilerSwiftParserDiagnostics
     _CompilerSwiftDiagnostics
+    ${ASTGEN_SARIF_DEPENDENCIES}
     swiftBasicSwift
 )
