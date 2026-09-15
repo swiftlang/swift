@@ -1568,6 +1568,16 @@ protected:
             Builder);
 
         // Decode substitutions.
+        //
+        // The substitution list length and the generic signature's parameter
+        // counts are independent fields of the mangled name. Reject any
+        // mismatch.
+        if (substNode->getNumChildren() != genericParams.size())
+          return MAKE_NODE_TYPE_ERROR(
+              substNode,
+              "substitution count (%zu) does not match the generic "
+              "signature's parameter count (%zu)",
+              substNode->getNumChildren(), (size_t)genericParams.size());
         for (unsigned i = 0, e = substNode->getNumChildren(); i < e; ++i) {
           auto *subst = substNode->getChild(i);
           auto substTy = decodeMangledType(subst, depth + 1,

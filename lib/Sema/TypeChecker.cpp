@@ -305,7 +305,8 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     // checking.
     (void)AvailabilityScope::getOrBuildForSourceFile(*SF);
 
-    // Type check the top-level elements of the source file.
+    // Type check the top-level elements of the source file. The DeclChecker
+    // handles auxiliary decls.
     for (auto D : SF->getTopLevelDecls()) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
@@ -696,8 +697,8 @@ bool TypeChecker::diagnoseInvalidFunctionType(
         : "c";
       auto extInfo2 =
         extInfo.withRepresentation(AnyFunctionType::Representation::Swift);
-      auto simpleFnTy = FunctionType::get(fnTy->getParams(), fnTy->getResult(),
-                                          extInfo2);
+      auto simpleFnTy = FunctionType::get(fnTy->getParams(), fnTy->getYields(),
+                                          fnTy->getResult(), extInfo2);
       ctx.Diags.diagnose(loc, diag::objc_convention_invalid,
                          simpleFnTy, strName);
       hadAnyError = true;

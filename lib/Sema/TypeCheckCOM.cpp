@@ -196,14 +196,6 @@ VarDecl *synthesizeIIDProperty(ProtocolDecl *PD, ASTContext &ASTContext,
   ext->setExtendedNominal(PD);
   PD->addExtension(ext);
 
-  // Route the extension through the synthesized file unit so it is code-gen'd
-  // and serialized: the `IID` accessor must be emitted for the current module
-  // and reachable by name lookup in modules that import it.  Synthesis only
-  // happens for source-file protocols (see SynthesizeCOMInterfaceIDRequest);
-  // imported protocols recover the extension from the deserialized module.
-  if (auto *file = dyn_cast<FileUnit>(PD->getModuleScopeContext()))
-    file->getOrCreateSynthesizedFile().addTopLevelDecl(ext);
-
   VarDecl *property =
       generateIDAccessor(ASTContext, /*DC=*/ext, /*decl=*/PD,
                          /*identifier=*/ASTContext.Id_IID, value,
@@ -271,11 +263,14 @@ const COMAttr *getAttribute(const ClassDecl *CD) {
 
 const COMAttr *getAttribute(const ProtocolDecl *PD) {
   auto *attr = PD->getAttrs().getAttribute<COMAttr>();
-  if (!attr)
+  if (!attr || attr->IID.empty() || attr->CLSID ||
+      !UUID::fromString(attr->IID.str().c_str())) {
+    // Diagnosed by `AttributeChecker::visitCOMAttr`.
+    // FIXME: We should probably be diagnosing in COMDeclInfoRequest itself,
+    // we shouldn't be relying on phase ordering here since it will break lazy
+    // type-checking.
     return nullptr;
-
-  ASSERT(!attr->IID.empty());
-  ASSERT(!attr->CLSID);
+  }
   return attr;
 }
 

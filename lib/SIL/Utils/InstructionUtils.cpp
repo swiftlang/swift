@@ -520,6 +520,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::StringLiteralInst:
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::COMMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst:
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::AddressToPointerInst:
@@ -770,6 +771,11 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::OpenExistentialRefInst: {
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
+  }
+
+  case SILInstructionKind::OpenCOMExistentialInst: {
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::Existential;
   }
 
   case SILInstructionKind::UnconditionalCheckedCastInst:

@@ -890,6 +890,9 @@ size_t swift_reflection_demangle(const char *MangledName, size_t Length,
   static_cast<void>(err);
 #else
   strncpy(OutDemangledName, Demangled.c_str(), MaxLength);
+  // Always terminate the output string, as long as it has room for a NUL.
+  if (MaxLength > 0)
+    OutDemangledName[MaxLength - 1] = '\0';
 #endif
   return Demangled.size();
 }

@@ -8,6 +8,11 @@ module Methods {
   requires cplusplus
 }
 
+module CallingConvention {
+  header "calling-convention.h"
+  requires cplusplus
+}
+
 module AmbiguousMethods {
   header "ambiguous_methods.h"
   requires cplusplus
