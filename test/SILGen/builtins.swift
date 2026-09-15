@@ -1140,3 +1140,13 @@ func markDependenceGuaranteed(_ p: AnyObject, _ o: AnyObject) -> AnyObject {
 func test_dereferenceable(_ ptr: Builtin.RawPointer, _ size: Builtin.Word) -> Builtin.RawPointer {
   return Builtin.dereferenceable(ptr, size)
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins23cowBufferForReadingTestyAA1CCADF : $@convention(thin) (@guaranteed C) -> @owned C {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $C):
+// CHECK:   [[COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[RESULT:%.*]] = builtin "COWBufferForReading"<C>([[COPY]] : $C) : $C
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function '$s8builtins23cowBufferForReadingTestyAA1CCADF'
+func cowBufferForReadingTest(_ c: C) -> C {
+  return Builtin.COWBufferForReading(c)
+}
