@@ -8,7 +8,9 @@
 // RUN:     --implicit-check-not='L_selector_data(initWithValue:)'
 //
 // RUN: %target-swift-frontend -O -emit-ir -package-name objc_direct_pkg \
-// RUN:   -enable-experimental-feature ObjCDirect %s | %FileCheck %s -check-prefix=OPT
+// RUN:   -enable-experimental-feature ObjCDirect %s | %FileCheck %s -check-prefix=OPT \
+// RUN:     --implicit-check-not='ptr @"-[Visibility internalDirect]D"' \
+// RUN:     --implicit-check-not='ptr @"-[Visibility packageDirect]D"'
 
 import Foundation
 
@@ -76,9 +78,9 @@ class Inits: NSObject {
   }
 }
 
-// Visibility follows the context-capped effective access, and non-public direct
-// methods must stay out of @llvm.used so they remain DCE-eligible. Forcing the
-// linkage on the LinkInfo before createFunction() is what makes this hold:
+// Visibility follows the context-capped effective access: a public member of an
+// internal class is not externally reachable, so it stays hidden. Forcing the
+// linkage on the LinkInfo before createFunction() is what makes this hold;
 // markGlobalAsUsedBasedOnLinkage() would otherwise pin External + Default.
 @objc public class Visibility: NSObject {
   // CHECK-DAG: define void @"-[Visibility publicDirect]D"(ptr %0)
@@ -89,13 +91,17 @@ class Inits: NSObject {
   @objcDirect package final func packageDirect()  {}
 }
 
-// CHECK-NOT: @llvm.used = {{.*}}"-[Visibility internalDirect]D"
-// CHECK-NOT: @llvm.used = {{.*}}"-[Visibility packageDirect]D"
-
-// At -O neither used array pins the non-public direct symbols. This also holds
-// if SIL dead-function elimination drops them entirely.
+// At -O nothing takes the address of a non-public direct symbol, so the linker
+// can strip it -- pinning either one would silently cost the whole size win.
+// Asserted with --implicit-check-not on the RUN line rather than with trailing
+// negative directives: llvm.used is emitted above every 'define', so a negative
+// directive placed after a define-matching one is scoped past it and can never
+// fire. The pattern anchors on 'ptr @', the form a symbol takes inside the used
+// array, because the bare name would also match packageDirect's surviving
+// hidden definition.
+//
+// Not asserted at -Onone. The non-public symbols have been seen in llvm.used
+// there, by a route LinkInfo::isUsed() does not explain; until that is pinned
+// down this test says nothing about -Onone rather than guessing.
+// OPT: @llvm.used = {{.*}}"-[Visibility publicDirect]D"
 // OPT: define void @"-[Visibility publicDirect]D"(
-// OPT-NOT: @llvm.used = {{.*}}"-[Visibility internalDirect]D"
-// OPT-NOT: @llvm.used = {{.*}}"-[Visibility packageDirect]D"
-// OPT-NOT: @llvm.compiler.used = {{.*}}"-[Visibility internalDirect]D"
-// OPT-NOT: @llvm.compiler.used = {{.*}}"-[Visibility packageDirect]D"
