@@ -60,10 +60,10 @@ sil @large_param_closure : $@convention(thin) <T> (@guaranteed X, Int) -> @out T
 // CHECK-LABEL: sil @test_partial_apply_reconstruction_block :
 // CHECK:   [[FN:%[0-9]+]] = function_ref @large_param_closure : $@convention(thin) <τ_0_0> (@in_guaranteed X, Int) -> @out τ_0_0
 // CHECK:   [[PA:%[0-9]+]] = partial_apply [callee_guaranteed] [[FN]]<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed X, Int) -> @out τ_0_0
-// CHECK:   debug_value (), let, name "closure", transform {
-// CHECK:   bb0:
-// CHECK:     %0 = convert_function undef : $@callee_guaranteed (@guaranteed X) -> @out T to $@callee_guaranteed @substituted <τ_0_0> (@guaranteed X) -> @out τ_0_0 for <T>
-// CHECK:     return %0
+// CHECK:   debug_value undef : {{.*}}, let, name "closure", transform {
+// CHECK:   bb0(%0 :
+// CHECK:     %1 = convert_function undef : $@callee_guaranteed (@guaranteed X) -> @out T to $@callee_guaranteed @substituted <τ_0_0> (@guaranteed X) -> @out τ_0_0 for <T>
+// CHECK:     return %1
 // CHECK:   }
 // CHECK:   debug_value [[PA]] : $@callee_guaranteed (@in_guaranteed X) -> @out T, let, name "plain"
 // CHECK:   debug_value undef : $@callee_guaranteed (@guaranteed X) -> @out T, var, name "pair", type $(@callee_guaranteed (@guaranteed X) -> @out T, Int), expr op_tuple_fragment:$(@callee_guaranteed (@guaranteed X) -> @out T, Int):0
@@ -90,8 +90,8 @@ sil @large_param : $@convention(thin) (@guaranteed X) -> ()
 // A thin function type ref.
 // CHECK-LABEL: sil @test_function_ref :
 // CHECK:   [[FR:%[0-9]+]] = function_ref @large_param : $@convention(thin) (@in_guaranteed X) -> ()
-// CHECK:   debug_value (), let, name "f", transform {
-// CHECK:   bb0:
+// CHECK:   debug_value undef : {{.*}}, let, name "f", transform {
+// CHECK:   bb0(%0 :
 // CHECK:     return undef : $@convention(thin) (@guaranteed X) -> ()
 // CHECK:   }
 // CHECK:   debug_value [[FR]] : $@convention(thin) (@in_guaranteed X) -> (), let, name "plain"
@@ -111,8 +111,8 @@ bb0:
 // Function with a large argument, wrapped in an optional.
 // CHECK-LABEL: sil @test_unchecked_enum_data :
 // CHECK:   [[E:%[0-9]+]] = unchecked_enum_data %0 : $Optional<@callee_guaranteed (@in_guaranteed X) -> ()>, #Optional.some!enumelt
-// CHECK:   debug_value (), let, name "f", transform {
-// CHECK:   bb0:
+// CHECK:   debug_value undef : {{.*}}, let, name "f", transform {
+// CHECK:   bb0(%0 :
 // CHECK:     return undef : $@callee_guaranteed (@guaranteed X) -> ()
 // CHECK:   }
 // CHECK:   debug_value [[E]] : $@callee_guaranteed (@in_guaranteed X) -> (), let, name "plain"
@@ -133,10 +133,10 @@ bb0(%0 : $Optional<@callee_guaranteed (@guaranteed X) -> ()>):
 // A large function type within an alloc_stack.
 // CHECK-LABEL: sil @test_alloc_stack_closure :
 // CHECK:   [[AS:%[0-9]+]] = alloc_stack $@callee_guaranteed (@in_guaranteed X) -> ()
-// CHECK:   debug_value (), let, name "f", transform {
-// CHECK:   bb0:
-// CHECK:     %0 = load undef : $*@callee_guaranteed (@guaranteed X) -> ()
-// CHECK:     return %0
+// CHECK:   debug_value undef : {{.*}}, let, name "f", transform {
+// CHECK:   bb0(%0 :
+// CHECK:     %1 = load undef : $*@callee_guaranteed (@guaranteed X) -> ()
+// CHECK:     return %1
 // CHECK:   }
 // CHECK:   dealloc_stack [[AS]]
 // CHECK-LABEL: } // end sil function 'test_alloc_stack_closure'
@@ -157,8 +157,8 @@ bb0(%0 : $@callee_guaranteed (@guaranteed X) -> ()):
 // A large function type extracted from a tuple.
 // CHECK-LABEL: sil @test_tuple_extract :
 // CHECK:   [[TE:%[0-9]+]] = tuple_extract %0 : $(@callee_guaranteed (@in_guaranteed X) -> (), Int), 0
-// CHECK:   debug_value (), let, name "f", transform {
-// CHECK:   bb0:
+// CHECK:   debug_value undef : {{.*}}, let, name "f", transform {
+// CHECK:   bb0(%0 :
 // CHECK:     return undef : $@callee_guaranteed (@guaranteed X) -> ()
 // CHECK:   }
 // CHECK:   debug_value [[TE]] : $@callee_guaranteed (@in_guaranteed X) -> (), let, name "plain"
