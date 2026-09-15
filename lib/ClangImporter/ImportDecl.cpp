@@ -4344,16 +4344,21 @@ namespace {
       if (inferSelfDependence(decl, result, returnIdx))
         return;
 
-      // FIXME: this uses '0' as the result index. That only works for
-      // standalone functions with no parameters.
-      // See markReturnsUnsafeNonescapable() for a general approach.
       auto &ASTContext = result->getASTContext();
+
+      auto retType = decl->getReturnType();
+      // A constructor's return type is 'void'; the value it produces is its
+      // class, so that is what decides whether the result is escapable.
+      clang::QualType resultTypeForEscapability = retType;
+      if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl))
+        resultTypeForEscapability =
+            Impl.getClangASTContext().getRecordType(ctordecl->getParent());
 
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(
-          nullptr, nullptr, 0,
+          nullptr, nullptr, returnIdx,
           LifetimeFlags().withImmortalSpecifier().withAnnotated());
-      if (hasUnsafeAPIAttr(decl) && !isEscapable(decl->getReturnType())) {
+      if (hasUnsafeAPIAttr(decl) && !isEscapable(resultTypeForEscapability)) {
         lifetimeDependencies.push_back(immortalLifetime);
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
@@ -4361,7 +4366,6 @@ namespace {
         return;
       }
 
-      auto retType = decl->getReturnType();
       auto warnForEscapableReturnType = [&] {
         if (isEscapableAnnotatedType(retType.getTypePtr())) {
           // Swift drops lifetime dependencies on Escapable targets, so this
@@ -4511,14 +4515,15 @@ namespace {
                 CxxEscapability::Unknown) == CxxEscapability::NonEscapable)
           lifetimeDependencies.push_back(immortalLifetime);
       }
-      clang::QualType resultTypeForEscapability = retType;
-      if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl))
-        resultTypeForEscapability =
-            Impl.getClangASTContext().getRecordType(ctordecl->getParent());
       bool resultIsNonEscapable =
           isNonEscapableAnnotatedType(resultTypeForEscapability.getTypePtr());
       bool resultDependenceIsAnnotated =
           getLifetimeDependenceFor(lifetimeDependencies, returnIdx).has_value();
+      // A '@lifetime(...)' written as a 'swift_attr' is parsed into a
+      // LifetimeAttr and honored by LifetimeDependenceInfoRequest; the author
+      // has said what the result depends on.
+      bool hasHandWrittenLifetimeAttr =
+          result->getAttrs().hasAttribute<LifetimeAttr>();
 
       if (!lifetimeDependencies.empty()) {
         Impl.SwiftContext.evaluator.cacheOutput(
@@ -4530,7 +4535,7 @@ namespace {
         // immortal lifetime so the implicit single-parameter inference does not
         // synthesize a scoped dependency that would be invalid.
         cacheImmortalLifetime(result);
-      } else if (resultIsNonEscapable) {
+      } else if (resultIsNonEscapable && !hasHandWrittenLifetimeAttr) {
         auto policy = Impl.getClangASTContext().getPrintingPolicy();
         policy.SuppressTagKeyword = true;
         Impl.addImportDiagnostic(
@@ -4548,8 +4553,7 @@ namespace {
       bool resultDependenceIsInferred =
           !resultDependenceIsAnnotated &&
           !isEscapable(resultTypeForEscapability) &&
-          !result->getAttrs().hasAttribute<LifetimeAttr>() &&
-          !hasSwiftAttribute(decl, {"safe"});
+          !hasHandWrittenLifetimeAttr && !hasSwiftAttribute(decl, {"safe"});
 
       if (skippedLifetime || resultDependenceIsInferred) {
         result->addAttribute(new (ASTContext) UnsafeAttr(/*implicit=*/true));
