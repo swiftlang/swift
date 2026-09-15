@@ -1566,6 +1566,31 @@ unsigned AbstractionPattern::getFlattenedValueCount() const {
 }
 
 AbstractionPattern
+AbstractionPattern::getFunctionYieldType(unsigned index) const {
+  switch (getKind()) {
+  case Kind::Opaque:
+    return *this;
+  case Kind::Type: {
+    if (isTypeParameterOrOpaqueArchetype())
+      return getOpaque();
+
+    auto yieldType =
+        cast<AnyFunctionType>(getType()).getYields()[index].getType();
+    return AbstractionPattern(getGenericSubstitutions(),
+                              getGenericSignatureForFunctionComponent(),
+                              yieldType->getCanonicalType());
+  }
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    return getOpaque();
+  default:
+    llvm_unreachable("does not have function yields");
+  }
+
+  llvm_unreachable("bad kind");
+}
+
+AbstractionPattern
 AbstractionPattern::getFunctionParamType(unsigned index) const {
   switch (getKind()) {
   case Kind::Opaque:
@@ -1718,6 +1743,10 @@ ParameterTypeFlags
 AbstractionPattern::getFunctionParamFlags(unsigned index) const {
   return cast<AnyFunctionType>(getType()).getParams()[index]
            .getParameterFlags();
+}
+
+YieldTypeFlags AbstractionPattern::getFunctionYieldFlags(unsigned index) const {
+  return cast<AnyFunctionType>(getType()).getYields()[index].getFlags();
 }
 
 bool
