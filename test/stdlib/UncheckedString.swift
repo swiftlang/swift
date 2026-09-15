@@ -228,6 +228,46 @@ UncheckedStringTests.test("interpolation") {
   expectTrue(greeting16 == "hello, world!" as UncheckedString<UInt16>)
 }
 
+// A separate `ExpressibleByUncheckedStringInterpolation` conformer that
+// reuses `DefaultUncheckedStringInterpolation` for its `StringInterpolation`
+// associated type, rather than defining its own -- and, unlike
+// `UncheckedString` itself, doesn't implement `init(stringInterpolation:)`,
+// relying entirely on the compiler-provided default (mirroring how `String`
+// gets `init(stringInterpolation:)` for free from `DefaultStringInterpolation`
+// unless it opts to override it, which `String` itself also does for
+// efficiency -- see `StringInterpolation.swift`).
+struct TaggedUncheckedString: ExpressibleByUncheckedStringInterpolation {
+  typealias StringInterpolation = DefaultUncheckedStringInterpolation<UInt8>
+
+  var storage: UncheckedString<UInt8>
+
+  init(uncheckedStringLiteral value: UncheckedString<UInt8>) {
+    storage = value
+  }
+}
+
+UncheckedStringTests.test("interpolation/defaultUncheckedStringInterpolationReuse") {
+  // Non-interpolated construction still goes through
+  // `init(uncheckedStringLiteral:)` as usual.
+  let plain: TaggedUncheckedString = "hello"
+  expectTrue(plain.storage == "hello" as UncheckedString<UInt8>)
+
+  // Interpolated construction resolves entirely via the
+  // `ExpressibleByUncheckedStringInterpolation` default `init(stringInterpolation:)`
+  // added in `UncheckedString+Literals.swift`, since `TaggedUncheckedString`
+  // doesn't implement one of its own.
+  let name: UncheckedString<UInt8> = "world"
+  let greeting: TaggedUncheckedString = "hello, \(name)!"
+  expectTrue(greeting.storage == "hello, world!" as UncheckedString<UInt8>)
+
+  // A custom `CustomUncheckedStringConvertible` conformer works too, exactly
+  // as it does for `UncheckedString` itself, since both route through the
+  // same `DefaultUncheckedStringInterpolation.appendInterpolation`.
+  let point = Point(x: 3, y: 4)
+  let described: TaggedUncheckedString = "point: \(point)"
+  expectTrue(described.storage == "point: (3, 4)" as UncheckedString<UInt8>)
+}
+
 UncheckedStringTests.test("operators") {
   // A concrete `+` overload resolves literal operands under context,
   // including single-character operands and ones containing `\x{hh}`.
