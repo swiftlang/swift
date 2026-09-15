@@ -1650,20 +1650,23 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     }
 
     // FIXME: Remove the rest.
-    if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::NewIsBetter;
-
-    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
-    if (result.has_value() && *result) {
-      if (binding.BindingType->hasTypeVariable())
-        return SubsumeBindingResult::ExistingIsBetter;
-
-      if (existing.BindingType->hasTypeVariable())
+    if (!CS.getASTContext().TypeCheckerOpts.SolverEnablePromoteSupertypes ||
+        CS.shouldAttemptFixes()) {
+      if (binding.BindingType->isEqual(existing.BindingType))
         return SubsumeBindingResult::NewIsBetter;
-    }
 
-    if (auto result = dedupCGFloatDoubleHack())
-      return *result;
+      auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+      if (result.has_value() && *result) {
+        if (binding.BindingType->hasTypeVariable())
+          return SubsumeBindingResult::ExistingIsBetter;
+
+        if (existing.BindingType->hasTypeVariable())
+          return SubsumeBindingResult::NewIsBetter;
+      }
+
+      if (auto result = dedupCGFloatDoubleHack())
+        return *result;
+    }
   }
 
   // (Supertypes, Fallback)
@@ -1723,11 +1726,14 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     }
 
     // FIXME: Remove the rest.
-    if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::ExistingIsBetter;
+    if (!CS.getASTContext().TypeCheckerOpts.SolverEnablePromoteSupertypes ||
+        CS.shouldAttemptFixes()) {
+      if (binding.BindingType->isEqual(existing.BindingType))
+        return SubsumeBindingResult::ExistingIsBetter;
 
-    if (auto result = dedupCGFloatDoubleHack())
-      return *result;
+      if (auto result = dedupCGFloatDoubleHack())
+        return *result;
+    }
   }
 
   // (Subtypes, Subtypes)
