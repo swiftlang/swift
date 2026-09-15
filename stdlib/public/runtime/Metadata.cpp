@@ -2266,15 +2266,44 @@ BorrowCacheEntry::tryInitialize(Metadata *metadata,
 
 namespace {
 
-class TupleCacheEntry
-    : public MetadataCacheEntryBase<TupleCacheEntry,
-                                    TupleTypeMetadata::Element> {
+// Tuple cache entries have two representations: inline and out-of-line.
+// Dynamically constructed tuple metadata is always stored inline.
+// Prespecialized tuple metadata is out-of-line.
+//
+// In both representations, the word before the tuple metadata stores the index
+// of the entry that provides extra inhabitants, as well as a bit which
+// indicates whether the representation is inline or out-of-line. Inline entries
+// (i.e. dynamically constructed entries) may be incomplete. The runtime will
+// retrieve the enclosing TupleCacheEntry for inline metadata by subtracting the
+// offset of the FullMetadata within the TupleCacheEntry, then retrieve the
+// metadata state from the MetadataCacheEntryBase. Out-of-line entries are
+// always complete, so the runtime checks the out-of-line bit first, and the
+// metadata is known to be complete if that bit is set.
+//
+// The ExtraInhabitantProvidingElement field directly before the metadata is
+// part of the contract with LibPrespecialized. Bump
+// LibPrespecializedData::minorVersionWithTupleMetadataMap to avoid using a
+// table with the old layout if the location or content of that field is ever
+// changed.
+class TupleCacheEntry : public MetadataCacheEntryBase<
+                            TupleCacheEntry, FullMetadata<TupleTypeMetadata>,
+                            TupleTypeMetadata::Element, ValueWitnessTable> {
 public:
   static const char *getName() { return "TupleCache"; }
 
-  unsigned ExtraInhabitantProvidingElement;
-  ValueWitnessTable Witnesses;
-  FullMetadata<TupleTypeMetadata> Data;
+  /// The bit that indicates that a tuple metadata is stored out of line. In
+  /// ExtraInhabitantProvidingElementOrPtr, it indicates that the field's value
+  /// is a pointer to the out of line representation. In the out of line
+  /// representation, it indicates that the adjoining metadata is out of line
+  /// and therefore is automatically in the Complete state.
+  static constexpr uintptr_t OutOfLineBit = 1;
+
+  /// The extra-inhabitant-providing element index shifted left one, or a
+  /// pointer to the out-of-line representation with the low bit set.
+  ///
+  /// Must remain the only declared member, and so the last: we depend on the
+  /// tuple metadata coming immediately afterward.
+  uintptr_t ExtraInhabitantProvidingElementOrPtr;
 
   struct Key {
     size_t NumElements;
@@ -2295,18 +2324,56 @@ public:
     }
   };
 
-  ValueType getValue() {
-    return &Data;
+  /// The word preceding a tuple's metadata, whichever form the metadata takes.
+  static const uintptr_t *wordBefore(const TupleTypeMetadata *metadata) {
+    auto bytes = reinterpret_cast<const char *>(asFullMetadata(metadata));
+    return reinterpret_cast<const uintptr_t *>(bytes - sizeof(uintptr_t));
   }
-  void setValue(ValueType value) {
-    assert(value == &Data);
+
+  /// Is this metadata an out of line representation, with no entry in front of
+  /// it?
+  static bool isOutOfLineRepresentation(const TupleTypeMetadata *metadata) {
+    return *wordBefore(metadata) & OutOfLineBit;
   }
+
+  /// The index of the element this tuple takes its extra inhabitants from.
+  static unsigned
+  extraInhabitantProvidingElement(const TupleTypeMetadata *metadata) {
+    return *wordBefore(metadata) >> 1;
+  }
+
+  bool hasInlineMetadata() const {
+    return !(ExtraInhabitantProvidingElementOrPtr & OutOfLineBit);
+  }
+
+  FullMetadata<TupleTypeMetadata> *getData() {
+    if (hasInlineMetadata())
+      return getTrailingObjects<FullMetadata<TupleTypeMetadata>>();
+    return reinterpret_cast<FullMetadata<TupleTypeMetadata> *>(
+        ExtraInhabitantProvidingElementOrPtr & ~OutOfLineBit);
+  }
+  const FullMetadata<TupleTypeMetadata> *getData() const {
+    return const_cast<TupleCacheEntry *>(this)->getData();
+  }
+
+  ValueType getValue() { return getData(); }
+  void setValue(ValueType value) { assert(value == getData()); }
 
   TupleCacheEntry(const Key &key, MetadataWaitQueue::Worker &worker,
                   MetadataRequest request,
                   const ValueWitnessTable *proposedWitnesses);
 
+  /// Adopt an out of line representation the prespecializations library
+  /// emitted. It is complete as emitted, so this entry exists only to find it
+  /// again through the cache.
+  TupleCacheEntry(const Key &key, MetadataWaitQueue::Worker &worker,
+                  MetadataRequest request,
+                  const TupleTypeMetadata *representation);
+
   AllocationResult allocate(const ValueWitnessTable *proposedWitnesses) {
+    swift_unreachable("allocated during construction");
+  }
+  AllocationResult allocate(const TupleTypeMetadata *representation) {
     swift_unreachable("allocated during construction");
   }
 
@@ -2315,31 +2382,31 @@ public:
                                     PrivateMetadataCompletionContext *context);
 
   MetadataStateWithDependency checkTransitiveCompleteness() {
-    auto dependency = swift::checkTransitiveCompleteness(&Data);
+    auto dependency = swift::checkTransitiveCompleteness(getData());
     return { dependency ? PrivateMetadataState::NonTransitiveComplete
                         : PrivateMetadataState::Complete,
              dependency };
   }
 
-  size_t getNumElements() const {
-    return Data.NumElements;
-  }
+  size_t getNumElements() const { return getData()->NumElements; }
 
   intptr_t getKeyIntValueForDump() {
     return 0; // No single meaningful value
   }
 
   friend llvm::hash_code hash_value(const TupleCacheEntry &value) {
+    auto *data = value.getData();
     auto elements = llvm::ArrayRef<TupleTypeMetadata::Element>(
-        value.Data.getElements(), value.Data.NumElements);
+        data->getElements(), data->NumElements);
     auto types =
         makeTransformRange(elements, [](TupleTypeMetadata::Element element) {
           return element.Type;
         });
-    return Key::hash_value(types, value.Data.Labels);
+    return Key::hash_value(types, data->Labels);
   }
 
-  bool matchesKey(const Key &key) {
+  static bool metadataMatchesKey(const TupleTypeMetadata &Data,
+                                 const Key &key) {
     if (key.NumElements != Data.NumElements)
       return false;
 
@@ -2358,33 +2425,78 @@ public:
     return strcmp(key.Labels, Data.Labels) == 0;
   }
 
+  bool matchesKey(const Key &key) {
+    return metadataMatchesKey(*getData(), key);
+  }
+
+  /// Whether a new entry built from these constructor arguments will
+  /// tail-allocate its metadata. An entry adopting an out of line
+  /// representation will not: that metadata, its elements, and its value
+  /// witnesses all live in the library.
+  static bool needsInlineMetadata(MetadataWaitQueue::Worker &, MetadataRequest,
+                                  const ValueWitnessTable *) {
+    return true;
+  }
+  static bool needsInlineMetadata(MetadataWaitQueue::Worker &, MetadataRequest,
+                                  const TupleTypeMetadata *) {
+    return false;
+  }
+
+  size_t
+  numTrailingObjects(OverloadToken<FullMetadata<TupleTypeMetadata>>) const {
+    return hasInlineMetadata() ? 1 : 0;
+  }
   size_t numTrailingObjects(OverloadToken<TupleTypeMetadata::Element>) const {
-    return getNumElements();
+    return hasInlineMetadata() ? getNumElements() : 0;
+  }
+  size_t numTrailingObjects(OverloadToken<ValueWitnessTable>) const {
+    return hasInlineMetadata() ? 1 : 0;
   }
 
   template <class... Args>
+  static size_t
+  numTrailingObjects(OverloadToken<FullMetadata<TupleTypeMetadata>>,
+                     const Key &, Args &&...extraArgs) {
+    return needsInlineMetadata(extraArgs...) ? 1 : 0;
+  }
+  template <class... Args>
   static size_t numTrailingObjects(OverloadToken<TupleTypeMetadata::Element>,
-                                   const Key &key,
-                                   Args &&...extraArgs) {
-    return key.NumElements;
+                                   const Key &key, Args &&...extraArgs) {
+    return needsInlineMetadata(extraArgs...) ? key.NumElements : 0;
+  }
+  template <class... Args>
+  static size_t numTrailingObjects(OverloadToken<ValueWitnessTable>,
+                                   const Key &, Args &&...extraArgs) {
+    return needsInlineMetadata(extraArgs...) ? 1 : 0;
   }
 };
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
+static_assert(offsetof(TupleCacheEntry, ExtraInhabitantProvidingElementOrPtr) ==
+                  sizeof(TupleCacheEntry) - sizeof(uintptr_t),
+              "a tuple's metadata begins one word past the discriminator, so "
+              "nothing may follow the discriminator in the entry");
+#pragma clang diagnostic pop
+static_assert(sizeof(TupleCacheEntry) %
+                      alignof(FullMetadata<TupleTypeMetadata>) ==
+                  0,
+              "the tail-allocated metadata must start at sizeof(entry)");
 
 class TupleCacheStorage :
   public LockingConcurrentMapStorage<TupleCacheEntry, TupleCacheTag> {
 public:
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Winvalid-offsetof"
   static TupleCacheEntry *
   resolveExistingEntry(const TupleTypeMetadata *metadata) {
-    // The correctness of this arithmetic is verified by an assertion in
-    // the TupleCacheEntry constructor.
+    // Only meaningful for a metadata tail-allocated on its entry, which is what
+    // the word preceding it reports. The correctness of this arithmetic is
+    // verified by an assertion in the TupleCacheEntry constructor.
+    assert(!TupleCacheEntry::isOutOfLineRepresentation(metadata));
     auto bytes = reinterpret_cast<const char*>(asFullMetadata(metadata));
-    bytes -= offsetof(TupleCacheEntry, Data);
+    bytes -= sizeof(TupleCacheEntry);
     auto entry = reinterpret_cast<const TupleCacheEntry*>(bytes);
     return const_cast<TupleCacheEntry*>(entry);
   }
-#pragma clang diagnostic pop
 };
 
 class TupleCache :
@@ -2395,6 +2507,25 @@ class TupleCache :
 
 /// The uniquing structure for tuple type metadata.
 static Lazy<TupleCache> TupleTypes;
+
+/// Find the out of line representation the prespecializations library emitted
+/// for a tuple, or null if the library provides no tuple matching the key.
+static const TupleTypeMetadata *
+getPrespecializedTupleTypeMetadata(const TupleCacheEntry::Key &key) {
+  auto *candidates =
+      getLibPrespecializedTupleTypeMetadata(key.Elements, key.NumElements);
+  if (!candidates)
+    return nullptr;
+
+  // The table's key is only the element types, so tuples that differ solely in
+  // their labels share an entry. Find the one that matches the whole request.
+  for (size_t i = 0; i < candidates->count; i++) {
+    auto *metadata = cast<TupleTypeMetadata>(candidates->metadata[i]);
+    if (TupleCacheEntry::metadataMatchesKey(*metadata, key))
+      return metadata;
+  }
+  return nullptr;
+}
 
 /// Generic tuple value witness for 'allocateBuffer'
 template <bool IsPOD, bool IsInline>
@@ -2538,9 +2669,8 @@ static void tuple_storeExtraInhabitantTag(OpaqueValue *tuple,
                                           unsigned xiCount,
                                           const Metadata *_metatype) {
   auto &metatype = *(const TupleTypeMetadata*) _metatype;
-  auto cacheEntry = TupleCacheStorage::resolveExistingEntry(&metatype);
-  auto &eltInfo =
-    metatype.getElement(cacheEntry->ExtraInhabitantProvidingElement);
+  auto &eltInfo = metatype.getElement(
+      TupleCacheEntry::extraInhabitantProvidingElement(&metatype));
   assert(xiCount == eltInfo.Type->vw_getNumExtraInhabitants());
 
   auto *elt = (OpaqueValue*)((uintptr_t)tuple + eltInfo.Offset);
@@ -2556,9 +2686,8 @@ static unsigned tuple_getExtraInhabitantTag(const OpaqueValue *tuple,
                                             const Metadata *_metatype) {
   auto &metatype = *(const TupleTypeMetadata*) _metatype;
 
-  auto cacheEntry = TupleCacheStorage::resolveExistingEntry(&metatype);
-  auto &eltInfo =
-    metatype.getElement(cacheEntry->ExtraInhabitantProvidingElement);
+  auto &eltInfo = metatype.getElement(
+      TupleCacheEntry::extraInhabitantProvidingElement(&metatype));
   assert(xiCount == eltInfo.Type->vw_getNumExtraInhabitants());
 
   auto *elt = (const OpaqueValue*)((uintptr_t)tuple + eltInfo.Offset);
@@ -2594,7 +2723,9 @@ tuple_storeEnumTagSinglePayload(OpaqueValue *enumAddr, unsigned whichCase,
 }
 
 /// Various standard witness table for tuples.
-static const ValueWitnessTable tuple_witnesses_pod_inline = {
+///
+/// Exported so the prespecialization library can use these witnesses.
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_pod_inline = {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) &tuple_##LOWER_ID<true, true>,
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
@@ -2604,7 +2735,7 @@ static const ValueWitnessTable tuple_witnesses_pod_inline = {
   ValueWitnessFlags(),
   0
 };
-static const ValueWitnessTable tuple_witnesses_nonpod_inline = {
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_nonpod_inline = {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) &tuple_##LOWER_ID<false, true>,
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
@@ -2614,7 +2745,7 @@ static const ValueWitnessTable tuple_witnesses_nonpod_inline = {
   ValueWitnessFlags(),
   0
 };
-static const ValueWitnessTable tuple_witnesses_pod_noninline = {
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_pod_noninline = {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) &tuple_##LOWER_ID<true, false>,
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
@@ -2624,7 +2755,7 @@ static const ValueWitnessTable tuple_witnesses_pod_noninline = {
   ValueWitnessFlags(),
   0
 };
-static const ValueWitnessTable tuple_witnesses_nonpod_noninline = {
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_nonpod_noninline = {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) &tuple_##LOWER_ID<false, false>,
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
@@ -2846,15 +2977,21 @@ swift::swift_getTupleTypeMetadata(MetadataRequest request,
 
   auto &cache = TupleTypes.get();
 
+  // We still cache entries from the prespecializations library, so check the
+  // cache first.
+  if (auto response = cache.tryAwaitExisting(key, request))
+    return *response;
+
+  // If the prespecializations library has this tuple, cache it as an out of
+  // line entry.
+  if (auto *representation = getPrespecializedTupleTypeMetadata(key))
+    return cache.getOrInsert(key, request, representation).second;
+
   // If we have constant labels, directly check the cache.
   if (!flags.hasNonConstantLabels())
     return cache.getOrInsert(key, request, proposedWitnesses).second;
 
   // If we have non-constant labels, we can't simply record the result.
-  // Look for an existing result, first.
-  if (auto response = cache.tryAwaitExisting(key, request))
-    return *response;
-
   // Allocate a copy of the labels string within the tuple type allocator.
   size_t labelsLen = strlen(labels);
   size_t labelsAllocSize = roundUpToAlignment(labelsLen + 2, sizeof(void *));
@@ -2881,6 +3018,11 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
                                  MetadataRequest request,
                                  const ValueWitnessTable *proposedWitnesses)
     : MetadataCacheEntryBase(worker, PrivateMetadataState::Abstract) {
+  // This is an inline entry, so the low bit is zero. The rest of the value is
+  // set in tryInitialize.
+  ExtraInhabitantProvidingElementOrPtr = 0;
+
+  auto &Data = *getData();
   Data.setKind(MetadataKind::Tuple);
   Data.NumElements = key.NumElements;
   Data.Labels = key.Labels;
@@ -2894,6 +3036,20 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   assert(TupleCacheStorage::resolveExistingEntry(&Data) == this);
 }
 
+TupleCacheEntry::TupleCacheEntry(const Key &key,
+                                 MetadataWaitQueue::Worker &worker,
+                                 MetadataRequest request,
+                                 const TupleTypeMetadata *representation)
+    : MetadataCacheEntryBase(worker, PrivateMetadataState::Complete) {
+  auto address = reinterpret_cast<uintptr_t>(asFullMetadata(representation));
+  assert(!(address & OutOfLineBit) && "metadata is not word-aligned");
+  ExtraInhabitantProvidingElementOrPtr = address | OutOfLineBit;
+
+  assert(isOutOfLineRepresentation(representation) &&
+         "constructing out of line cache entry but out of line bit is not set");
+  assert(metadataMatchesKey(*representation, key));
+}
+
 MetadataStateWithDependency
 TupleCacheEntry::tryInitialize(Metadata *metadata,
                                PrivateMetadataState state,
@@ -2905,6 +3061,12 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
   // Otherwise, we must still be abstract, because tuples don't have an
   // intermediate state between that and non-transitive completeness.
   assert(state == PrivateMetadataState::Abstract);
+
+  // An entry that adopted an out of line representation is always complete and
+  // never reaches initialization.
+  assert(hasInlineMetadata());
+  auto &Data = *getData();
+  auto &Witnesses = *getTrailingObjects<ValueWitnessTable>();
 
   bool allElementsTransitivelyComplete = true;
   const Metadata *knownIncompleteElement = nullptr;
@@ -2983,7 +3145,8 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
   }
   Witnesses.extraInhabitantCount = numExtraInhabitants;
   if (numExtraInhabitants > 0) {
-    ExtraInhabitantProvidingElement = extraInhabitantProvidingElement;
+    ExtraInhabitantProvidingElementOrPtr =
+        uintptr_t(extraInhabitantProvidingElement) << 1;
   }
 
   // Copy the function witnesses in, either from the proposed
@@ -3006,17 +3169,17 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
       else if (numExtraInhabitants == 0 && layout.size == 1)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi8_);
       else
-        proposedWitnesses = &tuple_witnesses_pod_inline;
+        proposedWitnesses = &swift_tupleWitnesses_pod_inline;
     } else if (layout.flags.isInlineStorage()
                && !layout.flags.isPOD()) {
-      proposedWitnesses = &tuple_witnesses_nonpod_inline;
+      proposedWitnesses = &swift_tupleWitnesses_nonpod_inline;
     } else if (!layout.flags.isInlineStorage()
                && layout.flags.isPOD()) {
-      proposedWitnesses = &tuple_witnesses_pod_noninline;
+      proposedWitnesses = &swift_tupleWitnesses_pod_noninline;
     } else {
       assert(!layout.flags.isInlineStorage()
              && !layout.flags.isPOD());
-      proposedWitnesses = &tuple_witnesses_nonpod_noninline;
+      proposedWitnesses = &swift_tupleWitnesses_nonpod_noninline;
     }
   }
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
@@ -7957,6 +8120,9 @@ MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
     }
 
     MetadataResponse forTupleMetadata(const TupleTypeMetadata *metadata) {
+      // An out of line representation is always complete.
+      if (TupleCacheEntry::isOutOfLineRepresentation(metadata))
+        return MetadataResponse{metadata, MetadataState::Complete};
       return TupleTypes.get().await(metadata, Request);
     }
 

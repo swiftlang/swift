@@ -553,7 +553,7 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
       new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   FunctionType::ExtInfo info;
-  zeroInitializerRef->setType(FunctionType::get({}, selfType, info));
+  zeroInitializerRef->setType(FunctionType::get({}, {}, selfType, info));
 
   auto call = CallExpr::createImplicitEmpty(ctx, zeroInitializerRef);
   call->setType(selfType);
@@ -994,7 +994,7 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   addressofFnRefExpr->setType(FunctionType::get(
       AnyFunctionType::Param(inoutSelfDecl->getInterfaceType(), Identifier(),
                              ParameterTypeFlags().withInOut(true)),
-      ctx.TheRawPointerType, addressOfInfo));
+      /* yields */ {}, ctx.TheRawPointerType, addressOfInfo));
 
   auto *selfPtrArgs = ArgumentList::createImplicit(
       ctx, {Argument::implicitInOut(ctx, inoutSelfRef)});
@@ -1016,7 +1016,7 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   initializeFnRefExpr->setType(FunctionType::get(
       {AnyFunctionType::Param(newValueDecl->getInterfaceType()),
        AnyFunctionType::Param(ctx.TheRawPointerType)},
-      TupleType::getEmpty(ctx), initializeInfo));
+      /* yields */ {}, TupleType::getEmpty(ctx), initializeInfo));
 
   auto *initArgs =
       ArgumentList::forImplicitUnlabeled(ctx, {newValueRef, selfPointer});
@@ -1631,8 +1631,8 @@ Expr *SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(ASTContext &ctx,
       new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   FunctionType::ExtInfo info;
-  reinterpretCastRef->setType(
-      FunctionType::get({FunctionType::Param(givenType)}, exprType, info));
+  reinterpretCastRef->setType(FunctionType::get(
+      {FunctionType::Param(givenType)}, /* yields */ {}, exprType, info));
 
   auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {baseExpr});
   auto reinterpreted =

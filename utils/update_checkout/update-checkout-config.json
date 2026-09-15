@@ -61,7 +61,7 @@
         "swift-integration-tests": {
             "remote": { "id": "swiftlang/swift-integration-tests" } },
         "swift-xcode-playground-support": {
-            "remote": { "id": "apple/swift-xcode-playground-support" },
+            "remote": { "id": "swiftlang/swift-xcode-playground-support" },
             "platforms": [ "Darwin" ]
         },
         "ninja": {

@@ -3798,6 +3798,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::COMMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel), and an operand.
@@ -3830,6 +3831,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       break;
     case SILInstructionKind::ObjCMethodInst:
       ResultInst = Builder.createObjCMethod(
+          Loc,
+          getLocalValue(Builder.maybeGetFunction(),
+                        ListOfValues[NextValueIndex], operandTy),
+          DRef, Ty);
+      break;
+    case SILInstructionKind::COMMethodInst:
+      ResultInst = Builder.createCOMMethod(
           Loc,
           getLocalValue(Builder.maybeGetFunction(),
                         ListOfValues[NextValueIndex], operandTy),
@@ -3951,6 +3959,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createCheckedCastAddrBranch(
         Loc, options, consumption, src, srcFormalType, dest,
         targetFormalType, successBB, failureBB);
+    break;
+  }
+  case SILInstructionKind::OpenCOMExistentialInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultInst = Builder.createOpenCOMExistential(
+        Loc,
+        getLocalValue(
+            Builder.maybeGetFunction(), ValID,
+            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
+        decodeValueOwnership(Attr));
     break;
   }
   case SILInstructionKind::UncheckedRefCastInst: {

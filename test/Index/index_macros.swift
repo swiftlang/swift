@@ -12,6 +12,7 @@
 // Check indexed symbols
 // RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %t/IndexTest.swift -load-plugin-library %t/%target-library-name(IndexMacros) -parse-as-library > %t/index.out
 // RUN: %FileCheck %s --input-file %t/index.out
+// RUN: %FileCheck %s --input-file %t/index.out --check-prefix DUP
 
 //--- IndexTest.swift
 @freestanding(expression)
@@ -21,6 +22,10 @@ macro freestandingExpr<T>(arg: T) = #externalMacro(module: "IndexMacros", type: 
 @freestanding(declaration, names: named(TestFree))
 macro freestandingDecl<T>(arg: T) = #externalMacro(module: "IndexMacros", type: "FreestandingDeclMacro")
 // CHECK: [[@LINE-1]]:7 | macro(internal)/Swift | freestandingDecl(arg:) |  [[DECL_USR:.*]] | Def
+
+@freestanding(declaration, names: named(TestFreeConforming))
+macro freestandingConformingDecl() = #externalMacro(module: "IndexMacros", type: "FreestandingConformingDeclMacro")
+// CHECK: [[@LINE-1]]:7 | macro(internal)/Swift | freestandingConformingDecl() |  [[CONFORMING_DECL_USR:.*]] | Def
 
 @attached(accessor)
 macro Accessor() = #externalMacro(module: "IndexMacros", type: "SomeAccessorMacro")
@@ -123,6 +128,11 @@ struct TestAttached {
 // CHECK: [[@LINE-24]]:39 | function/Swift | peerLog() | [[PEER_LOG_USR]] | Ref,Call,Impl,RelCall,RelCont
 // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | peerFunc() | [[PEER_FUNC_USR]]
 
+// `Conformance` adds `TestProto` as a conformance on an extension of `TestAttached`
+// CHECK: [[@LINE-28]]:1 | extension/ext-struct/Swift | TestAttached | {{.*}} | Def,Impl
+// CHECK: [[@LINE-29]]:1 | protocol/Swift | TestProto | [[PROTO_USR]] | Ref,Impl,RelBase
+// CHECK-NEXT: RelBase | extension/ext-struct/Swift | TestAttached
+
 // CHECK: [[@LINE+1]]:8 | struct(internal)/Swift | Outer | [[OUTER_USR:.*]] | Def
 struct Outer {
   // CHECK: [[@LINE+1]]:4 | macro/Swift | PeerMember() | [[PEER_MEMBER_USR]] | Ref
@@ -143,18 +153,21 @@ struct Outer {
 // CHECK: [[@LINE-6]]:16 | function/Swift | memberLog() | [[MEMBER_LOG_USR]] | Ref,Call,Impl,RelCall,RelCont
 // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | memberFunc() | [[INNER_FUNC_USR]]
 
-
-// Expanded extensions are visited last
-
-// `Conformance` adds `TestProto` as a conformance on an extension of `TestAttached`
-// CHECK: [[@LINE-51]]:1 | extension/ext-struct/Swift | TestAttached | {{.*}} | Def,Impl
-// CHECK: [[@LINE-52]]:1 | protocol/Swift | TestProto | [[PROTO_USR]] | Ref,Impl,RelBase
-// CHECK-NEXT: RelBase | extension/ext-struct/Swift | TestAttached
-
 // `Conformance` adds `TestProto` as a conformance on an extension of `TestInner`
-// CHECK: [[@LINE-18]]:3 | extension/ext-struct/Swift | TestInner | {{.*}} | Def,Impl
-// CHECK: [[@LINE-19]]:3 | protocol/Swift | TestProto | [[PROTO_USR]] | Ref,Impl,RelBase
+// CHECK: [[@LINE-10]]:3 | extension/ext-struct/Swift | TestInner | {{.*}} | Def,Impl
+// CHECK: [[@LINE-11]]:3 | protocol/Swift | TestProto | [[PROTO_USR]] | Ref,Impl,RelBase
 // CHECK-NEXT: RelBase | extension/ext-struct/Swift | TestInner
+
+// Make sure we pick up an extension macro attached to the expansion of a freestanding macro.
+#freestandingConformingDecl
+// CHECK: [[@LINE-1]]:1 | struct(internal)/Swift | TestFreeConforming | {{.*}} | Def,Impl
+// CHECK: [[@LINE-2]]:1 | extension/ext-struct/Swift | TestFreeConforming | {{.*}} | Def,Impl
+// CHECK: [[@LINE-3]]:1 | protocol/Swift | TestProto | {{.*}} | Ref,Impl,RelBase
+// CHECK-NEXT: RelBase | extension/ext-struct/Swift | TestFreeConforming
+
+// Make sure a freestanding decl expansion only gets reported once.
+// DUP-COUNT-1: | struct(internal)/Swift | TestFree | {{.*}} | Def,Impl
+// DUP-NOT: | struct(internal)/Swift | TestFree | {{.*}} | Def,Impl
 
 //--- IndexMacros.swift
 import SwiftSyntax
@@ -182,6 +195,17 @@ public struct FreestandingDeclMacro: DeclarationMacro {
         }
       }
       """]
+  }
+}
+
+/// Like `FreestandingDeclMacro`, but the expanded type also has an attached
+/// extension macro.
+public struct FreestandingConformingDeclMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["@Conformance struct TestFreeConforming {}"]
   }
 }
 

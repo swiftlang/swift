@@ -477,7 +477,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
 
   PrettySourceFileEmission StackEntry(SF);
 
-  // Emit types and other global decls.
+  // Emit types and other global decls. `emitGlobalDecl` handles auxiliary.
   for (auto *decl : SF.getTopLevelDecls())
     emitGlobalDecl(decl);
   for (auto *decl : SF.getHoistedDecls())
@@ -2656,9 +2656,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   if (!D->isAvailableDuringLowering())
     return;
 
-  D->visitAuxiliaryDecls([&](Decl *decl) {
-    emitGlobalDecl(decl);
-  });
+  D->visitAuxiliaryDecls([&](Decl *decl) { emitGlobalDecl(decl); },
+                         /*visitFreestanding*/ true, /*visitExtensions*/ true);
 
   switch (D->getKind()) {
   case DeclKind::Extension:
@@ -4834,6 +4833,11 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
 
 void IRGenModule::emitAccessibleFunction(StringRef sectionName,
                                          const AccessibleFunction &func) {
+  // In Embedded Distributed swift does not use accessible functions for executing targets,
+  // if we were about to emit a distributed function accessor, that's a bug.
+  assert(!(func.isDistributed() && Context.LangOpts.hasFeature(Feature::Embedded)) &&
+         "should not emit a distributed accessible function record in Embedded Swift");
+
   auto var = new llvm::GlobalVariable(
       Module, AccessibleFunctionRecordTy, /*isConstant=*/true,
       llvm::GlobalValue::PrivateLinkage, /*initializer=*/nullptr,
@@ -5975,9 +5979,17 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     if (!member->isAvailableDuringLowering())
       continue;
 
-    member->visitAuxiliaryDecls([&](Decl *decl) {
-      emitNestedTypeDecls({decl, nullptr});
-    });
+    member->visitAuxiliaryDecls(
+        [&](Decl *decl) {
+          // Nested types can have extension macros, these need to be emitted
+          // as top-level.
+          if (auto *ED = dyn_cast<ExtensionDecl>(decl)) {
+            emitGlobalDecl(ED);
+          } else {
+            emitNestedTypeDecls({decl, nullptr});
+          }
+        },
+        /*visitFreestanding*/ true, /*visitExtensions*/ true);
     switch (member->getKind()) {
     case DeclKind::Import:
     case DeclKind::TopLevelCode:

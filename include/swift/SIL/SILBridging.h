@@ -592,6 +592,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isGlobalInitOnceFunction() const;
   BRIDGED_INLINE bool isDestructor() const;
   BRIDGED_INLINE bool isGeneric() const;
+  BRIDGED_INLINE bool isDistributedAdHocSerializationRequirementWitness() const;
   BRIDGED_INLINE bool hasSemanticsAttr(BridgedStringRef attrName) const;
   BRIDGED_INLINE bool hasUnsafeNonEscapableResult() const;
   BRIDGED_INLINE bool hasDynamicSelfMetadata() const;
@@ -855,6 +856,8 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType InitExistentialMetatypeInst_getFormalConcreteType() const;
   BRIDGED_INLINE bool OpenExistentialAddr_isImmutable() const;
   BRIDGED_INLINE BridgedGenericEnvironment OpenExistentialRefInst_getDefinedGenericEnvironment() const;
+  BRIDGED_INLINE BridgedGenericEnvironment
+  OpenCOMExistentialInst_getDefinedGenericEnvironment() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar GlobalAccessInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar AllocGlobalInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction FunctionRefBaseInst_getReferencedFunction() const;
