@@ -226,6 +226,8 @@ import TwoSum
 import TypeFlood
 import UTF8Decode
 import UTF16Decode
+import UncheckedStringUInt8
+import UncheckedStringUInt16
 import Walsh
 import TaskDeadlines
 import WithUnsafeCurrentTask
@@ -449,6 +451,10 @@ register(TwoSum.benchmarks)
 register(TypeFlood.benchmarks)
 register(UTF8Decode.benchmarks)
 register(UTF16Decode.benchmarks)
+if #available(SwiftStdlib 9999, *) {
+  register(UncheckedStringUInt8.benchmarks)
+  register(UncheckedStringUInt16.benchmarks)
+}
 register(Walsh.benchmarks)
 register(TaskDeadlines.benchmarks)
 register(WithUnsafeCurrentTask.benchmarks)

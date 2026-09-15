@@ -3185,6 +3185,10 @@ public:
   emitStringToPointer(SILLocation loc, ManagedValue stringValue,
                       Type pointerType);
 
+  std::pair<ManagedValue,ManagedValue>
+  emitUncheckedStringToPointer(SILLocation loc, ManagedValue stringValue,
+                               Type stringType, Type pointerType);
+
   class ForceTryEmission {
     SILGenFunction &SGF;
     ForceTryExpr *Loc;

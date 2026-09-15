@@ -8508,6 +8508,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                   conversionsOrFixes.push_back(
                       ConversionRestrictionKind::StringToPointer);
               }
+
+              // The pointer can be converted from an UncheckedString, if the
+              // pointee type matches the string's element type.
+              if (ctx.getConvertConstUncheckedStringToPointerArgument()) {
+                if (type1->getUncheckedStringElementType())
+                  conversionsOrFixes.push_back(
+                      ConversionRestrictionKind::UncheckedStringToPointer);
+              }
             }
 
             if (type1IsPointer && optionalityMatches &&
@@ -14873,6 +14881,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     switch (restriction) {
     case ConversionRestrictionKind::ArrayToPointer:
+    case ConversionRestrictionKind::UncheckedStringToPointer:
     case ConversionRestrictionKind::InoutToPointer: {
       ptr2 = type2->lookThroughAllOptionalTypes()->castTo<BoundGenericType>();
       ptr1 = BoundGenericType::get(ptr2->getDecl(), ptr2->getParent(),
@@ -15120,6 +15129,19 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     auto baseType1 = getFixedTypeRecursive(obj1->getArrayElementType(), false);
     auto ptr2 = getBaseTypeForPointer(t2);
+
+    increaseScore(SK_ValueToOptional, locator, ptr2.getInt());
+
+    return matchPointerBaseTypes({baseType1, 0}, ptr2);
+  }
+
+  // UncheckedString<T> ===> UnsafePointer<T>
+  case ConversionRestrictionKind::UncheckedStringToPointer: {
+    addContextualScore();
+
+    auto baseType1 = getFixedTypeRecursive(
+        type1->getUncheckedStringElementType(), false);
+    auto ptr2 = getBaseTypeForPointer(type2->getDesugaredType());
 
     increaseScore(SK_ValueToOptional, locator, ptr2.getInt());
 
@@ -15443,6 +15465,7 @@ static void increaseScoreForGenericParamPointerConversion(
   case ConversionRestrictionKind::InoutToPointer:
   case ConversionRestrictionKind::ArrayToPointer:
   case ConversionRestrictionKind::StringToPointer:
+  case ConversionRestrictionKind::UncheckedStringToPointer:
   case ConversionRestrictionKind::PointerToPointer:
     break;
   default:

@@ -219,6 +219,8 @@ set(SWIFT_BENCH_MODULES
     single-source/TypeFlood
     single-source/UTF8Decode
     single-source/UTF16Decode
+    single-source/UncheckedStringUInt8
+    single-source/UncheckedStringUInt16
     single-source/Walsh
     single-source/Concurrency/ChildTaskCreation
     single-source/Concurrency/TaskIsCancelledCancellationScopes

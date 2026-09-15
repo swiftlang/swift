@@ -141,10 +141,11 @@ ERROR(lex_unterminated_string,none,
       "unterminated string literal", ())
 ERROR(lex_invalid_escape,none,
        "invalid escape sequence in literal", ())
-ERROR(lex_invalid_u_escape,none,
-      "\\u{...} escape sequence expects between 1 and 8 hex digits", ())
-ERROR(lex_invalid_u_escape_rbrace,none,
-      "expected '}' in \\u{...} escape sequence", ())
+ERROR(lex_invalid_hex_escape,none,
+      "\\%0{...} escape sequence expects between 1 and 8 hex digits",
+      (StringRef))
+ERROR(lex_invalid_hex_escape_rbrace,none,
+      "expected '}' in \\%0{...} escape sequence", (StringRef))
 ERROR(lex_invalid_escape_delimiter,none,
       "too many '#' characters in delimited escape", ())
 ERROR(lex_invalid_closing_delimiter,none,
@@ -161,8 +162,8 @@ ERROR(lex_regex_literal_unterminated,none,
 
 ERROR(lex_invalid_unicode_scalar,none,
       "invalid unicode scalar", ())
-ERROR(lex_unicode_escape_braces,none,
-      "expected hexadecimal code in braces after unicode escape", ())
+ERROR(lex_hex_escape_braces,none,
+      "expected hexadecimal code in braces after \\%0 escape", (StringRef))
 ERROR(lex_illegal_multiline_string_start,none,
       "multi-line string literal content must begin on a new line", ())
 ERROR(lex_illegal_multiline_string_end,none,

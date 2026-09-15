@@ -211,6 +211,14 @@ add_library(swiftCore
   SwiftNativeNSArray.swift
   TemporaryAllocation.swift
   UIntBuffer.swift
+  UncheckedString.swift
+  UncheckedString+Codable.swift
+  UncheckedString+Encoding.swift
+  UncheckedString+FastPath.swift
+  UncheckedString+Literals.swift
+  UncheckedString+RangeReplaceableCollection.swift
+  UncheckedStringProtocol.swift
+  UncheckedStringStorage.swift
   UnavailableStringAPIs.swift
   UnicodeData.swift
   UnicodeEncoding.swift

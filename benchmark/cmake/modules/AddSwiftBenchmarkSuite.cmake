@@ -338,6 +338,15 @@ function (swift_benchmark_compile_archopts)
 
   set(target "${BENCH_COMPILE_ARCHOPTS_ARCH}-${vendor}-${triple_platform}${ver}")
 
+  # UncheckedString is still pre-release (@available(SwiftStdlib 9999, *)).
+  # Unlike the stdlib's own build, the benchmark suite doesn't otherwise
+  # define the `SwiftStdlib` availability domain, so anything that uses
+  # `@available(SwiftStdlib 9999, *)`/`if #available(SwiftStdlib 9999, *)`
+  # needs these flags too.
+  set(unchecked_string_availability_flags
+      "-Xfrontend" "-define-availability"
+      "-Xfrontend" "SwiftStdlib 9999:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999")
+
   set(objdir "${CMAKE_CURRENT_BINARY_DIR}/${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
   file(MAKE_DIRECTORY "${objdir}")
 
@@ -484,6 +493,10 @@ function (swift_benchmark_compile_archopts)
         set(extra_options "-Xfrontend"
                           "-disable-swift-bridge-attr")
       endif()
+      if("${module_name}" STREQUAL "UncheckedStringUInt8" OR
+         "${module_name}" STREQUAL "UncheckedStringUInt16")
+        set(extra_options ${unchecked_string_availability_flags})
+      endif()
       set(objfile "${objdir}/${module_name}.o")
       set(swiftmodule "${objdir}/${module_name}.swiftmodule")
       set(source "${srcdir}/${module_name_path}.swift")
@@ -602,6 +615,7 @@ function (swift_benchmark_compile_archopts)
         ${SWIFT_BENCH_SIBFILES} "${source}"
       COMMAND "${SWIFT_EXEC}"
       ${common_swift4_options}
+      ${unchecked_string_availability_flags}
       "-whole-module-optimization"
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"

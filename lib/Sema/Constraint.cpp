@@ -575,6 +575,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[array-to-c-pointer]";
   case ConversionRestrictionKind::StringToPointer:
     return "[string-to-pointer]";
+  case ConversionRestrictionKind::UncheckedStringToPointer:
+    return "[unchecked-string-to-pointer]";
   case ConversionRestrictionKind::InoutToPointer:
     return "[inout-to-pointer]";
   case ConversionRestrictionKind::InoutToCPointer:
