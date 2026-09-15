@@ -4282,6 +4282,40 @@ private:
     return false;
   }
 
+  /// Reject a matched `@c` or `@cxx @implementation` pair whose C or C++
+  /// declaration returns a reference-counted foreign reference type at +0.
+  /// Returns true if an error was diagnosed (the match is invalid).
+  bool diagnoseUnretainedForeignResult(ValueDecl *req, ValueDecl *cand) {
+    const auto *clangFD =
+        dyn_cast_or_null<clang::FunctionDecl>(req->getClangDecl());
+    const auto *candFD = dyn_cast<FuncDecl>(cand);
+    if (!clangFD || !candFD)
+      return false;
+
+    // The implementation is lowered with the result convention of the C or
+    // C++ declaration (see getSILFunctionTypeForClangDecl), but its Swift
+    // body always produces an owned (+1) value, which would leak against an
+    // unretained (+0) result, or no annotation.
+    // An immortal foreign reference type is never retained or released, so
+    // its result convention does not matter.
+    // TODO: Support returning a foreign reference type unretained.
+    const auto *resultClass = candFD->getResultInterfaceType()
+                                  ->lookThroughAllOptionalTypes()
+                                  ->getClassOrBoundGenericClass();
+    if (!resultClass || !resultClass->hasRefCountingAnnotations())
+      return false;
+    if (importer::getOwnershipOfReturnedFRT(clangFD, cand->getASTContext()) ==
+        ResultConvention::Owned)
+      return false;
+
+    bool isCxx = cand->getAttrs().hasAttribute<CxxDeclAttr>();
+    unsigned reason =
+        importer::ReturnOwnershipInfo(clangFD).hasReturnsUnretained ? 1 : 0;
+    diagnose(cand, diag::cdecl_unretained_result_unsupported, cand, isCxx,
+             clangFD->getName(), reason);
+    return true;
+  }
+
   void diagnoseOutcome(MatchOutcome outcome, ValueDecl *req, ValueDecl *cand,
                        ObjCSelector explicitObjCName) {
     // If the candidate was invalid, we've already diagnosed the likely cause of
@@ -4301,7 +4335,8 @@ private:
     case MatchOutcome::Match:
     case MatchOutcome::MatchWithExplicitObjCName:
       // Successful outcomes!
-      if (diagnoseInvalidCxxMatch(req, cand))
+      if (diagnoseInvalidCxxMatch(req, cand) ||
+          diagnoseUnretainedForeignResult(req, cand))
         return;
       // If this member will require a vtable entry, diagnose that now.
       diagnoseVTableUse(cand);
