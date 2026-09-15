@@ -527,7 +527,8 @@ swift::Identifier BridgedType::getTupleElementLabel(SwiftInt idx) const {
 
 BridgedType BridgedType::getFunctionTypeWithNoEscape(bool withNoEscape) const {
   auto fnType = unbridged().getAs<swift::SILFunctionType>();
-  auto newTy = fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape(true));
+  auto newTy =
+      fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape(withNoEscape));
   return swift::SILType::getPrimitiveObjectType(newTy);
 }
 
