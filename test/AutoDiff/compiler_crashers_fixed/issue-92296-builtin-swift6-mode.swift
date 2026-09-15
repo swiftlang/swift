@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature BuiltinModule -emit-silgen -swift-version 6 %s
 
+// REQUIRES: swift_feature_BuiltinModule
+
 // https://github.com/swiftlang/swift/issues/92296
 // Ensure we skip @Sendable conversions when checking for builtin name
 import Builtin
