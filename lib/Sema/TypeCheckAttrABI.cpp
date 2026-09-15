@@ -851,19 +851,11 @@ public:
     auto behaviors = DeclAttribute::getBehaviors(kind);
 
     switch (behaviors & DeclAttribute::InABIAttrMask) {
-    case DeclAttribute::UnreachableInABIAttr:
-      ASSERT(abiAttr->canAppearOnDecl(apiDecl)
-                && "checking @abi on decl that can't have it???");
-      ASSERT(!abiAttr->canAppearOnDecl(apiDecl)
-                 && "unreachable-in-@abi attr on reachable decl???");
-
-      // If the asserts are disabled, fall through to no checking.
-      LLVM_FALLTHROUGH;
-
     case DeclAttribute::UnconstrainedInABIAttr:
       // No checking required.
       return false;
 
+    case DeclAttribute::UnreachableInABIAttr:
     case DeclAttribute::ForbiddenInABIAttr:
       // Diagnose if ABI has attribute.
       if (abi) {
