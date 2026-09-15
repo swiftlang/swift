@@ -956,8 +956,19 @@ SIMPLE_DECL_ATTR(yield_once, Coroutine,
   UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
   180)
 
+// Deliberately not OnAbstractFunction, which would also admit accessors. A
+// direct accessor is unsound and unsupported: GenClass's ClassDataBuilder
+// registers an accessor's selector through visitVarDecl / visitSubscriptDecl,
+// neither of which consults ObjCDirectAttr, so the selector stays in the class
+// method list -- with a type encoding that still advertises _cmd -- while IRGen
+// emits the entry point with the direct signature that omits it. For an
+// accessor that takes arguments this shifts every argument register by one.
+//
+// OnDestructor is kept so that @objcDirect on a deinit still gets its specific
+// diagnostic rather than the generic "cannot be applied to this declaration";
+// visitObjCDirectAttr rejects it.
 SIMPLE_DECL_ATTR(objcDirect, ObjCDirect,
-  OnAbstractFunction,
+  OnFunc | OnConstructor | OnDestructor,
   ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   181)
 DECL_ATTR_FEATURE_REQUIREMENT(ObjCDirect, ObjCDirect)

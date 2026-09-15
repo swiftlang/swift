@@ -1950,13 +1950,13 @@ void AttributeChecker::visitObjCMembersAttr(ObjCMembersAttr *attr) {
 // diagnoses and strips the attribute before this ever runs. That is also what
 // keeps the feature gate ahead of every applicability rule below.
 void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
-  auto *fn = dyn_cast<AbstractFunctionDecl>(D);
-  if (!fn) {
-    diagnoseAndRemoveAttr(attr, diag::objc_direct_not_in_class);
-    return;
-  }
+  // DeclAttr.def restricts the attribute to OnFunc | OnConstructor |
+  // OnDestructor, so accessors and subscripts are already rejected by the
+  // applicability check and this cast cannot fail.
+  auto *fn = cast<AbstractFunctionDecl>(D);
 
-  // Disallow on deinit.
+  // Disallow on deinit. This is kept as its own rule, rather than folded into
+  // the applicability mask, so that the diagnostic names the actual problem.
   if (isa<DestructorDecl>(fn)) {
     diagnoseAndRemoveAttr(attr, diag::objc_direct_on_deinit);
     return;
