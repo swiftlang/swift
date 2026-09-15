@@ -20,5 +20,6 @@ uint32_t GetForeignCOMAddRefCalls(void);
 uint32_t GetForeignCOMReleaseCalls(void);
 uint32_t GetForeignCOMDestructionCount(void);
 uint32_t GetForeignCOMMethodCalls(void);
+uint32_t GetForeignCOMQueryInterfaceCalls(void);
 
 #endif

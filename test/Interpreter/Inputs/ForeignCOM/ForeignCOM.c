@@ -1,6 +1,7 @@
 #include "ForeignCOM.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(_WIN32) && defined(__i386__)
 #define COM_CALL __stdcall
@@ -23,7 +24,7 @@ struct ForeignCOMObject {
 };
 
 static uint32_t ActiveReferences;
-static uint32_t AddRefs, Releases, Destructions, MethodCalls;
+static uint32_t AddRefs, Releases, Destructions, MethodCalls, Queries;
 
 static uint32_t COM_CALL AddRef(struct Interface *self) {
   assert(self->Owner->References);
@@ -45,10 +46,44 @@ static uint32_t COM_CALL Release(struct Interface *self) {
   return remaining;
 }
 
-// Querying a different interface is outside this fixture's scope.
+struct IID {
+  uint32_t Data1;
+  uint16_t Data2, Data3;
+  uint8_t Data4[8];
+};
+
+static const struct IID IID_IUnknown = {
+    0, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
+static const struct IID IID_IValue = {
+    0x10000000, 0, 0, {0, 0, 0, 0, 0, 0, 0, 1}};
+static const struct IID IID_IExtended = {
+    0x10000000, 0, 0, {0, 0, 0, 0, 0, 0, 0, 2}};
+static const struct IID IID_IProperty = {
+    0x10000000, 0, 0, {0, 0, 0, 0, 0, 0, 0, 3}};
+static const struct IID IID_IClassValue = {
+    0x10000000, 0, 0, {0, 0, 0, 0, 0, 0, 0, 5}};
+
 static int32_t COM_CALL QueryInterface(struct Interface *self, const void *iid,
                                        void **result) {
-  abort();
+  ++Queries;
+  assert(self->Owner->References);
+  if (!result)
+    return (int32_t)0x80004003u; // E_POINTER
+  *result = NULL;
+  struct Interface *target;
+  if (!memcmp(iid, &IID_IUnknown, sizeof(struct IID)) ||
+      !memcmp(iid, &IID_IValue, sizeof(struct IID)) ||
+      !memcmp(iid, &IID_IExtended, sizeof(struct IID)) ||
+      !memcmp(iid, &IID_IClassValue, sizeof(struct IID))) {
+    target = &self->Owner->Value;
+  } else if (!memcmp(iid, &IID_IProperty, sizeof(struct IID))) {
+    target = &self->Owner->Property;
+  } else {
+    return (int32_t)0x80004002u; // E_NOINTERFACE
+  }
+  AddRef(target);
+  *result = target;
+  return 0;
 }
 
 static int32_t COM_CALL Value(struct Interface *self, int32_t offset) {
@@ -132,7 +167,7 @@ static const struct {
 struct ForeignCOMObject *ForeignCOMObject_Create(int32_t value) {
   // Each test starts after all references from the preceding test are gone.
   assert(!ActiveReferences);
-  AddRefs = Releases = Destructions = MethodCalls = 0;
+  AddRefs = Releases = Destructions = MethodCalls = Queries = 0;
   struct ForeignCOMObject *object = malloc(sizeof(*object));
   assert(object);
   object->Value = (struct Interface){&ValueVTable, object};
@@ -164,3 +199,5 @@ uint32_t GetForeignCOMAddRefCalls(void) { return AddRefs; }
 uint32_t GetForeignCOMReleaseCalls(void) { return Releases; }
 uint32_t GetForeignCOMDestructionCount(void) { return Destructions; }
 uint32_t GetForeignCOMMethodCalls(void) { return MethodCalls; }
+
+uint32_t GetForeignCOMQueryInterfaceCalls(void) { return Queries; }
