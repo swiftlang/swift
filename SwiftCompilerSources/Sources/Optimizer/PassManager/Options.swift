@@ -48,6 +48,10 @@ struct Options {
     _bridged.enableMergeableTraps()
   }
 
+  var enableAsyncLoopYield: Bool {
+    _bridged.enableAsyncLoopYield()
+  }
+
   func hasFeature(_ feature: BridgedFeature) -> Bool {
     _bridged.hasFeature(feature)
   }

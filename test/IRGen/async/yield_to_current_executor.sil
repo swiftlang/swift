@@ -1,0 +1,27 @@
+// RUN: %target-swift-frontend -primary-file %s -emit-irgen -parse-stdlib -module-name main | %FileCheck %s
+
+// REQUIRES: concurrency
+
+sil_stage canonical
+
+import Builtin
+
+// The yieldToCurrentExecutor builtin lowers to an async suspension point whose
+// suspend function tail-calls swift_task_yieldToExecutor with the current
+// context and the resume function, so that the task is re-enqueued on the
+// executor it is already running on.
+
+// CHECK-LABEL: define{{.*}} swift{{(tail)?}}cc void @test_yield(ptr swiftasync %0)
+// CHECK:         [[RESUME:%.*]] = call ptr @llvm.coro.async.resume()
+// CHECK:         call { ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0s(i32 0, ptr [[RESUME]], ptr @__swift_async_resume_get_context, ptr @test_yield.2, ptr [[RESUME]], ptr {{%.*}})
+// CHECK:       }
+sil @test_yield : $@async () -> () {
+bb0:
+  %0 = builtin "yieldToCurrentExecutor"() : $()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @test_yield.2(ptr %0, ptr %1)
+// CHECK:         {{(musttail )?}}call swift{{(tail)?}}cc void @swift_task_yieldToExecutor(ptr swiftasync %1, ptr %0)
+// CHECK-NEXT:    ret void

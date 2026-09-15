@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sil-verify-all -enable-sil-opaque-values -parse-as-library -emit-sil -Onone %s | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-all -enable-sil-opaque-values -parse-as-library -emit-sil -Onone -disable-async-loop-yield %s | %FileCheck %s
 
 // REQUIRES: concurrency
 

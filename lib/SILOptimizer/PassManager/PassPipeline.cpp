@@ -290,6 +290,12 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // It is considered a diagnostics pass because it will diagnose cycles in
   // inline(always) function calling.
   P.addInlineAlwaysInlining();
+
+  // On targets where async resumption is not a guaranteed tail call, insert
+  // executor yields on the back-edges of loops containing suspension points
+  // so that they cannot grow the native stack without bound. This must run
+  // in all optimization modes, after inlining has settled the loop shapes.
+  P.addAsyncLoopYieldInsertion();
 }
 
 SILPassPipelinePlan

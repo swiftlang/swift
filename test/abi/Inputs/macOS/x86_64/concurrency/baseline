@@ -1150,3 +1150,4 @@ _swift_task_reportUnexpectedExecutor
 _swift_task_startOnMainActor
 _swift_task_suspend
 _swift_task_switch
+_swift_task_yieldToExecutor
