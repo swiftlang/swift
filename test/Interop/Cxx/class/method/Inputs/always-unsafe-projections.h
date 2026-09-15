@@ -9,6 +9,7 @@ struct InheritedBase {
   void *ptr;
   InheritedBase(const InheritedBase &);
 
+  // expected-note@+1 {{this returns a view into a type that owns its storage}}
   InheritedView view() const;
   int *pointer() const;
   int value() const;
