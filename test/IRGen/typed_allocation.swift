@@ -166,7 +166,7 @@ public func makeClassI(x: Int, y: Int, z: Int) -> ClassI<Int> {
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   {{.*}} = call noalias ptr @swift_allocObjectTyped(ptr {{.*}}, i64 40, i64 7, i64 [[MYSUBCLASS_TYPEID]])
 
-// CHECK-LABEL: define swiftcc void @"$e16typed_allocation3runyyAA3RefCFyyXEfU0_"(ptr %0, ptr captures(none) dereferenceable(16) %1)
+// CHECK-LABEL: define swiftcc void @"$e16typed_allocation3runyyAA3RefCFyyXEfU0_"(ptr %0, ptr align 8 captures(none) dereferenceable(16) %1)
 // CHECK: %2 = call {{.*}} ptr @swift_allocObjectTyped(ptr {{.*}}, i64 {{.*}}, i64 {{.*}}, i64 [[P_CAPTURE_TYPEID:.*]])
 // CHECK: call void @swift_deallocUninitializedObjectTyped(ptr %2, i64 {{.*}}, i64 {{.*}}, i64 [[P_CAPTURE_TYPEID]])
 public class Ref {}
