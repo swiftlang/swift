@@ -5972,7 +5972,9 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
 std::optional<importer::CxxUnknownEscapability>
 importer::explainUnknownEscapability(const clang::RecordDecl *recordDecl,
                                      ASTContext &ctx) {
-  EscapabilityLookupDescriptor desc{recordDecl->getTypeForDecl(), nullptr};
+  auto &clangCtx = recordDecl->getASTContext();
+  EscapabilityLookupDescriptor desc{
+      clangCtx.getCanonicalTagType(recordDecl).getTypePtr(), nullptr};
   // The request caches the verdict but not the reason behind it, so ask it for
   // the verdict and repeat the walk only when there is something to explain.
   if (evaluateOrDefault(ctx.evaluator, ClangTypeEscapability(desc),
