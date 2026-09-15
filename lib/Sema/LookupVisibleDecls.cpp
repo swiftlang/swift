@@ -315,16 +315,11 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       if (!D->isObjC())
         return;
 
-      // If the declaration is objc_direct, it cannot be called dynamically.
-      if (auto clangDecl = D->getClangDecl()) {
-        if (auto objCMethod = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-          if (objCMethod->isDirectMethod())
-            return;
-        } else if (auto objCProperty = dyn_cast<clang::ObjCPropertyDecl>(clangDecl)) {
-          if (objCProperty->isDirectProperty())
-            return;
-        }
-      }
+      // If the declaration is direct, it cannot be called dynamically: it has
+      // no entry in the class's Objective-C method list. Covers both Swift
+      // @objcDirect and imported objc_direct.
+      if (D->isObjCDirectDispatched())
+        return;
 
       if (D->isRecursiveValidation())
         return;
