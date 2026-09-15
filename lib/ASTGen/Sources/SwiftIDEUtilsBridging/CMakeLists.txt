@@ -4,8 +4,11 @@ add_pure_swift_host_library(swiftIDEUtilsBridging CXX_INTEROP
   DEPENDENCIES
     swiftAST
   SWIFT_DEPENDENCIES
+    _CompilerSwiftBasicFormat
     _CompilerSwiftIDEUtils
     _CompilerSwiftSyntax
     _CompilerSwiftIDEUtils
+    _CompilerSwiftSyntaxMacroExpansion
+    _CompilerSwiftSyntaxMacros
     swiftASTGen
 )
