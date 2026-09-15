@@ -751,6 +751,14 @@ bool DebugValueInst::isExprTypeValid() const {
       if (varInfo.DIExpr.elements().empty() &&
           varInfo.Type == box->getAddressType().getObjectType())
         return true;
+
+    // Cannot have an object category undef value of an address-only type,
+    // except for the $error variable, which is handled differently.
+    if (isa<SILUndef>(operand) && valueType.isObject() &&
+        !valueType.isLoadableOrOpaque(*getFunction())
+        && varInfo.Name != "$error") {
+      return false;
+    }
   } else {
     // Transform: debug BB transforms the SSA values to its return type.
     if (debugBB->getNumArguments() != operands.size())
