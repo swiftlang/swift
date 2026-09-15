@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros)
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 // The order of cases in the case specific CodingKeys enum should not matter
 enum SimpleEnum : Codable {

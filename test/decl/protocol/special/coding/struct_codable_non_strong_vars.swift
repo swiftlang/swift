@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros)
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 // Structs with Codable properties (with non-strong ownership) should get
 // derived conformance to Codable.
