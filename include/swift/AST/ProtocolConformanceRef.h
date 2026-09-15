@@ -172,12 +172,6 @@ public:
       llvm::function_ref<bool(ProtocolConformanceRef)> body
   ) const;
 
-  /// Returns the availability restriction that restricts use of this
-  /// conformance in the given context, or \c nullopt if the conformance is
-  /// available.
-  std::optional<AvailabilityRestriction>
-  getAvailabilityRestriction(DeclContext *dc, SourceLoc loc) const;
-
   using OpaqueValue = void*;
   OpaqueValue getOpaqueValue() const { return Union.getOpaqueValue(); }
   static ProtocolConformanceRef getFromOpaqueValue(OpaqueValue value) {

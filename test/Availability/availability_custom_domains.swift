@@ -66,6 +66,32 @@ func testDeployment() { // expected-note 3 {{add '@available' attribute to enclo
   availableAndUnavailableInEnabledDomain() // expected-error {{'availableAndUnavailableInEnabledDomain()' is unavailable}}
 }
 
+struct HasAccessorsAvailableInDynamicDomain {
+  var getterRestricted: Int {
+    @available(DynamicDomain)
+    get { 0 }
+    set { }
+  }
+
+  var setterRestricted: Int {
+    get { 0 }
+    @available(DynamicDomain)
+    set { }
+  }
+}
+
+func takesInout<T>(_ value: inout T) { }
+
+func testInoutAccessRestrictedByCustomDomain(
+  // expected-note@-1 2 {{add '@available' attribute to enclosing global function}}
+  _ value: inout HasAccessorsAvailableInDynamicDomain
+) {
+  takesInout(&value.getterRestricted) // expected-error {{cannot pass as inout because getter for 'getterRestricted' is only available in DynamicDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+  takesInout(&value.setterRestricted) // expected-error {{cannot pass as inout because setter for 'setterRestricted' is only available in DynamicDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+}
+
 // FIXME: [availability] Test @inlinable functions.
 
 func testIfAvailable(_ truthy: Bool) { // expected-note 11 {{add '@available' attribute to enclosing global function}}

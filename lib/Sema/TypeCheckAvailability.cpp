@@ -1117,12 +1117,16 @@ requiresDeploymentTargetOrEarlier(AvailabilityDomain domain,
 }
 
 /// Returns the diagnostic to emit for the potentially unavailable decl and sets
-/// \p IsError accordingly.
+/// \p IsError accordingly. The returned diagnostic may refer to \p scratch,
+/// so \p scratch must outlive it.
 static Diagnostic getPotentialUnavailabilityDiagnostic(
     const ValueDecl *D, const DeclContext *ReferenceDC,
-    AvailabilityDomain Domain, const AvailabilityRange &Availability,
+    const AvailabilityRestriction &Restriction, llvm::SmallString<64> &scratch,
     bool WarnBeforeDeploymentTarget, bool &IsError) {
   ASTContext &Context = ReferenceDC->getASTContext();
+  auto DomainAndRange = Restriction.getDomainAndRange(Context);
+  AvailabilityDomain Domain = DomainAndRange.getDomain();
+  const AvailabilityRange &Availability = DomainAndRange.getRange();
 
   if (requiresDeploymentTargetOrEarlier(Domain, Availability, Context)) {
     // The required OS version is at or before the deployment target so this
@@ -1139,20 +1143,20 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
   }
 
   IsError = true;
-  return Diagnostic(diag::availability_decl_only_in, D, Domain,
-                    Availability.hasMinimumVersion(), Availability);
+  return Diagnostic(diag::availability_decl_only_in, D,
+                    Restriction.getDiagnosticDescription(scratch, Context));
 }
 
 // Emits a diagnostic for a reference to a declaration that is potentially
 // unavailable at the given source location. Returns true if an error diagnostic
 // was emitted.
-static bool diagnosePotentialUnavailability(
-    const ValueDecl *D, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC,
-    const AvailabilityDomainAndRange &DomainAndRange,
-    const AvailabilityDomainAndRange &FixItDomainAndRange,
-    bool WarnBeforeDeploymentTarget = false) {
+static bool
+diagnosePotentialUnavailability(const ValueDecl *D, SourceRange ReferenceRange,
+                                const DeclContext *ReferenceDC,
+                                const AvailabilityRestriction &Restriction,
+                                bool WarnBeforeDeploymentTarget = false) {
   ASTContext &Context = ReferenceDC->getASTContext();
+  auto DomainAndRange = Restriction.getDomainAndRange(Context);
   AvailabilityDomain Domain = DomainAndRange.getDomain();
   const AvailabilityRange &Availability = DomainAndRange.getRange();
   if (Context.LangOpts.DisableAvailabilityChecking)
@@ -1160,9 +1164,10 @@ static bool diagnosePotentialUnavailability(
 
   bool IsError;
   {
+    llvm::SmallString<64> scratch;
     auto Diag = Context.Diags.diagnose(
         ReferenceRange.Start, getPotentialUnavailabilityDiagnostic(
-                                  D, ReferenceDC, Domain, Availability,
+                                  D, ReferenceDC, Restriction, scratch,
                                   WarnBeforeDeploymentTarget, IsError));
 
     // Direct a fixit to the error if an existing guard is nearly-correct
@@ -1171,7 +1176,8 @@ static bool diagnosePotentialUnavailability(
       return IsError;
   }
 
-  fixAvailability(ReferenceRange, ReferenceDC, FixItDomainAndRange, Context);
+  fixAvailability(ReferenceRange, ReferenceDC,
+                  Restriction.getFixItDomainAndRange(Context), Context);
   return IsError;
 }
 
@@ -1179,10 +1185,10 @@ static bool diagnosePotentialUnavailability(
 /// potentially unavailable.
 static void diagnosePotentialAccessorUnavailability(
     const AccessorDecl *Accessor, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC,
-    const AvailabilityDomainAndRange &DomainAndRange,
-    const AvailabilityDomainAndRange &FixItDomainAndRange, bool ForInout) {
+    const DeclContext *ReferenceDC, const AvailabilityRestriction &Restriction,
+    bool ForInout) {
   ASTContext &Context = ReferenceDC->getASTContext();
+  auto DomainAndRange = Restriction.getDomainAndRange(Context);
   AvailabilityDomain Domain = DomainAndRange.getDomain();
   const AvailabilityRange &Availability = DomainAndRange.getRange();
 
@@ -1192,10 +1198,10 @@ static void diagnosePotentialAccessorUnavailability(
                         : diag::availability_decl_only_in;
 
   {
-    auto Err =
-        Context.Diags.diagnose(ReferenceRange.Start, diag, Accessor,
-                               Context.getTargetAvailabilityDomain(),
-                               Availability.hasMinimumVersion(), Availability);
+    llvm::SmallString<64> scratch;
+    auto Err = Context.Diags.diagnose(
+        ReferenceRange.Start, diag, Accessor,
+        Restriction.getDiagnosticDescription(scratch, Context));
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(
@@ -1203,7 +1209,8 @@ static void diagnosePotentialAccessorUnavailability(
       return;
   }
 
-  fixAvailability(ReferenceRange, ReferenceDC, FixItDomainAndRange, Context);
+  fixAvailability(ReferenceRange, ReferenceDC,
+                  Restriction.getFixItDomainAndRange(Context), Context);
 }
 
 static DiagnosticBehavior
@@ -1227,27 +1234,26 @@ behaviorLimitForExplicitUnavailability(
 
 /// Emits a diagnostic for a protocol conformance that is potentially
 /// unavailable at the given source location.
-static bool diagnosePotentialUnavailability(
-    const RootProtocolConformance *rootConf, const ExtensionDecl *ext,
-    SourceLoc loc, const DeclContext *dc,
-    const AvailabilityDomainAndRange &domainAndRange,
-    const AvailabilityDomainAndRange &fixItDomainAndRange) {
+static bool
+diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
+                                const ExtensionDecl *ext, SourceLoc loc,
+                                const DeclContext *dc,
+                                const AvailabilityRestriction &restriction) {
   ASTContext &ctx = dc->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return false;
 
+  auto domainAndRange = restriction.getDomainAndRange(ctx);
   AvailabilityDomain domain = domainAndRange.getDomain();
   const AvailabilityRange &availability = domainAndRange.getRange();
+
   {
     auto type = rootConf->getType();
     auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-    auto err = availability.hasMinimumVersion()
-        ? ctx.Diags.diagnose(
-            loc, diag::conformance_availability_only_version_newer, type, proto,
-            domain, availability)
-        : ctx.Diags.diagnose(
-            loc, diag::conformance_availability_not_available, type, proto,
-            domain);
+    llvm::SmallString<64> scratch;
+    auto err = ctx.Diags.diagnose(
+        loc, diag::conformance_availability_unavailable, type, proto,
+        restriction.getDiagnosticDescription(scratch, ctx));
 
     auto behaviorLimit = behaviorLimitForExplicitUnavailability(rootConf, dc);
     if (!availability.hasMinimumVersion()) {
@@ -1264,7 +1270,7 @@ static bool diagnosePotentialUnavailability(
       return true;
   }
 
-  fixAvailability(loc, dc, fixItDomainAndRange, ctx);
+  fixAvailability(loc, dc, restriction.getFixItDomainAndRange(ctx), ctx);
   return true;
 }
 
@@ -1884,19 +1890,16 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
 
   auto type = rootConf->getType();
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-  auto domainAndRange = restriction.getDomainAndRange(ctx);
-  auto attr = restriction.getAttr();
 
   // Downgrade unavailable Sendable conformance diagnostics where
   // appropriate.
   auto behavior =
       behaviorLimitForExplicitUnavailability(rootConf, where.getDeclContext());
 
-  EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
+  llvm::SmallString<64> scratch;
   diags
       .diagnose(loc, diag::conformance_availability_unavailable, type, proto,
-                restriction.shouldHideDomainNameInDiagnostics(),
-                domainAndRange.getDomain(), EncodedMessage.Message)
+                restriction.getDiagnosticDescription(scratch, ctx))
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6,
                                LanguageMode::v6);
@@ -2202,7 +2205,6 @@ bool diagnoseExplicitUnavailability(
   SourceLoc Loc = R.Start;
   ASTContext &ctx = D->getASTContext();
   auto &diags = ctx.Diags;
-  auto domainAndRange = restriction.getDomainAndRange(ctx);
 
   // TODO: Consider removing this.
   // ObjC keypaths components weren't checked previously, so errors are demoted
@@ -2232,11 +2234,10 @@ bool diagnoseExplicitUnavailability(
     diag.limitBehavior(limit);
     attachRenameFixIts(diag, rename);
   } else {
-    EncodedDiagnosticMessage EncodedMessage(message);
+    llvm::SmallString<64> scratch;
     diags
         .diagnose(Loc, diag::availability_decl_unavailable, D,
-                  restriction.shouldHideDomainNameInDiagnostics(),
-                  domainAndRange.getDomain(), EncodedMessage.Message)
+                  restriction.getDiagnosticDescription(scratch, ctx))
         .highlight(R)
         .limitBehavior(limit);
   }
@@ -3085,16 +3086,12 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   }
 
   // Diagnose (and possibly signal) for potential unavailability
-  auto domainAndRange = restriction->getDomainAndRange(ctx);
-  auto fixItDomainAndRange = restriction->getFixItDomainAndRange(ctx);
-
   if (accessor) {
     bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
-    diagnosePotentialAccessorUnavailability(accessor, R, DC, domainAndRange,
-                                            fixItDomainAndRange, forInout);
+    diagnosePotentialAccessorUnavailability(accessor, R, DC, *restriction,
+                                            forInout);
   } else {
-    if (!diagnosePotentialUnavailability(D, R, DC, domainAndRange,
-                                         fixItDomainAndRange))
+    if (!diagnosePotentialUnavailability(D, R, DC, *restriction))
       return false;
   }
 
@@ -3396,7 +3393,6 @@ static bool diagnoseConformanceAvailabilityRestriction(
     bool warnIfConformanceUnavailablePreSwift6, bool preconcurrency,
     std::function<void(void)> maybeEmitAssociatedTypeNote) {
   auto *DC = where.getDeclContext();
-  auto &ctx = DC->getASTContext();
 
   if (restriction.isUnavailable()) {
     if (diagnoseExplicitUnavailability(loc, restriction, rootConf, ext, where,
@@ -3414,10 +3410,7 @@ static bool diagnoseConformanceAvailabilityRestriction(
   }
 
   // Diagnose (and possibly signal) for potential unavailability
-  auto domainAndRange = restriction.getDomainAndRange(ctx);
-  auto fixItDomainAndRange = restriction.getFixItDomainAndRange(ctx);
-  if (diagnosePotentialUnavailability(rootConf, ext, loc, DC, domainAndRange,
-                                      fixItDomainAndRange)) {
+  if (diagnosePotentialUnavailability(rootConf, ext, loc, DC, restriction)) {
     maybeEmitAssociatedTypeNote();
     return true;
   }
@@ -3434,6 +3427,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        bool preconcurrency) {
   assert(!where.isImplicit());
 
+  // FIXME: Shares a lot with
+  // AvailabilityContext::enumerateUnsatisfiedRestrictionsForConformance().
   if (conformance.isInvalid() || conformance.isAbstract())
     return false;
 

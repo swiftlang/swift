@@ -3624,23 +3624,17 @@ private:
     if (!restriction)
       return;
 
-    auto domainAndRange = restriction->getDomainAndRange(ctx);
-    auto domain = domainAndRange.getDomain();
+    auto domain = restriction->getDomainAndRange(ctx).getDomain();
 
-    auto emit = [&]() -> InFlightDiagnostic {
-      if (restriction->isUnavailable())
-        return diagnose(
-            ext, diag::objc_implementation_extension_unavailable, nominal,
-            restriction->shouldHideDomainNameInDiagnostics(), domain);
-
-      return diagnose(
-          ext, diag::objc_implementation_extension_only_available_in, nominal,
-          domain, domain.isVersioned(), domainAndRange.getRange());
-    };
-
-    emit().warnUntilLanguageModeIf(shouldDowngradeAvailabilityMismatchDiag(
-                                       domain, /*implIsLessAvailable=*/true),
-                                   LanguageMode::future);
+    // The extension implements the class rather than using it, so the
+    // `message:` from the `@available` attribute does not apply here.
+    llvm::SmallString<64> scratch;
+    diagnose(ext, diag::objc_implementation_extension_restricted, nominal,
+             restriction->getDiagnosticDescription(scratch, ctx,
+                                                   /*includeMessage=*/false))
+        .warnUntilLanguageModeIf(shouldDowngradeAvailabilityMismatchDiag(
+                                     domain, /*implIsLessAvailable=*/true),
+                                 LanguageMode::future);
 
     restriction->emitNoteForDecl(ext);
   }

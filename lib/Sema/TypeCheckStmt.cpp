@@ -3816,11 +3816,17 @@ public:
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
     if (!ctx.LangOpts.DisableAvailabilityChecking) {
-      if (auto restriction = seqConformanceRef.getAvailabilityRestriction(
-              dc, stmt->getForLoc())) {
-        emitDiagnosticsForUnavailableConformance(seqType, restriction.value());
+      auto availability =
+          AvailabilityContext::forLocation(stmt->getForLoc(), dc);
+      bool diagnosed =
+          availability.enumerateUnsatisfiedRestrictionsForConformance(
+              seqConformanceRef,
+              [&](const Decl *decl, AvailabilityRestriction restriction) {
+                emitDiagnosticsForUnavailableConformance(seqType, restriction);
+                return true;
+              });
+      if (diagnosed)
         return nullptr;
-      }
     }
 
     buildMakeIteratorVar();
@@ -3845,20 +3851,15 @@ private:
     auto loc = stmt->getForLoc();
     auto protoDecl = seqConformanceRef.getProtocol();
 
-    auto domainAndRange = restriction.getDomainAndRange(ctx);
-    auto domain = domainAndRange.getDomain();
-    auto range = domainAndRange.getRange();
-    if (domain.isVersioned() && range.hasMinimumVersion()) {
-      ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
-                         seqType, protoDecl,
-                         domain.getNameForAttributePrinting(),
-                         range.getVersionString());
+    llvm::SmallString<64> scratch;
+    ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
+                       seqType, protoDecl,
+                       restriction.getDiagnosticDescription(scratch, ctx));
+
+    // A restriction that is unavailable cannot be satisfied with a runtime
+    // availability query, so only offer a fix-it for the other restrictions.
+    if (!restriction.isUnavailable())
       fixAvailability(loc, dc, restriction.getFixItDomainAndRange(ctx), ctx);
-    } else {
-      ctx.Diags.diagnose(
-          loc, diag::for_loop_sequence_conformance_unavailable_unconditionally,
-          seqType, protoDecl);
-    }
   }
 
   void buildMakeIteratorVar() {
