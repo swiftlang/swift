@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=100000 -solver-enable-prune-disjunctions
-
-// Passes with default limits but slow
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=50000 -solver-enable-promote-supertypes
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=100000 -solver-disable-promote-supertypes
 
 // REQUIRES: objc_interop
 
