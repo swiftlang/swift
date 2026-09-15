@@ -2581,18 +2581,15 @@ namespace {
 
           // If this is an inherited foreign reference type, check if it has a
           // suitable superclass.
-          if (Impl.SwiftContext.LangOpts.hasFeature(
-                  Feature::ForeignReferenceTypeInheritance)) {
-            if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
-              if (auto baseDecl = cast_or_null<ClassDecl>(
-                      Impl.importDecl(primaryBase, getVersion()))) {
-                auto classResult = cast<ClassDecl>(result);
-                Type superclassType = baseDecl->getDeclaredInterfaceType();
-                classResult->setSuperclass(superclassType);
-                classResult->setInherited(
-                    Impl.SwiftContext.AllocateCopy(ArrayRef<InheritedEntry>{
-                        TypeLoc::withoutLoc(superclassType)}));
-              }
+          if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
+            if (auto baseDecl = cast_or_null<ClassDecl>(
+                    Impl.importDecl(primaryBase, getVersion()))) {
+              auto classResult = cast<ClassDecl>(result);
+              Type superclassType = baseDecl->getDeclaredInterfaceType();
+              classResult->setSuperclass(superclassType);
+              classResult->setInherited(
+                  Impl.SwiftContext.AllocateCopy(ArrayRef<InheritedEntry>{
+                      TypeLoc::withoutLoc(superclassType)}));
             }
           }
         }
@@ -3048,7 +3045,8 @@ namespace {
           Impl.diagnose(HeaderLoc(ann.second),
                         diag::private_fileid_attr_format_invalid,
                         decl->getName());
-          Impl.diagnose({}, diag::private_fileid_attr_format_specification);
+          Impl.diagnose(HeaderLoc(ann.second),
+                        diag::private_fileid_attr_format_specification);
 
           if (ann.first.count('/') > 1) {
             // Try to construct a suggestion from predictable mistakes.
@@ -3065,7 +3063,8 @@ namespace {
               suggestion.append(".swift");
 
             if (SourceFile::FileIDStr::parse(suggestion))
-              Impl.diagnose({}, diag::private_fileid_attr_format_suggestion,
+              Impl.diagnose(HeaderLoc(ann.second),
+                            diag::private_fileid_attr_format_suggestion,
                             suggestion);
           }
         }
@@ -4318,7 +4317,14 @@ namespace {
           !isa<clang::CXXMethodDecl, clang::ObjCMethodDecl>(decl))
         return;
 
-      bool hasSkippedLifetimeAnnotation = false;
+      // Which lifetime annotation Swift could not represent, and on what. The
+      // first one found is the one reported.
+      std::optional<importer::CxxUnsafetyExplanation> skippedLifetime;
+      auto skipLifetime = [&](importer::CxxUnsafetyReason reason,
+                              const clang::NamedDecl *culprit) {
+        if (!skippedLifetime)
+          skippedLifetime = importer::CxxUnsafetyExplanation{reason, culprit};
+      };
       auto isEscapable = [this](clang::QualType ty) {
         return evaluateOrDefault(
                    Impl.SwiftContext.evaluator,
@@ -4363,7 +4369,9 @@ namespace {
         if (isEscapableAnnotatedType(retType.getTypePtr())) {
           // Swift drops lifetime dependencies on Escapable targets, so this
           // annotation is not enforced. Import the API as @unsafe.
-          hasSkippedLifetimeAnnotation = true;
+          skipLifetime(
+              importer::CxxUnsafetyReason::SkippedLifetimeEscapableResult,
+              nullptr);
           Impl.addImportDiagnostic(
               decl,
               Diagnostic(diag::return_escapable_with_lifetimebound,
@@ -4389,8 +4397,13 @@ namespace {
       auto processLifetimeBound = [&](unsigned idx, clang::QualType ty,
                                       bool forSelf = false) {
         warnForEscapableReturnType();
+        // 'self' has no ParmVarDecl to point at, so it goes unnamed.
+        const clang::NamedDecl *annotated =
+            forSelf ? nullptr : decl->getParamDecl(idx);
         if (importedAsClass(ty, forSelf))
-          hasSkippedLifetimeAnnotation = true;
+          skipLifetime(
+              importer::CxxUnsafetyReason::SkippedLifetimeImportedAsClass,
+              annotated);
         paramHasAnnotation[idx] = true;
         // 'self' and lvalue references borrow the referent's storage.
         if (forSelf || ty->isLValueReferenceType())
@@ -4400,7 +4413,9 @@ namespace {
         // dependency on it, nor can the result inherit its lifetime as if it
         // were passed by value. Import the API as @unsafe.
         else if (ty->isRValueReferenceType())
-          hasSkippedLifetimeAnnotation = true;
+          skipLifetime(
+              importer::CxxUnsafetyReason::SkippedLifetimeRValueReference,
+              annotated);
         // A non-escapable passed by value: the result inherits its lifetime.
         else if (!isEscapable(ty))
           inheritLifetimeParamIndicesForReturn[idx] = true;
@@ -4408,7 +4423,9 @@ namespace {
         // borrowable storage, so we cannot form a scoped lifetime dependency.
         // Import the API as @unsafe.
         else
-          hasSkippedLifetimeAnnotation = true;
+          skipLifetime(
+              importer::CxxUnsafetyReason::SkippedLifetimeNoBorrowableStorage,
+              annotated);
       };
       auto processLifetimeCaptureBy =
           [&](const clang::LifetimeCaptureByAttr *attr, unsigned idx,
@@ -4519,7 +4536,7 @@ namespace {
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
-      } else if (hasSkippedLifetimeAnnotation && resultIsNonEscapable) {
+      } else if (skippedLifetime && resultIsNonEscapable) {
         // We skipped a lifetime annotation we could not faithfully represent
         // The API is imported @unsafe (below); give the non-escapable result an
         // immortal lifetime so the implicit single-parameter inference does not
@@ -4546,8 +4563,12 @@ namespace {
           !result->getAttrs().hasAttribute<LifetimeAttr>() &&
           !hasSwiftAttribute(decl, {"safe"});
 
-      if (hasSkippedLifetimeAnnotation || resultDependenceIsInferred) {
+      if (skippedLifetime || resultDependenceIsInferred) {
         result->addAttribute(new (ASTContext) UnsafeAttr(/*implicit=*/true));
+        Impl.LifetimeUnsafetyReasons[result] =
+            skippedLifetime.value_or(importer::CxxUnsafetyExplanation{
+                importer::CxxUnsafetyReason::InferredResultDependence,
+                nullptr});
       } else {
         for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
           if (isEscapable(param->getType()))
@@ -4557,6 +4578,9 @@ namespace {
           // We have a nonescapable parameter that does not have its lifetime
           // annotated nor is it marked noescape.
           result->addAttribute(new (ASTContext) UnsafeAttr(/*implicit=*/true));
+          Impl.LifetimeUnsafetyReasons[result] = {
+              importer::CxxUnsafetyReason::UnannotatedNonEscapableParam,
+              param};
           break;
         }
       }
@@ -11097,13 +11121,10 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
   if ((cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) &&
       cxxRecord->isCompleteDefinition()) {
     const clang::RecordDecl *superclassClangDecl = nullptr;
-    if (Impl.SwiftContext.LangOpts.hasFeature(
-            Feature::ForeignReferenceTypeInheritance)) {
-      auto derivedInfo =
-          evaluateOrDefault(Impl.SwiftContext.evaluator,
-                            ForeignReferenceTypeInfoRequest({cxxRecord}), {});
-      superclassClangDecl = derivedInfo.getPrimarySuperclass();
-    }
+    auto derivedInfo =
+        evaluateOrDefault(Impl.SwiftContext.evaluator,
+                          ForeignReferenceTypeInfoRequest({cxxRecord}), {});
+    superclassClangDecl = derivedInfo.getPrimarySuperclass();
 
     for (auto base : cxxRecord->bases()) {
       if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)

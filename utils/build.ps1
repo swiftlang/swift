@@ -553,7 +553,7 @@ $KnownCMakes = @{
   "4.4.1" = @{
     AMD64 = @{
       Artifact = "cmake-4.4.1-windows-amd64"
-      URL = "https://cmake.org/files/v4.4/cmake-4.4.1-windows-x86_64.zip"
+      URL = "https://github.com/Kitware/CMake/releases/download/v4.4.1/cmake-4.4.1-windows-x86_64.zip"
       SHA256 = "091919E1CDE162B69D2D5E0F3B1F5670C973E72133F78126FBB18042947D6F19"
       FileName = "cmake-4.4.1-windows-x86_64.zip"
       CMakeRoot = [IO.Path]::Combine("$ArtifactCache", "cmake-4.4.1-windows-amd64", "cmake-4.4.1-windows-x86_64", "share", "cmake-4.4")
@@ -561,7 +561,7 @@ $KnownCMakes = @{
     };
     ARM64 = @{
       Artifact = "cmake-4.4.1-windows-arm64"
-      URL = "https://cmake.org/files/v4.4/cmake-4.4.1-windows-arm64.zip"
+      URL = "https://github.com/Kitware/CMake/releases/download/v4.4.1/cmake-4.4.1-windows-arm64.zip"
       SHA256 = "DC59D9F377F891B8DA42EDE22F53717034A9D093092FCEAF6297FEEEC6AFBA29"
       FileName = "cmake-4.4.1-windows-arm64.zip"
       CMakeRoot = [IO.Path]::Combine("$ArtifactCache", "cmake-4.4.1-windows-arm64", "cmake-4.4.1-windows-arm64", "share", "cmake-4.4")
@@ -4152,13 +4152,10 @@ function Write-PlatformInfoPlist($PlatformOrOS) {
 }
 
 function Get-SelectedSDKBuilds() {
-  return $KnownPlatforms.Values | Where-Object {
-    switch ($_.OS) {
-      Windows { $Windows }
-      Android { $Android }
-      default { $false }
-    }
-  }
+  $Builds = @()
+  if ($Windows) { $Builds += $WindowsSDKBuilds }
+  if ($Android) { $Builds += $AndroidSDKBuilds }
+  return $Builds
 }
 
 # Promotes C module header directories that libdispatch and Foundation install

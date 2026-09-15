@@ -301,6 +301,11 @@ bool BridgedDeclObj::AbstractFunction_isOverridden() const {
   return getAs<swift::AbstractFunctionDecl>()->isOverridden();
 }
 
+bool BridgedDeclObj::AbstractFunction_isDistributedWitnessWithAdHocSerializationRequirement() const {
+  return getAs<swift::AbstractFunctionDecl>()
+      ->isDistributedWitnessWithAdHocSerializationRequirement();
+}
+
 bool BridgedDeclObj::Constructor_isInheritable() const {
   return getAs<swift::ConstructorDecl>()->isInheritable();
 }

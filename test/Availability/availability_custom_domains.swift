@@ -649,33 +649,113 @@ class DerivedUnavailable2: BaseAvailableInEnabledDomain { } // expected-error {{
 @available(DisabledDomain, unavailable)
 class DerivedUnavailable3: BaseAvailableInEnabledDomain { }
 
+@available(EnabledDomain)
+protocol ProtoAvailableInEnabledDomain { }
+
+@available(EnabledDomain, unavailable) // expected-note * {{'ProtoUnavailableInEnabledDomain' has been explicitly marked unavailable here}}
+protocol ProtoUnavailableInEnabledDomain { }
+
+@available(AlwaysEnabledDomain)
+protocol ProtoAvailableInAlwaysEnabledDomain { }
+
+@available(AlwaysEnabledDomain, unavailable) // expected-note * {{'ProtoUnavailableInAlwaysEnabledDomain' has been explicitly marked unavailable here}}
+protocol ProtoUnavailableInAlwaysEnabledDomain { }
+
+struct ConformsMoreAvailable: ProtoAvailableInEnabledDomain { // expected-error {{'ProtoAvailableInEnabledDomain' is only available in EnabledDomain}}
+  // expected-note@-1 {{add '@available' attribute to enclosing struct}}
+}
+
+struct ConformsMoreAvailableInExtension { }
+
+// expected-note@+2 {{add '@available' attribute to enclosing extension}}
+// expected-error@+1 {{'ProtoAvailableInEnabledDomain' is only available in EnabledDomain}}
+extension ConformsMoreAvailableInExtension: ProtoAvailableInEnabledDomain { }
+
+@available(EnabledDomain)
+struct ConformsAsAvailable: ProtoAvailableInEnabledDomain { }
+
+struct ConformsAsAvailableInExtension { }
+
+@available(EnabledDomain)
+extension ConformsAsAvailableInExtension: ProtoAvailableInEnabledDomain { }
+
+@available(DisabledDomain)
+struct ConformsLessAvailable: ProtoAvailableInEnabledDomain { // expected-error {{'ProtoAvailableInEnabledDomain' is only available in EnabledDomain}}
+  // expected-note@-1 {{add '@available' attribute to enclosing struct}}
+}
+
+@available(EnabledDomain, unavailable)
+struct ConformsUnavailable: ProtoAvailableInEnabledDomain { } // expected-error {{'ProtoAvailableInEnabledDomain' is only available in EnabledDomain}}
+
+struct ConformsToUnavailableProto: ProtoUnavailableInEnabledDomain { } // expected-error {{'ProtoUnavailableInEnabledDomain' is unavailable}}
+
+@available(EnabledDomain, unavailable)
+struct ConformsToUnavailableProtoWhenUnavailable: ProtoUnavailableInEnabledDomain { }
+
+struct ConformsToAlwaysEnabledProto: ProtoAvailableInAlwaysEnabledDomain { }
+
+struct ConformsToUnavailableAlwaysEnabledProto: ProtoUnavailableInAlwaysEnabledDomain { } // expected-error {{'ProtoUnavailableInAlwaysEnabledDomain' is unavailable}}
+
+@available(AlwaysEnabledDomain, unavailable)
+struct ConformsToUnavailableAlwaysEnabledProtoWhenUnavailable: ProtoUnavailableInAlwaysEnabledDomain { }
+
+// A conformance is allowed to be introduced in a later OS version than the
+// conforming type, but that exception must not hide a restriction that comes
+// from a custom domain.
+@available(macOS 99, iOS 99, tvOS 99, watchOS 99, visionOS 99, *)
+protocol ProtoAvailableInFutureOS { }
+
+struct ConformsToProtoAvailableInFutureOS: ProtoAvailableInFutureOS { }
+
+@available(macOS 99, iOS 99, tvOS 99, watchOS 99, visionOS 99, *)
+@available(EnabledDomain)
+protocol ProtoAvailableInFutureOSAndEnabledDomain { }
+
+@available(EnabledDomain)
+@available(macOS 99, iOS 99, tvOS 99, watchOS 99, visionOS 99, *)
+protocol ProtoAvailableInEnabledDomainAndFutureOS { }
+
+struct ConformsToProtoAvailableInFutureOSAndEnabledDomain: ProtoAvailableInFutureOSAndEnabledDomain { // expected-error {{'ProtoAvailableInFutureOSAndEnabledDomain' is only available in EnabledDomain}}
+  // expected-note@-1 {{add '@available' attribute to enclosing struct}}
+}
+
+struct ConformsToProtoAvailableInEnabledDomainAndFutureOS: ProtoAvailableInEnabledDomainAndFutureOS { // expected-error {{'ProtoAvailableInEnabledDomainAndFutureOS' is only available in EnabledDomain}}
+  // expected-note@-1 {{add '@available' attribute to enclosing struct}}
+}
+
 
 // Protocol conformance availability.
 protocol P { }
 
-struct MyType1 { }
+struct ConformsToPInEnabledDomain { }
 
 @available(EnabledDomain)
-extension MyType1: P { }
+extension ConformsToPInEnabledDomain: P { }
 
-struct MyType2 { }
+struct ConformsToPInAlwaysEnabledDomain { }
 
 @available(AlwaysEnabledDomain)
-extension MyType2: P { }
+extension ConformsToPInAlwaysEnabledDomain: P { }
 
-struct MyType3 { }
+struct ConformsToPInDisabledDomain { }
 
 @available(DisabledDomain)
-extension MyType3: P { }
+extension ConformsToPInDisabledDomain: P { }
+
+struct ConformsToPUnavailableInEnabledDomain { }
+
+@available(EnabledDomain, unavailable) // expected-note {{conformance of 'ConformsToPUnavailableInEnabledDomain' to 'P' has been explicitly marked unavailable here}}
+extension ConformsToPUnavailableInEnabledDomain: P { }
 
 func acceptP<T: P>(_: T.Type) { }
 
 func testP() { // expected-note 2{{add '@available' attribute to enclosing global function}}
-  acceptP(MyType1.self) // expected-error{{conformance of 'MyType1' to 'P' is only available in EnabledDomain}}
-  // expected-note@-1{{add 'if #available' version check}}
-  acceptP(MyType2.self) // okay
-  acceptP(MyType3.self)  // expected-error{{conformance of 'MyType3' to 'P' is only available in DisabledDomain}}
-  // expected-note@-1{{add 'if #available' version check}}
+  acceptP(ConformsToPInEnabledDomain.self) // expected-error {{conformance of 'ConformsToPInEnabledDomain' to 'P' is only available in EnabledDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+  acceptP(ConformsToPInAlwaysEnabledDomain.self) // okay
+  acceptP(ConformsToPInDisabledDomain.self) // expected-error {{conformance of 'ConformsToPInDisabledDomain' to 'P' is only available in DisabledDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+  acceptP(ConformsToPUnavailableInEnabledDomain.self) // expected-error {{conformance of 'ConformsToPUnavailableInEnabledDomain' to 'P' is unavailable}}
 }
 
 enum E {

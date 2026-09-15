@@ -319,6 +319,7 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
 
   case ValueKind::SuperMethodInst:
   case ValueKind::ObjCMethodInst:
+  case ValueKind::COMMethodInst:
   case ValueKind::ObjCSuperMethodInst:
     return CalleeList();
   }

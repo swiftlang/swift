@@ -526,7 +526,7 @@ int main(int argc, char **argv) {
       llvm::outs() << "Import successful!\n";
     if (DumpModule) {
       llvm::SmallVector<swift::Decl*, 10> Decls;
-      Module->getTopLevelDecls(Decls);
+      Module->getTopLevelDeclsWithAuxiliaryDecls(Decls);
       for (auto Decl : Decls)
         Decl->dump(llvm::outs());
     }

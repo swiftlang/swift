@@ -260,6 +260,16 @@ enum class AvailabilityRestrictionFlag : uint8_t {
   /// Return restrictions for `@available` attributes indicating deprecation in
   /// a future deployment target.
   IncludeSoftDeprecation = 1 << 3,
+
+  /// Do not return `Unintroduced` restrictions belonging to platform domains.
+  /// This is used when checking the availability of a protocol that a type
+  /// conforms to, since a conformance is allowed to be introduced in a later
+  /// OS version than the conforming type itself.
+  AllowUnintroducedInPlatformDomains = 1 << 4,
+
+  /// Do not return `Unintroduced` restrictions that are satisfied at or below
+  /// the deployment range of the restriction's domain.
+  AllowUnintroducedAtOrBelowDeploymentRange = 1 << 5,
 };
 using AvailabilityRestrictionFlags = OptionSet<AvailabilityRestrictionFlag>;
 

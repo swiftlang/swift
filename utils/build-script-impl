@@ -869,8 +869,17 @@ function set_build_options_for_host() {
     swift_cmake_options+=(
         -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${LIT_JOBS}"
     )
+
+    # The LLDB test suite is driven through the check-lldb targets, so its lit
+    # arguments have to be baked in here rather than passed at test time.
+    local lldb_lit_args="${LLVM_LIT_ARGS} -j ${LIT_JOBS}"
+    lldb_lit_args+=" --xunit-xml-output=$(lldb_test_results_directory ${host})/results.xml"
+    if test "${ENABLE_ASAN}" -o "$(echo ${LLDB_EXTRA_CMAKE_ARGS}|grep Address)"; then
+        # Limit the number of parallel tests
+        lldb_lit_args+=" -j $(sysctl hw.physicalcpu | awk -v N=${LIT_JOBS} '{ print (N < int($2/1.5)) ? N : int($2/1.5) }')"
+    fi
     lldb_cmake_options+=(
-        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${LIT_JOBS}"
+        -DLLVM_LIT_ARGS="${lldb_lit_args}"
     )
 
     if [[ "${CLANG_PROFILE_INSTR_USE}" ]]; then
@@ -1367,6 +1376,11 @@ function build_directory_bin() {
     product=$2
     root="$(build_directory ${host} ${product})"
     echo "${root}/bin"
+}
+
+function lldb_test_results_directory() {
+    host=$1
+    echo "$(build_directory ${host} lldb)/test-results"
 }
 
 function is_cmake_release_build_type() {
@@ -2747,34 +2761,22 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "--- Can't execute tests for ${host}, skipping... ---"
                     continue
                 fi
-                llvm_build_dir=$(build_directory ${host} llvm)
                 lldb_build_dir=$(build_directory ${host} lldb)
-                results_dir="${lldb_build_dir}/test-results"
 
-                call mkdir -p "${results_dir}"
-                LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --xunit-xml-output=${results_dir}/results.xml"
+                # The check-lldb targets write their JUnit report here; lit does
+                # not create the directory itself.
+                call mkdir -p "$(lldb_test_results_directory ${host})"
 
-                if test "${ENABLE_ASAN}" -o "$(echo ${LLDB_EXTRA_CMAKE_ARGS}|grep Address)"; then
-                    # Limit the number of parallel tests
-                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${LIT_JOBS} '{ print (N < int($2/1.5)) ? N : int($2/1.5) }')"
-                fi
-
-                FILTER_SWIFT_OPTION="--filter=[sS]wift"
-                LLVM_LIT_FILTER_ARG=""
+                # check-lldb-swift is check-lldb restricted to --filter=[sS]wift.
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
-                    LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
+                    lldb_check_target="check-lldb-swift"
+                else
+                    lldb_check_target="check-lldb"
                 fi
 
-                echo "--- Running LLDB unit tests ---"
-                with_pushd ${lldb_build_dir} \
-                    call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
                 echo "--- Running LLDB tests ---"
                 with_pushd ${lldb_build_dir} \
-                    call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
-                with_pushd ${results_dir} \
-                    call "${llvm_build_dir}/bin/llvm-lit" \
-                         "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
+                    call ${NINJA_BIN} -j ${BUILD_JOBS} ${lldb_check_target}
                 continue
                 ;;
             llbuild)

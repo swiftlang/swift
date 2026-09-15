@@ -721,6 +721,7 @@ void LargeValueVisitor::mapValueStorage() {
       case SILInstructionKind::ClassMethodInst:
       case SILInstructionKind::SuperMethodInst:
       case SILInstructionKind::ObjCMethodInst:
+      case SILInstructionKind::COMMethodInst:
       case SILInstructionKind::ObjCSuperMethodInst:
       case SILInstructionKind::WitnessMethodInst: {
         // TODO Any more instructions to add here?

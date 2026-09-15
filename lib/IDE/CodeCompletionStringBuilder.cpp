@@ -35,8 +35,14 @@ Type ide::eraseArchetypes(Type type, GenericSignature genericSig) {
       auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
       erasedParams.emplace_back(param.withType(erasedTy));
     }
+    SmallVector<AnyFunctionType::Yield, 1> erasedYields;
+    for (const auto &yield : genericFuncType->getYields()) {
+      auto erasedTy = eraseArchetypes(yield.getType(), genericSig);
+      erasedYields.emplace_back(erasedTy, yield.getFlags());
+    }
+
     return GenericFunctionType::get(
-        genericSig, erasedParams,
+        genericSig, erasedParams, erasedYields,
         eraseArchetypes(genericFuncType->getResult(), genericSig),
         genericFuncType->getExtInfo());
   }

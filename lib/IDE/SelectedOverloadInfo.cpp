@@ -63,8 +63,8 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
         Type KPValueTy = KPTy->castTo<BoundGenericType>()->getGenericArgs()[1];
         KPTy =
             BoundGenericType::get(KPDecl, Type(), {Result.BaseTy, KPValueTy});
-        Result.ValueTy =
-            FunctionType::get({Params[0].withType(KPTy)}, KPValueTy);
+        Result.ValueTy = FunctionType::get({Params[0].withType(KPTy)},
+                                           /* yields */ {}, KPValueTy);
       }
     }
     break;

@@ -548,6 +548,7 @@ public:
   void visitUnsafeSelfDependentResultAttr(UnsafeSelfDependentResultAttr *attr);
 
   void visitCalledAttr(CalledAttr *attr);
+  void visitCoroutineAttr(CoroutineAttr *attr);
 };
 
 } // end anonymous namespace
@@ -2510,9 +2511,12 @@ void AttributeChecker::visitCxxDeclAttr(CxxDeclAttr *attr) {
     diagnose(attr->getLocation(), diag::cxx_attr_requires_cxx_interop,
              attr->getAttrName());
 
-  // Only top-level func decls are currently supported.
-  if (D->getDeclContext()->isTypeContext())
-    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level, attr);
+  // @cxx may appear on a global function or on a function declared in a Swift
+  // extension of an imported C++ namespace.
+  auto *dc = D->getDeclContext();
+  if (dc->isTypeContext() && !importer::isClangNamespace(dc))
+    diagnose(attr->getLocation(), diag::cxx_not_global_or_namespace_member,
+             attr);
 
   // Reject using both @cxx and @objc on the same decl.
   if (D->getAttrs().getAttribute<ObjCAttr>())
@@ -2792,6 +2796,10 @@ void AttributeChecker::visitSILGenNameAttr(SILGenNameAttr *A) {
   if (D->getAttrs().hasAttribute<ABIAttr>()) {
     diagnoseAndRemoveAttr(A, diag::attr_abi_incompatible_with_silgen_name, D);
   }
+}
+
+void AttributeChecker::visitCoroutineAttr(CoroutineAttr *attr) {
+  // FIXME: allow only on @differentiable for modify accessorts
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
@@ -3409,15 +3417,16 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   // `@MainActor () async throws(E) -> Void`
   {
     llvm::SmallVector<Type, 4> mainTypes = {
-        FunctionType::get(/*params*/ {}, context.TheEmptyTupleType,
-                          ASTExtInfoBuilder().withThrows(
-                            true, throwsTypeVar
-                          ).build()),
+        FunctionType::get(
+            /*params*/ {}, /*yields*/ {}, context.TheEmptyTupleType,
+            ASTExtInfoBuilder().withThrows(true, throwsTypeVar).build()),
 
         FunctionType::get(
-            /*params*/ {}, context.TheEmptyTupleType,
-            ASTExtInfoBuilder().withAsync()
-                .withThrows(true, throwsTypeVar).build())};
+            /*params*/ {}, /*yields*/ {}, context.TheEmptyTupleType,
+            ASTExtInfoBuilder()
+                .withAsync()
+                .withThrows(true, throwsTypeVar)
+                .build())};
 
     Type mainActor = context.getMainActorType();
     if (mainActor) {
@@ -3429,10 +3438,10 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
                   Feature::GlobalActorIsolatedTypesUsability));
 
       mainTypes.push_back(FunctionType::get(
-          /*params*/ {}, context.TheEmptyTupleType,
+          /*params*/ {}, /*yields*/ {}, context.TheEmptyTupleType,
           extInfo.build()));
       mainTypes.push_back(FunctionType::get(
-          /*params*/ {}, context.TheEmptyTupleType,
+          /*params*/ {}, /*yields*/ {}, context.TheEmptyTupleType,
           extInfo.withAsync().build()));
     }
     TypeVariableType *mainType =
@@ -5313,6 +5322,7 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo derivedInterfaceInfo;
     derivedInterfaceTy = FunctionType::get(derivedInterfaceFuncTy->getParams(),
+                                           derivedInterfaceFuncTy->getYields(),
                                            derivedInterfaceFuncTy->getResult(),
                                            derivedInterfaceInfo);
     auto overrideInterfaceFuncTy =
@@ -5321,6 +5331,7 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
     FunctionType::ExtInfo overrideInterfaceInfo;
     overrideInterfaceTy = FunctionType::get(
         overrideInterfaceFuncTy->getParams(),
+        overrideInterfaceFuncTy->getYields(),
         overrideInterfaceFuncTy->getResult(), overrideInterfaceInfo);
   }
 
@@ -6944,19 +6955,20 @@ static bool checkFunctionSignature(
 /// Returns an `AnyFunctionType` from the given parameters, result type, and
 /// generic signature.
 static AnyFunctionType *
-makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
+makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters,
+                 ArrayRef<AnyFunctionType::Yield> yields, Type resultType,
                  bool throws, Type thrownError,
                  GenericSignature genericSignature) {
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   if (genericSignature) {
     GenericFunctionType::ExtInfo info;
     info = info.withThrows(throws, thrownError);
-    return GenericFunctionType::get(genericSignature, parameters, resultType,
-                                    info);
+    return GenericFunctionType::get(genericSignature, parameters, yields,
+                                    resultType, info);
   }
   FunctionType::ExtInfo info;
   info = info.withThrows(throws, thrownError);
-  return FunctionType::get(parameters, resultType, info);
+  return FunctionType::get(parameters, yields, resultType, info);
 }
 
 /// Computes the original function type corresponding to the given derivative
@@ -6980,8 +6992,9 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
          "Expected derivative result to be a two-element tuple");
   auto originalResult = derivativeResult->getElement(0).getType();
   auto *originalType = makeFunctionType(
-      curryLevels.back()->getParams(), originalResult,
-      curryLevels.back()->isThrowing(), curryLevels.back()->getThrownError(),
+      curryLevels.back()->getParams(), curryLevels.back()->getYields(),
+      originalResult, curryLevels.back()->isThrowing(),
+      curryLevels.back()->getThrownError(),
       curryLevels.size() == 1 ? derivativeFnTy->getOptGenericSignature()
                               : nullptr);
 
@@ -6991,12 +7004,12 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   for (auto pair : enumerate(llvm::reverse(curryLevelsWithoutLast))) {
     unsigned i = pair.index();
     AnyFunctionType *curryLevel = pair.value();
-    originalType =
-        makeFunctionType(curryLevel->getParams(), originalType,
-                         curryLevel->isThrowing(), curryLevel->getThrownError(),
-                         i == curryLevelsWithoutLast.size() - 1
-                             ? derivativeFnTy->getOptGenericSignature()
-                             : nullptr);
+    originalType = makeFunctionType(
+        curryLevel->getParams(), curryLevel->getYields(), originalType,
+        curryLevel->isThrowing(), curryLevel->getThrownError(),
+        i == curryLevelsWithoutLast.size() - 1
+            ? derivativeFnTy->getOptGenericSignature()
+            : nullptr);
   }
   return originalType;
 }
@@ -7007,6 +7020,7 @@ static AnyFunctionType *
 getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
                                  IndexSubset *linearParamIndices,
                                  bool wrtSelf) {
+  assert(!transposeFnType->isCoroutine());
   unsigned transposeParamsIndex = 0;
 
   // Get the transpose function's parameters and result type.
@@ -7082,23 +7096,24 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   AnyFunctionType *originalType;
   // If the transpose type is curried, the original function type is:
   // `(Self) -> (<original parameters>) -> <original result>`.
+  // TODO: These does not handle yields properly
   if (isCurried) {
     assert(selfType && "`Self` type should be resolved");
-    originalType = makeFunctionType(originalParams, originalResult,
-                                    transposeFnType->isThrowing(),
-                                    transposeFnType->getThrownError(),
-                                    /*genericSignature=*/nullptr);
     originalType = makeFunctionType(
-        AnyFunctionType::Param(selfType), originalType,
+        originalParams, /* yields */ {}, originalResult,
+        transposeFnType->isThrowing(), transposeFnType->getThrownError(),
+        /*genericSignature=*/nullptr);
+    originalType = makeFunctionType(
+        AnyFunctionType::Param(selfType), /* yields */ {}, originalType,
         /*throws=*/false, Type(), transposeFnType->getOptGenericSignature());
   }
   // Otherwise, the original function type is simply:
   // `(<original parameters>) -> <original result>`.
   else {
-    originalType = makeFunctionType(originalParams, originalResult,
-                                    transposeFnType->isThrowing(),
-                                    transposeFnType->getThrownError(),
-                                    transposeFnType->getOptGenericSignature());
+    originalType = makeFunctionType(
+        originalParams, /* yields */ {}, originalResult,
+        transposeFnType->isThrowing(), transposeFnType->getThrownError(),
+        transposeFnType->getOptGenericSignature());
   }
   return originalType;
 }
