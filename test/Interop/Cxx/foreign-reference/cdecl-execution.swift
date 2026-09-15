@@ -38,12 +38,20 @@ func CImplGetOpaqueValue(_ o: Opaque) -> Int32 {
   return opaqueValue(o)
 }
 
+// The C declaration returns the value retained (+1), which is what the Swift
+// body produces, so the C caller receives a reference of its own.
+@implementation @c
+func CImplReturnsRetainedShared(_ s: Shared) -> Shared {
+  return s
+}
+
 let s = makeShared(21)
 let o = makeOpaque(7)
 
 // CHECK: CImplTakesImmortal: 42
 // CHECK-NEXT: CImplReturnsImmortal: 42
 // CHECK-NEXT: CImplGetOpaqueValue: 7
+// CHECK-NEXT: CImplReturnsRetainedShared: 21 refCount=2
 // CHECK-NEXT: value: 21
 print("value: \(callSwiftImplementations(s, o))")
 

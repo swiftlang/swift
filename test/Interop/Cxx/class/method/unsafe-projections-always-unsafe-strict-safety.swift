@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportUnsafeCxxMethodsAsAlwaysUnsafe -strict-memory-safety
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportUnsafeCxxMethodsAsAlwaysUnsafe -strict-memory-safety \
+// RUN:   -verify-additional-prefix strict- \
+// RUN:   -verify-additional-file %S/Inputs%{fs-sep}unsafe-projections.h
 
 // REQUIRES: swift_feature_ImportUnsafeCxxMethodsAsAlwaysUnsafe
 

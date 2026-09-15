@@ -4317,13 +4317,18 @@ namespace {
           !isa<clang::CXXMethodDecl, clang::ObjCMethodDecl>(decl))
         return;
 
-      // Which lifetime annotation Swift could not represent, and on what. The
-      // first one found is the one reported.
-      std::optional<importer::CxxUnsafetyExplanation> skippedLifetime;
-      auto skipLifetime = [&](importer::CxxUnsafetyReason reason,
-                              const clang::NamedDecl *culprit) {
+      // The note for a lifetime annotation Swift could not represent. The first
+      // one found is the one reported.
+      std::optional<Diagnostic> skippedLifetime;
+      auto skipLifetime = [&](Diagnostic note) {
         if (!skippedLifetime)
-          skippedLifetime = importer::CxxUnsafetyExplanation{reason, culprit};
+          skippedLifetime = note;
+      };
+      // A skipped annotation sits either on a parameter or on 'self', which has
+      // no declaration to name.
+      auto onAnnotated = [](auto id, const clang::NamedDecl *param) {
+        return Diagnostic(id, param != nullptr,
+                          param ? param->getName() : StringRef());
       };
       auto isEscapable = [this](clang::QualType ty) {
         return evaluateOrDefault(
@@ -4370,8 +4375,7 @@ namespace {
           // Swift drops lifetime dependencies on Escapable targets, so this
           // annotation is not enforced. Import the API as @unsafe.
           skipLifetime(
-              importer::CxxUnsafetyReason::SkippedLifetimeEscapableResult,
-              nullptr);
+              Diagnostic(diag::cxx_unsafe_skipped_lifetime_escapable_result));
           Impl.addImportDiagnostic(
               decl,
               Diagnostic(diag::return_escapable_with_lifetimebound,
@@ -4401,9 +4405,8 @@ namespace {
         const clang::NamedDecl *annotated =
             forSelf ? nullptr : decl->getParamDecl(idx);
         if (importedAsClass(ty, forSelf))
-          skipLifetime(
-              importer::CxxUnsafetyReason::SkippedLifetimeImportedAsClass,
-              annotated);
+          skipLifetime(onAnnotated(
+              diag::cxx_unsafe_skipped_lifetime_imported_as_class, annotated));
         paramHasAnnotation[idx] = true;
         // 'self' and lvalue references borrow the referent's storage.
         if (forSelf || ty->isLValueReferenceType())
@@ -4413,9 +4416,8 @@ namespace {
         // dependency on it, nor can the result inherit its lifetime as if it
         // were passed by value. Import the API as @unsafe.
         else if (ty->isRValueReferenceType())
-          skipLifetime(
-              importer::CxxUnsafetyReason::SkippedLifetimeRValueReference,
-              annotated);
+          skipLifetime(onAnnotated(
+              diag::cxx_unsafe_skipped_lifetime_rvalue_reference, annotated));
         // A non-escapable passed by value: the result inherits its lifetime.
         else if (!isEscapable(ty))
           inheritLifetimeParamIndicesForReturn[idx] = true;
@@ -4423,9 +4425,9 @@ namespace {
         // borrowable storage, so we cannot form a scoped lifetime dependency.
         // Import the API as @unsafe.
         else
-          skipLifetime(
-              importer::CxxUnsafetyReason::SkippedLifetimeNoBorrowableStorage,
-              annotated);
+          skipLifetime(onAnnotated(
+              diag::cxx_unsafe_skipped_lifetime_no_borrowable_storage,
+              annotated));
       };
       auto processLifetimeCaptureBy =
           [&](const clang::LifetimeCaptureByAttr *attr, unsigned idx,
@@ -4565,10 +4567,9 @@ namespace {
 
       if (skippedLifetime || resultDependenceIsInferred) {
         result->addAttribute(new (ASTContext) UnsafeAttr(/*implicit=*/true));
-        Impl.LifetimeUnsafetyReasons[result] =
-            skippedLifetime.value_or(importer::CxxUnsafetyExplanation{
-                importer::CxxUnsafetyReason::InferredResultDependence,
-                nullptr});
+        Impl.LifetimeUnsafetyReasons.insert(
+            {result, skippedLifetime.value_or(Diagnostic(
+                         diag::cxx_unsafe_inferred_result_dependence))});
       } else {
         for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
           if (isEscapable(param->getType()))
@@ -4578,9 +4579,9 @@ namespace {
           // We have a nonescapable parameter that does not have its lifetime
           // annotated nor is it marked noescape.
           result->addAttribute(new (ASTContext) UnsafeAttr(/*implicit=*/true));
-          Impl.LifetimeUnsafetyReasons[result] = {
-              importer::CxxUnsafetyReason::UnannotatedNonEscapableParam,
-              param};
+          Impl.LifetimeUnsafetyReasons.insert(
+              {result, Diagnostic(diag::cxx_unsafe_unannotated_nonescapable_param,
+                                  /*named=*/true, param->getName())});
           break;
         }
       }
