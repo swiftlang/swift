@@ -51,10 +51,10 @@ func useInherited(_ d: InheritedDerived) {
   // expected-note@-1 {{reference to unsafe instance method 'view()'}}
 }
 
-// 'value', 'insert' and 'append' are carved out only for the C++ standard
-// library, whose overlay provides same-named safe wrappers. A user type gets the
-// original name plus a stub like any other projection, rather than being left
-// renamed with no un-renamed spelling to migrate to.
+// 'value', 'insert' and 'append' used to be carved out of the rename for the
+// C++ standard library, whose overlay provides same-named safe wrappers; the
+// unsafe import is '@_disfavoredOverload' instead. A user type gets the original
+// name plus a stub like any other projection.
 func useNotStd(_ n: inout NotStd) {
   _ = unsafe n.value()
   _ = unsafe n.insert(1)
