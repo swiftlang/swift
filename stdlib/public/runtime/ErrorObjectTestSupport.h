@@ -29,13 +29,6 @@ SWIFT_RUNTIME_EXPORT std::atomic<void (*)(
   const WitnessTable *errorConformance
 )> _swift_willThrowTypedImpl;
 #endif
-
-/// Set the value of @c _swift_willThrow atomically.
-///
-/// This function is present for use by the standard library's test suite only.
-SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_SPI
-void _swift_setWillThrowHandler(void (* handler)(SwiftError *error));
 }
 
 #endif
