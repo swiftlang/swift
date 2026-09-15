@@ -820,10 +820,14 @@ struct BridgedInstruction {
     SwiftInt numFunctions;
   };
 
+  // Values must match swift::CastConsumptionKind; asserted in
+  // CheckedCastAddrBranch_getConsumptionKind(). BorrowAlways (3) is
+  // omitted because checked_cast_addr_br cannot have it.
   enum class CastConsumptionKind {
-    TakeAlways,
-    TakeOnSuccess,
-    CopyOnSuccess
+    TakeAlways = 0,
+    TakeOnSuccess = 1,
+    CopyOnSuccess = 2,
+    TestOnly = 4
   };
 
   struct CheckedCastInstOptions {

@@ -184,6 +184,8 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
       break;
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("this should never occur here");
+    case CastConsumptionKind::TestOnly:
+      llvm_unreachable("test_only is rejected on entry");
     }
   }
 
@@ -254,6 +256,11 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
 ///
 SILInstruction *
 CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
+  // Every rewrite below produces a value in the cast's destination. A
+  // test_only cast has none -- its dest is undef -- so leave it alone.
+  if (!producesDestinationValue(dynamicCast.getBridgedConsumptionKind()))
+    return nullptr;
+
   auto kind = dynamicCast.getKind();
   (void)kind;
   assert(((kind == SILDynamicCastKind::CheckedCastAddrBranchInst) ||
@@ -390,6 +397,8 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   }
   case CastConsumptionKind::BorrowAlways:
     llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
+  case CastConsumptionKind::TestOnly:
+    llvm_unreachable("test_only is rejected on entry");
   case CastConsumptionKind::CopyOnSuccess:
     // If we are performing copy_on_success, store the value back into memory
     // here since we loaded it. We may need to cast back to the actual
@@ -619,6 +628,11 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
 /// instance into a bridged ObjC type.
 SILInstruction *
 CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
+  // Every rewrite below produces a value in the cast's destination. A
+  // test_only cast has none -- its dest is undef -- so leave it alone.
+  if (!producesDestinationValue(dynamicCast.getBridgedConsumptionKind()))
+    return nullptr;
+
   SILInstruction *Inst = dynamicCast.getInstruction();
   const SILFunction *F = Inst->getFunction();
   CastConsumptionKind ConsumptionKind = dynamicCast.getBridgedConsumptionKind();
@@ -684,6 +698,8 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
       break;
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("Should never hit this");
+    case CastConsumptionKind::TestOnly:
+      llvm_unreachable("test_only is rejected on entry");
     case CastConsumptionKind::CopyOnSuccess:
       // We assume that our caller is correct and will treat our argument as
       // being immutable, so we do not need to do anything here.
@@ -944,6 +960,9 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
     switch (Inst->getConsumptionKind()) {
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
+    case CastConsumptionKind::TestOnly:
+      // No destination value to produce; leave the cast as it is.
+      return nullptr;
     case CastConsumptionKind::CopyOnSuccess:
       if (!Src->getType().isTrivial(*BB->getParent())) {
         copiedSrc = Builder.createAllocStack(Loc, Src->getType());

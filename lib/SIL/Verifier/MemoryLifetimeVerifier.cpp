@@ -655,8 +655,13 @@ void MemoryLifetimeVerifier::setBitsOfPredecessor(Bits &getSet, Bits &killSet,
       break;
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("checked_cast_addr_br cannot have BorrowAlways");
+    case CastConsumptionKind::TestOnly:
+      break;
     }
-    if (castInst->getSuccessBB() == block)
+    // A test_only cast produces no value; its dest is undef, so there is
+    // nothing to mark initialized on the success edge.
+    if (castInst->getSuccessBB() == block &&
+        producesDestinationValue(castInst->getConsumptionKind()))
       locations.genBits(getSet, killSet, castInst->getDest());
   }
 }

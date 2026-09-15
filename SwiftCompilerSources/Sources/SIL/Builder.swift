@@ -356,7 +356,8 @@ public struct Builder {
     switch consumptionKind {
       case .TakeAlways:    bridgedConsumption = .TakeAlways
       case .TakeOnSuccess: bridgedConsumption = .TakeOnSuccess
-      case .CopyOnSuccess: bridgedConsumption = .CopyOnSuccess    
+      case .CopyOnSuccess: bridgedConsumption = .CopyOnSuccess
+      case .TestOnly:      bridgedConsumption = .TestOnly
     }
 
     let cast = bridged.createCheckedCastAddrBranch(source.bridged, sourceFormalType.bridged,

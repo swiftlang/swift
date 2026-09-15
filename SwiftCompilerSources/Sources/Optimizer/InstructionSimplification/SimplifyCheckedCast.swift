@@ -37,6 +37,10 @@ private extension CheckedCastAddrBranchInst {
       builder.createCopyAddr(from: source, to: destination, takeSource: true, initializeDest: true)
     case .CopyOnSuccess:
       builder.createCopyAddr(from: source, to: destination, takeSource: false, initializeDest: true)
+    case .TestOnly:
+      // Reports success without producing a value: there is nothing to
+      // move or copy, and `destination` is undef.
+      break
     }
     builder.createBranch(to: successBlock)
     context.erase(instruction: self)
@@ -47,7 +51,7 @@ private extension CheckedCastAddrBranchInst {
     switch consumptionKind {
     case .TakeAlways:
       builder.createDestroyAddr(address: source)
-    case .CopyOnSuccess, .TakeOnSuccess:
+    case .CopyOnSuccess, .TakeOnSuccess, .TestOnly:
       break
     }
     builder.createBranch(to: failureBlock)

@@ -1483,6 +1483,8 @@ static CastConsumptionKind getCastConsumptionKind(unsigned attr) {
     return CastConsumptionKind::CopyOnSuccess;
   case SIL_CAST_CONSUMPTION_BORROW_ALWAYS:
     return CastConsumptionKind::BorrowAlways;
+  case SIL_CAST_CONSUMPTION_TEST_ONLY:
+    return CastConsumptionKind::TestOnly;
   default:
     llvm_unreachable("not a valid CastConsumptionKind for SIL");
   }

@@ -2508,6 +2508,12 @@ final public class CheckedCastAddrBranchInst : TermInst {
     /// The source value is always left in place, and the destination
     /// value is copied into on success.
     case CopyOnSuccess
+
+    /// The cast only reports whether it would have succeeded. The source is
+    /// neither taken nor copied, and no destination value is produced -- the
+    /// destination operand is `SILUndef` and must not be read or tracked as
+    /// initialized.
+    case TestOnly
   }
 
   public var consumptionKind: CastConsumptionKind {
@@ -2515,6 +2521,7 @@ final public class CheckedCastAddrBranchInst : TermInst {
     case .TakeAlways:    return .TakeAlways
     case .TakeOnSuccess: return .TakeOnSuccess
     case .CopyOnSuccess: return .CopyOnSuccess
+    case .TestOnly:      return .TestOnly
     default:
       fatalError("invalid cast consumption kind")
     }
