@@ -19,7 +19,6 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -33,7 +32,6 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "MetadataRequest.h"
-#include "ResilientTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;

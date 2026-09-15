@@ -13,7 +13,6 @@
 #ifndef SWIFT_CONCURRENCY_DISPATCHSHIMS_H
 #define SWIFT_CONCURRENCY_DISPATCHSHIMS_H
 
-#include "Concurrency.h"
 
 // The values in this struct should be considered opaque
 struct swift_dispatch_priority_token_s {

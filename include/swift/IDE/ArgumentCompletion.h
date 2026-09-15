@@ -13,7 +13,6 @@
 #ifndef SWIFT_IDE_ARGUMENTCOMPLETION_H
 #define SWIFT_IDE_ARGUMENTCOMPLETION_H
 
-#include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/PossibleParamInfo.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"

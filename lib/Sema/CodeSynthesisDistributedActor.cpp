@@ -27,8 +27,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SynthesizedDeclBuilder.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/MapVector.h"

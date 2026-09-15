@@ -11,18 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/OwnershipLiveness.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Debug.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/SIL/Dominance.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/Test.h"
-#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 

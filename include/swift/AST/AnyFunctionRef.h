@@ -20,7 +20,6 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include <optional>
 

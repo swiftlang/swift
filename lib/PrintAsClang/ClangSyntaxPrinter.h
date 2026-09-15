@@ -20,7 +20,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/GenericRequirement.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 

@@ -18,13 +18,11 @@
 #ifndef SWIFT_COMPILEJOBCACHEKEY_H
 #define SWIFT_COMPILEJOBCACHEKEY_H
 
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/Basic/FileTypes.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
 
