@@ -17,6 +17,8 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/PlatformKindUtils.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -166,6 +168,41 @@ bool AvailabilityRestriction::shouldHideDomainNameInDiagnostics() const {
       return true;
     }
   }
+}
+
+StringRef AvailabilityRestriction::getDiagnosticDescription(
+    llvm::SmallString<64> &scratch, const ASTContext &ctx,
+    bool includeMessage) const {
+  auto domainAndRange = getDomainAndRange(ctx);
+  auto domain = domainAndRange.getDomain();
+  llvm::raw_svector_ostream os(scratch);
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+  case Reason::UnavailableObsolete:
+  case Reason::UnavailableUnintroduced: {
+    os << "is unavailable";
+
+    if (!shouldHideDomainNameInDiagnostics())
+      os << " in " << domain.getNameForDiagnostics();
+
+    // Include the message from the `@available` attribute, if there is one.
+    if (includeMessage) {
+      EncodedDiagnosticMessage encodedMessage(getAttr().getMessage());
+      if (!encodedMessage.Message.empty())
+        os << ": " << encodedMessage.Message;
+    }
+    break;
+  }
+  case Reason::Unintroduced: {
+    os << "is only available in " << domain.getNameForDiagnostics();
+    if (domainAndRange.getRange().hasMinimumVersion())
+      os << " " << domainAndRange.getRange().getVersionString() << " or newer";
+    break;
+  }
+  case Reason::Deprecated:
+    llvm_unreachable("deprecation requires a different diagnostic");
+  }
+  return scratch.str();
 }
 
 void AvailabilityRestriction::print(llvm::raw_ostream &os) const {
