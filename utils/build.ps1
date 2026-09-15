@@ -201,7 +201,7 @@ param
   # Android SDK Options
   [switch] $Android = $false,
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?(-beta[1-9])?$")]
-  [string] $AndroidNDKVersion = "r28c",
+  [string] $AndroidNDKVersion = "r30",
   [ValidateRange(21, 36)]
   [int] $AndroidAPILevel = 23,
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
@@ -511,7 +511,7 @@ $KnownNDKs = @{
     SHA256 = "6bec98ac2354d8a919760889a1a41d020132e5e8cfa1b1fe51610a72c36a466b"
     ClangVersion = 19
   }
-  "r30" = @{
+  r30 = @{
     URL = "https://dl.google.com/android/repository/android-ndk-r30-windows.zip"
     SHA256 = "b830098aaf18b67a42eb831c404e15e5f2990a474f054ac145b0bc957ac6d729"
     ClangVersion = 21
