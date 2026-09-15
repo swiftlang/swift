@@ -27,21 +27,21 @@ typealias DefaultExecutorFactory = SimpleExecutorFactory
 #endif
 
 struct SimpleExecutorFactory: ExecutorFactory {
-  public static var mainExecutor: any MainExecutor {
+  public static var mainExecutor: SimpleMainExecutor {
     print("Creating main executor")
     return SimpleMainExecutor()
   }
-  public static var defaultExecutor: any TaskExecutor {
+  public static var defaultExecutor: SimpleTaskExecutor {
     print("Creating task executor")
     return SimpleTaskExecutor()
   }
 }
 
 struct FatalExecutorFactory: ExecutorFactory {
-  public static var mainExecutor: any MainExecutor {
+  public static var mainExecutor: SimpleMainExecutor {
     fatalError("mainExecutor called on FatalExecutorFactory")
   }
-  public static var defaultExecutor: any TaskExecutor {
+  public static var defaultExecutor: SimpleTaskExecutor {
     fatalError("taskExecutor called on FatalExecutorFactory")
   }
 }
