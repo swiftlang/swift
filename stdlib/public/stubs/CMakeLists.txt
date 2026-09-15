@@ -1,5 +1,6 @@
 set(swift_stubs_sources
     Assert.cpp
+    FilePathStubs.cpp
     GlobalObjects.cpp
     LibcShims.cpp
     Random.cpp
