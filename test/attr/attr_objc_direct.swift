@@ -76,6 +76,13 @@ class InitClass: NSObject {
   // expected-error@-2 {{'@objcDirect' cannot be applied to 'required' initializers}}
 }
 
+// The attribute is OnFunc | OnConstructor | OnDestructor. Accessors and
+// subscripts are therefore rejected by the applicability check: GenClass
+// registers an accessor's selector through its var/subscript, which never
+// consults ObjCDirectAttr, so a direct accessor would keep a live selector --
+// advertising _cmd in its type encoding -- pointing at an entry point emitted
+// without it. deinit stays inside the mask purely so it keeps its own
+// diagnostic instead of the generic one.
 class DeinitClass: NSObject {
   @objcDirect deinit {}
   // expected-error@-1 {{'@objcDirect' cannot be applied to 'deinit'}}
@@ -83,6 +90,15 @@ class DeinitClass: NSObject {
 
 class PropertyClass: NSObject {
   @objcDirect var x: Int = 0
+  // expected-error@-1 {{cannot be applied to this declaration}}
+
+  var y: Int {
+    @objcDirect get { return 0 }
+    // expected-error@-1 {{cannot be applied to this declaration}}
+    set {}
+  }
+
+  @objcDirect subscript(i: Int) -> Int { return i }
   // expected-error@-1 {{cannot be applied to this declaration}}
 }
 
