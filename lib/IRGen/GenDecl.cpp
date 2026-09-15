@@ -3707,22 +3707,14 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   // Note this tests the AST attribute, not the local isObjCDirect flag, which
   // is also set for direct methods imported *from* Clang -- those keep the
   // linkage Clang gave them.
-  if (forDefinition && f->isObjCDirect()) {
-    // Prefer the decl ref, falling back to the location that isObjCDirect()
-    // itself consults, so the override is never silently skipped.
-    auto *AFD =
-        dyn_cast_or_null<AbstractFunctionDecl>(f->getDeclRef().getDecl());
-    if (!AFD)
-      AFD = f->getLocation().getAsASTNode<AbstractFunctionDecl>();
-    if (AFD) {
-      link.setLinkage(llvm::GlobalValue::ExternalLinkage);
-      // Use the context-capped effective access rather than the declared
-      // access: a public member of an internal class is not reachable outside
-      // the module, so it must stay hidden to remain DCE-eligible.
-      link.setVisibility(AFD->getFormalAccessScope().isPublic()
-                             ? llvm::GlobalValue::DefaultVisibility
-                             : llvm::GlobalValue::HiddenVisibility);
-    }
+  if (auto *AFD = forDefinition ? f->getObjCDirectDecl() : nullptr) {
+    link.setLinkage(llvm::GlobalValue::ExternalLinkage);
+    // Use the context-capped effective access rather than the declared
+    // access: a public member of an internal class is not reachable outside
+    // the module, so it must stay hidden to remain DCE-eligible.
+    link.setVisibility(AFD->getFormalAccessScope().isPublic()
+                           ? llvm::GlobalValue::DefaultVisibility
+                           : llvm::GlobalValue::HiddenVisibility);
   }
 
   bool isDefinition = f->isDefinition();
