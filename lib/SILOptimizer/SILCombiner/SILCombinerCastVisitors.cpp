@@ -293,6 +293,8 @@ SILInstruction *SILCombiner::visitEndCOWMutationInst(EndCOWMutationInst *ECM) {
     return nullptr;
   if (!op->hasOneUse())
     return nullptr;
+  if (op->getOwnershipKind() != OwnershipKind::Owned)
+    return nullptr;
 
   SingleValueInstruction *refCast = cast<SingleValueInstruction>(op);
   auto *newECM = Builder.createEndCOWMutation(ECM->getLoc(),
