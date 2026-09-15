@@ -179,8 +179,22 @@ func posix_memalign(_: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _: Int, _
 @_extern(c, "free")
 func free(_ p: UnsafeMutableRawPointer?)
 
+#if os(Linux) && !SWIFT_STDLIB_HAS_ARC4RANDOM
+// glibc only gained `arc4random_buf` in 2.36, and referencing it at all fails
+// to link against anything older. Use `getrandom(2)` instead, which glibc has
+// exposed since 2.25 and which the non-embedded Linux runtime also prefers.
+
+@_extern(c, "getrandom")
+func getrandom(
+  _ buf: UnsafeMutableRawPointer, _ nbytes: Int, _ flags: CUnsignedInt
+) -> Int
+
+@_extern(c, "__errno_location")
+func __errno_location() -> UnsafeMutablePointer<CInt>
+#else
 @_extern(c, "arc4random_buf")
 func arc4random_buf(buf: UnsafeMutableRawPointer, nbytes: Int)
+#endif
 
 #endif
 
@@ -993,8 +1007,28 @@ public func _willThrowTyped<E: Error>(_ error: E) {
 
 #if !SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
 // The Embedded Swift platform abstraction layer uses separate entrypoints.
+
 public func swift_stdlib_random(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) {
+#if os(Linux) && !SWIFT_STDLIB_HAS_ARC4RANDOM
+  let EINTR: CInt = 4
+  var buf = unsafe buf
+  var remaining = nbytes
+  while remaining > 0 {
+    let count = unsafe getrandom(buf, remaining, 0)
+    if count <= 0 {
+      // A signal can interrupt the call while it waits for the entropy pool to
+      // be seeded. Every other failure means there is no entropy source, and
+      // handing back a buffer that was never filled would silently produce
+      // predictable values.
+      if count < 0, unsafe __errno_location().pointee == EINTR { continue }
+      fatalError("unable to obtain entropy from getrandom")
+    }
+    unsafe buf += count
+    remaining -= count
+  }
+#else
   unsafe arc4random_buf(buf: buf, nbytes: nbytes)
+#endif
 }
 #endif
 
