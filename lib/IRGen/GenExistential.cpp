@@ -777,6 +777,11 @@ namespace {
       IGF.emit##Name##Destroy(addr, Refcounting); \
     } \
     StringRef getStructNameSuffix() const { return "." #name "ref"; } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
     REF_STORAGE_HELPER(Name, FixedTypeInfo) \
   };
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -846,6 +851,11 @@ namespace {
     getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const { \
       llvm_unreachable("should have overridden all actual uses of this"); \
     } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
     REF_STORAGE_HELPER(Name, LoadableTypeInfo) \
   };
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
@@ -912,6 +922,11 @@ namespace {
     void emitValueRelease(IRGenFunction &IGF, llvm::Value *value, \
                           Atomicity atomicity) const {} \
     void emitValueFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {} \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
   };
 #include "swift/AST/ReferenceStorage.def"
 #undef REF_STORAGE_HELPER
@@ -964,6 +979,12 @@ class OpaqueExistentialTypeInfo final :
             IsFixedSize, IsABIAccessible) {}
 
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   OpaqueExistentialLayout getLayout() const {
     return OpaqueExistentialLayout(getNumStoredProtocols());
   }
@@ -1130,6 +1151,12 @@ class ClassExistentialTypeInfo final
     assert(refcounting == ReferenceCounting::Native ||
            refcounting == ReferenceCounting::Unknown ||
            refcounting == ReferenceCounting::ObjC);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 
   TypeLayoutEntry
@@ -1466,6 +1493,12 @@ class ExistentialMetatypeTypeInfo final
       MetatypeTI(metatypeTI) {}
 
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   const LoadableTypeInfo &
   getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const {
     return MetatypeTI;
@@ -1505,6 +1538,12 @@ class ErrorExistentialTypeInfo : public HeapTypeInfo<ErrorExistentialTypeInfo>
   ReferenceCounting Refcounting;
 
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   ErrorExistentialTypeInfo(llvm::PointerType *storage,
                            Size size, SpareBitVector spareBits,
                            Alignment align,
@@ -1591,6 +1630,12 @@ class COMExistentialTypeInfo final
   }
 
 public:
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   COMExistentialTypeInfo(llvm::PointerType *storage, Size size, Alignment align)
       : SingleScalarTypeInfo(storage, size,
                              SpareBitVector::getConstant(size.getValueInBits(),

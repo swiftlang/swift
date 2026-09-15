@@ -46,6 +46,12 @@ public:
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
                             IsTriviallyDestroyable, IsCopyable, IsFixedSize, IsABIAccessible) {}
 
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
   }

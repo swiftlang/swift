@@ -27,8 +27,10 @@
 #include "../SILGen/SILGen.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SerializableHiddenTypeInfoRepresentation.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
@@ -102,6 +104,44 @@ public:
     return IRABIDetailsProvider::SizeAndAlignment{
         fixedTI->getFixedSize().getValue(),
         fixedTI->getFixedAlignment().getValue()};
+  }
+
+  AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
+    auto &typeInfo =
+        IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
+
+    AbstractTypeLayout layout;
+    auto type = TD->getDeclaredInterfaceType();
+    auto properties = typeConverter.getTypeProperties(
+        TD->getDeclaredTypeInContext(), TypeExpansionContext::minimal());
+    layout.typeProperties.isTrivial = bool(properties.isTrivial());
+    layout.typeProperties.isFixedABI = bool(properties.isFixedABI());
+    layout.typeProperties.isAddressOnly = bool(properties.isAddressOnly());
+    layout.typeProperties.isResilient = bool(properties.isResilient());
+    layout.typeProperties.isTypeExpansionSensitive =
+        bool(properties.isTypeExpansionSensitive());
+    layout.typeProperties.hasRawPointer =
+        bool(properties.isOrContainsRawPointer());
+    layout.typeProperties.isLexical = bool(properties.isLexical());
+    layout.typeProperties.hasPack = bool(properties.isOrContainsPack());
+    layout.typeProperties.isAddressableForDependencies =
+        bool(properties.isAddressableForDependencies());
+    layout.typeProperties.hasRawLayout =
+        bool(properties.isOrContainsRawLayout());
+    layout.typeProperties.mayHaveCustomDeinit =
+        bool(properties.mayHaveCustomDeinit());
+    layout.typeProperties.isVeryLargeType =
+        bool(properties.isVeryLargeType());
+    layout.typeProperties.definitelyIsAddressableForDependencies =
+        bool(properties.definitelyIsAddressableForDependencies());
+    layout.typeProperties.definitelyHasRawLayout =
+        bool(properties.definitelyIsOrContainsRawLayout());
+    layout.typeProperties.isEscapable = bool(properties.isEscapable());
+    if (type->hasReferenceSemantics())
+      layout.referenceCountingSystem = type->getReferenceCounting();
+    layout.typeInfoRepresentation =
+        typeInfo.createSerializableHiddenTypeInfoRepresentation(IGM);
+    return layout;
   }
 
   IRABIDetailsProvider::FunctionABISignature
@@ -473,6 +513,11 @@ IRABIDetailsProvider::~IRABIDetailsProvider() {}
 std::optional<IRABIDetailsProvider::SizeAndAlignment>
 IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
   return impl->getTypeSizeAlignment(TD);
+}
+
+AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(
+    const NominalTypeDecl *TD) {
+  return impl->getAbstractTypeLayout(TD);
 }
 
 std::optional<LoweredFunctionSignature>
