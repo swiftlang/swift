@@ -33,6 +33,12 @@ module InheritFRT {
   requires cplusplus
 }
 
+module InheritFRTSubclassing {
+  header "inherit-frt-subclassing.h"
+  requires cplusplus
+  export *
+}
+
 module WitnessTable {
   header "witness-table.h"
   requires cplusplus
