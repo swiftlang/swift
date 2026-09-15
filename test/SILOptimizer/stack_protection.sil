@@ -21,7 +21,7 @@ struct S {
 
 struct SpanLike {
   @_hasStorage var _pointer: Optional<UnsafeRawPointer>
-  @_hasStorage var _count: Int
+  @_hasStorage var _count: Int64
 }
 
 sil @unknown : $@convention(thin) (Builtin.RawPointer) -> ()
@@ -276,8 +276,8 @@ bb0(%0 : $Int64):
   %4 = struct $UnsafeRawPointer (%3 : $Builtin.RawPointer)
   %5 = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt, %4 : $UnsafeRawPointer
   %6 = integer_literal $Builtin.Int64, 8
-  %7 = struct $Int (%6 : $Builtin.Int64)
-  %8 = struct $SpanLike (%5 : $Optional<UnsafeRawPointer>, %7 : $Int)
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  %8 = struct $SpanLike (%5 : $Optional<UnsafeRawPointer>, %7 : $Int64)
   %9 = mark_dependence %8 : $SpanLike on %1 : $*Int64
   debug_value %9 : $SpanLike, let, name "b"
   %11 = struct_extract %9 : $SpanLike, #SpanLike._count
@@ -301,8 +301,8 @@ bb0(%0 : $Int64):
   %4 = struct $UnsafeRawPointer (%3 : $Builtin.RawPointer)
   %5 = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt, %4 : $UnsafeRawPointer
   %6 = integer_literal $Builtin.Int64, 8
-  %7 = struct $Int (%6 : $Builtin.Int64)
-  %8 = struct $SpanLike (%5 : $Optional<UnsafeRawPointer>, %7 : $Int)
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  %8 = struct $SpanLike (%5 : $Optional<UnsafeRawPointer>, %7 : $Int64)
   %9 = mark_dependence %8 : $SpanLike on %1 : $*Int64
   debug_value %9 : $SpanLike, let, name "b"
   %11 = struct_extract %9 : $SpanLike, #SpanLike._pointer
