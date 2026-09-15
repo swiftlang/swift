@@ -7021,6 +7021,20 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
                                         ConstraintLocatorBuilder locator) {
   Type fromType = cs.getType(expr);
 
+  // Bridge to the object type before injecting into an optional. Otherwise,
+  // the optional destination is mistaken for a Swift type to bridge from.
+  if (auto optionalObjectType = toType->getOptionalObjectType()) {
+    if (optionalObjectType->isAnyObject() ||
+        optionalObjectType->isBridgeableObjectType()) {
+      auto bridgedExpr =
+          buildObjCBridgeExpr(expr, optionalObjectType, locator);
+      if (!bridgedExpr)
+        return nullptr;
+      return cs.cacheType(
+          new (ctx) InjectIntoOptionalExpr(bridgedExpr, toType));
+    }
+  }
+
   // Bridged collection casts always succeed, so we treat them as
   // collection "upcasts".
   if ((fromType->isArray() && toType->isArray())
