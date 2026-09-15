@@ -19,7 +19,7 @@
 // EXTRACT-FOO-NOT: sil [ossa] hidden @$s5basic7VehicleC1nACSi_tcfc : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
 // EXTRACT-FOO-NOT: sil [ossa] hidden @$s5basic7VehicleC3nowSiyF : $@convention(method) (@guaranteed Vehicle) -> Int {
 
-// EXTRACT-FOO-LABEL: sil [ossa] @$s5basic3fooSiyF : $@convention(thin) () -> Int {
+// EXTRACT-FOO-LABEL: sil [stage=canonical] [ossa] @$s5basic3fooSiyF : $@convention(thin) () -> Int {
 // EXTRACT-FOO:       bb0:
 // EXTRACT-FOO-NEXT:    %0 = integer_literal
 // EXTRACT-FOO:         %[[POS:.*]] = struct $Int
@@ -30,7 +30,7 @@
 // EXTRACT-TEST-NOT: sil [ossa] hidden @$s5basic7VehicleC1nACSi_tcfc : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
 // EXTRACT-TEST-NOT: sil [ossa] hidden @$s5basic7VehicleC3nowSiyF : $@convention(method) (@guaranteed Vehicle) -> Int {
 
-// EXTRACT-TEST-LABEL:  sil [ossa] @$s5basic1XV4testyyF : $@convention(method) (X) -> () {
+// EXTRACT-TEST-LABEL:  sil [stage=canonical] [ossa] @$s5basic1XV4testyyF : $@convention(method) (X) -> () {
 // EXTRACT-TEST:        bb0(%0 : $X):
 // EXTRACT-TEST-NEXT:     function_ref
 // EXTRACT-TEST-NEXT:     function_ref @$s5basic3fooSiyF : $@convention(thin) () -> Int
@@ -43,7 +43,7 @@
 // EXTRACT-INIT-NOT: sil [ossa] @$s5basic1XV4testyyF : $@convention(method) (X) -> () {
 // EXTRACT-INIT-NOT: sil [ossa] @$s5basic7VehicleC3nowSiyF : $@convention(method) (@owned Vehicle) -> Int {
 
-// EXTRACT-INIT-LABEL:   sil [ossa] @$s5basic7VehicleC1nACSi_tcfc : $@convention(method) (Int, @owned Vehicle) -> @owned Vehicle {
+// EXTRACT-INIT-LABEL:   sil [stage=canonical] [ossa] @$s5basic7VehicleC1nACSi_tcfc : $@convention(method) (Int, @owned Vehicle) -> @owned Vehicle {
 // EXTRACT-INIT:         bb0
 // EXTRACT-INIT-NEXT:      end_init_let_ref
 // EXTRACT-INIT-NEXT:      begin_borrow
@@ -59,7 +59,7 @@
 // EXTRACT-NOW-NOT: sil [ossa] @$s5basic1XV4testyyF : $@convention(method) (X) -> () {
 // EXTRACT-NOW-NOT: sil [ossa] @$s5basic7VehicleC1nACSi_tcfc : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
 
-// EXTRACT-NOW-LABEL:   sil [ossa] @$s5basic7VehicleC3nowSiyF : $@convention(method) (@guaranteed Vehicle) -> Int {
+// EXTRACT-NOW-LABEL:   sil [stage=canonical] [ossa] @$s5basic7VehicleC3nowSiyF : $@convention(method) (@guaranteed Vehicle) -> Int {
 // EXTRACT-NOW:         bb0
 // EXTRACT-NOW:           class_method
 // EXTRACT-NOW-NEXT:      apply

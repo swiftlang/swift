@@ -106,10 +106,30 @@ class SILModule::SerializationCallback final
   }
 };
 
+StringRef swift::getSILStageName(SILStage stage) {
+  switch (stage) {
+  case SILStage::Raw:
+    return "raw";
+  case SILStage::Canonical:
+    return "canonical";
+  case SILStage::Lowered:
+    return "lowered";
+  }
+  llvm_unreachable("covered switch");
+}
+
+std::optional<SILStage> swift::getSILStageByName(StringRef name) {
+  return llvm::StringSwitch<std::optional<SILStage>>(name)
+      .Case("raw", SILStage::Raw)
+      .Case("canonical", SILStage::Canonical)
+      .Case("lowered", SILStage::Lowered)
+      .Default(std::nullopt);
+}
+
 SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
                      Lowering::TypeConverter &TC, const SILOptions &Options,
                      const IRGenOptions *irgenOptions)
-    : Stage(SILStage::Raw),
+    : StageFloor(SILStage::Raw),
       indexTrieRoot(new IndexTrieNode()), Options(Options),
       irgenOptions(irgenOptions), serialized(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
@@ -664,7 +684,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   if (!C.isConcrete())
     return {nullptr, nullptr};
 
-  if (getStage() != SILStage::Lowered) {
+  if (!haveFunctionTypesBeenRewritten()) {
     SILLinkerVisitor linker(*this, linkingMode);
     linker.processConformance(C);
   }

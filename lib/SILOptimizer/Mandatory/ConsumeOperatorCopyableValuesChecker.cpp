@@ -589,7 +589,7 @@ class ConsumeOperatorCopyableValuesCheckerPass : public SILFunctionTransform {
     if (fn->wasDeserializedCanonical())
       return;
 
-    assert(fn->getModule().getStage() == SILStage::Raw &&
+    assert(fn->getModule().getStageFloor() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
     LLVM_DEBUG(llvm::dbgs() << "*** Checking moved values in fn: "

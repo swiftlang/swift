@@ -10,7 +10,7 @@ import Builtin
 
 class Klass {}
 
-// CHECK-LABEL: sil [serialized] [ossa] @test_movevalue_escaping : 
+// CHECK-LABEL: sil [serialized] [stage=canonical] [ossa] @test_movevalue_escaping : 
 // CHECK:  %1 = move_value [pointer_escape] %0 : $Klass
 // CHECK-LABEL: } // end sil function 'test_movevalue_escaping'
 sil [serialized] [ossa] @test_movevalue_escaping : $@convention(thin) (@owned Klass) -> @owned Klass {
@@ -20,7 +20,7 @@ bb0(%0 : @owned $Klass):
   return %1 : $Klass
 }
 
-// CHECK-LABEL: sil [serialized] [ossa] @test_allocbox_escaping : 
+// CHECK-LABEL: sil [serialized] [stage=canonical] [ossa] @test_allocbox_escaping : 
 // CHECK:  %0 = alloc_box [pointer_escape] ${ var Klass }
 // CHECK-LABEL: } // end sil function 'test_allocbox_escaping'
 sil [serialized] [ossa] @test_allocbox_escaping : $@convention(thin) () -> () {
@@ -31,7 +31,7 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [serialized] [ossa] @test_beginborrow_escaping :
+// CHECK-LABEL: sil [serialized] [stage=canonical] [ossa] @test_beginborrow_escaping :
 // CHECK: %1 = begin_borrow [pointer_escape] %0 : $Klass
 // CHECK-LABEL: } // end sil function 'test_beginborrow_escaping'
 sil [serialized] [ossa] @test_beginborrow_escaping : $@convention(thin) (@owned Klass) -> () {
@@ -44,7 +44,7 @@ bb0(%0 : @owned $Klass):
   return %t : $()
 }
 
-// CHECK-LABEL: sil [serialized] [ossa] @test_reborrow : $@convention(thin) (@owned Klass) -> () {
+// CHECK-LABEL: sil [serialized] [stage=canonical] [ossa] @test_reborrow : $@convention(thin) (@owned Klass) -> () {
 // CHECK: bb3([[ARG:%.*]] : @reborrow $Klass):
 // CHECK: } // end sil function 'test_reborrow'
 sil [serialized] [ossa] @test_reborrow : $@convention(thin) (@owned Klass) -> () {

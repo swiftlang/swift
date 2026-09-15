@@ -63,7 +63,7 @@ public struct GenT<A, B> {
   public let z: (e0: External<A>, e1: External<B>)
 }
 
-// CHECK-LABEL: sil shared [serialized] @AA_stored_properties
+// CHECK-LABEL: sil shared [serialized] [stage=canonical] @AA_stored_properties
 sil shared [serialized] @AA_stored_properties : $@convention(thin) () -> () {
 entry:
   // CHECK: keypath $WritableKeyPath<S, Int>, (root $S; stored_property #S.x : $Int)
@@ -78,7 +78,7 @@ entry:
   return undef : $()
 }
 
-// CHECK-LABEL: sil shared [serialized] @BB_stored_properties_generic
+// CHECK-LABEL: sil shared [serialized] [stage=canonical] @BB_stored_properties_generic
 sil shared [serialized] @BB_stored_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> () {
 entry:
   // CHECK: keypath $WritableKeyPath<Gen<D, E, F>, D>, <τ_0_0, τ_0_1, τ_0_2 where {{.*}}> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; stored_property #Gen.x : $τ_0_0) <D, E, F>
@@ -89,7 +89,7 @@ entry:
   return undef : $()
 }
 
-// CHECK-LABEL: sil shared [serialized] @CC_tuple_elements
+// CHECK-LABEL: sil shared [serialized] [stage=canonical] @CC_tuple_elements
 sil shared [serialized] @CC_tuple_elements : $@convention(thin) () -> () {
 entry:
   // CHECK: keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.x : $(Int, Int); tuple_element #0 : $Int)
@@ -104,7 +104,7 @@ entry:
   return undef : $()
 }
 
-// CHECK-LABEL: sil shared [serialized] @DD_tuple_generic
+// CHECK-LABEL: sil shared [serialized] [stage=canonical] @DD_tuple_generic
 sil shared [serialized] @DD_tuple_generic : $@convention(thin) <T, U> () -> () {
 entry:
   // CHECK: keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
@@ -146,7 +146,7 @@ sil @set_gen_int_subs : $@convention(keypath_accessor_setter) <A: Hashable, B: H
 sil @gen_subs_eq : $@convention(keypath_accessor_equals) <A: Hashable, B: Hashable, C: Hashable> (@in_guaranteed (S, C), @in_guaranteed (S, C)) -> Bool
 sil @gen_subs_hash : $@convention(keypath_accessor_hash) <A: Hashable, B: Hashable, C: Hashable> (@in_guaranteed (S, C)) -> Int
 
-// CHECK-LABEL: sil shared [serialized] @EE_computed_properties
+// CHECK-LABEL: sil shared [serialized] [stage=canonical] @EE_computed_properties
 sil shared [serialized] @EE_computed_properties : $@convention(thin) () -> () {
 entry:
   // CHECK: keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(keypath_accessor_getter) (@in_guaranteed S) -> @out Int)
@@ -164,7 +164,7 @@ entry:
 sil @get_gen_a : $@convention(keypath_accessor_getter) <X1: P, Y1: Q, Z1: R> (@in_guaranteed Gen<X1, Y1, Z1>) -> @out X1
 sil @set_gen_a : $@convention(keypath_accessor_setter) <X2: P, Y2: Q, Z2: R> (@in_guaranteed X2, @in_guaranteed Gen<X2, Y2, Z2>) -> ()
 
-// CHECK-LABEL: sil shared [serialized] @FF_computed_properties_generic
+// CHECK-LABEL: sil shared [serialized] [stage=canonical] @FF_computed_properties_generic
 sil shared [serialized] @FF_computed_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> () {
 entry:
   // CHECK: keypath $KeyPath<Gen<D, E, F>, D>, <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; settable_property $τ_0_0, id @id_a : $@convention(thin) () -> (), getter @get_gen_a : $@convention(keypath_accessor_getter) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (@in_guaranteed Gen<τ_0_0, τ_0_1, τ_0_2>) -> @out τ_0_0, setter @set_gen_a : $@convention(keypath_accessor_setter) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (@in_guaranteed τ_0_0, @in_guaranteed Gen<τ_0_0, τ_0_1, τ_0_2>) -> ()) <D, E, F>
@@ -173,7 +173,7 @@ entry:
   return undef : $()
 }
 
-// CHECK-LABEL: sil shared [serialized] @GG_optional
+// CHECK-LABEL: sil shared [serialized] [stage=canonical] @GG_optional
 sil shared [serialized] @GG_optional : $@convention(thin) () -> () {
 entry:
   // CHECK: keypath $KeyPath<Optional<Int>, Optional<Int>>, (root $Optional<Int>; optional_chain : $Int; optional_wrap : $Optional<Int>)
@@ -184,7 +184,7 @@ entry:
   return undef : $()
 }
 
-// CHECK-LABEL: sil shared [serialized] @HH_indexes
+// CHECK-LABEL: sil shared [serialized] [stage=canonical] @HH_indexes
 sil shared [serialized] @HH_indexes : $@convention(thin) (S, C) -> () {
 // CHECK: bb0([[S:%.*]] : $S, [[C:%.*]] : $C):
 entry(%s : $S, %c : $C):
@@ -203,7 +203,7 @@ entry(%s : $S, %c : $C):
   return undef : $()
 }
 
-// CHECK-LABEL: sil shared [serialized] @II_external
+// CHECK-LABEL: sil shared [serialized] [stage=canonical] @II_external
 sil shared [serialized] @II_external : $@convention(thin) <D: P, E: Q, F: R> () -> () {
 entry:
   // CHECK: keypath $KeyPath<Gen<D, E, F>, D>, <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; settable_property $τ_0_0, id @id_a : $@convention(thin) () -> (), getter @get_gen_a : $@convention(keypath_accessor_getter) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (@in_guaranteed Gen<τ_0_0, τ_0_1, τ_0_2>) -> @out τ_0_0, setter @set_gen_a : $@convention(keypath_accessor_setter) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (@in_guaranteed τ_0_0, @in_guaranteed Gen<τ_0_0, τ_0_1, τ_0_2>) -> (), external #Gen.x<τ_0_0, τ_0_1, τ_0_2>) <D, E, F>
