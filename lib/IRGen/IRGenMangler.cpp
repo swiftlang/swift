@@ -95,6 +95,9 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
     AllowSymbolicReferencesLocally(AllowSymbolicReferences);
   llvm::SaveAndRestore<std::function<bool (SymbolicReferent)>>
     CanSymbolicReferenceLocally(CanSymbolicReference);
+  llvm::SaveAndRestore<bool>
+    AllowConcurrencyStandardSubstitutionsLocally(
+        AllowConcurrencyStandardSubstitutions, false);
 
   AllowSymbolicReferences = true;
   CanSymbolicReference = [&](SymbolicReferent s) -> bool {
