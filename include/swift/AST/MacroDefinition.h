@@ -20,9 +20,8 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/StringExtras.h"
-
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/PointerUnion.h"
+
 
 namespace swift {
 

@@ -20,7 +20,6 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 
 using namespace swift;

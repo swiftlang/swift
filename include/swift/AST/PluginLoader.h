@@ -14,10 +14,9 @@
 
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginRegistry.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include <optional>
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
 

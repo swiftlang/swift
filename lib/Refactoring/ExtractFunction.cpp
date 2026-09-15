@@ -14,7 +14,6 @@
 #include "RefactoringActions.h"
 #include "Utils.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IDETool/CompilerInvocation.h"
 
 using namespace swift::refactoring;

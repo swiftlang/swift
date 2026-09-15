@@ -22,7 +22,6 @@
 #ifndef SWIFT_BASIC_DIVERSESTACK_H
 #define SWIFT_BASIC_DIVERSESTACK_H
 
-#include "swift/Basic/Malloc.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include <cassert>

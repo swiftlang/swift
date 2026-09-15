@@ -20,7 +20,6 @@
 
 #include "swift/Basic/StringExtras.h"
 #include "clang/Basic/Specifiers.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include <optional>
 
 #include "ImportName.h"

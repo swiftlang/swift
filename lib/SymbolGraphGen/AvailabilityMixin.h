@@ -14,7 +14,6 @@
 #define SWIFT_SYMBOLGRAPHGEN_AVAILABILITYMIXIN_H
 
 #include "swift/AST/Attr.h"
-#include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/VersionTuple.h"

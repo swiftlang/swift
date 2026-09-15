@@ -26,7 +26,6 @@
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
