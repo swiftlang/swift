@@ -918,9 +918,9 @@ WitnessMetadata *AccessorTarget::getWitnessMetadata(llvm::Value *actorSelf) {
     auto *protocol = requirement->getDeclContext()->getSelfProtocolDecl();
     assert(protocol);
 
-    witness.SelfMetadata = actorSelf;
-    witness.SelfWitnessTable =
-        lookupWitnessTable(IGF, emitMetadataRef(actorSelf), protocol);
+    auto *selfMetadata = emitMetadataRef(actorSelf);
+    witness.SelfMetadata = selfMetadata;
+    witness.SelfWitnessTable = lookupWitnessTable(IGF, selfMetadata, protocol);
 
     Witness = witness;
   }
