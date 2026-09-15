@@ -668,8 +668,7 @@ public:
   /// skipped, which parameters were annotated) that cannot be re-derived from
   /// the Clang declaration alone. Recording keeps the reason and the verdict on
   /// the same code path, as elsewhere.
-  llvm::DenseMap<const Decl *, importer::CxxUnsafetyExplanation>
-      LifetimeUnsafetyReasons;
+  llvm::DenseMap<const Decl *, Diagnostic> LifetimeUnsafetyReasons;
 
   // Caches used by ObjCInterfaceAndImplementationRequest.
   llvm::DenseMap<Decl *, Decl *> ImplementationsByInterface;

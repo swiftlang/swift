@@ -1389,24 +1389,6 @@ diagnoseUnsafetyReason(ClangImporter::Implementation &Impl, HeaderLoc loc,
                          culprit);
   case importer::CxxUnsafetyReason::IndirectView:
     return note(diag::cxx_unsafe_indirect_view);
-
-  case importer::CxxUnsafetyReason::InferredResultDependence:
-    return note(diag::cxx_unsafe_inferred_result_dependence);
-  case importer::CxxUnsafetyReason::UnannotatedNonEscapableParam:
-    return note(diag::cxx_unsafe_unannotated_nonescapable_param,
-                         named, culprit);
-
-  case importer::CxxUnsafetyReason::SkippedLifetimeEscapableResult:
-    return note(diag::cxx_unsafe_skipped_lifetime_escapable_result);
-  case importer::CxxUnsafetyReason::SkippedLifetimeImportedAsClass:
-    return note(diag::cxx_unsafe_skipped_lifetime_imported_as_class, named,
-                culprit);
-  case importer::CxxUnsafetyReason::SkippedLifetimeRValueReference:
-    return note(diag::cxx_unsafe_skipped_lifetime_rvalue_reference, named,
-                culprit);
-  case importer::CxxUnsafetyReason::SkippedLifetimeNoBorrowableStorage:
-    return note(diag::cxx_unsafe_skipped_lifetime_no_borrowable_storage, named,
-                culprit);
   }
   llvm_unreachable("covered switch");
 }
@@ -1464,8 +1446,8 @@ void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
     // decision later.
     auto recorded = Impl.LifetimeUnsafetyReasons.find(decl);
     if (recorded != Impl.LifetimeUnsafetyReasons.end()) {
-      diagnoseUnsafetyReason(Impl, HeaderLoc(clangDecl->getLocation(), useLoc),
-                             recorded->second);
+      Impl.diagnose(HeaderLoc(clangDecl->getLocation(), useLoc),
+                    recorded->second);
       return;
     }
 
