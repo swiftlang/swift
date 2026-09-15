@@ -5878,19 +5878,11 @@ swift::swift_getExistentialTypeMetadata(
 
 ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   // Get the special protocol kind. Marker protocols are omitted before this
-  // runtime entry is called. A refined COM-interface chain may contain more
-  // than one descriptor, but every remaining protocol still has the same COM
-  // representation.
+  // runtime entry is called, and canonicalization removes inherited protocols.
+  // A COM existential therefore contains only its most-derived interface.
   auto special = SpecialProtocol::None;
   if (key.NumProtocols == 1)
     special = key.Protocols[0].getSpecialProtocol();
-  else if (key.NumProtocols > 1 &&
-           llvm::all_of(
-               make_range(key.Protocols, key.Protocols + key.NumProtocols),
-               [](ProtocolDescriptorRef protocol) {
-                 return protocol.getSpecialProtocol() == SpecialProtocol::COM;
-               }))
-    special = SpecialProtocol::COM;
 
   // Calculate the class constraint and number of witness tables for the
   // protocol set.
