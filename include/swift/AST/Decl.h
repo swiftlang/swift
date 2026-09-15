@@ -3414,6 +3414,22 @@ public:
   /// markAsObjC().
   bool isObjC() const;
 
+  /// Whether this is an Objective-C *direct* declaration -- either written
+  /// @objcDirect in Swift, or imported from a Clang declaration marked
+  /// objc_direct (a direct method, or an accessor of a direct property).
+  ///
+  /// A direct declaration is deliberately omitted from its class's Objective-C
+  /// method list, so it can never be found by selector lookup at runtime.
+  /// Anything that would reach it that way -- #selector, an @objc protocol
+  /// witness, @IBAction, AnyObject dispatch -- is unsound, and must either be
+  /// diagnosed or excluded rather than left to fail as an unrecognized
+  /// selector.
+  ///
+  /// Note this is *not* AbstractFunctionDecl::isObjCDirect(), which asks only
+  /// about the Swift attribute. IRGen depends on that narrower question: an
+  /// imported direct method keeps the linkage Clang gave it.
+  bool isObjCDirectDispatched() const;
+
   /// Note whether this declaration is known to be exposed to Objective-C.
   void setIsObjC(bool Value);
 
@@ -8710,6 +8726,13 @@ public:
   bool isObjCInstanceMethod() const;
 
   /// Returns true if this method has the @objcDirect attribute.
+  ///
+  /// This asks only about the Swift attribute. Callers that care whether the
+  /// method is a direct method in the Objective-C sense -- which also covers
+  /// methods imported from Clang's objc_direct -- want
+  /// isObjCDirectDispatched() instead. IRGen depends on the distinction:
+  /// an imported direct method keeps the linkage Clang gave it, while an
+  /// @objcDirect method has its linkage forced here.
   bool isObjCDirect() const {
     return getAttrs().hasAttribute<ObjCDirectAttr>();
   }

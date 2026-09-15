@@ -785,6 +785,12 @@ ERROR(expr_selector_not_objc,none,
       "argument of '#selector' refers to %kind0 that is not exposed to "
       "Objective-C",
       (const ValueDecl *))
+ERROR(expr_selector_objc_direct,none,
+      "argument of '#selector' refers to %kind0 that is a direct method",
+      (const ValueDecl *))
+NOTE(note_objc_direct_no_selector,none,
+     "a direct method is not added to its class's Objective-C method list, so "
+     "it cannot be found by selector at runtime", ())
 NOTE(make_decl_objc,none,
      "add '@objc' to expose this %kindonly0 to Objective-C",
      (const ValueDecl *))
@@ -2589,6 +2595,15 @@ ERROR(objc_direct_override,none,
       "'@objcDirect' methods cannot override superclass methods", ())
 ERROR(objc_direct_on_deinit,none,
       "'@objcDirect' cannot be applied to 'deinit'", ())
+ERROR(objc_direct_dynamic,none,
+      "'@objcDirect' cannot be applied to a 'dynamic' method; 'dynamic' "
+      "requires dispatch through the Objective-C runtime", ())
+ERROR(objc_direct_ibaction,none,
+      "'@objcDirect' cannot be applied to an '@IBAction' or '@IBSegueAction' "
+      "method; the action is invoked by selector", ())
+ERROR(witness_objc_direct,none,
+      "%kind0 cannot satisfy a requirement of '@objc' protocol %1 because it "
+      "is a direct method", (const ValueDecl *, Identifier))
 ERROR(objc_direct_required_init,none,
       "'@objcDirect' cannot be applied to 'required' initializers", ())
 ERROR(objc_direct_not_in_class,none,

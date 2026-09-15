@@ -1986,6 +1986,29 @@ void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
     return;
   }
 
+  // Reject anything that requires the method to be reachable by selector at
+  // runtime. A direct method is absent from the class's Objective-C method
+  // list, so such a dispatch would find nothing.
+  //
+  // 'dynamic' is checked semantically rather than as an attribute: the 'final'
+  // requirement below does not exclude it, because IsDynamicRequest honours an
+  // explicit 'dynamic' before it consults isSemanticallyFinal() -- 'final' only
+  // blocks *inference* of 'dynamic'. Asking isDynamic() also covers @NSManaged,
+  // which implies 'dynamic'. This must precede the 'final' check so that a
+  // non-final 'dynamic' method reports the real conflict.
+  if (fn->isDynamic()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_dynamic);
+    return;
+  }
+
+  // An action is wired up by selector from a nib or storyboard, which is not
+  // visible to the compiler at all, so this has to be rejected outright.
+  if (D->getAttrs().hasAttribute<IBActionAttr>() ||
+      D->getAttrs().hasAttribute<IBSegueActionAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_ibaction);
+    return;
+  }
+
   // Must be final (except for initializers, which can't be overridden the
   // same way).
   if (!isa<ConstructorDecl>(fn) && !fn->isFinal()) {
