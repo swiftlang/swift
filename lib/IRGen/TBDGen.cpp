@@ -823,15 +823,16 @@ private:
   apigen::APIAvailability getAvailability(const Decl *decl) {
     std::optional<bool> unavailable, spiAvailable;
     std::string introduced, obsoleted;
-    bool hasFallbackUnavailability = false, hasFallbackSPIAvailability = false;
+    // `@_spi_available` requires a specific platform, so only a platform
+    // attribute can make the symbol SPI and there is no fallback for it.
+    bool hasFallbackUnavailability = false;
     auto platform = targetPlatform(module->getASTContext().LangOpts);
     const Decl *declForAvailability = decl->getInnermostDeclWithAvailability();
     if (!declForAvailability)
       return {};
     for (auto attr : declForAvailability->getSemanticAvailableAttrs()) {
-      if (!attr.isPlatformSpecific()) {
-        hasFallbackUnavailability = attr.isUnconditionallyUnavailable();
-        hasFallbackSPIAvailability = attr.isSPI();
+      if (attr.getDomain().isUniversal()) {
+        hasFallbackUnavailability |= attr.isUnconditionallyUnavailable();
         continue;
       }
       if (attr.getPlatform() != platform)
@@ -845,7 +846,7 @@ private:
     }
     return {introduced, obsoleted,
             unavailable.value_or(hasFallbackUnavailability),
-            spiAvailable.value_or(hasFallbackSPIAvailability)};
+            spiAvailable.value_or(false)};
   }
 
   StringRef getSelectorName(SILDeclRef method, SmallString<128> &buffer) {
