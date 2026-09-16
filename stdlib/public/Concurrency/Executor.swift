@@ -985,7 +985,6 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
 
 /// Obtain the executor ref by calling the executor's `asUnownedTaskExecutor()`.
 /// The obtained executor ref will have all the user-defined flags set on the executor.
-@_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
 @_silgen_name("_task_taskExecutor_getTaskExecutorRef")
 internal func _task_taskExecutor_getTaskExecutorRef<E>(_ taskExecutor: E) -> Builtin.Executor
