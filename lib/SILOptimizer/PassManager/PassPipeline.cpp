@@ -301,6 +301,7 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
     P.addMandatoryAllocBoxToStack();
     P.addRemoveSILGenLifetimes();
     P.addLifetimeResolution();
+    P.addLifetimeResolutionDiagnose();
     return P;
   }
 
