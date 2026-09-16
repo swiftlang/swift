@@ -960,6 +960,7 @@ SIMPLE_DECL_ATTR(objcDirect, ObjCDirect,
   OnAbstractFunction,
   ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   181)
+DECL_ATTR_FEATURE_REQUIREMENT(ObjCDirect, ObjCDirect)
 
 LAST_DECL_ATTR(ObjCDirect)
 

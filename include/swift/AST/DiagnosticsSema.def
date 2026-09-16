@@ -2591,8 +2591,6 @@ ERROR(objc_direct_on_deinit,none,
       "'@objcDirect' cannot be applied to 'deinit'", ())
 ERROR(objc_direct_required_init,none,
       "'@objcDirect' cannot be applied to 'required' initializers", ())
-ERROR(objc_direct_requires_precondition_thunk,none,
-      "'@objcDirect' requires '-fobjc-direct-precondition-thunk'", ())
 ERROR(objc_direct_not_in_class,none,
       "'@objcDirect' can only be applied to members of a class", ())
 ERROR(objc_direct_in_generic_class,none,

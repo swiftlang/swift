@@ -1,4 +1,5 @@
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_ObjCDirect
 
 // The Swift callee and the clang caller have to agree on the direct symbol, and
 // a mismatch shows up as a link error rather than a failed CHECK -- so the link
@@ -9,7 +10,7 @@
 // RUN: split-file %s %t
 
 // Build the Swift library and its generated header.
-// RUN: %target-build-swift -Xcc -fobjc-direct-precondition-thunk \
+// RUN: %target-build-swift -enable-experimental-feature ObjCDirect \
 // RUN:   -emit-library -emit-objc-header -emit-objc-header-path %t/Mod-Swift.h \
 // RUN:   -module-name Mod %t/Mod.swift -o %t/libMod.dylib
 

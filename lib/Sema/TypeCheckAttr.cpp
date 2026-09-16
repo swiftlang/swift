@@ -58,7 +58,6 @@
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
-#include "clang/Basic/CodeGenOptions.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1946,24 +1945,14 @@ void AttributeChecker::visitObjCMembersAttr(ObjCMembersAttr *attr) {
   diagnoseObjCAttrWithoutFoundation(attr, D, reason, behavior);
 }
 
+// Note the Feature::ObjCDirect requirement is not checked here: DeclAttr.def
+// declares it with DECL_ATTR_FEATURE_REQUIREMENT, so checkDeclAttributes()
+// diagnoses and strips the attribute before this ever runs. That is also what
+// keeps the feature gate ahead of every applicability rule below.
 void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
   auto *fn = dyn_cast<AbstractFunctionDecl>(D);
   if (!fn) {
     diagnoseAndRemoveAttr(attr, diag::objc_direct_not_in_class);
-    return;
-  }
-
-  // @objcDirect is only correct when Clang's direct-method precondition-thunk
-  // ABI is enabled. Without it the method is still dropped from the ObjC
-  // metadata and statically dispatched, but no caller-side nil-check thunk is
-  // generated and the symbol mangles without the direct-ABI suffix -- i.e. only
-  // half-functional. Reject it up front rather than emit a broken method. This
-  // reads the same CodeGenOpt the mangler does (see SILDeclRef::mangle); the
-  // ClangImporter and its Clang invocation are created during frontend setup,
-  // before type checking, so the option is populated by the time we get here.
-  auto *importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-  if (!importer || !importer->getCodeGenOpts().ObjCDirectPreconditionThunk) {
-    diagnoseAndRemoveAttr(attr, diag::objc_direct_requires_precondition_thunk);
     return;
   }
 
