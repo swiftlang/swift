@@ -6,7 +6,7 @@
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -enable-experimental-feature CxxImplementation \
 // RUN:   -I %S/Inputs \
-// RUN:   %s | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-abi
+// RUN:   %s | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-abi,CHECK-%target-abi-%target-ptrsize
 
 // REQUIRES: swift_feature_CxxImplementation
 
@@ -35,7 +35,8 @@ public func overloadedByType(_ p: UnsafeMutablePointer<Int32>?) -> Int32 { retur
 
 // int overloadedByType(Point p);
 // The 8-byte struct is coerced into one `i64` by the C++ ABI.
-// CHECK-SYSV-LABEL: define{{.*}} i32 @_Z16overloadedByType5Point(i64
+// CHECK-SYSV-64-LABEL: define{{.*}} i32 @_Z16overloadedByType5Point(i64
+// CHECK-SYSV-32-LABEL: define{{.*}} i32 @_Z16overloadedByType5Point([2 x i32]
 // CHECK-WIN-LABEL: define{{.*}} i32 @"?overloadedByType@@YAHUPoint@@@Z"
 @cxx @implementation
 public func overloadedByType(_ p: Point) -> Int32 { return p.x + p.y }
@@ -62,7 +63,8 @@ public func overloadedByArityAndType(_ x: Double) -> Double { return x * 2 }
 public func overloadedByArityAndType(_ x: Int32, _ y: Int32) -> Int32 { return x + y }
 
 // int overloadedByArityAndType(Point p, int z);
-// CHECK-SYSV-LABEL: define{{.*}} i32 @_Z24overloadedByArityAndType5Pointi(i64
+// CHECK-SYSV-64-LABEL: define{{.*}} i32 @_Z24overloadedByArityAndType5Pointi(i64
+// CHECK-SYSV-32-LABEL: define{{.*}} i32 @_Z24overloadedByArityAndType5Pointi([2 x i32]
 // CHECK-WIN-LABEL: define{{.*}} i32 @"?overloadedByArityAndType@@YAHUPoint@@H@Z"
 @cxx @implementation
 public func overloadedByArityAndType(_ p: Point, _ z: Int32) -> Int32 { return (p.x + p.y) * z }
