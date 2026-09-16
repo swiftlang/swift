@@ -1,4 +1,8 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=100000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=40000 -solver-enable-promote-supertypes
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=100000 -solver-disable-promote-supertypes
+
+// At one point, this was the slowest expression (by number of scopes)
+// in the source compatibility suite.
 
 struct ID: CustomStringConvertible {
   var n: Int
@@ -10,7 +14,6 @@ struct Test {
 }
 
 func slow(_ tests: LazyFilterSequence<some Sequence<Test>>) -> [String] {
-  // expected-error@+1 {{reasonable time}}
   return Dictionary(
     grouping: tests.lazy.map(\.id),
     by: \.n
