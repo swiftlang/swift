@@ -167,3 +167,35 @@ extension GCLU: ExpressibleByExtendedGraphemeClusterLiteral {
 }
 let _: GCLU = .init(extendedGraphemeClusterLiteral: "🇧🇷") // expected-error{{'init(extendedGraphemeClusterLiteral:)' is only available in macOS 100 or newer}} expected-note{{add 'if #available' version check}}
 let _: GCLU = "🇧🇷" // expected-error{{'init(extendedGraphemeClusterLiteral:)' is only available in macOS 100 or newer}} expected-note{{add 'if #available' version check}}
+
+// rdar://187518362 - A @dynamicCallable call site builds an implicit array or
+// dictionary literal from the argument list. The diagnostic must point at that
+// argument list.
+
+@dynamicCallable
+struct DCPositionalCallee {
+  struct Args {}
+
+  func dynamicallyCall(withArguments args: Args) -> Int { 0 }
+}
+
+@available(macOS 100, *)
+extension DCPositionalCallee.Args: ExpressibleByArrayLiteral {
+  init(arrayLiteral elements: Int...) {}
+}
+
+@dynamicCallable
+struct DCKeywordCallee {
+  struct KeywordArgs {}
+
+  func dynamicallyCall(withKeywordArguments args: KeywordArgs) -> Int { 0 }
+}
+
+@available(macOS 100, *)
+extension DCKeywordCallee.KeywordArgs: ExpressibleByDictionaryLiteral {
+  init(dictionaryLiteral elements: (String, Int)...) {}
+}
+
+let _ = DCPositionalCallee()(1, 2) // expected-error@:29{{'init(arrayLiteral:)' is only available in macOS 100 or newer}} expected-note{{add 'if #available' version check}}
+let _ = DCKeywordCallee()(a: 1, b: 2) // expected-error@:26{{'init(dictionaryLiteral:)' is only available in macOS 100 or newer}} expected-note{{add 'if #available' version check}}
+let _ = DCKeywordCallee()(1, 2) // expected-error@:26{{'init(dictionaryLiteral:)' is only available in macOS 100 or newer}} expected-note{{add 'if #available' version check}}
