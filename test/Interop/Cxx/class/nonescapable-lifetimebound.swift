@@ -302,6 +302,11 @@ View fromLvalueRefNonTrivialValue(NonTrivialByValue &o [[clang::lifetimebound]])
 View fromRvalueRefTrivialValue(Owner &&o [[clang::lifetimebound]]);
 View fromRvalueRefNonTrivialValue(NonTrivialByValue &&o [[clang::lifetimebound]]);
 
+struct SWIFT_NONESCAPABLE IndependentCtor {
+    IndependentCtor(const Owner &o) SWIFT_RETURNS_INDEPENDENT_VALUE;
+    const int *member;
+};
+
 // CHECK: sil {{.*}}[clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil {{.*}}[clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
@@ -332,6 +337,7 @@ View fromRvalueRefNonTrivialValue(NonTrivialByValue &&o [[clang::lifetimebound]]
 // CHECK: sil {{.*}}[clang fromLvalueRefNonTrivialValue] {{.*}} : $@convention(c) (@inout NonTrivialByValue) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang fromRvalueRefTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} Owner) -> @lifetime(immortal) @owned View
 // CHECK: sil {{.*}}[clang fromRvalueRefNonTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} NonTrivialByValue) -> @lifetime(immortal) @owned View
+// CHECK: sil {{.*}}[clang IndependentCtor.init] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(immortal) @out IndependentCtor
 
 //--- test.swift
 
@@ -397,6 +403,10 @@ func lvalueRefLifetimebound(_ o: inout Owner, _ n: inout NonTrivialByValue) {
 func rvalueRefLifetimebound(_ o: consuming Owner, _ n: consuming NonTrivialByValue) {
     let _ = fromRvalueRefTrivialValue(consuming: o)
     let _ = fromRvalueRefNonTrivialValue(consuming: n)
+}
+
+func independentCtor(_ o: Owner) {
+    let _ = IndependentCtor(o)
 }
 
 //--- escaping_scopes.swift
@@ -523,5 +533,22 @@ func classTransitiveField(b: SwiftBoxNested) -> View {
   return b.field.field.handOutView()
   // expected-error @-1 {{lifetime-dependent value escapes its scope}}
   // expected-note @-2 {{it depends on this scoped access to variable 'field'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+// An independent result depends on nothing, so it may outlive the access to the
+// owner it was built from.
+@_lifetime(immortal)
+func independentCtorEscapes() -> IndependentCtor {
+  return IndependentCtor(globalOwner)
+}
+
+// Without the annotation the same escape is an error: the dependency Swift
+// infers ties the result to the owner.
+@_lifetime(immortal)
+func inferredCtorEscapes() -> ViewNoAnnotation {
+  return ViewNoAnnotation(globalOwner)
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'globalOwner'}}
   // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
 }
