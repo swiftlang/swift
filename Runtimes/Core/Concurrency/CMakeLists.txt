@@ -16,6 +16,7 @@ add_library(swift_Concurrency
   ExecutorImpl.cpp
   ExecutorChecks.cpp
   GlobalExecutor.cpp
+  SplitContinuation.cpp
   Task.cpp
   TaskAlloc.cpp
   TaskGroup.cpp
