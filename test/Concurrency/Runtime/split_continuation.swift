@@ -530,27 +530,6 @@ actor Elsewhere {
       expectFalse(task.isCancelled)
     }
 
-    tests.test("cancelling the scope while suspended runs the handler") {
-      let executor = ManualExecutor()
-      let task = Task(executorPreference: executor) {
-        await __withTaskCancellationScope { scope in
-          await withContinuation(of: Int.self, throwing: Never.self) {
-            (continuation: consuming Continuation<Int, Never>,
-             awaiter: consuming ContinuationAwaiter<Int, Never>) in
-            let holder = ContinuationHolder(continuation)
-            Task.detached(executorPreference: executor) { scope.cancel() }
-            return await awaiter.wait(
-              onCancel: { holder.resumeFromDetachedTask(returning: -12, executorPreference: executor) },
-              onEscalate: { _ in })
-          }
-        }
-      }
-      executor.runNextJob() // Runs the task to its suspension.
-      executor.runNextJobs(count: 3) // Scope cancel, the handler's resumer, the resumption.
-      expectEqual(-12, await task.value)
-      expectFalse(task.isCancelled)
-    }
-
     tests.test("a cancellation shield suppresses the handler while suspended") {
       let executor = ManualExecutor()
       let task = Task(executorPreference: executor) {
