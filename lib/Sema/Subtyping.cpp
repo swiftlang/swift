@@ -738,16 +738,9 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
         return ConflictFlag::TupleArity;
 
       for (unsigned i : indices(lhsTuple->getElements())) {
-        auto lhsElt = lhsTuple->getElement(i);
-        auto rhsElt = rhsTuple->getElement(i);
-        if (lhsElt.hasName() && rhsElt.hasName() &&
-            lhsElt.getName() != rhsElt.getName()) {
-          return ConflictFlag::TupleLabel;
-        }
-
-        auto result = checkConversion(cache,
-                                      lhsElt.getType(),
-                                      rhsElt.getType(), sig);
+        auto lhsElt = lhsTuple->getElementType(i);
+        auto rhsElt = rhsTuple->getElementType(i);
+        auto result = checkConversion(cache, lhsElt, rhsElt, sig);
         if (result)
           return result | ConflictFlag::TupleElement;
       }
@@ -1822,8 +1815,6 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " conformance";
   if (reason.contains(ConflictFlag::TupleArity))
     out << " tuple_arity";
-  if (reason.contains(ConflictFlag::TupleLabel))
-    out << " tuple_label";
   if (reason.contains(ConflictFlag::TupleElement))
     out << " tuple_element";
   if (reason.contains(ConflictFlag::Existential))
