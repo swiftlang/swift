@@ -13,8 +13,6 @@
 #include "CodeCompletionSwiftInterop.h"
 #include "SourceKit/Core/Context.h"
 #include "sourcekitd/sourcekitdInProc-Internal.h"
-#include "swift/AST/ASTPrinter.h"
-#include "swift/AST/USRGeneration.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"

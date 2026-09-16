@@ -25,7 +25,6 @@
 
 #include <dlfcn.h>
 
-#include <cstdio>
 
 namespace swift {
 namespace threading_impl {

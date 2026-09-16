@@ -1,5 +1,4 @@
 #include "swift/Basic/EnumMap.h"
-#include "llvm/ADT/DenseSet.h"
 #include "gtest/gtest.h"
 
 using namespace swift;

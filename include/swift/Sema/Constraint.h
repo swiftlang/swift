@@ -22,15 +22,14 @@
 #include "swift/AST/FunctionRefInfo.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/TypeLoc.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ContextualTypeInfo.h"
 #include "swift/Sema/OverloadChoice.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/Support/TrailingObjects.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace llvm {
 

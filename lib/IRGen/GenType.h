@@ -19,9 +19,6 @@
 #define SWIFT_IRGEN_GENTYPE_H
 
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/ilist.h"
-#include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/StringMap.h"
 #include "IRGenModule.h"
 #include "IRGenFunction.h"

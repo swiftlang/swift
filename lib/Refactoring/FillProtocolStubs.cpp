@@ -12,7 +12,6 @@
 
 #include "RefactoringActions.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift::refactoring;
 

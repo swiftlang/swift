@@ -15,12 +15,9 @@
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Driver/Action.h"
-#include "swift/Driver/Job.h"
 #include "llvm/Option/Arg.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include <sstream>
 
 using namespace swift::parseable_output;
 using namespace swift::driver;

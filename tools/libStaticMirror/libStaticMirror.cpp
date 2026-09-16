@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/LLVMInitialize.h"
 #include "swift/DependencyScan/StringUtils.h"
 #include "swift/StaticMirror/BinaryScanImpl.h"
 #include "swift/StaticMirror/BinaryScanningTool.h"

@@ -14,7 +14,6 @@
 #define SWIFT_SILOPTIMIZER_UTILS_PARTITIONUTILS_H
 
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILFunction.h"
@@ -28,7 +27,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 
-#include <algorithm>
 #include <variant>
 
 namespace swift {

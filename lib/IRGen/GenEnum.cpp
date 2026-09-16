@@ -107,9 +107,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/CFG.h"
@@ -135,7 +133,6 @@
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 #include "SwitchBuilder.h"
-#include "ClassTypeInfo.h"
 #include "NativeConventionSchema.h"
 
 using namespace swift;
