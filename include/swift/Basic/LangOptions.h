@@ -1111,10 +1111,10 @@ namespace swift {
     bool SolverEnableEnumerateSupertypes = true;
 
     /// Enable type variable joins. This will be on by default eventually.
-    bool SolverEnableTypeVariableJoins = false;
+    bool SolverEnableTypeVariableJoins = true;
 
     /// Enable type variable joins. This will be on by default eventually.
-    bool SolverEnablePromoteSupertypes = false;
+    bool SolverEnablePromoteSupertypes = true;
   };
 
   /// Options for controlling the behavior of the Clang importer.
