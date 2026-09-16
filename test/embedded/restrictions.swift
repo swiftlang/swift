@@ -184,6 +184,8 @@ func openme(p: any P) {
   _openExistential(p, do: generic)
 
   // implicit opening
-  // expected-warning@+1{{cannot use generic global function 'acceptP' on a value of type 'any P' in Embedded Swift}}
+  // Opening is the only way this call type checks -- 'any P' does not conform
+  // to 'P' -- so there is no coercion to suggest.
+  // expected-warning@+1{{cannot open existential type 'any P' when passing it as an argument to global function 'acceptP' in Embedded Swift}}
   acceptP(p)
 }

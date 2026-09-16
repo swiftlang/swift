@@ -841,7 +841,8 @@ namespace {
     /// metatype).
     Expr *openExistentialReference(Expr *base,
                                    ExistentialArchetypeType *archetype,
-                                   ValueDecl *member, SourceLoc memberLoc) {
+                                   ValueDecl *member, SourceLoc memberLoc,
+                                   bool isArgument = false) {
       assert(archetype && "archetype not already opened?");
 
       // Dig out the base type.
@@ -872,9 +873,12 @@ namespace {
       assert(baseTy->isAnyExistentialType() && "Type must be existential");
 
       // Embedded Swift has limitations on the use of generic members of
-      // existentials. Diagnose them here.
-      diagnoseGenericMemberOfExistentialInEmbedded(
-          dc, memberLoc, baseTy, member);
+      // existentials. Diagnose them here. Opening an argument is diagnosed by
+      // the caller, which has the argument expression a fix-it can attach to.
+      if (!isArgument) {
+        diagnoseGenericMemberOfExistentialInEmbedded(
+            dc, memberLoc, baseTy, member);
+      }
 
       // If the base was an lvalue but it will only be treated as an
       // rvalue, turn the base into an rvalue now. This results in
@@ -6535,9 +6539,16 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       auto knownOpened = solution.OpenedExistentialTypes.find(
           cs.getConstraintLocator(argLoc));
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
+        // Embedded Swift cannot specialize the callee for the opened
+        // archetype, so diagnose the opening before performing it.
+        diagnoseOpenedExistentialArgumentInEmbedded(
+            dc, argExpr, argType->getWithoutSpecifierType(),
+            callee.getDecl(), paramIdx);
+
         argExpr = openExistentialReference(
             argExpr, knownOpened->second, callee.getDecl(),
-            apply ? apply->getLoc() : argExpr->getLoc());
+            apply ? apply->getLoc() : argExpr->getLoc(),
+            /*isArgument=*/true);
         argType = cs.getType(argExpr);
       }
     }
