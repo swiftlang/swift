@@ -207,3 +207,8 @@ module FunctionTemplateParameterPack {
   header "function-template-parameter-pack.h"
   requires cplusplus
 }
+
+module FunctionTemplateNullability {
+  header "function-template-nullability.h"
+  requires cplusplus
+}

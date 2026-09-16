@@ -58,6 +58,11 @@ struct LibPrespecializedData {
   /// those.
   TargetPointer<Runtime, const void> tupleMetadataMap;
 
+  /// Foreign type metadata map, keyed on the type's full identity string. That
+  /// string can contain interior NULs. The key is exact, so the map contains a
+  /// single metadata per key.
+  TargetPointer<Runtime, const void> foreignMetadataMap;
+
   // Existing fields are above, add new fields below this point.
 
   // The major/minor version numbers for this version of the struct.
@@ -72,6 +77,7 @@ struct LibPrespecializedData {
   static constexpr uint32_t minorVersionWithPointerKeyedWitnessTableMap = 5;
   static constexpr uint32_t minorVersionWithFunctionMetadataMap = 6;
   static constexpr uint32_t minorVersionWithTupleMetadataMap = 7;
+  static constexpr uint32_t minorVersionWithForeignMetadataMap = 8;
 
   // Option flags values.
   enum : typename Runtime::StoredSize {
@@ -144,6 +150,16 @@ struct LibPrespecializedData {
       return nullptr;
     return tupleMetadataMap;
   }
+
+  using ForeignMetadataMap =
+      PrebuiltAuxDataImplicitStringMap<TargetPointer<Runtime, const void>,
+                                       void>;
+
+  const ForeignMetadataMap *getForeignMetadataMap() const {
+    if (minorVersion < minorVersionWithForeignMetadataMap)
+      return nullptr;
+    return reinterpret_cast<const ForeignMetadataMap *>(foreignMetadataMap);
+  }
 };
 
 /// The value of an entry in a prespecialized metadata table whose key does not
@@ -200,6 +216,11 @@ getLibPrespecializedFunctionTypeMetadata(const Metadata *result,
 const PrespecializedMetadataCandidates *
 getLibPrespecializedTupleTypeMetadata(const Metadata *const *elements,
                                       unsigned numElements);
+
+/// Look up the canonical prespecialized foreign type metadata for a foreign
+/// type descriptor, or nullptr if the library has none.
+ForeignTypeMetadata *
+getLibPrespecializedForeignTypeMetadata(const TypeContextDescriptor *description);
 
 std::pair<LibPrespecializedLookupResult, const TypeContextDescriptor *>
 getLibPrespecializedTypeDescriptor(Demangle::NodePointer node);

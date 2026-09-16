@@ -1087,7 +1087,7 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
   if (!KPI->getFunction()->hasOwnership()) {
     // In non-ossa, bail out if we have non-trivial pattern operands.
     for (const Operand &Op : KPI->getPatternOperands()) {
-      if (Op.get()->getType().isTrivial(*KPI->getFunction()))
+      if (!Op.get()->getType().isTrivial(*KPI->getFunction()))
         return false;
     }
   } else {

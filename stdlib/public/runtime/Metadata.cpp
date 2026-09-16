@@ -6251,15 +6251,6 @@ swift_getExtendedExistentialTypeMetadata(
 // StringMap because we don't need to actually copy the string.
 namespace {
 
-static const TypeContextDescriptor *
-getForeignTypeDescription(Metadata *metadata) {
-  if (auto foreignClass = dyn_cast<ForeignClassMetadata>(metadata))
-    return foreignClass->getDescription();
-  else if (auto foreignClass = dyn_cast<ForeignReferenceTypeMetadata>(metadata))
-    return foreignClass->getDescription();
-  return cast<ValueMetadata>(metadata)->getDescription();
-}
-
 class ForeignMetadataCacheEntry
   : public MetadataCacheEntryBase<ForeignMetadataCacheEntry, /*spurious*/ int> {
 
@@ -6381,10 +6372,31 @@ private:
 
 static Lazy<MetadataCache<ForeignMetadataCacheEntry, ForeignMetadataCacheTag>> ForeignMetadata;
 
+/// Is this foreign metadata complete without the cache having to say so?
+///
+/// Foreign metadata whose descriptor has no completion function is always
+/// complete. Foreign type metadata retrieved from the prespecializations
+/// library is never added to the cache, so we can't check the state variable in
+/// the cache. The prespecializations library only includes foreign metadata
+/// without a completion function, so this covers all of them.
+static bool
+isForeignMetadataCompleteByConstruction(const TypeContextDescriptor *description) {
+  return !description->getForeignMetadataInitialization().CompletionFunction;
+}
+
 MetadataResponse
 swift::swift_getForeignTypeMetadata(MetadataRequest request,
                                     ForeignTypeMetadata *candidate) {
   auto description = getForeignTypeDescription(candidate);
+
+  if (auto *prespecialized =
+          getLibPrespecializedForeignTypeMetadata(description)) {
+    assert(isForeignMetadataCompleteByConstruction(description) &&
+           "prespecialized foreign metadata should have no completion "
+           "function");
+    return MetadataResponse{prespecialized, MetadataState::Complete};
+  }
+
   ForeignMetadataCacheEntry::Key key{description};
   return ForeignMetadata->getOrInsert(key, request, candidate).second;
 }
@@ -8110,6 +8122,9 @@ MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
 
     MetadataResponse forForeignMetadata(const Metadata *metadata,
                             const TypeContextDescriptor *description) {
+      if (isForeignMetadataCompleteByConstruction(description))
+        return MetadataResponse{metadata, MetadataState::Complete};
+
       ForeignMetadataCacheEntry::Key key{description};
       return ForeignMetadata.get().await(key, Request);
     }
@@ -8465,6 +8480,9 @@ checkMetadataDependency(MetadataDependency dependency) {
     MetadataStateWithDependency
     forForeignMetadata(const Metadata *metadata,
                        const TypeContextDescriptor *description) {
+      if (isForeignMetadataCompleteByConstruction(description))
+        return {PrivateMetadataState::Complete, MetadataDependency()};
+
       ForeignMetadataCacheEntry::Key key{description};
       return ForeignMetadata.get().checkDependency(key, Requirement);
     }
