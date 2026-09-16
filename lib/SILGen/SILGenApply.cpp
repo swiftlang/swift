@@ -3147,7 +3147,7 @@ private:
       // Create a new value-dependence here if the primary result is
       // trivial.
       auto &valueTL = SGF.getTypeLowering(value.getType());
-      if (valueTL.isTrivial()) {
+      if (valueTL.isTrivial(&SGF.F)) {
         SILValue dependentValue =
           SGF.B.createMarkDependence(eval, value.forward(SGF),
                                      owner.getValue(),
@@ -3995,7 +3995,7 @@ private:
       } else if (isMutatingParameter(ParamInfos.front().getConvention())) {
         paramOwnership = ValueOwnership::InOut;
       } else {
-        paramOwnership = ValueOwnership::Owned;      
+        paramOwnership = ValueOwnership::Owned;
       }
       if (auto addr = SGF.tryEmitAddressableParameterAsAddress(std::move(arg),
                                                               paramOwnership)) {
@@ -4593,7 +4593,7 @@ private:
                                 SILValue packExpansionIndex,
                                 SILValue packIndex) {
       auto partialCleanup = CleanupHandle::invalid();
-      if (!tupleTL.isTrivial()) {
+      if (!tupleTL.isTrivial(&SGF.F)) {
         partialCleanup =
           SGF.enterPartialDestroyPackCleanup(packAddr, formalPackType,
                                              packComponentIndex,
@@ -4664,7 +4664,7 @@ private:
     });
 
     // If the tuple is trivial, we don't need a cleanup.
-    if (tupleTL.isTrivial())
+    if (tupleTL.isTrivial(&SGF.F))
       return CleanupHandle::invalid();
 
     // Otherwise, push a full-tuple cleanup for it.
@@ -4697,7 +4697,7 @@ private:
     // scope, then pop the scope and recreate the cleanup.
     auto eltAddr = eltInit->getManagedAddress().forward(SGF);
     scope.pop();
-    auto cleanup = (paramTL.isTrivial()
+    auto cleanup = (paramTL.isTrivial(&SGF.F)
                       ? CleanupHandle::invalid()
                       : SGF.enterDestroyCleanup(eltAddr));
 
@@ -7909,7 +7909,7 @@ static void collectFakeIndexParameters(SILGenFunction &SGF,
     // storage.
     if (tl.getRecursiveProperties().isAddressOnly()) {
       convention = ParameterConvention::Indirect_In_Guaranteed;
-    } else if (tl.isTrivial()) {
+    } else if (tl.isTrivial(&SGF.F)) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
       convention = ParameterConvention::Direct_Guaranteed;
@@ -7922,7 +7922,7 @@ static void collectFakeIndexParameters(SILGenFunction &SGF,
     // component then copies for each accessor it runs.
     if (tl.getRecursiveProperties().isAddressOnly()) {
       convention = ParameterConvention::Indirect_In;
-    } else if (tl.isTrivial()) {
+    } else if (tl.isTrivial(&SGF.F)) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
       convention = ParameterConvention::Direct_Owned;

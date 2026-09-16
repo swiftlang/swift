@@ -48,6 +48,10 @@ using namespace Lowering;
 // SILGenFunction Class implementation
 //===----------------------------------------------------------------------===//
 
+static llvm::cl::opt<bool> SILGenOwnershipForTrivial(
+    "silgen-ownership-for-trivial", llvm::cl::init(false),
+    llvm::cl::desc("Emit functions in SILGen with ownership for trivial values"));
+
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
                                DeclContext *DC, bool IsEmittingTopLevelCode)
     : SGM(SGM), F(F), silConv(SILAddressConventions::forFunction(F)),
@@ -58,6 +62,10 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
   assert(DC && "creating SGF without a DeclContext?");
   B.setInsertionPoint(createBasicBlock());
   B.setCurrentDebugScope(F.getDebugScope());
+
+  if (SILGenOwnershipForTrivial) {
+    F.setOwnershipForTrivialValues(true);
+  }
 
   // Populate VarDeclScopeMap.
   SourceLoc SLoc = F.getLocation().getSourceLoc();
@@ -707,7 +715,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         auto &lowering = getTypeLowering(entryValue->getType());
         if (entryValue->getType().isAddress()) {
           // If the value is currently an address, load it, copying if needed.
-          if (lowering.isTrivial()) {
+          if (lowering.isTrivial(&F)) {
             SILValue result = lowering.emitLoad(
                 B, loc, entryValue, LoadOwnershipQualifier::Trivial);
             return result;
@@ -725,7 +733,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           }
         } else {
           // Otherwise, just return it, copying if needed.
-          if (forceCopy && !lowering.isTrivial()) {
+          if (forceCopy && !lowering.isTrivial(&F)) {
             auto result = B.emitCopyValueOperation(loc, entryValue);
             return result;
           }
@@ -877,7 +885,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         if (!useLoweredAddresses()) {
           auto &lowering = getTypeLowering(addr->getType());
           auto rvalue =
-              lowering.isTrivial()
+              lowering.isTrivial(&F)
                   ? ManagedValue::forObjectRValueWithoutOwnership(addr)
                   : ManagedValue::forOwnedRValue(addr,
                                                  CleanupHandle::invalid());
