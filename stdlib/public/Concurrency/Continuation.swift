@@ -210,14 +210,16 @@ public nonisolated(nonsending) func withContinuation<Success: ~Copyable>(
   #endif
 }
 
-// MARK: - ContinuationAwaiter
+// ==== -----------------------------------------------------------------------
+// MARK: ContinuationAwaiter
 
-/// The *await* half of a split continuation, held by the suspending task.
+/// The *await* half of a continuation, can be used by a task to suspend until
+/// the continuation is resumed.
 ///
-/// It is non-copyable and non-escapable, so it must be awaited exactly once and
-/// cannot leave the ``withContinuation(of:throwing:_:)`` scope it was vended
-/// in, and it traps if it is destroyed without being awaited.
-@_spi(Concurrency)
+/// It must be awaited exactly once and cannot leave the
+/// ``withContinuation(of:throwing:_:)`` scope it was vended in, and it traps
+/// if it is destroyed without being awaited.
+@_spi(SplitContinuation)
 @available(StdlibDeploymentTarget 6.5, *)
 @safe
 @frozen
@@ -243,8 +245,8 @@ public struct ContinuationAwaiter<Success: ~Copyable, Failure: Error>: ~Copyable
   /// Suspend until the paired ``Continuation`` is resumed, then return its value
   /// or throw its error.
   ///
-  /// If the continuation was already resumed before this is reached, this does
-  /// not suspend at all and returns the value directly.
+  /// If the continuation was already resumed before `wait()` is called, this
+  /// call does not suspend at all and returns the value immediately.
   @export(implementation)
   public nonisolated(nonsending) consuming func wait() async throws(Failure) -> sending Success {
     #if $SplitContinuations
@@ -259,11 +261,12 @@ public struct ContinuationAwaiter<Success: ~Copyable, Failure: Error>: ~Copyable
     #endif
   }
 
-  /// Suspend until the paired ``Continuation`` is resumed, with an optional
+  /// Suspend until the paired ``Continuation`` is resumed, with a
   /// cancellation handler and a priority-escalation handler installed for the
   /// duration of the suspension.
   ///
-  /// If the task is already cancelled, `onCancel` runs before this suspends.
+  /// If the current task is already cancelled, `onCancel` runs before this
+  /// function suspends.
   ///
   /// - Parameters:
   ///   - onCancel: Run when the task is cancelled while suspended
@@ -314,9 +317,10 @@ public struct ContinuationAwaiter<Success: ~Copyable, Failure: Error>: ~Copyable
   }
 }
 
-// MARK: - withContinuation
+// ==== -----------------------------------------------------------------------
+// MARK: withContinuation
 
-/// Creates a split continuation and hands `body` both halves: the *resume* half
+/// Creates a continuation and hands `body` both halves: the *resume* half
 /// (a ``Continuation``) to give to whoever performs the work, and the *await*
 /// half (a ``ContinuationAwaiter``) for the task to await.
 ///
@@ -333,7 +337,7 @@ public struct ContinuationAwaiter<Success: ~Copyable, Failure: Error>: ~Copyable
 ///     throwing.
 ///   - body: Receives both halves of the continuation. Its own result
 ///     becomes the result of this function.
-@_spi(Concurrency)
+@_spi(SplitContinuation)
 @available(StdlibDeploymentTarget 6.5, *)
 @export(implementation)
 public nonisolated(nonsending) func withContinuation<
@@ -354,15 +358,15 @@ public nonisolated(nonsending) func withContinuation<
   // half (given to whoever performs the work) and the await half (awaited by
   // `body`). The continuation is destroyed when this scope exits, after the
   // await has resolved and moved the value out.
-  let token = Builtin.createSplitContinuation(Success.self)
-  let continuation = Continuation<Success, Failure>(token)
-  let awaiter = ContinuationAwaiter<Success, Failure>(context: token)
+  let rawContinuation = Builtin.createSplitContinuation(Success.self)
+  let continuation = Continuation<Success, Failure>(rawContinuation)
+  let awaiter = ContinuationAwaiter<Success, Failure>(context: rawContinuation)
   do {
     let result = try await body(consume continuation, consume awaiter)
-    Builtin.destroySplitContinuation(token)
+    Builtin.destroySplitContinuation(rawContinuation)
     return result
   } catch {
-    Builtin.destroySplitContinuation(token)
+    Builtin.destroySplitContinuation(rawContinuation)
     throw error
   }
   #else
@@ -370,9 +374,10 @@ public nonisolated(nonsending) func withContinuation<
   #endif
 }
 
-// MARK: - Resuming on the resumer's own thread
+// ==== -----------------------------------------------------------------------
+// MARK: Resuming on the resumer's own thread
 
-@_spi(Concurrency)
+@_spi(SplitContinuation)
 @available(StdlibDeploymentTarget 6.5, *)
 extension Continuation where Success: ~Copyable {
   /// Resume the task awaiting this continuation by having it return the given
@@ -390,7 +395,8 @@ extension Continuation where Success: ~Copyable {
   /// preference of its own -- mirroring
   /// ``ExecutorJob/runSynchronously(on:)-(UnownedSerialExecutor)``. Use
   /// ``resume(returning:on:)`` if only a task executor is known, or
-  /// ``resume(returning:isolatedTo:taskExecutor:)`` if both are.
+  /// ``resume(returning:isolatedTo:taskExecutor:)`` if both serial and task
+  /// executor are known.
   ///
   /// - Parameters:
   ///   - value: The value to return from the continuation.
@@ -412,7 +418,8 @@ extension Continuation where Success: ~Copyable {
   /// Resume the task awaiting this continuation by having it throw the given
   /// error, offering the current thread to run the resumed task inline.
   ///
-  /// See ``resume(returning:isolatedTo:)`` for when the thread is taken.
+  /// See ``resume(returning:isolatedTo:)`` for when calling thread is used
+  /// to execute the resumed continuation.
   @export(implementation)
   public consuming func resume(
     throwing error: __owned Failure,
@@ -431,7 +438,8 @@ extension Continuation where Success: ~Copyable {
   /// throw, based on the given `Result`, offering the current thread to run the
   /// resumed task inline.
   ///
-  /// See ``resume(returning:isolatedTo:)`` for when the thread is taken.
+  /// See ``resume(returning:isolatedTo:)`` for when calling thread is used
+  /// to execute the resumed continuation.
   @export(implementation)
   public consuming func resume(
     with result: consuming sending Result<Success, Failure>,
@@ -480,7 +488,8 @@ extension Continuation where Success: ~Copyable {
   /// Resume the task awaiting this continuation by having it throw the given
   /// error, offering the current thread to run the resumed task inline.
   ///
-  /// See ``resume(returning:on:)`` for when the thread is taken.
+  /// See ``resume(returning:on:)`` for when calling thread is used to
+  /// execute the resumed continuation.
   @export(implementation)
   public consuming func resume(
     throwing error: __owned Failure,
@@ -499,7 +508,8 @@ extension Continuation where Success: ~Copyable {
   /// throw, based on the given `Result`, offering the current thread to run the
   /// resumed task inline.
   ///
-  /// See ``resume(returning:on:)`` for when the thread is taken.
+  /// See ``resume(returning:on:)`` for when calling thread is used to
+  /// execute the resumed continuation.
   @export(implementation)
   public consuming func resume(
     with result: consuming sending Result<Success, Failure>,
@@ -547,8 +557,8 @@ extension Continuation where Success: ~Copyable {
   /// Resume the task awaiting this continuation by having it throw the given
   /// error, offering the current thread to run the resumed task inline.
   ///
-  /// See ``resume(returning:isolatedTo:taskExecutor:)`` for when the thread is
-  /// taken.
+  /// See ``resume(returning:isolatedTo:taskExecutor:)`` for when calling
+  /// thread is used to execute the resumed continuation.
   @export(implementation)
   public consuming func resume(
     throwing error: __owned Failure,
@@ -568,8 +578,8 @@ extension Continuation where Success: ~Copyable {
   /// throw, based on the given `Result`, offering the current thread to run the
   /// resumed task inline.
   ///
-  /// See ``resume(returning:isolatedTo:taskExecutor:)`` for when the thread is
-  /// taken.
+  /// See ``resume(returning:isolatedTo:taskExecutor:)`` for when calling
+  /// thread is used to execute the resumed continuation.
   @export(implementation)
   public consuming func resume(
     with result: consuming sending Result<Success, Failure>,
@@ -591,13 +601,14 @@ extension Continuation where Success: ~Copyable {
   }
 }
 
-// MARK: - Runtime functions
+// ==== -----------------------------------------------------------------------
+// MARK: Runtime functions
 
 @usableFromInline
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_continuation_setResumingExecutors")
 internal func _continuationSetResumingExecutors(
-  _ token: Builtin.RawUnsafeContinuation,
+  _ continuation: Builtin.RawUnsafeContinuation,
   _ serialExecutor: Builtin.Executor,
   _ taskExecutor: Builtin.Executor)
 
