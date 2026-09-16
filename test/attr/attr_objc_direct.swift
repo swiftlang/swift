@@ -1,6 +1,7 @@
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_ObjCDirect
 
-// RUN: %target-typecheck-verify-swift -Xcc -fobjc-direct-precondition-thunk
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ObjCDirect
 
 import Foundation
 

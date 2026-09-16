@@ -1466,12 +1466,21 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // Mirror Clang's own gate rather than hardcoding the direct ABI: Clang
     // appends the trailing 'D' (and drops the '\01' prefix) only when the
     // precondition-thunk ABI is on, so reading the same CodeGenOpt keeps the
-    // callee symbol byte-identical to Clang's caller-side reference. Sema
-    // rejects @objcDirect outright when the flag is off, so in practice this is
-    // true wherever we get here; reading it anyway keeps the two in lockstep.
+    // callee symbol byte-identical to Clang's caller-side reference.
     auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
     bool useDirectABI =
         importer && importer->getCodeGenOpts().ObjCDirectPreconditionThunk;
+    // There is no meaningful symbol to emit if the flag is off: with
+    // includePrefixByte=false and useDirectABI=false the result is bare
+    // "-[Class sel]", which matches neither the '\01'-prefixed form Clang uses
+    // for an ordinary method nor the 'D'-suffixed form it uses for a direct
+    // one, so nothing could ever resolve it. Getting here at all requires Sema
+    // to have accepted @objcDirect, which requires Feature::ObjCDirect, which
+    // in turn implies the Clang flag (see ParseClangImporterArgs) -- so this
+    // assert is what enforces that implication rather than merely documenting
+    // it.
+    assert(useDirectABI && "Feature::ObjCDirect did not imply "
+                           "-fobjc-direct-precondition-thunk");
 
     // The class-name segment must be the identifier printed for the ObjC
     // @interface, which is what Clang uses to build the caller's reference: the
