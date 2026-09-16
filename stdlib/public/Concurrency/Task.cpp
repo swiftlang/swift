@@ -1808,11 +1808,11 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
-/// Defined with the split continuations below. A continuation token is either a
-/// task or the task-shaped header of a split continuation; the resume entry
+/// Defined with the split continuations below. A raw continuation is either a
+/// task or the task-shaped storage of a split continuation; the resume entry
 /// points tell them apart by reading the marker word. Returns false for an
 /// ordinary task.
-static bool tryResumeSplitContinuation(void *token, SwiftError *error);
+static bool tryResumeSplitContinuation(void *continuation, SwiftError *error);
 
 SWIFT_CC(swift)
 static void swift_continuation_resumeImpl(AsyncTask *task) {
@@ -1859,12 +1859,12 @@ static void swift_continuation_throwingResumeWithErrorImpl(AsyncTask *task,
 // threads. Unlike swift_continuation_init/await/resume, which assume create and
 // await are adjacent on one task with nothing in between, a split continuation:
 //
-//   * create (swift_continuation_createSplit): allocates a header, the context
-//     and the result storage, state Pending; does NOT bind a resume-point and
-//     does NOT touch task execution state. Returns the header, which is the
-//     token shared by both halves. The header is shaped like the front of a
-//     task, so one Continuation type can carry either flavour and a resume
-//     works for both.
+//   * create (swift_continuation_createSplit): allocates the continuation's
+//     storage, its context, and the result storage, state Pending; does NOT
+//     bind a resume-point and does NOT touch task execution state. Returns
+//     the continuation. Its storage is shaped like the front of a task, so
+//     one Continuation type can carry either flavour and a resume works for
+//     both.
 //   * await (swift_continuation_awaitSplit): binds the resume-point to the
 //     *current* task, records the awaiting task on the context, publishes any
 //     handler records together with the suspension, and performs the
@@ -1879,14 +1879,14 @@ static void swift_continuation_throwingResumeWithErrorImpl(AsyncTask *task,
 
 namespace {
 
-/// The state a split continuation needsA split continuation token is the
-/// address of one of these.
+/// The storage backing a split continuation. A raw continuation referring to a
+/// split continuation is the address of one of these.
 ///
 /// The layout makes a split continuation resumable by *any* code that can
 /// resume a regular one, including code compiled before split continuations
 /// existed. `ResumeContext` sits at exactly the offset at which an AsyncTask
 /// keeps its own.
-struct SplitContinuationHeader {
+struct SplitContinuationStorage {
   /// Distinguishes this from a task.
   uintptr_t Marker;
 
@@ -1914,43 +1914,43 @@ struct SplitContinuationHeader {
   TaskExecutorRef ResumingTaskExecutor;
 };
 
-/// Written into `SplitContinuationHeader::Marker`, where a task keeps its
+/// Written into `SplitContinuationStorage::Marker`, where a task keeps its
 /// metadata pointer. No metadata pointer is all-ones.
 static constexpr uintptr_t SplitContinuationMarker = ~(uintptr_t)0;
 
-static_assert(offsetof(SplitContinuationHeader, Marker) == 0,
+static_assert(offsetof(SplitContinuationStorage, Marker) == 0,
               "the marker must sit where a task keeps its metadata pointer");
-static_assert(offsetof(SplitContinuationHeader, ResumeContext) ==
+static_assert(offsetof(SplitContinuationStorage, ResumeContext) ==
                   offsetof(AsyncTask, ResumeContext),
-              "a split continuation token must be loadable as if it were a "
+              "a split continuation must be loadable as if it were a "
               "task, so its ResumeContext must sit at the task's offset");
 
-/// The context follows the header, at the context's alignment.
+/// The context follows the storage, at the context's alignment.
 static size_t splitContextOffset() {
-  return llvm::alignTo(sizeof(SplitContinuationHeader),
+  return llvm::alignTo(sizeof(SplitContinuationStorage),
                        alignof(ContinuationAsyncContext));
 }
 
-/// Whether `token` is a split continuation token rather than a task.
-static bool isSplitContinuationToken(const void *token) {
-  return *reinterpret_cast<const uintptr_t *>(token) ==
+/// Whether `continuation` is a split continuation rather than a task.
+static bool isSplitContinuation(const void *continuation) {
+  return *reinterpret_cast<const uintptr_t *>(continuation) ==
          SplitContinuationMarker;
 }
 
-/// The header a split continuation token refers to.
-static SplitContinuationHeader *splitHeaderFromToken(const void *token) {
-  return reinterpret_cast<SplitContinuationHeader *>(
-      const_cast<void *>(token));
+/// The storage a split continuation refers to.
+static SplitContinuationStorage *storageOfContinuation(const void *continuation) {
+  return reinterpret_cast<SplitContinuationStorage *>(
+      const_cast<void *>(continuation));
 }
 
 static ContinuationAsyncContext *
-contextOfSplitHeader(SplitContinuationHeader *header) {
-  return static_cast<ContinuationAsyncContext *>(header->ResumeContext);
+contextOfStorage(SplitContinuationStorage *storage) {
+  return static_cast<ContinuationAsyncContext *>(storage->ResumeContext);
 }
 
-static SplitContinuationHeader *
-splitHeader(ContinuationAsyncContext *context) {
-  return reinterpret_cast<SplitContinuationHeader *>(
+static SplitContinuationStorage *
+storageOfContext(ContinuationAsyncContext *context) {
+  return reinterpret_cast<SplitContinuationStorage *>(
       reinterpret_cast<char *>(context) - splitContextOffset());
 }
 
@@ -1985,8 +1985,8 @@ resumeSplitTaskAfterContinuation(ContinuationAsyncContext *context) {
   assert(status == ContinuationStatus::Awaited &&
          "detected concurrent attempt to resume continuation");
 
-  auto *header = splitHeader(context);
-  auto task = header->AwaitingTask;
+  auto *storage = storageOfContext(context);
+  auto task = storage->AwaitingTask;
   assert(task && "awaited split continuation has no awaiting task");
 
   // Make sure TSan knows that the resume call happens-before the task
@@ -2002,7 +2002,7 @@ resumeSplitTaskAfterContinuation(ContinuationAsyncContext *context) {
   // to run the resumed task inline. The offer is taken only if that thread
   // belongs to the executor the task actually resumes on; otherwise, and when
   // no offer was made at all, the task is enqueued as usual.
-  if (header->ResumingExecutorsKnown) {
+  if (storage->ResumingExecutorsKnown) {
     auto resumeExecutor = context->ResumeToExecutor;
 
     // Which executor the task resumes on is decided at *await* time, and the
@@ -2019,8 +2019,8 @@ resumeSplitTaskAfterContinuation(ContinuationAsyncContext *context) {
     // itself the default. Never some other, unrelated executor the resumer
     // merely happened to be running on.
     auto preferredTaskExecutor = task->getPreferredTaskExecutor();
-    if (!mustSwitchToRun(header->ResumingSerialExecutor, resumeExecutor,
-                         header->ResumingTaskExecutor, preferredTaskExecutor)) {
+    if (!mustSwitchToRun(storage->ResumingSerialExecutor, resumeExecutor,
+                         storage->ResumingTaskExecutor, preferredTaskExecutor)) {
       // Donate the current thread to the resumed task like
       // ExecutorJob.runSynchronously / swift_job_run, which establishes the
       // tracking context *before* flagAsRunning and save/restores the active
@@ -2036,12 +2036,12 @@ resumeSplitTaskAfterContinuation(ContinuationAsyncContext *context) {
 
 
 SWIFT_CC(swift)
-void *
+SplitContinuation *
 swift::swift_continuation_createSplit(const Metadata *resultType) {
-  // Task-allocate the header, the context and trailing storage for the result
-  // value. The result storage has to live here rather than in the awaiting
-  // frame because a resume can arrive before the await does and needs somewhere
-  // to write the value.
+  // Task-allocate the continuation's storage, the context and trailing storage
+  // for the result value. The result storage has to live here rather than in
+  // the awaiting frame because a resume can arrive before the await does and
+  // needs somewhere to write the value.
   assert(swift_task_getCurrent() &&
          "creating a split continuation outside of a task");
 
@@ -2080,31 +2080,31 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
   context->Cond = nullptr;
 #endif
 
-  auto *header = static_cast<SplitContinuationHeader *>(allocation);
-  header->Marker = SplitContinuationMarker;
-  header->AwaitingTask = nullptr;
-  header->ResumingExecutorsKnown = false;
-  header->ResumingSerialExecutor = SerialExecutorRef::generic();
-  header->ResumingTaskExecutor = TaskExecutorRef::undefined();
+  auto *storage = static_cast<SplitContinuationStorage *>(allocation);
+  storage->Marker = SplitContinuationMarker;
+  storage->AwaitingTask = nullptr;
+  storage->ResumingExecutorsKnown = false;
+  storage->ResumingSerialExecutor = SerialExecutorRef::generic();
+  storage->ResumingTaskExecutor = TaskExecutorRef::undefined();
 
   // Relaxed is fine: resumption must happen-after this call returns and the
-  // token is handed to the executor.
+  // continuation is handed to the executor.
   context->AwaitSynchronization.store(ContinuationStatus::Pending,
                                       std::memory_order_relaxed);
 
-  header->ResumeContext = context;
+  storage->ResumeContext = context;
 
   concurrency::trace::task_continuation_init(nullptr, context);
 
-  return allocation;
+  return static_cast<SplitContinuation *>(allocation);
 }
 
 
 SWIFT_CC(swiftasync)
-void swift::swift_continuation_awaitSplit(void *splitHeaderPtr) {
-  auto *header =
-      static_cast<SplitContinuationHeader *>(splitHeaderPtr);
-  auto *context = contextOfSplitHeader(header);
+void swift::swift_continuation_awaitSplit(SplitContinuation *continuation) {
+  auto *storage =
+      reinterpret_cast<SplitContinuationStorage *>(continuation);
+  auto *context = contextOfStorage(storage);
   auto task = swift_task_getCurrent();
   assert(task && "awaiting a split continuation without a task");
 
@@ -2126,7 +2126,7 @@ void swift::swift_continuation_awaitSplit(void *splitHeaderPtr) {
   // Record ourselves as the awaiting task *before* transitioning to Awaited, so
   // that a racing resume that observes Awaited finds a valid task to enqueue.
   // The store is published by the release CAS below.
-  header->AwaitingTask = task;
+  storage->AwaitingTask = task;
 
   concurrency::trace::task_continuation_await(context);
 
@@ -2190,11 +2190,11 @@ void swift::swift_continuation_awaitSplit(void *splitHeaderPtr) {
   return context->ResumeParent(context);
 }
 
-static bool tryResumeSplitContinuation(void *token, SwiftError *error) {
-  if (!isSplitContinuationToken(token))
+static bool tryResumeSplitContinuation(void *continuation, SwiftError *error) {
+  if (!isSplitContinuation(continuation))
     return false;
 
-  auto *context = contextOfSplitHeader(splitHeaderFromToken(token));
+  auto *context = contextOfStorage(storageOfContinuation(continuation));
   concurrency::trace::task_continuation_resume(context, error != nullptr);
   if (error)
     context->ErrorResult = error;
@@ -2204,26 +2204,26 @@ static bool tryResumeSplitContinuation(void *token, SwiftError *error) {
 
 SWIFT_CC(swift)
 void swift::swift_continuation_setResumingExecutors(
-    void *token, SerialExecutorRef serialExecutor,
+    SplitContinuation *continuation, SerialExecutorRef serialExecutor,
     TaskExecutorRef taskExecutor) {
   // Setting the resume executors is only supported on split continuations.
-  if (!isSplitContinuationToken(token))
+  if (!isSplitContinuation(continuation))
     return;
 
   // Written by the resuming thread before it resumes, and read only by the
   // resume itself, so no synchronization is needed.
-  auto *header = splitHeaderFromToken(token);
-  header->ResumingSerialExecutor = serialExecutor;
-  header->ResumingTaskExecutor = taskExecutor;
-  header->ResumingExecutorsKnown = true;
+  auto *storage = storageOfContinuation(continuation);
+  storage->ResumingSerialExecutor = serialExecutor;
+  storage->ResumingTaskExecutor = taskExecutor;
+  storage->ResumingExecutorsKnown = true;
 }
 
 SWIFT_CC(swift)
-void swift::swift_continuation_destroySplit(void *splitHeaderPtr) {
+void swift::swift_continuation_destroySplit(SplitContinuation *continuation) {
   // The await has resolved and taken the result out of the context, and the
   // resume-exactly-once contract guarantees the resume side is finished with the
   // context before the awaiting task runs again, so it is safe to free.
-  swift_task_dealloc(splitHeaderPtr);
+  swift_task_dealloc(continuation);
 }
 
 bool swift::swift_task_isCancelled(AsyncTask *task) {

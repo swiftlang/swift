@@ -14,7 +14,7 @@
 // it always did.  This file pins the other half -- what create, get/await and
 // destroy lower to -- and in particular the two things the design rests on:
 //
-//   * the token is read as if it were a task, so that a resume needs no knowledge
+//   * the continuation is read as if it were a task, so that a resume needs no knowledge
 //     of which flavour it has, and
 //   * the awaiting frame binds its own Parent/ResumeParent into the continuation
 //     context immediately before suspending, because create deliberately bound
@@ -44,27 +44,27 @@ bb0:
   return %tok : $Builtin.RawUnsafeContinuation
 }
 
-// Destroy is handed the token, which is where the allocation starts.
+// Destroy is handed the continuation, which is where the allocation starts.
 //
 // CHECK-LABEL: define{{.*}} swiftcc void @split_destroy(ptr %0)
 // CHECK:   call swiftcc void @swift_continuation_destroySplit(ptr %0)
 // CHECK: }
 // CHECK: declare extern_weak swiftcc void @swift_continuation_destroySplit(ptr)
 sil @split_destroy : $@convention(thin) (Builtin.RawUnsafeContinuation) -> () {
-bb0(%token : $Builtin.RawUnsafeContinuation):
-  %d = builtin "destroySplitContinuation"(%token : $Builtin.RawUnsafeContinuation) : $()
+bb0(%continuation : $Builtin.RawUnsafeContinuation):
+  %d = builtin "destroySplitContinuation"(%continuation : $Builtin.RawUnsafeContinuation) : $()
   %t = tuple ()
   return %t : $()
 }
 
-// Awaiting a token bound with getSplitContinuationAddr:
+// Awaiting a continuation bound with getSplitContinuationAddr:
 //
-//   * the context is loaded out of the token by reading the field at which an
-//     AsyncTask keeps its own ResumeContext -- the token is a header shaped like
+//   * the context is loaded out of the continuation by reading the field at which
+//     an AsyncTask keeps its own ResumeContext -- the continuation is shaped like
 //     the front of a task, and this is where that shape is relied on;
 //   * this frame's async context is stored as Parent and a fresh coro resume
 //     function as ResumeParent, since create bound neither; and
-//   * the suspension tail-calls swift_continuation_awaitSplit with the token.
+//   * the suspension tail-calls swift_continuation_awaitSplit with the continuation.
 //
 // CHECK-LABEL: define{{.*}} swifttailcc void @split_await(ptr swiftasync %0, ptr %1)
 // CHECK:   [[CTXADDR:%.*]] = getelementptr inbounds nuw %swift.task, ptr %1, i32 0, i32 {{[0-9]+}}
@@ -90,9 +90,9 @@ bb0(%token : $Builtin.RawUnsafeContinuation):
 // CHECK: }
 // CHECK: declare extern_weak swifttailcc void @swift_continuation_awaitSplit(ptr)
 sil @split_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
-entry(%token : $Builtin.RawUnsafeContinuation):
+entry(%continuation : $Builtin.RawUnsafeContinuation):
   %a = alloc_stack $Builtin.Int32
-  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%token : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
   await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1
 bb1:
   dealloc_stack %a : $*Builtin.Int32

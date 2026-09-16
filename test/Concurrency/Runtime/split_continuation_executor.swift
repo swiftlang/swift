@@ -11,6 +11,7 @@
 
 @_spi(Concurrency) import _Concurrency
 @_spi(ExperimentalCustomExecutors) import _Concurrency
+@_spi(SplitContinuation) import _Concurrency
 import StdlibUnittest
 import Synchronization
 
@@ -108,7 +109,7 @@ final class ContinuationHolder<Success: ~Copyable, Failure: Error>: Sendable {
   }
 }
 
-actor IsolatedActor {
+actor Worker {
   private let _executor: ManualExecutor
   nonisolated var unownedExecutor: UnownedSerialExecutor { _executor.asUnownedSerialExecutor() }
   init(_ executor: ManualExecutor) { self._executor = executor }
@@ -132,8 +133,8 @@ actor IsolatedActor {
 
     tests.test("passing the awaiting task's executor donates the thread") {
       let executor = ManualExecutor()
-      let isolated = IsolatedActor(executor)
-      let task = Task.immediate {
+      let isolated = Worker(executor)
+      let task = Task {
         await isolated.run {
           await withContinuation(of: Int.self, throwing: Never.self) {
             (continuation: consuming Continuation<Int, Never>,
@@ -154,8 +155,8 @@ actor IsolatedActor {
 
     tests.test("donating the thread with handlers installed") {
       let executor = ManualExecutor()
-      let isolated = IsolatedActor(executor)
-      let task = Task.immediate {
+      let isolated = Worker(executor)
+      let task = Task {
         await isolated.run {
           await withContinuation(of: Int.self, throwing: Never.self) {
             (continuation: consuming Continuation<Int, Never>,
@@ -176,8 +177,8 @@ actor IsolatedActor {
     tests.test("passing another executor enqueues") {
       let rightExecutor = ManualExecutor()
       let wrongExecutor = ManualExecutor()
-      let isolated = IsolatedActor(rightExecutor)
-      let task = Task.immediate {
+      let isolated = Worker(rightExecutor)
+      let task = Task {
         await isolated.run {
           await withContinuation(of: Int.self, throwing: Never.self) {
             (continuation: consuming Continuation<Int, Never>,
@@ -203,13 +204,13 @@ actor IsolatedActor {
 
     tests.test("awaiting from another isolation domain resumes across the hop") {
       // Creates the continuation on this actor's executor but awaits from
-      // another isolation domain (a second `IsolatedActor`, isolated to its own
+      // another isolation domain (a second `Worker`, isolated to its own
       // executor), so the task resumes there instead.
       let executor = ManualExecutor()
       let elsewhereExecutor = ManualExecutor()
-      let isolated = IsolatedActor(executor)
-      let other = IsolatedActor(elsewhereExecutor)
-      let task = Task.immediate {
+      let isolated = Worker(executor)
+      let other = Worker(elsewhereExecutor)
+      let task = Task {
         await isolated.run {
           await withContinuation(of: Int.self, throwing: Never.self) {
             (continuation: consuming Continuation<Int, Never>,
@@ -232,7 +233,7 @@ actor IsolatedActor {
     tests.test("a task executor preference enqueues") {
       let executor = ManualExecutor()
       let preference = ManualExecutor()
-      let isolated = IsolatedActor(executor)
+      let isolated = Worker(executor)
       let task = Task(executorPreference: preference) {
         await isolated.run {
           await withContinuation(of: Int.self, throwing: Never.self) {
@@ -255,7 +256,7 @@ actor IsolatedActor {
     tests.test("passing an executor on an ordinary continuation just enqueues") {
       let executor = ManualExecutor()
       let unrelated = ManualExecutor()
-      let isolated = IsolatedActor(executor)
+      let isolated = Worker(executor)
       generic.hold()
       let task = Task.immediate {
         await isolated.run {
@@ -297,7 +298,7 @@ actor IsolatedActor {
     tests.test("passing only a task executor enqueues when the task is actor-isolated") {
       let executor = ManualExecutor()
       let preference = ManualExecutor()
-      let isolated = IsolatedActor(executor)
+      let isolated = Worker(executor)
       let task = Task(executorPreference: preference) {
         await isolated.run {
           await withContinuation(of: Int.self, throwing: Never.self) {

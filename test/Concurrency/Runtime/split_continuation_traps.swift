@@ -8,7 +8,7 @@
 // REQUIRES: swift_feature_SplitContinuations
 // UNSUPPORTED: back_deployment_runtime
 
-@_spi(Concurrency) import _Concurrency
+@_spi(Concurrency) @_spi(SplitContinuation) import _Concurrency
 import StdlibUnittest
 
 @main struct Main {

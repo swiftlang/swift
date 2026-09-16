@@ -2613,7 +2613,7 @@ FUNCTION(ContinuationThrowingResumeWithError,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// void *swift_continuation_createSplit(const Metadata *resultType);
+// SplitContinuation *swift_continuation_createSplit(const Metadata *resultType);
 FUNCTION(ContinuationCreateSplit,
          _Concurrency, swift_continuation_createSplit, SwiftCC,
          SplitContinuationAvailability,
@@ -2623,7 +2623,7 @@ FUNCTION(ContinuationCreateSplit,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_continuation_awaitSplit(void *splitHeader);
+// void swift_continuation_awaitSplit(SplitContinuation *continuation);
 FUNCTION(ContinuationAwaitSplit,
          _Concurrency, swift_continuation_awaitSplit, SwiftAsyncCC,
          SplitContinuationAvailability,
@@ -2633,7 +2633,7 @@ FUNCTION(ContinuationAwaitSplit,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_continuation_destroySplit(void *splitHeader);
+// void swift_continuation_destroySplit(SplitContinuation *continuation);
 FUNCTION(ContinuationDestroySplit,
          _Concurrency, swift_continuation_destroySplit, SwiftCC,
          SplitContinuationAvailability,
