@@ -1453,6 +1453,7 @@ bool TypeBase::isCGFloat() {
   auto *module = DC->getParentModule();
   // On macOS `CGFloat` is part of a `CoreGraphics` module,
   // but on Linux it could be found in `Foundation`.
+  // Keep this list in sync with ASTContext::getCGFloatDecl().
   return (module->getName().is("CoreGraphics") ||
           module->getName().is("Foundation")   ||
           module->getName().is("CoreFoundation")) &&
