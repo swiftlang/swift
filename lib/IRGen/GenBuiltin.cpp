@@ -446,7 +446,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto call = IGF.Builder.CreateCall(
         IGF.IGM.getContinuationCreateSplitFunctionPointer(), {metadata});
     call->setCallingConv(IGF.IGM.SwiftCC);
-    // The returned context pointer is the RawUnsafeContinuation token.
+    // The call returns the RawUnsafeContinuation for the new continuation.
     auto &rawContTI = IGF.IGM.getRawUnsafeContinuationTypeInfo();
     out.add(IGF.Builder.CreateBitOrPointerCast(call,
                                                rawContTI.getStorageType()));
@@ -454,9 +454,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   case BuiltinValueKind::GetSplitContinuationAddr: {
-    // Binding the token to this frame is done by the await_async_continuation
-    // that consumes this value, which reads this builtin's operands directly.
-    // Here the token is simply forwarded as the continuation.
+    // Binding the continuation to this frame is done by the
+    // await_async_continuation that consumes this value, which reads this
+    // builtin's operands directly. Here it is simply forwarded.
     auto continuation = args.claimNext();
     (void)args.claimAll();
     out.add(continuation);

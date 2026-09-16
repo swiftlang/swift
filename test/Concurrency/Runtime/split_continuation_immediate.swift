@@ -12,6 +12,7 @@
 
 @_spi(Concurrency) import _Concurrency
 @_spi(ExperimentalCustomExecutors) import _Concurrency
+@_spi(SplitContinuation) import _Concurrency
 import StdlibUnittest
 import Synchronization
 

@@ -1988,17 +1988,18 @@ static ManagedValue emitBuiltinAwaitSplitThrowingContinuation(
       SGF.getLoweredType(AbstractionPattern::getOpaque(), substResultType);
   auto resumeBuf = SGF.emitTemporaryAllocation(loc, opaqueResumeType);
 
-  // The continuation token (a Builtin.RawUnsafeContinuation).
-  SILValue token = args[0].getValue();
+  // The continuation, not yet bound to this frame (a
+  // Builtin.RawUnsafeContinuation).
+  SILValue unboundContinuation = args[0].getValue();
 
-  // Bind the existing token to this frame's resume buffer.
+  // Bind the continuation to this frame's resume buffer.
   // `getSplitContinuationAddr` takes the same single generic parameter as
   // this builtin, so the substitutions carry over unchanged.
   auto &ctx = SGF.getASTContext();
   auto continuation = SGF.B.createBuiltin(
       loc, BuiltinNames::GetSplitContinuationAddr,
       SILType::getPrimitiveObjectType(ctx.TheRawUnsafeContinuationType), subs,
-      {token, resumeBuf});
+      {unboundContinuation, resumeBuf});
 
   SILBasicBlock *resumeBlock = SGF.createBasicBlock();
   SILBasicBlock *errorBlock = SGF.createBasicBlock(FunctionSection::Postmatter);

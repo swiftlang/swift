@@ -550,7 +550,7 @@ llvm::Function *IRGenModule::getAwaitSplitContinuationFn() {
 
   // The parameter here matches the extra argument passed to
   // @llvm.coro.suspend.async by emitAwaitSplitContinuation: the split
-  // continuation's header.
+  // continuation itself.
   llvm::Type *argTys[] = { Int8PtrTy };
   auto *suspendFnTy =
     llvm::FunctionType::get(VoidTy, argTys, false /*vaargs*/);
@@ -565,9 +565,9 @@ llvm::Function *IRGenModule::getAwaitSplitContinuationFn() {
     DebugInfo->emitArtificialFunction(suspendIGF, suspendFn);
   auto &Builder = suspendIGF.Builder;
 
-  llvm::Value *header = suspendFn->getArg(0);
+  llvm::Value *continuation = suspendFn->getArg(0);
   auto *call = Builder.CreateCall(
-      getContinuationAwaitSplitFunctionPointer(), {header});
+      getContinuationAwaitSplitFunctionPointer(), {continuation});
   call->setCallingConv(SwiftAsyncCC);
   call->setDoesNotThrow();
   call->setTailCallKind(AsyncTailCallKind);

@@ -1132,37 +1132,36 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_continuation_throwingResumeWithError(AsyncTask *continuation,
                                                 /* +1 */ SwiftError *error);
 
+/// Opaque handle to a split continuation, returned by
+/// swift_continuation_createSplit and consumed by the other
+/// swift_continuation_*Split entry points.
+struct SplitContinuation;
+
 /// Create a *split* continuation for a result of the given type.
 ///
 /// Unlike swift_continuation_init, this does not bind the continuation to the
-/// current task or touch the task's execution state. It allocates a header, a
-/// ContinuationAsyncContext (state Pending) and result storage sized for
-/// the resultType, and returns the header.
-///
-/// That header is the token shared by both halves of a split continuation.  It is
-/// shaped like the front of a task: its ResumeContext field sits where a task
-/// keeps its own so swift_continuation_resume* entry points cane resume it.
-/// It is awaited in one frame via swift_continuation_awaitSplit and must be
-/// destroyed exactly once via swift_continuation_destroySplit after the await has resolved.
+/// current task or touch the task's execution state. It allocates the
+/// continuation's ContinuationAsyncContext (state Pending) and result storage
+/// sized for the resultType, and returns the split continuation.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void *
+SplitContinuation *
 swift_continuation_createSplit(const Metadata *resultType);
 
 /// Await a split continuation from the current task.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_continuation_awaitSplit(void *splitHeader);
+void swift_continuation_awaitSplit(SplitContinuation *continuation);
 
 /// Destroy a split continuation created by swift_continuation_createSplit,
 /// after its result has been consumed by the await.  Frees the context and its
 /// result storage.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_destroySplit(void *splitHeader);
+void swift_continuation_destroySplit(SplitContinuation *continuation);
 
-/// Tell the next resume of the given continuation token which executors the
+/// Tell the next resume of the given split continuation which executors the
 /// resuming thread is running on, offering that thread to run the resumed task
 /// inline instead of enqueuing the task on its executor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_setResumingExecutors(void *token,
+void swift_continuation_setResumingExecutors(SplitContinuation *continuation,
                                              SerialExecutorRef serialExecutor,
                                              TaskExecutorRef taskExecutor);
 
