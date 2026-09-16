@@ -55,3 +55,13 @@ class BuildGraphTestCase(unittest.TestCase):
         schedule = build_graph.produce_scheduled_build(selectedProducts)
         names = [x.name for x in schedule[0]]
         self.assertEqual(['cmark', 'llvm', 'swift', 'swiftpm'], names)
+
+    def test_cycle_raises_runtime_error(self):
+        root = ProductMock('root')
+        a = ProductMock('a')
+        b = ProductMock('b')
+        a.deps.extend([root, b])
+        b.deps.append(a)
+
+        with self.assertRaisesRegex(RuntimeError, 'Found cycle in build graph!'):
+            build_graph.produce_scheduled_build([a])

@@ -24,6 +24,7 @@ def _get_po_ordered_nodes(root, invertedDepMap):
     # Then setup our worklist/visited node set.
     worklist = [root]
     visitedNodes = set([])
+    visitingNodes = set([])
     # TODO: Can we unify po_ordered_nodes and visitedNodes in some way?
     po_ordered_nodes = []
 
@@ -49,6 +50,7 @@ def _get_po_ordered_nodes(root, invertedDepMap):
         if node in visitedNodes:
             worklist.pop()
             continue
+        visitingNodes.add(node)
 
         # Then grab the dependents of our node.
         deps = invertedDepMap.get(node, set([]))
@@ -60,6 +62,8 @@ def _get_po_ordered_nodes(root, invertedDepMap):
         # node.
         foundDep = False
         for d in deps:
+            if d in visitingNodes:
+                raise RuntimeError('Found cycle in build graph!')
             if d not in visitedNodes:
                 foundDep = True
                 worklist.append(d)
@@ -70,6 +74,7 @@ def _get_po_ordered_nodes(root, invertedDepMap):
         # the visited nodes set, and append it to the po_ordered_nodes in
         # its final position.
         worklist.pop()
+        visitingNodes.remove(node)
         visitedNodes.add(node)
         po_ordered_nodes.append(node)
     return po_ordered_nodes
