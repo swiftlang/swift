@@ -10,12 +10,68 @@
 //
 //===----------------------------------------------------------------------===//
 
-module _GUIDDef {
-  header "guiddef.h"
-  export *
-}
+module WinSDK.Shared [system] {
+  module AFUnix {
+    header "afunix.h"
+    export *
+  }
 
-module WinAPIFamily {
-  header "winapifamily.h"
-  export *
+  module DXGI {
+    header "dxgi1_6.h"
+    export *
+
+    link "dxgi.lib"
+  }
+
+  module GUIDDef {
+    header "guiddef.h"
+    export *
+  }
+
+  module APIFamily {
+    header "winapifamily.h"
+    export *
+  }
+
+  module MinWinDef {
+    header "minwindef.h"
+    export *
+  }
+
+  module RPC {
+    header "rpc.h"
+    export *
+
+    link "RpcRT4.Lib"
+  }
+
+  module RPCNDR {
+    header "rpcndr.h"
+    export *
+  }
+
+  module SDDL {
+    header "sddl.h"
+    export *
+  }
+
+  module SDKDDKVer {
+    header "sdkddkver.h"
+    export *
+  }
+
+  module WinError {
+    header "winerror.h"
+    export *
+  }
+
+  module WTypesBase {
+    header "wtypesbase.h"
+    export *
+  }
+
+  module WTypes {
+    header "wtypes.h"
+    export *
+  }
 }
