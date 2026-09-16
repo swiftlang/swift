@@ -188,7 +188,7 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &SGF,
   auto &ti = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
   
   // Destroy is a no-op for trivial types.
-  if (ti.isTrivial())
+  if (ti.isTrivial(&SGF.F))
     return ManagedValue::forObjectRValueWithoutOwnership(
         SGF.emitEmptyTuple(loc));
 
@@ -770,7 +770,8 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   auto toTy = substitutions.getReplacementTypes()[1];
   auto &fromTL = SGF.getTypeLowering(fromTy);
   auto &toTL = SGF.getTypeLowering(toTy);
-  assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
+  assert(!fromTL.isTrivial(&SGF.F) && !toTL.isTrivial(&SGF.F)
+         && "expected ref type");
 
   auto arg = args[0];
 
@@ -853,7 +854,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
       return SGF.emitManagedLoadCopy(loc, toAddr, toTL);
     }
     // Leave the cleanup on the original value.
-    if (toTL.isTrivial())
+    if (toTL.isTrivial(&SGF.F))
       return ManagedValue::forTrivialAddressRValue(toAddr);
 
     // Initialize the +1 result buffer without taking the incoming value. The

@@ -6972,6 +6972,13 @@ public:
       if (!F.hasOwnership()) {
         return;
       }
+      
+      // For arguments of trivial type, allow the internal ownership to vary
+      // if the function has ownership for trivial values enabled.
+      if (F.hasOwnershipForTrivialValues()
+          && F.getTypeProperties(bbarg->getType()).isTrivial()) {
+        return;
+      }
 
       // Use the function's own conventions (fnConv carries its per-function
       // lowered-addresses state) so an already-lowered function verifies against

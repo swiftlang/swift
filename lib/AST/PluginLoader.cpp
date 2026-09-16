@@ -230,7 +230,7 @@ PluginLoader::lookupPluginByModuleName(Identifier moduleName) {
   auto &map = getPluginMap();
   auto found = map.find(moduleName);
   if (found == map.end()) {
-    static PluginEntry notFound{"", ""};
+    static PluginEntry notFound{"", "", "", ""};
     return notFound;
   }
 

@@ -140,6 +140,11 @@ SILType SILType::getUnsafeRawPointer(const ASTContext &ctx) {
 }
 
 bool SILType::isTrivial(const SILFunction &F) const {
+  // If the function uses ownership for trivial values, then no types are
+  // considered trivial in its context.
+  if (F.hasOwnershipForTrivialValues()) {
+    return false;
+  }
   auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
   
   return F.getTypeProperties(contextType).isTrivial();
