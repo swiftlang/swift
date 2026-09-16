@@ -678,8 +678,11 @@ SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
 
   for (auto *Use : Value->getUses()) {
     SILInstruction *Inst = Use->getUser();
+    // Debug uses are rewritten during salvage and shouldn't extend lifetimes.
+    if (isa<DebugValueInst>(Inst))
+      continue;
     if (isa<RefCountingInst>(Inst) || isa<DestroyValueInst>(Inst) ||
-        isa<DebugValueInst>(Inst) || isa<EndBorrowInst>(Inst)) {
+        isa<EndBorrowInst>(Inst)) {
       Uses.push_back(Inst);
       continue;
     }
