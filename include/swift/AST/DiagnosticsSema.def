@@ -8781,6 +8781,12 @@ WARNING(swiftify_nullable_as_empty_span_param_missing, none,
         "retain the legacy Optional-propagating behavior for _Nullable "
         "__counted_by and __sized_by pointers", ())
 
+ERROR(derivation_macro_could_not_be_loaded, none,
+      "derivation macro '%0' for witness %1 could not be loaded from '%2'", (StringRef, DeclName, StringRef))
+
+ERROR(failed_to_expand_derived_conformance, none,
+      "failed to expand derived conformance to %0", (Type))
+
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
