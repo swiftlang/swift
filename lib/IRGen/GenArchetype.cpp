@@ -36,6 +36,7 @@
 #include "ClassTypeInfo.h"
 #include "FixedTypeInfo.h"
 #include "GenClass.h"
+#include "GenExistential.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenOpaque.h"
@@ -380,6 +381,15 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
 
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   assert(isExemplarArchetype(archetype) && "lowering non-exemplary archetype");
+
+  // An opened COM existential contains its interface pointer directly.
+  // Ordinary generic parameters constrained to a COM interface remain opaque
+  // and continue through the normal generic ABI below.
+  if (isa<ExistentialArchetypeType>(archetype) &&
+      llvm::any_of(archetype->getConformsTo(), [](ProtocolDecl *protocol) {
+        return protocol->isCOMInterface();
+      }))
+    return createCOMInterfaceTypeInfo(IGM);
 
   auto layout = archetype->getLayoutConstraint();
 

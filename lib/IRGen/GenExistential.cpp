@@ -33,6 +33,7 @@
 #include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
+#include "GenCall.h"
 #include "GenClass.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
@@ -41,10 +42,10 @@
 #include "GenProto.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
-#include "IndirectTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "IndirectTypeInfo.h"
 #include "MetadataRequest.h"
 #include "Outlining.h"
 #include "ProtocolInfo.h"
@@ -1575,7 +1576,10 @@ class COMExistentialTypeInfo final
     auto *method = IGF.Builder.CreateLoad(slot, "com.refcount.method");
     auto *type = llvm::FunctionType::get(IGF.IGM.Int32Ty, {IGF.IGM.Int8PtrTy},
                                          /*isVarArg=*/false);
-    Signature signature(type, llvm::AttributeList(), llvm::CallingConv::C);
+    Signature signature(
+        type, llvm::AttributeList(),
+        expandCallingConv(IGF.IGM, SILFunctionTypeRepresentation::COMMethod,
+                          /*isAsync=*/false, /*isCalleeAllocatedCoro=*/false));
     auto function =
         FunctionPointer::createUnsigned(FunctionPointer::Kind::Function,
                                         method, signature);
@@ -1713,6 +1717,11 @@ llvm::Type *IRGenModule::getExistentialType(unsigned numTables) {
   return Types.getExistentialType(numTables);
 }
 
+const TypeInfo *irgen::createCOMInterfaceTypeInfo(IRGenModule &IGM) {
+  return new COMExistentialTypeInfo(IGM.Int8PtrTy, IGM.getPointerSize(),
+                                    IGM.getPointerAlignment());
+}
+
 static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   auto layout = T.getExistentialLayout();
 
@@ -1726,8 +1735,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   }
 
   if (layout.getCOMInterface())
-    return new COMExistentialTypeInfo(IGM.Int8PtrTy, IGM.getPointerSize(),
-                                      IGM.getPointerAlignment());
+    return createCOMInterfaceTypeInfo(IGM);
 
   llvm::StructType *type;
 
