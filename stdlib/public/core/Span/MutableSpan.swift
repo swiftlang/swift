@@ -56,7 +56,7 @@ public struct MutableSpan<Element: ~Copyable>
   }
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow start)
   @_transparent
   internal init(
