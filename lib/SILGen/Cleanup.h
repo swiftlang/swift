@@ -18,7 +18,9 @@
 #define SWIFT_SILGEN_CLEANUP_H
 
 #include "swift/Basic/Assertions.h"
-#define SWIFT_INCLUDED_IN_SILGEN_SOURCES
+#ifndef SWIFT_INCLUDED_IN_SILGEN_SOURCES
+#define SWIFT_INCLUDED_IN_SILGEN_SOURCES 1
+#endif
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/DiverseStack.h"
 #include "swift/SIL/SILLocation.h"
