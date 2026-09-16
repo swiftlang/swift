@@ -20,6 +20,7 @@
 
 #include "MetadataImpl.h"
 #include "swift/Runtime/ExistentialContainer.h"
+#include "swift/shims/_SwiftCOMShims.h"
 
 namespace swift {
 namespace metadataimpl {
@@ -478,14 +479,12 @@ struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBoxBase
 /// or Objective-C reference counting.
 struct SWIFT_LIBRARY_VISIBILITY COMExistentialBox
     : RetainableBoxBase<COMExistentialBox, void *> {
-  using RefCountOperation = uint32_t (*)(void *);
-
   static void invoke(void *interface, unsigned slot) {
     if (!interface)
       return;
 
     auto **vtable = *reinterpret_cast<void ***>(interface);
-    reinterpret_cast<RefCountOperation>(vtable[slot])(interface);
+    reinterpret_cast<_SwiftCOMLifetimeFunction>(vtable[slot])(interface);
   }
 
   static void *retain(void *interface) {
