@@ -955,12 +955,11 @@ void IRGenFunction::emitResumeAsyncContinuationReturning(
   auto &valueTI = getTypeInfo(valueTy);
   Address srcAddr = valueTI.getAddressForPointer(srcPtr);
 
-  // Extract the destination value pointer and cast it from an opaque
-  // pointer type.
+  // Extract the destination value pointer and cast it from an opaque pointer
+  // type.
   //
-  // A split continuation token is the header of a continuation created in
-  // another frame, laid out so that this finds its context exactly as it finds a
-  // task's. The runtime entry point called below tells them apart itself.
+  // A split continuation is created in another frame, laid out exactly as a
+  // task.
   Address context = emitLoadOfContinuationContext(*this, continuation);
   auto destPtrAddr = emitAddrOfContinuationNormalResultPointer(*this, context);
   auto destPtr =
@@ -990,12 +989,12 @@ void IRGenFunction::emitAwaitSplitContinuation(
     llvm::Value *continuation, Address resumeBuffer, SILType resumeTy,
     llvm::BasicBlock *normalBB, llvm::PHINode *optionalErrorResult,
     llvm::BasicBlock *optionalErrorBB) {
-  // The token is the header of a continuation created separately (in another
-  // frame) via swift_continuation_createSplit. The context is loaded out of it
-  // exactly as it would be out of a task.
-  llvm::Value *header =
+  // This continuation was created separately (in another frame) via
+  // swift_continuation_createSplit. It is shaped like a task, so its context
+  // is loaded out of it exactly as it would be out of a task.
+  llvm::Value *continuationAsTask =
       Builder.CreateBitCast(continuation, IGM.SwiftTaskPtrTy);
-  Address continuationContext = emitLoadOfContinuationContext(*this, header);
+  Address continuationContext = emitLoadOfContinuationContext(*this, continuationAsTask);
   AsyncCoroutineCurrentContinuationContext = continuationContext.getAddress();
 
   // Bind the resume-point to this function. Create did not bind anything, so
@@ -1046,7 +1045,7 @@ void IRGenFunction::emitAwaitSplitContinuation(
     auto awaitFnPtr = IGM.getAwaitSplitContinuationFn();
     arguments.push_back(
         Builder.CreateBitOrPointerCast(awaitFnPtr, IGM.Int8PtrTy));
-    arguments.push_back(Builder.CreateBitOrPointerCast(header, IGM.Int8PtrTy));
+    arguments.push_back(Builder.CreateBitOrPointerCast(continuationAsTask, IGM.Int8PtrTy));
 
     auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy},
                                            false /*packed*/);
@@ -1093,7 +1092,7 @@ void IRGenFunction::emitAwaitSplitContinuation(
 }
 
 void IRGenFunction::emitDestroySplitContinuation(llvm::Value *continuation) {
-  // The token is the header, which is where the allocation starts.
+  // The continuation is where the allocation starts.
   auto call = Builder.CreateCall(
       IGM.getContinuationDestroySplitFunctionPointer(),
       {Builder.CreateBitOrPointerCast(continuation, IGM.Int8PtrTy)});

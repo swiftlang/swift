@@ -7,8 +7,8 @@ import _Concurrency
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test6createBcyF
 // CHECK: [[MT:%.*]] = metatype $@thin Builtin.Int32.Type
-// CHECK: [[TOKEN:%.*]] = builtin "createSplitContinuation"<Builtin.Int32>([[MT]] : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
-// CHECK: return [[TOKEN]]
+// CHECK: [[CONTINUATION:%.*]] = builtin "createSplitContinuation"<Builtin.Int32>([[MT]] : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
+// CHECK: return [[CONTINUATION]]
 func create() -> Builtin.RawUnsafeContinuation {
   return Builtin.createSplitContinuation(Builtin.Int32.self)
 }
@@ -20,13 +20,13 @@ func create() -> Builtin.RawUnsafeContinuation {
 // CHECK: [[ERROR]]([[ERR:%.*]] : @owned $any Error):
 // CHECK: throw [[ERR]]
 func awaitThrowing(
-  _ token: Builtin.RawUnsafeContinuation
+  _ continuation: Builtin.RawUnsafeContinuation
 ) async throws -> Builtin.Int32 {
-  return try await Builtin.awaitSplitThrowingContinuation(token)
+  return try await Builtin.awaitSplitThrowingContinuation(continuation)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test7destroyyyBcF
 // CHECK: builtin "destroySplitContinuation"({{%.*}} : $Builtin.RawUnsafeContinuation) : $()
-func destroy(_ token: Builtin.RawUnsafeContinuation) {
-  Builtin.destroySplitContinuation(token)
+func destroy(_ continuation: Builtin.RawUnsafeContinuation) {
+  Builtin.destroySplitContinuation(continuation)
 }

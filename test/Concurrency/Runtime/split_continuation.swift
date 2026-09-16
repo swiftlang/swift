@@ -7,7 +7,7 @@
 // REQUIRES: swift_feature_SplitContinuations
 // UNSUPPORTED: back_deployment_runtime
 
-@_spi(Concurrency) import _Concurrency
+@_spi(Concurrency) @_spi(SplitContinuation) import _Concurrency
 import StdlibUnittest
 import Synchronization
 
@@ -528,6 +528,27 @@ actor Elsewhere {
       }
       expectEqual(-11, await task.value)
       expectFalse(task.isCancelled)
+    }
+
+    tests.test("a cancellation shield suppresses the handler while suspended") {
+      let executor = ManualExecutor()
+      let task = Task(executorPreference: executor) {
+        await withTaskCancellationShield {
+          await withContinuation(of: Int.self, throwing: Never.self) {
+            (continuation: consuming Continuation<Int, Never>,
+             awaiter: consuming ContinuationAwaiter<Int, Never>) in
+            let holder = ContinuationHolder(continuation)
+            holder.resumeFromDetachedTask(returning: 42, executorPreference: executor)
+            return await awaiter.wait(
+              onCancel: { expectUnreachable("shielded onCancel must not run") },
+              onEscalate: { _ in })
+          }
+        }
+      }
+      executor.runNextJob() // Runs the task to its suspension.
+      task.cancel()
+      executor.runNextJobs(count: 2) // Runs the detached resumer, then the resume itself.
+      expectEqual(42, await task.value)
     }
 
     // MARK: - Errors thrown out of the body.
