@@ -578,7 +578,8 @@ static ManagedValue emitBuiltinGepImpl(SILGenFunction &SGF,
                                        SILLocation loc,
                                        SubstitutionMap substitutions,
                                        ArrayRef<ManagedValue> args,
-                                       bool isProjection) {
+                                       bool isProjection,
+                                       bool stackProtected) {
   SILType ElemTy = SGF.getLoweredType(substitutions.getReplacementTypes()[0]);
   SILType RawPtrType = args[0].getUnmanagedValue()->getType();
   SILValue addr = SGF.B.createPointerToAddress(loc,
@@ -587,10 +588,10 @@ static ManagedValue emitBuiltinGepImpl(SILGenFunction &SGF,
                                                /*strict*/ true,
                                                /*invariant*/ false);
   addr = SGF.B.createIndexAddr(loc, addr, args[1].getUnmanagedValue(),
-                               /*needsStackProtection=*/ true,
+                               /*needsStackProtection=*/ stackProtected,
                                isProjection);
   addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType,
-                                      /*needsStackProtection=*/ true);
+                                      /*needsStackProtection=*/ stackProtected);
   return ManagedValue::forObjectRValueWithoutOwnership(addr);
 }
 
@@ -603,7 +604,8 @@ static ManagedValue emitBuiltinGep(SILGenFunction &SGF,
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "gep should have two substitutions");
   assert(args.size() == 3 && "gep should be given three arguments");
-  return emitBuiltinGepImpl(SGF, loc, substitutions, args, /*isProjection=*/ false);
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args,
+                            /*isProjection=*/ false, /*stackProtected=*/ true);
 }
 
 /// Specialized emitter for Builtin.gepProjection.
@@ -615,7 +617,22 @@ static ManagedValue emitBuiltinGepProjection(SILGenFunction &SGF,
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "gepProjection should have two substitutions");
   assert(args.size() == 3 && "gepProjection should be given three arguments");
-  return emitBuiltinGepImpl(SGF, loc, substitutions, args, /*isProjection=*/ true);
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args,
+                            /*isProjection=*/ true, /*stackProtected=*/ true);
+}
+
+/// Specialized emitter for Builtin.unprotectedGepProjection.
+static ManagedValue emitBuiltinUnprotectedGepProjection(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             SubstitutionMap substitutions,
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
+  assert(substitutions.getReplacementTypes().size() == 1 &&
+         "unprotectedGepProjection should have two substitutions");
+  assert(args.size() == 3 &&
+         "unprotectedGepProjection should be given three arguments");
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args,
+                            /*isProjection=*/ true, /*stackProtected=*/ false);
 }
 
 /// Specialized emitter for Builtin.getTailAddr.
