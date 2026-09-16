@@ -3197,6 +3197,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getGepOperation(Context, Id, Types[0]);
 
   case BuiltinValueKind::GepProjection:
+  case BuiltinValueKind::UnprotectedGepProjection:
     if (Types.size() != 1) return nullptr;
     return getGepOperation(Context, Id, Types[0]);
 
