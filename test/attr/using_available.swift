@@ -1,11 +1,15 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -verify -primary-file %t/caller.swift %t/defaulted.swift
+
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -verify -primary-file %t/caller.swift %t/defaulted.swift -DTOP
+// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -verify -primary-file %t/caller.swift %t/defaulted.swift -DBOTTOM
 
 // REQUIRES: swift_feature_DefaultIsolationPerFile
 
 //--- defaulted.swift
+#if TOP
 using @available(*, deprecated, message: "legacy")
+#endif
 
 public func defaultedFunc() {}
 
@@ -28,6 +32,10 @@ extension DefaultedClass {
 
 @available(*, deprecated, message: "explicit")
 public func explicitlyDeprecated() {}
+
+#if BOTTOM
+using @available(*, deprecated, message: "legacy")
+#endif
 
 //--- caller.swift
 public func uses() {

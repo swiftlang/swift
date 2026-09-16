@@ -1,20 +1,33 @@
 #
 # API Notes for the C++ Standard Library
 #
+
+# Keep this list in sync with the files installed in
+# Runtimes/Overlay/Cxx/std/CMakeLists.txt.
+set(apinotes
+  std.apinotes
+  std_span.apinotes
+  std_string_view.apinotes
+)
+
 set(output_dir "${SWIFTLIB_DIR}/apinotes")
+
+set(inputs)
+set(outputs)
+foreach(input ${apinotes})
+  list(APPEND inputs "${CMAKE_CURRENT_SOURCE_DIR}/${input}")
+  list(APPEND outputs "${output_dir}/${input}")
+endforeach()
+
 add_custom_command_target(unused_var
     CUSTOM_TARGET_NAME CxxStdlib-apinotes
     COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}"
-    COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes" "${output_dir}"
-    COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std_span.apinotes" "${output_dir}"
-    COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std_string_view.apinotes" "${output_dir}"
+    COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" ${inputs} "${output_dir}/"
     COMMENT "Copying CxxStdlib API Notes to ${output_dir}"
-    OUTPUT "${output_dir}/std.apinotes"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std_span.apinotes"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std_string_view.apinotes")
+    OUTPUT ${outputs}
+    DEPENDS ${inputs})
 
-swift_install_in_component(FILES std.apinotes
+swift_install_in_component(FILES ${apinotes}
     DESTINATION "lib/swift/apinotes"
     COMPONENT compiler)
 

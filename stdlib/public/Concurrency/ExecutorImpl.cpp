@@ -16,6 +16,7 @@
 
 #include "Error.h"
 #include "ExecutorBridge.h"
+#include "swift/Runtime/Casting.h"
 
 using namespace swift;
 

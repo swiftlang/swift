@@ -1399,8 +1399,12 @@ def create_argument_parser():
     option('--skip-build-android', toggle_false('build_android'),
            help='skip building Swift stdlibs for Android')
 
-    option('--skip-build-benchmarks', toggle_false('build_benchmarks'),
-           help='skip building Swift Benchmark Suite')
+    option('--build-benchmarks', toggle_true('build_benchmarks'), default=False,
+           help='build Swift Benchmark Suite')
+
+    option('--skip-build-benchmarks', toggle_true('skip_build_benchmarks'),
+           help='[no-op] building the Swift Benchmark Suite is skipped by '
+                'default; pass --build-benchmarks to opt in')
 
     option('--build-external-benchmarks', toggle_true,
            help='skip building Swift Benchmark Suite')
@@ -1528,13 +1532,14 @@ def create_argument_parser():
            help='enable building llvm using modules')
 
     option('--llvm-enable-index-store', toggle_true('llvm_enable_index_store'),
-           default=True,
+           default=False,
            help='emit -index-store-path while building LLVM/Clang and Swift '
                 'host tools (gated on the host compiler accepting the flag, '
-                'so it is a no-op for older compilers). Defaults to ON, but '
-                'is forced OFF when --sccache is in use (sccache cannot '
-                'cache the index-store side outputs and would otherwise '
-                'miss on every translation unit).')
+                'so it is a no-op for older compilers). Defaults to OFF. It '
+                'is also forced OFF when --sccache or an explicit '
+                '--cmake-c-launcher/--cmake-cxx-launcher is in use (compiler '
+                'caches cannot cache the index-store side outputs and would '
+                'otherwise miss on every translation unit).')
 
     option('--llvm-targets-to-build', store,
            default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR;BPF',

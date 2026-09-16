@@ -350,7 +350,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   CFunctionPointer = uint8_t(FunctionTypeRepresentation::CFunctionPointer),
 
   /// The value of the greatest AST function representation.
-  LastAST = CFunctionPointer,
+  LastAST = uint8_t(FunctionTypeRepresentation::Last),
 
   /// The value of the least SIL-only function representation.
   FirstSIL = 8,
@@ -380,6 +380,10 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   KeyPathAccessorSetter,
   KeyPathAccessorEquals,
   KeyPathAccessorHash,
+
+  /// A COM interface method. The interface pointer is passed as the first
+  /// argument using the foreign calling convention.
+  COMMethod,
 };
 
 /// Returns true if the function with this convention doesn't carry a context.
@@ -409,6 +413,7 @@ isThinRepresentation(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
   case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
@@ -445,6 +450,7 @@ isKeyPathAccessorRepresentation(SILFunctionTypeRepresentation rep) {
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::Closure:
     case SILFunctionTypeRepresentation::CXXMethod:
+    case SILFunctionTypeRepresentation::COMMethod:
       return false;
   }
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
@@ -475,6 +481,7 @@ convertRepresentation(SILFunctionTypeRepresentation rep) {
     return {FunctionTypeRepresentation::Block};
   case SILFunctionTypeRepresentation::Thin:
     return {FunctionTypeRepresentation::Thin};
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
     return {FunctionTypeRepresentation::CFunctionPointer};
@@ -500,6 +507,7 @@ constexpr bool canBeCalledIndirectly(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     return false;
   case SILFunctionTypeRepresentation::ObjCMethod:
@@ -524,6 +532,7 @@ template <typename Repr> constexpr bool shouldStoreClangType(Repr repr) {
   case SILFunctionTypeRepresentation::Block:
   case SILFunctionTypeRepresentation::CXXMethod:
     return true;
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
@@ -550,8 +559,8 @@ class ASTExtInfoBuilder {
   // If bits are added or removed, then TypeBase::NumAFTExtInfoBits
   // and NumMaskBits must be updated, and they must match.
   //
-  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult |
-  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |
+  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult |inout_result|called_once| coroutine |
+  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |     15     |    16     |    17     |
   //
   enum : unsigned {
     RepresentationMask = 0xF << 0,
@@ -565,7 +574,9 @@ class ASTExtInfoBuilder {
     DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
     SendingResultMask = 1 << 14,
     InOutResultMask = 1 << 15,
-    NumMaskBits = 16
+    CalledOnceMask = 1 << 16,
+    CoroutineMask = 1 << 17,
+    NumMaskBits = 18
   };
 
   static_assert(FunctionTypeIsolation::Mask == 0x7, "update mask manually");
@@ -582,16 +593,22 @@ class ASTExtInfoBuilder {
   /// a concrete dependent type should set the Sendable bit instead.
   Type sendableDependentType;
 
+  /// A dependent type that determines whether the function is @called(once).
+  /// Only used within the constraint system, and must contain type variables,
+  /// a concrete dependent type should set the Sendable bit instead.
+  Type calledOnceDependentType;
+
   ArrayRef<LifetimeDependenceInfo> lifetimeDependencies;
 
   using Representation = FunctionTypeRepresentation;
 
   ASTExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo,
                     Type globalActor, Type thrownError,
-                    Type sendableDependentType,
+                    Type sendableDependentType, Type calledOnceDependentType,
                     ArrayRef<LifetimeDependenceInfo> lifetimeDependencies)
       : bits(bits), clangTypeInfo(clangTypeInfo), globalActor(globalActor),
         thrownError(thrownError), sendableDependentType(sendableDependentType),
+        calledOnceDependentType(calledOnceDependentType),
         lifetimeDependencies(lifetimeDependencies) {
     assert(isThrowing() || !thrownError);
     assert(hasGlobalActorFromBits(bits) == !globalActor.isNull());
@@ -605,7 +622,8 @@ public:
                           DifferentiabilityKind::NonDifferentiable, nullptr,
                           FunctionTypeIsolation::forNonIsolated(),
                           {} /* LifetimeDependenceInfo */,
-                          false /*sendingResult*/) {}
+                          false /*sendingResult*/,
+                          false /*calledOnce*/) {}
 
   // Constructor for polymorphic type.
   ASTExtInfoBuilder(Representation rep, bool throws, Type thrownError)
@@ -613,23 +631,25 @@ public:
                           DifferentiabilityKind::NonDifferentiable, nullptr,
                           FunctionTypeIsolation::forNonIsolated(),
                           {} /* LifetimeDependenceInfo */,
-                          false /*sendingResult*/) {}
+                          false /*sendingResult*/,
+                          false /*calledOnce*/) {}
 
   // Constructor with almost no defaults.
   ASTExtInfoBuilder(Representation rep, bool isNoEscape, bool throws,
                     Type thrownError, DifferentiabilityKind diffKind,
                     const clang::Type *type, FunctionTypeIsolation isolation,
                     ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
-                    bool sendingResult)
+                    bool sendingResult, bool calledOnce)
       : ASTExtInfoBuilder(
             ((unsigned)rep) | (isNoEscape ? NoEscapeMask : 0) |
-                (throws ? ThrowsMask : 0) |
-                (((unsigned)diffKind << DifferentiabilityMaskOffset) &
-                 DifferentiabilityMask) |
-                (unsigned(isolation.getKind()) << IsolationMaskOffset) |
-                (sendingResult ? SendingResultMask : 0),
+            (throws ? ThrowsMask : 0) |
+            (((unsigned)diffKind << DifferentiabilityMaskOffset) &
+             DifferentiabilityMask) |
+            (unsigned(isolation.getKind()) << IsolationMaskOffset) |
+            (sendingResult ? SendingResultMask : 0) |
+            (calledOnce ? CalledOnceMask : 0),
             ClangTypeInfo(type), isolation.getOpaqueType(), thrownError,
-            /*sendableDependentType*/ Type(), lifetimeDependencies) {}
+            /*sendableDependentType*/ Type(), /*calledOnceDependentType*/Type(), lifetimeDependencies) {}
 
   void checkInvariants() const;
 
@@ -650,6 +670,10 @@ public:
   constexpr bool isThrowing() const { return bits & ThrowsMask; }
 
   constexpr bool hasSendingResult() const { return bits & SendingResultMask; }
+
+  constexpr bool isCalledOnce() const { return bits & CalledOnceMask; }
+
+  constexpr bool isCoroutine() const { return bits & CoroutineMask; }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind((bits & DifferentiabilityMask) >>
@@ -675,6 +699,11 @@ public:
   /// is only used within the constraint system, and will contain type
   /// variables if present.
   Type getSendableDependentType() const { return sendableDependentType; }
+
+  /// A dependent type that determines whether the function is @called(once). This
+  /// is only used within the constraint system, and will contain type
+  /// variables if present.
+  Type getCalledOnceDependentType() const { return calledOnceDependentType; }
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     return lifetimeDependencies;
@@ -717,6 +746,7 @@ public:
     case SILFunctionTypeRepresentation::ObjCMethod:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::WitnessMethod:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
       return true;
     }
@@ -735,41 +765,48 @@ public:
     return ASTExtInfoBuilder(
         (bits & ~RepresentationMask) | (unsigned)rep,
         shouldStoreClangType(rep) ? clangTypeInfo : ClangTypeInfo(),
-        globalActor, thrownError, sendableDependentType, lifetimeDependencies);
+        globalActor, thrownError, sendableDependentType, calledOnceDependentType, lifetimeDependencies);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withNoEscape(bool noEscape = true) const {
     return ASTExtInfoBuilder(noEscape ? (bits | NoEscapeMask)
                                       : (bits & ~NoEscapeMask),
                              clangTypeInfo, globalActor, thrownError,
-                             sendableDependentType, lifetimeDependencies);
+                             sendableDependentType, calledOnceDependentType, lifetimeDependencies);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withSendable(bool concurrent = true) const {
     return ASTExtInfoBuilder(concurrent ? (bits | SendableMask)
                                         : (bits & ~SendableMask),
                              clangTypeInfo, globalActor, thrownError,
-                             sendableDependentType, lifetimeDependencies);
+                             sendableDependentType, calledOnceDependentType, lifetimeDependencies);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withAsync(bool async = true) const {
     return ASTExtInfoBuilder(async ? (bits | AsyncMask) : (bits & ~AsyncMask),
                              clangTypeInfo, globalActor, thrownError,
-                             sendableDependentType, lifetimeDependencies);
+                             sendableDependentType, calledOnceDependentType, lifetimeDependencies);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withThrows(bool throws, Type thrownError) const {
     assert(throws || !thrownError);
     return ASTExtInfoBuilder(
         throws ? (bits | ThrowsMask) : (bits & ~ThrowsMask), clangTypeInfo,
-        globalActor, thrownError, sendableDependentType, lifetimeDependencies);
+        globalActor, thrownError, sendableDependentType, calledOnceDependentType, lifetimeDependencies);
   }
 
   [[nodiscard]]
   ASTExtInfoBuilder
   withSendableDependentType(Type sendableDependentType) const {
     return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
-                             sendableDependentType, lifetimeDependencies);
+                             sendableDependentType, calledOnceDependentType, lifetimeDependencies);
+  }
+
+  [[nodiscard]] ASTExtInfoBuilder
+  withCalledOnceDependentType(Type calledOnceDependentType) const {
+    return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
+                             sendableDependentType, calledOnceDependentType,
+                             lifetimeDependencies);
   }
 
   [[nodiscard]]
@@ -781,7 +818,15 @@ public:
     return ASTExtInfoBuilder(sending ? (bits | SendingResultMask)
                                      : (bits & ~SendingResultMask),
                              clangTypeInfo, globalActor, thrownError,
-                             sendableDependentType, lifetimeDependencies);
+                             sendableDependentType, calledOnceDependentType, lifetimeDependencies);
+  }
+
+  [[nodiscard]]
+  ASTExtInfoBuilder withCoroutine(bool coroutine = true) const {
+    return ASTExtInfoBuilder(
+        coroutine ? (bits | CoroutineMask) : (bits & ~CoroutineMask),
+        clangTypeInfo, globalActor, thrownError, sendableDependentType,
+        calledOnceDependentType, lifetimeDependencies);
   }
 
   [[nodiscard]]
@@ -791,13 +836,13 @@ public:
         (bits & ~DifferentiabilityMask) |
             ((unsigned)differentiability << DifferentiabilityMaskOffset),
         clangTypeInfo, globalActor, thrownError, sendableDependentType,
-        lifetimeDependencies);
+        calledOnceDependentType, lifetimeDependencies);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
     return ASTExtInfoBuilder(bits, ClangTypeInfo(type), globalActor,
                              thrownError, sendableDependentType,
-                             lifetimeDependencies);
+                             calledOnceDependentType, lifetimeDependencies);
   }
 
   /// Put a SIL representation in the ExtInfo.
@@ -811,7 +856,7 @@ public:
     return ASTExtInfoBuilder(
         (bits & ~RepresentationMask) | (unsigned)rep,
         shouldStoreClangType(rep) ? clangTypeInfo : ClangTypeInfo(),
-        globalActor, thrownError, sendableDependentType, lifetimeDependencies);
+        globalActor, thrownError, sendableDependentType, calledOnceDependentType, lifetimeDependencies);
   }
 
   /// \p lifetimeDependencies should be arena allocated and not a temporary
@@ -820,7 +865,7 @@ public:
   [[nodiscard]] ASTExtInfoBuilder withLifetimeDependencies(
       llvm::ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) const {
     return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
-                             sendableDependentType, lifetimeDependencies);
+                             sendableDependentType, calledOnceDependentType, lifetimeDependencies);
   }
 
   [[nodiscard]] ASTExtInfoBuilder withLifetimeDependencies(
@@ -833,13 +878,20 @@ public:
         (bits & ~IsolationMask) |
             (unsigned(isolation.getKind()) << IsolationMaskOffset),
         clangTypeInfo, isolation.getOpaqueType(), thrownError,
-        sendableDependentType, lifetimeDependencies);
+        sendableDependentType, calledOnceDependentType, lifetimeDependencies);
   }
 
   [[nodiscard]] ASTExtInfoBuilder withHasInOutResult() const {
     return ASTExtInfoBuilder((bits | InOutResultMask), clangTypeInfo,
                              globalActor, thrownError, sendableDependentType,
-                             lifetimeDependencies);
+                             calledOnceDependentType, lifetimeDependencies);
+  }
+
+  [[nodiscard]] ASTExtInfoBuilder withCalledOnce(bool enabled = true) const {
+    return ASTExtInfoBuilder(enabled ? (bits | CalledOnceMask)
+                                     : (bits & ~CalledOnceMask),
+                             clangTypeInfo, globalActor, thrownError,
+                             sendableDependentType, calledOnceDependentType, lifetimeDependencies);
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
@@ -848,6 +900,7 @@ public:
     ID.AddPointer(globalActor.getPointer());
     ID.AddPointer(thrownError.getPointer());
     ID.AddPointer(sendableDependentType.getPointer());
+    ID.AddPointer(calledOnceDependentType.getPointer());
     for (auto info : lifetimeDependencies) {
       info.Profile(ID);
     }
@@ -881,9 +934,11 @@ class ASTExtInfo {
 
   ASTExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo, Type globalActor,
              Type thrownError, Type sendableDependentType,
+             Type calledOnceDependentType,
              llvm::ArrayRef<LifetimeDependenceInfo> lifetimeDependenceInfo)
       : builder(bits, clangTypeInfo, globalActor, thrownError,
-                sendableDependentType, lifetimeDependenceInfo) {
+                sendableDependentType, calledOnceDependentType,
+                lifetimeDependenceInfo) {
     builder.checkInvariants();
   };
 
@@ -915,6 +970,8 @@ public:
 
   constexpr bool isThrowing() const { return builder.isThrowing(); }
 
+  constexpr bool isCoroutine() const { return builder.isCoroutine(); }
+
   constexpr bool hasSendingResult() const { return builder.hasSendingResult(); }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
@@ -939,6 +996,13 @@ public:
     return builder.getSendableDependentType();
   }
 
+  /// A dependent type that determines whether the function is @called(once). This
+  /// is only used within the constraint system, and will contain type
+  /// variables if present.
+  Type getCalledOnceDependentType() const {
+    return builder.getCalledOnceDependentType();
+  }
+
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     return builder.getLifetimeDependencies();
   }
@@ -946,6 +1010,8 @@ public:
   FunctionTypeIsolation getIsolation() const { return builder.getIsolation(); }
 
   constexpr bool hasInOutResult() const { return builder.hasInOutResult(); }
+
+  constexpr bool isCalledOnce() const { return builder.isCalledOnce(); }
 
   /// Helper method for changing the representation.
   ///
@@ -987,6 +1053,14 @@ public:
     return builder.withThrows(true, Type()).build();
   }
 
+  /// Helper method for changing only the coroutine field.
+  ///
+  /// Prefer using \c ASTExtInfoBuilder::withCoroutine for chaining.
+  [[nodiscard]]
+  ASTExtInfo withCoroutine(bool coroutine = true) const {
+    return builder.withCoroutine(coroutine).build();
+  }
+
   /// Helper method for changing only the async field.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withAsync for chaining.
@@ -998,6 +1072,11 @@ public:
   [[nodiscard]]
   ASTExtInfo withSendableDependentType(Type sendableDependentType) const {
     return builder.withSendableDependentType(sendableDependentType).build();
+  }
+
+  [[nodiscard]] ASTExtInfo
+  withCalledOnceDependentType(Type calledOnceDependentType) const {
+    return builder.withCalledOnceDependentType(calledOnceDependentType).build();
   }
 
   [[nodiscard]] ASTExtInfo withSendingResult(bool sending = true) const {
@@ -1034,6 +1113,10 @@ public:
       SmallVectorImpl<LifetimeDependenceInfo> lifetimeDependencies) const =
       delete;
 
+  [[nodiscard]] ASTExtInfo withCalledOnce(bool enabled = true) const {
+    return builder.withCalledOnce(enabled).build();
+  }
+
   void Profile(llvm::FoldingSetNodeID &ID) const { builder.Profile(ID); }
 
   bool isEqualTo(ASTExtInfo other, bool useClangTypes) const {
@@ -1060,6 +1143,7 @@ SILFunctionLanguage getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     return SILFunctionLanguage::C;
   case SILFunctionTypeRepresentation::Thick:
@@ -1092,7 +1176,8 @@ class SILExtInfoBuilder {
   //   |    0 .. 4    |      5      |     6    |     7      |   8
   //   |differentiability|unimplementable|erased isolation|nonisolated(nonsending)|
   //   |     9 .. 11     |      12       |      13        |    14                 |
-  //
+  //   | called_once |
+  //   |      15     |
   enum : unsigned {
     RepresentationMask = 0x1F << 0,
     PseudogenericMask = 1 << 5,
@@ -1104,7 +1189,8 @@ class SILExtInfoBuilder {
     UnimplementableMask = 1 << 12,
     ErasedIsolationMask = 1 << 13,
     NonisolatedNonsendingIsolationMask = 1 << 14,
-    NumMaskBits = 15
+    CalledOnceMask = 1 << 15,
+    NumMaskBits = 16
   };
 
   unsigned bits; // Naturally sized for speed.
@@ -1124,12 +1210,14 @@ class SILExtInfoBuilder {
   static unsigned makeBits(Representation rep, bool isPseudogeneric,
                            bool isNoEscape, bool isSendable, bool isAsync,
                            bool isUnimplementable,
+                           bool isCalledOnce,
                            SILFunctionTypeIsolation isolation,
                            DifferentiabilityKind diffKind) {
     return ((unsigned)rep) | (isPseudogeneric ? PseudogenericMask : 0) |
            (isNoEscape ? NoEscapeMask : 0) | (isSendable ? SendableMask : 0) |
            (isAsync ? AsyncMask : 0) |
            (isUnimplementable ? UnimplementableMask : 0) |
+           (isCalledOnce ? CalledOnceMask : 0) |
            (isolation.isNonisolatedNonsending()
                 ? NonisolatedNonsendingIsolationMask
                 : 0) |
@@ -1144,17 +1232,17 @@ public:
   SILExtInfoBuilder()
       : SILExtInfoBuilder(
             makeBits(SILFunctionTypeRepresentation::Thick, false, false, false,
-                     false, false, SILFunctionTypeIsolation::forUnknown(),
+                     false, false, false, SILFunctionTypeIsolation::forUnknown(),
                      DifferentiabilityKind::NonDifferentiable),
             ClangTypeInfo(nullptr), /*LifetimeDependenceInfo*/ {}) {}
 
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
                     bool isSendable, bool isAsync, bool isUnimplementable,
-                    SILFunctionTypeIsolation isolation,
+                    bool isCalledOnce, SILFunctionTypeIsolation isolation,
                     DifferentiabilityKind diffKind, const clang::Type *type,
                     ArrayRef<LifetimeDependenceInfo> lifetimeDependenceInfo)
       : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape, isSendable,
-                                   isAsync, isUnimplementable, isolation,
+                                   isAsync, isUnimplementable, isCalledOnce, isolation,
                                    diffKind),
                           ClangTypeInfo(type), lifetimeDependenceInfo) {}
 
@@ -1163,6 +1251,7 @@ public:
       : SILExtInfoBuilder(makeBits(info.getSILRepresentation(), isPseudogeneric,
                                    info.isNoEscape(), info.isSendable(),
                                    info.isAsync(), /*unimplementable*/ false,
+                                   info.isCalledOnce(),
                                    SILFunctionTypeIsolation::fromAST(info.getIsolation()),
                                    info.getDifferentiabilityKind()),
                           info.getClangTypeInfo(),
@@ -1207,6 +1296,8 @@ public:
     return bits & UnimplementableMask;
   }
 
+  constexpr bool isCalledOnce() const { return bits & CalledOnceMask; }
+
   /// Does this function type have nonisolated(nonsending) isolation
   /// (i.e. is it the lowering of an nonisolated(nonsending) function type)?
   constexpr bool hasNonisolatedNonsendingIsolation() const {
@@ -1249,6 +1340,7 @@ public:
     case Representation::ObjCMethod:
     case Representation::Method:
     case Representation::WitnessMethod:
+    case Representation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
       return true;
     }
@@ -1267,6 +1359,7 @@ public:
     case Representation::Method:
     case Representation::WitnessMethod:
     case Representation::Closure:
+    case Representation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
     case Representation::KeyPathAccessorGetter:
     case Representation::KeyPathAccessorSetter:
@@ -1316,6 +1409,12 @@ public:
     return SILExtInfoBuilder(isolated
                                  ? (bits | NonisolatedNonsendingIsolationMask)
                                  : (bits & ~NonisolatedNonsendingIsolationMask),
+                             clangTypeInfo, lifetimeDependencies);
+  }
+
+  [[nodiscard]] SILExtInfoBuilder withCalledOnce(bool once = true) const {
+    return SILExtInfoBuilder(once ? (bits | CalledOnceMask)
+                                  : (bits & ~CalledOnceMask),
                              clangTypeInfo, lifetimeDependencies);
   }
 
@@ -1421,7 +1520,7 @@ public:
   static SILExtInfo getThin() {
     return SILExtInfoBuilder(
                SILExtInfoBuilder::Representation::Thin, false, false, false,
-               false, false, SILFunctionTypeIsolation::forUnknown(),
+               false, false, false, SILFunctionTypeIsolation::forUnknown(),
                DifferentiabilityKind::NonDifferentiable, nullptr, {})
         .build();
   }
@@ -1451,6 +1550,10 @@ public:
 
   constexpr bool isUnimplementable() const {
     return builder.isUnimplementable();
+  }
+
+  constexpr bool isCalledOnce() const {
+    return builder.isCalledOnce();
   }
 
   constexpr bool hasNonisolatedNonsendingIsolation() const {

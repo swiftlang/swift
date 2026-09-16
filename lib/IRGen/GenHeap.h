@@ -77,6 +77,7 @@ public:
   /// consisting solely of the standard heap metadata.
   llvm::Constant *getPrivateMetadata(IRGenModule &IGM,
                                      llvm::Constant *captureDescriptor,
+                                     std::optional<uint64_t> mallocTypeId,
                                      const llvm::Twine &name) const;
 
   std::optional<uint64_t>
@@ -112,20 +113,53 @@ public:
 void emitDeallocateHeapObject(IRGenFunction &IGF,
                               llvm::Value *object,
                               llvm::Value *size,
-                              llvm::Value *alignMask);
+                              llvm::Value *alignMask,
+                              std::optional<uint64_t> mallocTypeId);
+
+void emitDeallocateHeapObjectTyped(IRGenFunction &IGF,
+                                   llvm::Value *object,
+                                   llvm::Value *size,
+                                   llvm::Value *alignMask,
+                                   llvm::Value *typeDescriptor);
+
+/// Emit a heap object deallocation for an object none of whose fields were
+/// ever initialized (skips running any field destructors).
+void emitDeallocateUninitializedHeapObject(IRGenFunction &IGF,
+                                           llvm::Value *object,
+                                           llvm::Value *size,
+                                           llvm::Value *alignMask,
+                                           std::optional<uint64_t> mallocTypeId);
 
 /// Emit a class instance deallocation.
 void emitDeallocateClassInstance(IRGenFunction &IGF,
                                  llvm::Value *object,
                                  llvm::Value *size,
-                                 llvm::Value *alignMask);
+                                 llvm::Value *alignMask,
+                                 std::optional<uint64_t> mallocTypeId);
+
+/// Emit a class instance deallocation with malloc type
+void emitDeallocateClassInstanceTyped(IRGenFunction &IGF,
+                                      llvm::Value *object,
+                                      llvm::Value *size,
+                                      llvm::Value *alignMask,
+                                      llvm::Value *typeDescriptor);
   
 /// Emit a partial class instance deallocation from a failing constructor.
 void emitDeallocatePartialClassInstance(IRGenFunction &IGF,
                                         llvm::Value *object,
                                         llvm::Value *metadata,
                                         llvm::Value *size,
-                                        llvm::Value *alignMask);
+                                        llvm::Value *alignMask,
+                                        std::optional<uint64_t> mallocTypeId);
+
+/// Emit a partial class instance deallocation from a failing
+/// constructor with malloc type
+void emitDeallocatePartialClassInstanceTyped(IRGenFunction &IGF,
+                                             llvm::Value *object,
+                                             llvm::Value *metadata,
+                                             llvm::Value *size,
+                                             llvm::Value *alignMask,
+                                             llvm::Value *typeDescriptor);
 
 /// Allocate a boxed value.
 ///
@@ -187,7 +221,8 @@ IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
 
 std::optional<uint64_t>
 computeTypedMallocTypeDescriptor(IRGenModule &IGM,
-                                 llvm::SmallVectorImpl<SILType> &fieldTypes);
+                                 llvm::SmallVectorImpl<SILType> &fieldTypes,
+                                 bool isArray = false);
 
 } // end namespace irgen
 } // end namespace swift

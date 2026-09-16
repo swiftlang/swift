@@ -53,6 +53,7 @@ extension SwiftReflectionContextRef {
   typealias ConformanceIterationCallback = (swift_reflection_ptr_t, swift_reflection_ptr_t) -> Void
   typealias MetadataAllocationIterationCallback = (swift_metadata_allocation_t) -> Void
   typealias MetadataAllocationBacktraceIterationCallback = (swift_reflection_ptr_t, Int, UnsafePointer<swift_reflection_ptr_t>) -> Void
+  typealias TaskRegistryIterationCallback = (swift_reflection_ptr_t) -> Void
 
   internal var allocations: [swift_metadata_allocation_t] {
     get throws {
@@ -169,6 +170,17 @@ extension SwiftReflectionContextRef {
     if let error = withUnsafeMutablePointer(to: &body, {
       swift_reflection_iterateMetadataAllocationBacktraces(self, {
         $3!.bindMemory(to: MetadataAllocationBacktraceIterationCallback.self, capacity: 1).pointee($0, $1, $2!)
+      }, $0)
+    }) {
+      throw Error(cString: error)
+    }
+  }
+
+  internal func iterateTaskRegistry(_ body: @escaping TaskRegistryIterationCallback) throws {
+    var body = body
+    if let error = withUnsafeMutablePointer(to: &body, {
+      swift_reflection_iterateTaskRegistry(self, {
+        $1!.bindMemory(to: TaskRegistryIterationCallback.self, capacity: 1).pointee($0)
       }, $0)
     }) {
       throw Error(cString: error)

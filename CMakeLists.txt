@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19.6)
+cmake_minimum_required(VERSION 3.24)
 
 
 #  set_property(GLOBAL PROPERTY GLOBAL_DEPENDS_DEBUG_MODE 1)
@@ -824,8 +824,8 @@ cmake_dependent_option(SWIFT_ENABLE_SOURCEKIT_TESTS
 option(SWIFT_THREADING_PACKAGE
   "Override the threading package used for the build.  This can either be a
    single package name, or a semicolon separated sequence of sdk:package pairs.
-   Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'
-   or the empty string for the SDK default.")
+   Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none',
+   'embedded', or the empty string for the SDK default.")
 
 option(SWIFT_THREADING_HAS_DLSYM
   "Enable the use of the dlsym() function.  This gets used to provide TSan
@@ -1122,9 +1122,7 @@ set(SWIFT_MODULE_CACHE_PATH
 
 # Check what linux distribution is being used.
 # This can be used to determine the default linker to use.
-if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.22")
-  cmake_host_system_information(RESULT DISTRO_NAME  QUERY DISTRIB_PRETTY_NAME)
-endif()
+cmake_host_system_information(RESULT DISTRO_NAME  QUERY DISTRIB_PRETTY_NAME)
 
 # Which default linker to use. Prefer LLVM_USE_LINKER if it set, otherwise use
 # our own defaults. This should only be possible in a unified (not stand alone)

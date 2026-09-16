@@ -1248,7 +1248,7 @@ class AnObject {}
 
 sil @replace_unconditional_check_cast_failure : $@convention(thin) (Builtin.Int1, @guaranteed AnObject) -> (@out Value) {
 bb0(%2 : $*Value, %0 : $Builtin.Int1, %1 : $AnObject):
-  cond_br %0, bb1, bb2
+  cond_br %0, bb3, bb2
 
 bb1:
   %3 = tuple()
@@ -1262,6 +1262,9 @@ bb2:
   %32 = alloc_stack $AnObject
   dealloc_stack %32: $*AnObject
   dealloc_stack %31 : $*AnObject
+  br bb1
+
+bb3:
   br bb1
 }
 

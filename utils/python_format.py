@@ -45,6 +45,7 @@ _KNOWN_SCRIPT_PATHS = [
     _SWIFT_PATH / "utils/dev-scripts/split-cmdline",
     _SWIFT_PATH / "utils/gyb",
     _SWIFT_PATH / "utils/line-directive",
+    _SWIFT_PATH / "utils/PathSanitizingDiff",
     _SWIFT_PATH / "utils/PathSanitizingFileCheck",
     _SWIFT_PATH / "utils/recursive-lipo",
     _SWIFT_PATH / "utils/round-trip-syntax-test",

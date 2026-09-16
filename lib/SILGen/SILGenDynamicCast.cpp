@@ -16,7 +16,6 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "ExitableFullExpr.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -262,7 +261,7 @@ namespace {
       }
 
       ManagedValue result;
-      if (!origTargetTL.isAddressOnly() || !SGF.useLoweredAddresses()) {
+      if (origTargetTL.isLoadableOrOpaque(SGF.F)) {
         result = SGF.emitLoad(Loc, buffer, origTargetTL, ctx, IsTake);
       } else {
         result = SGF.emitManagedBufferWithCleanup(buffer, origTargetTL);
@@ -297,8 +296,8 @@ namespace {
 
   private:
     CastStrategy computeStrategy() const {
-      if (canSILUseScalarCheckedCastInstructions(SGF.SGM.M, SourceType,
-                                                 TargetType))
+      if (canSILUseScalarCheckedCastInstructions(
+              SGF.SGM.M, SGF.F.hasLoweredAddresses(), SourceType, TargetType))
         return CastStrategy::Scalar;
       return CastStrategy::Address;
     }
@@ -406,7 +405,8 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
   
   // Figure out if we need the value to be in a temporary.
   bool requiresAddress =
-    !canSILUseScalarCheckedCastInstructions(SGF.SGM.M, sourceType, targetType);
+    !canSILUseScalarCheckedCastInstructions(
+        SGF.SGM.M, SGF.F.hasLoweredAddresses(), sourceType, targetType);
   
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);
@@ -495,7 +495,7 @@ RValue Lowering::emitConditionalCheckedCast(
   SILValue resultObjectBuffer;
   std::optional<TemporaryInitialization> resultObjectTemp;
   SGFContext resultObjectCtx;
-  if ((resultTL.isAddressOnly() && SGF.useLoweredAddresses())
+  if (!resultTL.isLoadableOrOpaque(SGF.F)
       || (C.getEmitInto()
           && C.getEmitInto()->canPerformInPlaceInitialization())) {
     SILType resultTy = resultTL.getLoweredType();

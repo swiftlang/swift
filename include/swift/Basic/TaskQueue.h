@@ -15,13 +15,13 @@
 
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Program.h"
 
 #include <functional>
 #include <memory>
 #include <queue>
+#include "llvm/ADT/ArrayRef.h"
 
 #if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
 struct rusage;

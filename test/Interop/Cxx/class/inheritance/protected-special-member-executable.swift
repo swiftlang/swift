@@ -5,6 +5,7 @@
 // REQUIRES: rdar168302720
 // Fails on Windows：  https://github.com/swiftlang/swift/issues/67288
 // Fails on non-macOS: https://github.com/swiftlang/swift/issues/86426
+// Apparently, also fails on some macOS CI bots. 
 
 import StdlibUnittest
 import ProtectedSpecialMember

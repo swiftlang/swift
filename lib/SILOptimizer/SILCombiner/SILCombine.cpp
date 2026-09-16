@@ -25,7 +25,6 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -42,12 +41,10 @@
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include <set>
 
 using namespace swift;
 
@@ -238,8 +235,8 @@ bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
 
     LLVM_DEBUG(llvm::dbgs() << "Sink forwarding: " << *svi << '\n');
 
-    // Otherwise, delete all of the debug uses so we don't have to sink them as
-    // well and then return true so we process svi in its new position.
+    // Otherwise, salvage all of the debug uses so we don't have to sink them
+    // as well and then return true so we process svi in its new position.
     deleteAllDebugUses(svi, getInstModCallbacks());
     svi->moveBefore(consumingUser);
     MadeChange = true;
@@ -255,6 +252,9 @@ bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
   if (llvm::any_of(getNonDebugUses(svi),
                    [](Operand *use) { return !use->isLifetimeEnding(); }))
     return false;
+
+  // Salvage svi before sinking it.
+  salvageDebugInfo(svi);
 
   while (!svi->use_empty()) {
     auto *sviUse = *svi->use_begin();
@@ -736,11 +736,14 @@ void SwiftPassInvocation::eraseInstruction(SILInstruction *inst, bool salvageDeb
   if (silCombiner) {
     silCombiner->eraseInstFromFunction(*inst, /*addOperandsToWorklist=*/ true, salvageDebugInfo);
   } else {
-    if (salvageDebugInfo) {
-      swift::salvageDebugInfo(inst);
-    }
     if (inst->isStaticInitializerInst()) {
+      // Ignore salvageDebugInfo: Static initializers can't have debug values.
       inst->getParent()->erase(inst, *getPassManager()->getModule());
+    } else if (salvageDebugInfo) {
+      swift::salvageDebugInfo(inst);
+      // Erase debug instructions left behind by salvageDebugInfo.
+      // TODO: Change this back to eraseFromParent when salvageDebugInfo is complete.
+      swift::eraseFromParentWithDebugInsts(inst);
     } else {
       inst->eraseFromParent();
     }

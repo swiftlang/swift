@@ -29,6 +29,7 @@ struct DwarfReader {
 
     // CHECK: {{.*}}/Inlining is a {{32|64}}-bit ELF image
     // CHECK: Units:
+    // CHECK: Functions:
     // CHECK: Call Sites:
 
     if !testDwarfReaderFor(path: CommandLine.arguments[1]) {

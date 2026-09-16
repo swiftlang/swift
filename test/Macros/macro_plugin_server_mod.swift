@@ -43,7 +43,8 @@
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
 // RUN:   -module-name MyApp \
 // RUN:   %t/app.swift \
-// RUN:   2>&1 | tee %t/macro-expansions.txt
+// RUN:   2>&1 | grep "^[<-][->]" \
+// RUN:        | tee %t/macro-expansions.txt
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
 

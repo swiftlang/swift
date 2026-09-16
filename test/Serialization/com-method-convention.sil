@@ -1,0 +1,41 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -parse-stdlib -emit-sil -emit-sorted-sil -sil-verify-all -module-name COMConvention %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-sib -sil-verify-all -module-name COMConvention %s -o %t/COMConvention.sib
+// RUN: %target-swift-frontend -parse-stdlib -emit-sil -emit-sorted-sil -sil-verify-all -module-name COMConvention %t/COMConvention.sib | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -use-clang-function-types -emit-sil -emit-sorted-sil -sil-verify-all -module-name COMConvention %t/COMConvention.sib | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// Preserve the convention on a function definition and on a function value.
+// COM methods do not require a stored Clang function type.
+
+// CHECK-LABEL: sil @method : $@convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32 {
+// CHECK: return %0
+sil @method : $@convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32 {
+bb0(%value : $Builtin.Int32, %self : $Builtin.RawPointer):
+  return %value : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @reference : $@convention(thin) () -> @convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32 {
+// CHECK: [[METHOD:%.*]] = function_ref @method : $@convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32
+// CHECK: return [[METHOD]]
+sil @reference : $@convention(thin) () -> @convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32 {
+bb0:
+  %method = function_ref @method : $@convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32
+  return %method : $@convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32
+}
+
+// The SIL self argument remains last; moving it to the physical first argument
+// belongs to IRGen.
+// CHECK-LABEL: sil @use : $@convention(thin) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32 {
+// CHECK: [[METHOD:%.*]] = function_ref @method : $@convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32
+// CHECK: [[RESULT:%.*]] = apply [[METHOD]](%0, %1) : $@convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32
+// CHECK: return [[RESULT]]
+sil @use : $@convention(thin) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32 {
+bb0(%value : $Builtin.Int32, %self : $Builtin.RawPointer):
+  %method = function_ref @method : $@convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32
+  %result = apply %method(%value, %self) : $@convention(com_method) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32
+  return %result : $Builtin.Int32
+}

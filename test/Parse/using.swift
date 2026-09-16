@@ -18,26 +18,41 @@ using @inlinable
 // expected-error@-1 {{'@inlinable' is not valid in a 'using' declaration}}
 // expected-note@-2 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
 
-do { // expected-note 2 {{first non-import declaration here}}
+using @backDeployed(before: macOS 13.0)
+// expected-error@-1:8 {{'@backDeployed' is not valid in a 'using' declaration}}
+// expected-note@-2:8 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+
+using @backDeployed(before: macOS 13.0, iOS 16.0)
+// expected-error@-1:8 {{'@backDeployed' is not valid in a 'using' declaration}}
+// expected-note@-2:8 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+
+using @_originallyDefinedIn(module: "Other", macOS 13.0)
+// expected-error@-1:8 {{'@_originallyDefinedIn' is not valid in a 'using' declaration}}
+// expected-note@-2:8 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+
+using @_originallyDefinedIn(module: "Other", macOS 13.0, iOS 16.0)
+// expected-error@-1:8 {{'@_originallyDefinedIn' is not valid in a 'using' declaration}}
+// expected-note@-2:8 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
+
+do {
   using // expected-warning {{expression of type 'Int' is unused}}
   @MainActor
 // expected-error@+1 {{expected declaration}}
 }
 
-using @diagnose(StrictMemorySafety, as: error) // expected-error {{'using' must appear before any non-import declaration}}
+using @diagnose(StrictMemorySafety, as: error)
 
 // We have a tailored diagnostic for global actors that aren't MainActor.
 @globalActor
-actor MyActor {
+actor MyActor { // expected-note@:7 {{'MyActor' declared here}}
   static let shared = MyActor()
   using @MyActor
   // expected-error@-1:3 {{declaration is only valid at file scope}}
   // TODO: we don't diagnose nested 'using' misuse since the request doesn't see it.
 }
 
-using @MyActor // expected-error {{'using' must appear before any non-import declaration}}
-// expected-error@-1:7 {{global actor 'MyActor' is not valid in a 'using' declaration}}
-// expected-note@-2:7 {{file-level default isolation must be '@MainActor' or 'nonisolated'}}
+using @MyActor // expected-error@:7 {{global actor 'MyActor' is not valid in a 'using' declaration}}
+// expected-note@-1:7 {{file-level default isolation must be '@MainActor' or 'nonisolated'}}
 
 do {
   using // expected-warning {{expression of type 'Int' is unused}}

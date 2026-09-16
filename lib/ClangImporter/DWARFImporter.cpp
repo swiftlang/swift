@@ -13,7 +13,6 @@
 #include "ImporterImpl.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

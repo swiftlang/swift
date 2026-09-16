@@ -45,7 +45,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -55,7 +54,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
-#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -166,7 +164,8 @@ getPartialApplyOfDynamicMethodFormalType(SILGenModule &SGM, SILDeclRef member,
   auto extInfo = completeMethodTy->getExtInfo()
                    .withRepresentation(FunctionTypeRepresentation::Swift);
 
-  auto fnType = CanFunctionType::get(params, resultType, extInfo);
+  auto fnType = CanFunctionType::get(params, completeMethodTy.getYields(),
+                                     resultType, extInfo);
   return fnType;
 }
 
@@ -443,6 +442,29 @@ private:
             getSubstFormalInterfaceType(substFormalType, subs)),
         Substitutions(subs), Loc(l) {}
 
+  /// Only opened COM existentials dispatch through the foreign interface.
+  /// Generic receivers continue to use Swift witness tables.
+  bool isCOMExistentialMethod() const {
+    if (kind != Kind::WitnessMethod)
+      return false;
+
+    auto *proto = cast<ProtocolDecl>(Constant.getDecl()->getDeclContext());
+    auto selfType = proto->getSelfInterfaceType()->getCanonicalType();
+    return proto->isCOMInterface() &&
+           selfType.subst(Substitutions)->is<ExistentialArchetypeType>();
+  }
+
+  SILType getWitnessMethodType(SILType type) const {
+    ASSERT(kind == Kind::WitnessMethod);
+    if (!isCOMExistentialMethod())
+      return type;
+
+    auto FTy = Lowering::adjustFunctionType(
+        type.castTo<SILFunctionType>(),
+        SILFunctionTypeRepresentation::COMMethod, ProtocolConformanceRef());
+    return SILType::getPrimitiveObjectType(FTy);
+  }
+
 public:
 
   static Callee forIndirect(ManagedValue indirectValue,
@@ -608,7 +630,7 @@ public:
     case Kind::WitnessMethod:
       if (Constant.isForeign)
         return true;
-      return false;
+      return isCOMExistentialMethod();
     case Kind::ClassMethod:
     case Kind::SuperMethod:
     case Kind::DynamicMethod:
@@ -737,7 +759,11 @@ public:
       ArgumentScope S(SGF, Loc);
 
       SILValue fn;
-      if (!constant->isForeign) {
+      if (isCOMExistentialMethod()) {
+        auto SILTy = constantInfo.getSILType();
+        fn = SGF.B.createCOMMethod(Loc, borrowedSelf->getValue(), *constant,
+                                   getWitnessMethodType(SILTy));
+      } else if (!constant->isForeign) {
         fn = SGF.B.createWitnessMethod(
           Loc, lookupType, conformance, *constant,
           constantInfo.getSILType());
@@ -815,7 +841,8 @@ public:
 
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
-      return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
+      return createCalleeTypeInfo(
+          SGF, constant, getWitnessMethodType(constantInfo.getSILType()));
     }
     case Kind::DynamicMethod: {
       auto formalType = getDynamicMethodLoweredType(
@@ -1869,8 +1896,9 @@ public:
       auto substSelfType = dynamicMemberRef->getBase()->getType()->getCanonicalType();
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      substFormalType = CanFunctionType::get(
-          {AnyFunctionType::Param(substSelfType)}, substFormalType, info);
+      substFormalType =
+          CanFunctionType::get({AnyFunctionType::Param(substSelfType)},
+                               /* yields */ {}, substFormalType, info);
 
       setCallee(Callee::forDynamic(SGF, member,
                                    memberRef.getSubstitutions(),
@@ -1981,8 +2009,8 @@ static void emitRawApply(SILGenFunction &SGF,
   if (subs && subs.getGenericSignature()->areAllParamsConcrete())
     subs = SubstitutionMap();
 
-  SILFunctionConventions substFnConv(substFnType, SGF.SGM.M);
-  // Get the callee value.
+  SILFunctionConventions substFnConv(
+      substFnType, SILAddressConventions::forFunction(SGF.F));
   bool isConsumed = substFnType->isCalleeConsumed();
   bool isUnowned = substFnType->isCalleeUnowned();
   SILValue fnValue =
@@ -3549,6 +3577,43 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow(SILModule &M) && {
   return lvExpr;
 }
 
+/// Whether every reference `expr` goes through is strong, so that a dependence
+/// on storage interior to the referent can be rooted in something that outlives
+/// it.
+///
+/// Weak and unowned references don't keep an instance alive, so they break
+/// the strong chain.
+static bool hasStrongReferenceChain(Expr *expr) {
+  auto isStrong = [](ConcreteDeclRef declRef) -> VarDecl * {
+    auto *vd = dyn_cast_or_null<VarDecl>(declRef.getDecl());
+    if (!vd)
+      return nullptr;
+    if (auto *attr = vd->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+      if (attr->get() != ReferenceOwnership::Strong)
+        return nullptr;
+    }
+    return vd;
+  };
+
+  expr = expr->getSemanticsProvidingExpr();
+  if (auto *load = dyn_cast<LoadExpr>(expr))
+    return hasStrongReferenceChain(load->getSubExpr());
+  if (auto *force = dyn_cast<ForceValueExpr>(expr))
+    return hasStrongReferenceChain(force->getSubExpr());
+  if (auto *bind = dyn_cast<BindOptionalExpr>(expr))
+    return hasStrongReferenceChain(bind->getSubExpr());
+  if (auto *optEval = dyn_cast<OptionalEvaluationExpr>(expr))
+    return hasStrongReferenceChain(optEval->getSubExpr());
+  if (auto *dre = dyn_cast<DeclRefExpr>(expr))
+    return isStrong(dre->getDeclRef()) != nullptr;
+  if (auto *mre = dyn_cast<MemberRefExpr>(expr)) {
+    if (!isStrong(mre->getMember()))
+      return false;
+    return hasStrongReferenceChain(mre->getBase());
+  }
+  return false;
+}
+
 ManagedValue
 SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
                                                      ValueOwnership ownership) {
@@ -3655,13 +3720,14 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
   switch (strategy.getKind()) {
   case AccessStrategy::Storage: {
     auto vd = cast<VarDecl>(memberStorage);
-    // TODO: Is it possible and/or useful for class storage to be
-    // addressable?
-    if (!vd->isInstanceMember()
-        || !isa<StructDecl>(vd->getDeclContext())) {
+    if (!vd->isInstanceMember()) {
       return notAddressable();
     }
-  
+    auto *declContext = vd->getDeclContext();
+    if (!isa<StructDecl>(declContext) && !isa<ClassDecl>(declContext)) {
+      return notAddressable();
+    }
+
     // If the storage holds the fully-abstracted representation of the
     // type, then we can use its address.
     auto absBaseTy = getLoweredType(AbstractionPattern::getOpaque(),
@@ -3669,23 +3735,42 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     auto memberTy = absBaseTy.getFieldType(vd, &F);
     auto absMemberTy = getLoweredType(AbstractionPattern::getOpaque(),
                             lookupExpr->getType()->getWithoutSpecifierType());
-    
+
     if (memberTy.getAddressType() != absMemberTy.getAddressType()) {
       // The storage is not fully abstracted, so it can't serve as a
       // stable address.
       return notAddressable();
     }
-    
+
+    if (isa<ClassDecl>(declContext)) {
+      // A class instance holds its stored properties at a stable address for as
+      // long as the instance is alive, so unlike a struct the base does not
+      // itself have to be addressable. We only need to make sure that the
+      // instance stays alive.
+      //
+      // This only makes sense for a 'let' field, because it cannot be modified.
+      if (!vd->isLet() || accessKind != AccessKind::Read
+          || !hasStrongReferenceChain(lookupExpr->getBase())) {
+        return notAddressable();
+      }
+      // Project the field as an l-value: RefElementComponent borrows the
+      // instance using formal access, so that borrow outlives the call this
+      // address is passed to.
+      LValue lv = emitLValue(lookupExpr, SGFAccessKind::BorrowedAddressRead);
+      auto fieldAddr = emitAddressOfLValue(lookupExpr, std::move(lv));
+      return ManagedValue::forBorrowedAddressRValue(fieldAddr.getValue());
+    }
+
     // Otherwise, we can project the field address from the stable address
     // of the base, if it has one. Try to get the stable address for the
     // base.
     auto baseAddr = tryEmitAddressableParameterAsAddress(
       ArgumentSource(lookupExpr->getBase()), ownership);
-      
+
     if (!baseAddr) {
       return notAddressable();
     }
-    
+
     // Project the field's address.
     auto fieldAddr = B.createStructElementAddr(lookupExpr,
                                                baseAddr.getValue(), vd);
@@ -3894,6 +3979,12 @@ private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType,
             bool isAddressable,
             std::optional<AnyFunctionType::Param> origParam = std::nullopt) {
+    // An @in_cxx argument is consumed, so it cannot borrow a variable's storage
+    // in place; materialize a temporary the caller destroys instead.
+    if (isAddressable && ParamInfos.front().getConvention() ==
+                             ParameterConvention::Indirect_In_CXX)
+      isAddressable = false;
+
     if (isAddressable) {
       // If the function takes an addressable parameter, and its argument is
       // a reference to an addressable declaration with compatible ownership,
@@ -3917,7 +4008,12 @@ private:
     if (!arg.hasLValueType()) {
       // If the unsubstituted function type has a parameter of tuple type,
       // explode the tuple value.
-      if (origParamType.isTuple()) {
+      //
+      // However, a C++ reference to an aggregate imported as a tuple is passed
+      // as a single indirect value rather than exploded into its elements.
+      bool isClangReference = origParamType.isClangType() &&
+                              origParamType.getClangType()->isReferenceType();
+      if (origParamType.isTuple() && !isClangReference) {
         emitExpanded(std::move(arg), origParamType);
         return;
       }
@@ -5144,7 +5240,8 @@ struct ParamLowering {
 
   ParamLowering(CanSILFunctionType fnType, SILGenFunction &SGF)
       : Params(fnType->getUnsubstitutedType(SGF.SGM.M)->getParameters()),
-        Rep(fnType->getRepresentation()), fnConv(fnType, SGF.SGM.M),
+        Rep(fnType->getRepresentation()),
+        fnConv(fnType, SILAddressConventions::forFunction(SGF.F)),
         typeExpansionContext(SGF.getTypeExpansionContext()) {}
 
   ClaimedParamsRef claimParams(AbstractionPattern origFormalType,
@@ -5613,8 +5710,32 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
   // begin_borrow instructions added for move-only self argument.
   if (selfArgMV.getValue()->getType().isMoveOnly() &&
       selfArgMV.getValue()->getType().isObject()) {
-    uncurriedArgs.back() = ManagedValue::forBorrowedObjectRValue(
+    selfArgMV = ManagedValue::forBorrowedObjectRValue(
         lookThroughMoveOnlyCheckerPattern(selfArgMV.getValue()));
+  }
+
+  // Under opaque values, a borrow accessor's @in_guaranteed self is lowered to a
+  // by-value object, but the base here can still be an address, e.g. the
+  // begin_access of an inout base. Load it so the argument matches the callee's
+  // self convention.
+  //
+  // This keys off the callee's lowered self type rather than the accessor kind.
+  // A mutating mutate accessor takes @inout self, and Indirect_Inout is an
+  // address in every mode: isIndirectSILParam returns true for it without
+  // consulting loweredAddresses. Such a base is passed through untouched and
+  // stays mutable at the call site. Self is loaded only when it is genuinely
+  // by-value: a borrow accessor, or a mutate accessor whose self isn't inout
+  // (on a class, or an explicit 'nonmutating mutate').
+  if (!SGF.silConv.useLoweredAddresses() && selfArgMV.getType().isAddress()) {
+    SILFunctionConventions substConv(calleeTypeInfo.substFnType,
+                                     SILAddressConventions::forFunction(SGF.F));
+    auto selfParamTy = substConv.getSILType(
+        calleeTypeInfo.substFnType->getSelfParameter(),
+        SGF.getTypeExpansionContext());
+    if (selfParamTy.isObject()) {
+      selfArgMV =
+          SGF.emitManagedLoadBorrow(uncurriedLoc.value(), selfArgMV.getValue());
+    }
   }
 
   if (fnValue.getFunction()->getConventions().hasGuaranteedResult()) {
@@ -5622,12 +5743,15 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
       // unchecked_ownership is used to silence the ownership verifier for
       // returning a value produced within a load_borrow scope. SILGenCleanup
       // eliminates it and introduces return_borrow appropriately.
-      uncurriedArgs.back() =
+      selfArgMV =
           ManagedValue::forForwardedRValue(
               SGF, SGF.B.createUncheckedOwnership(uncurriedLoc.value(),
                                                   selfArgMV.getValue()));
     }
   }
+
+  // Write-back the self arg.
+  uncurriedArgs.back() = selfArgMV;
 
   auto value = SGF.applyBorrowMutateAccessor(
       uncurriedLoc.value(), fnValue, callee.getSubstitutions(),
@@ -5651,7 +5775,8 @@ ManagedValue SILGenFunction::applyBorrowMutateAccessor(
 
   if (rawResult->getType().isMoveOnly()) {
     if (rawResult->getType().isAddress()) {
-      SILFunctionConventions substFnConv(substFnType, SGM.M);
+      SILFunctionConventions substFnConv(
+          substFnType, SILAddressConventions::forFunction(F));
       auto result = B.createMarkUnresolvedNonCopyableValueInst(
           loc, rawResult,
           substFnConv.hasInoutResult()
@@ -5856,7 +5981,8 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   std::optional<ArgumentScope> argScope;
   std::optional<CalleeTypeInfo> calleeTypeInfo;
   SILLocation loc = callSite->Loc;
-  SILFunctionConventions substConv(substFnType, SGF.SGM.M);
+  SILFunctionConventions substConv(
+      substFnType, SILAddressConventions::forFunction(SGF.F));
 
   // If we have a named builtin and have an indirect out parameter, compute a
   // result plan/arg scope before we prepare arguments.
@@ -5924,6 +6050,10 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   if (builtinName.is(getBuiltinName(BuiltinValueKind::AddTaskLocalValue))) {
     SGF.addEmissionFinalizer([rawResult](SILGenFunction &SGF) {
       SGF.finalizeAddTaskLocalValue(rawResult);
+    });
+  } else if (builtinName.is(getBuiltinName(BuiltinValueKind::TaskPushDeadline))) {
+    SGF.addEmissionFinalizer([rawResult](SILGenFunction &SGF) {
+      SGF.finalizeTaskPushDeadline(rawResult);
     });
   }
 
@@ -6399,7 +6529,8 @@ RValue SILGenFunction::emitApply(
     loc.markAutoGenerated();
 
   // Explode the direct results.
-  SILFunctionConventions substFnConv(substFnType, SGM.M);
+  SILFunctionConventions substFnConv(
+      substFnType, SILAddressConventions::forFunction(F));
   SmallVector<ManagedValue, 4> directResults;
   auto addManagedDirectResult = [&](SILValue result,
                                     const SILResultInfo &resultInfo) {
@@ -6539,7 +6670,8 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
     subs = SubstitutionMap();
 
   CanSILFunctionType silFnType = substFnType.castTo<SILFunctionType>();
-  SILFunctionConventions fnConv(silFnType, SGM.M);
+  SILFunctionConventions fnConv(silFnType,
+                                SILAddressConventions::forFunction(F));
   SILType resultType = fnConv.getSILResultType(getTypeExpansionContext());
   if (!silFnType->hasErrorResult()) {
     return B.createApply(loc, fn, subs, args);
@@ -6554,6 +6686,12 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
     // can end up here. Since the callee cannot actually throw, emit
     // an unreachable in the error branch.
     ASSERT(silFnType->getErrorResult().getInterfaceType()->isNever());
+    // If direct, the block still needs to have a dummy Never error arg.
+    if (!fnConv.hasIndirectSILErrorResults()) {
+      errorBB->createPhiArgument(
+          fnConv.getSILErrorType(getTypeExpansionContext()),
+          OwnershipKind::Owned);
+    }
     B.emitBlock(errorBB);
     B.createUnreachable(loc);
   } else {
@@ -6899,7 +7037,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   // Easy case -- no payload
   if (!element->hasAssociatedValues()) {
     assert(payloads.empty());
-    if (enumTy.isLoadable(F) || !silConv.useLoweredAddresses()) {
+    if (enumTy.isLoadableOrOpaque(F)) {
       return emitManagedRValueWithCleanup(
           B.createEnum(loc, SILValue(), element, enumTy.getObjectType()));
     }
@@ -6951,7 +7089,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   }
 
   // Loadable with payload
-  if (enumTy.isLoadable(F) || !silConv.useLoweredAddresses()) {
+  if (enumTy.isLoadableOrOpaque(F)) {
     ManagedValue payloadMV;
     if (boxMV) {
       payloadMV = boxMV;
@@ -7024,6 +7162,16 @@ RValue SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                                    SubstitutionMap subMap,
                                                    ArrayRef<ManagedValue> args,
                                                    SGFContext ctx) {
+  for (auto conf : subMap.getConformances()) {
+    if (conf.isInvalid()) {
+      ABORT([&](llvm::raw_ostream &out) {
+        out << "Invalid conformance in substitution map for call to ";
+        out << declRef << ":\n";
+        subMap.dump(out);
+      });
+    }
+  }
+
   // Calls into library intrinsics are implicitly generated by the compiler.
   // Marking them as explicit creates a backtrace pointing back to the user code
   // that the intrinsic call was generated from.
@@ -7049,7 +7197,8 @@ RValue SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   calleeTypeInfo.origResultType = origFormalType.getFunctionResultType();
   calleeTypeInfo.substResultType = substFormalType.getResult();
 
-  SILFunctionConventions silConv(calleeTypeInfo.substFnType, getModule());
+  SILFunctionConventions silConv(calleeTypeInfo.substFnType,
+                                 SILAddressConventions::forFunction(F));
   llvm::SmallVector<ManagedValue, 8> finalArgs;
   convertOwnershipConventionsGivenParamInfos(
       *this, silConv.getParameters(), args, loc,
@@ -7733,22 +7882,52 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
 
 static void collectFakeIndexParameters(SILGenFunction &SGF,
                                        CanType substType,
+                                       ValueOwnership ownership,
                                     SmallVectorImpl<SILParameterInfo> &params) {
-  if (auto tuple = dyn_cast<TupleType>(substType)) {
-    for (auto substEltType : tuple.getElementTypes())
-      collectFakeIndexParameters(SGF, substEltType, params);
-    return;
+  // An `inout` index is passed as a single address, even if its type is a
+  // tuple, so it must not be destructured into one parameter per element.
+  if (ownership != ValueOwnership::InOut) {
+    if (auto tuple = dyn_cast<TupleType>(substType)) {
+      for (auto substEltType : tuple.getElementTypes())
+        collectFakeIndexParameters(SGF, substEltType, ownership, params);
+      return;
+    }
   }
 
-  // Use conventions that will produce a +1 value.
   auto &tl = SGF.getTypeLowering(substType);
   ParameterConvention convention;
-  if (tl.isAddressOnly()) {
-    convention = ParameterConvention::Indirect_In;
-  } else if (tl.isTrivial()) {
-    convention = ParameterConvention::Direct_Unowned;
-  } else {
-    convention = ParameterConvention::Direct_Owned;
+
+  switch (ownership) {
+  case ValueOwnership::InOut:
+    // An `inout` index is a single exclusive access that spans the whole formal
+    // access on the storage.
+    convention = ParameterConvention::Indirect_Inout;
+    break;
+
+  case ValueOwnership::Shared:
+    // A `borrowing` index is borrowed for the whole formal access on the
+    // storage.
+    if (tl.getRecursiveProperties().isAddressOnly()) {
+      convention = ParameterConvention::Indirect_In_Guaranteed;
+    } else if (tl.isTrivial()) {
+      convention = ParameterConvention::Direct_Unowned;
+    } else {
+      convention = ParameterConvention::Direct_Guaranteed;
+    }
+    break;
+
+  case ValueOwnership::Default:
+  case ValueOwnership::Owned:
+    // Use conventions that will produce a +1 value, which the storage
+    // component then copies for each accessor it runs.
+    if (tl.getRecursiveProperties().isAddressOnly()) {
+      convention = ParameterConvention::Indirect_In;
+    } else if (tl.isTrivial()) {
+      convention = ParameterConvention::Direct_Unowned;
+    } else {
+      convention = ParameterConvention::Direct_Owned;
+    }
+    break;
   }
 
   params.push_back(SILParameterInfo{tl.getLoweredType().getASTType(),
@@ -7766,7 +7945,8 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
   SmallVector<SILParameterInfo, 4> substParamTys;
   for (auto substParam : substParams) {
     auto substParamType = substParam.getParameterType()->getCanonicalType();
-    collectFakeIndexParameters(SGF, substParamType, substParamTys);
+    collectFakeIndexParameters(SGF, substParamType,
+                               substParam.getValueOwnership(), substParamTys);
   }
 
   SmallVector<ManagedValue, 4> argValues;
@@ -7833,6 +8013,21 @@ PreparedArguments SILGenFunction::prepareIndices(SILLocation loc,
   ArrayRef<ManagedValue> remainingArgs = argValues;
   for (auto i : indices(substParams)) {
     auto substParamType = substParams[i].getParameterType()->getCanonicalType();
+
+    // An `inout` index is a single exclusive access on the argument, which the
+    // emission above has already opened.
+    if (substParams[i].isInOut()) {
+      auto address = remainingArgs.front();
+      remainingArgs = remainingArgs.slice(1);
+      result.addArbitrary(ArgumentSource(
+          argList->getExpr(i),
+          LValue::forAddress(SGFAccessKind::ReadWrite, address,
+                             /*enforcement=*/std::nullopt,
+                             AbstractionPattern(substParamType),
+                             substParamType)));
+      continue;
+    }
+
     auto count = RValue::getRValueSize(substParamType);
     RValue elt(*this, remainingArgs.slice(0, count), substParamType);
     result.add(argList->getExpr(i), std::move(elt));
@@ -7924,6 +8119,12 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
 
   if (!subscriptIndices.isNull()) {
     for (auto &component : std::move(subscriptIndices).getSources()) {
+      // An `inout` index is carried as an l-value referring to an access that
+      // has already been opened for the whole formal access on the storage.
+      if (component.isLValue()) {
+        values.addArbitrary(std::move(component));
+        continue;
+      }
       auto argLoc = component.getKnownRValueLocation();
       RValue &&arg = std::move(component).asKnownRValue(*this);
       values.add(argLoc, std::move(arg));
@@ -8404,7 +8605,7 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
     if (isa<VarDecl>(memberRef.getDecl())) {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      methodTy = CanFunctionType::get({}, valueTy, info);
+      methodTy = CanFunctionType::get({}, {}, valueTy, info);
     } else {
       methodTy = cast<FunctionType>(valueTy);
     }
@@ -8418,7 +8619,8 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo info;
     FunctionType::Param arg(operand->getType().getASTType());
-    auto memberFnTy = CanFunctionType::get({arg}, methodTy, info);
+    auto memberFnTy =
+        CanFunctionType::get({arg}, /* yields */ {}, methodTy, info);
 
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        memberFnTy);
@@ -8509,15 +8711,16 @@ SILGenFunction::emitDynamicSubscriptGetterApply(SILLocation loc,
 
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo methodInfo;
-    const auto methodTy =
-        CanFunctionType::get(indexArgs.getParams(), valueTy, methodInfo);
+    const auto methodTy = CanFunctionType::get(
+        indexArgs.getParams(), /* yields */ {}, valueTy, methodInfo);
     auto foreignMethodTy =
         getPartialApplyOfDynamicMethodFormalType(SGM, member, subscriptRef);
 
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo functionInfo;
     FunctionType::Param baseArg(operand->getType().getASTType());
-    auto functionTy = CanFunctionType::get({baseArg}, methodTy, functionInfo);
+    auto functionTy = CanFunctionType::get({baseArg}, /* yields */ {}, methodTy,
+                                           functionInfo);
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        functionTy);
     SILValue memberArg =

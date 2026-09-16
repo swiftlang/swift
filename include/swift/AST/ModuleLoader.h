@@ -283,9 +283,17 @@ public:
   ///
   /// If a non-null \p versionInfo is provided, the module version will be
   /// parsed and populated.
+  ///
+  /// HACK: \p isSourceCanImport is true only for the canonical source query (a
+  /// real import or a source `#if canImport`), which may emit diagnostics and
+  /// record the resolved version. Other queries intend to be side-effect-free
+  /// and must pass false. A diagnostic counts as a side effect here: we can
+  /// query `canImport` while discovering regions for `@diagnose`, so emitting
+  /// one leads to a cycle.
   virtual bool canImportModule(ImportPath::Module named, SourceLoc loc,
                                ModuleVersionInfo *versionInfo,
-                               bool isTestableImport = false) = 0;
+                               bool isTestableImport,
+                               bool isSourceCanImport) = 0;
 
   /// Import a module with the given module path.
   ///

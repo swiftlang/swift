@@ -160,8 +160,9 @@ where to stop in the debugger. Rather than trying to guess/check if one has an
 asserts swift compiler, one can use the following options to cause the
 diagnostic engine to assert on the first error/warning:
 
-* `-Xllvm -swift-diagnostics-assert-on-error=1`
-* `-Xllvm -swift-diagnostics-assert-on-warning=1`
+* `-diagnostics-assert-on-error`
+* `-diagnostics-assert-on-warning`
+* `-diagnostics-assert-on-group <diagnostic group name>`
 
 These allow one to dump a stack trace of where the diagnostic is being emitted
 (if run without a debugger) or drop into the debugger if a debugger is attached.
@@ -305,6 +306,17 @@ A short (non-exhaustive) list of SIL printing options:
 
 NOTE: This may emit a lot of text to stderr, so be sure to pipe the
 output to a file.
+
+* `-Xllvm -sil-view-dom=<pass_count>`: Open a graphical view of the dominator
+  tree for the function at the given pass count. The graph shows the full
+  contents of each basic block.
+
+* `-Xllvm -sil-view-dom-only=<pass_count>`: Like `-sil-view-dom`, but the
+  graph shows only basic block labels without their contents.
+
+  NOTE: These flags use `llvm::ViewGraph`, which on macOS relies on the
+  `open` program. `.dot` files must be associated with a dot viewer such as
+  Graphviz for the graph to display.
 
 ### Getting CommandLine for swift stdlib from Ninja to enable dumping stdlib SIL
 
@@ -1485,4 +1497,3 @@ or from `xcodebuild`:
 ```sh
 xcodebuild <other options> OTHER_SWIFT_FLAGS='$(inherited) -stats-output-dir /tmp/subdir'
 ```
-

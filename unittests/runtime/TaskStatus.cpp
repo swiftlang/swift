@@ -89,7 +89,7 @@ static SerialExecutorRef createFakeExecutor(uintptr_t value) {
 
 TEST(TaskStatusTest, basicTasks) {
   AsyncTask *createdTask = nullptr;
-  auto createdExecutor = createFakeExecutor(1234);
+  auto createdExecutor = createFakeExecutor(1024);
   bool hasRun = false;
 
   struct Storage { int value; };
@@ -134,6 +134,6 @@ TEST(TaskStatusTest, cancellation_simple) {
     swift_task_cancel(task);
     EXPECT_TRUE(swift_task_isCancelled(task));
   }, [&](AsyncTask *task) {
-    swift_job_run(task, createFakeExecutor(1234));
+    swift_job_run(task, createFakeExecutor(1024));
   });
 }

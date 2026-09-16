@@ -19,7 +19,6 @@
 
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
-#include "swift/Basic/Assertions.h"
 using namespace swift;
 using namespace Lowering;
 
@@ -108,7 +107,7 @@ ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &SGF,
 void ManagedValue::copyInto(SILGenFunction &SGF, SILLocation loc,
                             SILValue dest) {
   auto &lowering = SGF.getTypeLowering(getType());
-  if (lowering.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
+  if (!lowering.isLoadableOrOpaque(SGF.F)) {
     SGF.B.createCopyAddr(loc, getValue(), dest, IsNotTake, IsInitialization);
     return;
   }

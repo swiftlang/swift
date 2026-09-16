@@ -377,7 +377,7 @@ internal func ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(
   _ elementType: Any.Type
 ) -> Never {
   _assertionFailure(
-    "Fatal error",
+    kind: .fatal(),
     """
     Duplicate elements of type '\(elementType)' were found in a Set.
     This usually means either that the type violates Hashable's requirements, or

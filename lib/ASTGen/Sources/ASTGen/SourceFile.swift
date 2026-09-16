@@ -72,7 +72,7 @@ public struct ExportedSourceFile {
   }
 }
 
-extension Parser.ExperimentalFeatures {
+extension Parser.LanguageFeatures {
   init(from context: BridgedASTContext?) {
     self = []
     guard let context = context else { return }
@@ -94,6 +94,8 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.DefaultIsolationPerFile, to: .defaultIsolationPerFile)
     mapFeature(.BorrowAndMutateAccessors, to: .borrowAndMutateAccessors)
     mapFeature(.LiteralExpressions, to: .literalExpressions)
+    mapFeature(.CalledAttribute, to: .calledAttribute)
+    mapFeature(.CoroutineFunctions, to: .coroutineFunctions)
   }
 }
 
@@ -128,7 +130,7 @@ public func parseSourceFile(
   var parser = Parser(
     buffer,
     swiftVersion: Parser.SwiftVersion(from: ctx),
-    experimentalFeatures: Parser.ExperimentalFeatures(from: ctx)
+    languageFeatures: Parser.LanguageFeatures(from: ctx)
   )
 
   let parsed: Syntax

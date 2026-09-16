@@ -74,6 +74,7 @@ namespace swift {
   constexpr size_t ExprAlignInBits = 3;
   constexpr size_t StmtAlignInBits = 3;
   constexpr size_t TypeAlignInBits = 3;
+  constexpr size_t ConformanceAlignInBits = 3;
   constexpr size_t PatternAlignInBits = 3;
   constexpr size_t TypeReprAlignInBits = 3;
 

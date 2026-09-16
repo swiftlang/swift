@@ -13,8 +13,8 @@ import Foundation
 
 // ThisModule -weak imports-> intermediate_foundation -imports-> Foundation
 // Because Foundation is _not_ re-exported, make sure any symbols from it are strongly referenced.
-// CAUTION: Suppose you _want_ Foundation to be weak-linked. It's not enough to just `@_exported import Foundation`
-//          in the intermediate_foundation module. That only gets you the Swift half of the Foundation overlay.
+// If you _want_ Foundation to be weak-linked, write `@_exported import Foundation` in the
+// intermediate_foundation module. That covers both halves of the Foundation overlay.
 
 // CHECK-DAG: @"OBJC_CLASS_$_NSNotification" = external global %objc_class
 _ = NSNotification()

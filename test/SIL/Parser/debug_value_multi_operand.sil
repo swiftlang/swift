@@ -1,0 +1,21 @@
+// RUN: %target-sil-opt -sil-print-types %s | %target-sil-opt -sil-print-types | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil @test_multi_operand_transform :
+sil @test_multi_operand_transform : $@convention(thin) (Builtin.Int64, Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int32):
+  // CHECK: debug_value (%0 : $Builtin.Int64, %1 : $Builtin.Int32), let, name "combined", transform {
+  // CHECK:   bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int32):
+  // CHECK:     return %0 : $Builtin.Int64
+  // CHECK:   }
+  debug_value (%0 : $Builtin.Int64, %1 : $Builtin.Int32), let, name "combined", transform {
+  bb0(%a : $Builtin.Int64, %b : $Builtin.Int32):
+    return %a : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+// CHECK: } // end sil function 'test_multi_operand_transform'

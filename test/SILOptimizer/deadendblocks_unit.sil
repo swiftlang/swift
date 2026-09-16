@@ -54,7 +54,7 @@ bb2:
 }
 
 // CHECK-LABEL: Function complex_cfg
-// CHECK:       [bb7,bb8,bb9]
+// CHECK:       [bb7,bb8,bb9,bb10]
 // CHECK:       end function complex_cfg
 sil @complex_cfg : $@convention(thin) () -> ((), @error any Error) {
 bb0:
@@ -77,8 +77,10 @@ bb6:
 bb7:
   br bb8
 bb8:
-  cond_br undef, bb8, bb9
+  cond_br undef, bb10, bb9
 bb9:
   unreachable
+bb10:
+  br bb8
 }
 

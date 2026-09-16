@@ -1,0 +1,182 @@
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
+
+// A loadable single-payload enum whose payload is a single retainable pointer
+// (a bare class/AnyObject/NativeObject, or a nested optional already lowered
+// this way) is lowered to `ptr` in LLVM IR, rather than a pointer-width
+// integer. This holds for arbitrarily nested optionals and for custom enums
+// with more than one no-payload case, as long as every empty case fits in one
+// of the payload's low, invalid-pointer extra inhabitants.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class C {}
+sil_vtable C {}
+
+// A single-level Optional<class> is `ptr`.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_optional_class(ptr %0)
+sil @take_optional_class : $@convention(thin) (@guaranteed Optional<C>) -> @owned Optional<C> {
+bb0(%0 : $Optional<C>):
+  retain_value %0 : $Optional<C>
+  return %0 : $Optional<C>
+}
+
+// Optional<AnyObject> is `ptr`.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_optional_anyobject(ptr %0)
+sil @take_optional_anyobject : $@convention(thin) (@guaranteed Optional<AnyObject>) -> @owned Optional<AnyObject> {
+bb0(%0 : $Optional<AnyObject>):
+  retain_value %0 : $Optional<AnyObject>
+  return %0 : $Optional<AnyObject>
+}
+
+// Optional<Builtin.NativeObject> is `ptr`.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_optional_nativeobject(ptr %0)
+sil @take_optional_nativeobject : $@convention(thin) (@guaranteed Optional<Builtin.NativeObject>) -> @owned Optional<Builtin.NativeObject> {
+bb0(%0 : $Optional<Builtin.NativeObject>):
+  retain_value %0 : $Optional<Builtin.NativeObject>
+  return %0 : $Optional<Builtin.NativeObject>
+}
+
+// The empty case is exactly the null pointer.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @make_none()
+// CHECK: ret ptr null
+sil @make_none : $@convention(thin) () -> @owned Optional<C> {
+bb0:
+  %0 = enum $Optional<C>, #Optional.none!enumelt
+  return %0 : $Optional<C>
+}
+
+// A switch over the optional tests the pointer directly against null.
+// CHECK-LABEL: define{{.*}} swiftcc void @switch_optional_class(ptr %0)
+// CHECK: icmp eq ptr %0, null
+sil @switch_optional_class : $@convention(thin) (@guaranteed Optional<C>) -> () {
+bb0(%0 : $Optional<C>):
+  switch_enum %0 : $Optional<C>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%1 : $C):
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// A nested optional is also a single pointer: the outer `.none` occupies a
+// non-null low extra inhabitant of the payload, and `.some(.none)` is null.
+// Only valid pointers are ever dereferenced, so the sentinels ride along in a
+// `ptr`.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_nested_optional(ptr %0)
+sil @take_nested_optional : $@convention(thin) (@guaranteed Optional<Optional<C>>) -> @owned Optional<Optional<C>> {
+bb0(%0 : $Optional<Optional<C>>):
+  retain_value %0 : $Optional<Optional<C>>
+  return %0 : $Optional<Optional<C>>
+}
+
+// A triply-nested optional stays a single pointer too.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_triple_nested_optional(ptr %0)
+sil @take_triple_nested_optional : $@convention(thin) (@guaranteed Optional<Optional<Optional<C>>>) -> @owned Optional<Optional<Optional<C>>> {
+bb0(%0 : $Optional<Optional<Optional<C>>>):
+  retain_value %0 : $Optional<Optional<Optional<C>>>
+  return %0 : $Optional<Optional<Optional<C>>>
+}
+
+// `.some(.none)` of a nested optional is the null pointer.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @make_some_none()
+// CHECK: ret ptr null
+sil @make_some_none : $@convention(thin) () -> @owned Optional<Optional<C>> {
+bb0:
+  %0 = enum $Optional<C>, #Optional.none!enumelt
+  %1 = enum $Optional<Optional<C>>, #Optional.some!enumelt, %0 : $Optional<C>
+  return %1 : $Optional<Optional<C>>
+}
+
+// The outer `.none` of a nested optional is a non-null low extra inhabitant.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @make_outer_none()
+// CHECK: ret ptr inttoptr
+sil @make_outer_none : $@convention(thin) () -> @owned Optional<Optional<C>> {
+bb0:
+  %0 = enum $Optional<Optional<C>>, #Optional.none!enumelt
+  return %0 : $Optional<Optional<C>>
+}
+
+// A custom single-payload enum whose payload is a single retainable pointer
+// lowers to `ptr` even with several no-payload cases: each empty case takes a
+// distinct low extra inhabitant of the pointer.
+enum ManyEmpty {
+  case value(C)
+  case a
+  case b
+  case c
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_many_empty(ptr %0)
+sil @take_many_empty : $@convention(thin) (@guaranteed ManyEmpty) -> @owned ManyEmpty {
+bb0(%0 : $ManyEmpty):
+  retain_value %0 : $ManyEmpty
+  return %0 : $ManyEmpty
+}
+
+// The second no-payload case is a distinct low, non-null extra inhabitant of
+// the pointer (the exact value is platform-dependent).
+// CHECK-LABEL: define{{.*}} swiftcc ptr @make_many_empty_b()
+// CHECK: ret ptr inttoptr (i{{[0-9]+}} {{[0-9]+}} to ptr)
+sil @make_many_empty_b : $@convention(thin) () -> @owned ManyEmpty {
+bb0:
+  %0 = enum $ManyEmpty, #ManyEmpty.b!enumelt
+  return %0 : $ManyEmpty
+}
+
+// A custom single-payload enum whose payload is itself a `ptr`-lowered optional
+// is a single pointer too.
+enum OptPayload {
+  case value(Optional<C>)
+  case p
+  case q
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_opt_payload(ptr %0)
+sil @take_opt_payload : $@convention(thin) (@guaranteed OptPayload) -> @owned OptPayload {
+bb0(%0 : $OptPayload):
+  retain_value %0 : $OptPayload
+  return %0 : $OptPayload
+}
+
+// The payload need not be a managed reference: a trivial single pointer (a
+// raw/unsafe pointer) carries its tag in its own extra inhabitants too, so its
+// optional is a `ptr` with `.none` == null.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_optional_unsafe_pointer(ptr %0)
+sil @take_optional_unsafe_pointer : $@convention(thin) (Optional<UnsafeMutablePointer<Int>>) -> Optional<UnsafeMutablePointer<Int>> {
+bb0(%0 : $Optional<UnsafeMutablePointer<Int>>):
+  return %0 : $Optional<UnsafeMutablePointer<Int>>
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_optional_opaque_pointer(ptr %0)
+sil @take_optional_opaque_pointer : $@convention(thin) (Optional<OpaquePointer>) -> Optional<OpaquePointer> {
+bb0(%0 : $Optional<OpaquePointer>):
+  return %0 : $Optional<OpaquePointer>
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc ptr @make_none_unsafe_pointer()
+// CHECK: ret ptr null
+sil @make_none_unsafe_pointer : $@convention(thin) () -> Optional<UnsafeMutablePointer<Int>> {
+bb0:
+  %0 = enum $Optional<UnsafeMutablePointer<Int>>, #Optional.none!enumelt
+  return %0 : $Optional<UnsafeMutablePointer<Int>>
+}
+
+// The `.none` test of a trivial pointer optional is a null comparison too.
+// CHECK-LABEL: define{{.*}} swiftcc void @switch_optional_unsafe_pointer(ptr %0)
+// CHECK: icmp eq ptr %0, null
+sil @switch_optional_unsafe_pointer : $@convention(thin) (Optional<UnsafeMutablePointer<Int>>) -> () {
+bb0(%0 : $Optional<UnsafeMutablePointer<Int>>):
+  switch_enum %0 : $Optional<UnsafeMutablePointer<Int>>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%1 : $UnsafeMutablePointer<Int>):
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}

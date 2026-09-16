@@ -600,7 +600,7 @@ extension InlineArray where Element: ~Copyable {
         let span = Span<Element>()
         return unsafe _overrideLifetime(span, borrowing: self)
       }
-      let span = unsafe Span(_unsafeStart: _protectedAddress, count: count)
+      let span = unsafe Span(_unchecked: _protectedAddress, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
@@ -621,13 +621,17 @@ extension InlineArray where Element: ~Copyable {
         return unsafe _overrideLifetime(span, mutating: &self)
       }
       let span = unsafe MutableSpan(
-        _unsafeStart: _protectedMutableAddress,
+        _unchecked: _protectedMutableAddress,
         count: count
       )
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }
 }
+
+//===----------------------------------------------------------------------===//
+// MARK: - Iterable & Other Conformances
+//===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
 extension InlineArray: Iterable where Element: ~Copyable {
@@ -656,3 +660,40 @@ extension InlineArray: ConvertibleToBytes
 @available(SwiftStdlib 6.2, *)
 extension InlineArray: ConvertibleFromBytes
   where Element: ConvertibleFromBytes {}
+
+// Conformances to Equatable and Hashable added in 6.5 (SE-0543).
+@available(SwiftStdlib 6.5, *)
+extension InlineArray: Equatable where Element: ~Copyable & Equatable { }
+
+@available(SwiftStdlib 6.5, *)
+extension InlineArray: Hashable where Element: ~Copyable & Hashable { }
+
+// _Implementations_ for Equatable and Hashable have earlier availability
+// than the conformances themselves do, and therefore are defined in a separate
+// extension.
+@available(SwiftStdlib 6.2, *)
+extension InlineArray where Element: ~Copyable & Equatable {
+  /// Returns a Boolean value indicating whether two inline arrays contain
+  /// the same elements in the same order.
+  ///
+  /// You can use the equal-to operator (`==`) to compare two inline
+  /// arrays when the element type is `Equatable`.
+  ///
+  /// - Parameters:
+  ///   - lhs: An array to compare.
+  ///   - rhs: Another array to compare.
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  public static func ==(lhs: borrowing Self, rhs: borrowing Self) -> Bool {
+    lhs.span._elementsEqual(to: rhs.span)
+  }
+}
+  
+@available(SwiftStdlib 6.2, *)
+extension InlineArray where Element: ~Copyable & Hashable {
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    span._hashContents(into: &hasher)
+  }
+}

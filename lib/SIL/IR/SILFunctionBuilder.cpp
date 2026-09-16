@@ -22,7 +22,6 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "clang/AST/Mangle.h"
 
 using namespace swift;
 
@@ -173,7 +172,8 @@ void SILFunctionBuilder::addFunctionAttributes(
   }
 
   // @_silgen_name and @_cdecl functions may be called from C code somewhere.
-  if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
+  if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>() ||
+      Attrs.hasAttribute<CxxDeclAttr>())
     F->setHasCReferences(true);
 
   for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {
@@ -254,9 +254,12 @@ void SILFunctionBuilder::addFunctionAttributes(
 
   // Add section for anything that was originally a function.
   if (isa<AbstractFunctionDecl>(decl)) {
-    if (auto *SA = Attrs.getAttribute<SectionAttr>())
-      F->setSection(SA->Name);
+    if (auto sectionName = decl->getSection())
+      F->setSection(*sectionName);
   }
+
+  if (auto *TA = decl->getAttrs().getAttribute<TargetAttr>())
+    F->setTargetFeatures(TA->Value);
 
   // Only emit replacements for the objc entry point of objc methods.
   // There is one exception: @_dynamicReplacement(for:) of @objc methods in
@@ -292,12 +295,21 @@ void SILFunctionBuilder::addFunctionAttributes(
   } else if (constant.isDistributedThunk()) {
     // It's okay for `decodeFuncDecl` to be null because system could be
     // generic.
-    if (auto decodeFuncDecl =
-            getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
-                decl)) {
-      auto decodeRef = SILDeclRef(decodeFuncDecl);
-      auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
-      F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
+    //
+    // In Embedded Swift, the receiver-side runtime entry that would otherwise
+    // look up `decodeNextArgument` by mangled name (and require the witness
+    // to be alive) is not used: distributed dispatch is fully concrete and
+    // goes through a compile-time-known accessor. Skip the artificial
+    // reference so the generic-over-SerializationRequirement witness can be
+    // DCE'd and is never emitted into IR.
+    if (!mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      if (auto decodeFuncDecl =
+              getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
+                  decl)) {
+        auto decodeRef = SILDeclRef(decodeFuncDecl);
+        auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
+        F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
+      }
     }
   }
 }
@@ -442,6 +454,11 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
                           constant);
   } else if (auto *ce = constant.getAbstractClosureExpr()) {
+    // Add the section for the closure, which can be specified explicitly or
+    // inferred from the enclosing function or closure.
+    if (auto sectionName = ce->getSection())
+      F->setSection(*sectionName);
+
     if (mod.getOptions().EnableGlobalAssemblyVision) {
       F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
     } else {

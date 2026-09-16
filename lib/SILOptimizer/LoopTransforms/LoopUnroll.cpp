@@ -12,9 +12,7 @@
 
 #define DEBUG_TYPE "sil-loopunroll"
 
-#include "llvm/ADT/DepthFirstIterator.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILCloner.h"
@@ -241,6 +239,19 @@ static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
   return Dist.getZExtValue() + Adjust;
 }
 
+/// A loop that iterates over the elements of a variadic generic pack uses its
+/// induction variable (a header block argument) as the index operand of a
+/// `dynamic_pack_index`.
+static bool isPackIterationLoop(SILLoop *Loop) {
+  for (auto *arg : Loop->getHeader()->getArguments()) {
+    for (auto *use : arg->getUses()) {
+      if (isa<DynamicPackIndexInst>(use->getUser()))
+        return true;
+    }
+  }
+  return false;
+}
+
 /// Check whether we can duplicate the instructions in the loop and use a
 /// heuristic that looks at the trip count and the cost of the instructions in
 /// the loop to determine whether we should unroll this loop.
@@ -260,6 +271,8 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
   // Use command-line threshold for unrolling.
   const uint64_t SILLoopUnrollThreshold = Loop->getBlocks().empty() ? 0 : 
     (Loop->getBlocks())[0]->getParent()->getModule().getOptions().UnrollThreshold;
+
+  const bool isPackLoop = isPackIterationLoop(Loop);
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
       if (!canDuplicateLoopInstruction(Loop, &Inst, deb))
@@ -268,6 +281,15 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
         ++Cost;
       if (auto AI = FullApplySite::isa(&Inst)) {
         auto Callee = AI.getCalleeFunction();
+        // If the callee is unknown, it can be
+        // devirtualized/specialized/always inlined later on which can lead to
+        // code bloat, bailout. Pack-iteration loops are the exception: they
+        // must be unrolled to devirtualize the witness methods
+        // called on their pack elements, so don't bail out on their unknown
+        // callees.
+        if (!Callee && !isPackLoop) {
+          return false;
+        }
         if (Callee && getEligibleFunction(AI, InlineSelection::Everything, SRA)) {
           // If callee is rather big and potentially inlinable, it may be better
           // not to unroll, so that the body of the callee can be inlined later.
@@ -316,10 +338,10 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
           Latch->getSinglePredecessorBlock()->getTerminator());
       if (CondBr->getTrueBB() != Latch)
         SILBuilderWithScope(CondBr).createBranch(
-            CondBr->getLoc(), CondBr->getTrueBB(), CondBr->getTrueArgs());
+            CondBr->getLoc(), CondBr->getTrueBB());
       else
         SILBuilderWithScope(CondBr).createBranch(
-            CondBr->getLoc(), CondBr->getFalseBB(), CondBr->getFalseArgs());
+            CondBr->getLoc(), CondBr->getFalseBB());
       CondBr->eraseFromParent();
       return;
     }
@@ -338,11 +360,11 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
   if (CurLoopIter == LastLoopIter) {
     if (CondBr->getTrueBB() == CurrentHeader) {
       SILBuilderWithScope(CondBr).createBranch(
-          CondBr->getLoc(), CondBr->getFalseBB(), CondBr->getFalseArgs());
+          CondBr->getLoc(), CondBr->getFalseBB());
     } else {
       assert(CondBr->getFalseBB() == CurrentHeader);
       SILBuilderWithScope(CondBr).createBranch(
-          CondBr->getLoc(), CondBr->getTrueBB(), CondBr->getTrueArgs());
+          CondBr->getLoc(), CondBr->getTrueBB());
     }
     CondBr->eraseFromParent();
     return;
@@ -352,12 +374,12 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
   if (CondBr->getTrueBB() == CurrentHeader) {
     SILBuilderWithScope(CondBr).createCondBranch(
         CondBr->getLoc(), CondBr->getCondition(), NextIterationsHeader,
-        CondBr->getTrueArgs(), CondBr->getFalseBB(), CondBr->getFalseArgs());
+        CondBr->getFalseBB());
   } else {
     assert(CondBr->getFalseBB() == CurrentHeader);
     SILBuilderWithScope(CondBr).createCondBranch(
         CondBr->getLoc(), CondBr->getCondition(), CondBr->getTrueBB(),
-        CondBr->getTrueArgs(), NextIterationsHeader, CondBr->getFalseArgs());
+        NextIterationsHeader);
   }
   CondBr->eraseFromParent();
 }
@@ -556,6 +578,7 @@ class LoopUnrolling : public SILFunctionTransform {
       Changed |= tryToUnrollLoop(Loop, SRA, deb);
 
     if (Changed) {
+      updateAllGuaranteedPhis(PM, Fun);
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
       removeUnreachableBlocks(*Fun);
       if (Fun->needBreakInfiniteLoops())

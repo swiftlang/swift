@@ -69,7 +69,15 @@ public:
 
   /// Convert a UUID to its string representation.
   void toString(llvm::SmallVectorImpl<char> &out) const;
-  
+
+  /// Copy the 16 bytes in string order (bytes[0] is the first string octet),
+  /// regardless of host. Unlike \c Value, which is native-endian on Windows,
+  /// so callers needing a host-independent layout (e.g. deriving a GUID's
+  /// numeric fields) must use this. This is not a COM REFIID; a REFIID is the
+  /// target-native \c Value.
+  void getCanonicalBytes(unsigned char (&bytes)[Size]) const;
+
+
   int compare(UUID y) const;
   
 #define COMPARE_UUID(op) \

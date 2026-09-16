@@ -16,7 +16,6 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
-#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/ActorIsolation.h"
@@ -35,7 +34,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/Basic/TypeID.h"
@@ -52,6 +50,8 @@ class AvailabilityScope;
 class BreakStmt;
 class ContextualPattern;
 class ContinueStmt;
+class COMDeclInfo;
+class COMInterfaceHierarchy;
 class DefaultArgumentExpr;
 class DefaultArgumentType;
 class DoCatchStmt;
@@ -750,6 +750,11 @@ struct WhereClauseOwner {
   visitRequirements(TypeResolutionStage stage,
                     llvm::function_ref<bool(Requirement, RequirementRepr *)>
                         callback) const &&;
+
+  /// Visit each of the requirements and call \p callback for all of
+  /// their types.
+  void forAllRequirementTypes(
+      llvm::function_ref<void(Type, TypeRepr *)> callback) const &&;
 };
 
 void simple_display(llvm::raw_ostream &out, const WhereClauseOwner &owner);
@@ -1251,6 +1256,46 @@ private:
   friend SimpleRequest;
 
   bool evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the COM role and associated declaration information for a nominal
+/// type, or \c nullptr when it is not a COM interface or implementation.
+class COMDeclInfoRequest :
+    public SimpleRequest<COMDeclInfoRequest,
+                         const COMDeclInfo *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  const COMDeclInfo *evaluate(Evaluator &evaluator,
+                              NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the validated inheritance hierarchy for a COM interface, or null
+/// when the protocol does not declare a COM interface.
+class COMInterfaceHierarchyRequest
+    : public SimpleRequest<COMInterfaceHierarchyRequest,
+                           const COMInterfaceHierarchy *(ProtocolDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  const COMInterfaceHierarchy *evaluate(Evaluator &evaluator,
+                                        ProtocolDecl *protocol) const;
 
 public:
   // Caching
@@ -2624,6 +2669,26 @@ public:
   void cacheResult(Type value) const;
 };
 
+/// Determines the yield type of a coroutine
+class YieldsTypeRequest
+    : public SimpleRequest<YieldsTypeRequest, Type(FuncDecl *, unsigned),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, FuncDecl *decl, unsigned idx) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 class PatternBindingEntryRequest
     : public SimpleRequest<PatternBindingEntryRequest,
                            const PatternBindingEntry *(PatternBindingDecl *,
@@ -3001,6 +3066,48 @@ private:
   // Evaluation.
   ConstructorDecl * evaluate(Evaluator &evaluator,
                              NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes the implicit metatype extension carrying \c var \c IID for a
+/// \c @com protocol.  The GUID is read from the protocol's own \c COMAttr, so
+/// the property is re-derived in modules importing a binary \c .swiftmodule.
+class SynthesizeCOMInterfaceIDRequest
+    : public SimpleRequest<SynthesizeCOMInterfaceIDRequest,
+                           VarDecl *(ProtocolDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  VarDecl *evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes the Microsoft COM model's \c static \c var \c CLSID member on a
+/// \c @com class. The GUID is read from the class's own \c COMAttr. Rootless
+/// models retian the implementation identity without introducing this
+/// Microsoft-specific API.
+class SynthesizeCOMCLSIDRequest
+    : public SimpleRequest<SynthesizeCOMCLSIDRequest, VarDecl *(ClassDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  VarDecl *evaluate(Evaluator &evaluator, ClassDecl *decl) const;
 
 public:
   // Caching.
@@ -3599,7 +3706,8 @@ public:
 /// Resolves the referenced original declaration for a `@derivative` attribute.
 class DerivativeAttrOriginalDeclRequest
     : public SimpleRequest<DerivativeAttrOriginalDeclRequest,
-                           AbstractFunctionDecl *(DerivativeAttr *),
+                           TinyPtrVector<AbstractFunctionDecl *>(
+                               DerivativeAttr *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3608,8 +3716,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  AbstractFunctionDecl *evaluate(Evaluator &evaluator,
-                                 DerivativeAttr *attr) const;
+  TinyPtrVector<AbstractFunctionDecl *> evaluate(Evaluator &evaluator,
+                                                 DerivativeAttr *attr) const;
 
 public:
   // Caching.
@@ -4373,6 +4481,26 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Synthesizes the implicit `@available` attributes that are implied by the
+/// availability scopes that contain a declaration in a local context, attaching
+/// them to the declaration as a side effect.
+class SynthesizeLocalAvailableAttrsRequest
+    : public SimpleRequest<SynthesizeLocalAvailableAttrsRequest,
+                           evaluator::SideEffect(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+  static bool appliesTo(const Decl *decl);
+};
+
 class ClosureEffectsRequest
     : public SimpleRequest<ClosureEffectsRequest,
                            FunctionType::ExtInfo(ClosureExpr *),
@@ -5044,11 +5172,12 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @c functions for compatibility with the foreign language.
-class TypeCheckCDeclFunctionRequest
-    : public SimpleRequest<TypeCheckCDeclFunctionRequest,
+/// Check a function that is exported to a foreign language for compatibility
+/// with that language. This covers @c, @_cdecl, and @cxx.
+class TypeCheckForeignFunctionRequest
+    : public SimpleRequest<TypeCheckForeignFunctionRequest,
                            evaluator::SideEffect(FuncDecl *FD,
-                                                 CDeclAttr *attr),
+                                                 DeclAttribute *attr),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5057,7 +5186,7 @@ private:
   friend SimpleRequest;
 
   evaluator::SideEffect
-  evaluate(Evaluator &evaluator, FuncDecl *FD, CDeclAttr *attr) const;
+  evaluate(Evaluator &evaluator, FuncDecl *FD, DeclAttribute *attr) const;
 
 public:
   bool isCached() const { return true; }
@@ -5257,6 +5386,33 @@ public:
   bool isCached() const { return true; }
   std::optional<DeclAttributes> getCachedResult() const;
   void cacheResult(DeclAttributes) const;
+};
+
+/// Determine the section into which the given declaration or closure should be
+/// placed, based on an explicit `@section` attribute or the inference rules
+/// for `@section`.
+///
+/// Produces the name of the section, or `std::nullopt` if the entity belongs in
+/// the platform-appropriate default section.
+class SectionForDeclRequest
+    : public SimpleRequest<SectionForDeclRequest,
+                           std::optional<StringRef>(
+                               llvm::PointerUnion<const Decl *,
+                                                  const AbstractClosureExpr *>),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<StringRef>
+  evaluate(Evaluator &evaluator,
+           llvm::PointerUnion<const Decl *, const AbstractClosureExpr *>
+               declOrClosure) const;
+
+public:
+  bool isCached() const { return true; }
 };
 
 class UniqueUnderlyingTypeSubstitutionsRequest

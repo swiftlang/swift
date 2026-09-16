@@ -152,6 +152,7 @@ public func registerTests() {
     replacePhisWithIncomingValuesTest,
     borrowIntroducersTest,
     enclosingValuesTest,
+    ssaUpdaterTest,
     instructionBasedSSAUpdaterTest,
     forwardingDefUseTest,
     forwardingUseDefTest,

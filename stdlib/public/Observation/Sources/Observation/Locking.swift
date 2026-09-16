@@ -15,7 +15,26 @@
 // symbols that are not provided by this library - so instead it has to re-implement
 // all of this on its own... 
 
-#if canImport(Darwin.os.lock)
+// In Embedded Swift there is no platform libc overlay to import, so the lock is
+// built on the Embedded Swift platform abstraction layer's mutex hooks. This
+// mirrors what Synchronization's Mutex does in
+// stdlib/public/Synchronization/Mutex/EmbeddedImpl.swift.
+#if $Embedded
+@_extern(c, "_swift_mutex_init")
+internal func _swift_mutex_init(
+  _ mutex: UnsafeMutableRawPointer,
+  _ flags: CUnsignedLongLong
+)
+
+@_extern(c, "_swift_mutex_destroy")
+internal func _swift_mutex_destroy(_ mutex: UnsafeMutableRawPointer)
+
+@_extern(c, "_swift_mutex_lock")
+internal func _swift_mutex_lock(_ mutex: UnsafeMutableRawPointer)
+
+@_extern(c, "_swift_mutex_unlock")
+internal func _swift_mutex_unlock(_ mutex: UnsafeMutableRawPointer)
+#elseif canImport(Darwin.os.lock)
 import Darwin.os.lock
 #elseif canImport(Glibc)
 import Glibc
@@ -31,7 +50,11 @@ import Android
 #endif
 
 internal struct Lock {
-  #if canImport(Darwin.os.lock)
+  #if $Embedded
+  // Opaque inline storage for the platform's mutex; the platform layer decides
+  // what actually lives in these words.
+  typealias Primitive = [(EMBEDDED_SWIFT_MUTEX_NUM_WORDS) of UInt]
+  #elseif canImport(Darwin.os.lock)
   typealias Primitive = os_unfair_lock
   #elseif canImport(Glibc) || canImport(Musl) || canImport(Bionic)
   #if os(FreeBSD) || os(OpenBSD)
@@ -59,7 +82,10 @@ internal struct Lock {
   }
 
   fileprivate static func initialize(_ platformLock: PlatformLock) {
-    #if canImport(Darwin.os.lock)
+    #if $Embedded
+    platformLock.initialize(to: .init(repeating: 0))
+    _swift_mutex_init(UnsafeMutableRawPointer(platformLock), 0)
+    #elseif canImport(Darwin.os.lock)
     platformLock.initialize(to: os_unfair_lock())
     #elseif canImport(Glibc) || canImport(Musl) || canImport(Bionic)
     let result = pthread_mutex_init(platformLock, nil)
@@ -74,7 +100,9 @@ internal struct Lock {
   }
 
   fileprivate static func deinitialize(_ platformLock: PlatformLock) {
-    #if canImport(Glibc) || canImport(Musl) || canImport(Bionic)
+    #if $Embedded
+    _swift_mutex_destroy(UnsafeMutableRawPointer(platformLock))
+    #elseif canImport(Glibc) || canImport(Musl) || canImport(Bionic)
     let result = pthread_mutex_destroy(platformLock)
     precondition(result == 0, "pthread_mutex_destroy failed")
     #endif
@@ -82,7 +110,9 @@ internal struct Lock {
   }
 
   fileprivate static func lock(_ platformLock: PlatformLock) {
-    #if canImport(Darwin.os.lock)
+    #if $Embedded
+    _swift_mutex_lock(UnsafeMutableRawPointer(platformLock))
+    #elseif canImport(Darwin.os.lock)
     os_unfair_lock_lock(platformLock)
     #elseif canImport(Glibc) || canImport(Musl) || canImport(Bionic)
     pthread_mutex_lock(platformLock)
@@ -95,7 +125,9 @@ internal struct Lock {
   }
 
   fileprivate static func unlock(_ platformLock: PlatformLock) {
-    #if canImport(Darwin.os.lock)
+    #if $Embedded
+    _swift_mutex_unlock(UnsafeMutableRawPointer(platformLock))
+    #elseif canImport(Darwin.os.lock)
     os_unfair_lock_unlock(platformLock)
     #elseif canImport(Glibc) || canImport(Musl) || canImport(Bionic)
     let result = pthread_mutex_unlock(platformLock)

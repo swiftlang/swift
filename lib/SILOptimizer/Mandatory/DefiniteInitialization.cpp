@@ -540,6 +540,9 @@ namespace {
     void diagnoseRefElementAddr(RefElementAddrInst *REI);
     bool diagnoseMethodCall(const DIMemoryUse &Use,
                             bool SuperInitDone);
+    std::optional<SILLocation>
+    getUninitializedExplicitReturnLocation(const DIMemoryUse &Use);
+    bool diagnoseMissingNilInFailableInitializer(const DIMemoryUse &Use);
     void diagnoseBadExplicitStore(SILInstruction *Inst);
     
     bool isBlockIsReachableFromEntry(const SILBasicBlock *BB);
@@ -2321,6 +2324,64 @@ bool LifetimeChecker::diagnoseReturnWithoutInitializingStoredProperties(
   return true;
 }
 
+std::optional<SILLocation>
+LifetimeChecker::getUninitializedExplicitReturnLocation(
+    const DIMemoryUse &Use) {
+  auto *block = Use.Inst->getParent();
+  auto isUninitializedExplicitReturn = [&](SILInstruction *inst) {
+    return inst->getLoc().is<ReturnLocation>() &&
+           getAnyUninitializedMemberAtInst(inst, Use.FirstElement,
+                                           Use.NumElements) != -1;
+  };
+
+  if (isUninitializedExplicitReturn(block->getTerminator()))
+    return block->getTerminator()->getLoc();
+
+  for (auto *predecessor : block->getPredecessorBlocks()) {
+    auto *terminator = predecessor->getTerminator();
+    if (isUninitializedExplicitReturn(terminator))
+      return terminator->getLoc();
+  }
+
+  return std::nullopt;
+}
+
+bool LifetimeChecker::diagnoseMissingNilInFailableInitializer(
+    const DIMemoryUse &Use) {
+  // SIL functions parsed from a .sil file and top-level code have no decl
+  // context, so this has to be checked before asking for the decl.
+  auto *DC = F.getDeclContext();
+  if (!DC)
+    return false;
+
+  auto *ctor = dyn_cast_or_null<ConstructorDecl>(DC->getAsDecl());
+  if (!ctor || !ctor->isFailable())
+    return false;
+
+  // Only diagnose when the failure is reached through an explicit return that
+  // leaves stored properties uninitialized. Any other use before initialization
+  // keeps its own, more precise diagnostic.
+  auto returnLoc = getUninitializedExplicitReturnLocation(Use);
+  if (!returnLoc)
+    return false;
+
+  if (!shouldEmitError(Use.Inst))
+    return false;
+
+  // The diagnostic has to be flushed before the notes are emitted: notes are
+  // held back while another diagnostic is in flight, and they refer to storage
+  // that does not outlive noteUninitializedMembers().
+  {
+    auto diag = diagnose(Module, *returnLoc,
+                         diag::return_from_failable_init_without_nil);
+    if (auto *returnStmt = returnLoc->getAsASTNode<ReturnStmt>())
+      diag.fixItInsertAfter(returnStmt->getEndLoc(), " nil");
+  }
+
+  noteUninitializedMembers(Use);
+  return true;
+}
+
 /// Check and diagnose various failures when a load use is not fully
 /// initialized.
 ///
@@ -2342,6 +2403,9 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
     emitSelfConsumedDiagnostic(Inst);
     return;
   }
+
+  if (diagnoseMissingNilInFailableInitializer(Use))
+    return;
   
   // If this is a load with a single user that is a return (and optionally a
   // retain_value for non-trivial structs/enums), then this is a return in the

@@ -86,8 +86,9 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
   // FIXME: Code completion doesn't offer accessors. It only emits 'VarDecl's.
   // So getter/setter specific availability doesn't work in code completion.
 
-  auto Domain = Attr.getDomain();
-  auto DeprecatedRange = Attr.getDeprecatedRange(Ctx).value();
+  auto DomainAndRange = Attr.getDeprecatedDomainAndRange(Ctx).value();
+  auto Domain = DomainAndRange.getDomain();
+  auto DeprecatedRange = DomainAndRange.getRange();
   auto Message = Attr.getMessage();
   auto NewName = Attr.getRename();
   if (!isSoftDeprecated) {

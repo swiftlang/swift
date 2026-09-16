@@ -47,10 +47,10 @@ bb0(%tuple : $*(A, B)):
 sil @dont_simplify_dynamic_pack_index : $@convention(thin) (@inout (A, B), Builtin.Word) -> () {
 bb0(%tuple : $*(A, B), %i : $Builtin.Word):
   %idx = dynamic_pack_index %i of $Pack{A, B}
-  %tok = open_pack_element %idx of <each Z> at <Pack{A, B}>, shape $Z, uuid "01234567-89AB-CDEF-0123-000000000000"
-  %addr = tuple_pack_element_addr %idx of %tuple : $*(A, B) as $*@pack_element("01234567-89AB-CDEF-0123-000000000000") Z
+  %tok = open_pack_element %idx of <each Z> at <Pack{A, B}>, shape $Z, id 1
+  %addr = tuple_pack_element_addr %idx of %tuple : $*(A, B) as $*@pack_element(1) Z
   %use = function_ref @use : $@convention(thin) <T> (@in_guaranteed T) -> ()
-  apply %use<@pack_element("01234567-89AB-CDEF-0123-000000000000") Z>(%addr) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  apply %use<@pack_element(1) Z>(%addr) : $@convention(thin) <T> (@in_guaranteed T) -> ()
   %ret = tuple ()
   return %ret : $()
 }

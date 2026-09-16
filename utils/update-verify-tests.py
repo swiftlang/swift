@@ -14,7 +14,6 @@ from update_verify_tests.core import check_expectations
   - multiple prefixes on the same line (-verify-additional-prefix my-prefix -verify-additional-prefix my-other-prefix)
   - multiple prefixes on separate RUN lines (RUN: -verify-additional-prefix my-prefix\nRUN: -verify-additional-prefix my-other-prefix)
   - regexes matchers
-  - multiple checks targeting the same line are supported, but a line may only contain one check
   - if multiple checks targeting the same line are failing the script is not guaranteed to produce a minimal diff
   - columns
   - doc files

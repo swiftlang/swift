@@ -43,13 +43,18 @@
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/ThreadSanitizer.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/MathExtras.h"
 #include <algorithm>
 #include <cctype>
 #include <cinttypes>
 #include <condition_variable>
+#include <limits>
 #include <new>
 #include <unordered_set>
 #include <vector>
+#if defined(__APPLE__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
+#include <malloc/malloc.h>
+#endif
 #if SWIFT_PTRAUTH
 #include <ptrauth.h>
 #endif
@@ -1301,7 +1306,11 @@ public:
     return 0; // No single meaningful value here.
   }
 
-  bool matchesKey(const Key &key) const {
+  /// Does the given function type metadata describe exactly the type `key`
+  /// asks for? Split out from matchesKey so the same comparison can be applied
+  /// to prespecialized function metadata, which lives outside any cache entry.
+  static bool metadataMatchesKey(const FunctionTypeMetadata &Data,
+                                 const Key &key) {
     if (key.getFlags().getIntValue() != Data.Flags.getIntValue())
       return false;
     if (key.getDifferentiabilityKind().Value !=
@@ -1323,6 +1332,10 @@ public:
         return false;
     }
     return true;
+  }
+
+  bool matchesKey(const Key &key) const {
+    return metadataMatchesKey(Data, key);
   }
 
   friend llvm::hash_code hash_value(const FunctionCacheEntry &value) {
@@ -1360,6 +1373,26 @@ public:
 
 /// The uniquing structure for function type metadata.
 static SimpleGlobalCache<FunctionCacheEntry, FunctionTypesTag> FunctionTypes;
+
+/// Get the unique function type metadata for a key, preferring a
+/// prespecialized one from the prespecializations library. Prespecialized
+/// function types never go into the dynamic cache.
+static const FunctionTypeMetadata *
+getFunctionTypeMetadataForKey(const FunctionCacheEntry::Key &key) {
+  auto numParameters = key.getFlags().getNumParameters();
+  if (auto *candidates = getLibPrespecializedFunctionTypeMetadata(
+          key.getResult(), key.Parameters, numParameters)) {
+    // The table's key is only (result, parameters...), so several function
+    // types can share an entry. Find the one that matches the whole request.
+    for (size_t i = 0; i < candidates->count; i++) {
+      auto *metadata = cast<FunctionTypeMetadata>(candidates->metadata[i]);
+      if (FunctionCacheEntry::metadataMatchesKey(*metadata, key))
+        return metadata;
+    }
+  }
+
+  return &FunctionTypes.getOrInsert(key).first->Data;
+}
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata0(FunctionTypeFlags flags,
@@ -1421,7 +1454,7 @@ swift::swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
     reinterpret_cast<const ParameterFlags *>(parameterFlags), result, nullptr,
     ExtendedFunctionTypeFlags(), nullptr
   };
-  return &FunctionTypes.getOrInsert(key).first->Data;
+  return getFunctionTypeMetadataForKey(key);
 }
 
 const FunctionTypeMetadata *
@@ -1442,7 +1475,7 @@ swift::swift_getFunctionTypeMetadataDifferentiable(
     reinterpret_cast<const ParameterFlags *>(parameterFlags), result, nullptr,
     ExtendedFunctionTypeFlags(), nullptr
   };
-  return &FunctionTypes.getOrInsert(key).first->Data;
+  return getFunctionTypeMetadataForKey(key);
 }
 
 const FunctionTypeMetadata *
@@ -1458,7 +1491,7 @@ swift::swift_getFunctionTypeMetadataGlobalActor(
     reinterpret_cast<const ParameterFlags *>(parameterFlags), result,
     globalActor, ExtendedFunctionTypeFlags(), nullptr
   };
-  return &FunctionTypes.getOrInsert(key).first->Data;
+  return getFunctionTypeMetadataForKey(key);
 }
 
 extern "C" const EnumDescriptor NOMINAL_TYPE_DESCR_SYM(s5NeverO);
@@ -1532,7 +1565,7 @@ swift::swift_getExtendedFunctionTypeMetadata(
     reinterpret_cast<const ParameterFlags *>(parameterFlags), result,
     globalActor, extFlags, thrownError
   };
-  return &FunctionTypes.getOrInsert(key).first->Data;
+  return getFunctionTypeMetadataForKey(key);
 }
 
 FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
@@ -1765,11 +1798,10 @@ vector_destroy(OpaqueValue *dest, const Metadata *metatype) {
   
   auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
   auto destBytes = (char*)dest;
-  
-  for (unsigned i = 0, end = vectorType->getRealizedCount(),
-                stride = vectorType->Element->vw_stride();
-       i < end;
-       ++i, destBytes += stride) {
+
+  const intptr_t end = vectorType->getRealizedCount();
+  const size_t stride = vectorType->Element->vw_stride();
+  for (intptr_t i = 0; i < end; ++i, destBytes += stride) {
     vectorType->Element->vw_destroy((OpaqueValue*)destBytes);
   }
 }
@@ -1788,11 +1820,10 @@ vector_elementwise_transfer(OpaqueValue *dest, OpaqueValue *src,
   auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
   auto destBytes = (char*)dest;
   auto srcBytes = (char*)src;
-  
-  for (unsigned i = 0, end = vectorType->getRealizedCount(),
-                stride = vectorType->Element->vw_stride();
-       i < end;
-       ++i, destBytes += stride, srcBytes += stride) {
+
+  const intptr_t end = vectorType->getRealizedCount();
+  const size_t stride = vectorType->Element->vw_stride();
+  for (intptr_t i = 0; i < end; ++i, destBytes += stride, srcBytes += stride) {
     elementFn(
       (OpaqueValue*)destBytes,
       (OpaqueValue*)srcBytes,
@@ -1902,8 +1933,19 @@ FixedArrayCacheEntry::tryInitialize(Metadata *metadata,
   assert(count > 0);
   Data.ValueWitnesses = &Witnesses;
   auto eltWitnesses = element->getValueWitnesses();
-  auto arraySize
-    = Witnesses.size = Witnesses.stride = eltWitnesses->stride * count;
+  size_t arraySize;
+  {
+    bool overflowed = false;
+    arraySize = llvm::SaturatingMultiply((size_t)eltWitnesses->stride,
+                                         (size_t)count, &overflowed);
+    if (SWIFT_UNLIKELY(overflowed)) {
+      swift::fatalError(0,
+                        "Builtin.FixedArray of %zd elements with stride %zu "
+                        "is too large to be representable\n",
+                        count, (size_t)eltWitnesses->stride);
+    }
+  }
+  Witnesses.size = Witnesses.stride = arraySize;
   // We take on most of the properties of the element type, except that an array
   // of elements might end up larger than an inline buffer, and the array is
   // always addressable for dependencies.
@@ -2224,15 +2266,44 @@ BorrowCacheEntry::tryInitialize(Metadata *metadata,
 
 namespace {
 
-class TupleCacheEntry
-    : public MetadataCacheEntryBase<TupleCacheEntry,
-                                    TupleTypeMetadata::Element> {
+// Tuple cache entries have two representations: inline and out-of-line.
+// Dynamically constructed tuple metadata is always stored inline.
+// Prespecialized tuple metadata is out-of-line.
+//
+// In both representations, the word before the tuple metadata stores the index
+// of the entry that provides extra inhabitants, as well as a bit which
+// indicates whether the representation is inline or out-of-line. Inline entries
+// (i.e. dynamically constructed entries) may be incomplete. The runtime will
+// retrieve the enclosing TupleCacheEntry for inline metadata by subtracting the
+// offset of the FullMetadata within the TupleCacheEntry, then retrieve the
+// metadata state from the MetadataCacheEntryBase. Out-of-line entries are
+// always complete, so the runtime checks the out-of-line bit first, and the
+// metadata is known to be complete if that bit is set.
+//
+// The ExtraInhabitantProvidingElement field directly before the metadata is
+// part of the contract with LibPrespecialized. Bump
+// LibPrespecializedData::minorVersionWithTupleMetadataMap to avoid using a
+// table with the old layout if the location or content of that field is ever
+// changed.
+class TupleCacheEntry : public MetadataCacheEntryBase<
+                            TupleCacheEntry, FullMetadata<TupleTypeMetadata>,
+                            TupleTypeMetadata::Element, ValueWitnessTable> {
 public:
   static const char *getName() { return "TupleCache"; }
 
-  unsigned ExtraInhabitantProvidingElement;
-  ValueWitnessTable Witnesses;
-  FullMetadata<TupleTypeMetadata> Data;
+  /// The bit that indicates that a tuple metadata is stored out of line. In
+  /// ExtraInhabitantProvidingElementOrPtr, it indicates that the field's value
+  /// is a pointer to the out of line representation. In the out of line
+  /// representation, it indicates that the adjoining metadata is out of line
+  /// and therefore is automatically in the Complete state.
+  static constexpr uintptr_t OutOfLineBit = 1;
+
+  /// The extra-inhabitant-providing element index shifted left one, or a
+  /// pointer to the out-of-line representation with the low bit set.
+  ///
+  /// Must remain the only declared member, and so the last: we depend on the
+  /// tuple metadata coming immediately afterward.
+  uintptr_t ExtraInhabitantProvidingElementOrPtr;
 
   struct Key {
     size_t NumElements;
@@ -2253,18 +2324,56 @@ public:
     }
   };
 
-  ValueType getValue() {
-    return &Data;
+  /// The word preceding a tuple's metadata, whichever form the metadata takes.
+  static const uintptr_t *wordBefore(const TupleTypeMetadata *metadata) {
+    auto bytes = reinterpret_cast<const char *>(asFullMetadata(metadata));
+    return reinterpret_cast<const uintptr_t *>(bytes - sizeof(uintptr_t));
   }
-  void setValue(ValueType value) {
-    assert(value == &Data);
+
+  /// Is this metadata an out of line representation, with no entry in front of
+  /// it?
+  static bool isOutOfLineRepresentation(const TupleTypeMetadata *metadata) {
+    return *wordBefore(metadata) & OutOfLineBit;
   }
+
+  /// The index of the element this tuple takes its extra inhabitants from.
+  static unsigned
+  extraInhabitantProvidingElement(const TupleTypeMetadata *metadata) {
+    return *wordBefore(metadata) >> 1;
+  }
+
+  bool hasInlineMetadata() const {
+    return !(ExtraInhabitantProvidingElementOrPtr & OutOfLineBit);
+  }
+
+  FullMetadata<TupleTypeMetadata> *getData() {
+    if (hasInlineMetadata())
+      return getTrailingObjects<FullMetadata<TupleTypeMetadata>>();
+    return reinterpret_cast<FullMetadata<TupleTypeMetadata> *>(
+        ExtraInhabitantProvidingElementOrPtr & ~OutOfLineBit);
+  }
+  const FullMetadata<TupleTypeMetadata> *getData() const {
+    return const_cast<TupleCacheEntry *>(this)->getData();
+  }
+
+  ValueType getValue() { return getData(); }
+  void setValue(ValueType value) { assert(value == getData()); }
 
   TupleCacheEntry(const Key &key, MetadataWaitQueue::Worker &worker,
                   MetadataRequest request,
                   const ValueWitnessTable *proposedWitnesses);
 
+  /// Adopt an out of line representation the prespecializations library
+  /// emitted. It is complete as emitted, so this entry exists only to find it
+  /// again through the cache.
+  TupleCacheEntry(const Key &key, MetadataWaitQueue::Worker &worker,
+                  MetadataRequest request,
+                  const TupleTypeMetadata *representation);
+
   AllocationResult allocate(const ValueWitnessTable *proposedWitnesses) {
+    swift_unreachable("allocated during construction");
+  }
+  AllocationResult allocate(const TupleTypeMetadata *representation) {
     swift_unreachable("allocated during construction");
   }
 
@@ -2273,31 +2382,31 @@ public:
                                     PrivateMetadataCompletionContext *context);
 
   MetadataStateWithDependency checkTransitiveCompleteness() {
-    auto dependency = swift::checkTransitiveCompleteness(&Data);
+    auto dependency = swift::checkTransitiveCompleteness(getData());
     return { dependency ? PrivateMetadataState::NonTransitiveComplete
                         : PrivateMetadataState::Complete,
              dependency };
   }
 
-  size_t getNumElements() const {
-    return Data.NumElements;
-  }
+  size_t getNumElements() const { return getData()->NumElements; }
 
   intptr_t getKeyIntValueForDump() {
     return 0; // No single meaningful value
   }
 
   friend llvm::hash_code hash_value(const TupleCacheEntry &value) {
+    auto *data = value.getData();
     auto elements = llvm::ArrayRef<TupleTypeMetadata::Element>(
-        value.Data.getElements(), value.Data.NumElements);
+        data->getElements(), data->NumElements);
     auto types =
         makeTransformRange(elements, [](TupleTypeMetadata::Element element) {
           return element.Type;
         });
-    return Key::hash_value(types, value.Data.Labels);
+    return Key::hash_value(types, data->Labels);
   }
 
-  bool matchesKey(const Key &key) {
+  static bool metadataMatchesKey(const TupleTypeMetadata &Data,
+                                 const Key &key) {
     if (key.NumElements != Data.NumElements)
       return false;
 
@@ -2316,33 +2425,78 @@ public:
     return strcmp(key.Labels, Data.Labels) == 0;
   }
 
+  bool matchesKey(const Key &key) {
+    return metadataMatchesKey(*getData(), key);
+  }
+
+  /// Whether a new entry built from these constructor arguments will
+  /// tail-allocate its metadata. An entry adopting an out of line
+  /// representation will not: that metadata, its elements, and its value
+  /// witnesses all live in the library.
+  static bool needsInlineMetadata(MetadataWaitQueue::Worker &, MetadataRequest,
+                                  const ValueWitnessTable *) {
+    return true;
+  }
+  static bool needsInlineMetadata(MetadataWaitQueue::Worker &, MetadataRequest,
+                                  const TupleTypeMetadata *) {
+    return false;
+  }
+
+  size_t
+  numTrailingObjects(OverloadToken<FullMetadata<TupleTypeMetadata>>) const {
+    return hasInlineMetadata() ? 1 : 0;
+  }
   size_t numTrailingObjects(OverloadToken<TupleTypeMetadata::Element>) const {
-    return getNumElements();
+    return hasInlineMetadata() ? getNumElements() : 0;
+  }
+  size_t numTrailingObjects(OverloadToken<ValueWitnessTable>) const {
+    return hasInlineMetadata() ? 1 : 0;
   }
 
   template <class... Args>
+  static size_t
+  numTrailingObjects(OverloadToken<FullMetadata<TupleTypeMetadata>>,
+                     const Key &, Args &&...extraArgs) {
+    return needsInlineMetadata(extraArgs...) ? 1 : 0;
+  }
+  template <class... Args>
   static size_t numTrailingObjects(OverloadToken<TupleTypeMetadata::Element>,
-                                   const Key &key,
-                                   Args &&...extraArgs) {
-    return key.NumElements;
+                                   const Key &key, Args &&...extraArgs) {
+    return needsInlineMetadata(extraArgs...) ? key.NumElements : 0;
+  }
+  template <class... Args>
+  static size_t numTrailingObjects(OverloadToken<ValueWitnessTable>,
+                                   const Key &, Args &&...extraArgs) {
+    return needsInlineMetadata(extraArgs...) ? 1 : 0;
   }
 };
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
+static_assert(offsetof(TupleCacheEntry, ExtraInhabitantProvidingElementOrPtr) ==
+                  sizeof(TupleCacheEntry) - sizeof(uintptr_t),
+              "a tuple's metadata begins one word past the discriminator, so "
+              "nothing may follow the discriminator in the entry");
+#pragma clang diagnostic pop
+static_assert(sizeof(TupleCacheEntry) %
+                      alignof(FullMetadata<TupleTypeMetadata>) ==
+                  0,
+              "the tail-allocated metadata must start at sizeof(entry)");
 
 class TupleCacheStorage :
   public LockingConcurrentMapStorage<TupleCacheEntry, TupleCacheTag> {
 public:
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Winvalid-offsetof"
   static TupleCacheEntry *
   resolveExistingEntry(const TupleTypeMetadata *metadata) {
-    // The correctness of this arithmetic is verified by an assertion in
-    // the TupleCacheEntry constructor.
+    // Only meaningful for a metadata tail-allocated on its entry, which is what
+    // the word preceding it reports. The correctness of this arithmetic is
+    // verified by an assertion in the TupleCacheEntry constructor.
+    assert(!TupleCacheEntry::isOutOfLineRepresentation(metadata));
     auto bytes = reinterpret_cast<const char*>(asFullMetadata(metadata));
-    bytes -= offsetof(TupleCacheEntry, Data);
+    bytes -= sizeof(TupleCacheEntry);
     auto entry = reinterpret_cast<const TupleCacheEntry*>(bytes);
     return const_cast<TupleCacheEntry*>(entry);
   }
-#pragma clang diagnostic pop
 };
 
 class TupleCache :
@@ -2353,6 +2507,25 @@ class TupleCache :
 
 /// The uniquing structure for tuple type metadata.
 static Lazy<TupleCache> TupleTypes;
+
+/// Find the out of line representation the prespecializations library emitted
+/// for a tuple, or null if the library provides no tuple matching the key.
+static const TupleTypeMetadata *
+getPrespecializedTupleTypeMetadata(const TupleCacheEntry::Key &key) {
+  auto *candidates =
+      getLibPrespecializedTupleTypeMetadata(key.Elements, key.NumElements);
+  if (!candidates)
+    return nullptr;
+
+  // The table's key is only the element types, so tuples that differ solely in
+  // their labels share an entry. Find the one that matches the whole request.
+  for (size_t i = 0; i < candidates->count; i++) {
+    auto *metadata = cast<TupleTypeMetadata>(candidates->metadata[i]);
+    if (TupleCacheEntry::metadataMatchesKey(*metadata, key))
+      return metadata;
+  }
+  return nullptr;
+}
 
 /// Generic tuple value witness for 'allocateBuffer'
 template <bool IsPOD, bool IsInline>
@@ -2496,9 +2669,8 @@ static void tuple_storeExtraInhabitantTag(OpaqueValue *tuple,
                                           unsigned xiCount,
                                           const Metadata *_metatype) {
   auto &metatype = *(const TupleTypeMetadata*) _metatype;
-  auto cacheEntry = TupleCacheStorage::resolveExistingEntry(&metatype);
-  auto &eltInfo =
-    metatype.getElement(cacheEntry->ExtraInhabitantProvidingElement);
+  auto &eltInfo = metatype.getElement(
+      TupleCacheEntry::extraInhabitantProvidingElement(&metatype));
   assert(xiCount == eltInfo.Type->vw_getNumExtraInhabitants());
 
   auto *elt = (OpaqueValue*)((uintptr_t)tuple + eltInfo.Offset);
@@ -2514,9 +2686,8 @@ static unsigned tuple_getExtraInhabitantTag(const OpaqueValue *tuple,
                                             const Metadata *_metatype) {
   auto &metatype = *(const TupleTypeMetadata*) _metatype;
 
-  auto cacheEntry = TupleCacheStorage::resolveExistingEntry(&metatype);
-  auto &eltInfo =
-    metatype.getElement(cacheEntry->ExtraInhabitantProvidingElement);
+  auto &eltInfo = metatype.getElement(
+      TupleCacheEntry::extraInhabitantProvidingElement(&metatype));
   assert(xiCount == eltInfo.Type->vw_getNumExtraInhabitants());
 
   auto *elt = (const OpaqueValue*)((uintptr_t)tuple + eltInfo.Offset);
@@ -2552,7 +2723,9 @@ tuple_storeEnumTagSinglePayload(OpaqueValue *enumAddr, unsigned whichCase,
 }
 
 /// Various standard witness table for tuples.
-static const ValueWitnessTable tuple_witnesses_pod_inline = {
+///
+/// Exported so the prespecialization library can use these witnesses.
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_pod_inline = {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) &tuple_##LOWER_ID<true, true>,
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
@@ -2562,7 +2735,7 @@ static const ValueWitnessTable tuple_witnesses_pod_inline = {
   ValueWitnessFlags(),
   0
 };
-static const ValueWitnessTable tuple_witnesses_nonpod_inline = {
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_nonpod_inline = {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) &tuple_##LOWER_ID<false, true>,
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
@@ -2572,7 +2745,7 @@ static const ValueWitnessTable tuple_witnesses_nonpod_inline = {
   ValueWitnessFlags(),
   0
 };
-static const ValueWitnessTable tuple_witnesses_pod_noninline = {
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_pod_noninline = {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) &tuple_##LOWER_ID<true, false>,
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
@@ -2582,7 +2755,7 @@ static const ValueWitnessTable tuple_witnesses_pod_noninline = {
   ValueWitnessFlags(),
   0
 };
-static const ValueWitnessTable tuple_witnesses_nonpod_noninline = {
+SWIFT_RUNTIME_EXPORT const ValueWitnessTable swift_tupleWitnesses_nonpod_noninline = {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) &tuple_##LOWER_ID<false, false>,
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
@@ -2608,17 +2781,20 @@ static constexpr TypeLayout getInitialLayoutForHeapObject() {
 /// calling a functor with the offset of each field, and returning the
 /// final layout characteristics of the type.
 ///
+/// Returns false if the running size overflows size_t, leaving \p layout
+/// untouched. \p setOffset will already have run for the elements preceding the
+/// overflow.
+///
 /// GetLayoutFn should have signature:
 ///   const TypeLayout *(ElementType &type);
 ///
 /// SetOffsetFn should have signature:
 ///   void (size_t index, ElementType &type, size_t offset)
-template<typename ElementType, typename GetLayoutFn, typename SetOffsetFn>
-static void performBasicLayout(TypeLayout &layout,
-                               ElementType *elements,
-                               size_t numElements,
-                               GetLayoutFn &&getLayout,
-                               SetOffsetFn &&setOffset) {
+template <typename ElementType, typename GetLayoutFn, typename SetOffsetFn>
+[[nodiscard]] static bool
+performBasicLayout(TypeLayout &layout, ElementType *elements,
+                   size_t numElements, GetLayoutFn &&getLayout,
+                   SetOffsetFn &&setOffset) {
   size_t size = layout.size;
   size_t alignMask = layout.flags.getAlignmentMask();
   bool isPOD = layout.flags.isPOD();
@@ -2631,13 +2807,18 @@ static void performBasicLayout(TypeLayout &layout,
 
     // Lay out this element.
     const TypeLayout *eltLayout = getLayout(i, elt);
-    size = roundUpToAlignMask(size, eltLayout->flags.getAlignmentMask());
+    if (SWIFT_UNLIKELY(!roundUpToAlignMaskCheckingOverflow(
+            size, eltLayout->flags.getAlignmentMask(), size)))
+      return false;
 
     // Report this record to the functor.
     setOffset(i, elt, size);
 
     // Update the size and alignment of the aggregate..
-    size += eltLayout->size;
+    bool overflowed = false;
+    size = llvm::SaturatingAdd(size, (size_t)eltLayout->size, &overflowed);
+    if (SWIFT_UNLIKELY(overflowed))
+      return false;
     alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
     if (!eltLayout->flags.isPOD()) isPOD = false;
     if (!eltLayout->flags.isCopyable()) isCopyable = false;
@@ -2649,6 +2830,13 @@ static void performBasicLayout(TypeLayout &layout,
   bool isInline =
       ValueWitnessTable::isValueInline(isBitwiseTakable, size, alignMask + 1);
 
+  // The stride rounds the size up again, which can carry even when the size
+  // itself did not.
+  size_t stride;
+  if (SWIFT_UNLIKELY(
+          !roundUpToAlignMaskCheckingOverflow(size, alignMask, stride)))
+    return false;
+
   layout.size = size;
   layout.flags = ValueWitnessFlags()
                      .withAlignmentMask(alignMask)
@@ -2659,16 +2847,95 @@ static void performBasicLayout(TypeLayout &layout,
                      .withAddressableForDependencies(isAddressableForDependencies)
                      .withInlineStorage(isInline);
   layout.extraInhabitantCount = 0;
-  layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
+  layout.stride = std::max(size_t(1), stride);
+  return true;
+}
+
+/// Report that a type's layout size is not representable and halt.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE static void
+fatalLayoutOverflow(const char *kind, const char *name) {
+  swift::fatalError(
+      0, "%s %s has a layout size that is too large to be representable\n",
+      kind, name);
+}
+
+/// Report that a field offset doesn't fit the field offset vector and halt.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE static void
+fatalFieldOffsetOverflow(const char *kind, const char *name) {
+  swift::fatalError(0,
+                    "%s %s has a field offset that does not fit in the 32-bit "
+                    "field offset vector\n",
+                    kind, name);
+}
+
+/// Report that a tuple's layout size is not representable and halt. Tuples are
+/// structural, so there is no name to report.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE static void
+fatalTupleLayoutOverflow() {
+  swift::fatalError(
+      0, "tuple has a layout size that is too large to be representable\n");
+}
+
+/// Report that a tuple element offset doesn't fit the field it's published in
+/// and halt.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE static void
+fatalTupleElementOffsetOverflow() {
+  swift::fatalError(0, "tuple has an element offset that does not fit in the "
+                       "32-bit element offset field\n");
+}
+
+/// Report that a class instance size doesn't fit the 32-bit field it's
+/// published in and halt.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE static void
+fatalInstanceSizeOverflow(const char *name, size_t size) {
+  swift::fatalError(0,
+                    "class %s has an instance size of %zu bytes, which exceeds "
+                    "the 32-bit InstanceSize field\n",
+                    name, size);
+}
+
+/// Lay out a tuple, writing each element offset into \p elementOffsets, which
+/// may be null. Halts if the layout size is not representable, or if an element
+/// offset does not fit in \p OffsetTy.
+template <typename OffsetTy>
+static void getTupleTypeLayoutImpl(TypeLayout *result, OffsetTy *elementOffsets,
+                                   size_t numElements,
+                                   const TypeLayout *const *elements) {
+  *result = TypeLayout();
+  unsigned numExtraInhabitants = 0;
+  bool offsetTruncated = false;
+  if (SWIFT_UNLIKELY(!performBasicLayout(
+          *result, elements, numElements,
+          [](size_t i, const TypeLayout *elt) { return elt; },
+          [elementOffsets, &numExtraInhabitants,
+           &offsetTruncated](size_t i, const TypeLayout *elt, size_t offset) {
+            if (elementOffsets) {
+              if (SWIFT_UNLIKELY(offset >
+                                 (size_t)std::numeric_limits<OffsetTy>::max()))
+                offsetTruncated = true;
+              elementOffsets[i] = OffsetTy(offset);
+            }
+            numExtraInhabitants =
+                std::max(numExtraInhabitants, elt->getNumExtraInhabitants());
+          }))) {
+    fatalTupleLayoutOverflow();
+  }
+
+  if (SWIFT_UNLIKELY(offsetTruncated))
+    fatalTupleElementOffsetOverflow();
+
+  if (numExtraInhabitants > 0) {
+    *result = TypeLayout(result->size, result->stride, result->flags,
+                         numExtraInhabitants);
+  }
 }
 
 size_t swift::swift_getTupleTypeLayout2(TypeLayout *result,
                                         const TypeLayout *elt0,
                                         const TypeLayout *elt1) {
   const TypeLayout *elts[] = { elt0, elt1 };
-  uint32_t offsets[2];
-  swift_getTupleTypeLayout(result, offsets,
-                           TupleTypeFlags().withNumElements(2), elts);
+  size_t offsets[2];
+  getTupleTypeLayoutImpl(result, offsets, 2, elts);
   assert(offsets[0] == 0);
   return offsets[1];
 }
@@ -2678,9 +2945,8 @@ OffsetPair swift::swift_getTupleTypeLayout3(TypeLayout *result,
                                             const TypeLayout *elt1,
                                             const TypeLayout *elt2) {
   const TypeLayout *elts[] = { elt0, elt1, elt2 };
-  uint32_t offsets[3];
-  swift_getTupleTypeLayout(result, offsets,
-                           TupleTypeFlags().withNumElements(3), elts);
+  size_t offsets[3];
+  getTupleTypeLayoutImpl(result, offsets, 3, elts);
   assert(offsets[0] == 0);
   return {offsets[1], offsets[2]};
 }
@@ -2689,24 +2955,8 @@ void swift::swift_getTupleTypeLayout(TypeLayout *result,
                                      uint32_t *elementOffsets,
                                      TupleTypeFlags flags,
                                      const TypeLayout * const *elements) {
-  *result = TypeLayout();
-  unsigned numExtraInhabitants = 0;
-  performBasicLayout(*result, elements, flags.getNumElements(),
-    [](size_t i, const TypeLayout *elt) { return elt; },
-    [elementOffsets, &numExtraInhabitants]
-    (size_t i, const TypeLayout *elt, size_t offset) {
-      if (elementOffsets)
-        elementOffsets[i] = uint32_t(offset);
-      numExtraInhabitants = std::max(numExtraInhabitants,
-                                     elt->getNumExtraInhabitants());
-    });
-  
-  if (numExtraInhabitants > 0) {
-    *result = TypeLayout(result->size,
-                         result->stride,
-                         result->flags,
-                         numExtraInhabitants);
-  }
+  getTupleTypeLayoutImpl(result, elementOffsets, flags.getNumElements(),
+                         elements);
 }
 
 MetadataResponse
@@ -2727,15 +2977,21 @@ swift::swift_getTupleTypeMetadata(MetadataRequest request,
 
   auto &cache = TupleTypes.get();
 
+  // We still cache entries from the prespecializations library, so check the
+  // cache first.
+  if (auto response = cache.tryAwaitExisting(key, request))
+    return *response;
+
+  // If the prespecializations library has this tuple, cache it as an out of
+  // line entry.
+  if (auto *representation = getPrespecializedTupleTypeMetadata(key))
+    return cache.getOrInsert(key, request, representation).second;
+
   // If we have constant labels, directly check the cache.
   if (!flags.hasNonConstantLabels())
     return cache.getOrInsert(key, request, proposedWitnesses).second;
 
   // If we have non-constant labels, we can't simply record the result.
-  // Look for an existing result, first.
-  if (auto response = cache.tryAwaitExisting(key, request))
-    return *response;
-
   // Allocate a copy of the labels string within the tuple type allocator.
   size_t labelsLen = strlen(labels);
   size_t labelsAllocSize = roundUpToAlignment(labelsLen + 2, sizeof(void *));
@@ -2762,6 +3018,11 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
                                  MetadataRequest request,
                                  const ValueWitnessTable *proposedWitnesses)
     : MetadataCacheEntryBase(worker, PrivateMetadataState::Abstract) {
+  // This is an inline entry, so the low bit is zero. The rest of the value is
+  // set in tryInitialize.
+  ExtraInhabitantProvidingElementOrPtr = 0;
+
+  auto &Data = *getData();
   Data.setKind(MetadataKind::Tuple);
   Data.NumElements = key.NumElements;
   Data.Labels = key.Labels;
@@ -2775,6 +3036,20 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   assert(TupleCacheStorage::resolveExistingEntry(&Data) == this);
 }
 
+TupleCacheEntry::TupleCacheEntry(const Key &key,
+                                 MetadataWaitQueue::Worker &worker,
+                                 MetadataRequest request,
+                                 const TupleTypeMetadata *representation)
+    : MetadataCacheEntryBase(worker, PrivateMetadataState::Complete) {
+  auto address = reinterpret_cast<uintptr_t>(asFullMetadata(representation));
+  assert(!(address & OutOfLineBit) && "metadata is not word-aligned");
+  ExtraInhabitantProvidingElementOrPtr = address | OutOfLineBit;
+
+  assert(isOutOfLineRepresentation(representation) &&
+         "constructing out of line cache entry but out of line bit is not set");
+  assert(metadataMatchesKey(*representation, key));
+}
+
 MetadataStateWithDependency
 TupleCacheEntry::tryInitialize(Metadata *metadata,
                                PrivateMetadataState state,
@@ -2786,6 +3061,12 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
   // Otherwise, we must still be abstract, because tuples don't have an
   // intermediate state between that and non-transitive completeness.
   assert(state == PrivateMetadataState::Abstract);
+
+  // An entry that adopted an out of line representation is always complete and
+  // never reaches initialization.
+  assert(hasInlineMetadata());
+  auto &Data = *getData();
+  auto &Witnesses = *getTrailingObjects<ValueWitnessTable>();
 
   bool allElementsTransitivelyComplete = true;
   const Metadata *knownIncompleteElement = nullptr;
@@ -2826,13 +3107,25 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
 
   // Perform basic layout on the tuple.
   auto layout = getInitialLayoutForValueType();
-  performBasicLayout(layout, Data.getElements(), Data.NumElements,
-    [](size_t i, const TupleTypeMetadata::Element &elt) {
-      return elt.getTypeLayout();
-    },
-    [](size_t i, TupleTypeMetadata::Element &elt, size_t offset) {
-      elt.Offset = offset;
-    });
+  // Element::Offset is StoredSize on Apple platforms but uint32_t elsewhere.
+  bool offsetTruncated = false;
+  if (SWIFT_UNLIKELY(!performBasicLayout(
+          layout, Data.getElements(), Data.NumElements,
+          [](size_t i, const TupleTypeMetadata::Element &elt) {
+            return elt.getTypeLayout();
+          },
+          [&offsetTruncated](size_t i, TupleTypeMetadata::Element &elt,
+                             size_t offset) {
+            using OffsetTy = decltype(elt.Offset);
+            if (SWIFT_UNLIKELY(offset >
+                               (size_t)std::numeric_limits<OffsetTy>::max()))
+              offsetTruncated = true;
+            elt.Offset = offset;
+          }))) {
+    fatalTupleLayoutOverflow();
+  }
+  if (SWIFT_UNLIKELY(offsetTruncated))
+    fatalTupleElementOffsetOverflow();
 
   Witnesses.size = layout.size;
   Witnesses.flags = layout.flags;
@@ -2852,7 +3145,8 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
   }
   Witnesses.extraInhabitantCount = numExtraInhabitants;
   if (numExtraInhabitants > 0) {
-    ExtraInhabitantProvidingElement = extraInhabitantProvidingElement;
+    ExtraInhabitantProvidingElementOrPtr =
+        uintptr_t(extraInhabitantProvidingElement) << 1;
   }
 
   // Copy the function witnesses in, either from the proposed
@@ -2875,17 +3169,17 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
       else if (numExtraInhabitants == 0 && layout.size == 1)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi8_);
       else
-        proposedWitnesses = &tuple_witnesses_pod_inline;
+        proposedWitnesses = &swift_tupleWitnesses_pod_inline;
     } else if (layout.flags.isInlineStorage()
                && !layout.flags.isPOD()) {
-      proposedWitnesses = &tuple_witnesses_nonpod_inline;
+      proposedWitnesses = &swift_tupleWitnesses_nonpod_inline;
     } else if (!layout.flags.isInlineStorage()
                && layout.flags.isPOD()) {
-      proposedWitnesses = &tuple_witnesses_pod_noninline;
+      proposedWitnesses = &swift_tupleWitnesses_pod_noninline;
     } else {
       assert(!layout.flags.isInlineStorage()
              && !layout.flags.isPOD());
-      proposedWitnesses = &tuple_witnesses_nonpod_noninline;
+      proposedWitnesses = &swift_tupleWitnesses_nonpod_noninline;
     }
   }
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
@@ -3230,12 +3524,20 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
                                      const TypeLayout *const *fieldTypes,
                                      uint32_t *fieldOffsets) {
   auto layout = getInitialLayoutForValueType();
-  performBasicLayout(
-      layout, fieldTypes, numFields,
-      [&](size_t i, const TypeLayout *fieldType) { return fieldType; },
-      [&](size_t i, const TypeLayout *fieldType, uint32_t offset) {
-        assignUnlessEqual(fieldOffsets[i], offset);
-      });
+  bool offsetTruncated = false;
+  if (SWIFT_UNLIKELY(!performBasicLayout(
+          layout, fieldTypes, numFields,
+          [&](size_t i, const TypeLayout *fieldType) { return fieldType; },
+          [&](size_t i, const TypeLayout *fieldType, size_t offset) {
+            if (SWIFT_UNLIKELY(offset > (size_t)UINT32_MAX))
+              offsetTruncated = true;
+            assignUnlessEqual(fieldOffsets[i], uint32_t(offset));
+          }))) {
+    fatalLayoutOverflow("struct", structType->getDescription()->Name.get());
+  }
+  if (SWIFT_UNLIKELY(offsetTruncated))
+    fatalFieldOffsetOverflow("struct",
+                             structType->getDescription()->Name.get());
 
   // If the struct is always noncopyable, we must honor that.
   if (structType->getDescription()->isUnconditionallySuppressing(
@@ -3274,17 +3576,26 @@ static void swift_cvw_initStructMetadataWithLayoutStringImpl(
   assert(structType->hasLayoutString());
 
   auto layout = getInitialLayoutForValueType();
-  performBasicLayout(
-      layout, fieldTypes, numFields,
-      [&](size_t i, const uint8_t *fieldType) {
-        if (fieldTags[i]) {
-          return (const TypeLayout*)fieldType;
-        }
-        return ((const Metadata*)fieldType)->getTypeLayout();
-      },
-      [&](size_t i, const uint8_t *fieldType, uint32_t offset) {
-        assignUnlessEqual(fieldOffsets[i], offset);
-      });
+  // The field offset vector is 32 bits wide.
+  bool offsetTruncated = false;
+  if (SWIFT_UNLIKELY(!performBasicLayout(
+          layout, fieldTypes, numFields,
+          [&](size_t i, const uint8_t *fieldType) {
+            if (fieldTags[i]) {
+              return (const TypeLayout *)fieldType;
+            }
+            return ((const Metadata *)fieldType)->getTypeLayout();
+          },
+          [&](size_t i, const uint8_t *fieldType, size_t offset) {
+            if (SWIFT_UNLIKELY(offset > (size_t)UINT32_MAX))
+              offsetTruncated = true;
+            assignUnlessEqual(fieldOffsets[i], uint32_t(offset));
+          }))) {
+    fatalLayoutOverflow("struct", structType->getDescription()->Name.get());
+  }
+  if (SWIFT_UNLIKELY(offsetTruncated))
+    fatalFieldOffsetOverflow("struct",
+                             structType->getDescription()->Name.get());
 
   // If the struct is always noncopyable, we must honor that.
   if (layout.flags.isCopyable() &&
@@ -4142,15 +4453,23 @@ static void initClassFieldOffsetVector(ClassMetadata *self,
     // Skip empty fields.
     if (fieldOffsets[i] == 0 && eltLayout->size == 0)
       continue;
-    auto offset = roundUpToAlignMask(size,
-                                     eltLayout->flags.getAlignmentMask());
+    size_t offset;
+    if (SWIFT_UNLIKELY(!roundUpToAlignMaskCheckingOverflow(
+            size, eltLayout->flags.getAlignmentMask(), offset)))
+      fatalLayoutOverflow("class", self->getDescription()->Name.get());
     fieldOffsets[i] = offset;
-    size = offset + eltLayout->size;
+    bool overflowed = false;
+    size = llvm::SaturatingAdd(offset, (size_t)eltLayout->size, &overflowed);
+    if (SWIFT_UNLIKELY(overflowed))
+      fatalLayoutOverflow("class", self->getDescription()->Name.get());
     alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
   }
 
   // Save the final size and alignment into the metadata record.
   assert(self->isTypeMetadata());
+  // InstanceSize is 32 bits. Ensure we don't overflow it.
+  if (SWIFT_UNLIKELY(size > (size_t)UINT32_MAX))
+    fatalInstanceSizeOverflow(self->getDescription()->Name.get(), size);
   self->setInstanceSize(size);
   self->setInstanceAlignMask(alignMask);
 
@@ -4662,8 +4981,13 @@ swift::swift_updatePureObjCClassMetadata(Class cls,
 
     // Skip empty fields.
     if (offset != 0 || eltLayout->size != 0) {
-      offset = roundUpToAlignMask(size, eltLayout->flags.getAlignmentMask());
-      size = offset + eltLayout->size;
+      if (SWIFT_UNLIKELY(!roundUpToAlignMaskCheckingOverflow(
+              size, eltLayout->flags.getAlignmentMask(), offset)))
+        fatalLayoutOverflow("class", rodata->Name);
+      bool overflowed = false;
+      size = llvm::SaturatingAdd(offset, (size_t)eltLayout->size, &overflowed);
+      if (SWIFT_UNLIKELY(overflowed))
+        fatalLayoutOverflow("class", rodata->Name);
       alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
 
       // Fill in the field offset global, if this ivar has one.
@@ -4696,7 +5020,10 @@ swift::swift_updatePureObjCClassMetadata(Class cls,
     }
   }
 
-  // Save the size into the Objective-C metadata.
+  // Save the size into the Objective-C metadata. Ensure we don't overflow the
+  // 32-bit size field.
+  if (SWIFT_UNLIKELY(size > (size_t)UINT32_MAX))
+    fatalInstanceSizeOverflow(rodata->Name, size);
   if (rodata->InstanceSize != size)
     rodata->InstanceSize = size;
 
@@ -5125,6 +5452,8 @@ OpaqueExistentialValueWitnesses_0 =
 static const ValueWitnessTable
 OpaqueExistentialValueWitnesses_1 =
   ValueWitnessTableForBox<OpaqueExistentialBox<1>>::table;
+static const ValueWitnessTable COMExistentialValueWitnesses =
+  ValueWitnessTableForBox<COMExistentialBox>::table;
 
 /// The standard metadata for Any.
 const FullMetadata<ExistentialTypeMetadata> swift::
@@ -5289,7 +5618,10 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
     // Without ObjC interop, Error is native-refcounted.
     return &VALUE_WITNESS_SYM(Bo);
 #endif
-      
+
+  case SpecialProtocol::COM:
+    return &COMExistentialValueWitnesses;
+
   // Other existentials use standard representation.
   case SpecialProtocol::None:
     break;
@@ -5313,6 +5645,8 @@ ExistentialTypeMetadata::getRepresentation() const {
   switch (Flags.getSpecialProtocol()) {
   case SpecialProtocol::Error:
     return ExistentialTypeRepresentation::Error;
+  case SpecialProtocol::COM:
+    return ExistentialTypeRepresentation::COM;
   case SpecialProtocol::None:
     break;
   }
@@ -5347,6 +5681,8 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->isPureNSError();
   }
+  case ExistentialTypeRepresentation::COM:
+    return true;
   }
 
   swift_unreachable(
@@ -5370,6 +5706,10 @@ const {
   case ExistentialTypeRepresentation::Error:
     // TODO: If we were able to claim the value from a uniquely-owned
     // existential box, we would want to deallocError here.
+    break;
+
+  case ExistentialTypeRepresentation::COM:
+    // Taking the interface pointer leaves no auxiliary container state.
     break;
   }
 }
@@ -5396,6 +5736,9 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
       return container;
     return errorBox->getValue();
   }
+  case ExistentialTypeRepresentation::COM:
+    // The interface pointer is the existential value.
+    return container;
   }
 
   swift_unreachable(
@@ -5421,6 +5764,8 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getType();
   }
+  case ExistentialTypeRepresentation::COM:
+    swift_unreachable("the dynamic Swift type of a COM existential is not directly projectable");
   }
 
   swift_unreachable(
@@ -5457,6 +5802,8 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getErrorConformance();
   }
+  case ExistentialTypeRepresentation::COM:
+    swift_unreachable("COM existentials do not store Swift witness tables");
   }
 
   // The return type here describes extra structure for the protocol
@@ -5526,19 +5873,30 @@ swift::swift_getExistentialTypeMetadata(
 }
 
 ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
-  // Calculate the class constraint and number of witness tables for the
-  // protocol set.
-  unsigned numWitnessTables = 0;
-  for (auto p : make_range(key.Protocols, key.Protocols + key.NumProtocols)) {
-    if (p.needsWitnessTable())
-      ++numWitnessTables;
-  }
-
-  // Get the special protocol kind for an uncomposed protocol existential.
-  // Protocol compositions are currently never special.
+  // Get the special protocol kind. Marker protocols are omitted before this
+  // runtime entry is called. A refined COM-interface chain may contain more
+  // than one descriptor, but every remaining protocol still has the same COM
+  // representation.
   auto special = SpecialProtocol::None;
   if (key.NumProtocols == 1)
     special = key.Protocols[0].getSpecialProtocol();
+  else if (key.NumProtocols > 1 &&
+           llvm::all_of(
+               make_range(key.Protocols, key.Protocols + key.NumProtocols),
+               [](ProtocolDescriptorRef protocol) {
+                 return protocol.getSpecialProtocol() == SpecialProtocol::COM;
+               }))
+    special = SpecialProtocol::COM;
+
+  // Calculate the class constraint and number of witness tables for the
+  // protocol set.
+  unsigned numWitnessTables = 0;
+  if (special != SpecialProtocol::COM) {
+    for (auto p : make_range(key.Protocols, key.Protocols + key.NumProtocols)) {
+      if (p.needsWitnessTable())
+        ++numWitnessTables;
+    }
+  }
 
   Data.setKind(MetadataKind::Existential);
   Data.ValueWitnesses = getExistentialValueWitnesses(key.ClassConstraint,
@@ -7762,6 +8120,9 @@ MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
     }
 
     MetadataResponse forTupleMetadata(const TupleTypeMetadata *metadata) {
+      // An out of line representation is always complete.
+      if (TupleCacheEntry::isOutOfLineRepresentation(metadata))
+        return MetadataResponse{metadata, MetadataState::Complete};
       return TupleTypes.get().await(metadata, Request);
     }
 
@@ -8313,6 +8674,31 @@ static void checkAllocatorDebugEnvironmentVariables(void *context) {
   _swift_debug_allocationPoolBackPointerOffset = PoolRange::PageSize - sizeof(PoolTrailer);
 }
 
+// Used to allocate new pages for the allocator, or for metadata allocations
+// larger than the pool allocation size.
+static void *allocateRawMetadataMemory(size_t size, size_t alignMask) {
+#ifdef MALLOC_ZONE_MALLOC_DEFAULT_ALIGN
+  // ObjC classes (and thus Swift classes) need to be allocated with the
+  // canonical tag, because the ObjC runtime uses the high bits of the isa field
+  // for other purposes. For now, force all Swift metadata to be allocated with
+  // the canonical tag. In the future, we should be able to refine this so that
+  // only classes use the canonical tag, and maybe only NSObject subclasses.
+  //
+  // Match the value of MALLOC_ZONE_MALLOC_OPTION_CANONICAL_TAG without
+  // referencing it, so we can build against SDKs that don't have it.
+  auto canonicalTag = (malloc_zone_malloc_options_t)(1u << 1);
+  size_t alignment = alignMask + 1;
+  if (alignment < sizeof(void *))
+    alignment = sizeof(void *);
+  size = roundUpToAlignment(size, alignment);
+
+  if (__builtin_available(macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0,
+                          visionOS 26.0, *))
+    return malloc_zone_malloc_with_options(NULL, alignment, size, canonicalTag);
+#endif
+  return swift_slowAlloc(size, alignMask);
+}
+
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   assert(Tag != 0);
   assert(alignment <= alignof(void*));
@@ -8323,7 +8709,7 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
 
   // If the size is larger than the maximum, just do a normal heap allocation.
   if (size > PoolRange::MaxPoolAllocationSize) {
-    void *allocation = swift_slowAlloc(size, alignment - 1);
+    void *allocation = allocateRawMetadataMemory(size, alignment - 1);
     memsetScribble(allocation, size);
     return allocation;
   }
@@ -8346,8 +8732,8 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
                            curState.Remaining - sizeWithHeader};
     } else {
       allocatedNewPage = true;
-      allocation = reinterpret_cast<char *>(swift_slowAlloc(PoolRange::PageSize,
-                                                            alignof(char) - 1));
+      allocation = reinterpret_cast<char *>(
+          allocateRawMetadataMemory(PoolRange::PageSize, alignof(char) - 1));
       memsetScribble(allocation, PoolRange::PageSize);
 
       auto poolSize = PoolRange::PageSize;

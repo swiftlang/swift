@@ -15,9 +15,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -25,20 +23,9 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/STLExtras.h"
-#include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/Serialization/SerializationOptions.h"
-#include "swift/Serialization/Validation.h"
 #include "clang/Basic/Module.h"
-#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/Regex.h"
-#include "llvm/Support/StringSaver.h"
 
 using namespace swift;
 
@@ -248,7 +235,7 @@ static void printImports(raw_ostream &out,
   for (auto import : allImports) {
     auto importedModule = import.importedModule;
     if (importedModule->isOnoneSupportModule() ||
-        importedModule->isClangHeaderImportModule()) {
+        importedModule->isClangBridgingHeaderImportModule()) {
       continue;
     }
 
@@ -486,6 +473,15 @@ class InheritedProtocolCollector {
 
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
       for (ProtocolDecl *protoDecl : layout.getProtocols()) {
+        // Do not record conformances to invertible protocols, as their
+        // conformances are always re-inferred using the interface itself.
+        // Note that the existential layout of an inherited type synthesizes
+        // entries for every invertible protocol that the type does not
+        // suppress, so these are usually not conformances that the extension
+        // actually declares.
+        if (protoDecl->getInvertibleProtocolKind())
+          continue;
+
         auto protoTy = protoDecl->getDeclaredInterfaceType()->castTo<ProtocolType>();
         if (!isPublicOrUsableFromInline(protoTy))
           continue;
@@ -747,35 +743,20 @@ public:
       return false;
     assert(nominal->isGenericContext());
 
-    auto emitExtension =
-        [&](ArrayRef<const ProtocolType *> conformanceProtos) {
-      if (!printOptions.printPublicInterface())
-        out << "@_spi(" << DummyProtocolName << ")\n";
-      out << "@available(*, unavailable)\nextension ";
-      nominal->getDeclaredType().print(out, printOptions);
-      out << " : ";
-      llvm::interleave(
-          conformanceProtos,
-          [&out, &printOptions](const ProtocolType *protoTy) {
-            protoTy->print(out, printOptions);
-          },
-          [&out] { out << ", "; });
-      out << " where "
-          << nominal->getGenericSignature().getGenericParams()[0]->getName()
-          << " : " << DummyProtocolName << " {}\n";
-    };
-
-    // We have to print conformances for invertible protocols in separate
-    // extensions, so do those first and save the rest for one extension.
-    SmallVector<const ProtocolType *, 8> regulars;
-    for (auto *proto : ConditionalConformanceProtocols) {
-      if (proto->getDecl()->getInvertibleProtocolKind()) {
-        emitExtension(proto);
-        continue;
-      }
-      regulars.push_back(proto);
-    }
-    emitExtension(regulars);
+    if (!printOptions.printPublicInterface())
+      out << "@_spi(" << DummyProtocolName << ")\n";
+    out << "@available(*, unavailable)\nextension ";
+    nominal->getDeclaredType().print(out, printOptions);
+    out << " : ";
+    llvm::interleave(
+        ConditionalConformanceProtocols,
+        [&out, &printOptions](const ProtocolType *protoTy) {
+          protoTy->print(out, printOptions);
+        },
+        [&out] { out << ", "; });
+    out << " where "
+        << nominal->getGenericSignature().getGenericParams()[0]->getName()
+        << " : " << DummyProtocolName << " {}\n";
     return true;
   }
 

@@ -29,11 +29,13 @@ struct NoPointersUnsafe {
   float x, y, z;
 } SWIFT_UNSAFE;
 
+// expected-note@+1 {{this type has unknown escapability: its member 'numbers' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
 struct HasPointers {
   float *numbers;
 };
 
 
+// expected-note@+1 {{this type has unknown escapability: its member 'numbers' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
 union HasPointersUnion {
   float *numbers;
   double x;
@@ -54,6 +56,7 @@ struct HasRefCounted {
   struct RefCountedType *ref;
 };
 
+// expected-note@+1 {{this type has unknown escapability: its member 'next' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
 struct ListNode {
   double data;
   struct ListNode *next;

@@ -29,26 +29,19 @@
 
 #define DEBUG_TYPE "sil-move-only-type-eliminator"
 
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 
 using namespace swift;
 
@@ -215,6 +208,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(Builtin)
   NO_UPDATE_NEEDED(CheckedCastBranch)
   NO_UPDATE_NEEDED(ClassMethod)
+  NO_UPDATE_NEEDED(COMMethod)
   NO_UPDATE_NEEDED(ConvertFunction)
   NO_UPDATE_NEEDED(CopyAddr)
   NO_UPDATE_NEEDED(DeallocBox)
@@ -236,6 +230,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(OpenExistentialAddr)
   NO_UPDATE_NEEDED(OpenExistentialBox)
   NO_UPDATE_NEEDED(OpenExistentialRef)
+  NO_UPDATE_NEEDED(OpenCOMExistential)
   NO_UPDATE_NEEDED(ProjectBox)
   NO_UPDATE_NEEDED(RefElementAddr)
   NO_UPDATE_NEEDED(RefToBridgeObject)
@@ -245,6 +240,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(UncheckedTakeEnumDataAddr)
   NO_UPDATE_NEEDED(UncheckedBorrowEnumDataAddr)
   NO_UPDATE_NEEDED(UncheckedInPlaceEnumDataAddr)
+  NO_UPDATE_NEEDED(ValueMetatype)
   NO_UPDATE_NEEDED(MakeBorrow)
   NO_UPDATE_NEEDED(MakeAddrBorrow)
   NO_UPDATE_NEEDED(InitBorrowAddr)
@@ -321,27 +317,14 @@ namespace {
 
 struct SILMoveOnlyWrappedTypeEliminator {
   SILFunction *fn;
-  bool trivialOnly;
 
-  SILMoveOnlyWrappedTypeEliminator(SILFunction *fn, bool trivialOnly)
-      : fn(fn), trivialOnly(trivialOnly) {}
+  SILMoveOnlyWrappedTypeEliminator(SILFunction *fn)
+      : fn(fn) {}
 
   bool process();
 };
 
 } // namespace
-
-/// Returns true if this is a moveonlywrapped type whose underlying type is a
-/// trivial type /or/ if this is a boxed type of that sort.
-static bool isMoveOnlyWrappedTrivial(SILValue value) {
-  auto *fn = value->getFunction();
-  SILType type = value->getType();
-  if (type.removingMoveOnlyWrapper().isTrivial(fn))
-    return true;
-  if (type.isBoxedMoveOnlyWrappedType(fn))
-    return type.getSILBoxFieldType(fn).removingMoveOnlyWrapper().isTrivial(fn);
-  return false;
-}
 
 bool SILMoveOnlyWrappedTypeEliminator::process() {
   bool madeChange = false;
@@ -351,13 +334,8 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
   // For each value whose type is move-only wrapped:
   // - rewrite the value's type
   // - record its users for later visitation
-  auto visitValue = [&touchedInsts, fn = fn,
-                     trivialOnly = trivialOnly](SILValue value) -> bool {
+  auto visitValue = [&touchedInsts, fn = fn](SILValue value) -> bool {
     if (!value->getType().hasAnyMoveOnlyWrapping(fn))
-      return false;
-
-    // If we are looking at trivial only, skip non-trivial function args.
-    if (trivialOnly && !isMoveOnlyWrappedTrivial(value))
       return false;
 
     for (auto *use : value->getNonTypeDependentUses())
@@ -444,10 +422,8 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
 namespace {
 
 struct SILMoveOnlyWrappedTypeEliminatorPass : SILFunctionTransform {
-  bool trivialOnly;
-
-  SILMoveOnlyWrappedTypeEliminatorPass(bool trivialOnly)
-      : SILFunctionTransform(), trivialOnly(trivialOnly) {}
+  SILMoveOnlyWrappedTypeEliminatorPass()
+      : SILFunctionTransform() {}
 
   void run() override {
     auto *fn = getFunction();
@@ -460,7 +436,7 @@ struct SILMoveOnlyWrappedTypeEliminatorPass : SILFunctionTransform {
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
-    if (SILMoveOnlyWrappedTypeEliminator(getFunction(), trivialOnly)
+    if (SILMoveOnlyWrappedTypeEliminator(getFunction())
             .process()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
@@ -469,10 +445,6 @@ struct SILMoveOnlyWrappedTypeEliminatorPass : SILFunctionTransform {
 
 } // anonymous namespace
 
-SILTransform *swift::createTrivialMoveOnlyTypeEliminator() {
-  return new SILMoveOnlyWrappedTypeEliminatorPass(true /*trivial only*/);
-}
-
 SILTransform *swift::createMoveOnlyTypeEliminator() {
-  return new SILMoveOnlyWrappedTypeEliminatorPass(false /*trivial only*/);
+  return new SILMoveOnlyWrappedTypeEliminatorPass();
 }

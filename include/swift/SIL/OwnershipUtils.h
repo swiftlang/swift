@@ -15,15 +15,12 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/NoDiscard.h"
 #include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/StackList.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
@@ -194,6 +191,10 @@ bool findUsesOfSimpleValue(SILValue value,
 /// reborrows.
 bool visitGuaranteedForwardingPhisForSSAValue(
     SILValue value, function_ref<bool(Operand *)> func);
+
+/// Visit all GuaranteedForwardingPhis of \p value, following phi uses.
+bool visitExtendedGuaranteedForwardingPhis(
+    SILValue value, function_ref<bool(Operand *)> visitor);
 
 //===----------------------------------------------------------------------===//
 //                                Abstractions

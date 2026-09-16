@@ -21,11 +21,8 @@
 #include "Initialization.h"
 #include "SILGenFunction.h"
 #include "swift/AST/CanTypeVisitor.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/AbstractionPattern.h"
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
@@ -296,7 +293,7 @@ static ManagedValue implodeTupleValues(ArrayRef<ManagedValue> values,
 
   // To implode an address-only tuple, we need to create a buffer to hold the
   // result tuple.
-  if (TL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
+  if (!TL.isLoadableOrOpaque(SGF.F)) {
     assert(KIND != ImplodeKind::Unmanaged &&
            "address-only values are always managed!");
     auto buffer = SGF.emitTemporary(l, TL);
@@ -744,6 +741,17 @@ RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
   borrowedValues.reserve(values.size());
   for (ManagedValue v : values) {
     borrowedValues.emplace_back(v.borrow(SGF, loc));
+  }
+  return RValue(SGF, std::move(borrowedValues), type, elementsToBeAdded);
+}
+
+RValue RValue::formalAccessBorrow(SILGenFunction &SGF, SILLocation loc) const & {
+  assert((isComplete() || isInSpecialState()) &&
+         "can't borrow incomplete rvalue");
+  std::vector<ManagedValue> borrowedValues;
+  borrowedValues.reserve(values.size());
+  for (ManagedValue v : values) {
+    borrowedValues.emplace_back(v.formalAccessBorrow(SGF, loc));
   }
   return RValue(SGF, std::move(borrowedValues), type, elementsToBeAdded);
 }

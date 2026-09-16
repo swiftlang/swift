@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "bit-dataflow"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BitDataflow.h"
 #include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/MemoryLocations.h"

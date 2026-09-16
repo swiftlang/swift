@@ -19,15 +19,29 @@
 
 #include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
-#include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
+// The full Metadata.h is only needed for ResultTypeInfo's non-embedded
+// representation below, which calls value witness methods on Metadata.
+// Everywhere else in this header, Metadata/HeapMetadata are used as opaque
+// pointers, satisfied by the forward declarations in MetadataValues.h and
+// HeapObject.h.
+#if !SWIFT_CONCURRENCY_EMBEDDED
+#include "swift/ABI/Metadata.h"
+#endif
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/VoucherShims.h"
+
+#ifndef SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
+#if SWIFT_CONCURRENCY_EMBEDDED
+#define SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY 0
+#else
+#define SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY 1
+#endif
+#endif
 #include "swift/Basic/STLExtras.h"
 #include "swift/Threading/ConditionVariable.h"
 #include "swift/Threading/Mutex.h"
-#include "bitset"
-#include "queue" // TODO: remove and replace with our own mpsc
+#include "llvm/ADT/PointerIntPair.h"
 
 // Does the runtime integrate with libdispatch?
 #if defined(SWIFT_CONCURRENCY_USES_DISPATCH)
@@ -374,10 +388,19 @@ public:
     static constexpr size_t ActiveTaskStatusSize = 2 * sizeof(void *);
 #endif
 
+#if !SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
+    static constexpr size_t TaskRegistryTaskSize = 0;
+#else
+    // registryNext and registryPrev pointers
+    static constexpr size_t TaskRegistryTaskSize = 2 * sizeof(void *);
+#endif
+
     // Private storage is currently 6 pointers, 16 bytes of non-pointer data,
-    // 8 bytes of padding, the ActiveTaskStatus, and a RecursiveMutex.
+    // 8 bytes of padding, the ActiveTaskStatus, a RecursiveMutex, and
+    // potentially 2 task registry pointers.
     static constexpr size_t PrivateStorageSize =
       6 * sizeof(void *) + 16 + 8 + ActiveTaskStatusSize
+      + TaskRegistryTaskSize
       + sizeof(RecursiveMutex);
 
     char Storage[PrivateStorageSize];
@@ -604,6 +627,11 @@ public:
   /// `swift_task_popTaskExecutorPreference(record)` method pair.
   void dropInitialTaskExecutorPreferenceRecord();
 
+  // ==== Task Deadlines -------------------------------------------------------
+
+  /// Inherit the deadline status from parent task if present.
+  void inheritDeadlineFrom(AsyncTask *parent);
+
   // ==== Task Local Values ----------------------------------------------------
 
   void localValuePush(const HeapObject *key,
@@ -762,6 +790,18 @@ public:
   private:
     TaskGroup* Group;
 
+    /// The next task in the intrusive singly-linked list of tasks that have
+    /// completed and are ready to be consumed by the owning group's ready
+    /// queue, in FIFO order, with the low bit stealing storage for whether
+    /// this task completed with an error (the ready queue only has access
+    /// to the task itself, not the group's own bookkeeping, when dequeuing).
+    /// A task-group child is only ever offered to (and thus only ever
+    /// linked into the ready queue of) its own group, and only once, so
+    /// it's safe to store this link directly in the task rather than in a
+    /// separately allocated queue node. Only meaningful while this task is
+    /// actually enqueued; see `NaiveTaskGroupQueue` in TaskGroup.cpp.
+    llvm::PointerIntPair<AsyncTask *, 1, bool> NextReadyTaskAndErrorFlag;
+
     friend class AsyncTask;
     friend class TaskGroup;
 
@@ -772,6 +812,20 @@ public:
     /// Return the group this task should offer into when it completes.
     TaskGroup* getGroup() {
       return Group;
+    }
+
+    AsyncTask *getNextReadyTask() const {
+      return NextReadyTaskAndErrorFlag.getPointer();
+    }
+    void setNextReadyTask(AsyncTask *task) {
+      NextReadyTaskAndErrorFlag.setPointer(task);
+    }
+
+    bool getReadyHadErrorResult() const {
+      return NextReadyTaskAndErrorFlag.getInt();
+    }
+    void setReadyHadErrorResult(bool hadError) {
+      NextReadyTaskAndErrorFlag.setInt(hadError);
     }
   };
 

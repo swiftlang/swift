@@ -20,7 +20,7 @@ d4.f()
 // CHECK: call {{.*}} @{{_ZN8Derived31fEv|"\?f@Derived3@@UEAAHXZ"}}
 // CHECK: call swiftcc {{.*}} @"$sSo8Derived4V1fs5Int32VyF"
 
-// CHECK: define {{.*}} @"$sSo8Derived4V1fs5Int32VyF"(ptr swiftself dereferenceable
+// CHECK: define {{.*}} @"$sSo8Derived4V1fs5Int32VyF"(ptr noalias swiftself dereferenceable
 // CHECK: call {{.*}}  @{{.*}}__synthesizedBaseCall_{{.*}}
 
 // CHECK: define {{.*}}void @{{_ZN7DerivedIiE3fooEv|"\?foo@\?\$Derived@H@@UEAAXXZ"}}

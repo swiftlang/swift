@@ -2,7 +2,7 @@
 
 // CHECK: struct Lander<CChar> {
 // CHECK:   init()
-// CHECK:   typealias size_type = {{UInt|UInt32}}
-// CHECK:   mutating func test(_: {{UInt|UInt32}})
+// CHECK:   typealias size_type = {{CUnsignedLong|CUnsignedInt}}
+// CHECK:   mutating func test(_: {{CUnsignedLong|CUnsignedInt}})
 // CHECK: }
 // CHECK: typealias Surveyor = Lander<CChar>

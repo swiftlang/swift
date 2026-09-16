@@ -35,8 +35,14 @@ Type ide::eraseArchetypes(Type type, GenericSignature genericSig) {
       auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
       erasedParams.emplace_back(param.withType(erasedTy));
     }
+    SmallVector<AnyFunctionType::Yield, 1> erasedYields;
+    for (const auto &yield : genericFuncType->getYields()) {
+      auto erasedTy = eraseArchetypes(yield.getType(), genericSig);
+      erasedYields.emplace_back(erasedTy, yield.getFlags());
+    }
+
     return GenericFunctionType::get(
-        genericSig, erasedParams,
+        genericSig, erasedParams, erasedYields,
         eraseArchetypes(genericFuncType->getResult(), genericSig),
         genericFuncType->getExtInfo());
   }
@@ -449,7 +455,10 @@ bool CodeCompletionStringBuilder::addCallArgumentPatterns(
     ArrayRef<const ParamDecl *> declParams, const DeclContext *DC,
     GenericSignature genericSig, DefaultArgumentOutputMode defaultArgsMode,
     bool includeDefaultValues) {
-  assert(declParams.empty() || typeParams.size() == declParams.size());
+  // 'declParams' may be empty, or shorter than 'typeParams': a variadic generic
+  // parameter pack is a single 'ParamDecl' that expands to multiple substituted
+  // function type parameters, and error recovery can leave the decl and its type
+  // disagreeing. Index 'declParams' defensively rather than in lockstep.
 
   bool modifiedBuilder = false;
   bool needComma = false;
@@ -466,7 +475,7 @@ bool CodeCompletionStringBuilder::addCallArgumentPatterns(
     SmallString<32> Scratch;
     StringRef defaultValue;
 
-    if (!declParams.empty()) {
+    if (i < declParams.size()) {
       const ParamDecl *PD = declParams[i];
       hasDefault =
           PD->isDefaultArgument() && !isNonDesirableImportedDefaultArg(PD);

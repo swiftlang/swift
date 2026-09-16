@@ -19,6 +19,9 @@ roots:
       - name: module.modulemap
         type: file
         external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/winsdk_um.modulemap"
+      - name: WinSDK.apinotes
+        type: file
+        external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/WinSDK.apinotes"
   - name: "@WindowsSdkDir@/Include/@WindowsSDKVersion@/shared"
     type: directory
     contents:
@@ -51,6 +54,7 @@ install(TARGETS ClangModules
   EXPORT SwiftOverlayTargets)
 install(FILES
   ucrt.modulemap
+  WinSDK.apinotes
   vcruntime.apinotes
   vcruntime.modulemap
   winsdk_um.modulemap

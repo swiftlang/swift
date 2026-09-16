@@ -23,13 +23,12 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/Test.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Transforms/Utils/ModuleUtils.h"
 
 using namespace swift;
+using namespace swift::Lowering;
 
 static llvm::cl::opt<bool> EmitLogging(
     "sil-move-only-checker-emit-pruned-liveness-logging");
@@ -54,30 +53,40 @@ static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
 //                         MARK: TypeSubElementCount
 //===----------------------------------------------------------------------===//
 
-TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
-                                         TypeExpansionContext context)
-    : number(1) {
+uint32_t TypeConverter::getTypeSubElementCount(SILType type,
+                                               TypeExpansionContext context) {
+  auto key = std::make_pair(type, context);
+  auto found = TypeSubElementCache.find(key);
+  if (found != TypeSubElementCache.end())
+    return found->second;
+
+  uint32_t number = 1;
+
   if (auto tupleType = type.getAs<TupleType>()) {
     unsigned numElements = 0;
     for (auto index : indices(tupleType.getElementTypes()))
       numElements +=
-          TypeSubElementCount(type.getTupleElementType(index), mod, context);
+          getTypeSubElementCount(type.getTupleElementType(index), context);
     number = numElements;
-    return;
+    TypeSubElementCache[key] = number;
+    return number;
   }
 
   if (auto *structDecl = getFullyReferenceableStruct(type)) {
     // A resilient struct has 1 element.
-    if (structDecl->isResilient(mod.getSwiftModule(),
+    auto *swiftModule = context.getContext()->getParentModule();
+    ASSERT(swiftModule != nullptr);
+    if (structDecl->isResilient(swiftModule,
                                 ResilienceExpansion::Maximal)) {
       number = 1;
-      return;
+      TypeSubElementCache[key] = number;
+      return number;
     }
 
     unsigned numElements = 0;
     for (auto *fieldDecl : structDecl->getStoredProperties())
-      numElements += TypeSubElementCount(
-          type.getFieldType(fieldDecl, mod, context), mod, context);
+      numElements += getTypeSubElementCount(
+          type.getFieldType(fieldDecl, *this, context), context);
     number = numElements;
 
     // If we do not have any elements, just set our size to 1.
@@ -89,7 +98,8 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
       ++number;
     }
 
-    return;
+    TypeSubElementCache[key] = number;
+    return number;
   }
 
   if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
@@ -97,8 +107,8 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
     for (auto *eltDecl : enumDecl->getAllElements()) {
       if (!eltDecl->hasAssociatedValues())
         continue;
-      auto elt = type.getEnumElementType(eltDecl, mod, context);
-      numElements += unsigned(TypeSubElementCount(elt, mod, context));
+      auto elt = type.getEnumElementType(eltDecl, *this, context);
+      numElements += unsigned(getTypeSubElementCount(elt, context));
     }
     number = numElements + 1;
     if (type.isValueTypeWithDeinit()) {
@@ -106,15 +116,22 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
       // end of the structure.
       ++number;
     }
-    return;
+    TypeSubElementCache[key] = number;
+    return number;
   }
 
-  // If this isn't a tuple, struct, or enum, it is a single element. This was
-  // our default value, so we can just return.
+  // If this isn't a tuple, struct, or enum, it is a single element.
+  TypeSubElementCache[key] = number;
+  return number;
 }
 
+TypeSubElementCount::TypeSubElementCount(SILType type,
+                                         TypeConverter &TC,
+                                         TypeExpansionContext context)
+    : number(TC.getTypeSubElementCount(type, context)) {}
+
 TypeSubElementCount::TypeSubElementCount(SILValue value) : number(1) {
-  auto whole = TypeSubElementCount(value->getType(), *value->getModule(),
+  auto whole = TypeSubElementCount(value->getType(), value->getModule()->Types,
                                    TypeExpansionContext(*value->getFunction()));
   // The value produced by a drop_deinit has one fewer subelement than that of
   // its type--the deinit bit is not included.
@@ -131,12 +148,22 @@ TypeSubElementCount::TypeSubElementCount(SILValue value) : number(1) {
 
 std::optional<SubElementOffset>
 SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
-                                    SILValue rootAddress) {
+                                    SILValue rootAddress,
+                                    SILType *opaqueBoundaryType) {
   unsigned finalSubElementOffset = 0;
   SILModule &mod = *rootAddress->getModule();
 
   LLVM_DEBUG(llvm::dbgs() << "computing element offset for root:\n";
              rootAddress->print(llvm::dbgs()));
+
+  // Note that we looked through a node of the type tree whose leaves are opaque,
+  // reaching a type that is not a sub-tree of the root's. Anything projected out
+  // of such a node affects the node as a whole. Assigning unconditionally leaves
+  // the outermost such node, which is the one that matters.
+  auto noteOpaqueBoundary = [&](SILValue boundary) {
+    if (opaqueBoundaryType)
+      *opaqueBoundaryType = boundary->getType();
+  };
 
   while (1) {
     LLVM_DEBUG(llvm::dbgs() << "projection: ";
@@ -156,9 +183,12 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       continue;
     }
 
+    // An unchecked address cast reinterprets its operand as an unrelated type,
+    // so its result covers the operand as a whole.
     if (auto *uaci =
             dyn_cast<UncheckedAddrCastInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = uaci->getOperand();
+      noteOpaqueBoundary(projectionDerivedFromRoot);
       continue;
     }
 
@@ -173,15 +203,20 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       continue;
     }
 
+    // The payload of an existential is not part of the existential's type tree:
+    // an existential is a single opaque leaf, while its payload can have any
+    // number of leaves. So a projection of the payload covers that one leaf.
     if (auto *oea =
             dyn_cast<OpenExistentialAddrInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = oea->getOperand();
+      noteOpaqueBoundary(projectionDerivedFromRoot);
       continue;
     }
 
     if (auto *iea =
             dyn_cast<InitExistentialAddrInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = iea->getOperand();
+      noteOpaqueBoundary(projectionDerivedFromRoot);
       continue;
     }
 
@@ -192,7 +227,7 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       // Keep track of what subelement is being referenced.
       for (unsigned i : range(teai->getFieldIndex())) {
         finalSubElementOffset += TypeSubElementCount(
-            tupleType.getTupleElementType(i), mod,
+            tupleType.getTupleElementType(i), mod.Types,
             TypeExpansionContext(*rootAddress->getFunction()));
       }
       projectionDerivedFromRoot = teai->getOperand();
@@ -210,7 +245,7 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
           break;
         auto context = TypeExpansionContext(*rootAddress->getFunction());
         finalSubElementOffset += TypeSubElementCount(
-            type.getFieldType(fieldDecl, mod, context), mod, context);
+            type.getFieldType(fieldDecl, mod.Types, context), mod.Types, context);
       }
 
       projectionDerivedFromRoot = seai->getOperand();
@@ -227,9 +262,9 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
         if (element == enumData->getElement())
           break;
         auto context = TypeExpansionContext(*rootAddress->getFunction());
-        auto elementTy = ty.getEnumElementType(element, mod, context);
+        auto elementTy = ty.getEnumElementType(element, mod.Types, context);
         finalSubElementOffset +=
-            unsigned(TypeSubElementCount(elementTy, mod, context));
+            unsigned(TypeSubElementCount(elementTy, mod.Types, context));
       }
       projectionDerivedFromRoot = enumData->getEnum();
       continue;
@@ -299,7 +334,7 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
       // Keep track of what subelement is being referenced.
       for (unsigned i : range(teai->getFieldIndex())) {
         finalSubElementOffset += TypeSubElementCount(
-            tupleType.getTupleElementType(i), mod,
+            tupleType.getTupleElementType(i), mod.Types,
             TypeExpansionContext(*rootAddress->getFunction()));
       }
       projectionDerivedFromRoot = teai->getOperand();
@@ -319,7 +354,7 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
             break;
           auto context = TypeExpansionContext(*rootAddress->getFunction());
           finalSubElementOffset += TypeSubElementCount(
-              type.getFieldType(pair.value(), mod, context), mod, context);
+              type.getFieldType(pair.value(), mod.Types, context), mod.Types, context);
         }
 
         projectionDerivedFromRoot = dsi->getOperand();
@@ -334,7 +369,7 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
         for (unsigned i : range(resultIndex)) {
           auto context = TypeExpansionContext(*rootAddress->getFunction());
           finalSubElementOffset +=
-              TypeSubElementCount(type.getTupleElementType(i), mod, context);
+              TypeSubElementCount(type.getTupleElementType(i), mod.Types, context);
         }
 
         projectionDerivedFromRoot = dti->getOperand();
@@ -352,7 +387,7 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
           break;
         auto context = TypeExpansionContext(*rootAddress->getFunction());
         finalSubElementOffset += TypeSubElementCount(
-            type.getFieldType(fieldDecl, mod, context), mod, context);
+            type.getFieldType(fieldDecl, mod.Types, context), mod.Types, context);
       }
 
       projectionDerivedFromRoot = seai->getOperand();
@@ -551,7 +586,7 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
             if (utedai->getElement() != record.element) {
               continue;
             }
-            if (!domTree->dominates(utedai, insertPt)) {
+            if (!domTree->properlyDominates(utedai, insertPt)) {
               continue;
             }
 
@@ -599,13 +634,54 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
   llvm_unreachable("Not understand subtype");
 }
 
+/// If a use of \p projectedValue reaches its root by projecting a payload out
+/// of an existential, returns that existential's type; otherwise returns an
+/// empty type.
+///
+/// An existential is opaque: the leaf subelements of its payload are not tracked
+/// separately, so projecting a payload address out of one does not enter a
+/// larger element space. `SubElementOffset::compute` accordingly treats the
+/// existential projections as offset-preserving pass-throughs, so counting the
+/// payload's subelements would produce a range past the end of the
+/// existential's own elements -- e.g. a payload with a deinit has an extra bit
+/// for `self`.
+static SILType getExistentialTypeForSubElementCount(SILValue projectedValue) {
+  SILValue value = projectedValue;
+  SILType existentialType;
+  while (true) {
+    if (auto *iea = dyn_cast<InitExistentialAddrInst>(value)) {
+      value = iea->getOperand();
+      existentialType = value->getType();
+      continue;
+    }
+    if (auto *oea = dyn_cast<OpenExistentialAddrInst>(value)) {
+      value = oea->getOperand();
+      existentialType = value->getType();
+      continue;
+    }
+    return existentialType;
+  }
+}
+
 void TypeTreeLeafTypeRange::get(
     Operand *op, SILValue rootValue,
     SmallVectorImpl<TypeTreeLeafTypeRange> &ranges) {
   auto projectedValue = op->get();
-  auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
+  SILType opaqueBoundaryType;
+  auto startEltOffset =
+      SubElementOffset::compute(projectedValue, rootValue, &opaqueBoundaryType);
   if (!startEltOffset)
     return;
+
+  // If the operand was projected out of an opaque node of the root's type tree,
+  // it affects that whole node. None of the sub-tree reasoning below applies:
+  // the operand's own leaves aren't in the tree, and there is in particular no
+  // separate deinit bit to carve out, since the opaque node is a single leaf.
+  if (opaqueBoundaryType) {
+    auto count = TypeSubElementCount(opaqueBoundaryType, op->getFunction());
+    ranges.push_back({*startEltOffset, *startEltOffset + count});
+    return;
+  }
 
   // A drop_deinit only consumes the deinit bit of its operand.
   if (isa<DropDeinitInst>(op->getUser())) {
@@ -655,16 +731,23 @@ void TypeTreeLeafTypeRange::get(
   // Uses that borrow a value do not involve the deinit bit.
   //
   // FIXME: This shouldn't be limited to applies.
+  auto subElementCount = TypeSubElementCount(projectedValue);
+  SILType deinitBitType = projectedValue->getType();
+  if (SILType existentialType =
+          getExistentialTypeForSubElementCount(projectedValue)) {
+    subElementCount = TypeSubElementCount(existentialType, op->getFunction());
+    deinitBitType = existentialType;
+  }
+
   unsigned deinitBitOffset = 0;
-  if (op->get()->getType().isValueTypeWithDeinit() &&
+  if (deinitBitType.isValueTypeWithDeinit() &&
       op->getOperandOwnership() == OperandOwnership::Borrow &&
       ApplySite::isa(op->getUser())) {
     deinitBitOffset = 1;
   }
 
-  ranges.push_back({*startEltOffset, *startEltOffset +
-                                         TypeSubElementCount(projectedValue) -
-                                         deinitBitOffset});
+  ranges.push_back(
+      {*startEltOffset, *startEltOffset + subElementCount - deinitBitOffset});
 }
 
 void TypeTreeLeafTypeRange::constructProjectionsForNeededElements(

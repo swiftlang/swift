@@ -32,9 +32,7 @@
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/Runtime/HeapObject.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -54,8 +52,6 @@
 #include "llvm/IR/Value.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
@@ -157,6 +153,10 @@ public:
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
+
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden layout declarations do not produce IR");
+  }
 
   void visitFuncDecl(FuncDecl *method) {
     if (!requiresObjCMethodDescriptor(method)) return;
@@ -360,6 +360,10 @@ public:
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
 
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden layout declarations do not produce IR");
+  }
+
   void visitAbstractFunctionDecl(AbstractFunctionDecl *method) {
     if (isa<AccessorDecl>(method)) {
       // Accessors are handled as part of their AbstractStorageDecls.
@@ -469,7 +473,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
 
   PrettySourceFileEmission StackEntry(SF);
 
-  // Emit types and other global decls.
+  // Emit types and other global decls. `emitGlobalDecl` handles auxiliary.
   for (auto *decl : SF.getTopLevelDecls())
     emitGlobalDecl(decl);
   for (auto *decl : SF.getHoistedDecls())
@@ -534,7 +538,7 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
       llvm::Constant *elt = cast<llvm::Constant>(&*handle);
       std::string eltName = name.str() + "_" + elt->getName().str();
       if (elt->getType() != eltTy)
-        elt = llvm::ConstantExpr::getBitCast(elt, eltTy);
+        elt = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(elt, eltTy);
       auto var = new llvm::GlobalVariable(IGM.Module, eltTy, isConstant,
                                           linkage, elt, eltName);
       var->setSection(section);
@@ -562,7 +566,7 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
   for (auto &handle : handles) {
     auto elt = cast<llvm::Constant>(&*handle);
     if (elt->getType() != eltTy)
-      elt = llvm::ConstantExpr::getBitCast(elt, eltTy);
+      elt = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(elt, eltTy);
     elts.push_back(elt);
   }
 
@@ -2524,7 +2528,8 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM, LinkInfo &linkInfo,
   }
 
   llvm::Function *fn =
-    llvm::Function::Create(signature.getType(), linkInfo.getLinkage(), name);
+    llvm::Function::Create(signature.getType(), linkInfo.getLinkage(),
+     /*addrspace*/IGM.DataLayout.getProgramAddressSpace(), name);
   fn->setCallingConv(signature.getCallingConv());
 
   if (insertBefore) {
@@ -2647,9 +2652,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   if (!D->isAvailableDuringLowering())
     return;
 
-  D->visitAuxiliaryDecls([&](Decl *decl) {
-    emitGlobalDecl(decl);
-  });
+  D->visitAuxiliaryDecls([&](Decl *decl) { emitGlobalDecl(decl); },
+                         /*visitFreestanding*/ true, /*visitExtensions*/ true);
 
   switch (D->getKind()) {
   case DeclKind::Extension:
@@ -2739,6 +2743,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
   case DeclKind::Using:
     return;
+
+  case DeclKind::HiddenTypeLayoutInfo:
+    llvm_unreachable("hidden layout declarations do not produce IR");
   }
 
   llvm_unreachable("bad decl kind!");
@@ -3739,6 +3746,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
   if (!f->section().empty())
     fn->setSection(f->section());
+
+  addTargetAttrFunctionAttributes(fn, f->targetFeatures());
 
   llvm::AttrBuilder attrBuilder(getLLVMContext());
   if (!f->wasmExportName().empty()) {
@@ -4820,6 +4829,11 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
 
 void IRGenModule::emitAccessibleFunction(StringRef sectionName,
                                          const AccessibleFunction &func) {
+  // In Embedded Distributed swift does not use accessible functions for executing targets,
+  // if we were about to emit a distributed function accessor, that's a bug.
+  assert(!(func.isDistributed() && Context.LangOpts.hasFeature(Feature::Embedded)) &&
+         "should not emit a distributed accessible function record in Embedded Swift");
+
   auto var = new llvm::GlobalVariable(
       Module, AccessibleFunctionRecordTy, /*isConstant=*/true,
       llvm::GlobalValue::PrivateLinkage, /*initializer=*/nullptr,
@@ -5961,9 +5975,17 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     if (!member->isAvailableDuringLowering())
       continue;
 
-    member->visitAuxiliaryDecls([&](Decl *decl) {
-      emitNestedTypeDecls({decl, nullptr});
-    });
+    member->visitAuxiliaryDecls(
+        [&](Decl *decl) {
+          // Nested types can have extension macros, these need to be emitted
+          // as top-level.
+          if (auto *ED = dyn_cast<ExtensionDecl>(decl)) {
+            emitGlobalDecl(ED);
+          } else {
+            emitNestedTypeDecls({decl, nullptr});
+          }
+        },
+        /*visitFreestanding*/ true, /*visitExtensions*/ true);
     switch (member->getKind()) {
     case DeclKind::Import:
     case DeclKind::TopLevelCode:
@@ -5982,6 +6004,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 
     case DeclKind::Missing:
       llvm_unreachable("missing decl in IRGen");
+
+    case DeclKind::HiddenTypeLayoutInfo:
+      llvm_unreachable("hidden layout declarations are not nested types");
 
     case DeclKind::Macro:
       continue;

@@ -71,10 +71,34 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
   }
 
   public func insertPhiArgument(
-    atPosition: Int, type: Type, ownership: Ownership, _ context: some MutatingContext
+    atPosition: Int, type: Type, ownership: Ownership, decl: ValueDecl? = nil, _ context: some MutatingContext
   ) -> Argument {
     context.notifyInstructionsChanged()
-    return bridged.insertPhiArgument(atPosition, type.bridged, ownership._bridged).argument
+    return bridged.insertPhiArgument(atPosition, type.bridged, ownership._bridged,
+                                     (decl as Decl?).bridged).argument
+  }
+
+  /// Replaces the type of the phi argument at `index` with `type`, rewiring all of its uses
+  /// to the new argument. The argument must not be in the entry block.
+  public func replacePhiArgumentAndReplaceAllUses(
+    at index: Int, type: Type, ownership: Ownership, decl: ValueDecl? = nil,
+    _ context: some MutatingContext
+  ) -> Argument {
+    let oldArgument = arguments[index]
+    let uses = Array(oldArgument.uses)
+    // `eraseArgument` requires the argument to have no uses. Redirect them to a
+    // placeholder of the new type first, then retarget them to the new argument
+    // once it exists.
+    let undef = Undef.get(type: type, context)
+    for use in uses {
+      use.set(to: undef, context)
+    }
+    eraseArgument(at: index, context)
+    let newArgument = insertPhiArgument(atPosition: index, type: type, ownership: ownership, decl: decl, context)
+    for use in uses {
+      use.set(to: newArgument, context)
+    }
+    return newArgument
   }
 
   public func eraseArgument(at index: Int, _ context: some MutatingContext) {

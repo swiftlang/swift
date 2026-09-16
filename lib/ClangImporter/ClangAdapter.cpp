@@ -22,6 +22,7 @@
 #include "ImporterImpl.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
@@ -101,6 +102,42 @@ importer::getFirstNonLocalDecl(const clang::Decl *D) {
   if (iter == D->redecls_end())
     return nullptr;
   return *iter;
+}
+
+/// Counts the nullability and bounds-safety annotations carried by \p ty:
+/// a \c _Nonnull / \c _Nullable nullability qualifier and a \c __sized_by /
+/// \c __counted_by bounds attribute each contribute one point. Both accessors
+/// see through intervening sugar, so annotation nesting order is irrelevant.
+static unsigned typeRefinementScore(clang::QualType ty) {
+  unsigned score = 0;
+  if (ty->getNullability())
+    ++score;
+  if (ty->getAs<clang::CountAttributedType>())
+    ++score;
+  return score;
+}
+
+static unsigned functionRefinementScore(const clang::FunctionDecl *fn) {
+  unsigned score = typeRefinementScore(fn->getReturnType());
+  for (const clang::ParmVarDecl *param : fn->parameters())
+    score += typeRefinementScore(param->getType());
+  return score;
+}
+
+const clang::FunctionDecl *
+importer::mostRefinedFunctionRedecl(const clang::FunctionDecl *fn) {
+  const clang::FunctionDecl *best = fn;
+  unsigned bestScore = functionRefinementScore(fn);
+  for (const clang::FunctionDecl *redecl : fn->redecls()) {
+    if (redecl == fn)
+      continue;
+    unsigned score = functionRefinementScore(redecl);
+    if (score > bestScore) {
+      best = redecl;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 std::optional<clang::Module *>
@@ -292,22 +329,22 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
   // Handle builtin types by importing them and getting the Swift name.
   if (auto builtinTy = type->getAs<clang::BuiltinType>()) {
     // Names of integer types.
-    static const char *intTypeNames[] = {"UInt8", "UInt16", "UInt32", "UInt64",
-                                         "UInt128"};
+    static constexpr llvm::StringLiteral intTypeNames[] = {
+        "UInt8", "UInt16", "UInt32", "UInt64", "UInt128"};
 
     /// Retrieve the name for an integer type based on its size.
     auto getIntTypeName = [&](bool isSigned) -> StringRef {
       switch (ctx.getTypeSize(builtinTy)) {
       case 8:
-        return StringRef(intTypeNames[0]).substr(isSigned ? 1 : 0);
+        return intTypeNames[0].substr(isSigned ? 1 : 0);
       case 16:
-        return StringRef(intTypeNames[1]).substr(isSigned ? 1 : 0);
+        return intTypeNames[1].substr(isSigned ? 1 : 0);
       case 32:
-        return StringRef(intTypeNames[2]).substr(isSigned ? 1 : 0);
+        return intTypeNames[2].substr(isSigned ? 1 : 0);
       case 64:
-        return StringRef(intTypeNames[3]).substr(isSigned ? 1 : 0);
+        return intTypeNames[3].substr(isSigned ? 1 : 0);
       case 128:
-        return StringRef(intTypeNames[4]).substr(isSigned ? 1 : 0);
+        return intTypeNames[4].substr(isSigned ? 1 : 0);
       default:
         llvm_unreachable("bad integer type size");
       }
@@ -591,10 +628,17 @@ bool importer::isNSNotificationGlobal(const clang::NamedDecl *decl) {
 }
 
 bool importer::hasNativeSwiftDecl(const clang::Decl *decl) {
-  if (auto *attr = decl->getAttr<clang::ExternalSourceSymbolAttr>())
-    if (attr->getGeneratedDeclaration() && attr->getLanguage() == "Swift")
-      return true;
-  return false;
+  auto *attr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
+  if (!attr || !attr->getGeneratedDeclaration() || attr->getLanguage() != "Swift")
+    return false;
+  // external_source_symbol is inheritable, so Clang can merge this marker from a
+  // -Swift.h forward-declaration onto a Clang module's real decl that has no Swift
+  // counterpart. Only trust it when defined_in names the decl's own module.
+  if (auto *owning = decl->getOwningModule())
+    if (!attr->getDefinedIn().empty() &&
+        attr->getDefinedIn() != owning->getTopLevelModuleName())
+      return false;
+  return true;
 }
 
 /// Translate the "nullability" notion from API notes into an optional type

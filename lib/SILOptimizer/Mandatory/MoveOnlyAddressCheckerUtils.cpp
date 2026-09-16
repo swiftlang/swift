@@ -224,18 +224,13 @@
 
 #define DEBUG_TYPE "sil-move-only-checker"
 
-#include "swift/AST/AccessScope.h"
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Consumption.h"
@@ -255,7 +250,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
@@ -264,8 +258,6 @@
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1401,7 +1393,7 @@ void UseState::initializeLiveness(
                             << *livenessInstAndValue.first;
                liveness.print(llvm::dbgs()));
   }
-  
+
   auto updateForLivenessAccess = [&](BeginAccessInst *beginAccess,
                                      const SmallBitVector &livenessMask) {
     for (auto *endAccess : beginAccess->getEndAccesses()) {
@@ -1991,15 +1983,16 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
   // Allowing full object consumption in a deinit is still not allowed.
   if (iterType == targetType && !isa<DropDeinitInst>(user)) {
     // Don't allow whole-value consumption of `self` from a `deinit`.
-    if (!fn->getModule().getASTContext().LangOpts
-            .hasFeature(Feature::ConsumeSelfInDeinit)
+    auto &Ctx = fn->getModule().getASTContext();
+    if (!Ctx.LangOpts.hasFeature(Feature::ConsumeSelfInDeinit)
+        && !Ctx.LangOpts.hasFeature(Feature::MutateAndConsumeInDeinit)
         && kind == PartialMutation::Kind::Consume
         && useState.sawDropDeinit
         // TODO: Revisit this when we introduce deinits on enums.
         && !targetType.getEnumOrBoundGenericEnum()) {
       LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType in deinit! "
                                  "Not allowed yet");
-      
+
       return {PartialMutationError::consumeDuringDeinit(iterType)};
     }
 
@@ -2039,7 +2032,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
           (kind == PartialMutation::Kind::Consume) && useState.sawDropDeinit &&
           (nom ==
            useState.address->getType().getNominalOrBoundGenericNominal());
-      if (nom->getValueTypeDestructor() && !isAllowedPartialConsume) {
+      if (nom->hasValueTypeDestructor() && !isAllowedPartialConsume) {
         // If we find one, emit an error since we are going to have to extract
         // through the deinit. Emit a nice error saying what it is. Since we
         // are emitting an error, we do a bit more work and construct the
@@ -2201,7 +2194,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
   /// base address that we are checking which should be the operand of the mark
   /// must check value.
   SILValue getRootAddress() const { return markedValue; }
-  
+
   ASTContext &getASTContext() {
     return markedValue->getFunction()->getASTContext();
   }
@@ -2241,7 +2234,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     }
     return emittedError;
   }
-  
+
   void onError(Operand *op) {
       LLVM_DEBUG(llvm::dbgs() << "    Found use unrecognized by the walker!\n";
                  op->getUser()->print(llvm::dbgs()));
@@ -2337,7 +2330,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // Ignore end_access.
   if (isa<EndAccessInst>(user))
     return true;
-  
+
   // Ignore end_cow_mutation_addr.
   if (isa<EndCOWMutationAddrInst>(user)) {
     return true;
@@ -2379,7 +2372,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // immutable, so it is fine if we see debug_values or other uses that aren't
     // directly related to the current marked use; they will have to behave
     // compatibly anyway.
-    if (di->getOperand() == getRootAddress()) {
+    if (di->getSingleOperand() == getRootAddress()) {
       useState.debugValue = di;
     }
     return true;
@@ -2561,7 +2554,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         auto operand = stripAccessAndIdentityCasts(markedValue->getOperand());
         auto *fArg = dyn_cast<SILFunctionArgument>(operand);
         auto *ptrToAddr = dyn_cast<PointerToAddressInst>(operand);
-            
+
         // If we have a closure captured that we specialized, we should have a
         // no consume or assign and should emit a normal guaranteed diagnostic.
         if (fArg && fArg->isClosureCapture() &&
@@ -2703,6 +2696,32 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       }
     }
     return true;
+  }
+
+  // For TakeOnSuccess, only a successful cast consumes Src.  A failed cast
+  // leaves Src in place. Model this by recording the take at the entry of the
+  // success block rather than at the branch itself, so liveness treats Src as
+  // consumed starting there while still live from the branch to the failure
+  // edge.
+  if (auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user)) {
+    if (ccabi->getSrc() == op->get() &&
+        ccabi->getConsumptionKind() == CastConsumptionKind::TakeOnSuccess) {
+      LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br "
+                                 "take_on_success Src: " << *user);
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+        return false;
+      }
+
+      auto *successEntry = &ccabi->getSuccessBB()->front();
+      for (auto leafRange : leafRanges) {
+        useState.recordTakeUse(successEntry, leafRange);
+        useState.recordLivenessUse(user, leafRange);
+      }
+      return true;
+    }
   }
 
   // Now that we have handled or loadTakeOrCopy, we need to now track our
@@ -2897,7 +2916,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
     return true;
   }
-  
+
   if (auto *access = dyn_cast<BeginAccessInst>(op->getUser())) {
     switch (access->getAccessKind()) {
     // Treat an opaque read access as a borrow liveness use for the duration
@@ -3011,6 +3030,19 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
 
   for (auto takeInstAndValue : instsToTest) {
     LLVM_DEBUG(llvm::dbgs() << "    Checking: " << *takeInstAndValue.first);
+
+    // The value is consumed and used at the same instruction (e.g. passed both
+    // @in and @in_guaranteed to one apply).
+    if (addressUseState.isLivenessUse(takeInstAndValue.first,
+                                      takeInstAndValue.second)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "        Consumed and used at the same instruction!\n");
+      hadAnyErrorUsers = true;
+      diagnosticEmitter.emitAddressInstConsumesAndUsesValue(
+          addressUseState.address, takeInstAndValue.first);
+      emittedDiagnostic = true;
+      continue;
+    }
 
     // Check if we are in the boundary...
 

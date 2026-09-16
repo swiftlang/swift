@@ -35,6 +35,14 @@
 
 namespace swift {
 
+/// Used as the default UnderlyingAllocator below; only ever instantiated in
+/// hosted builds (Embedded Swift always supplies an explicit allocator that
+/// goes through the platform abstraction layer instead, e.g. TaskPrivate.h's
+/// SwiftGlobalAllocator), so it's fine for this to remain incomplete when
+/// __STDC_HOSTED__ is false.
+class MallocFreeAllocator;
+
+#if __STDC_HOSTED__
 /// malloc/free-based allocator to be used with the StackAllocator to allocate
 /// the slabs themselves.
 class MallocFreeAllocator {
@@ -47,6 +55,7 @@ public:
     free(ptr);
   }
 };
+#endif
 
 /// A bump-pointer allocator that obeys a stack discipline.
 ///
@@ -289,8 +298,11 @@ private:
 
     size_t capacity = std::max(SlabCapacity,
                                Allocation::includingHeader(size));
+    // The payload handed out of a slab lives at `this + headerSize()`, and
+    // headerSize() is rounded up to `alignment` (MaximumAlignment), so the slab
+    // buffer itself must be `alignment`-aligned for the payload to be aligned.
     void *slabBuffer = this->allocateGlobal(Slab::includingHeader(capacity),
-                                            alignof(Slab) - 1);
+                                            std::max(alignof(Slab), alignment) - 1);
     Slab *newSlab = ::new (slabBuffer) Slab(capacity);
     if (slab)
       slab->next = newSlab;
@@ -309,7 +321,10 @@ private:
       Slab *next = slab->next;
       freedCapacity += slab->capacity;
       slab->clearMetadata();
-      this->deallocateGlobal(slab, slab->capacity, alignof(Slab) - 1);
+      // Must match the alignMask used to allocate the slab in
+      // getSlabForAllocation, so the runtime picks the same free path
+      this->deallocateGlobal(slab, slab->capacity,
+                             std::max(alignof(Slab), alignment) - 1);
       numAllocatedSlabs--;
       slab = next;
     }

@@ -75,6 +75,8 @@ private:
                             StringRef displayName);
 
   void queueBuffer(SourceManager &sourceMgr, unsigned bufferID);
+
+  void addQueueDiagnostic(const DiagnosticInfo &info, SourceManager &SM);
 };
 } // namespace swift
 

@@ -160,14 +160,14 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
 
   let _: Sendable = MO() // expected-error {{value of type 'MO' does not conform to specified type 'Copyable'}}
   let _: Copyable = mo // expected-error {{value of type 'MO' does not conform to specified type 'Copyable'}}
-  let _: AnyObject = MO() // expected-error {{value of type 'MO' expected to be instance of class or class-constrained type}}
+  let _: AnyObject = MO() // expected-error {{value of noncopyable type 'MO' cannot be converted to 'AnyObject'}}
   let _: Any = mo // expected-error {{value of type 'MO' does not conform to specified type 'Copyable'}}
 
   _ = MO() as P // expected-error {{cannot convert value of type 'MO' to type 'any P' in coercion}}
   _ = MO() as any P // expected-error {{cannot convert value of type 'MO' to type 'any P' in coercion}}
   _ = MO() as Any // expected-error {{cannot convert value of type 'MO' to type 'Any' in coercion}}
   _ = MO() as MO
-  _ = MO() as AnyObject // expected-error {{value of type 'MO' expected to be instance of class or class-constrained type}}
+  _ = MO() as AnyObject // expected-error {{value of noncopyable type 'MO' cannot be converted to 'AnyObject'}}
   _ = 5 as MO // expected-error {{cannot convert value of type 'Int' to type 'MO' in coercion}}
   _ = a as MO // expected-error {{cannot convert value of type 'Any' to type 'MO' in coercion}}
   _ = b as MO // expected-error {{cannot convert value of type 'any Box' to type 'MO' in coercion}}

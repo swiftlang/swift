@@ -16,16 +16,12 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/NullablePtr.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/CommandLine.h"
@@ -127,18 +123,18 @@ SILValue swift::stripSinglePredecessorArgs(SILValue V) {
     auto *A = dyn_cast<SILArgument>(V);
     if (!A)
       return V;
-    
+
     SILBasicBlock *BB = A->getParent();
-    
+
     // First try and grab the single predecessor of our parent BB. If we don't
     // have one, bail.
     SILBasicBlock *Pred = BB->getSinglePredecessorBlock();
     if (!Pred)
       return V;
-    
+
     // Then grab the terminator of Pred...
     TermInst *PredTI = Pred->getTerminator();
-    
+
     // And attempt to find our matching argument.
     //
     // *NOTE* We can only strip things here if we know that there is no semantic
@@ -152,14 +148,6 @@ SILValue swift::stripSinglePredecessorArgs(SILValue V) {
       V = BI->getArg(A->getIndex());
       continue;
     }
-    
-    if (auto *CBI = dyn_cast<CondBranchInst>(PredTI)) {
-      if (SILValue Arg = CBI->getArgForDestBB(BB, A)) {
-        V = Arg;
-        continue;
-      }
-    }
-    
     return V;
   }
 }
@@ -206,9 +194,9 @@ SILValue swift::stripCasts(SILValue v) {
 SILValue swift::stripUpCasts(SILValue v) {
   assert(v->getType().isClassOrClassMetatype() &&
          "Expected class or class metatype!");
-  
+
   v = stripSinglePredecessorArgs(v);
-  
+
   while (true) {
     if (auto *ui = dyn_cast<UpcastInst>(v)) {
       v = ui->getOperand();
@@ -230,7 +218,7 @@ SILValue swift::stripClassCasts(SILValue v) {
       v = ui->getOperand();
       continue;
     }
-    
+
     if (auto *ucci = dyn_cast<UnconditionalCheckedCastInst>(v)) {
       v = ucci->getOperand();
       continue;
@@ -528,6 +516,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::StringLiteralInst:
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::COMMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst:
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::AddressToPointerInst:
@@ -632,6 +621,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::EndCOWMutationAddrInst:
+  case SILInstructionKind::EndFormalScopeInst:
   case SILInstructionKind::HasSymbolInst:
   case SILInstructionKind::DynamicPackIndexInst:
   case SILInstructionKind::PackPackIndexInst:
@@ -660,7 +650,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
     return RuntimeEffect::NoEffect;
   }
-      
+
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialBoxInst:
   case SILInstructionKind::OpenExistentialValueInst:
@@ -777,6 +767,11 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::OpenExistentialRefInst: {
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
+  }
+
+  case SILInstructionKind::OpenCOMExistentialInst: {
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::Existential;
   }
 
   case SILInstructionKind::UnconditionalCheckedCastInst:
@@ -917,6 +912,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     SILType opType = cast<ExistentialMetatypeInst>(inst)->getOperand()->getType();
     impactType = opType;
     switch (opType.getPreferredExistentialRepresentation()) {
+    case ExistentialRepresentation::COM:
+      return RuntimeEffect::MetaData | RuntimeEffect::Existential;
     case ExistentialRepresentation::Metatype:
     case ExistentialRepresentation::Boxed:
     case ExistentialRepresentation::Opaque:
@@ -1051,6 +1048,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::CXXMethod:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::Closure:
@@ -1063,7 +1061,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
 
     if (isa<BeginApplyInst>(inst))
-      rt |= RuntimeEffect::Allocating;      
+      rt |= RuntimeEffect::Allocating;
 
     if (auto *pa = dyn_cast<PartialApplyInst>(inst)) {
       if (pa->isOnStack()) {
@@ -1109,8 +1107,12 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case BuiltinValueKind::IsOptionalType:
       return RuntimeEffect::Casting;
     case BuiltinValueKind::AllocRaw:
+    case BuiltinValueKind::AllocRawTyped:
+    case BuiltinValueKind::AllocErrorBoxTyped:
       return RuntimeEffect::Allocating;
     case BuiltinValueKind::DeallocRaw:
+    case BuiltinValueKind::DeallocRawTyped:
+    case BuiltinValueKind::DeallocErrorBoxTyped:
       return RuntimeEffect::Deallocating;
     case BuiltinValueKind::Fence:
     case BuiltinValueKind::CmpXChg:
@@ -1491,7 +1493,7 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   //
   // TODO: we could loosen this requirement if all paths lead to a drop_deinit.
   if (auto *nominalTy = ty.getNominalOrBoundGenericNominal()) {
-    if (nominalTy->getValueTypeDestructor())
+    if (nominalTy->hasValueTypeDestructor())
       return false;
   }
 
@@ -1507,5 +1509,5 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   }
 
   unsigned numFields = module.Types.countNumberOfFields(ty, expansion);
-  return (numFields <= 6);
+  return (numFields <= MaxNumFieldsToExpand);
 }

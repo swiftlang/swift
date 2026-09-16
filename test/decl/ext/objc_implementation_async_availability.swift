@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -import-objc-header %S/Inputs/objc_implementation_async_availability.h -enable-experimental-feature ObjCImplementation -target %target-stable-abi-triple -Xcc -Wno-nullability-completeness
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -import-objc-header %S/Inputs/objc_implementation_async_availability.h -target %target-stable-abi-triple -Xcc -Wno-nullability-completeness
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_ObjCImplementation
 
 // An imported Objective-C completion-handler method that carries an
 // availability attribute must still expose its async alternative. Otherwise an

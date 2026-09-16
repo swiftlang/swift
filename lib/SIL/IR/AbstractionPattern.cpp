@@ -29,7 +29,6 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/CanTypeVisitor.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
@@ -37,7 +36,6 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/AST/PrettyPrinter.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -503,6 +501,10 @@ const clang::Type *getClangFunctionParameterType(const clang::Type *ty,
 static
 const clang::Type *getClangArrayElementType(const clang::Type *ty,
                                             unsigned index) {
+  // A fixed-size array can be imported as a tuple either directly or through
+  // a C++ reference to it. In the latter case strip the reference.
+  if (ty->isReferenceType())
+    ty = ty->getPointeeType().getTypePtr();
   return ty->castAsArrayTypeUnsafe()->getElementType().getTypePtr();
 }
 
@@ -1249,33 +1251,25 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
     return AbstractionPattern(getGenericSubstitutions(),
                               getGenericSignatureForFunctionComponent(),
                               getResultType(getType()),
-                              clangFunctionType->getReturnType().getTypePtr());    
+                              clangFunctionType->getReturnType().getTypePtr());
   }
   case Kind::CXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-    return AbstractionPattern(getGenericSubstitutions(),
-                              getGenericSignatureForFunctionComponent(),
-                              getResultType(getType()),
-                              getCXXMethod()->getReturnType().getTypePtr());
+    return AbstractionPattern(
+        getGenericSubstitutions(), getGenericSignatureForFunctionComponent(),
+        getResultType(getType()), getCXXMethod()->getReturnType().getTypePtr());
   case Kind::CurriedObjCMethodType:
     return getPartialCurriedObjCMethod(
-                              getGenericSubstitutions(),
-                              getGenericSignatureForFunctionComponent(),
-                              getResultType(getType()),
-                              getObjCMethod(),
-                              getEncodedForeignInfo());
+        getGenericSubstitutions(), getGenericSignatureForFunctionComponent(),
+        getResultType(getType()), getObjCMethod(), getEncodedForeignInfo());
   case Kind::CurriedCFunctionAsMethodType:
     return getPartialCurriedCFunctionAsMethod(
-                                      getGenericSubstitutions(),
-                                      getGenericSignatureForFunctionComponent(),
-                                      getResultType(getType()),
-                                      getClangType(),
-                                      getImportAsMemberStatus());
+        getGenericSubstitutions(), getGenericSignatureForFunctionComponent(),
+        getResultType(getType()), getClangType(), getImportAsMemberStatus());
   case Kind::CurriedCXXMethodType:
-    return getPartialCurriedCXXMethod(getGenericSubstitutions(),
-                                      getGenericSignatureForFunctionComponent(),
-                                      getResultType(getType()), getCXXMethod(),
-                                      getImportAsMemberStatus());
+    return getPartialCurriedCXXMethod(
+        getGenericSubstitutions(), getGenericSignatureForFunctionComponent(),
+        getResultType(getType()), getCXXMethod(), getImportAsMemberStatus());
   case Kind::PartialCurriedObjCMethodType:
   case Kind::ObjCMethodType: {
     // If this is a foreign async function, the result type comes from the
@@ -1328,7 +1322,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
         auto clangResultType = callbackParamTy
           ->getParamType(callbackResultIndex)
           .getTypePtr();
-        
+
         return AbstractionPattern(getGenericSubstitutions(),
                                   getGenericSignatureForFunctionComponent(),
                                   getResultType(getType()), clangResultType);
@@ -1339,13 +1333,12 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
         // form to represent the mapping from block parameters to tuple elements
         // in the return type.
         return AbstractionPattern::getObjCCompletionHandlerArgumentsType(
-                      getGenericSubstitutions(),
-                      getGenericSignatureForFunctionComponent(),
-                      getResultType(getType()), callbackParamTy,
-                      getEncodedForeignInfo());
+            getGenericSubstitutions(),
+            getGenericSignatureForFunctionComponent(), getResultType(getType()),
+            callbackParamTy, getEncodedForeignInfo());
       }
     }
-    
+
     return AbstractionPattern(getGenericSubstitutions(),
                               getGenericSignatureForFunctionComponent(),
                               getResultType(getType()),
@@ -1546,6 +1539,11 @@ unsigned AbstractionPattern::getLoweredParamIndex(unsigned formalIndex) const {
 }
 
 unsigned AbstractionPattern::getFlattenedValueCount() const {
+  // A C++ reference to an array that is imported as a tuple is passed as a
+  // single indirect value, not exploded into its elements.
+  if (isClangType() && getClangType()->isReferenceType())
+    return 1;
+
   // The count is always 1 unless the original type is a tuple.
   if (!isTuple())
     return 1;
@@ -2997,7 +2995,7 @@ public:
         addParam(param.getOrigFlags(), expansionType);
       }
     });
-    
+
     if (yieldType) {
       substYieldType = visit(yieldType, yieldPattern);
     }
@@ -3023,8 +3021,12 @@ public:
       extInfo = extInfo->withThrows(true, newErrorType);
     }
 
+    // Yields were substituted separately
+    if (extInfo)
+      extInfo = extInfo->withCoroutine(false);
+
     return CanFunctionType::get(FunctionType::CanParamArrayRef(newParams),
-                                newResultTy, extInfo);
+                                /* yields */ {}, newResultTy, extInfo);
   }
   
   CanType visitFunctionType(CanFunctionType func,

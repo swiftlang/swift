@@ -217,6 +217,23 @@ class Product(object):
         return targets.toolchain_path(install_destdir,
                                       self.args.install_prefix)
 
+    def merged_install_toolchain_path(self, host_target):
+        """merged_install_toolchain_path() -> string or None
+
+        Returns the path to the merged multi-architecture toolchain
+        that is being created as part of the build, if it exists.
+        """
+        if not self.should_include_host_in_lipo(host_target):
+            return None
+
+        toolchain_path = targets.toolchain_path(self.args.install_destdir,
+                                                self.args.install_prefix)
+
+        if not os.path.exists(os.path.join(toolchain_path, 'bin', 'swiftc')):
+            return None
+
+        return toolchain_path
+
     def native_clang_tools_path(self, host_target):
         if self.args.native_clang_tools_path is not None:
             return os.path.split(self.args.native_clang_tools_path)[0]

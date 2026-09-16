@@ -6,9 +6,9 @@
 
 \lettrine{M}{ost developers} interact with the Swift compiler through the \index{Xcode}Xcode build system or the \index{Swift package manager}Swift package manager, but for simplicity's sake we're just going to consider direct invocation of \texttt{swiftc} from the command line. The \texttt{swiftc} command runs the \IndexDefinition{Swift driver}\emph{Swift driver}, which invokes the \emph{Swift frontend} program to actually compile each source file; then, depending on the usage mode, the driver runs additional tools, such as the linker, to produce the final build artifact. Most of this book concerns the frontend, but we will briefly review the operation of the driver now.
 
-In the Swift module system, all source files in a module must be built together. The Swift driver takes a list of source files on the command line, which become the \IndexDefinition{main module}\emph{main module} being built. By default, the Swift driver generates an executable from the main module:
+In the Swift module system, all source files in a module must be built together. The Swift driver takes a list of source files on the command line, which become the \IndexDefinition{main module}\emph{main module} being built. By default, the Swift driver generates an executable from the source files of the main module:
 \begin{Verbatim}
-$ swiftc main.swift other.swift stuff.swift
+$ swiftc main.swift other.swift stuff.swift -o app
 \end{Verbatim}
 
 \IndexDefinition{main function}
@@ -17,7 +17,7 @@ $ swiftc main.swift other.swift stuff.swift
 Executables must define a \emph{main function}, which is the entry point invoked when the executable is run. There are three mechanisms for doing so:
 \begin{enumerate}
 \item If the user invokes the driver with a single source file, this file becomes the \emph{main source file} of the module. If there are multiple source files and one of them is named \texttt{main.swift}, then this file becomes the main source file. The main source file is special, in that it can contain statements at the top level, outside of a function body. Top-level statements are collected into \emph{top-level code declarations}, and the frontend generates a main function which executes each top-level code declaration in source order. Source files other than the main source file cannot contain statements at the top level.
-\item In the absence of a main source file, the user can annotate a struct, enum or class declaration with the \texttt{@main} attribute, in which case the declaration must contain a static method named \texttt{main()}. This method becomes the main entry point. This attribute was introduced in \IndexSwift{5.3}Swift 5.3~\cite{se0281}.
+\item In the absence of a main source file, the user can annotate a struct, enum, or class declaration with the \texttt{@main} attribute, in which case the declaration must contain a static method named \texttt{main()}. This method becomes the main entry point. This attribute was introduced in \IndexSwift{5.3}Swift 5.3~\cite{se0281}.
 \item The older \texttt{@NSApplicationMain} and \texttt{@UIApplicationMain} attributes, deprecated since \IndexSwift{5.a@5.10}Swift 5.10~\cite{se0383}, provide a similar mechanism specific to Apple platforms. Attaching one of these attributes to a class conforming to \texttt{NSApplicationMain} or \texttt{UIApplicationMain}, respectively, will generate a main entry point which calls the \texttt{NSApplicationMain()} or \texttt{UIApplicationMain()} system framework function.
 \end{enumerate}
 
@@ -28,7 +28,7 @@ $ swiftc algorithm.swift utils.swift -module-name SudokuSolver
 \end{Verbatim}
 
 \paragraph{Frontend jobs.}
-The \IndexDefinition{Swift frontend}Swift frontend itself is single-threaded, but the driver can benefit from multi-core concurrency by running multiple \IndexDefinition{frontend job}frontend jobs in parallel. Each frontend job compiles one or more \index{source file}source files; these are the \IndexDefinition{primary file}\emph{primary source files} of the frontend job. All non-primary source files are the \IndexDefinition{secondary file}\emph{secondary source files} of the frontend job. The assignment of primary source files to each frontend job is determined by the \emph{compilation mode}:
+The \IndexDefinition{Swift frontend}Swift frontend itself is single-threaded, but the driver can benefit from multi-core concurrency by running multiple \IndexDefinition{frontend job}frontend jobs in parallel. Each frontend job compiles one or more \index{source file}source files; these are the \IndexDefinition{primary file}\emph{primary source files} of the frontend job. All non-primary source files are the \IndexDefinition{secondary file}\emph{secondary source files} of the frontend job. The mapping from primary source files to frontend jobs is determined by the current \emph{compilation mode}:
 \begin{itemize}
 \item The \IndexFlag{wmo}\texttt{-wmo} driver flag selects \IndexDefinition{whole module optimization}\emph{whole module mode}, typically used for \index{release build}release builds. In this mode, the driver schedules a single frontend job. The primary files of this job are all the source files in the main module, and there are no secondary files. In whole module mode, the frontend is able to perform more aggressive optimization across source file boundaries, hence its usage for release builds.
 \item The \IndexFlag{disable-batch-mode}\texttt{-disable-batch-mode} driver flag selects \IndexDefinition{single file mode}\emph{single file mode}, with one frontend job per source file. In this mode, each frontend job has a single primary file, with all other files being secondary files. Single file mode was the default for \index{debug build}debug builds until \IndexSwift{4.1}Swift~4.1, however these days it is only used for testing the compiler.
@@ -52,16 +52,16 @@ ld m.o v.o c.o -o main
 \end{Verbatim}
 
 \paragraph{Compilation pipeline.}
-\FigRef{compilerpipeline} shows a high-level view of the Swift frontend; this resembles the classic multi-pass compiler design, described in \cite{muchnick1997advanced} or \cite{cooper2004engineering} for example: 
+\FigRef{compilerpipeline} illustrates each stage of the Swift frontend, which resembles the classical multi-pass compiler design \cite{muchnick1997advanced,cooper2004engineering}:
 \begin{enumerate}
-\item \IndexDefinition{parser}\textbf{Parse:} Source files are parsed, building the \IndexDefinition{abstract syntax tree}\index{AST|see{abstract syntax tree}}\index{syntax tree|see{abstract syntax tree}}abstract syntax \index{tree}tree.
-\item \IndexDefinition{Sema}\textbf{Sema:} Semantic analysis is performed, producing a type-checked syntax tree. (We'll see shortly the first two stages are not completely sequential.)
-\item \IndexDefinition{SILGen}\textbf{SILGen:} The syntax tree is lowered to \IndexDefinition{raw SIL}``raw SIL.'' \IndexDefinition{SIL}SIL is the Swift Intermediate Language, an \index{SSA form}SSA (static single assignment) program representation \cite{sil,siltalk}.
-\item \IndexDefinition{SIL optimizer}\textbf{SILOptimizer:} The raw SIL is transformed into \IndexDefinition{canonical SIL}``canonical SIL'' by a series of \IndexDefinition{SIL mandatory pass}\emph{mandatory passes}, which analyze the control flow graph and emit diagnostics; for example, \IndexDefinition{definite initialization}\emph{definite initialization} ensures that all storage locations are initialized.
+\item \IndexDefinition{parser}\textbf{Parse:} Reads each source file and builds the \IndexDefinition{abstract syntax tree}\index{AST|see{abstract syntax tree}}\index{syntax tree|see{abstract syntax tree}}abstract syntax \index{tree}tree.
+\item \IndexDefinition{Sema}\textbf{Sema:} Short for ``semantic analysis''---produces a type-checked syntax tree and emits diagnostics. (We will see the first two stages are not completely sequential.)
+\item \IndexDefinition{SILGen}\textbf{SILGen:} Lowers the syntax tree to \IndexDefinition{raw SIL}``raw SIL.'' \IndexDefinition{SIL}SIL is the Swift Intermediate Language, an \index{SSA form}SSA (static single assignment) program representation \cite{sil,siltalk}.
+\item \IndexDefinition{SIL optimizer}\textbf{SILOptimizer:} Transforms the raw SIL into \IndexDefinition{canonical SIL}``canonical SIL'' with a series of \IndexDefinition{SIL mandatory pass}\emph{mandatory passes}, which analyze the control flow graph and emit diagnostics; for example, \IndexDefinition{definite initialization}\emph{definite initialization} ensures that all storage locations are initialized.
 
-When the \IndexFlag{O}\texttt{-O} command line flag is specified, the canonical SIL is optimized by a series of \IndexDefinition{SIL performance pass}\emph{performance passes} to improve run-time performance and code size.
-\item \IndexDefinition{IRGen}\textbf{IRGen:} The optimized SIL is then transformed into LLVM IR.
-\item \index{LLVM}\textbf{LLVM:} Finally, the LLVM IR is handed off to LLVM, which performs various lower level optimizations before generating machine code. (LLVM is, of course, the project formerly known as the ``Low Level Virtual Machine \cite{llvm}.'')
+When the \IndexFlag{O}\texttt{-O} command line flag is given, the canonical SIL is also optimized by a series of \IndexDefinition{SIL performance pass}\emph{performance passes} to improve run-time performance and code size.
+\item \IndexDefinition{IRGen}\textbf{IRGen:} Transforms optimized SIL into LLVM IR (intermediate representation).
+\item \index{LLVM}\textbf{LLVM:} The code generation stage, which performs various low-level optimizations and generates machine code. (LLVM is, of course, the project formerly known as the ``Low Level Virtual Machine'' \cite{llvm}.)
 \end{enumerate}
 
 \begin{figure}\captionabove{The compilation pipeline}\label{compilerpipeline}
@@ -88,7 +88,7 @@ When the \IndexFlag{O}\texttt{-O} command line flag is specified, the canonical 
 \paragraph{Debugging flags.}
 Various command-line flags are provided to run the pipeline until a certain phase, and dump the output of that phase to the terminal (or some other file, in conjunction with the \IndexFlag{o}\texttt{-o} flag). These are useful for debugging the compiler:
 \begin{itemize}
-\item \IndexFlag{dump-parse}\texttt{-dump-parse} runs only the parser, and prints the \index{abstract syntax tree}syntax tree as an \IndexDefinition{s-expression}\emph{s-expression}. (The term comes from \index{Lisp}Lisp. An s-expression represents a tree structure by nested parenthesized lists; e.g.\ \texttt{(a (b c) d)} is a node with three children \texttt{a}, \texttt{(b c)} and \texttt{d}, and \texttt{(b c)} has two children \texttt{b} and \texttt{c}.)
+\item \IndexFlag{dump-parse}\texttt{-dump-parse} runs only the parser, and prints the \index{abstract syntax tree}syntax tree as an \IndexDefinition{s-expression}\emph{s-expression}. (The term comes from \index{Lisp}Lisp. An s-expression represents a tree structure by nested parenthesized lists; e.g.\ \texttt{(a (b c) d)} is a node with three children: \texttt{a}, followed by \texttt{(b c)}, and then \texttt{d}, and \texttt{(b c)} has two children \texttt{b} and \texttt{c}.)
 \item \IndexFlag{dump-ast}\texttt{-dump-ast} runs only the parser and Sema, and prints the type-checked syntax tree as an s-expression.
 \item \IndexFlag{print-ast}\texttt{-print-ast} prints the type-checked syntax tree in a form that approximates what was written in source code. This is useful for getting a sense of what declarations the compiler \index{synthesized declaration}synthesized, for example for derived conformances to protocols like \texttt{Equatable}.
 \item \IndexFlag{emit-silgen}\texttt{-emit-silgen} runs only Sema and SILGen, and prints the raw SIL output by SILGen.
@@ -97,7 +97,7 @@ Various command-line flags are provided to run the pipeline until a certain phas
 \item \IndexFlag{S}\texttt{-S} prints the \index{assembly language}assembly output by LLVM.
 \end{itemize}
 
-Each pipeline phase can emit \index{warning}warnings and \index{error}errors, collectively known as \IndexDefinition{diagnostic}\emph{diagnostics}. The parser attempts to recover from errors; the presence of parse errors does not prevent Sema from running. On the other hand, if Sema emits errors, compilation stops; SILGen does not attempt to lower an invalid abstract syntax tree to SIL (but SILGen can emit its own diagnostics, including those that result from lazy type checking of declarations in secondary files).
+Each pipeline phase can emit \index{warning}warnings and \index{error}errors, collectively known as \IndexDefinition{diagnostic}\emph{diagnostics}. The parser attempts to recover from errors, so the presence of parse errors does not prevent Sema from attempting to type-check the parsed syntax tree. However, the parser or \index{Sema!diagnostics}Sema diagnose errors, compilation stops; we do not move on to \index{SILGen!diagnostics}SILGen. The same is true for each subsequent stage, so if SILGen, the \index{SIL optimizer!diagnostics}SIL optimizer, or \index{IRGen!diagnostics}IRGen diagnose an error, we do not proceed to the next stage.
 
 \index{TBD}
 \index{textual interface}
@@ -136,9 +136,9 @@ We get the scope map below:
 ASTSourceFileScope 0x14c131908, [1:1 - 5:1] 'id.swift'
 `-AbstractFunctionDeclScope 0x14c1392c0, [1:1 - 4:1] 'id(_:)'
   `-GenericParamScope 0x14c139118, [1:1 - 4:1] param 0 'T'
-    |-ParameterListScope 0x14c139238, [1:11 - 1:18] 
-    `-FunctionBodyScope 0x14c1392c0, [1:25 - 4:1] 
-      `-BraceStmtScope 0x14c139510, [1:25 - 4:1] 
+    |-ParameterListScope 0x14c139238, [1:11 - 1:18]
+    `-FunctionBodyScope 0x14c1392c0, [1:25 - 4:1]
+      `-BraceStmtScope 0x14c139510, [1:25 - 4:1]
         `-PatternEntryDeclScope 0x14c139450, [2:7 - 4:1] entry 0 'x'
           `-PatternEntryInitializerScope 0x14c139450, [2:11 - 2:11] entry 0 'x'
 \end{Verbatim}
@@ -146,55 +146,29 @@ ASTSourceFileScope 0x14c131908, [1:1 - 5:1] 'id.swift'
 Unqualified lookup is an important part of type resolution (\SecRef{identtyperepr}).
 
 \paragraph{Qualified lookup.}
-A qualified lookup searches in a list of type declarations for a member with the given name. Qualified lookup recursively visits the conformed protocols of each struct, enum and class declaration, and the superclass of each class declaration. If the found member was from a protocol or superclass, we apply a substitution map, which will be described in \SecRef{member type repr}. The primitive operation, which searches inside a single type declaration and its extensions only, is called \index{direct lookup}\emph{direct lookup}  (\SecRef{direct lookup}).
+A qualified lookup searches in a list of type declarations for a member with the given name. Qualified lookup recursively visits the conformed \index{local conformance}protocols of each struct, enum, and class declaration, and the \index{superclass declaration}superclass of each class declaration. If the found member was from a protocol or superclass, we apply a substitution map (we will describe this in \SecRef{member type repr}). The primitive operation, which searches inside a single type declaration and its extensions only, is called \index{direct lookup}\emph{direct lookup}  (\SecRef{direct lookup}).
 
 \paragraph{Module lookup.} \IndexDefinition{module lookup}A qualified lookup where the base is a module declaration searches for a top-level declaration in the given module and any other modules that it re-exports via ``\verb|@_exported import|''.
 
-\paragraph{Dynamic lookup.} A qualified lookup whose base is the \texttt{AnyObject} type implements the legacy \index{Objective-C}Objective-C behavior of a message send to \texttt{id}, which can invoke any method defined in any Objective-C class or protocol. In Swift, the so-called \IndexDefinition{AnyObject lookup@\texttt{AnyObject} lookup|see{dynamic lookup}}\IndexDefinition{dynamic lookup}\emph{dynamic lookup} searches a global lookup table constructed to contain all \texttt{@objc} members of all classes and protocols:
+\paragraph{Dynamic lookup.} A qualified lookup whose base is the \texttt{AnyObject} type implements the legacy \index{Objective-C}Objective-C behavior of a message send to \texttt{id}, which can invoke any method defined in any Objective-C class or protocol. In Swift, the so-called \IndexDefinition{AnyObject lookup@\texttt{AnyObject} lookup|see{dynamic lookup}}\IndexDefinition{dynamic lookup}\emph{dynamic lookup} searches a global lookup table constructed to contain all \texttt{@objc} members of all classes and \index{Objective-C protocol}protocols:
 \begin{itemize}
 \item Any class can contain \texttt{@objc} members, and the attribute can either be explicitly stated, or inferred if the method \index{override}overrides an \texttt{@objc} method from the superclass.
 \item Protocol members are \texttt{@objc} only if the protocol itself is \texttt{@objc}.
 \end{itemize}
 
 \paragraph{Operator lookup.}
-Operator symbols are declared at the top level of a module by \IndexDefinition{operator declaration}\emph{operator declarations}. \IndexDefinition{operator symbol}Operator declarations have a fixity (\index{prefix operator}prefix, \index{infix operator}infix, or \index{postfix operator}postfix), and infix operators also have a \IndexDefinition{precedence group}\emph{precedence group}. Precedence groups are \index{partial order}partially ordered with respect to other precedence groups. Standard operators like \texttt{+} and \texttt{*} and their precedence groups are thus defined in the standard library, rather than being built-in to the language itself.
+Operator symbols are declared at the top level of a module by \IndexDefinition{operator declaration}\emph{operator declarations}. \IndexDefinition{operator symbol}Operator declarations have a fixity (\index{prefix operator}prefix, \index{infix operator}infix, or \index{postfix operator}postfix), and infix operators also have a \IndexDefinition{precedence group}\emph{precedence group}. Precedence groups are \index{partial order}partially ordered with respect to other precedence groups. Standard operators like \texttt{+} and \texttt{*} and their precedence groups are thus defined in the \index{standard library}standard library, rather than being built-in to the language itself.
 
 \IndexDefinition{operator lookup}
 \index{tree}
-The \index{parser}parser parses an arithmetic expression like \texttt{2 + 3 * 6} into a flat list of nodes and operator symbols, called a \index{sequence expression}\emph{sequence expression}. The parser does not know the precedence, fixity or associativity of the \texttt{+} and \texttt{*} operators. Indeed, it does not know that they exist at all. The \IndexDefinition{pre-check expression pass}\emph{pre-check} pass of the expression type checker looks up operator symbols, in this case \texttt{+} and \texttt{*}, and transforms sequence expressions into the more familiar nested tree form, according to the operator's fixity, precedence and associativity.
+The \index{parser}parser parses an arithmetic expression like \texttt{2 + 3 * 6} into a flat list of nodes and operator symbols, called a \index{sequence expression}\emph{sequence expression}. The parser does not know the precedence, fixity, or associativity of the \texttt{+} and \texttt{*} operators. Indeed, it does not know that they exist at all. The \IndexDefinition{pre-check expression pass}\emph{pre-check} pass of the expression type checker looks up operator symbols, in this case \texttt{+} and \texttt{*}, and transforms sequence expressions into the more familiar nested tree form, according to the operator's fixity, precedence and associativity.
 
 Operator symbols do not themselves have an implementation; they are just names. An operator symbol can be used as the name of a function implementing the operator on a specific type (for prefix and postfix operators) or a specific pair of types (for infix operators). Operator functions can be declared either at the top level, or as a member of a type. As far as a name lookup is concerned, the interesting thing about operator functions is that they are visible globally, even when declared inside of a type. Operator functions are found by consulting the operator lookup table, which contains top-level operator functions as well as member operator functions of all declared types.
 
-When the compiler \index{expression type checker}type checks the expression \texttt{2 + 3 * 6}, it must pick two specific operator functions for \texttt{+} and \texttt{*} among all the possibilities, in order for this expression to type check. In this case, the overloads for \texttt{Int} are chosen, because \texttt{Int} is the default literal type for the literals \texttt{2}, \texttt{3} and \texttt{6}.
+In the expression \texttt{2 + 3 * 6}, the \index{expression type checker}expression type checker must select two specific operator functions for \texttt{+} and \texttt{*} among all the possibilities. In this case, the overloads for \texttt{Int} are chosen, because \texttt{Int} is the default literal type for the literals \texttt{2}, \texttt{3}, and \texttt{6}. We won't say much about the expression type checker in this book, but there is some further discussion in \SecRef{sec:special types}.
 
 \begin{listing}\captionabove{Operator lookup in action}\label{customops}
-\begin{Verbatim}
-prefix operator <&>
-infix operator ++: MyPrecedence
-infix operator **: MyPrecedence
-
-precedencegroup MyPrecedence {
-  associativity: right
-  higherThan: AdditionPrecedence
-}
-
-// Member operator examples
-struct Chicken {
-  static prefix func <&>(x: Chicken) {}
-  static func ++(lhs: Chicken, rhs: Chicken) -> Int {}
-}
-
-struct Sausage {
-  static func ++(lhs: Sausage, rhs: Sausage) -> Bool {}
-}
-
-// Top-level operator example
-func **(lhs: Sausage, rhs: Sausage) -> Sausage {}
-
-// Global operator lookup finds Sausage.++
-// `fn' has type (Sausage, Sausage) -> Bool
-let fn = { ($0 ++ $1) as Bool }
-\end{Verbatim}
+\VerbInput{compilation-model/operators.swift}
 \end{listing}
 \ListingRef{customops} shows the definition of some custom operators and precedence groups. Note that the overload of \texttt{++} inside struct \texttt{Chicken} returns \texttt{Int}, and the overload of \texttt{++} inside struct \texttt{Sausage} returns \texttt{Bool}. The closure value stored in \texttt{fn} applies \texttt{++} to two anonymous closure parameters, \verb|$0| and \verb|$1|. While they do not have declared types, by simply coercing the \emph{return type} to \texttt{Bool}, we are able to unambiguously pick the overload of \texttt{++} declared in \texttt{Sausage}. (Whether this is good style is left to the reader to judge.)
 
@@ -204,7 +178,7 @@ Initially, infix operators defined their precedence as an integer value; \IndexS
 
 The ``compilation pipeline'' model as described is an over-simplification of the actual state of affairs. Ultimately, each frontend job only needs to generate machine code from the declarations in its primary files, so all stages from SILGen onward operate on the frontend job's primary files only. The situation while parsing and type checking is more subtle, because name lookup must find declarations in other \index{source file}source files, even secondary files. This requires having the \index{abstract syntax tree}abstract syntax tree for secondary files as well. However, it would be inefficient if every frontend job was required to fully parse all secondary files, because the time spent in the \index{parser}parser would be proportional to the number of frontend jobs multiplied by the number of source files, negating the benefits of parallelism.
 
-The \IndexDefinition{delayed parsing}\emph{delayed parsing} optimization solves this dilemma. When parsing a \index{secondary file}secondary file for the first time, the parser does not construct syntax tree nodes for the bodies of top-level types, extensions, and functions. Instead, it operates in a high-speed mode where comments are skipped and pairs of braces are matched, but very little other work is performed. This outputs a ``skeleton'' representation of each secondary file. (In whole module mode, there is no delayed parsing. There are no secondary files, and delayed parsing of declarations in \index{primary file}primary files is pointless, since they are always needed for type checking and code generation anyway.) If we later need the body of a type or extension declaration from a secondary file---for example, if a name lookup into this declaration is performed while type checking an \index{expression}expression in a primary file---then we will parse the source range of the declaration again, this time building the full syntax tree.
+The \IndexDefinition{delayed parsing}\emph{delayed parsing} optimization solves this dilemma. When parsing a \index{secondary file}secondary file for the first time, the parser does not construct syntax tree nodes for the bodies of top-level types, extensions, and functions. Instead, it operates in a high-speed mode where comments are skipped and pairs of braces are matched, but very little other work is performed. This outputs a ``skeleton'' representation of each secondary file. If we later need the body of a type or extension declaration from a secondary file---for example, if a name lookup into this declaration is performed while type checking an \index{expression}expression in a primary file---then we will parse the source range of the declaration again, this time building the full syntax tree. (In whole module mode, there is no delayed parsing. There are no secondary files, and delayed parsing of declarations in \index{primary file}primary files is pointless, since they are always needed for type checking and code generation anyway.)
 
 While it is possible to construct a pathological program where every source file triggers delayed parsing of all declarations in every other file, this is unlikely in practice.
 
@@ -271,7 +245,7 @@ For this reason, we want to minimize time spent type checking declarations in se
 
 Thus, the work of type checking is split up into small, fine-grained \IndexDefinition{request}\emph{requests} which are evaluated on demand, instead of sequentially. There is still a semantic analysis pass that visits the declarations of each primary file in source order, but it merely kicks off requests and emits diagnostics.
 
-Concretely, a \emph{request} packages a list of input parameters together with an \IndexDefinition{evaluation function}\emph{evaluation function}. With the exception of emitting diagnostics, the request function's result should only depend on those inputs, and the results of other requests. The request evaluator directly invokes the evaluation function, and caches the result. Clients only evaluate the request via the request evaluator framework, which returns the cached value if present, detects request cycles automatically, and tracks dependency information for incremental builds.
+Concretely, a \emph{request} packages a list of input parameters together with an \IndexDefinition{evaluation function}\emph{evaluation function}. With the exception of emitting diagnostics, the request function's result should only depend on those inputs, and the results of other requests. The request evaluator directly invokes the evaluation function, and \index{memoization}caches the result. Clients only evaluate the request via the request evaluator framework, which returns the cached value if present, detects request cycles automatically, and tracks dependency information for incremental builds.
 
 \IndexDefinition{type-check primary file request}
 \IndexDefinition{AST lowering request}
@@ -295,13 +269,13 @@ let food = cook()
 func cook() -> Food {}
 struct Food {}
 \end{Verbatim}
-Notice how the \index{initial value expression}initial value expression of \texttt{food} references the \texttt{cook()} function, and the return type of \texttt{cook()} is the \texttt{Food} struct declared immediately after, \texttt{Food} is the inferred type of \texttt{food}. This plays out with the request evaluator:
+Notice how the \index{initial value expression}initial value expression of \texttt{food} references the \texttt{cook()} function, and the return type of \texttt{cook()} is the \texttt{Food} struct declared immediately after, so that \texttt{Food} is the inferred type of \texttt{food}. This plays out as follows with the request evaluator:
 \begin{enumerate}
 \item The \Request{type-check primary file request} begins by visiting the declaration of \texttt{food} and performing various semantic checks.
 \item One of these checks evaluates the \Request{interface type request} with the declaration of \texttt{food}. This is a variable declaration, so the evaluation function will type check the initial value expression and return the type of the result.
 \begin{enumerate}
 \item In order to type check the expression \texttt{cook()}, the \Request{interface type request} is evaluated again, this time with the declaration of \texttt{cook} as its input parameter.
-\item The interface type of \texttt{cook()} has not been computed yet, so the request evaluator invokes the request evaluation function.
+\item The interface type of \texttt{cook()} has not been computed yet, so the request evaluator invokes the evaluation function to get the interface type of \texttt{cook()}.
 \end{enumerate}
 \item After computing the interface type of \texttt{food} and performing other semantic checks, the \Request{type-check primary file request} moves on to the declaration of \texttt{cook}:
 \begin{enumerate}
@@ -328,7 +302,7 @@ struct Box {
 }
 \end{Verbatim}
 
-Our frontend job does not emit any diagnostics in the semantic analysis pass, because the \texttt{contents} stored property of \texttt{Box} is not actually referenced while type checking the primary file \texttt{a.swift}. However when SILGen runs, it needs to determine whether the parameter of type \texttt{Box} to the \texttt{open()} function needs to be passed directly in registers, or via an address by computing the \index{type lowering}\emph{type lowering} for the \texttt{Box} type. The type lowering procedure recursively computes the type lowering of each stored property of \texttt{Box}; this evaluates the \index{interface type request}\Request{interface type request} for the \texttt{contents} property of \texttt{Box}, which emits a diagnostic because the identifier \index{identifier}``\texttt{DoesNotExist}'' does not resolve to a valid type. The interface type of the stored property then becomes the \index{error type}error type. We will discuss type lowering in \SecRef{sec:type lowering}.
+Our frontend job does not emit any diagnostics in the semantic analysis pass, because the \texttt{contents} stored property of \texttt{Box} is not actually referenced while type checking the primary file \texttt{a.swift}. However when SILGen runs, it needs to determine whether the parameter of type \texttt{Box} to the \texttt{open()} function needs to be passed directly in registers, or via an address, by computing the \index{type lowering}\emph{type lowering} for the \texttt{Box} type. The type lowering procedure recursively computes the type lowering of each stored property of \texttt{Box}; this evaluates the \index{interface type request}\Request{interface type request} for the \texttt{contents} property of \texttt{Box}, which emits a diagnostic because the identifier \index{identifier}``\texttt{DoesNotExist}'' does not resolve to a valid type. The interface type of the stored property then becomes the \index{error type}error type. (We will discuss type lowering in \SecRef{sec:type lowering}.)
 \end{example}
 
 The request evaluator framework was first introduced in \IndexSwift{4.2}Swift~4.2 \cite{reqeval}. In subsequent releases, various ad-hoc mechanisms were gradually converted into request evaluator requests, with resulting gains to compiler performance, stability, and implementation maintainability.
@@ -366,7 +340,7 @@ $ swiftc -stats-output-dir -fine-grained-timers /tmp/stats ...
 $ awk -f '/InterfaceTypeRequest.wall/ { x += $2 } END { print x }' \
     /tmp/stats/*.json
 \end{Verbatim}
-Another command-line flag is \IndexFlag{trace-stats-events}\texttt{-trace-stats-events}. It must be passed in conjunction with \texttt{-stats-output-dir}, and enables output of a trace file to the statistics directory. The trace file is a sequence of time-stamped events that mark the start and end of each request evaluation function, in CSV format. More details about these flags in \cite{compileperf}.
+Another command-line flag is \IndexFlag{trace-stats-events}\texttt{-trace-stats-events}. It must be passed in conjunction with \texttt{-stats-output-dir}, and enables output of a trace file to the statistics directory. The trace file is a sequence of time-stamped events that mark the start and end of each request evaluation function, in CSV format. For more about these flags, see \cite{compileperf}.
 
 
 \section{Incremental Builds}\label{incremental builds}
@@ -377,7 +351,7 @@ The request evaluator also records dependencies for incremental compilation, ena
 \item Perform a clean build of all \index{source file}source files in the program, and collect the \index{object file}object files.
 \item Make a change to one or more source files in the input program.
 \item Do an incremental build, which rebuilds some subset of source files in the input program. If a source file was rebuilt but the resulting object file is identical to the one saved in Step~1, the incremental build performed \emph{wasted work}.
-\item Finally, do another clean build, which yet again rebuilds all source files in the input program. If a source file was rebuilt and the resulting object file is different to the one saved in Step~1, the incremental build was \emph{incorrect}.
+\item Finally, do another clean build, which yet again rebuilds all source files in the input program. If a source file was rebuilt and the resulting object file is different than the one saved in Step~1, the incremental build was \emph{incorrect}.
 \end{enumerate}
 This highlights the difficulty of the incremental compilation problem. Rebuilding \emph{too many} files is an annoyance; rebuilding \emph{too few} files is a correctness issue. A correct but ineffective implementation would rebuild all source files every time. On the other hand, the opposite approach of only rebuilding the subset of source files that have changed since the last compiler invocation is too aggressive. To see why it is incorrect, consider the program shown in \ListingRef{incrlisting1}. Let's say the programmer builds the program, adds the overload \verb|f: (Int) -> ()|, then builds it again. The new overload is more specific, so the call \texttt{f(123)} in \texttt{b.swift} now refers to the new overload; therefore, \texttt{b.swift} must also be rebuilt.
 \begin{listing}\captionabove{Rebuilding a file after adding a new overload}\label{incrlisting1}
@@ -460,11 +434,11 @@ Next, the \Request{type-check primary file request} runs with the source file \t
 The frontend job writes out the dependency files for \texttt{a.swift} and \texttt{b.swift} upon completion. Both source files require the names ``\texttt{soup}'' and ``\texttt{Pumpkin}.'' The dependency of \texttt{b.swift} on ``\texttt{Pumpkin}'' is correctly recorded because evaluating a request with a cached value replays the request's required names list in Step~2 above.
 \end{example}
 
-There's a bit more to the incremental build story than this; in particular, we haven't talked about the ``interface hash'' mechanism, meant to avoid rebuilding of dependent source files for changes were limited to comments, whitespace or function bodies. We're already far afield from the goal of describing Swift generics though, so the curious reader can refer to \cite{reqeval} and \cite{incremental} for details.
+There's a bit more to the incremental build story than this; in particular, we haven't talked about the ``interface hash'' mechanism, meant to avoid rebuilding source files when changes are limited to comments, whitespace, or function bodies. We're already strayed far from the goal of describing Swift generics though, so the curious reader can refer to \cite{reqeval} and \cite{incremental} for details.
 
 \section{Module System}\label{module system}
 
-The frontend represents a module by a \IndexDefinition{module declaration}\emph{module declaration} containing one or more \IndexDefinition{file unit}\emph{file units}. The list of source files in a compiler invocation form the \index{main module}\emph{main module}. The main module is special, because its \index{abstract syntax tree}abstract syntax tree is constructed directly by parsing source code; the file units are \IndexDefinition{source file}\emph{source files}. There are three other kinds of modules:
+The frontend represents a module by a \IndexDefinition{module declaration}\emph{module declaration} containing one or more \IndexDefinition{file unit}\emph{file units}. The source program given to the compiler invocation forms the \index{main module}\emph{main module}. The main module is special, because its \index{abstract syntax tree}abstract syntax tree is constructed directly by parsing source code; the file units are \IndexDefinition{source file}\emph{source files}. There are three other kinds of modules:
 \begin{enumerate}
 \item \textbf{Serialized modules} that consist of one or more \IndexDefinition{serialized AST file unit}\emph{serialized AST file units}. When the main module imports another module written in Swift, the frontend reads a serialized module that was previously built.
 
@@ -472,7 +446,7 @@ The frontend represents a module by a \IndexDefinition{module declaration}\emph{
 
 \item \textbf{The builtin module}, which has exactly one file unit that contains types and intrinsics implemented by the compiler itself.
 \end{enumerate}
-The main module depends on other modules via the \texttt{import} keyword, which parses as an \IndexDefinition{import declaration}\emph{import declaration}. After parsing, one of the first stages in semantic analysis loads all modules imported the main module. The standard library is defined in the \texttt{Swift} module, which is imported automatically unless the frontend was invoked with the \IndexFlag{parse-stdlib}\texttt{-parse-stdlib} flag, used when building the standard library itself. As for the builtin module, it is ordinarily not visible, but the \texttt{-parse-stdlib} flag also causes it to be implicitly imported (\SecRef{sec:special types}).
+The main module depends on other modules via the \texttt{import} keyword, which parses as an \IndexDefinition{import declaration}\emph{import declaration}. After parsing, one of the first stages in semantic analysis loads all modules imported the main module. The \IndexDefinition{standard library}standard library is defined in the \texttt{Swift} module, which is imported automatically unless the frontend was invoked with the \IndexFlag{parse-stdlib}\texttt{-parse-stdlib} flag, used when building the standard library itself. As for the builtin module, it is ordinarily not visible, but the \texttt{-parse-stdlib} flag also causes it to be implicitly imported (\SecRef{sec:special types}).
 
 \paragraph{Serialized modules.} The \IndexFlag{emit-module}\texttt{-emit-module} flag instructs the compiler to generate a \index{binary module|see{serialized module}}\IndexDefinition{serialized module}serialized module. Serialized module files use the ``\texttt{.swiftmodule}'' file name extension. Serialized modules are stored in a binary format, closely tied to the specific version of the Swift compiler. (When building a shared library for distribution, it is better to publish a textual interface instead, as described at the end of this section.)
 
@@ -514,7 +488,7 @@ Note that (1) above means the textual interface format is target-specific; a sep
 
 When a module defined by a textual interface is imported for the first time, a frontend job parses and type checks the textual interface, and generates a serialized module file which is then consumed by the original frontend job. Serialized module files generated in this manner are cached, and can be reused between invocations of the same compiler version.
 
-The \texttt{@inlinable} attribute was introduced in \IndexSwift{4.2}Swift 4.2~\cite{se0193}. The Swift \index{ABI}ABI was formally stabilized in \IndexSwift{5.0}Swift 5, when the standard library became part of the operating system on Apple platforms. Library evolution support and textual interfaces became user-visible features in \IndexSwift{5.1}Swift 5.1~\cite{se0260}. A recent paper describes a formal model for reasoning about the Swift ABI \cite{formalabi}.
+The \texttt{@inlinable} attribute was introduced in \IndexSwift{4.2}Swift 4.2~\cite{se0193}. The Swift \index{ABI}ABI was formally stabilized in \IndexSwift{5.0}Swift 5, when the \index{standard library}standard library became part of the operating system on Apple platforms. Library evolution support and textual interfaces became user-visible features in \IndexSwift{5.1}Swift 5.1~\cite{se0260}. A recent paper describes a formal model for reasoning about the Swift ABI \cite{formalabi}.
 
 \section{Source Code Reference}\label{src:compilation model}
 
@@ -525,7 +499,7 @@ The Swift driver is now implemented in Swift, and lives in a separate repository
 \begin{quote}
 \url{https://github.com/swiftlang/swift-driver}
 \end{quote}
-The Swift frontend, standard library, and runtime are found in the main repository:
+The Swift frontend, \IndexSource{standard library}standard library, and runtime are found in the main repository:
 \begin{quote}
 \url{https://github.com/swiftlang/swift}
 \end{quote}
@@ -549,7 +523,7 @@ Key source files:
 
 \IndexSource{AST context}
 \apiref{ASTContext}{class}
-This is a singleton class representing the frontend instance. An AST context provides a memory allocation arena, unique allocation for various immutable data types used throughout the compiler, and storage for various other global singletons.
+This is a singleton class representing the frontend instance. An AST context provides a \IndexSource{permanent arena}memory allocation arena, unique allocation for various immutable data types used throughout the compiler, and storage for various other global singletons.
 
 \subsection*{Request Evaluator}
 Key source files:
@@ -585,7 +559,7 @@ These methods are implemented in \SourceFile{lib/AST/TypeCheckRequestFunctions.c
 
 \IndexSource{request evaluator}
 \apiref{Evaluator}{class}
-The \texttt{Evaluator} class is a singleton, stored in the \texttt{evaluator} instance variable of the global \texttt{ASTContext} singleton. 
+The \texttt{Evaluator} class is a singleton, stored in the \texttt{evaluator} instance variable of the global \texttt{ASTContext} singleton.
 
 Requests are evaluated by calling the \texttt{evaluateOrDefault()} top-level function. This function receives the request evaluator singleton, the request to evaluate, and a sentinel value to return in case of circularity. The request evaluator will either return a cached value, or invoke the evaluation function and cache the result.
 
@@ -607,16 +581,14 @@ An \texttt{Uncached} request is appropriate when the evaluation function wraps s
 
 A \texttt{Cached} request will store its results in a per-request kind \texttt{DenseMap} whose keys are the inputs given to the evaluation function. This requires no additional work on the side of the request, but it has the disadvantage that the overhead of the \texttt{DenseMap} becomes significant when the number of distinct keys is too great. The request implementation only needs to declare one additional method in this case, named \texttt{isCached()}. This allows opting out of caching for certain inputs only; always returning \texttt{true} is the most common implementation.
 
-A \texttt{SeparatelyCached} request must declare \texttt{isCached()} as above, together with two additional methods, \texttt{getCachedResult()} and \texttt{cacheResult()}. Separate caching takes additional work to implement, but it avoids the cost of the \texttt{DenseMap} when the cached value can be stored directly inside the input value.
-
-For example, in a whole-module build, the \texttt{InterfaceTypeRequest} will be evaluated against almost every single \texttt{ValueDecl}. For this reason, the \texttt{InterfaceTypeRequest} uses separate caching, storing the interface type directly in an instance variable of the \texttt{ValueDecl} itself.
+A \texttt{SeparatelyCached} request must declare \texttt{isCached()} as above, together with two additional methods, \texttt{getCachedResult()} and \texttt{cacheResult()}. Separate caching takes additional work to implement, but it avoids the cost of the \texttt{DenseMap} when the cached value can be stored directly inside the input value. For example, in a whole-module build, the \texttt{InterfaceTypeRequest} will be evaluated against almost every single \texttt{ValueDecl}. For this reason, the \texttt{InterfaceTypeRequest} uses separate caching, storing the interface type directly in an instance variable of the \texttt{ValueDecl} itself.
 
 A \texttt{SplitCached} request is like \texttt{SeparatelyCached} in that the request must declare \texttt{isCached()}, \texttt{getCachedResult()}, and \texttt{cacheResult()} methods, which are called by the evaluator. The evaluator also allocates a \texttt{DenseMap}, just like the \texttt{Cached} case, but the evaluator does not store anything there itself. The request's \texttt{getCachedResult()} and \texttt{cacheResult()} methods either store the result somewhere of their own choosing, or they pass it down to the evaluator's cache, using a pair of methods on the \texttt{Evaluator} singleton:
 \begin{itemize}
 \item \texttt{getCachedNonEmptyOutput()} takes a request, and returns a \texttt{std::optional} with the cached value, or \texttt{std::nullopt} if there isn't one.
 \item \texttt{cacheNonEmptyOutput()} takes a request and the result, and updates the cache.
 \end{itemize}
-Split caching works best when the request is evaluated against a large number of inputs, but when the result is almost always some empty placeholder value. The idea is that the empty value is stored directly, perhaps with a single bit, whereas all other results are cached by the request evaluator.
+Split caching works best when the request is evaluated against a large number of inputs, but when the result is almost always some empty placeholder value. The idea is that the empty value is stored directly, perhaps with a single bit, whereas all other results are cached by the request evaluator in a \texttt{DenseMap}.
 
 For example, we use split caching for the \texttt{OpaqueResultTypeRequest} of \ChapRef{chap:opaque result types}. This request is evaluated against almost every \texttt{ValueDecl}, but most value declarations don't have an \index{opaque result type}opaque result type, so the result is almost always \texttt{nullptr}. We don't want to build a \texttt{DenseMap} whose keys range over all value declarations and where most values are \texttt{nullptr}. We also don't want to use separate caching, since that would require adding a new instance variable to \texttt{ValueDecl} whose value is almost always \texttt{nullptr}. Split caching allows us to reserve a single bit in the \texttt{ValueDecl} to indicate the presence of an opaque result type, while the actual declaration of the opaque result type is then stored in the request evaluator's cache, but only for those value declarations that actually have one.
 
@@ -669,7 +641,7 @@ Flags passed as part of an \texttt{UnqualifiedLookupDescriptor}.
 \apiref{DeclContext}{class}
 Declaration contexts will be \IndexSource{declaration context}introduced in \ChapRef{chap:decls}, and the \texttt{DeclContext} class in \SecRef{src:declarations}.
 \begin{itemize}
-\item The various overloads of \texttt{lookupQualified()} perform a \IndexSource{qualified lookup}qualified name lookup into the given base type. The ``\texttt{this}'' parameter---the \texttt{DeclContext~*} which the method is called on determines the visibility of declarations found via lookup through imports and access control; \texttt{this} is \emph{not} the base type of the lookup.
+\item The various overloads of \texttt{lookupQualified()} perform a \IndexSource{qualified lookup}qualified name lookup into the given base type. The ``\texttt{this}'' parameter---the \texttt{DeclContext~*} which the method is called on---determines the visibility of declarations found via lookup through imports and access control; it is \emph{not} the base type of the lookup.
 \end{itemize}
 
 \apiref{NLOptions}{enum}
@@ -730,7 +702,7 @@ Represents a parsed source file from disk. Inherits from \texttt{FileUnit}.
 \end{itemize}
 
 \subsubsection*{Imported and serialized modules}
-Support for \IndexSource{Clang importer}\IndexSource{imported module}imported and \IndexSource{serialized module}serialized modules can be found in a pair sub-directories:
+Support for \IndexSource{Clang importer}\IndexSource{imported module}imported and \IndexSource{serialized module}serialized modules can be found in a pair of sub-directories:
 \begin{itemize}
 \item \SourceFile{lib/ClangImporter/}
 \item \SourceFile{lib/Serialization/}

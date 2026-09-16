@@ -20,8 +20,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/Witness.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
@@ -29,6 +29,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
+#include <optional>
 #include <utility>
 
 namespace swift {
@@ -103,6 +104,17 @@ enum class BuiltinConformanceKind {
 
   Last_Kind = Missing
 };
+
+/// Requirements of COM identity protocols that have compiler-provided
+/// witnesses.
+enum class COMIdentityRequirementKind {
+  InterfaceID,
+  ActivationID,
+};
+
+/// Classify a compiler-managed COM identity requirement.
+std::optional<COMIdentityRequirementKind>
+classifyCOMIdentityRequirement(ValueDecl *requirement);
 
 enum : unsigned {
   NumProtocolConformanceStateBits =

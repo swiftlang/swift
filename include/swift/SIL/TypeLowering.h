@@ -16,6 +16,7 @@
 #include "swift/ABI/ProtocolDispatchStrategy.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/AccessControls.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILInstruction.h"
@@ -98,8 +99,6 @@ class TypeLowering {
 private:
   friend class TypeConverter;
 
-  virtual void setLoweredAddresses() const {}
-
 protected:
   /// The SIL type of values with this Swift type.
   mutable SILType LoweredType;
@@ -144,9 +143,21 @@ public:
   /// is address-only if it is a resilient value type, or if it is a fragile
   /// value type with a resilient member. In either case, the full layout of
   /// values of the type is unavailable to the compiler.
+  SWIFT_UNAVAILABLE_IN_SILGEN_MSG(
+      "use `!isLoadableOrOpaque(F)` or `isAddress()` depending on your needs")
   bool isAddressOnly() const {
     return Properties.isAddressOnly();
   }
+  /// isLoadableOrOpaque - Returns true if values of this type can be handled as
+  /// direct, loaded SSA values.
+  ///
+  /// The SIL pass AddressLowering transforms a function so that types with
+  /// opaque layouts, i.e., "address-only", are no longer used as a loadable
+  /// type. That's why this query is dependent on the current function F.
+  ///  
+  /// Mirrors SILType::isLoadableOrOpaque.
+  bool isLoadableOrOpaque(const SILFunction &F) const;
+
   /// isLoadable - Returns true if the type is loadable, in other words, its
   /// full layout is available to the compiler. This is the inverse of
   /// isAddressOnly.
@@ -181,6 +192,17 @@ public:
   /// in SIL.
   SILType getLoweredType() const {
     return LoweredType;
+  }
+
+  /// getLoweredType - Get the type used to represent values of the Swift type
+  /// in SIL, with its value category derived from \p loweredAddresses.
+  /// 
+  /// Address-only types are by address (\c $*T) when \p loweredAddresses is
+  /// true and opaque SSA values (\c $T) otherwise.
+  SILType getLoweredType(bool loweredAddresses) const {
+    return LoweredType.getCategoryType((loweredAddresses && Properties.isAddressOnly())
+                                           ? SILValueCategory::Address
+                                           : SILValueCategory::Object);
   }
 
   /// Returns true if the SIL type is an address.
@@ -491,7 +513,12 @@ enum class CaptureKind {
   /// A local value captured as a constant.
   Constant,
   /// A let constant captured as a pointer to storage
-  Immutable
+  Immutable,
+  /// A local value captured directly, moved (not boxed or copied) into the
+  /// closure's context. This is only used for `@called(once)` closures that
+  /// capture `@called(once)` values at the moment because such closures
+  /// cannot be copied or called multiple times.
+  Consuming,
 };
 
 /// Interesting information about the lowering of a function type.
@@ -649,9 +676,6 @@ class TypeConverter {
   void removeNullEntry(const TypeKey &k);
 #endif
 
-  /// True if SIL conventions force address-only to be passed by address.
-  bool LoweredAddresses;
-
   CanGenericSignature CurGenericSignature;
 
   /// Stack of types currently being lowered as part of an aggregate.
@@ -671,6 +695,9 @@ class TypeConverter {
   ///
   /// Second element is a ResilienceExpansion.
   llvm::DenseMap<std::pair<SILType, unsigned>, unsigned> TypeFields;
+
+  /// Cache for TypeSubElementCount.
+  llvm::DenseMap<std::pair<SILType, TypeExpansionContext>, unsigned> TypeSubElementCache;
 
   llvm::DenseMap<AbstractClosureExpr *, FunctionTypeInfo> ClosureInfos;
   llvm::DenseMap<SILDeclRef, TypeExpansionContext>
@@ -704,7 +731,7 @@ public:
   ModuleDecl &M;
   ASTContext &Context;
 
-  TypeConverter(ModuleDecl &m, bool loweredAddresses = true);
+  TypeConverter(ModuleDecl &m);
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
@@ -803,8 +830,13 @@ public:
   /// Get the method dispatch strategy for a protocol.
   static ProtocolDispatchStrategy getProtocolDispatchStrategy(ProtocolDecl *P);
 
-  /// Count the total number of fields inside the given SIL Type
+  /// Count the total number of fields inside the given SILType.
   unsigned countNumberOfFields(SILType Ty, TypeExpansionContext expansion);
+
+  /// Count number of sub-elements inside the given SILType.
+  ///
+  /// FIXME: This is going away soon.
+  uint32_t getTypeSubElementCount(SILType type, TypeExpansionContext context);
 
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
@@ -874,13 +906,29 @@ public:
       .getLoweredType();
   }
 
-  SILType getLoweredLoadableType(Type t,
-                                 TypeExpansionContext forExpansion,
-                                 SILModule &M) {
+  // Returns the lowered SIL type for a Swift type, with the value category
+  // derived from \p loweredAddresses (see TypeLowering::getLoweredType(bool)).
+  // Callers with a SILFunction pass F.hasLoweredAddresses(); context-free
+  // callers pass a fixed default.
+  SILType getLoweredType(Type t, TypeExpansionContext forExpansion,
+                         bool loweredAddresses) {
+    return getTypeLowering(t, forExpansion).getLoweredType(loweredAddresses);
+  }
+
+  SILType getLoweredType(AbstractionPattern origType, Type substType,
+                         TypeExpansionContext forExpansion,
+                         bool loweredAddresses) {
+    return getTypeLowering(origType, substType, forExpansion)
+        .getLoweredType(loweredAddresses);
+  }
+
+  // \p loweredAddresses is supplied by the caller (e.g.
+  // SILFunction::hasLoweredAddresses()), not derived from the module.
+  SILType getLoweredLoadableType(Type t, TypeExpansionContext forExpansion,
+                                 bool loweredAddresses) {
     const TypeLowering &ti = getTypeLowering(t, forExpansion);
-    assert(
-        (ti.isLoadable() || !SILModuleConventions(M).useLoweredAddresses()) &&
-        "unexpected address-only type");
+    assert((ti.isLoadable() || !loweredAddresses) &&
+           "unexpected address-only type");
     return ti.getLoweredType();
   }
 
@@ -1145,8 +1193,6 @@ public:
   void withClosureTypeInfo(AbstractClosureExpr *closure,
                            const FunctionTypeInfo &closureInfo,
                            llvm::function_ref<void()> operation);
-
-  void setLoweredAddresses();
 
 private:
   CanType computeLoweredRValueType(TypeExpansionContext context,

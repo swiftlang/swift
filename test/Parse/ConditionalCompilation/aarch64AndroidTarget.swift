@@ -1,6 +1,8 @@
 // RUN: %swift -typecheck %s -verify -target aarch64-unknown-linux-android -disable-objc-interop -parse-stdlib
 // RUN: %swift-ide-test -test-input-complete -source-filename=%s -target aarch64-unknown-linux-android
 
+// expected-warning@<unknown> * {{libc not found for 'aarch64-unknown-linux-android'; C stdlib may be unavailable}}
+
 #if os(Linux) || os(anyAppleOS)
 // This block should not be type checked.
 // os(Android) does not imply os(Linux).

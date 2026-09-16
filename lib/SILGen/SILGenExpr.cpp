@@ -36,7 +36,6 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ExtInfo.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/KnownProtocols.h"
@@ -48,7 +47,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/type_traits.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -59,7 +57,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -80,7 +77,7 @@ ManagedValue SILGenFunction::emitManagedCopy(SILLocation loc, SILValue v,
     return ManagedValue::forRValueWithoutOwnership(v);
   if (v->getType().isObject() && v->getOwnershipKind() == OwnershipKind::None)
     return ManagedValue::forObjectRValueWithoutOwnership(v);
-  assert((!lowering.isAddressOnly() || !silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(F) &&
          "cannot retain an unloadable type");
 
   v = lowering.emitCopyValue(B, loc, v);
@@ -102,7 +99,7 @@ SILGenFunction::emitManagedFormalEvaluationCopy(SILLocation loc, SILValue v,
     return ManagedValue::forRValueWithoutOwnership(v);
   if (v->getType().isObject() && v->getOwnershipKind() == OwnershipKind::None)
     return ManagedValue::forObjectRValueWithoutOwnership(v);
-  assert((!lowering.isAddressOnly() || !silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(F) &&
          "cannot retain an unloadable type");
 
   v = lowering.emitCopyValue(B, loc, v);
@@ -122,7 +119,7 @@ ManagedValue SILGenFunction::emitManagedLoadCopy(SILLocation loc, SILValue v,
     return ManagedValue::forRValueWithoutOwnership(v);
   if (v->getOwnershipKind() == OwnershipKind::None)
     return ManagedValue::forObjectRValueWithoutOwnership(v);
-  assert((!lowering.isAddressOnly() || !silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(F) &&
          "cannot retain an unloadable type");
   return emitManagedRValueWithCleanup(v, lowering);
 }
@@ -142,7 +139,7 @@ SILGenFunction::emitManagedLoadBorrow(SILLocation loc, SILValue v,
     return ManagedValue::forObjectRValueWithoutOwnership(v);
   }
 
-  assert((!lowering.isAddressOnly() || !silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(F) &&
          "cannot retain an unloadable type");
   auto *lbi = B.createLoadBorrow(loc, v);
   return emitManagedBorrowedRValueWithCleanup(v, lbi, lowering);
@@ -161,7 +158,7 @@ ManagedValue SILGenFunction::emitManagedStoreBorrow(
     lowering.emitStore(B, loc, v, addr, StoreOwnershipQualifier::Trivial);
     return ManagedValue::forTrivialAddressRValue(addr);
   }
-  assert((!lowering.isAddressOnly() || !silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(F) &&
          "cannot retain an unloadable type");
   auto *sbi = B.createStoreBorrow(loc, v, addr);
   Cleanups.pushCleanup<EndBorrowCleanup>(sbi);
@@ -1065,7 +1062,7 @@ RValue RValueEmitter::visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C) {
     auto enumTy = SGF.getLoweredType(E->getType());
 
     ManagedValue noneValue;
-    if (enumTy.isLoadable(SGF.F) || !SGF.silConv.useLoweredAddresses()) {
+    if (enumTy.isLoadableOrOpaque(SGF.F)) {
       auto *e = SGF.B.createEnum(E, SILValue(), noneDecl, enumTy);
       noneValue = SGF.emitManagedRValueWithCleanup(e);
     } else {
@@ -1209,7 +1206,7 @@ SILGenFunction::ForceTryEmission::ForceTryEmission(SILGenFunction &SGF,
 
   SILValue indirectError;
   auto &errorTL = SGF.getTypeLowering(loc->getThrownError());
-  if (!errorTL.isAddressOnly()) {
+  if (errorTL.isLoadableOrOpaque(SGF.F)) {
     (void) catchBB->createPhiArgument(errorTL.getLoweredType(),
                                       OwnershipKind::Owned);
   } else {
@@ -1265,8 +1262,8 @@ void SILGenFunction::ForceTryEmission::finish() {
               return error.getType().getObjectType().getASTType();
             }, LookUpConformanceInModule());
 
-        // Generic errors are passed indirectly.
-        if (!error.getType().isAddress()) {
+        // If lowering addresses, the error must be passed indirectly.
+        if (SGF.silConv.useLoweredAddresses() && !error.getType().isAddress()) {
           auto *tmp = SGF.B.createAllocStack(
               Loc, error.getType().getObjectType(), std::nullopt);
           error.forwardInto(SGF, Loc, tmp);
@@ -1322,8 +1319,8 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
 
   // Form the optional using address operations if the type is address-only or
   // if we already have an address to use.
-  bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
-      SGF.silConv.useLoweredAddresses());
+  bool isByAddress = SGF.silConv.useLoweredAddresses() &&
+                     (usingProvidedContext || !optTL.isLoadableOrOpaque(SGF.F));
 
   TemporaryInitializationPtr optTemp;
   if (!isByAddress) {
@@ -1346,13 +1343,6 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
 
   // Set up a "catch" block for when an error occurs.
   SILBasicBlock *catchBB = SGF.createBasicBlock(FunctionSection::Postmatter);
-
-  // FIXME: opaque values
-  auto &errorTL = SGF.getTypeLowering(E->getThrownError());
-  if (!errorTL.isAddressOnly()) {
-    (void) catchBB->createPhiArgument(errorTL.getLoweredType(),
-                                      OwnershipKind::Owned);
-  }
 
   FullExpr localCleanups(SGF.Cleanups, E);
 
@@ -1419,9 +1409,6 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   SGF.B.emitBlock(catchBB);
   FullExpr catchCleanups(SGF.Cleanups, E);
 
-  // Consume the thrown error.
-  if (!errorTL.isAddressOnly())
-    (void) SGF.emitManagedRValueWithCleanup(catchBB->getArgument(0));
   catchCleanups.pop();
 
   if (isByAddress) {
@@ -1952,6 +1939,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::COMMethod:
     case SILFunctionType::Representation::CXXMethod:
     case SILFunctionType::Representation::KeyPathAccessorGetter:
     case SILFunctionType::Representation::KeyPathAccessorSetter:
@@ -1986,6 +1974,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::COMMethod:
     case SILFunctionType::Representation::CXXMethod:
     case SILFunctionType::Representation::KeyPathAccessorGetter:
     case SILFunctionType::Representation::KeyPathAccessorSetter:
@@ -2217,7 +2206,15 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     if (srcType->getRepresentation() == FunctionTypeRepresentation::Swift
         && srcType->withExtInfo(destType->getExtInfo())->isEqual(destType)) {
       auto value = SGF.emitRValueAsSingleValue(e->getSubExpr());
-      auto expectedTy = SGF.getLoweredType(destType);
+      auto expectedTy = SGF.getLoweredType(destType).castTo<SILFunctionType>();
+
+      // Sendable doesn't matter for this conversion.
+      if (auto *conv = dyn_cast<ConvertFunctionInst>(value.getValue())) {
+        if (conv->onlyConvertsSendable())
+          value =
+              ManagedValue::forObjectRValueWithoutOwnership(conv->getOperand());
+      }
+
       if (auto thinToThick =
             dyn_cast<ThinToThickFunctionInst>(value.getValue())) {
         value = ManagedValue::forObjectRValueWithoutOwnership(
@@ -2227,8 +2224,10 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
                          "nontrivial thin function reference");
         value = SGF.emitUndef(expectedTy);
       }
-      
-      if (value.getType() != expectedTy) {
+
+      auto valueTy = value.getType().castTo<SILFunctionType>();
+      // Besides conversion, a declaration can have an explicit `@Sendable`.
+      if (valueTy->withSendable(false) != expectedTy->withSendable(false)) {
         SGF.SGM.diagnose(e->getLoc(), diag::not_implemented,
                          "nontrivial thin function reference");
         value = SGF.emitUndef(expectedTy);
@@ -3136,6 +3135,44 @@ static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
   return SGF.B.createValueMetatype(loc, metaTy, selfValue.getValue());
 }
 
+/// Emit the operand of a `value_metatype` or `existential_metatype`
+/// instruction.
+///
+/// Neither instruction consumes its operand; they only inspect the type of the
+/// value it designates. So when the operand names existing storage, borrow that
+/// storage in place instead of loading a copy out of it. That avoids a needless
+/// retain/release, and it's what lets `type(of:)` apply to a noncopyable value,
+/// where the copy would otherwise be diagnosed as a consume.
+///
+/// Only an address-only operand may be left in memory. `existential_metatype`
+/// accepts an address only for an address-only (opaque) existential; for a
+/// class, boxed, or metatype existential it reads the container as a value, and
+/// IRGen has no way to interpret an address there. So a loadable operand is
+/// loaded -- with `load_borrow`, which still doesn't consume it.
+///
+/// The caller must have established a `FormalEvaluationScope` covering the use
+/// of the returned value.
+static ManagedValue emitMetatypeOperand(SILGenFunction &SGF, Expr *baseExpr) {
+  if (auto *load = dyn_cast<LoadExpr>(baseExpr)) {
+    auto accessKind = SGF.getTypeLowering(load->getType()).isAddress()
+                          ? SGFAccessKind::BorrowedAddressRead
+                          : SGFAccessKind::BorrowedObjectRead;
+    LValue lv = SGF.emitLValue(load->getSubExpr(), accessKind);
+    auto base = SGF.emitBorrowedLValue(load, std::move(lv));
+
+    // A borrowed read of physical storage comes back as the address of that
+    // storage, whether or not the type is loadable, so the load happens here.
+    if (base.getType().isAddress() && base.getType().isLoadable(SGF.F))
+      base = SGF.B.createFormalAccessLoadBorrow(load, base);
+    return base;
+  }
+
+  // Otherwise the operand produces a temporary of its own, which we can just
+  // read from.
+  return SGF.emitRValueAsSingleValue(baseExpr,
+                                     SGFContext::AllowImmediatePlusZero);
+}
+
 SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
   Type formalBaseType = baseExpr->getType()->getWithoutSpecifierType();
   CanType baseTy = formalBaseType->getCanonicalType();
@@ -3144,8 +3181,8 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
   if (baseTy.isAnyExistentialType()) {
     SILType metaTy = getLoweredLoadableType(
                                       CanExistentialMetatypeType::get(baseTy));
-    auto base = emitRValueAsSingleValue(baseExpr,
-                                  SGFContext::AllowImmediatePlusZero).getValue();
+    FormalEvaluationScope scope(*this);
+    auto base = emitMetatypeOperand(*this, baseExpr).getValue();
     return B.createExistentialMetatype(loc, metaTy, base);
   }
   SILType metaTy = getLoweredLoadableType(CanMetatypeType::get(baseTy));
@@ -3165,9 +3202,11 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
     }
 
     Scope S(*this, loc);
-    auto base = emitRValueAsSingleValue(baseExpr, SGFContext::AllowImmediatePlusZero);
-    return S.popPreservingValue(B.createValueMetatype(loc, metaTy, base))
-        .getValue();
+    FormalEvaluationScope scope(*this);
+    auto base = emitMetatypeOperand(*this, baseExpr);
+    auto result = B.createValueMetatype(loc, metaTy, base);
+    scope.pop();
+    return S.popPreservingValue(result).getValue();
   }
   // Otherwise, ignore the base and return the static thin metatype.
   emitIgnoredExpr(baseExpr);
@@ -3670,7 +3709,7 @@ static PreparedArguments loadIndexValuesForKeyPathComponent(
       // The index argument arrives as an `Indirect_In_Guaranteed` parameter,
       // so a non-address shape is only possible when SIL operates on opaque
       // values rather than addresses.
-      assert(!SGF.SGM.M.useLoweredAddresses());
+      assert(!SGF.useLoweredAddresses());
       if (indexes.size() > 1)
         elt = SGF.B.createTupleExtract(loc, elt, i);
       value = ManagedValue::forBorrowedRValue(elt).copy(SGF, loc);
@@ -3688,8 +3727,14 @@ static AccessorDecl *
 getRepresentativeAccessorForKeyPath(AbstractStorageDecl *storage) {
   if (storage->requiresOpaqueGetter())
     return storage->getOpaqueAccessor(AccessorKind::Get);
-  assert(storage->requiresOpaqueReadCoroutine());
-  return storage->getOpaqueAccessor(AccessorKind::Read);
+  // Prefer the old read coroutine when it exists (so key paths for storage that
+  // predates the CoroutineAccessors feature keep referring to it); otherwise use
+  // the new yielding-borrow coroutine, which is the only read accessor a
+  // new-only property has.
+  if (storage->requiresOpaqueReadCoroutine())
+    return storage->getOpaqueAccessor(AccessorKind::Read);
+  assert(storage->requiresOpaqueYieldingBorrowCoroutine());
+  return storage->getOpaqueAccessor(AccessorKind::YieldingBorrow);
 }
 
 static CanType buildKeyPathIndicesTuple(ASTContext &C,
@@ -3715,7 +3760,7 @@ static void emitReturn(SILGenFunction &subSGF, CanType methodType,
     resultSubst = subSGF.emitSubstToOrigValue(
         loc, resultSubst, AbstractionPattern::getOpaque(), methodType);
 
-  if (subSGF.F.getModule().useLoweredAddresses()) {
+  if (subSGF.useLoweredAddresses()) {
     resultSubst.forwardInto(subSGF, loc, resultArg);
     scope.pop();
     subSGF.B.createReturn(loc, subSGF.emitEmptyTuple(loc));
@@ -3839,7 +3884,7 @@ static void emitKeyPathThunk(
     baseArgTy = genericEnv->mapTypeIntoEnvironment(SGM.M, baseArgTy);
   }
   if (!lowerValueArg) {
-    if (SGM.M.useLoweredAddresses()) {
+    if (!SGM.M.usesOpaqueValues()) {
       resultArg = entry->createFunctionArgument(resultArgTy);
     }
   } else {
@@ -4838,6 +4883,12 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
     /// Returns true if a key path component for the given property or
     /// subscript should be externally referenced.
     auto shouldUseExternalKeyPathComponent = [&]() -> bool {
+      // Embedded Swift does not emit property descriptors, and it can't need
+      // them because there is no resilience.
+      if (getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+        return false;
+      }
+
       // The property descriptor has the canonical key path component
       // information so doesn't have to refer to another external descriptor.
       if (forPropertyDescriptor) {
@@ -5441,7 +5492,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
 
   SILValue contBBArg;
   TemporaryInitializationPtr addrOnlyResultBuf;
-  if (resultTL.isAddressOnly()) {
+  if (!resultTL.isLoadableOrOpaque(SGF.F)) {
     addrOnlyResultBuf = SGF.emitTemporary(loc, resultTL);
   } else {
     contBBArg = contBB->createPhiArgument(resultTy, OwnershipKind::Owned);
@@ -5451,7 +5502,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
 
   SEB.addOptionalSomeCase(
       isPresentBB, contBB, [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
-        if (resultTL.isAddressOnly()) {
+        if (!resultTL.isLoadableOrOpaque(SGF.F)) {
           SILValue addr =
               addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
           auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
@@ -5467,7 +5518,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
   SEB.addOptionalNoneCase(
       isNotPresentBB, contBB,
       [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
-        if (resultTL.isAddressOnly()) {
+        if (!resultTL.isLoadableOrOpaque(SGF.F)) {
           SILValue addr =
               addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
           SGF.emitInjectOptionalNothingInto(loc, addr, resultTL);
@@ -5482,7 +5533,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
 
   // Continue.
   SGF.B.emitBlock(contBB);
-  if (resultTL.isAddressOnly()) {
+  if (!resultTL.isLoadableOrOpaque(SGF.F)) {
     addrOnlyResultBuf->finishInitialization(SGF);
     return addrOnlyResultBuf->getManagedAddress();
   }
@@ -5848,7 +5899,7 @@ RValue RValueEmitter::visitTernaryExpr(TernaryExpr *E, SGFContext C) {
   auto NumTrueTaken = SGF.loadProfilerCount(E->getThenExpr());
   auto NumFalseTaken = SGF.loadProfilerCount(E->getElseExpr());
 
-  if (lowering.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+  if (lowering.isLoadableOrOpaque(SGF.F)) {
     // If the result is loadable, emit each branch and forward its result
     // into the destination block argument.
     
@@ -6217,7 +6268,7 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
 
   // If optValue was loadable, we emitted a switch_enum. In such a case, return
   // the argument from hasValueBB.
-  if (optValue.getType().isLoadable(F) || !silConv.useLoweredAddresses()) {
+  if (optValue.getType().isLoadableOrOpaque(F)) {
     return emitManagedRValueWithCleanup(hasValueBB->getArgument(0));
   }
 
@@ -6238,7 +6289,7 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
   auto &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
   
   ManagedValue optValue;
-  if (!SGF.silConv.useLoweredAddresses() || optTL.isLoadable()
+  if (optTL.isLoadableOrOpaque(SGF.F)
       || E->getType()->hasOpenedExistential()) {
     optValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
   } else {
@@ -6357,8 +6408,8 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
 
   // Form the optional using address operations if the type is address-only or
   // if we already have an address to use.
-  bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
-                      silConv.useLoweredAddresses());
+  bool isByAddress = silConv.useLoweredAddresses() &&
+                     (usingProvidedContext || !optTL.isLoadableOrOpaque(F));
 
   TemporaryInitializationPtr optTemp;
   if (!isByAddress) {
@@ -6669,9 +6720,30 @@ void SILGenFunction::emitOpenExistentialExprImpl(
     return;
   }
 
-  auto existentialValue = emitRValueAsSingleValue(
-      E->getExistentialValue(),
-      SGFContext::AllowGuaranteedPlusZero);
+  ManagedValue existentialValue;
+
+  // If this is a noncopyable existential coming from a LoadExpr, then we can
+  // borrow the underlying storage under the enclosing formal access and open it
+  // in place, exactly as we already do for an existential that isn't behind an
+  // access. The move-only checker can then promote to a mutable access
+  // and consume the payload directly if necessary.
+  auto *existentialExpr = E->getExistentialValue();
+  auto existentialRepr = getLoweredType(existentialExpr->getType())
+                             .getPreferredExistentialRepresentation();
+  if (existentialExpr->getType()->isNoncopyable() &&
+      existentialRepr == ExistentialRepresentation::Opaque) {
+    if (auto *load = dyn_cast<LoadExpr>(existentialExpr)) {
+      LValue lv = emitLValue(load->getSubExpr(),
+                             SGFAccessKind::BorrowedAddressRead);
+      existentialValue = emitBorrowedLValue(load, std::move(lv));
+    }
+  }
+
+  if (!existentialValue) {
+    existentialValue = emitRValueAsSingleValue(
+        existentialExpr,
+        SGFContext::AllowGuaranteedPlusZero);
+  }
 
   Type opaqueValueType = E->getOpaqueValue()->getType()->getRValueType();
   auto payload = emitOpenExistential(
@@ -7374,7 +7446,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     }
     optTemp->finishInitialization(SGF);
 
-    if (subType.isLoadable(SGF.F) || !SGF.useLoweredAddresses()) {
+    if (subType.isLoadableOrOpaque(SGF.F)) {
       ManagedValue value =
           SGF.B.createLoadTake(E, optTemp->getManagedAddress());
       return RValue(SGF, {value}, subType.getASTType());
@@ -7383,7 +7455,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
   }
 
-  if (subType.isLoadable(SGF.F) || !SGF.useLoweredAddresses()) {
+  if (subType.isLoadableOrOpaque(SGF.F)) {
     ManagedValue mv = SGF.emitRValue(subExpr).getAsSingleValue(SGF, subExpr);
     if (mv.getType().isTrivial(SGF.F))
       return RValue(SGF, {mv}, subType.getASTType());
@@ -7459,7 +7531,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
         SGF.emitLValue(li->getSubExpr(), SGFAccessKind::BorrowedAddressRead);
     auto address = SGF.emitAddressOfLValue(subExpr, std::move(lv));
 
-    if (subType.isLoadable(SGF.F)) {
+    if (subType.isLoadableOrOpaque(SGF.F)) {
       // Trivial types don't undergo any lifetime analysis, so simply load
       // the value.
       if (subType.isTrivial(SGF.F)
@@ -7499,7 +7571,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
     return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
   }
 
-  if (subType.isLoadable(SGF.F) || !SGF.silConv.useLoweredAddresses()) {
+  if (subType.isLoadableOrOpaque(SGF.F)) {
     ManagedValue mv =
       SGF.emitRValue(subExpr, SGFContext::AllowImmediatePlusZero)
          .getAsSingleValue(SGF, subExpr);

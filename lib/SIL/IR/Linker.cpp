@@ -53,9 +53,6 @@
 #define DEBUG_TYPE "sil-linker"
 #include "Linker.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -64,8 +61,10 @@
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/Serialization/SerializedSILLoader.h"
-#include <functional>
+#include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -77,6 +76,8 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 //===----------------------------------------------------------------------===//
 
 void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
+  PrettyStackTraceSILFunction trace("deserializing", F);
+
   ASSERT(F->isExternalDeclaration());
 
   LLVM_DEBUG(llvm::dbgs() << "Imported function: "

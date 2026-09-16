@@ -4,7 +4,12 @@
 // RUN: %target-run %t/test_runtime_function_counters 2>&1 | %FileCheck %s
 // REQUIRES: runtime_function_counters
 // REQUIRES: executable_test
-// REQUIRES: rdar48995133
+
+// OS and back-deployment runtimes never build with
+// SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS. We can only test a locally built
+// runtime.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 /// Test functionality related to the runtime function counters.
 

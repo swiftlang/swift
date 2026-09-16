@@ -58,6 +58,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/YieldList.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -135,6 +136,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   [[nodiscard]]
   bool visit(ParameterList *PL) {
     return inherited::visit(PL);
+  }
+
+  [[nodiscard]]
+  bool visit(YieldList *YL) {
+    return inherited::visit(YL);
   }
 
   //===--------------------------------------------------------------------===//
@@ -448,6 +454,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *D) {
+    return false;
+  }
+
   bool visitMacroDecl(MacroDecl *MD) {
     bool WalkGenerics = visitGenericParamListIfNeeded(MD);
 
@@ -548,10 +558,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-      if (!isa<AccessorDecl>(FD))
+      if (auto *YL = AFD->getYields())
+        if (visit(YL))
+          return true;
+
+      if (!isa<AccessorDecl>(FD)) {
         if (auto *const TyR = FD->getResultTypeRepr())
           if (doIt(TyR))
             return true;
+      }
     }
 
     // Visit trailing requirements
@@ -1572,6 +1587,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         [&]() { return Walker.walkToParameterListPost(PL); });
   }
 
+  [[nodiscard]]
+  bool visitYieldList(YieldList *YL) {
+    return traverse(
+        Walker.walkToYieldListPre(YL),
+        [&]() {
+          for (auto &Y : *YL) {
+            if (doIt(&Y))
+              return true;
+          }
+          return false;
+        },
+        [&]() { return Walker.walkToYieldListPost(YL); });
+  }
+
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
 
@@ -1593,8 +1622,18 @@ public:
   
   bool shouldSkip(Decl *D) {
     if (!Walker.shouldWalkMacroArgumentsAndExpansion().second &&
-        Walker.isDeclInMacroExpansion(D) && !Walker.Parent.isNull())
-      return true;
+        !Walker.Parent.isNull()) {
+      if (Walker.isDeclInMacroExpansion(D))
+        return true;
+
+      // Legacy traversal presents accessors as peers of their storage.
+      // Preserve the storage's macro expansion boundary when deciding whether
+      // to walk them.
+      if (Walker.shouldWalkAccessorsTheOldWay())
+        if (auto *accessor = dyn_cast<AccessorDecl>(D))
+          if (Walker.isDeclInMacroExpansion(accessor->getStorage()))
+            return true;
+    }
 
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       // VarDecls are walked via their NamedPattern, ignore them if we encounter
@@ -1672,6 +1711,19 @@ public:
       }
     }
     return false;
+  }
+
+  [[nodiscard]]
+  bool doIt(Yield *Y) {
+    return traverse(
+        Walker.walkToYieldPre(Y),
+        [&]() {
+          if (Y->getTypeRepr())
+            if (doIt(Y->getTypeRepr()))
+              return true;
+          return false;
+        },
+        [&]() { return Walker.walkToYieldPost(Y); });
   }
 
 private:
@@ -2438,8 +2490,17 @@ bool Traversal::visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T) {
 
 bool Traversal::visitGenericArgumentExprTypeRepr(
     GenericArgumentExprTypeRepr *T) {
-  return false; // Don't walk the inner expression; it will be type-checked
-                // independently by `resolveGenericArgumentExprTypeRepr`
+  if (!Walker.shouldWalkIntoGenericArgumentExprTypeRepr())
+    return false; // Don't walk the inner expression; it will be type-checked
+                  // independently by `resolveGenericArgumentExprTypeRepr`
+
+  auto *argExpr = T->getArgExpr();
+  if (!argExpr)
+    argExpr = T->getOriginalArgExpr();
+  if (!argExpr)
+    return false;
+
+  return doIt(argExpr) == nullptr;
 }
 
 Expr *Expr::walk(ASTWalker &walker) {

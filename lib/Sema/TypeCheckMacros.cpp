@@ -17,13 +17,11 @@
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
-#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
@@ -50,7 +48,6 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
-#include "llvm/Config/config.h"
 
 #define DEBUG_TYPE "macros"
 
@@ -1093,7 +1090,7 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
     ModuleDecl *originModule = nullptr;
     // FIXME: remove this workaround once namespace contents are imported into
     // their corresponding modules
-    if (macroSourceFile->getParentModule()->isClangHeaderImportModule())
+    if (macroSourceFile->getParentModule()->isClangBridgingHeaderImportModule())
       originModule = cast<Decl *>(target)->getModuleContextForNameLookup();
     performImportResolutionForClangMacroBuffer(*macroSourceFile, originModule);
   }
@@ -1402,10 +1399,10 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   if (role == MacroRole::Peer) {
     dc = attachedTo->getDeclContext();
   } else if (role == MacroRole::Conformance || role == MacroRole::Extension) {
-    // Conformance macros always expand to extensions at file-scope.
+    // Conformance macros always expand to extensions at top-level file-scope.
     dc = attachedTo->getDeclContext();
     if (!isa<ClangModuleUnit>(dc->getModuleScopeContext()))
-      dc = dc->getParentSourceFile();
+      dc = dc->getOutermostParentSourceFile();
     else
       ASSERT(isa<FileUnit>(dc) && !isa<SourceFile>(dc) && "decls imported from Clang should not have a SourceFile");
   } else {
@@ -2180,17 +2177,6 @@ std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
     // Bind the extension to the original nominal type.
     extension->setExtendedNominal(nominal);
     nominal->addExtension(extension);
-
-    // Most other macro-generated declarations are visited through calling
-    // 'visitAuxiliaryDecls' on the original declaration the macro is attached
-    // to. We don't do this for macro-generated extensions, because the
-    // extension is not a peer of the original declaration. Instead of
-    // requiring all callers of 'visitAuxiliaryDecls' to understand the
-    // hoisting behavior of macro-generated extensions, we make the
-    // extension accessible through 'getTopLevelDecls()'.
-    if (auto file = dyn_cast<FileUnit>(
-            decl->getDeclContext()->getModuleScopeContext()))
-      file->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
 
     // Don't validate documented conformances for the 'conformance' role.
     if (role == MacroRole::Conformance)

@@ -132,6 +132,7 @@ namespace swift {
   struct RequirementMatch;
   class TupleTypeElt;
   class EnumElementDecl;
+  class MacroDecl;
   class ProtocolDecl;
   class SubstitutableType;
   class SourceManager;
@@ -187,6 +188,16 @@ std::optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
 /// "NS" prefix stripping will apply under omit-needless-words.
 StringRef getSwiftName(KnownFoundationEntity kind);
 
+// We explicitly define the BumpPtrAllocator template parameters here since the
+// solver memory limit is based on the total number of bytes allocated for the
+// slabs, so can be affected by the values chosen. Currently these values match
+// what is used in LLVM for stable/23.x.
+struct ConstraintSolverAllocator
+    : public llvm::BumpPtrAllocatorImpl<llvm::MallocAllocator,
+                                        /*SlabSize*/ 4096,
+                                        /*SizeThreshold*/ 4096,
+                                        /*GrowthDelay*/ 128> {};
+
 /// Introduces a new constraint checker arena, whose lifetime is
 /// tied to the lifetime of this RAII object.
 class ConstraintCheckerArenaRAII {
@@ -203,7 +214,7 @@ public:
   /// \param allocator The allocator used for allocating any data that
   /// goes into the constraint checker arena.
   ConstraintCheckerArenaRAII(ASTContext &self,
-                             llvm::BumpPtrAllocator &allocator);
+                             ConstraintSolverAllocator &allocator);
 
   ConstraintCheckerArenaRAII(const ConstraintCheckerArenaRAII &) = delete;
   ConstraintCheckerArenaRAII(ConstraintCheckerArenaRAII &&) = delete;
@@ -251,6 +262,20 @@ struct OpenedExistentialSignature {
 
   /// The `Self` parameter in the opened existential signature.
   CanType SelfType;
+};
+
+/// Identifies one of the builtin macros used to derive conformances \c
+/// MacroDecl is synthesized by the compiler.
+enum class BuiltinDerivedConformanceMacroKind : uint8_t {
+  DeriveEquatable,
+  DeriveHashable,
+  DeriveError,
+  DeriveComparable,
+  DeriveCaseIterable,
+  DeriveEncodable,
+  DeriveDecodable,
+
+  NumKinds,
 };
 
 /// ASTContext - This object creates and owns the AST objects.
@@ -810,6 +835,9 @@ public:
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
 
+  // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast_AEIC.
+  FuncDecl *getIsOSVersionAtLeastAEICDecl() const;
+
   // Retrieve the declaration of Swift._stdlib_isVariantOSVersionAtLeast.
   FuncDecl *getIsVariantOSVersionAtLeastDecl() const;
 
@@ -839,7 +867,12 @@ public:
   /// Does *not* perform any name lookup to check whether, the module already
   /// contains a decl with the same name, only does synthesis.
   ProtocolDecl *synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const;
-  
+
+  /// Retrieve the builtin \c MacroDecl used to derive conformances via \c
+  /// SwiftMacros, synthesizing it into the stdlib on first use.
+  MacroDecl *getBuiltinDerivedConformanceMacroDecl(
+      BuiltinDerivedConformanceMacroKind kind) const;
+
   /// Determine whether the given nominal type is one of the standard
   /// library or Cocoa framework types that is known to be bridged by another
   /// module's overlay, for layering or implementation detail reasons.
@@ -925,17 +958,26 @@ public:
 
   /// Get the availability of features introduced in the specified version
   /// of the Swift compiler for the target platform.
-  AvailabilityRange getSwiftAvailability(unsigned major, unsigned minor) const;
+  ///
+  /// Some targets have a minimum supported OS version that postdates the
+  /// introduction of an older Swift runtime, and features from that runtime are
+  /// therefore reported as being always available. Pass \p ignoreMinOS to get
+  /// the OS version in which the features actually appeared instead.
+  AvailabilityRange getSwiftAvailability(unsigned major, unsigned minor,
+                                         bool ignoreMinOS = false) const;
 
   // For each feature defined in FeatureAvailability, define two functions;
   // the latter, with the suffix RuntimeAvailability, is for use with
   // AvailabilityRange::forRuntimeTarget(), and only looks at the Swift
   // runtime version.
 #define FEATURE(N, V)                                                          \
-  inline AvailabilityRange get##N##Availability() const {                      \
+  inline AvailabilityRange get##N##Availability(bool ignoreMinOS = false)      \
+      const {                                                                  \
     if (LangOpts.hasFeature(Feature::Embedded))                                \
       return AvailabilityRange::alwaysAvailable();                             \
-    return getSwiftAvailability V;                                             \
+    auto version = llvm::VersionTuple V;                                       \
+    return getSwiftAvailability(version.getMajor(), *version.getMinor(),       \
+                                ignoreMinOS);                                  \
   }                                                                            \
   inline AvailabilityRange get##N##RuntimeAvailability() const {               \
     return AvailabilityRange(VersionRange::allGTE(llvm::VersionTuple V));      \
@@ -1192,6 +1234,12 @@ public:
   void setMaxAssignedDiscriminator(
       const DeclContext *dc, unsigned discriminator);
 
+  /// Returns an integer, guaranteed to be unique from every other integer
+  /// previously returned by this function within the current AST context.
+  /// This identifies existential and pack element generic environments,
+  /// which are unique per call site.
+  uint64_t getNextGenericEnvironmentID();
+
   /// Retrieve the Clang module loader for this ASTContext.
   ///
   /// If there is no Clang module loader, returns a null pointer.
@@ -1426,6 +1474,18 @@ public:
   /// conformance.
   std::vector<MissingWitness>
   takeDelayedMissingWitnesses(NormalProtocolConformance *conformance);
+
+  /// Record that a witness of a conformance of \p nominal could not be fully
+  /// deserialized because \p moduleName was never loaded. Used to add an
+  /// actionable note ("add 'import <module>'") to the later requirement-failure
+  /// diagnostic at the use site.
+  void recordUnloadedModuleForConformingType(const NominalTypeDecl *nominal,
+                                              Identifier moduleName);
+
+  /// Retrieve the modules that were not loaded while deserializing conformances
+  /// of \p nominal, or an empty list if there were none.
+  ArrayRef<Identifier>
+  getUnloadedModulesForConformingType(const NominalTypeDecl *nominal) const;
 
   /// Produce a specialized conformance, which takes a generic
   /// conformance and substitutions written in terms of the generic

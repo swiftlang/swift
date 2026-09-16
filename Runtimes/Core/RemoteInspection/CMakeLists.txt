@@ -13,7 +13,6 @@ target_include_directories(swiftRemoteInspection PUBLIC
   "$<BUILD_INTERFACE:${SwiftCore_SWIFTC_SOURCE_DIR}/include/swift/RemoteInspection/RuntimeHeaders>")
 target_link_libraries(swiftRemoteInspection PRIVATE
   swiftDemangling
-  $<$<BOOL:${SwiftCore_ENABLE_CRASH_REPORTER_CLIENT}>:swiftDemanglingCR>
   swiftLLVMSupport
   swiftShims)
 

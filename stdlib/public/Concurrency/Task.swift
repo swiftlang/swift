@@ -252,6 +252,21 @@ extension Task {
   public func cancel() {
     unsafe _taskCancel(_AsyncTask(_task))
   }
+
+  /// Cancel this task, recording a specific `CancellationError.Reason`.
+  ///
+  /// Semantically identical to ``Task/cancel()``, but the passed `reason` is
+  /// stored on the task and can be read back via ``Task/cancellationReason``.
+  /// First-cancel-wins on the reason: if the task is already cancelled, this
+  /// call is a no-op with respect to both the cancelled state and the
+  /// recorded reason.
+  ///
+  /// Child tasks recursively cancelled through this call inherit the same reason.
+  @export(implementation)
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func cancel(reason: CancellationError.Reason) {
+    unsafe _taskCancelWithFlags(_AsyncTask(_task), UInt(reason._rawValue))
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -746,22 +761,21 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
 ///
 /// - Returns: The return value, if any, of the `body` closure.
 @available(SwiftStdlib 6.0, *)
-// Note: Could not be always-emit-into client since the UnsafeCurrentTask initializer was not usableFromInline
-// in 6.0, so we can't make this symbol more available than the availability of UnsafeCurrentTask.init.
+@export(implementation)
 @abi(
-  // abi only necessary to avoid redeclaration clash with previous declaration (__abi_withUnsafeCurrentTask)
-  nonisolated(nonsending) func withUnsafeCurrentTaskNonsending<T>(
+  nonisolated(nonsending) func withUnsafeCurrentTaskNonsendingExportedImpl<T>(
     body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
   ) async rethrows -> T
 )
 public nonisolated(nonsending) func withUnsafeCurrentTask<T>(
   body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
 ) async rethrows -> T {
-  guard let _task = unsafe _getCurrentAsyncTask() else {
-    return try await body(nil)
-  }
-
-  return try unsafe await body(UnsafeCurrentTask(_task))
+  // This is a backdeployment workaround!
+  // We cannot use the UnsafeCurrentTask initializer since it can't be used from a backdeployed function.
+  // We can get the UnsafeCurrentTask using the withUnsafeCurrentTask and escape the reference.
+  // This is safe, because we know this is the _current task_ so it must be alive still anyway.
+  let task: UnsafeCurrentTask? = unsafe withUnsafeCurrentTask { unsafe $0 }
+  return try unsafe await body(task)
 }
 
 // Old version for ABI compatibility
@@ -772,6 +786,19 @@ public nonisolated(nonsending) func withUnsafeCurrentTask<T>(
 )
 internal func __abi_withUnsafeCurrentTask<T>(
   body: (UnsafeCurrentTask?) async throws -> T
+) async rethrows -> T {
+  unsafe try await withUnsafeCurrentTask(body: body)
+}
+
+// Old version for ABI compatibility
+@available(SwiftStdlib 6.4, *)
+@abi(
+  nonisolated(nonsending) func withUnsafeCurrentTaskNonsending<T>(
+    body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
+  ) async rethrows -> T
+)
+public nonisolated(nonsending) func __abi_withUnsafeCurrentTaskNonsending<T>(
+  body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
 ) async rethrows -> T {
   unsafe try await withUnsafeCurrentTask(body: body)
 }
@@ -918,6 +945,39 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
   public func cancel() {
     unsafe _taskCancel(_rawTask)
+  }
+
+  /// Cancel the current task, recording a specific `CancellationError.Reason`.
+  ///
+  /// Semantically identical to `cancel()`, but the passed `reason` is stored
+  /// on the task and can be read back via ``UnsafeCurrentTask/cancellationReason``
+  /// or ``Task/cancellationReason``. First-cancel-wins on the reason: if the
+  /// task is already cancelled, this call is a no-op with respect to both
+  /// the cancelled state and the recorded reason.
+  ///
+  /// Child tasks recursively cancelled as a result of this call inherit the
+  /// same reason.
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
+  public func cancel(reason: CancellationError.Reason) {
+    unsafe _taskCancelWithFlags(_rawTask, UInt(reason._rawValue))
+  }
+
+  /// The reason for the current task's cancellation, or `nil` if the task
+  /// is not cancelled.
+  ///
+  /// Mirrors ``UnsafeCurrentTask/isCancelled``: once this returns non-nil it
+  /// will consistently return the same value for the remaining life of the
+  /// task. Not affected by cancellation shields.
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
+  public var cancellationReason: CancellationError.Reason? {
+    // Packed encoding: bit 0 is the isCancelled flag; bits 1..3 carry the
+    // `CancellationError.Reason` raw value. One runtime call returns both.
+    let packed = unsafe _taskGetIsCancelledWithReason(_rawTask)
+    guard packed & 1 != 0 else { return nil }
+    let raw = UInt8(truncatingIfNeeded: packed >> 1)
+    return CancellationError.Reason(_rawValue: raw) ?? .unspecified
   }
 
   /// Checks if this task is executing in a scope with a task cancellation shield activated by the
@@ -1117,6 +1177,16 @@ public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws
 @_silgen_name("swift_task_cancel")
 @usableFromInline
 internal func _taskCancel(_ task: _AsyncTask)
+
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_task_cancelWithFlags")
+@usableFromInline
+internal func _taskCancelWithFlags(_ task: _AsyncTask, _ flags: UInt)
+
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_task_getIsCancelledWithReason")
+@usableFromInline
+internal func _taskGetIsCancelledWithReason(_ task: _AsyncTask) -> UInt
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_isCancelled")

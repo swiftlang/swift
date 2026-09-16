@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -parse -enable-bare-slash-regex -disable-availability-checking -experimental-skip-all-function-bodies -verify -stats-output-dir %t %s
+// RUN: %target-swift-frontend -parse -enable-bare-slash-regex -experimental-skip-all-function-bodies -verify -stats-output-dir %t %s
 // RUN: %{python} %utils/process-stats-dir.py --set-csv-baseline %t/stats.csv %t
 // RUN: %FileCheck -input-file %t/stats.csv %s
 

@@ -43,6 +43,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -3139,6 +3140,8 @@ namespace {
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
+      checkIsolatedConformancesInPattern(pattern);
+
       // Walking into patterns leads to nothing good because then we
       // end up visiting the AccessorDecls of a top-level
       // PatternBindingDecl twice.
@@ -3189,6 +3192,18 @@ namespace {
       if (!expr->getType() || expr->getType()->hasError())
         return Action::SkipNode(expr);
 
+      if (auto *T = dyn_cast<TypeExpr>(expr)) {
+        if (!T->isImplicit()) {
+          checkIsolatedConformancesInType(T->getType(), T->getTypeRepr(),
+                                          expr->getLoc());
+        }
+      }
+
+      if (auto *cast = dyn_cast<ExplicitCastExpr>(expr)) {
+        checkIsolatedConformancesInType(
+            cast->getCastType(), cast->getCastTypeRepr(), expr->getLoc());
+      }
+
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
         opaqueValues.push_back({
             openExistential->getOpaqueValue(),
@@ -3222,6 +3237,33 @@ namespace {
 
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         determineClosureIsolationInContext(closure, Parent.getAsExpr());
+
+        if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+          if (auto globalActor = getExplicitGlobalActor(explicitClosure)) {
+            checkIsolatedConformancesInType(globalActor,
+                                            /*TR=*/nullptr, expr->getLoc());
+          }
+
+          for (auto *param : *explicitClosure->getParameters()) {
+            checkIsolatedConformancesInType(param->getInterfaceType(),
+                                            param->getTypeRepr(),
+                                            expr->getLoc());
+          }
+
+          if (auto *thrownTypeRepr =
+                  explicitClosure->getExplicitThrownTypeRepr()) {
+            checkIsolatedConformancesInType(
+                explicitClosure->getExplicitThrownType(), thrownTypeRepr,
+                thrownTypeRepr->getLoc());
+          }
+
+          checkIsolatedConformancesInType(
+              explicitClosure->getResultType(),
+              explicitClosure->hasExplicitResultType()
+                  ? explicitClosure->getExplicitResultTypeRepr()
+                  : nullptr,
+              expr->getLoc());
+        }
 
         checkLocalCaptures(closure);
         contextStack.push_back(closure);
@@ -4777,6 +4819,35 @@ namespace {
       return Type();
     }
 
+    void checkIsolatedConformancesInPattern(Pattern *P) {
+      class Walker : public ASTWalker {
+      public:
+        PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+          if (P->isImplicit())
+            return Action::Continue(P);
+
+          if (auto *I = dyn_cast<IsPattern>(P)) {
+            checkIsolatedConformancesInType(I->getCastType(),
+                                            I->getCastTypeRepr(), I->getLoc());
+          }
+
+          if (auto *E = dyn_cast<EnumElementPattern>(P)) {
+            checkIsolatedConformancesInType(
+                E->getParentType(), E->getParentTypeRepr(), E->getLoc());
+          }
+
+          return Action::Continue(P);
+        }
+      };
+
+      Walker W;
+      P->walk(W);
+    }
+
+    static void checkIsolatedConformancesInType(Type T, TypeRepr *TR, SourceLoc loc) {
+      TypeChecker::checkIsolatedConformancesInType(T, TR ? TR->getLoc() : loc);
+    }
+
   public:
     /// Determine the isolation of a particular closure.
     ///
@@ -5468,6 +5539,11 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
   if (isa<ProtocolDecl>(nominal))
     return std::nullopt;
 
+  // We can infer isolation for witness in an actor, but the actor itself needs
+  // to stay instance isolated.
+  if (nominal->isAnyActor())
+    return std::nullopt;
+
   std::optional<InferredActorIsolation> foundIsolation;
   for (auto conformance :
        nominal->getLocalConformances(ConformanceLookupKind::NonStructural)) {
@@ -5498,7 +5574,8 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedConcurrent:
       if (inferredIsolation.source.effectivelyExplicit() &&
-          explicitNonisolatedIsSpecial(nominal)) {
+          getDefaultIsolationForContext(nominal) ==
+              DefaultIsolation::Nonisolated) {
         if (!foundIsolation) {
           // We found an explicitly 'nonisolated' protocol.
           foundIsolation = {
@@ -5583,11 +5660,16 @@ getIsolationFromInheritedProtocols(ProtocolDecl *protocol) {
   return foundIsolation;
 }
 
-/// Compute the isolation of a nominal type from the property wrappers on
-/// any stored properties.
+/// Compute the global actor isolation of a nominal type from the property
+/// wrappers on any stored properties.
 static std::optional<ActorIsolation>
 getIsolationFromWrappers(NominalTypeDecl *nominal) {
   if (!isa<StructDecl>(nominal) && !isa<ClassDecl>(nominal))
+    return std::nullopt;
+
+  // Actors are already instance isolated, and must not get a global actor
+  // isolation from their property wrappers.
+  if (nominal->isAnyActor())
     return std::nullopt;
 
   if (!nominal->getParentSourceFile())
@@ -5642,6 +5724,9 @@ getIsolationFromWrappers(NominalTypeDecl *nominal) {
     }
   }
 
+  // We never intend to return ActorIsolation besides a global actor.
+  ASSERT(!foundIsolation || foundIsolation->isGlobalActor());
+
   return foundIsolation;
 }
 
@@ -5686,6 +5771,7 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::Macro:
   case DeclKind::MacroExpansion:
   case DeclKind::Using:
+  case DeclKind::HiddenTypeLayoutInfo:
     return std::nullopt;
 
   case DeclKind::PatternBinding:
@@ -6056,6 +6142,10 @@ static void addAttributesForActorIsolation(Decl *decl,
     break;
   }
   case ActorIsolation::GlobalActor: {
+    // Don't place a global actor attribute onto an actor! Wrong and the
+    // swiftinterface won't typecheck.
+    ASSERT(!isa<ClassDecl>(decl) || !cast<ClassDecl>(decl)->isExplicitActor());
+
     auto typeExpr = TypeExpr::createImplicit(isolation.getGlobalActor(), ctx);
     auto attr = CustomAttr::create(ctx, SourceLoc(), typeExpr, /*owner=*/decl,
                                    /*implicit=*/true);
@@ -6420,6 +6510,32 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
     return {{ActorIsolation::forNonisolatedNonsending(), {}}, nullptr, {}};
   }
 
+  // Lets use `nonisolated(unsafe)` and @preconcurrency from the wrapped
+  // property as a default isolation for its backing storage property.
+  // These attributes are intended for the storage and helpful
+  // when property wrapper initializer references something that would
+  // otherwise cause concurrency warnings or errors and since it's a
+  // default it doesn't clash with other inference rules associated with
+  // property wrappers.
+  if (auto *var = dyn_cast<VarDecl>(value)) {
+    if (auto *originalVar = var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::Backing)) {
+      if (auto *nonisolated =
+              originalVar->getAttrs().getAttribute<NonisolatedAttr>()) {
+        if (nonisolated->isUnsafe()) {
+          auto isolation =
+              ActorIsolation::forNonisolated(/*unsafe=*/true)
+                  .withPreconcurrency(originalVar->getAttrs()
+                                          .hasAttribute<PreconcurrencyAttr>());
+          return {{isolation, IsolationSource(originalVar,
+                                              IsolationSource::Kind::Explicit)},
+                  nullptr,
+                  {}};
+        }
+      }
+    }
+  }
+
   // We did not find anything special, return unspecified.
   return {{ActorIsolation::forUnspecified(), {}}, nullptr, {}};
 }
@@ -6653,6 +6769,14 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   // declaration. All of the logic for FuncDecls below only applies to
   // non-accessor functions.
   if (auto accessor = dyn_cast<AccessorDecl>(value)) {
+    // A synthesized distributed thunk accessor is always '@concurrent',
+    // regardless of the storage's isolation. We can't put that attribute
+    // on the accessor itself, and there is no "thunk var" to attach it to,
+    // so we handle the semantics here instead.
+    if (accessor->isDistributedThunk()) {
+      return {ActorIsolation::forNonisolatedConcurrent(),
+              IsolationSource(/*source*/ nullptr, IsolationSource::Explicit)};
+    }
     return getInferredActorIsolation(accessor->getStorage());
   }
 
@@ -7642,6 +7766,18 @@ bool swift::checkSendableConformance(
   if (classDecl && classDecl->getParentSourceFile()) {
     bool isInherited = isa<InheritedProtocolConformance>(conformance);
 
+    // Workaround: the conformance lookup table may not form an
+    // InheritedProtocolConformance for Sendable when the superclass is
+    // Sendable through @MainActor isolation (the table fix is #90251).
+    // Check the superclass directly so we don't misdiagnose.
+    if (!isInherited) {
+      if (auto superclassTy = classDecl->getSuperclass()) {
+        auto superConf = lookupConformance(superclassTy,
+            conformance->getProtocol(), /*allowMissing=*/false);
+        isInherited = superConf.isConcrete();
+      }
+    }
+
     // A non-final class cannot conform to `Sendable` unless it is protected by
     // global actor isolation.
     if (!classDecl->isSemanticallyFinal() && !isGlobalActorIsolated) {
@@ -7748,40 +7884,42 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
   ASTContext &ctx = nominal->getASTContext();
   llvm::VersionTuple noVersion;
 
-  // Add platform-version-specific @available attributes. Search from nominal
-  // type declaration through its enclosing declarations to find the first one
-  // with platform-specific attributes.
+  // Add @available(<Domain>, unavailable) attributes for each domain the
+  // declaration has explicit availability in.
   for (Decl *enclosing = nominal;
        enclosing;
        enclosing = enclosing->getDeclContext()
            ? enclosing->getDeclContext()->getAsDecl()
            : nullptr) {
-    bool anyPlatformSpecificAttrs = false;
+    bool addedAvailabilityAttributes = false;
     for (auto available : enclosing->getSemanticAvailableAttrs()) {
-      // FIXME: [availability] Generalize to AvailabilityDomain.
-      if (available.getPlatform() == PlatformKind::none)
+      auto domain = available.getDomain();
+
+      // The blanket "unavailable" attribute added below already covers the
+      // universal domain.
+      if (domain.isUniversal())
         continue;
 
+      auto kind = domain.isVersioned() ? AvailableAttr::Kind::Unavailable
+                                       : available.getParsedAttr()->getKind();
+
       auto attr = new (ctx) AvailableAttr(
-          SourceLoc(), SourceRange(),
-          AvailabilityDomain::forPlatform(available.getPlatform()), SourceLoc(),
-          AvailableAttr::Kind::Unavailable, available.getMessage(),
+          SourceLoc(), SourceRange(), domain, SourceLoc(), kind,
+          available.getMessage(),
           /*Rename=*/"", available.getIntroduced().value_or(noVersion),
           SourceRange(), available.getDeprecated().value_or(noVersion),
           SourceRange(), available.getObsoleted().value_or(noVersion),
           SourceRange(),
           /*Implicit=*/true, available.getParsedAttr()->isSPI());
       ext->addAttribute(attr);
-      anyPlatformSpecificAttrs = true;
+      addedAvailabilityAttributes = true;
     }
 
-    // If we found any platform-specific availability attributes, we're done.
-    if (anyPlatformSpecificAttrs)
+    if (addedAvailabilityAttributes)
       break;
   }
 
-  // Add the blanket "unavailable".
-
+  // Add the blanket '@available(*, unavailable)' attribute.
   ext->addAttribute(
       AvailableAttr::createUniversallyUnavailable(ctx, /*Message=*/""));
 }
@@ -8150,8 +8288,8 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   }
 
   // Rebuild the (inner) function type.
-  fnType = FunctionType::get(
-      newTypeParams, newResultType, fnType->getExtInfo());
+  fnType = FunctionType::get(newTypeParams, /* yields */ {}, newResultType,
+                             fnType->getExtInfo());
 
   if (!outerFnType)
     return fnType;
@@ -8160,11 +8298,11 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   if (auto genericFnType = dyn_cast<GenericFunctionType>(outerFnType)) {
     return GenericFunctionType::get(
         genericFnType->getGenericSignature(), outerFnType->getParams(),
-        Type(fnType), outerFnType->getExtInfo());
+        outerFnType->getYields(), Type(fnType), outerFnType->getExtInfo());
   }
 
-  return FunctionType::get(
-      outerFnType->getParams(), Type(fnType), outerFnType->getExtInfo());
+  return FunctionType::get(outerFnType->getParams(), outerFnType->getYields(),
+                           Type(fnType), outerFnType->getExtInfo());
 }
 
 AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
@@ -8255,13 +8393,13 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
 
   // Rebuild the outer function type around it.
   if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
-    return GenericFunctionType::get(
-        genericFnType->getGenericSignature(), fnType->getParams(),
-        Type(innerFnType), fnType->getExtInfo());
+    return GenericFunctionType::get(genericFnType->getGenericSignature(),
+                                    fnType->getParams(), fnType->getYields(),
+                                    Type(innerFnType), fnType->getExtInfo());
   }
 
-  return FunctionType::get(
-      fnType->getParams(), Type(innerFnType), fnType->getExtInfo());
+  return FunctionType::get(fnType->getParams(), fnType->getYields(),
+                           Type(innerFnType), fnType->getExtInfo());
 }
 
 bool swift::completionContextUsesConcurrencyFeatures(const DeclContext *dc) {
@@ -8490,6 +8628,9 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::Subscript:
   case DeclKind::Macro:
     return false;
+
+  case DeclKind::HiddenTypeLayoutInfo:
+    llvm_unreachable("hidden layout declarations are not value references");
 
   case DeclKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleDecl should not show up here");

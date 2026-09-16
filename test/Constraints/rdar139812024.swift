@@ -10,8 +10,8 @@ import Foundation
 final class Image: NSObject {
 }
 
-@available(*, unavailable)
-extension Image: Sendable {} // expected-note {{explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note {{explicitly marked unavailable here}}
+extension Image: Sendable {}
 
 class Lock<State> {
   func withLock<R: Sendable>(_: @Sendable (inout State) -> R) -> R {

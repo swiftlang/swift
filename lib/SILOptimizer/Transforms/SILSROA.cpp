@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-sroa"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/DebugUtils.h"
@@ -27,11 +26,8 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Allocator.h"
 #include "llvm/Support/Debug.h"
-#include <type_traits>
 
 using namespace swift;
 
@@ -194,7 +190,10 @@ bool SROAMemoryUseAnalyzer::analyze() {
 void
 SROAMemoryUseAnalyzer::
 createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
-  SILBuilderWithScope B(AI);
+  // As alloc_stack is a meta instruction, SILBuilderWithScope would inherit
+  // the wrong scope. The new alloc_stack instructions must reuse the original
+  // instruction's scope.
+  SILBuilder B(AI, AI->getDebugScope());
   SILType Type = AI->getType().getObjectType();
   std::optional<SILDebugVariable> AIDebugVarInfo =
       SILDebugVariable::createFromAllocation(AI);
@@ -316,7 +315,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     // variable from the different allocations, but a debug_value can only have
     // one operand.
     if (DVI->getDebugReconstructionBlock()) {
-      DVI->killOperand();
+      DVI->killOperand(Operand->getOperandNumber());
       continue;
     }
     for (size_t i : indices(NewAllocations)) {

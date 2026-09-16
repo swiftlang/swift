@@ -27,15 +27,12 @@
 #include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/YAMLTraits.h"
 #include <functional>
 using namespace swift;
 using namespace Lowering;
@@ -109,7 +106,7 @@ class SILModule::SerializationCallback final
 SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
                      Lowering::TypeConverter &TC, const SILOptions &Options,
                      const IRGenOptions *irgenOptions)
-    : Stage(SILStage::Raw), loweredAddresses(!Options.EnableSILOpaqueValues),
+    : Stage(SILStage::Raw),
       indexTrieRoot(new IndexTrieNode()), Options(Options),
       irgenOptions(irgenOptions), serialized(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
@@ -611,6 +608,30 @@ SILMoveOnlyDeinit *SILModule::lookUpMoveOnlyDeinit(const NominalTypeDecl *C,
   return tbl;
 }
 
+SILMoveOnlyDeinit *
+SILModule::lookUpSpecializedMoveOnlyDeinit(SILType nominalType) {
+  // Specialized deinits are keyed by the object type, so that a lookup for the
+  // corresponding address type finds them too.
+  auto iter = SpecializedMoveOnlyDeinitMap.find(nominalType.getObjectType());
+  if (iter != SpecializedMoveOnlyDeinitMap.end())
+    return iter->second;
+
+  return nullptr;
+}
+
+SILMoveOnlyDeinit *
+SILModule::lookUpMoveOnlyDeinitForType(SILType nominalType,
+                                       bool deserializeLazily) {
+  // Prefer a specialized deinit, which is what must be used in Embedded Swift
+  // when the type is generic: the unspecialized deinit takes type metadata,
+  // which isn't available there.
+  if (auto *specialized = lookUpSpecializedMoveOnlyDeinit(nominalType))
+    return specialized;
+
+  return lookUpMoveOnlyDeinit(nominalType.getNominalOrBoundGenericNominal(),
+                              deserializeLazily);
+}
+
 SILVTable *SILModule::lookUpSpecializedVTable(SILType classTy) {
   // First try to look up R from the lookup table.
   auto R = SpecializedVTableMap.find(classTy);
@@ -788,6 +809,14 @@ bool SILModule::loadDifferentiabilityWitness(SILDifferentiabilityWitness *dw) {
     return false;
   assert(dw == newDW);
   return true;
+}
+
+SILDifferentiabilityWitness *
+SILModule::loadDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
+  if (auto *dw = lookUpDifferentiabilityWitness(key))
+    return dw;
+
+  return getSILLoader()->lookupDifferentiabilityWitness(key);
 }
 
 void SILModule::registerDeserializationNotificationHandler(

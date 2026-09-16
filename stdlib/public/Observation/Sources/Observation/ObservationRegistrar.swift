@@ -15,27 +15,6 @@
 /// the ``Observation/Observable()`` macro to indicate observability of a type.
 @available(SwiftStdlib 5.9, *)
 public struct ObservationRegistrar: Sendable {
-  internal class ValueObservationStorage {
-    func emit<Element>(_ element: Element) -> Bool { return false }
-    func cancel() { }
-  }
-  
-  private struct ValuesObserver {
-    private let storage: ValueObservationStorage
-    
-    internal init(storage: ValueObservationStorage) {
-      self.storage = storage
-    }
-    
-    internal func emit<Element>(_ element: Element) -> Bool {
-      storage.emit(element)
-    }
-    
-    internal func cancel() {
-      storage.cancel()
-    }
-  }
-
   private struct State: @unchecked Sendable {
     private enum ObservationKind {
       case willSetTracking(@Sendable (AnyKeyPath) -> Void)
@@ -330,16 +309,20 @@ public struct ObservationRegistrar: Sendable {
   }
 }
 
+// Codable is not available in Embedded Swift. The conformance only exists so
+// that Codable types can contain a registrar; it deliberately encodes nothing.
+#if !$Embedded
 @available(SwiftStdlib 5.9, *)
 extension ObservationRegistrar: Codable {
   public init(from decoder: any Decoder) throws {
     self.init()
   }
-  
+
   public func encode(to encoder: any Encoder) {
     // Don't encode a registrar's transient state.
   }
 }
+#endif
 
 @available(SwiftStdlib 5.9, *)
 extension ObservationRegistrar: Hashable {

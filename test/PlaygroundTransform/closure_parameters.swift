@@ -7,6 +7,8 @@
 // RUN: %target-playground-build-run-swift(-swift-version 6 -Xfrontend -pc-macro -Xfrontend -playground -Xfrontend -debugger-support) | %FileCheck %s
 //
 // REQUIRES: executable_test
+// REQUIRES: concurrency
+// REQUIRES: concurrency_runtime
 
 import PlaygroundSupport
 

@@ -21,14 +21,13 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/FileSystem.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/HiddenTypeLayout.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
@@ -39,22 +38,18 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/Basic/PathRemapper.h"
-#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/Serialization.h"
 #include "swift/Serialization/SerializationOptions.h"
@@ -68,19 +63,14 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Bitcode/BitcodeConvenience.h"
 #include "llvm/Bitstream/BitstreamWriter.h"
-#include "llvm/Config/config.h"
-#include "llvm/Support/Allocator.h"
 #include "llvm/Support/Chrono.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
-#include "llvm/Support/Error.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <functional>
 #include <vector>
 
 #define DEBUG_TYPE "Serialization"
@@ -763,7 +753,7 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC,
     return CURRENT_MODULE_ID;
   if (M == this->M->getASTContext().TheBuiltinModule)
     return BUILTIN_MODULE_ID;
-  if (M->isClangHeaderImportModule())
+  if (M->isClangBridgingHeaderImportModule())
     return OBJC_HEADER_MODULE_ID;
 
   // Reject references to hidden dependencies.
@@ -2277,6 +2267,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Module:
   case DeclKind::PrecedenceGroup:
   case DeclKind::Using:
+  case DeclKind::HiddenTypeLayoutInfo:
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
     llvm_unreachable("decl should never be a member");
@@ -3064,6 +3055,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::PrivateImport:
     case DeclAttrKind::AllowFeatureSuppression:
     case DeclAttrKind::Diagnose:
+    case DeclAttrKind::Called:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
@@ -3137,6 +3129,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                       theAttr->isImplicit(),
                                       theAttr->Underscored,
                                       theAttr->Name);
+      return;
+    }
+
+    case DeclAttrKind::CxxDecl: {
+      auto *theAttr = cast<CxxDeclAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[CxxDeclDeclAttrLayout::Code];
+      CxxDeclDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                        theAttr->isImplicit(), theAttr->Name);
       return;
     }
 
@@ -3309,6 +3309,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         }
       }
 
+      // Only a platform domain has a platform. The domain kind tells the
+      // reader whether this field is meaningful.
+      unsigned rawPlatform = 0;
+      if (auto platform = domain.getPlatformKind())
+        rawPlatform = static_cast<unsigned>(*platform);
+
       llvm::SmallString<32> blob;
       blob.append(theAttr->getMessage());
       blob.append(theAttr->getRename());
@@ -3321,7 +3327,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isNoAsync(),
           theAttr->isSPI(),
           static_cast<uint8_t>(domainKind),
-          static_cast<unsigned>(domain.getPlatformKind()),
+          rawPlatform,
           customDomainID,
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
@@ -3494,17 +3500,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       assert(attr->getOriginalDeclaration() &&
              "`@differentiable` attribute should have original declaration set "
              "during construction or parsing");
-      auto *paramIndices = attr->getParameterIndices();
-      assert(paramIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> paramIndicesVector;
-      for (unsigned i : range(paramIndices->getCapacity()))
-        paramIndicesVector.push_back(paramIndices->contains(i));
-
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
           getRawStableDifferentiabilityKind(attr->getDifferentiabilityKind()),
-          S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
-          paramIndicesVector);
+          S.addGenericSignatureRef(attr->getDerivativeGenericSignature()));
+      writeDiffParamIndices(attr->getParameterIndices());
       return;
     }
 
@@ -3512,27 +3512,26 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[DerivativeDeclAttrLayout::Code];
       auto *attr = cast<DerivativeAttr>(DA);
       auto &ctx = S.getASTContext();
-      assert(attr->getOriginalFunction(ctx) && attr->getOriginalDeclaration() &&
+      assert(attr->getOriginalFunctions(ctx).size() &&
+             attr->getOriginalDeclaration() &&
              "`@derivative` attribute should have original declaration set "
              "during construction or parsing");
       auto origDeclNameRef = attr->getOriginalFunctionName();
 
-      DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction(ctx));
+      SmallVector<DeclID, 1> origDeclIDs;
+      for (auto *origAFD : attr->getOriginalFunctions(ctx))
+        origDeclIDs.push_back(S.addDeclRef(origAFD));
       auto derivativeKind =
           getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
       uint8_t rawAccessorKind = 0;
       auto origAccessorKind = origDeclNameRef.AccessorKind;
       if (origAccessorKind)
         rawAccessorKind = uint8_t(getStableAccessorKind(*origAccessorKind));
-      auto *parameterIndices = attr->getParameterIndices();
-      assert(parameterIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> paramIndicesVector;
-      for (unsigned i : range(parameterIndices->getCapacity()))
-        paramIndicesVector.push_back(parameterIndices->contains(i));
       DerivativeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          origAccessorKind.has_value(), rawAccessorKind, origDeclID,
-          derivativeKind, paramIndicesVector);
+          origAccessorKind.has_value(), rawAccessorKind, derivativeKind,
+          origDeclIDs);
+      writeDiffParamIndices(attr->getParameterIndices());
       writeDeclNameRefIfNeeded(origDeclNameRef.Name);
       return;
     }
@@ -3545,14 +3544,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
              "during construction or parsing");
 
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
-      auto *parameterIndices = attr->getParameterIndices();
-      assert(parameterIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> paramIndicesVector;
-      for (unsigned i : range(parameterIndices->getCapacity()))
-        paramIndicesVector.push_back(parameterIndices->contains(i));
-      TransposeDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origDeclID,
-          paramIndicesVector);
+      TransposeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                          attr->isImplicit(), origDeclID);
+      writeDiffParamIndices(attr->getParameterIndices());
       writeDeclNameRefIfNeeded(attr->getOriginalFunctionName().Name);
       return;
     }
@@ -3593,9 +3587,18 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::Section: {
       auto *theAttr = cast<SectionAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SectionDeclAttrLayout::Code];
-      SectionDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                           theAttr->isImplicit(),
-                                           theAttr->Name);
+      bool isDefault = theAttr->isDefault();
+      SectionDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(), isDefault,
+          isDefault ? StringRef() : *theAttr->Name);
+      return;
+    }
+
+    case DeclAttrKind::Target: {
+      auto *theAttr = cast<TargetAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[TargetDeclAttrLayout::Code];
+      TargetDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       theAttr->isImplicit(), theAttr->Value);
       return;
     }
 
@@ -3632,6 +3635,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       InheritActorContextDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           static_cast<uint8_t>(theAttr->getModifier()), theAttr->isImplicit());
+      return;
+    }
+
+    case DeclAttrKind::Unsafe: {
+      auto *theAttr = cast<UnsafeAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[UnsafeDeclAttrLayout::Code];
+      UnsafeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       theAttr->isAlways(),
+                                       theAttr->isImplicit());
       return;
     }
 
@@ -4023,6 +4035,34 @@ private:
     ParameterListLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, paramIDs);
   }
 
+  void writeDiffParamIndices(const IndexSubset *indices) {
+    assert(indices && "Parameter indices must be resolved");
+
+    using namespace decls_block;
+
+    SmallVector<bool, 4> paramIndicesVector;
+    for (unsigned i : range(indices->getCapacity()))
+      paramIndicesVector.push_back(indices->contains(i));
+
+    unsigned abbrCode =
+        S.DeclTypeAbbrCodes[DifferentiationParamIndicesLayout::Code];
+    DifferentiationParamIndicesLayout::emitRecord(S.Out, S.ScratchRecord,
+                                                  abbrCode, paramIndicesVector);
+    }
+    
+  void WriteYieldList(const SmallVector<AnyFunctionType::Yield, 1> &yields) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionYieldLayout::Code];
+    for (auto &yield : yields) {
+      auto paramFlags = yield.getFlags();
+      auto rawOwnership =
+          getRawStableParamDeclSpecifier(paramFlags.getOwnershipSpecifier());
+      FunctionYieldLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                      S.addTypeRef(yield.getType()),
+                                      rawOwnership);
+    }
+  }
+
   /// Writes an array of members for a decl context.
   ///
   /// \param parentID The DeclID of the context.
@@ -4367,6 +4407,11 @@ public:
   /// If this gets referenced, we forgot to handle a decl.
   void visitDecl(const Decl *) = delete;
 
+  void visitHiddenTypeLayoutInfoDecl(const HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable(
+        "hidden layout declaration serialization is not implemented yet");
+  }
+
   /// Add all of the inherited entries to the result vector.
   ///
   /// \returns the number of entries added.
@@ -4449,7 +4494,6 @@ public:
                                 S.addDeclRef(extendedNominal),
                                 contextID.getOpaqueValue(),
                                 extension->isImplicit(),
-                                extension->isMetatypeExtension(),
                                 S.addGenericSignatureRef(
                                            extension->getGenericSignature()),
                                 numConformances,
@@ -4887,7 +4931,8 @@ public:
     if (auto mangledName = ctx.lookupTypeToHideWhenEmittingModule(
             ty->getCanonicalType())) {
       ty = HiddenType::get(ctx, *mangledName,
-                           var->getDeclContext()->getParentModule());
+                           var->getDeclContext()->getParentModule(), nullptr,
+                           CanType());
     }
     SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)
@@ -5053,6 +5098,14 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
+    // Write the body yields
+    {
+      SmallVector<AnyFunctionType::Yield, 1> yields;
+      fn->getYieldInterfaceTypes(yields);
+      assert(yields.empty() == !fn->isCoroutine());
+      WriteYieldList(yields);
+    }
+
     writeLifetimeDependenciesIfNeeded(fn);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
@@ -5190,6 +5243,7 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
+    // We do not write yields, these are inferred from the storage
     writeLifetimeDependenciesIfNeeded(fn);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
@@ -5621,6 +5675,7 @@ static uint8_t getRawStableSILFunctionTypeRepresentation(
   SIMPLE_CASE(SILFunctionTypeRepresentation, ObjCMethod)
   SIMPLE_CASE(SILFunctionTypeRepresentation, WitnessMethod)
   SIMPLE_CASE(SILFunctionTypeRepresentation, Closure)
+  SIMPLE_CASE(SILFunctionTypeRepresentation, COMMethod)
   SIMPLE_CASE(SILFunctionTypeRepresentation, CXXMethod)
   SIMPLE_CASE(SILFunctionTypeRepresentation, KeyPathAccessorGetter)
   SIMPLE_CASE(SILFunctionTypeRepresentation, KeyPathAccessorSetter)
@@ -6124,6 +6179,19 @@ public:
     }
   }
 
+  void serializeFunctionTypeYields(const AnyFunctionType *fnTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionYieldLayout::Code];
+    for (auto &yield : fnTy->getYields()) {
+      auto paramFlags = yield.getFlags();
+      auto rawOwnership =
+          getRawStableParamDeclSpecifier(paramFlags.getOwnershipSpecifier());
+      FunctionYieldLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          S.addTypeRef(yield.getType()), rawOwnership);
+    }
+  }
+
   TypeID encodeIsolation(swift::FunctionTypeIsolation isolation) {
     switch (isolation.getKind()) {
     case swift::FunctionTypeIsolation::Kind::NonIsolated:
@@ -6178,9 +6246,12 @@ public:
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation,
-        fnTy->hasSendingResult());
+        fnTy->hasSendingResult(),
+        fnTy->isCalledOnce(),
+        fnTy->isCoroutine());
 
     serializeFunctionTypeParams(fnTy);
+    serializeFunctionTypeYields(fnTy);
 
     auto lifetimeDependencies = fnTy->getLifetimeDependencies();
     if (!lifetimeDependencies.empty()) {
@@ -6200,10 +6271,12 @@ public:
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation, fnTy->hasSendingResult(),
+        isolation, fnTy->hasSendingResult(), fnTy->isCalledOnce(),
+        fnTy->isCoroutine(),                                          
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
+    serializeFunctionTypeYields(fnTy);
 
     auto lifetimeDependencies = fnTy->getLifetimeDependencies();
     if (!lifetimeDependencies.empty()) {
@@ -6288,10 +6361,10 @@ public:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(),
-        fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
-        stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
-        fnTy->isUnimplementable(), fnTy->getIsolation().getKind(),
+        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(), fnTy->isAsync(),
+        stableCoroutineKind, stableCalleeConvention, stableRepresentation,
+        fnTy->isPseudogeneric(), fnTy->isNoEscape(), fnTy->isUnimplementable(),
+        fnTy->isCalledOnce(), fnTy->getIsolation().getKind(),
         stableDiffKind, fnTy->hasErrorResult(),
         fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
@@ -6610,6 +6683,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TupleTypeEltLayout>();
   registerDeclTypeAbbr<FunctionTypeLayout>();
   registerDeclTypeAbbr<FunctionParamLayout>();
+  registerDeclTypeAbbr<FunctionYieldLayout>();
   registerDeclTypeAbbr<MetatypeTypeLayout>();
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
   registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();
@@ -6734,6 +6808,9 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<InheritedProtocolsLayout>();
 
+  registerDeclTypeAbbr<DifferentiationParamIndicesLayout>();
+  registerDeclTypeAbbr<HiddenTypeLayoutInfoLayout>();
+
 #define DECL_ATTR(X, NAME, ...) \
   registerDeclTypeAbbr<NAME##DeclAttrLayout>();
 #include "swift/AST/DeclAttr.def"
@@ -6762,7 +6839,22 @@ void Serializer::writeAllDeclsAndTypes() {
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(PackConformancesToSerialize);
     wroteSomething |= writeASTBlockEntitiesIfNeeded(SILLayoutsToSerialize);
+    wroteSomething |= writeHiddenTypeLayoutInformationIfNeeded();
   } while (wroteSomething);
+}
+
+bool Serializer::writeHiddenTypeLayoutInformationIfNeeded() {
+  if (HiddenTypeLayoutsToSerialize.empty())
+    return false;
+
+  using namespace decls_block;
+  unsigned abbrCode = DeclTypeAbbrCodes[HiddenTypeLayoutInfoLayout::Code];
+  while (!HiddenTypeLayoutsToSerialize.empty()) {
+    const Decl *decl = HiddenTypeLayoutsToSerialize.pop_back_val();
+    HiddenTypeLayoutInfoLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addDeclRef(decl));
+  }
+  return true;
 }
 
 std::vector<CharOffset> Serializer::writeAllIdentifiers() {
@@ -7119,12 +7211,13 @@ static void recordDerivativeFunctionConfig(
          attr->getDerivativeGenericSignature()});
   }
   for (auto *attr : AFD->getAttrs().getAttributes<DerivativeAttr>()) {
-    auto *origAFD = attr->getOriginalFunction(ctx);
-    auto mangledName =
-        ctx.getIdentifier(Mangler.mangleDeclWithPrefix(origAFD, ""));
-    derivativeConfigs[mangledName].insert(
-        {ctx.getIdentifier(attr->getParameterIndices()->getString()),
-         AFD->getGenericSignature()});
+    for (auto *origAFD : attr->getOriginalFunctions(ctx)) {
+      auto mangledName =
+          ctx.getIdentifier(Mangler.mangleDeclWithPrefix(origAFD, ""));
+      derivativeConfigs[mangledName].insert(
+          {ctx.getIdentifier(attr->getParameterIndices()->getString()),
+           AFD->getGenericSignature()});
+    }
   }
 }
 
@@ -7218,6 +7311,70 @@ static void collectInterestingNestedDeclarations(
                                            isLocal);
     }
   }
+}
+
+static bool scheduleHiddenTypeLayoutSerialization(
+    const Decl *D,
+    llvm::SmallSetVector<const Decl *, 16> &layoutsToSerialize) {
+  // We assume the standard library will always be available,
+  // so no need to serialize hidden representations of types defined within.
+  if (D->isStdlibDecl())
+    return false;
+
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
+    if (auto *parentNominal =
+            nominal->getDeclContext()->getSelfNominalTypeDecl())
+      scheduleHiddenTypeLayoutSerialization(parentNominal,
+                                            layoutsToSerialize);
+  } else if (auto *hiddenDecl = dyn_cast<HiddenTypeLayoutInfoDecl>(D)) {
+    if (auto *parentTypeDecl = hiddenDecl->ParentDecl)
+      scheduleHiddenTypeLayoutSerialization(parentTypeDecl,
+                                            layoutsToSerialize);
+  }
+
+  return layoutsToSerialize.insert(D);
+}
+
+void Serializer::handleHiddenTypeLayoutRequirement(
+    const HiddenTypeLayoutRequirement &requirement) {
+  if (!scheduleHiddenTypeLayoutSerialization(
+          requirement.LayoutDecl, HiddenTypeLayoutsToSerialize) ||
+      !Options.EnableHiddenTypeLayoutSerializationRemarks)
+    return;
+
+  auto *abiExposedLeaf = requirement.LayoutAffectingStorage->getDeclContext()
+                             ->getSelfNominalTypeDecl();
+  assert(abiExposedLeaf);
+
+  auto &diags = getASTContext().Diags;
+  switch (requirement.Origin) {
+  case HiddenTypeLayoutOrigin::ImplementationOnly:
+    diags.diagnose(
+        requirement.LayoutAffectingStorage->getLoc(),
+        diag::serialization_scheduled_implementation_only_hidden_type_layout,
+        requirement.HiddenType, abiExposedLeaf,
+        requirement.LayoutAffectingStorage);
+    break;
+  case HiddenTypeLayoutOrigin::InternalBridgingHeader:
+    diags.diagnose(
+        requirement.LayoutAffectingStorage->getLoc(),
+        diag::serialization_scheduled_internal_bridging_header_hidden_type_layout,
+        requirement.HiddenType, abiExposedLeaf,
+        requirement.LayoutAffectingStorage);
+    break;
+  case HiddenTypeLayoutOrigin::RecoveredHiddenType:
+    diags.diagnose(
+        requirement.LayoutAffectingStorage->getLoc(),
+        diag::serialization_scheduled_recovered_hidden_type_layout,
+        requirement.HiddenType, abiExposedLeaf,
+        requirement.LayoutAffectingStorage);
+    break;
+  }
+
+  if (abiExposedLeaf != requirement.ABIExposedType)
+    diags.diagnose(requirement.ABIExposedType->getLoc(),
+                   diag::serialization_hidden_type_layout_abi_exposure,
+                   abiExposedLeaf, requirement.ABIExposedType);
 }
 
 void Serializer::writeAST(ModuleOrSourceFile DC) {
@@ -7364,6 +7521,16 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       auto MangledName = Mangler.mangleOpaqueTypeDecl(OTD);
       opaqueReturnTypeGenerator.insert(MangledName, addDeclRef(OTD));
     }
+  }
+
+  auto &langOpts = M->getASTContext().LangOpts;
+  if (langOpts.hasFeature(
+          Feature::SerializeAbstractTypeLayoutForHiddenTypes) &&
+      M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+    forEachRequiredHiddenTypeLayout(
+        M, files, [&](const HiddenTypeLayoutRequirement &requirement) {
+          handleHiddenTypeLayoutRequirement(requirement);
+        });
   }
 
   writeAllDeclsAndTypes();

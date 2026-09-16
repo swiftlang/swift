@@ -304,6 +304,7 @@ extension String: RangeReplaceableCollection {
       self = ""
       return
     }
+    if isEmpty { return }
     _guts.clear()
   }
 }

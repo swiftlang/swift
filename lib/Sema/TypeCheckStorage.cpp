@@ -33,6 +33,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -40,6 +41,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SourceFileExtras.h"
+#include "swift/AST/SynthesizedDeclBuilder.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -901,16 +903,22 @@ static void diagnoseReadWriteMutatingnessMismatch(
   bool hasCoroutineAccessorFeature =
       storage->getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors);
 
+  // Name an accessor for the diagnostic.  When we have the parsed accessor
+  // decl, use it so that a `_read`/`_modify` that was rewritten to its yielding
+  // counterpart is still named with the spelling the user wrote.
+  auto nameForAccessor = [&](AccessorKind kind) -> StringRef {
+    if (auto *decl = storage->getParsedAccessor(kind))
+      return getAccessorNameForDiagnostic(
+          decl, /*article=*/false, /*legacy=*/hasCoroutineAccessorFeature);
+    return getAccessorNameForDiagnostic(
+        kind, /*article=*/false, /*legacy=*/hasCoroutineAccessorFeature);
+  };
+
   auto readerAccessor = directAccessorKindForReadImpl(storage->getReadImpl());
   StringRef readerAccessorName =
-      readerAccessor.has_value()
-          ? getAccessorNameForDiagnostic(
-                *readerAccessor, /*article=*/false,
-                /*underscored=*/hasCoroutineAccessorFeature)
-          : "the inherited accessor";
-  StringRef writerAccessorName =
-      getAccessorNameForDiagnostic(writerAccesor, /*article=*/false,
-                                   /*underscored=*/hasCoroutineAccessorFeature);
+      readerAccessor.has_value() ? nameForAccessor(*readerAccessor)
+                                 : "the inherited accessor";
+  StringRef writerAccessorName = nameForAccessor(writerAccesor);
   unsigned diagnosticForm;
   if (isModifierMutating) {
     // modifier can't be mutating when both the setter is nonmutating and the
@@ -932,8 +940,8 @@ static void diagnoseReadWriteMutatingnessMismatch(
 
   modifyAccessor->diagnose(
       diag::readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,
-      getAccessorNameForDiagnostic(readWriterAccessor, /*article=*/false,
-                                   /*underscored=*/hasCoroutineAccessorFeature),
+      getAccessorNameForDiagnostic(modifyAccessor, /*article=*/false,
+                                   /*legacy=*/hasCoroutineAccessorFeature),
       isModifierMutating ? SelfAccessKind::Mutating
                          : SelfAccessKind::NonMutating,
       diagnosticForm, writerAccessorName, SelfAccessKind::NonMutating,
@@ -944,7 +952,7 @@ static void diagnoseReadWriteMutatingnessMismatch(
                      getAccessorNameForDiagnostic(
                          writerAccesor,
                          /*article=*/false,
-                         /*underscored=*/hasCoroutineAccessorFeature),
+                         /*legacy=*/hasCoroutineAccessorFeature),
                      0);
   }
   AccessorDecl *reader = nullptr;
@@ -1055,8 +1063,13 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     return OpaqueReadOwnership::YieldingBorrow;
   };
 
-  if (auto *accessorDecl = storage->getAccessor(AccessorKind::Read)) {
-    auto lifetimeDependencies = accessorDecl->getLifetimeDependencies();
+  // A '_read' or 'yielding borrow' coroutine whose yielded value has a scoped
+  // lifetime dependence borrows its source, so the opaque read is a borrow.
+  auto *readAccessor = storage->getAccessor(AccessorKind::Read);
+  if (!readAccessor)
+    readAccessor = storage->getAccessor(AccessorKind::YieldingBorrow);
+  if (readAccessor) {
+    auto lifetimeDependencies = readAccessor->getLifetimeDependencies();
     if (lifetimeDependencies.has_value() && !lifetimeDependencies->empty()) {
       for (auto &lifetimeDependenceInfo : *lifetimeDependencies) {
         if (lifetimeDependenceInfo.hasScopeLifetimeParamIndices()) {
@@ -1067,7 +1080,13 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  if (storage->getAccessor(AccessorKind::YieldingBorrow))
+  // A 'yielding borrow' protocol requirement keeps a borrowing opaque read, like
+  // '@_borrowed', so the read-coroutine spellings stay symmetric in a protocol's
+  // witness layout.  Only concrete storage synthesizes a getter for it (see
+  // below); protocol requirement layout is handled separately by the
+  // additive-witness work.
+  if (storage->getAccessor(AccessorKind::YieldingBorrow) &&
+      isa<ProtocolDecl>(storage->getDeclContext()))
     return OpaqueReadOwnership::YieldingBorrow;
 
   if (storage->getAccessor(AccessorKind::Borrow))
@@ -1082,6 +1101,15 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getInnermostDeclContext()->mapTypeIntoEnvironment(
         storage->getValueInterfaceType())->isNoncopyable())
     return usesBorrowed(DiagKind::NoncopyableType);
+
+  // A concrete copyable 'yielding borrow' exposes an owned getter -- matching
+  // '_read', whose synthesized getter is part of the shipped ABI -- in addition
+  // to the borrowing coroutine, so a caller can use either.  (A getter alone
+  // would drop the coroutine that the property was written with; the coroutine
+  // alone would lose the getter that a remapped '_read' shipped.)  The getter
+  // delegates to the coroutine, running its full body including the back half.
+  if (storage->getAccessor(AccessorKind::YieldingBorrow))
+    return OpaqueReadOwnership::OwnedOrBorrowed;
 
   return OpaqueReadOwnership::Owned;
 }
@@ -1837,10 +1865,10 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   SmallVector<ASTNode, 6> Body;
 
   // Load the existing storage and store it into the 'tmp1' temporary.
-  auto *Tmp1VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                                   SourceLoc(), Ctx.getIdentifier("tmp1"), Get);
-  Tmp1VD->setInterfaceType(VD->getValueInterfaceType());
-  Tmp1VD->setImplicit();
+  VarDecl *Tmp1VD = VarDeclBuilder(Get, Ctx.getIdentifier("tmp1"))
+                        .introducer(VarDecl::Introducer::Let)
+                        .type(VD->getValueInterfaceType())
+                        .synthesized(false);
 
   auto *Named = NamedPattern::createImplicit(Ctx, Tmp1VD, Tmp1VD->getTypeInContext());
   auto *Let =
@@ -1869,11 +1897,10 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
                                   /*elseloc*/ SourceLoc(),
                                   /*else*/ nullptr, /*implicit*/ true));
 
-  auto *Tmp2VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                                   SourceLoc(), Ctx.getIdentifier("tmp2"),
-                                   Get);
-  Tmp2VD->setInterfaceType(VD->getValueInterfaceType());
-  Tmp2VD->setImplicit();
+  VarDecl *Tmp2VD = VarDeclBuilder(Get, Ctx.getIdentifier("tmp2"))
+                        .introducer(VarDecl::Introducer::Let)
+                        .type(VD->getValueInterfaceType())
+                        .synthesized(false);
 
 
   // Take the initializer from the PatternBindingDecl for VD.
@@ -2167,10 +2194,10 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
         OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getTypeInContext());
       }
 
-      OldValue = new (Ctx) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
-                                   SourceLoc(), Ctx.getIdentifier("tmp"), Set);
-      OldValue->setImplicit();
-      OldValue->setInterfaceType(VD->getValueInterfaceType());
+      OldValue = VarDeclBuilder(Set, Ctx.getIdentifier("tmp"))
+                     .introducer(VarDecl::Introducer::Let)
+                     .type(VD->getValueInterfaceType())
+                     .synthesized(false);
       auto *tmpPattern =
           NamedPattern::createImplicit(Ctx, OldValue, OldValue->getTypeInContext());
       auto *tmpPBD = PatternBindingDecl::createImplicit(
@@ -2536,39 +2563,6 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   llvm_unreachable("bad synthesized function kind");
 }
 
-/// If the accessor is one of the given kinds, and there is a @section on a
-/// parsed accessor of one of the given kinds, transfer it to the accessor.
-///
-/// Returns true if anything was transferred.
-static bool tryTransferAccessorSection(
-    AccessorDecl *accessor, ArrayRef<AccessorKind> kinds) {
-  // Is our accessor one of the expected kinds?
-  if (std::find(kinds.begin(), kinds.end(), accessor->getAccessorKind()) ==
-        kinds.end())
-    return false;
-
-  // If the accessor has a @section attribute already, we're done.
-  if (accessor->getAttrs().hasAttribute<SectionAttr>())
-    return true;
-
-  // Look for a parsed accessor from which we can pull the section name.
-  auto storage = accessor->getStorage();
-  for (auto kind : kinds) {
-    auto parsed = storage->getParsedAccessor(kind);
-    if (!parsed)
-      continue;
-
-    if (auto section = parsed->getAttrs().getAttribute<SectionAttr>()) {
-      // Clone the attribute.
-      ASTContext &ctx = storage->getASTContext();
-      accessor->getAttrs().add(section->clone(ctx));
-      return true;
-    }
-  }
-
-  return false;
-}
-
 static void finishImplicitAccessor(AccessorDecl *accessor,
                                    ASTContext &ctx) {
   accessor->setImplicit();
@@ -2578,28 +2572,6 @@ static void finishImplicitAccessor(AccessorDecl *accessor,
 
   if (accessor->doesAccessorHaveBody())
     accessor->setBodySynthesizer(&synthesizeAccessorBody);
-
-  // Look for a @section attribute to transfer.
-  AccessorKind readAccessors[] = {
-    AccessorKind::Get,
-    AccessorKind::DistributedGet,
-    AccessorKind::Read,
-    AccessorKind::YieldingBorrow,
-    AccessorKind::Borrow,
-    AccessorKind::Address
-  };
-  AccessorKind writeAccessors[] = {
-    AccessorKind::Set,
-    AccessorKind::Modify,
-    AccessorKind::YieldingMutate,
-    AccessorKind::Mutate,
-    AccessorKind::MutableAddress,
-    AccessorKind::Init,
-    AccessorKind::WillSet,
-    AccessorKind::DidSet
-  };
-  if (!tryTransferAccessorSection(accessor, writeAccessors))
-    tryTransferAccessorSection(accessor, readAccessors);
 }
 
 static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
@@ -2807,7 +2779,8 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   // The forwarding index parameters.
   auto *params = buildIndexForwardingParamList(storage, {}, ctx);
 
-  // Coroutine accessors always return ().
+  // Coroutine accessors always return (). The constructor below
+  // will take care of deducing yield type.
   const Type retTy = TupleType::getEmpty(ctx);
 
   auto *accessor = AccessorDecl::create(
@@ -3038,52 +3011,72 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-/// When the CoroutineAccessors feature is available, the coroutine accessor
-/// _could_ be required.  That non-underscored accessor would be preferred to
-/// its underscored counterpart accessor.
+/// Do we need to emit a legacy coroutine accessor?
 ///
-/// The underscored accessor could, however, still be required for ABI
-/// stability.
-static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+/// We generally prefer the newer ABI version but need to preserve ABI stability
+/// in many cases.  The details depend on the target platform, build
+/// configuration, whether this is a concrete or protocol type, and when the
+/// property in question became available.
+static bool requiresCorrespondingLegacyCoroutineAccessorImpl(
     AbstractStorageDecl const *storage, AccessorKind kind,
     AccessorDecl const *decl, AbstractStorageDecl const *derived) {
   auto &ctx = storage->getASTContext();
   assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
   assert(kind == AccessorKind::YieldingMutate || kind == AccessorKind::YieldingBorrow);
 
-  // If any overridden decl requires the underscored version, then this decl
-  // does too.  Otherwise dispatch to the underscored version on a value
-  // statically the super but dynamically this subtype would not dispatch to an
-  // override of the underscored version but rather (incorrectly) the
-  // supertype's implementation.
+  // If any overridden decl emits the legacy version, then this decl must as
+  // well, in order to ensure callers always get the right implementation.
   if (storage == derived) {
     auto *current = storage;
     while ((current = current->getOverriddenDecl())) {
       auto *currentDecl = cast_or_null<AccessorDecl>(
           decl ? decl->getOverriddenDecl() : nullptr);
-      if (requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+      if (requiresCorrespondingLegacyCoroutineAccessorImpl(
               current, kind, currentDecl, derived)) {
         return true;
       }
     }
   }
 
-  // Non-exported storage has no ABI to keep stable.
-  if (isExported(storage) != ExportedLevel::Exported)
+  // If this module is not resilient, we don't need to preserve a stable ABI,
+  // so emit only the new (yield_once_2) ABI.
+  if (storage->getModuleContext()->getResilienceStrategy() !=
+      ResilienceStrategy::Resilient)
     return false;
 
-  // The non-underscored accessor is not present, the underscored accessor
-  // won't be either.
+  // Storage that isn't visible outside its module has no ABI to keep stable.
+  // "Visible outside the module" means public/`@usableFromInline` (which
+  // isExported reports as Exported) or package: a separately-compiled module in
+  // the same package can call it across a resilience boundary, so it needs the
+  // stable (underscored) ABI too.
+  if (isExported(storage) != ExportedLevel::Exported &&
+      !storage
+           ->getFormalAccessScope(/*useDC=*/nullptr,
+                                  /*treatUsableFromInlineAsPublic=*/true)
+           .isPackage())
+    return false;
+
+  // The yielding accessor is not present, so we won't emit a legacy
+  // wrapper either.
   auto *accessor = decl ? decl : storage->getOpaqueAccessor(kind);
   if (!accessor)
     return false;
 
-  // Availability checks are only relevant on targets which support versioned
-  // availability.  Otherwise, since we're building with library evolution,
-  // conservatively assume that the binary must keep ABI compatibility with its
-  // prior versions, and emit the underscored variant.
-  if (!ctx.supportsVersionedAvailability())
+  // Always emit an old-ABI wrapper for protocols.  This ensures that
+  // protocol witness-table layout remains frozen and identical across every
+  // platform and deployment target, so that an old, never-recompiled
+  // conformance or caller can always link against the same slot.
+  if (storage->getDeclContext()->getSelfProtocolDecl())
     return true;
+
+  // Availability-gated ABI compatibility only matters on targets that support
+  // versioned OS availability: there, a binary built before the new yielding
+  // ABI became available may run against a newer framework, so the framework
+  // must preserve the old ABI accessor.  Targets without versioned
+  // availability (e.g. Linux, embedded) have no prebuilt binaries to stay
+  // compatible with, so always emit only the new ABI.
+  if (!ctx.supportsVersionedAvailability())
+    return false;
 
   AvailabilityContext accessorAvailability = [&] {
     if (storage->getModuleContext()->isMainModule()) {
@@ -3105,19 +3098,19 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
     return retval;
   }();
   auto featureAvailability = ctx.getCoroutineAccessorsAvailability();
-  // If accessor was introduced only after the feature was, there's no old ABI
-  // to maintain.
+  // If the accessor became available after the new coroutine ABI did,
+  // we will never need the legacy ABI.
   if (accessorAvailability.getPlatformRange().isContainedIn(
           featureAvailability))
     return false;
 
-  // The underscored accessor is required for ABI stability.
+  // The legacy ("underscored") accessor is required for ABI stability.
   return true;
 }
 
-bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
+bool AbstractStorageDecl::requiresCorrespondingLegacyCoroutineAccessor(
     AccessorKind kind, AccessorDecl const *decl) const {
-  return requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+  return requiresCorrespondingLegacyCoroutineAccessorImpl(
       this, kind, decl,
       /*derived=*/this);
 }
@@ -3133,7 +3126,7 @@ bool RequiresOpaqueModifyCoroutineRequest::evaluate(
     return false;
 
   if (hasModifyFeature && isUnderscored) {
-    return storage->requiresCorrespondingUnderscoredCoroutineAccessor(
+    return storage->requiresCorrespondingLegacyCoroutineAccessor(
         AccessorKind::YieldingMutate);
   }
 
@@ -3345,10 +3338,11 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
   auto StorageInterfaceTy = OptionalType::get(VD->getInterfaceType());
   auto StorageTy = OptionalType::get(VD->getTypeInContext());
 
-  auto *Storage = new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
-                                        VD->getLoc(), StorageName,
-                                        VD->getDeclContext());
-  Storage->setInterfaceType(StorageInterfaceTy);
+  VarDecl *Storage = VarDeclBuilder(VD->getDeclContext(), StorageName)
+                         .introducer(VarDecl::Introducer::Var)
+                         .at(VD->getLoc())
+                         .type(StorageInterfaceTy)
+                         .synthesized(false);
   Storage->setLazyStorageFor(VD);
   Storage->setUserAccessible(false);
 
@@ -3422,10 +3416,10 @@ static VarDecl *synthesizeLocalWrappedValueVar(VarDecl *var) {
     }
   }
 
-  VarDecl *localVar = new (ctx) VarDecl(/*IsStatic=*/false,
-                                        VarDecl::Introducer::Var,
-                                        var->getLoc(), name, dc);
-  localVar->setImplicit();
+  VarDecl *localVar = VarDeclBuilder(dc, name)
+                          .introducer(VarDecl::Introducer::Var)
+                          .at(var->getLoc())
+                          .synthesized(false);
   localVar->getAttrs() = var->getAttrs();
   localVar->overwriteAccess(var->getFormalAccess());
   localVar->setImplInfo(*mutability);
@@ -3477,11 +3471,11 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
 
   // Form the property.
   auto dc = var->getDeclContext();
-  VarDecl *property = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
-                                        VarDecl::Introducer::Var,
-                                        var->getLoc(),
-                                        name, dc);
-  property->setImplicit();
+  VarDecl *property = VarDeclBuilder(dc, name)
+                          .static_(var->isStatic())
+                          .introducer(VarDecl::Introducer::Var)
+                          .at(var->getLoc())
+                          .synthesized(false);
   property->setOriginalWrappedProperty(var);
   addMemberToContextIfNeeded(property, dc, var);
 
@@ -3742,11 +3736,11 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
     backingVar->setName(name);
   } else {
     auto introducer = isa<ParamDecl>(var) ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
-    backingVar = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
-                                   introducer,
-                                   var->getLoc(),
-                                   name, dc);
-    backingVar->setImplicit();
+    backingVar = VarDeclBuilder(dc, name)
+                     .static_(var->isStatic())
+                     .introducer(introducer)
+                     .at(var->getLoc())
+                     .synthesized(false);
     backingVar->setOriginalWrappedProperty(var);
 
     // The backing storage is 'private'.
@@ -4030,8 +4024,8 @@ static void finishPropertyWrapperImplInfo(VarDecl *var,
   if (var->hasObservers() || var->getDeclContext()->isLocalContext()) {
     info = StorageImplInfo::getMutableComputed();
   } else {
-    info = StorageImplInfo(ReadImplKind::Get, WriteImplKind::Set,
-                           ReadWriteImplKind::Modify);
+    info = StorageImplInfo::getMutableOpaque(OpaqueReadOwnership::Owned,
+                                             var->getASTContext());
   }
 }
 
@@ -4344,6 +4338,18 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       writeImpl = WriteImplKind::Set;
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
     }
+    if (storage->getParsedAccessor(AccessorKind::YieldingMutate)) {
+      // `yielding mutate` implies `yielding borrow`
+      // (unless it's overridden later in this function).
+      readImpl = ReadImplKind::YieldingBorrow;
+      // If there's a written `set`, use `yielding mutate` only
+      // for read/write access and use the `set` for simple write.
+      // If there isn't a written `set`, use `yielding mutate` for
+      // both.
+      if (!storage->getParsedAccessor(AccessorKind::Set))
+        writeImpl = WriteImplKind::YieldingMutate;
+      readWriteImpl = ReadWriteImplKind::YieldingMutate;
+    }
     if (storage->getParsedAccessor(AccessorKind::Get)) {
       readImpl = ReadImplKind::Get;
     }
@@ -4386,9 +4392,9 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       if (auto willSet = storage->getParsedAccessor(AccessorKind::WillSet)) {
         willSet->diagnose(diag::observing_accessor_conflicts_with_accessor, 0,
                           getAccessorNameForDiagnostic(
-                              firstNonObserver->getAccessorKind(),
+                              firstNonObserver,
                               /*article=*/true,
-                              /*underscored=*/hasCoroutineAccessorFeature));
+                              /*legacy=*/hasCoroutineAccessorFeature));
         willSet->setInvalid();
         hasWillSet = false;
       }
@@ -4396,9 +4402,9 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       if (auto didSet = storage->getParsedAccessor(AccessorKind::DidSet)) {
         didSet->diagnose(diag::observing_accessor_conflicts_with_accessor, 1,
                          getAccessorNameForDiagnostic(
-                             firstNonObserver->getAccessorKind(),
+                             firstNonObserver,
                              /*article=*/true,
-                             /*underscored=*/hasCoroutineAccessorFeature));
+                             /*legacy=*/hasCoroutineAccessorFeature));
         didSet->setInvalid();
         hasDidSet = false;
       }

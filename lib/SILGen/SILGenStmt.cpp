@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Condition.h"
 #include "Conversion.h"
@@ -335,7 +334,8 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
         // Other decls define entities that may be used by the program, such as
         // local function declarations. So handle them here, before checking for
         // reachability, and then continue looping.
-        SGF.visit(D);
+        if (!SGF.SGM.shouldSkipDecl(D))
+          SGF.visit(D);
         continue;
       }
     }
@@ -485,6 +485,17 @@ createIndirectResultInit(SILGenFunction &SGF, SILValue addr,
   // Create an initialization which will initialize it.
   auto &resultTL = SGF.getTypeLowering(addr->getType());
   auto temporary = SGF.useBufferAsTemporary(addr, resultTL);
+
+  // A tuple result stored into an @out buffer must not be initialized
+  // element-by-element across a suspension point. This could result in
+  // a partial write happening before the suspension, and only the part of the write
+  // happening after the suspension point would survive, leaving the earlier part corrupt.
+  // Only a tuple with more than one element can be left partially written
+  if (SGF.F.isAsync()) {
+    if (auto tupleTy = addr->getType().getAs<TupleType>())
+      if (tupleTy->getNumElements() > 1)
+        temporary->setCanSplitIntoTupleElements(false);
+  }
 
   // Remember the cleanup that will be activated.
   auto cleanup = temporary->getInitializedCleanup();
@@ -1361,9 +1372,9 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   auto &exnTL = SGF.getTypeLowering(formalExnType);
 
   SILValue exnArg;
-
-  // FIXME: opaque values
-  if (exnTL.isAddressOnly()) {
+  bool errorIsIndirect = exnTL.isAddress();
+  
+  if (errorIsIndirect) {
     exnArg = SGF.B.createAllocStack(
         S, exnTL.getLoweredType());
     SGF.enterDeallocStackCleanup(exnArg);
@@ -1373,8 +1384,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   JumpDest throwDest = createThrowDest(S->getBody(),
                                        ThrownErrorInfo(exnArg));
 
-  // FIXME: opaque values
-  if (!exnTL.isAddressOnly()) {
+  if (!errorIsIndirect) {
     exnArg = throwDest.getBlock()->createPhiArgument(
         exnTL.getLoweredType(), OwnershipKind::Owned);
   }
@@ -1845,9 +1855,9 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     args.push_back(exn);
   } else if (shouldDiscard) {
     if (exn->getType().isAddress())
-      B.createDestroyAddr(loc, exn);
+      B.emitDestroyAddrAndFold(loc, exn);
     else
-      B.createDestroyValue(loc, exn);
+      B.emitDestroyValueOperation(loc, exn);
   }
 
   // Emit clean-ups needed prior to entering throw block.

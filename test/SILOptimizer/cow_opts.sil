@@ -126,10 +126,12 @@ bb1(%a : $Str):
   (%u, %b) = begin_cow_mutation %as : $Buffer
   %e2 = end_cow_mutation %b : $Buffer
   %s2 = struct $Str (%e2: $Buffer)
-  cond_br undef, bb1(%s2 : $Str), bb2
+  cond_br undef, bb3, bb2
 bb2:
   %t = tuple (%u : $Builtin.Int1, %e2 : $Buffer)
   return %t : $(Builtin.Int1, Buffer)
+bb3:
+  br bb1(%s2 : $Str)
 }
 
 // CHECK-LABEL: sil @test_cond_br_condition
@@ -170,10 +172,12 @@ bb1(%a : $Str):
   (%u, %b) = begin_cow_mutation %as : $Buffer
   %e2 = end_cow_mutation %b : $Buffer
   %s2 = struct $Str (%e2: $Buffer)
-  cond_br undef, bb1(%s2 : $Str), bb2
+  cond_br undef, bb3, bb2
 bb2:
   %t = tuple (%u : $Builtin.Int1, %e2 : $Buffer)
   return %t : $(Builtin.Int1, Buffer)
+bb3:
+  br bb1(%s2 : $Str)
 }
 
 // CHECK-LABEL: sil @test_escape_in_loop
@@ -191,10 +195,12 @@ bb1(%a : $Buffer):
   (%u, %b) = begin_cow_mutation %a : $Buffer
   %e2 = end_cow_mutation %b : $Buffer
   apply %f(%e2) : $@convention(thin) (@guaranteed Buffer) -> ()
-  cond_br undef, bb1(%e2 : $Buffer), bb2
+  cond_br undef, bb3, bb2
 bb2:
   %t = tuple (%u : $Builtin.Int1, %e2 : $Buffer)
   return %t : $(Builtin.Int1, Buffer)
+bb3:
+  br bb1(%e2 : $Buffer)
 }
 
 // CHECK-LABEL: sil @test_escape_outside_loop
@@ -211,11 +217,13 @@ bb0(%0 : $Buffer):
 bb1(%a : $Buffer):
   (%u, %b) = begin_cow_mutation %a : $Buffer
   %e2 = end_cow_mutation %b : $Buffer
-  cond_br undef, bb1(%e2 : $Buffer), bb2
+  cond_br undef, bb3, bb2
 bb2:
   apply %f(%e2) : $@convention(thin) (@guaranteed Buffer) -> ()
   %t = tuple (%u : $Builtin.Int1, %e2 : $Buffer)
   return %t : $(Builtin.Int1, Buffer)
+bb3:
+  br bb1(%e2 : $Buffer)
 }
 
 // CHECK-LABEL: sil [ossa] @ossa_test_simple

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-enable-crash-on-valid-salvage
+// RUN: %target-typecheck-verify-swift -solver-enable-diagnose-valid-salvage
 
 /// This file collects some random test cases where we used to find
 /// a valid solution in salvage().

@@ -22,7 +22,6 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -36,7 +35,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SmallString.h"
@@ -250,16 +248,15 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
         varInterfaceType->lookThroughAllOptionalTypes()->is<AnyFunctionType>();
     if (!isStructuralFunctionType) {
       auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
-      varInterfaceType = FunctionType::get({}, varInterfaceType, extInfo);
+      varInterfaceType = FunctionType::get({}, {}, varInterfaceType, extInfo);
     }
   }
 
   // Create the parameter.
-  auto *arg = new (ctx) ParamDecl(SourceLoc(), paramLoc, var->getName(),
-                                  paramLoc, var->getName(), DC);
-  arg->setSpecifier(ParamSpecifier::Default);
-  arg->setInterfaceType(varInterfaceType);
-  arg->setImplicit();
+  ParamDecl *arg =
+      ParamDecl::createImplicit(ctx, /*specifierLoc=*/SourceLoc(), paramLoc,
+                                var->getName(), paramLoc, var->getName(),
+                                varInterfaceType, DC, ParamSpecifier::Default);
   arg->setAutoClosure(isAutoClosure);
 
   // Don't allow the parameter to accept temporary pointer conversions.
@@ -317,11 +314,10 @@ createImplicitConstructor(NominalTypeDecl *decl, ImplicitConstructorKind ICK,
       auto systemTy = getDistributedActorSystemType(classDecl);
 
       // Create the parameter. API name is actorSystem, local name is system
-      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_actorSystem, Loc,
-                                      ctx.Id_system, decl);
-      arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(systemTy);
-      arg->setImplicit();
+      ParamDecl *arg =
+          ParamDecl::createImplicit(ctx, /*specifierLoc=*/SourceLoc(), Loc,
+                                    ctx.Id_actorSystem, Loc, ctx.Id_system,
+                                    systemTy, decl, ParamSpecifier::Default);
 
       params.push_back(arg);
     }
@@ -1288,17 +1284,27 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       continue;
 
     bool alreadyDeclared = false;
+    bool interfaceMarksInitUnavailable = false;
+    auto superSelector = superclassCtor->getObjCRuntimeName();
 
     auto results = decl->lookupDirect(DeclBaseName::createConstructor());
     for (auto *member : results) {
-      if (!isInMainBody(member, decl))
-        continue;
-
       auto *ctor = cast<ConstructorDecl>(member);
 
       // Skip any invalid constructors.
       if (ctor->isInvalid())
         continue;
+
+      // Detect an init from the imported Objective-C interface (not the
+      // extension's main body) that marks the superclass selector unavailable,
+      // e.g. 'NS_UNAVAILABLE'.
+      if (!isInMainBody(member, decl)) {
+        if (ctor->hasClangNode() && superSelector &&
+            ctor->getObjCRuntimeName() == superSelector &&
+            ctor->isUnavailable())
+          interfaceMarksInitUnavailable = true;
+        continue;
+      }
 
       auto type = swift::getMemberTypeForComparison(ctor, nullptr);
       if (isOverrideBasedOnType(ctor, type, superclassCtor)) {
@@ -1325,9 +1331,12 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       // reachable from Objective-C (e.g. '[Class new]') and traps at runtime if
       // it's invoked, so warn the author to implement it. (Non-required
       // designated inits; required ones are handled by
-      // diagnoseMissingRequiredInitializer above.)
+      // diagnoseMissingRequiredInitializer above.) Skip the warning when the
+      // interface marks that initializer unavailable (e.g. 'NS_UNAVAILABLE'):
+      // its stub is unreachable from Objective-C.
       if (kind == DesignatedInitKind::Stub &&
-          implCtx->getDecl()->isObjCImplementation())
+          implCtx->getDecl()->isObjCImplementation() &&
+          !interfaceMarksInitUnavailable)
         ctx.Diags.diagnose(implCtx->getDecl(),
                            diag::objc_implementation_missing_inherited_init,
                            superclassCtor);
@@ -1555,12 +1564,10 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
         if (auto *initAccessor = var->getAccessor(AccessorKind::Init)) {
           // Check whether the property has stronger availability restrictions
           // than the initializer.
-          if (!var->hasStorage()) {
-            if (auto restriction =
-                    structAvailability.unsatisfiedRestrictionForDecl(var)) {
-              availabilityRestrictions.push_back({var, *restriction});
-              return true;
-            }
+          if (auto restriction =
+              structAvailability.unsatisfiedRestrictionForDecl(var)) {
+            availabilityRestrictions.push_back({var, *restriction});
+            return true;
           }
 
           // Make sure that all properties accessed by init accessor

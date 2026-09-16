@@ -46,20 +46,17 @@ internal protocol RemoteProcess: AnyObject {
   func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void)
   func iteratePotentialMetadataPages(_ body: (swift_addr_t, UInt64) -> Void)
 
+  /// Releases the strong reference this process passed to its reflection
+  /// context, breaking the resulting cycle so the process can be destroyed.
+  /// The context must not be used afterwards.
+  func releaseContextRef()
+
   var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] { get }
 }
 
 extension RemoteProcess {
-  internal func toOpaqueRef() -> UnsafeMutableRawPointer {
-    return Unmanaged.passRetained(self).toOpaque()
-  }
-
   internal static func fromOpaque(_ ptr: UnsafeRawPointer) -> Self {
     return Unmanaged.fromOpaque(ptr).takeUnretainedValue()
-  }
-
-  internal func release() {
-    Unmanaged.passUnretained(self).release()
   }
 }
 

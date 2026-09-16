@@ -1,5 +1,5 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -swift-version 5 -Xllvm -sil-print-types %s -enable-experimental-feature FullTypedThrows
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -swift-version 5 -Xllvm -sil-print-types %s -enable-experimental-feature FullTypedThrows
+// RUN: %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values -swift-version 5 %s -enable-experimental-feature FullTypedThrows -o /dev/null
 
 // RUN: %target-swift-emit-silgen -swift-version 5 -Xllvm -sil-print-types %s -enable-experimental-feature FullTypedThrows | %FileCheck %s
 
@@ -237,12 +237,14 @@ func reabstractClosureAsTypedThrowing(b: Bool) throws(MyError) -> Int {
   // CHECK-NEXT: dealloc_stack [[ERROR_BOX]] : $*MyError
   // CHECK: [[RESULT:%.*]] = load [trivial] [[INT_BOX]] : $*Int
   // CHECK-NEXT: dealloc_stack [[INT_BOX]] : $*Int
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: return [[RESULT]] : $Int
 
   // CHECK: [[ERROR_BB]]:
   // CHECK-NEXT: [[ERROR:%.*]] = load [trivial] [[ERROR_BOX]] : $*MyError
   // CHECK-NEXT: dealloc_stack [[ERROR_BOX]] : $*MyError
   // CHECK: dealloc_stack [[INT_BOX]] : $*Int
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: throw [[ERROR]] : $MyError
 }
 

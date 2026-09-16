@@ -316,6 +316,7 @@ extension ApplySite {
                                                 hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
                                                 isOnStack: partialAp.isOnStack,
                                                 isNested:  partialAp.isNested,
+                                                isCalledOnce: partialAp.isCalledOnce,
                                                 argumentLocationsFrom: self)
       partialAp.replace(with: newApply, context)
 
@@ -594,22 +595,6 @@ extension Instruction {
     }
   }
 
-  /// Returns true if `otherInst` is in the same block and is strictly dominated by this instruction or
-  /// the parent block of the instruction dominates parent block of `otherInst`.
-  func dominates(
-    _ otherInst: Instruction,
-    _ domTree: DominatorTree
-  ) -> Bool {
-    if parentBlock == otherInst.parentBlock {
-      return dominatesInBlock(otherInst)
-    } else {
-      return parentBlock.dominates(
-        otherInst.parentBlock,
-        domTree
-      )
-    }
-  }
-
   /// If this instruction uses a (single) existential archetype, i.e. it has a type-dependent operand,
   /// returns the concrete type if it is known.
   var concreteTypeOfDependentExistentialArchetype: CanonicalType? {
@@ -648,6 +633,11 @@ extension Instruction {
     guard let nominal = type.nominal else {
       return true
     }
+
+    guard type.mayHaveCustomDeinit(in: parentFunction) else {
+      return false
+    }
+
     if nominal.valueTypeDestructor != nil {
       guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
         return true
@@ -893,7 +883,7 @@ extension FunctionPassContext {
   func removeTriviallyDeadInstructionsIgnoringDebugUses(in function: Function) {
     for inst in function.reversedInstructions {
       if inst.isTriviallyDeadIgnoringDebugUses {
-        erase(instructionIncludingDebugUses: inst)
+        erase(instruction: inst)
       }
     }
   }
@@ -944,7 +934,7 @@ extension SimplifyContext {
     second.replace(with: replacement, self)
 
     if canEraseFirst {
-      erase(instructionIncludingDebugUses: first)
+      erase(instruction: first)
     }
   }
 }

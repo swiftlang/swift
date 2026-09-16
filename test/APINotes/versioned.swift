@@ -4,11 +4,11 @@
 
 // RUN: %target-swift-ide-test  -F %S/Inputs/custom-frameworks -print-module -source-filename %s -module-to-print=APINotesFrameworkTest -function-definitions=false -swift-version 4 | %FileCheck -check-prefix=CHECK-SWIFT-4 %s
 
-// CHECK-SWIFT-5: func jumpTo(x: Double, y: Double, z: Double)
-// CHECK-SWIFT-4: func jumpTo(x: Double, y: Double, z: Double)
+// CHECK-SWIFT-5: func jumpTo(x: CDouble, y: CDouble, z: CDouble)
+// CHECK-SWIFT-4: func jumpTo(x: CDouble, y: CDouble, z: CDouble)
 
-// CHECK-SWIFT-5: func accept(_ ptr: UnsafeMutablePointer<Double>)
-// CHECK-SWIFT-4: func acceptPointer(_ ptr: UnsafeMutablePointer<Double>?)
+// CHECK-SWIFT-5: func accept(_ ptr: UnsafeMutablePointer<CDouble>)
+// CHECK-SWIFT-4: func acceptPointer(_ ptr: UnsafeMutablePointer<CDouble>?)
 
 // CHECK-SWIFT-5: func normallyUnchanged()
 // CHECK-SWIFT-5: @available(swift, obsoleted: 4.2, renamed: "normallyUnchanged()")

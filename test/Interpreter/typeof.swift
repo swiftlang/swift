@@ -87,3 +87,28 @@ print(boxedExistentialMetatype(GrilledCheese()))
 print(boxedExistentialMetatype(GrilledCheese() as Meltdown))
 // CHECK: (x: Int, y: Int, Double)
 print(type(of: labeledTuple()))
+
+// Reading the operand out of storage goes through a different SILGen path than
+// reading a parameter or a temporary: the storage is borrowed in place. Cover
+// each existential representation there, since only an opaque existential may
+// be left in memory -- the rest have to be loaded.
+
+protocol ClassBound : AnyObject {}
+class ClassBoundImpl : ClassBound {}
+
+var opaqueExistential: Fooable = S()
+var classExistential: ClassBound = ClassBoundImpl()
+var boxedExistentialVar: Error = Hangry.Hungry
+var existentialMetatype: Fooable.Type = S.self
+var classInstance: B = D()
+
+// CHECK: S
+print(type(of: opaqueExistential))
+// CHECK: ClassBoundImpl
+print(type(of: classExistential))
+// CHECK: Hangry
+print(type(of: boxedExistentialVar))
+// CHECK: S.Type
+print(type(of: existentialMetatype))
+// CHECK: D
+print(type(of: classInstance))

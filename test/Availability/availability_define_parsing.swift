@@ -36,13 +36,13 @@ public func noVersionMulti() {}
 // CHECK: duplicate definition of availability macro '_duplicateVersion' for version '1.0'
 // CHECK-NEXT: _duplicateVersion
 
-// CHECK: -define-availability argument:1:18: warning: unrecognized platform name 'spaceOS'; did you mean 'macOS'?
+// CHECK: -define-availability argument:1:18: warning: cannot find availability domain 'spaceOS'; did you mean 'macOS'?
 // CHECK-NEXT: _brokenPlatforms:spaceOS 10.11
 
-// CHECK: -define-availability argument:1:26: warning: unrecognized platform name 'macos'; did you mean 'macOS'?
+// CHECK: -define-availability argument:1:26: warning: cannot find availability domain 'macos'; did you mean 'macOS'?
 // CHECK-NEXT: _incorrectCase
 
-// CHECK: -define-availability argument:1:16: warning: unrecognized platform name 'ios'; did you mean 'iOS'?
+// CHECK: -define-availability argument:1:16: warning: cannot find availability domain 'ios'; did you mean 'iOS'?
 // CHECK-NEXT: _incorrectCase
 
 // FIXME: [availability] Diagnostic needs improvement

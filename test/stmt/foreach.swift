@@ -418,7 +418,20 @@ struct UnavailableSeq {
 extension UnavailableSeq: Sequence {}
 
 func testUnavailableSequenceConformance(seq: UnavailableSeq) {
-  for x in seq { // expected-error {{for-in loop requires 'UnavailableSeq' to conform to 'Sequence', but the conformance is unavailable}}
+  for x in seq { // expected-error {{for-in loop requires 'UnavailableSeq' to conform to 'Sequence', which is unavailable}}
+    _ = x
+  }
+}
+
+struct ObsoletedSeq {
+  func makeIterator() -> AnyIterator<Int> { AnyIterator { nil } }
+}
+
+@available(swift, obsoleted: 4.0)
+extension ObsoletedSeq: Sequence {}
+
+func testObsoletedSequenceConformance(seq: ObsoletedSeq) {
+  for x in seq { // expected-error {{for-in loop requires 'ObsoletedSeq' to conform to 'Sequence', which is unavailable}}
     _ = x
   }
 }

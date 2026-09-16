@@ -16,12 +16,14 @@
 
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/LoopInfo.h"
@@ -307,12 +309,13 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     GenericFunctionType::ExtInfo info;
     astFnTy = GenericFunctionType::get(
-        genSig, params, silFnTy->getAllResultsInterfaceType().getASTType(),
-        info);
+        genSig, params, /* yields */ {},
+        silFnTy->getAllResultsInterfaceType().getASTType(), info);
   } else {
     FunctionType::ExtInfo info;
     astFnTy = FunctionType::get(
-        params, silFnTy->getAllResultsInterfaceType().getASTType(), info);
+        params, /* yields */ {},
+        silFnTy->getAllResultsInterfaceType().getASTType(), info);
   }
 
   Type resultType =

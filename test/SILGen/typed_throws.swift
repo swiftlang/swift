@@ -1,5 +1,5 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
+// RUN: %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values %s -o /dev/null
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s --enable-var-scope
 // RUN: %target-swift-emit-sil -sil-verify-all %s
@@ -55,6 +55,7 @@ func throwsClassError() throws(ClassError) {
 // CHECK: apply [[FN]]<E>([[ERROR_ALLOC]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
 // CHECK: copy_addr [take] [[ERROR_ALLOC]] to [init] %0 : $*E
 // CHECK: dealloc_stack [[ERROR_ALLOC]] : $*E
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: throw_addr
 func throwsIndirectError<E: Error>(_ error: E) throws(E) {
   throw error

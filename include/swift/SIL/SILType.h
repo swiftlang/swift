@@ -78,6 +78,10 @@ enum class ExistentialRepresentation {
   /// The container may be able to directly adopt a class reference using
   /// init_existential_ref for some class types.
   Boxed,
+  /// The container is a single COM interface pointer. Copies and destroys
+  /// dispatch `AddRef` and `Release` through slots 1 and 2 of the interface
+  /// vtable. It carries netiher Swift type metadata nor witness tables.
+  COM,
 };
 
 /// The value category.
@@ -356,6 +360,10 @@ public:
   bool isTrivial(const SILFunction &F) const;
 
   bool isTrivial(const SILFunction *f) const { return isTrivial(*f); }
+
+  /// True if the underlying AST type is non-trivial only because it is
+  /// non-Escapable.
+  bool isNonTrivialOnlyBecauseNonEscapable(const SILFunction &F) const;
 
   /// True if the type is the Builtin.RawPointer or a struct/tuple/enum which
   /// contains a Builtin.RawPointer.
@@ -895,6 +903,9 @@ public:
 
   /// Returns true if this SILType is a differentiable type.
   bool isDifferentiable(SILModule &M) const;
+
+  /// Returns true if this SILType is a `@called(once)` function type.
+  bool isCalledOnce() const;
 
   /// Returns the @_rawLayout attribute on this type if it has one.
   RawLayoutAttr *getRawLayout() const {

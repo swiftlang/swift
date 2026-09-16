@@ -76,6 +76,49 @@ To checkout the commits that most closely match the timestamp of the checked out
 ./swift/utils/update-checkout --scheme release/6.2 --match-timestamp
 ```
 
+## Configuration
+
+### Clone URLs
+
+By default, the URL a repository is cloned from is formed by interpolating its
+`remote` `id` into the top-level `ssh-clone-pattern` or `https-clone-pattern`,
+depending on whether `--clone-with-ssh` was passed:
+
+```json
+"ssh-clone-pattern": "git@github.com:%s.git",
+"https-clone-pattern": "https://github.com/%s.git",
+"repos": {
+    "swift": { "remote": { "id": "swiftlang/swift" } }
+}
+```
+
+A repository that does not live where the clone patterns point can override its
+URL. Use `url` when the same URL should be used for both protocols, or
+`ssh-url` / `https-url` to override only the URL for a given protocol:
+
+```json
+"repos": {
+    "boringssl": {
+        "remote": {
+            "id": "google/boringssl",
+            "url": "https://boringssl.googlesource.com/boringssl"
+        }
+    },
+    "swift-corelibs-xctest": {
+        "remote": {
+            "id": "swiftlang/swift-corelibs-xctest",
+            "ssh-url": "git@github.com:swiftlang/swift-corelibs-xctest.git",
+            "https-url": "https://github.com/swiftlang/swift-corelibs-xctest.git"
+        }
+    }
+}
+```
+
+When both a protocol-specific override and `url` are present, the
+protocol-specific one wins for its protocol. An override for the other protocol
+is still preferred over the interpolated URL, so a repository that only
+specifies `https-url` is cloned over `HTTPS` even with `--clone-with-ssh`.
+
 ## Testing
 
 `update-checkout` has both unit and end to end tests located in the `tests` directory. You can run them with the following command:

@@ -531,3 +531,23 @@ do {
     }
   }
 }
+
+// Regression from ElementType bookkeeping that wasn't caught by existing tests
+do {
+  struct C {
+    init(_: [any P]) {}
+    init?(_: [(any P)?]) {}
+
+    init(label: [any P]) {}
+    init?(label: [(any P)?]) {}
+  }
+
+  protocol P {}
+  struct S: P {}
+
+  let x1 = C([S()])
+  let x2 = C(label: [S()])
+
+  let _: C = x1
+  let _: C = x2
+}

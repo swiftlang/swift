@@ -1,0 +1,82 @@
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
+
+// REQUIRES: CPU=x86_64 || CPU=arm64
+
+// A loadable single-payload enum whose payload holds a managed reference and
+// stores its tag in that reference's extra inhabitants keeps the payload's
+// concrete element types, so pointers lower to `ptr` (rather than opaque
+// integer words). This covers multi-word payloads: class-bound existentials,
+// aggregates mixing a reference with other fields, and their optionals.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class C {}
+sil_vtable C {}
+
+protocol P : class { func noop() }
+
+struct Pair { var a: C; var b: Int }
+
+struct PaddedRef { var x: Int32; var ref: C }
+
+// A class-bound existential (with a witness table) is a two-pointer value; its
+// optional carries both words as `ptr`.
+// CHECK-LABEL: define{{.*}} swiftcc { ptr, ptr } @take_optional_existential(ptr %0, ptr %1)
+sil @take_optional_existential : $@convention(thin) (@guaranteed Optional<P>) -> @owned Optional<P> {
+bb0(%0 : $Optional<P>):
+  retain_value %0 : $Optional<P>
+  return %0 : $Optional<P>
+}
+
+// A struct mixing a reference and an integer: the reference word is `ptr`, the
+// integer word keeps its concrete type.
+// CHECK-LABEL: define{{.*}} swiftcc { ptr, i64 } @take_optional_pair(ptr %0, i64 %1)
+sil @take_optional_pair : $@convention(thin) (@guaranteed Optional<Pair>) -> @owned Optional<Pair> {
+bb0(%0 : $Optional<Pair>):
+  retain_value %0 : $Optional<Pair>
+  return %0 : $Optional<Pair>
+}
+
+// A padded payload: a leading `Int32` pushes the reference to the second word,
+// leaving 4 bytes of padding. The reference word is still `ptr`; the padding
+// stays inside the leading integer word.
+// CHECK-LABEL: define{{.*}} swiftcc { i64, ptr } @take_optional_padded(i64 %0, ptr %1)
+sil @take_optional_padded : $@convention(thin) (@guaranteed Optional<PaddedRef>) -> @owned Optional<PaddedRef> {
+bb0(%0 : $Optional<PaddedRef>):
+  retain_value %0 : $Optional<PaddedRef>
+  return %0 : $Optional<PaddedRef>
+}
+
+// A custom single-payload enum over a two-pointer existential, with extra empty
+// cases, still uses the concrete two-pointer layout.
+enum ExistentialOrTags {
+  case value(P)
+  case a
+  case b
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc { ptr, ptr } @take_existential_or_tags(ptr %0, ptr %1)
+sil @take_existential_or_tags : $@convention(thin) (@guaranteed ExistentialOrTags) -> @owned ExistentialOrTags {
+bb0(%0 : $ExistentialOrTags):
+  retain_value %0 : $ExistentialOrTags
+  return %0 : $ExistentialOrTags
+}
+
+// Switching over the existential optional tests the reference word directly
+// (against null) without round-tripping through an integer.
+// CHECK-LABEL: define{{.*}} swiftcc void @switch_optional_existential(ptr %0, ptr %1)
+// CHECK: icmp eq ptr %0, null
+sil @switch_optional_existential : $@convention(thin) (@guaranteed Optional<P>) -> () {
+bb0(%0 : $Optional<P>):
+  switch_enum %0 : $Optional<P>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%1 : $P):
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}

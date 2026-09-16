@@ -15,13 +15,12 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
@@ -58,6 +57,12 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
 
     // Final methods can be statically referenced.
     if (method->isFinal())
+      return MethodDispatch::Static;
+
+    // Embedded Swift cannot put a generic method in a vtable, so these are
+    // dispatched statically. The type checker rejects the cases where that
+    // would be observable (`open`, or an override).
+    if (method->mustBeStaticallyDispatchedInEmbedded())
       return MethodDispatch::Static;
 
     // Imported class methods are dynamically dispatched.
@@ -1244,8 +1249,9 @@ bool SILDeclRef::hasNonUniqueDefinition() const {
 }
 
 bool SILDeclRef::declExposedToForeignLanguage(const ValueDecl *decl) {
-  // @c / @_cdecl / @objc.
+  // @c / @_cdecl / @cxx / @objc.
   if (decl->getAttrs().hasAttribute<CDeclAttr>() ||
+      decl->getAttrs().hasAttribute<CxxDeclAttr>() ||
       (decl->getAttrs().hasAttribute<ObjCAttr>() &&
        decl->getDeclContext()->isModuleScopeContext())) {
     return true;
@@ -1267,27 +1273,7 @@ bool SILDeclRef::declExposedToForeignLanguage(const ValueDecl *decl) {
 }
 
 bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
-  // This function only forces the issue in embedded.
-  if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
-    return false;
-
-  auto module = decl->getModuleContext();
-  auto &ctx = module->getASTContext();
-
-  switch (decl->getEffectiveCodeGenerationModel()) {
-  case CodeGenerationModel::Implementation:
-    /// When deferring all code generation, declarations are emitted as late
-    /// as possible, so they must have non-unique definitions.
-    return true;
-
-  case CodeGenerationModel::Inlinable:
-    // If the declaration is not from the main module, treat its definition as
-    // non-unique.
-    return module != ctx.MainModule && ctx.MainModule;
-
-  case CodeGenerationModel::Interface:
-    return false;
-  }
+  return decl->hasNonUniqueDefinition();
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {
@@ -1564,7 +1550,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
                                                       SKind);
 
   case SILDeclRef::Kind::AsyncEntryPoint: {
-    return "async_Main";
+    return ASYNC_MAIN_ENTRY_POINT_NAME;
   }
   case SILDeclRef::Kind::EntryPoint: {
     return getASTContext().getEntryPointFunctionName();
@@ -1598,8 +1584,9 @@ std::optional<std::string> SILDeclRef::getAsmName() const {
       if (auto VD = dyn_cast<ValueDecl>(decl))
         return std::string(EA->getCName(VD));
 
-    // @c/@_cdecl
-    if (decl->getAttrs().hasAttribute<CDeclAttr>())
+    // @c/@_cdecl/@cxx.
+    if (decl->getAttrs().hasAttribute<CDeclAttr>() ||
+        decl->getAttrs().hasAttribute<CxxDeclAttr>())
       return std::string(decl->getCDeclName());
   }
 

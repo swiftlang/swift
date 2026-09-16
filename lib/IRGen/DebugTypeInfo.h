@@ -44,17 +44,17 @@ protected:
   /// Needed to determine the size of basic types and to determine
   /// the storage type for undefined variables.
   std::optional<uint32_t> NumExtraInhabitants;
-  Alignment Align;
-  bool DefaultAlignment = true;
+  /// The alignment of the type, if it is known.
+  std::optional<Alignment> Align;
   bool IsMetadataType = false;
   bool IsFixedBuffer = false;
   bool IsForwardDecl = false;
 
 public:
   DebugTypeInfo() = default;
-  DebugTypeInfo(swift::Type Ty, Alignment AlignInBytes = Alignment(1),
-                bool HasDefaultAlignment = true, bool IsMetadataType = false,
-                bool IsFixedBuffer = false,
+  DebugTypeInfo(swift::Type Ty,
+                std::optional<Alignment> AlignInBytes = std::nullopt,
+                bool IsMetadataType = false, bool IsFixedBuffer = false,
                 std::optional<uint32_t> NumExtraInhabitants = {});
 
   /// Create type for a local variable.
@@ -96,10 +96,13 @@ public:
     return false;
   }
 
-  Alignment getAlignment() const { return Align; }
+  std::optional<Alignment> getAlignment() const { return Align; }
+  /// The alignment in bits, or 0 when the alignment isn't known.
+  unsigned getAlignInBits(unsigned BitsPerByte) const {
+    return Align ? Align->getValue() * BitsPerByte : 0;
+  }
   bool isNull() const { return !Type; }
   bool isMetadataType() const { return IsMetadataType; }
-  bool hasDefaultAlignment() const { return DefaultAlignment; }
   bool isFixedBuffer() const { return IsFixedBuffer; }
   bool isForwardDecl() const { return IsForwardDecl; }
   std::optional<uint32_t> getNumExtraInhabitants() const {
@@ -147,8 +150,7 @@ template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
   }
   static swift::irgen::DebugTypeInfo getTombstoneKey() {
     return swift::irgen::DebugTypeInfo(
-        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(),
-        swift::irgen::Alignment(), /* HasDefaultAlignment = */ false);
+        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey());
   }
   static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
     return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());

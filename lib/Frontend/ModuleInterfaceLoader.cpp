@@ -20,8 +20,8 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SearchPathOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheResult.h"
@@ -33,8 +33,6 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
-#include "clang/Frontend/CompileJobCacheResult.h"
-#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
@@ -47,7 +45,6 @@
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualOutputBackend.h"
@@ -1110,7 +1107,7 @@ class ModuleInterfaceLoaderImpl {
     }
     InterfaceSubContextDelegateImpl astDelegate(
         ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
-        ctx.ClangImporterOpts, ctx.CASOpts, Opts,
+        ctx.ClangImporterOpts, ctx.CASOpts, ctx.SILOpts, Opts,
         /*buildModuleCacheDirIfAbsent*/ true, cacheDir, prebuiltCacheDir,
         backupInterfaceDir, /*replayPrefixMap=*/{},
         /*serializeDependencyHashes*/ false, trackSystemDependencies);
@@ -1481,6 +1478,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &ClangOpts, const CASOptions &CASOpts,
+    const SILOptions &SILOpts,
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef BackupInterfaceDir, StringRef ModuleName, StringRef InPath,
     StringRef OutPath, StringRef ABIOutputPath,
@@ -1489,7 +1487,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     ModuleInterfaceLoaderOptions LoaderOpts,
     bool silenceInterfaceDiagnostics) {
   InterfaceSubContextDelegateImpl astDelegate(
-      SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, CASOpts,
+      SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, CASOpts, SILOpts,
       LoaderOpts,
       /*CreateCacheDirIfAbsent*/ true, CacheDir, PrebuiltCacheDir,
       BackupInterfaceDir, replayPrefixMap, SerializeDependencyHashes,
@@ -1646,6 +1644,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     FrontendOptions::ActionType requestedAction,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
+    const SILOptions &silOpts,
     bool suppressNotes, bool suppressRemarks,
     PrintDiagnosticNamesMode printDiagnosticNames) {
   GenericArgs.push_back("-frontend");
@@ -1699,6 +1698,17 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   GenericArgs.push_back("-swift-version");
   GenericArgs.push_back(ArgSaver.save(genericSubInvocation.getLangOptions()
     .EffectiveLanguageVersion.asAPINotesVersionString()));
+
+  // Forward the parent's sanitizer selection so the child's ClangImporter
+  // propagates the same flags into its Clang cc1 args. This is important because
+  // -sanitize options can add target-features (e.g. MTE). These are checked when
+  // loading a PCM (and mismatches are fatal).
+  genericSubInvocation.getSILOptions().Sanitizers = silOpts.Sanitizers;
+#define SANITIZER(_, kind, name, __)                                           \
+  if (silOpts.Sanitizers & SanitizerKind::kind) {                              \
+    GenericArgs.push_back("-sanitize=" #name);                                 \
+  }
+#include "swift/Basic/Sanitizers.def"
 
   genericSubInvocation.setImportSearchPaths(
       SearchPathOpts.getImportSearchPaths());
@@ -1801,8 +1811,10 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(clangImporterOpts.BuildSessionFilePath);
   }
 
-  if (casOpts.EnableCaching) {
+  if (casOpts.EnableCaching || casOpts.ImportModuleFromCAS) {
     genericSubInvocation.getCASOptions().EnableCaching = casOpts.EnableCaching;
+    genericSubInvocation.getCASOptions().ImportModuleFromCAS =
+        casOpts.ImportModuleFromCAS;
     genericSubInvocation.getCASOptions().Config = casOpts.Config;
     genericSubInvocation.getCASOptions().HasImmutableFileSystem =
         casOpts.HasImmutableFileSystem;
@@ -1852,6 +1864,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     SourceManager &SM, DiagnosticEngine *Diags,
     const SearchPathOptions &searchPathOpts, const LangOptions &langOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
+    const SILOptions &silOpts,
     ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
     StringRef moduleCachePath, StringRef prebuiltCachePath,
     StringRef backupModuleInterfaceDir,
@@ -1864,6 +1877,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
   inheritOptionsForBuildingInterface(LoaderOpts.requestedAction, searchPathOpts,
                                      langOpts, clangImporterOpts, casOpts,
+                                     silOpts,
                                      Diags->getSuppressNotes(),
                                      Diags->getSuppressRemarks(),
                                      Diags->getPrintDiagnosticNamesMode());
@@ -2044,6 +2058,29 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     genericSubInvocation.getLangOptions().enableFeature(Feature::Embedded);
     GenericArgs.push_back("-enable-experimental-feature");
     GenericArgs.push_back("Embedded");
+  }
+
+  // Inherit COM interop and its selected model. Textual interfaces can use
+  // compiler-owned COM model conditions, so both the in-process invocation and
+  // its reproducible build arguments must agree with the importing context.
+  genericSubInvocation.getLangOptions().EnableCOMInterop =
+      langOpts.EnableCOMInterop;
+  genericSubInvocation.getLangOptions().COMModel = langOpts.COMModel;
+  if (langOpts.EnableCOMInterop) {
+    assert(langOpts.COMModel && "enabled COM interop requires a model");
+    GenericArgs.push_back("-enable-experimental-com-interop");
+
+    StringRef modelName;
+    switch (*langOpts.COMModel) {
+    case LangOptions::COMInteropModel::Microsoft:
+      modelName = "microsoft";
+      break;
+    case LangOptions::COMInteropModel::CoreFoundation:
+      modelName = "corefoundation";
+      break;
+    }
+    GenericArgs.push_back(
+        ArgSaver.save((Twine("-com-interop-model=") + modelName).str()));
   }
 
   if (langOpts.DebuggerSupport) {
@@ -2316,7 +2353,8 @@ bool ExplicitSwiftModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
     std::string *cacheKey, bool IsCanImportLookup,
-    bool isTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule) {
+    bool isTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule,
+    bool isSourceCanImport) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -2401,7 +2439,7 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
 
 bool ExplicitSwiftModuleLoader::canImportModule(
     ImportPath::Module path, SourceLoc loc, ModuleVersionInfo *versionInfo,
-    bool isTestableDependencyLookup) {
+    bool isTestableDependencyLookup, bool isSourceCanImport) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
@@ -2709,7 +2747,8 @@ bool ExplicitCASModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
     std::string *CacheKey, bool IsCanImportLookup,
-    bool IsTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule) {
+    bool IsTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule,
+    bool isSourceCanImport) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -2774,7 +2813,7 @@ std::error_code ExplicitCASModuleLoader::findModuleFilesInDirectory(
 
 bool ExplicitCASModuleLoader::canImportModule(
     ImportPath::Module path, SourceLoc loc, ModuleVersionInfo *versionInfo,
-    bool isTestableDependencyLookup) {
+    bool isTestableDependencyLookup, bool isSourceCanImport) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
@@ -2850,6 +2889,20 @@ std::unique_ptr<ExplicitCASModuleLoader> ExplicitCASModuleLoader::create(
 }
 
 namespace swift::SwiftInterfaceModuleOutputPathResolution {
+static unsigned getCOMInteropCacheState(const LangOptions &langOpts) {
+  if (!langOpts.EnableCOMInterop)
+    return 0;
+
+  assert(langOpts.COMModel && "enabled COM interop requires a model");
+  switch (*langOpts.COMModel) {
+  case LangOptions::COMInteropModel::Microsoft:
+    return 1;
+  case LangOptions::COMInteropModel::CoreFoundation:
+    return 2;
+  }
+  llvm_unreachable("unhandled COM interop model");
+}
+
 /// Construct a key for the .swiftmodule being generated. There is a
 /// balance to be struck here between things that go in the cache key and
 /// things that go in the "up to date" check of the cache entry. We want to
@@ -2928,8 +2981,11 @@ static std::string getContextHash(const CompilerInvocation &CI,
       unsigned(CI.getLangOptions().EnableCXXInterop),
 
       // Is Embedded Swift enabled?
-      unsigned(CI.getLangOptions().hasFeature(Feature::Embedded))
-  );
+      unsigned(CI.getLangOptions().hasFeature(Feature::Embedded)),
+
+      // COM model conditions can select different declarations from the same
+      // textual interface.
+      getCOMInteropCacheState(CI.getLangOptions()));
 
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }

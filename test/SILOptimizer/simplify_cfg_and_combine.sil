@@ -123,7 +123,7 @@ bb3(%r : $Builtin.Int32):
 // CHECK-NEXT: return
 sil @cond_br_dominates_cond_fail : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
-  cond_br %0, bb2, bb1
+  cond_br %0, bb3, bb1
 
 bb1:
   cond_fail %0 : $Builtin.Int1
@@ -132,6 +132,9 @@ bb1:
 bb2:
   %r = tuple()
   return %r : $()
+
+bb3:
+  br bb2
 }
 
 /// CHECK-LABEL: sil @select_enum_dominates_switch_enum : $@convention(thin) (Int32) -> Int32 {

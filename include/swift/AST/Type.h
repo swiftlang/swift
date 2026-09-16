@@ -154,6 +154,7 @@ inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
 /// bridged.
 enum class ForeignLanguage : uint8_t {
   C,
+  Cxx,
   ObjectiveC,
 };
 

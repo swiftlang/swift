@@ -13,16 +13,29 @@
 #ifndef SWIFT_BASIC_LAZY_H
 #define SWIFT_BASIC_LAZY_H
 
-#include <functional>
 #include <memory>
 #include <optional>
 
-#include "swift/Basic/Malloc.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Threading/Once.h"
 
+// Neither Malloc.h nor <functional> is used directly by this file; Malloc.h
+// is included here only for the benefit of clients that don't include it
+// themselves (e.g. Heap.cpp's use of AlignedAlloc/AlignedFree), and
+// LazyValue's default Initializer is std::function, which requires
+// <functional>. GCC's libstdc++ hard-errors on freestanding-incompatible
+// headers like these under -ffreestanding, and neither is needed by the
+// embedded runtime (its only Malloc.h-using code is hosted-only, and
+// LazyValue has no callers outside the hosted-only compiler, e.g. lib/Sema),
+// so keep both hosted-only.
+#if __STDC_HOSTED__
+#include "swift/Basic/Malloc.h"
+#include <functional>
+#endif
+
 namespace swift {
 
+#if __STDC_HOSTED__
 /// A template for lazy-initialized values.
 /// Usage:
 ///
@@ -49,6 +62,7 @@ public:
   T *operator->() { return &get(); }
   T &operator*() { return get(); }
 };
+#endif // __STDC_HOSTED__
 
 /// A template for lazily-constructed, zero-initialized, leaked-on-exit
 /// global objects.

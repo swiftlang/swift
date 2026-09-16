@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift \
-// RUN:   -disable-availability-checking
+// RUN: %target-typecheck-verify-swift
 
 // These tests complement lifetime_depend_noattr.swift. If you add a test here, add one there.
 

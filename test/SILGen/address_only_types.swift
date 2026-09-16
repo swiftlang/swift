@@ -18,6 +18,7 @@ protocol Unloadable {
 func address_only_argument(_ x: Unloadable) {
   // CHECK: bb0([[XARG:%[0-9]+]] : $*any Unloadable):
   // CHECK: debug_value [[XARG]] {{.*}} expr op_deref
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
 }
@@ -35,6 +36,8 @@ func address_only_return(_ x: Unloadable, y: Int) -> Unloadable {
   // CHECK-NEXT: debug_value [[XARG]] : $*any Unloadable, let, name "x", {{.*}} expr op_deref
   // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64, let, name "y"
   // CHECK-NEXT: copy_addr [[XARG]] to [init] [[RET]]
+  // CHECK-NEXT: end_formal_scope
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: [[VOID:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[VOID]]
   return x

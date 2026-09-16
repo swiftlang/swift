@@ -10,7 +10,7 @@ struct UnownedBox<T : AnyObject> {
   unowned var value: T
 }
 
-// CHECK-LABEL: sil [ossa] @unowned_copy_value_caller : {{.*}} {
+// CHECK-LABEL: sil [ossa] [opaque] @unowned_copy_value_caller : {{.*}} {
 // CHECK:       bb0([[STRONG:%[^,]+]] :
 // CHECK:         [[UNOWNED:%[^,]+]] = unowned_copy_value [[STRONG]]
 // CHECK:         destroy_value [[STRONG]]

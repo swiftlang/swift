@@ -111,7 +111,8 @@ extension TaskLocalMacro: PeerMacro {
 
     return [
       """
-      \(attributes)\(access)\(nonisolatedKw)\(staticKw)let \(raw: dollarName)\(explicitTypeAnnotation) = TaskLocal(wrappedValue: \(initialValue))
+      \(attributes)
+      \(access)\(nonisolatedKw)\(staticKw)let \(raw: dollarName)\(explicitTypeAnnotation) = TaskLocal(wrappedValue: \(initialValue))
       """
     ]
   }

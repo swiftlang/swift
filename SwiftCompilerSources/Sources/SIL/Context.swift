@@ -40,10 +40,22 @@ extension Context {
 
   public var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
 
-  public var moduleHasLoweredAddresses: Bool { _bridged.moduleHasLoweredAddresses() }
+  /// True if -enable-sil-opaque-values was passed. Address-only types are
+  /// represented as opaque SSA values in Raw SIL rather than as raw addresses.
+  public var usesOpaqueValues: Bool { _bridged.usesOpaqueValues() }
 
   public func lookupDeinit(ofNominal: NominalTypeDecl) -> Function? {
     _bridged.lookUpNominalDeinitFunction(ofNominal.bridged).function
+  }
+
+  /// Looks up the specialized deinit for a concrete type, if one was created.
+  public func lookupSpecializedDeinit(ofType type: Type) -> Function? {
+    _bridged.lookUpSpecializedDeinitFunction(type.bridged).function
+  }
+
+  /// Registers `deinitFunc` as the specialized deinit of the concrete `type`.
+  public func addSpecializedDeinit(ofType type: Type, _ deinitFunc: Function) {
+    _bridged.addSpecializedDeinit(type.bridged, deinitFunc.bridged)
   }
 
   public func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
@@ -94,6 +106,15 @@ extension Context {
     return _bridged.lookupWitnessTable(conformance.bridged).witnessTable
   }
 
+  /// Replaces opaque result types in `conformance` with their underlying types.
+  ///
+  /// If an associated type is an opaque result type, the associated conformance is abstract.
+  /// This returns the concrete conformance of the opaque type's underlying type - if it is
+  /// known in the current type expansion context.
+  public func substituteOpaqueTypes(in conformance: Conformance) -> Conformance {
+    return _bridged.substOpaqueTypesWithUnderlyingTypes(conformance.bridged).conformance
+  }
+
   public func lookupVTable(for classDecl: NominalTypeDecl) -> VTable? {
     return _bridged.lookupVTable(classDecl.bridged).vTable
   }
@@ -116,6 +137,14 @@ extension Context {
 extension MutatingContext {
   public func verifyIsTransforming(function: Function) {
     precondition(_bridged.isTransforming(function.bridged), "pass modifies wrong function")
+  }
+
+  /// Verifies that:
+  /// - the instruction is not deleted
+  /// - the parent function is the currently transformed function
+  public func verifyModifying(instruction: Instruction) {
+    precondition(!instruction.isDeleted, "trying to modify or use a deleted instruction")
+    verifyIsTransforming(function: instruction.parentFunction)
   }
 
   public func notifyInstructionsChanged() {
@@ -172,8 +201,8 @@ extension MutatingContext {
   }
 
   /// Removes and deletes `instruction`.
-  /// If `salvageDebugInfo` is true, compensating `debug_value` instructions are inserted for certain
-  /// kind of instructions.
+  /// If `salvageDebugInfo` is true, `debug_value` users of the instructions will be rewritten
+  /// Otherwise, the instruction must not have any uses at this point.
   public func erase(instruction: Instruction, salvageDebugInfo: Bool = true) {
     if !instruction.isInStaticInitializer {
       verifyIsTransforming(function: instruction.parentFunction)
@@ -195,30 +224,27 @@ extension MutatingContext {
     _bridged.eraseInstruction(instruction.bridged, salvageDebugInfo)
   }
 
-  public func erase(instructionIncludingAllUsers inst: Instruction, salvageDebugInfo: Bool = true) {
+  /// Removes and deletes `inst` and all its users.
+  /// `debug_value` users of any deleted instruction will be rewritten.
+  public func erase(instructionIncludingAllUsers inst: Instruction) {
     if inst.isDeleted {
       return
     }
     for result in inst.results {
       // salvageDebugInfo may create new `debug_value` users, which are inserted at the begin of the
       // use-list. Therefore we cannot iterate with a `for use in result.uses`.
-      while let use = result.uses.first {
-        erase(instructionIncludingAllUsers: use.instruction, salvageDebugInfo: salvageDebugInfo)
+      // Debug users must not be deleted before salvageDebugInfo is called later.
+      while let use = result.uses.ignoreDebugUses.first {
+        erase(instructionIncludingAllUsers: use.instruction)
       }
     }
-    erase(instruction: inst, salvageDebugInfo: salvageDebugInfo)
+    erase(instruction: inst)
   }
 
   public func erase<S: Sequence>(instructions: S) where S.Element: Instruction {
     for inst in instructions {
       erase(instruction: inst)
     }
-  }
-
-  public func erase(instructionIncludingDebugUses inst: Instruction) {
-    precondition(inst.results.allSatisfy { $0.uses.ignoreDebugUses.isEmpty })
-    salvageDebugInfo(of: inst)
-    erase(instructionIncludingAllUsers: inst)
   }
 
   public func erase(block: BasicBlock) {

@@ -19,7 +19,6 @@
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -69,16 +68,17 @@ PartialApplyInst *SILGenBuilder::createPartialApply(
     ParameterConvention CalleeConvention,
     SILFunctionTypeIsolation ResultIsolation,
     PartialApplyInst::OnStackKind OnStack, StackAllocationIsNested_t IsNested,
-    const GenericSpecializationInformation *SpecializationInfo) {
+    const GenericSpecializationInformation *SpecializationInfo,
+    bool IsCalledOnce) {
 
   // We completely drop the generic signature if all generic parameters were
   // concrete. Similar to emitRawApply.
   if (Subs && Subs.getGenericSignature()->areAllParamsConcrete())
     Subs = SubstitutionMap();
 
-  return SILBuilder::createPartialApply(Loc, Fn, Subs, Args, CalleeConvention,
-                                        ResultIsolation, OnStack, IsNested,
-                                        SpecializationInfo);
+  return SILBuilder::createPartialApply(
+      Loc, Fn, Subs, Args, CalleeConvention, ResultIsolation, IsCalledOnce,
+      OnStack, IsNested, SpecializationInfo, std::nullopt);
 }
 
 //===----------------------------------------------------------------------===//
@@ -89,7 +89,8 @@ ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
                                                SubstitutionMap subs,
                                                ArrayRef<ManagedValue> args,
                                                ParameterConvention calleeConvention,
-                                         SILFunctionTypeIsolation resultIsolation) {
+                                               SILFunctionTypeIsolation resultIsolation,
+                                               bool isCalledOnce) {
   llvm::SmallVector<SILValue, 8> values;
   llvm::transform(args, std::back_inserter(values),
                   [&](ManagedValue mv) -> SILValue {
@@ -97,7 +98,9 @@ ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
   });
   SILValue result =
       createPartialApply(loc, fn, subs, values, calleeConvention,
-                         resultIsolation);
+                         resultIsolation,
+                         PartialApplyInst::OnStackKind::NotOnStack,
+                         StackAllocationIsNested, nullptr, isCalledOnce);
   // Partial apply instructions create a box, so we need to put on a cleanup.
   return getSILGenFunction().emitManagedRValueWithCleanup(result);
 }
@@ -126,11 +129,32 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
          !fnType->isNoEscape() && resultFnType->isNoEscape() &&
          "Expect a escaping to noescape conversion");
   (void)fnType;
-  (void)resultFnType;
+
+  // For a `@called(once)` function value, the conversion is a
+  // ownership-consuming forwarding operation, so forward `fn`'s cleanup onto
+  // the result, exactly like the sibling `createConvertFunction` above does for
+  // other function conversions. Mark the conversion's lifetime as already
+  // guaranteed so that `ClosureLifetimeFixup` leaves it alone; the operand's
+  // lifetime is already exactly as long as it needs to be, by construction.
+  //
+  // `OperandOwnershipClassifier` treats `ConvertEscapeToNoEscapeInst` as
+  // `ForwardingConsume` as well when the result type is `@called(once)`.
+  if (resultFnType->isCalledOnce()) {
+    CleanupCloner cloner(*this, fn);
+    SILValue result =
+        createConvertEscapeToNoEscape(loc, fn.forward(getSILGenFunction()),
+                                      resultTy, /*lifetimeGuaranteed=*/true);
+    return cloner.clone(result);
+  }
+
+  // For an ordinary (copyable) escaping closure, the conversion doesn't
+  // consume its operand -- the original escaping value may still be used
+  // again afterwards -- so keep it alive with its own independent cleanup.
+
   SILValue fnValue = fn.getValue();
   SILValue result =
       createConvertEscapeToNoEscape(loc, fnValue, resultTy, false);
-  
+
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
@@ -384,8 +408,9 @@ SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
   if (lowering.isTrivial())
     return originalValue;
 
-  assert(!lowering.isAddressOnly() && "cannot perform a copy value of an "
-                                      "address only type");
+  assert(lowering.isLoadableOrOpaque(SGF.F) &&
+         "cannot perform a copy value of an "
+         "address only type");
 
   if (ty.isObject() &&
       originalValue.getOwnershipKind() == OwnershipKind::None) {
@@ -502,7 +527,7 @@ ManagedValue SILGenBuilder::createUncheckedEnumDataAddrForTake(
 ManagedValue
 SILGenBuilder::createLoadIfLoadable(SILLocation loc, ManagedValue addr) {
   assert(addr.getType().isAddress());
-  if (!addr.getType().isLoadable(SGF.F))
+  if (!addr.getType().isLoadableOrOpaque(SGF.F))
     return addr;
   return createLoadWithSameOwnership(loc, addr);
 }
@@ -528,7 +553,7 @@ ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
       lowering.emitLoadOfCopy(*this, loc, v.forward(SGF), IsTake);
   if (lowering.isTrivial())
     return ManagedValue::forObjectRValueWithoutOwnership(result);
-  assert((!lowering.isAddressOnly() || !SGF.silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(SGF.F) &&
          "cannot retain an unloadable type");
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
@@ -559,8 +584,7 @@ ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v,
       lowering.emitLoadOfCopy(*this, loc, v.getValue(), IsNotTake);
   if (lowering.isTrivial())
     return ManagedValue::forObjectRValueWithoutOwnership(result);
-  assert((!lowering.isAddressOnly()
-          || !SGF.silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(SGF.F) &&
          "cannot retain an unloadable type");
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
@@ -613,6 +637,11 @@ static ManagedValue createInputFunctionArgument(
     return SGF.emitManagedPackWithCleanup(arg);
 
   case SILArgumentConvention::Indirect_In_CXX:
+    // An @in_cxx parameter is destroyed by the caller (this is the
+    // parameter-passing convention of the Itanium C++ ABI), so don't enter a
+    // cleanup for it here.
+    return ManagedValue::forOwnedRValue(arg, CleanupHandle::invalid());
+
   case SILArgumentConvention::Indirect_In:
     if (SGF.silConv.useLoweredAddresses())
       return SGF.emitManagedBufferWithCleanup(arg);
@@ -840,6 +869,15 @@ ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
   SILValue openedExistential =
       createOpenExistentialRef(loc, original.forward(SGF), type);
   return cloner.clone(openedExistential);
+}
+
+ManagedValue SILGenBuilder::createOpenCOMExistential(SILLocation loc,
+                                                     ManagedValue original,
+                                                     SILType type) {
+  CleanupCloner cloner(*this, original);
+  SILValue openedCOMExistential =
+      createOpenCOMExistential(loc, original.forward(SGF), type);
+  return cloner.clone(openedCOMExistential);
 }
 
 ManagedValue SILGenBuilder::createOpenExistentialValue(SILLocation loc,

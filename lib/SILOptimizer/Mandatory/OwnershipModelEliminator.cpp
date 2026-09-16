@@ -26,7 +26,6 @@
 #include "swift/SIL/SILValue.h"
 #define DEBUG_TYPE "sil-ownership-model-eliminator"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"
@@ -39,7 +38,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
@@ -246,6 +244,7 @@ struct OwnershipModelEliminatorVisitor
   HANDLE_FORWARDING_INST(Enum)
   HANDLE_FORWARDING_INST(UncheckedEnumData)
   HANDLE_FORWARDING_INST(OpenExistentialRef)
+  HANDLE_FORWARDING_INST(OpenCOMExistential)
   HANDLE_FORWARDING_INST(InitExistentialRef)
   HANDLE_FORWARDING_INST(MarkDependence)
   HANDLE_FORWARDING_INST(DifferentiableFunction)
@@ -396,7 +395,8 @@ bool OwnershipModelEliminatorVisitor::visitApplyInst(ApplyInst *ai) {
 
   // Insert destroy_addr for @in_cxx arguments.
   auto fnTy = callee->getType().castTo<SILFunctionType>();
-  SILFunctionConventions fnConv(fnTy, ai->getModule());
+  SILFunctionConventions fnConv(
+      fnTy, SILAddressConventions::forFunction(*ai->getFunction()));
   bool changed = false;
 
   for (int i = fnConv.getSILArgIndexOfFirstParam(),
@@ -786,6 +786,16 @@ static bool stripOwnership(SILFunction &func) {
   for (auto &it : lifetimeEnds) {
     auto *pai = it.first;
     for (auto *lifetimeEnd : it.second) {
+      // A `@called(once)` closure's context can be consumed directly by a
+      // `try_apply`, which is a terminator, so the `dealloc_stack` has to
+      // go at the start of every successor block instead.
+      if (auto *term = dyn_cast<TermInst>(lifetimeEnd)) {
+        for (auto *successor : term->getSuccessorBlocks()) {
+          SILBuilderWithScope(successor->begin())
+              .createDeallocStack(lifetimeEnd->getLoc(), pai);
+        }
+        continue;
+      }
       SILBuilderWithScope(lifetimeEnd->getNextInstruction())
           .createDeallocStack(lifetimeEnd->getLoc(), pai);
     }

@@ -11,12 +11,12 @@
 // CHECK-NEXT: func | (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func << (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func >> (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
-// CHECK-NEXT: func < (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> Bool
-// CHECK-NEXT: func > (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> Bool
-// CHECK-NEXT: func == (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> Bool
-// CHECK-NEXT: func != (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> Bool
-// CHECK-NEXT: func <= (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> Bool
-// CHECK-NEXT: func >= (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> Bool
+// CHECK-NEXT: func < (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> CBool
+// CHECK-NEXT: func > (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> CBool
+// CHECK-NEXT: func == (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> CBool
+// CHECK-NEXT: func != (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> CBool
+// CHECK-NEXT: func <= (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> CBool
+// CHECK-NEXT: func >= (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> CBool
 
 // CHECK:      func && (lhs: LoadableBoolWrapper, rhs: LoadableBoolWrapper) -> LoadableBoolWrapper
 // CHECK-NEXT: func || (lhs: LoadableBoolWrapper, rhs: LoadableBoolWrapper) -> LoadableBoolWrapper

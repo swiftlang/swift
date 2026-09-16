@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ArgumentSource.h"
 #include "ExecutorBreadcrumb.h"
 #include "FunctionInputGenerator.h"
 #include "Initialization.h"
@@ -19,12 +18,10 @@
 #include "Scope.h"
 #include "TupleGenerators.h"
 
-#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Generators.h"
 #include "swift/SIL/SILArgument.h"
@@ -40,7 +37,7 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
+SILValue SILGenFunction::emitSelfDeclForClassDeinit(VarDecl *selfDecl) {
   SILFunctionConventions conventions = F.getConventionsInContext();
 
   // Emit the implicit 'self' argument.
@@ -52,33 +49,46 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
   uint16_t ArgNo = 1; // Hardcoded for destructors.
   auto dv = SILDebugVariable(selfDecl->isLet(), ArgNo);
 
-  // If we have a move only type, then mark it with
-  // mark_unresolved_non_copyable_value so we can't escape it.
-  //
-  // For now, we do not handle move only class deinits. This is because we need
-  // to do a bit more refactoring to handle the weird way that it deals with
-  // ownership. But for simple move only deinits (like struct/enum), that are
-  // owned, lets mark them as needing to be no implicit copy checked so they
-  // cannot escape.
-  if (selfType.isMoveOnly() && !selfType.isAnyClassReferenceType()) {
-    SILValue addr = B.createAllocStack(selfDecl, selfValue->getType(), dv);
-    addr = B.createMarkUnresolvedNonCopyableValueInst(
-        selfDecl, addr,
-        MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
-    if (selfValue->getType().isObject()) {
-      B.createStore(selfDecl, selfValue, addr, StoreOwnershipQualifier::Init);
-    } else {
-      B.createCopyAddr(selfDecl, selfValue, addr, IsTake, IsInitialization);
-    }
-    // drop_deinit invalidates any user-defined struct/enum deinit
-    // before the individual members are destroyed.
-    addr = B.createDropDeinit(selfDecl, addr);
-    selfValue = addr;
+  VarLocs[selfDecl] = VarLoc(selfValue, SILAccessEnforcement::Unknown);
+  SILLocation PrologueLoc(selfDecl);
+  PrologueLoc.markAsPrologue();
+  enterFormalScopeCleanup(PrologueLoc, selfValue);
+  B.emitDebugDescription(PrologueLoc, selfValue, dv);
+  return selfValue;
+}
+
+SILValue SILGenFunction::emitSelfDeclForMoveOnlyDeinit(VarDecl *selfDecl) {
+  SILFunctionConventions conventions = F.getConventionsInContext();
+
+  // Emit the implicit 'self' argument.
+  SILType selfType = conventions.getSILArgumentType(
+      conventions.getNumSILArguments() - 1, F.getTypeExpansionContext());
+  selfType = F.mapTypeIntoEnvironment(selfType);
+  SILValue selfValue = F.begin()->createFunctionArgument(selfType, selfDecl);
+
+  uint16_t ArgNo = 1; // Hardcoded for destructors.
+  auto dv = SILDebugVariable(selfDecl->isLet(), ArgNo);
+
+  //Mark the value with  mark_unresolved_non_copyable_value so we can't escape
+  // it.
+  SILValue addr = B.createAllocStack(selfDecl, selfValue->getType(), dv);
+  addr = B.createMarkUnresolvedNonCopyableValueInst(
+      selfDecl, addr,
+      MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
+  if (selfValue->getType().isObject()) {
+    B.createStore(selfDecl, selfValue, addr, StoreOwnershipQualifier::Init);
+  } else {
+    B.createCopyAddr(selfDecl, selfValue, addr, IsTake, IsInitialization);
   }
+  // drop_deinit invalidates any user-defined struct/enum deinit
+  // before the individual members are destroyed.
+  addr = B.createDropDeinit(selfDecl, addr);
+  selfValue = addr;
 
   VarLocs[selfDecl] = VarLoc(selfValue, SILAccessEnforcement::Unknown);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
+  enterFormalScopeCleanup(PrologueLoc, selfValue);
   B.emitDebugDescription(PrologueLoc, selfValue, dv);
   return selfValue;
 }
@@ -752,7 +762,26 @@ public:
 
     // The self parameter follows the formal parameters.
     if (selfParam) {
-      emitParam(selfParam);
+      // A `@cxx @implementation` function in an extension of a C++ namespace
+      // is emitted directly under its C++ entry point, and its lowered type
+      // drops the formal metatype self parameter. There is no SIL argument to
+      // claim, so materialize the metatype and bind it.
+      auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(SGF.FunctionDC);
+      if (afd && afd->getAttrs().hasAttribute<CxxDeclAttr>() &&
+          loweredParams.isFinished() &&
+          selfParam->getTypeInContext()->is<AnyMetatypeType>()) {
+        SILLocation loc(selfParam);
+        loc.markAsPrologue();
+        ++ArgNo;
+        auto ty = SGF.getLoweredType(selfParam->getTypeInContext());
+        SILValue metatype = SGF.B.createMetatype(loc, ty);
+        SILDebugVariable DebugVar(selfParam->isLet(), ArgNo);
+        SGF.B.emitDebugDescription(loc, metatype, DebugVar);
+        SGF.VarLocs[selfParam] =
+            SILGenFunction::VarLoc(metatype, SILAccessEnforcement::Unknown);
+      } else {
+        emitParam(selfParam);
+      }
     }
 
     if (FormalParamTypes) FormalParamTypes->finish();
@@ -985,6 +1014,7 @@ private:
     if (!argrv.getType().isAddress()) {
       // NOTE: We setup SGF.VarLocs[pd] in updateArgumentValueForBinding.
       updateArgumentValueForBinding(argrv, loc, pd, varinfo);
+      SGF.enterFormalScopeCleanup(loc, argrv.getValue());
       SGF.enterLocalVariableAddressableBufferScope(pd);
       return;
     }
@@ -999,6 +1029,7 @@ private:
       }
       SGF.VarLocs[pd] = SILGenFunction::VarLoc(allocStack,
         SILAccessEnforcement::Unknown);
+      SGF.enterFormalScopeCleanup(pd, allocStack);
       SGF.enterLocalVariableAddressableBufferScope(pd);
       return;
     }
@@ -1119,6 +1150,7 @@ private:
     }
     
     SGF.VarLocs[pd] = SILGenFunction::VarLoc(argrv.getValue(), access);
+    SGF.enterFormalScopeCleanup(pd, argrv.getValue());
     SGF.enterLocalVariableAddressableBufferScope(pd);
   }
 
@@ -1241,6 +1273,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       break;
     }
 
+    case CaptureKind::Consuming:
     case CaptureKind::ImmutableBox:
     case CaptureKind::Box:
       llvm_unreachable("should be impossible");
@@ -1359,6 +1392,49 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     break;
   }
 
+  case CaptureKind::Consuming: {
+    assert(!isPack);
+
+    auto argIndex = SGF.F.begin()->getNumArguments();
+    auto fnConv = SGF.F.getConventions();
+    bool isIndirect =
+        fnConv.isSILIndirect(fnConv.getParamInfoForSILArg(argIndex));
+    if (isIndirect)
+      ty = ty.getAddressType();
+
+    auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
+    fArg->setClosureCapture(true);
+    ManagedValue val = SGF.emitManagedRValueWithCleanup(fArg);
+
+    if (isIndirect) {
+      // The incoming address is already an owned, use it directly instead of
+      // materializing and storing into a separate temporary.
+      val = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          Loc, val,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
+    } else {
+      // Sema treats the captured decl as an lvalue since it's `Var`-introduced;
+      // materialize an address for it, moving (not copying) the incoming
+      // owned value in, since it can't be copied.
+      auto addr = SGF.emitTemporary(Loc, lowering);
+      SGF.B.emitStoreValueOperation(Loc, val.forward(SGF), addr->getAddress(),
+                                    StoreOwnershipQualifier::Init);
+      addr->finishInitialization(SGF);
+      val = addr->getManagedAddress();
+
+      val = val.ensurePlusOne(SGF, Loc);
+      val = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          Loc, val,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
+    }
+
+    arg = val.getValue();
+    enforcement = SILAccessEnforcement::Unknown;
+    break;
+  }
+
   case CaptureKind::ImmutableBox:
   case CaptureKind::Box: {
     assert(!isPack);
@@ -1455,6 +1531,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 
   SGF.VarLocs[VD] = SILGenFunction::VarLoc(arg, enforcement, box);
+  SGF.enterFormalScopeCleanup(VD, arg);
   SGF.enterLocalVariableAddressableBufferScope(VD);
   SILDebugVariable DbgVar(VD->isLet(), ArgNo);
   if (auto *AllocStack = dyn_cast<AllocStackInst>(arg)) {
@@ -1630,9 +1707,9 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
 
   // And the abstraction pattern may force an indirect return even if the
   // concrete type wouldn't normally be returned indirectly.
-  if (!SILModuleConventions::isReturnedIndirectlyInSIL(resultConvType,
-                                                       SGF.SGM.M)) {
-    if (!SILModuleConventions(SGF.SGM.M).useLoweredAddresses()
+  if (!SILAddressConventions::isReturnedIndirectlyInSIL(resultConvType,
+                                                       SGF.F)) {
+    if (SGF.SGM.M.usesOpaqueValues()
         || origResultType.getResultConvention(SGF.SGM.Types) != AbstractionPattern::Indirect)
       return;
   }
@@ -1667,9 +1744,9 @@ static void emitIndirectErrorParameter(SILGenFunction &SGF,
 
   // And the abstraction pattern may force an indirect return even if the
   // concrete type wouldn't normally be returned indirectly.
-  if (!SILModuleConventions::isThrownIndirectlyInSIL(errorConvType,
-                                                     SGF.SGM.M)) {
-    if (!SILModuleConventions(SGF.SGM.M).useLoweredAddresses()
+  if (!SILAddressConventions::isThrownIndirectlyInSIL(errorConvType,
+                                                     SGF.F)) {
+    if (SGF.SGM.M.usesOpaqueValues()
         || origErrorType.getErrorConvention(SGF.SGM.Types)
             != AbstractionPattern::Indirect)
       return;
@@ -1757,8 +1834,18 @@ uint16_t SILGenFunction::emitBasicProlog(
                        std::move(scopedDependencyParams))
       .emitParams(origClosureType, paramList, selfParam);
 
-  // Record the ArgNo of the artificial $error inout argument. 
-  if (errorType && !(*errorType)->isNever() && IndirectErrorResult == nullptr) {
+  // Record the ArgNo of the artificial $error inout argument.
+  //
+  // The abstraction pattern's `errorType` can describe a throwing closure
+  // while the emitted SIL function is non-throwing — this happens when a
+  // non-throwing literal is stored into a `throws(E)` position and the
+  // outer conversion adds the error result externally. The indirect error
+  // parameter emission above already guards on the lowered SIL function's
+  // conventions; do the same for the `$error` debug placeholder, which
+  // must only appear in a function whose SIL type has an error result
+  // (SIL verifier enforces this invariant).
+  if (errorType && !(*errorType)->isNever() && IndirectErrorResult == nullptr &&
+      F.getLoweredFunctionType()->hasErrorResult()) {
     CanType errorTypeInContext =
       DC->mapTypeIntoEnvironment(*errorType)->getCanonicalType();
     auto loweredErrorTy = getLoweredType(*origErrorType, errorTypeInContext);

@@ -109,6 +109,12 @@ function(add_swift_unittest test_dirname)
     endif()
   endif()
 
+  if(SWIFT_STDLIB_ENABLE_LAZY_LINK)
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " -Wl,-framework,CoreFoundation")
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " -Wl,-framework,Foundation")
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " -Wl,-lswiftObjectiveC")
+  endif()
+
   is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" HAS_DEBUG_INFO)
   target_compile_options("${test_dirname}" PRIVATE $<$<BOOL:${HAS_DEBUG_INFO}>:-g>)
 

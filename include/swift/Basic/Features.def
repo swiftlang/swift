@@ -277,8 +277,12 @@ LANGUAGE_FEATURE(LifetimeDependenceMutableAccessors, 0, "Support mutable accesso
 LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
+LANGUAGE_FEATURE(SymbolLinkageMarkers, 492, "Section placement control (`@section`, `@used`, `objectFormat`)")
 LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
-LANGUAGE_FEATURE(BuiltinTaskCancellationShield, 0, "Task Cancellation Shield Builtins")
+LANGUAGE_FEATURE(BuiltinTaskCancellationShield, 504, "Task Cancellation Shield Builtins")
+LANGUAGE_FEATURE(BuiltinTaskCancellationScope, 0, "Task Cancellation Scope Builtins")
+LANGUAGE_FEATURE(BuiltinTaskDeadline, 526, "Task Deadline Builtins")
+LANGUAGE_FEATURE(BuiltinCancellationHandlerWithReason, 526, "Cancellation Handler With Reason Builtins")
 LANGUAGE_FEATURE(ClosureLifetimes, 0, "Support @_lifetime on function types")
 BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude private initialized properties from memberwise init")
 LANGUAGE_FEATURE(BuiltinMarkDependence, 0, "markDependence Builtin")
@@ -290,6 +294,8 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(TildeSendable, 518, "~Sendable for explicitly mark
 LANGUAGE_FEATURE(SuppressedAssociatedTypesWithDefaults, 503, "Associated types that are ~Copyable and ~Escapable")
 LANGUAGE_FEATURE(SourceWarningControl, 522, "Source-level warning control with @diagnose")
 LANGUAGE_FEATURE(BorrowInout, 519, "Ref and MutableRef")
+LANGUAGE_FEATURE(BuiltinAllocRawTyped, 0, "Builtin.allocRawTyped/deallocRawTyped")
+LANGUAGE_FEATURE(BuiltinTypedAllocationID, 0, "Builtin.typedAllocationID")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
@@ -366,6 +372,10 @@ EXPERIMENTAL_FEATURE(MoveOnlyEnumDeinits, true)
 EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
 EXPERIMENTAL_FEATURE(ConsumeSelfInDeinit, true)
+
+// Whether `as?`/`as!`/`is` are permitted from a noncopyable existential
+// value to a concrete type.
+EXPERIMENTAL_FEATURE(NoncopyableCasting, false)
 
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
@@ -525,11 +535,14 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
 /// Do not import non-field C++ record members until requested from Swift.
-EXPERIMENTAL_FEATURE(ImportCxxMembersLazily, true)
+LANGUAGE_FEATURE(ImportCxxMembersLazily, 0, "import C++ members lazily")
 
 /// Import a C++ foreign reference type's primary FRT base as a Swift
 /// superclass.
-EXPERIMENTAL_FEATURE(ForeignReferenceTypeInheritance, true)
+LANGUAGE_FEATURE(ForeignReferenceTypeInheritance, 0, "foreign reference type inheritance hierarchy")
+
+/// Enable @cxx @implementation for implementing C++ functions in Swift.
+EXPERIMENTAL_FEATURE(CxxImplementation, true)
 
 /// `yielding borrow`/`yielding mutate` single-yield coroutine accessors
 // TODO: When this is turned on by default, take care of:
@@ -543,6 +556,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 /// used to disable running the second half after an
 /// error, but no longer has any effect.
 EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
+
+/// normal coroutines (as functions)
+EXPERIMENTAL_FEATURE(CoroutineFunctions, false)
 
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
@@ -595,6 +611,9 @@ LANGUAGE_FEATURE(BorrowingForLoop, 0, "borrowing for-in loops")
 /// Allow use of @inline(always) attribute
 SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
 
+/// Allow use of the @unsafe(always) attribute
+SUPPRESSIBLE_LANGUAGE_FEATURE(AlwaysUnsafeAttribute, 0, "@unsafe(always) attribute")
+
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 
@@ -605,8 +624,9 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
 
-/// Allow enabling dynamic keypaths in Embedded Swift.
-EXPERIMENTAL_FEATURE(EmbeddedKeyPaths, true)
+/// Enable subscript parameters that have ownership (inout, borrowing,
+/// consuming).
+EXPERIMENTAL_FEATURE(SubscriptParametersWithOwnership, true)
 
 /// Emit typed allocation calls in Embedded Swift.
 EXPERIMENTAL_FEATURE(TypedAllocation, true)
@@ -618,10 +638,10 @@ EXPERIMENTAL_FEATURE(CheckImplementationOnly, true)
 /// report references to implementation-only imported modules.
 EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
 
-/// Make @_implementationOnly safe by serializing hidden type layout information
-/// so that clients can correctly manipulate types from @_implementationOnly
-/// imports without access to the defining module.
-EXPERIMENTAL_FEATURE(SafeImplementationOnly, true)
+/// Serialize abstract layout information for hidden types (@_implementationOnly, or
+/// from -internal-import-bridging-header) that contribute to module ABI. The goal
+// is to make leaking such types into module ABI safe, even without library evolution.
+EXPERIMENTAL_FEATURE(SerializeAbstractTypeLayoutForHiddenTypes, true)
 
 /// Check that use sites have the required @_spi import for operators.
 EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
@@ -643,7 +663,34 @@ EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 
 /// Allow use of macros to derive various conformances
-EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, false)
+EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, true)
+
+/// Allow use of `@called(...)` on function types.
+EXPERIMENTAL_FEATURE(CalledAttribute, false)
+
+/// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
+EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
+
+/// Import C++ methods that are hard to use correctly under their original name
+/// as '@unsafe(always)', instead of renaming them to '__<name>Unsafe'.
+EXPERIMENTAL_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe, true)
+
+/// Handle lookup for llvm intrinsics like aarch64.neon.smull and .sqxtn
+LANGUAGE_FEATURE(BuiltinExtendVectorLanes, 0, "Support for accessing LLVM Builtins that widen or narrow vector lanes")
+
+/// Infer the return ownership of C++ methods that return libkern's OSObject or
+/// one of its subclasses from the method's name, following libkern's
+/// conventions.
+EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
+
+/// Emit `resignRemoteID` calls in remote distributed actor deinits.
+EXPERIMENTAL_FEATURE(DistributedActorResignRemoteID, false)
+
+/// Enable @_target, a per-function target-features/CPU override.
+EXPERIMENTAL_FEATURE(TargetAttribute, true)
+
+/// Enable distributed actors in Embedded Swift.
+EXPERIMENTAL_FEATURE(EmbeddedDistributed, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

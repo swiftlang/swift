@@ -13,8 +13,6 @@
 #define DEBUG_TYPE "sil-access-utils"
 
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/NodeDatastructures.h"
@@ -432,53 +430,6 @@ bool swift::isLetAddress(SILValue address) {
     return false;
 
   return isLetForBase(base);
-}
-
-//===----------------------------------------------------------------------===//
-//                      MARK: Deinitialization barriers.
-//===----------------------------------------------------------------------===//
-
-bool swift::mayAccessPointer(SILInstruction *instruction) {
-  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
-         !isa<AbortApplyInst>(instruction));
-  if (!instruction->mayReadOrWriteMemory())
-    return false;
-  if (isa<BuiltinInst>(instruction)) {
-    // Consider all builtins that read/write memory to access pointers.
-    return true;
-  }
-  bool retval = false;
-  visitAccessedAddress(instruction, [&retval](Operand *operand) {
-    auto accessStorage = AccessStorage::compute(operand->get());
-    auto kind = accessStorage.getKind();
-    if (kind == AccessRepresentation::Kind::Unidentified ||
-        kind == AccessRepresentation::Kind::Global)
-      retval = true;
-  });
-  return retval;
-}
-
-bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
-  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
-         !isa<AbortApplyInst>(instruction));
-  if (isa<BuiltinInst>(instruction)) {
-    return instruction->mayReadOrWriteMemory();
-  }
-  return isa<LoadWeakInst>(instruction) 
-      || isa<LoadUnownedInst>(instruction) 
-      || isa<StrongCopyUnownedValueInst>(instruction)
-      || isa<StrongCopyUnmanagedValueInst>(instruction);
-}
-
-/// Conservatively, whether this instruction could involve a synchronization
-/// point like a memory barrier, lock or syscall.
-bool swift::maySynchronize(SILInstruction *instruction) {
-  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
-         !isa<AbortApplyInst>(instruction));
-  if (isa<BuiltinInst>(instruction)) {
-    return instruction->mayReadOrWriteMemory();
-  }
-  return isa<HopToExecutorInst>(instruction);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2405,9 +2356,7 @@ swift::getSingleInitAllocStackUse(AllocStackInst *asi,
         destroyingUses->push_back(use);
       continue;
     case SILInstructionKind::DebugValueInst:
-      if (cast<DebugValueInst>(user)->hasAddrVal())
-        continue;
-      break;
+      continue;
     case SILInstructionKind::DeallocStackInst:
     case SILInstructionKind::LoadBorrowInst:
       continue;
@@ -2644,6 +2593,10 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::CondFailMessage:
     case BuiltinValueKind::AllocRaw:
     case BuiltinValueKind::DeallocRaw:
+    case BuiltinValueKind::AllocRawTyped:
+    case BuiltinValueKind::DeallocRawTyped:
+    case BuiltinValueKind::AllocErrorBoxTyped:
+    case BuiltinValueKind::DeallocErrorBoxTyped:
     case BuiltinValueKind::StackAlloc:
     case BuiltinValueKind::UnprotectedStackAlloc:
     case BuiltinValueKind::AllocVector:
@@ -2682,7 +2635,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       // SIL address.
       // visitor(&builtin->getAllOperands()[0]);
       return;
-      
+
     // zeroInitializer with an address operand zeroes the address.
     case BuiltinValueKind::ZeroInitializer:
     case BuiltinValueKind::PrepareInitialization:
@@ -2797,7 +2750,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::DereferenceBorrowAddrInst:
     visitor(&I->getAllOperands()[0]);
     return;
-    
+
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst:
@@ -2869,6 +2822,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::EndCOWMutationAddrInst:
+  case SILInstructionKind::EndFormalScopeInst:
   case SILInstructionKind::BeginUnpairedAccessInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:

@@ -27,7 +27,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DistributedDecl.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/KnownProtocols.h"
@@ -40,12 +39,8 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -321,6 +316,23 @@ static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
   }
 }
 
+static bool isCalledOnceFunctionType(EitherFunctionType eitherFnTy) {
+  if (auto fnTy = eitherFnTy.dyn_cast<const AnyFunctionType *>()) {
+    return fnTy->isCalledOnce();
+  }
+
+  auto silFnTy = cast<const SILFunctionType *>(eitherFnTy);
+  return silFnTy->isCalledOnce();
+}
+
+/// Whether the given function type conforms to Copyable.
+static bool isCopyableFunctionType(EitherFunctionType eitherFnTy) {
+  if (isCalledOnceFunctionType(eitherFnTy))
+    return false;
+
+  return true;
+}
+
 /// Whether the given function type conforms to Escapable.
 static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
   if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
@@ -337,6 +349,9 @@ static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
 }
 
 static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
+  if (isCalledOnceFunctionType(eitherFnTy))
+    return false;
+
   SILFunctionTypeRepresentation representation;
   if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
     representation = silFnTy->getRepresentation();
@@ -350,6 +365,7 @@ static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
   case SILFunctionTypeRepresentation::Block:
     return false;
   case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Method:
@@ -390,7 +406,9 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
     case KnownProtocolKind::Copyable:
       // Functions cannot permanently destroy a move-only var/let
       // that they capture, so it's safe to copy functions, like classes.
-      return synthesizeConformance();
+      if (isCopyableFunctionType(functionType))
+        return synthesizeConformance();
+      break;
     case KnownProtocolKind::BitwiseCopyable:
       if (isBitwiseCopyableFunctionType(functionType))
         return synthesizeConformance();

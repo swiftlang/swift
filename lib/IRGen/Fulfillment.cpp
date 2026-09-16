@@ -24,7 +24,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -123,9 +122,6 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::Integer:
     return true;
 
-  // Hidden types are leaves.
-  case TypeKind::Hidden:
-    return true;
   }
   llvm_unreachable("bad type kind");
 }

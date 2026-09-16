@@ -224,6 +224,28 @@ ProtocolDescriptor ProtocolError{
     .withSpecialProtocol(SpecialProtocol::Error)
 };
 
+struct COMProtocolDescriptorStorage {
+  ProtocolDescriptor Descriptor;
+  TargetCOMInterfaceID<InProcess> InterfaceID{};
+
+  COMProtocolDescriptorStorage(const char *name)
+      : Descriptor{name, nullptr,
+                   ProtocolDescriptorFlags()
+                     .withSwift(true)
+                     .withClassConstraint(ProtocolClassConstraint::Any)
+                     .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
+                     .withSpecialProtocol(SpecialProtocol::COM)} {
+    }
+};
+
+COMProtocolDescriptorStorage
+ProtocolCOMStorage{"_TMp8Metadata11ProtocolCOM"};
+ProtocolDescriptor &ProtocolCOM = ProtocolCOMStorage.Descriptor;
+
+COMProtocolDescriptorStorage
+ProtocolCOMBaseStorage{"_TMp8Metadata15ProtocolCOMBase"};
+ProtocolDescriptor &ProtocolCOMBase = ProtocolCOMBaseStorage.Descriptor;
+
 ProtocolDescriptor ProtocolClassConstrained{
   "_TMp8Metadata24ProtocolClassConstrained",
   nullptr,
@@ -393,6 +415,46 @@ TEST(MetadataTest, getExistentialMetadata) {
       return special;
     });
 
+  ProtocolDescriptorRef comProtocolChain[] = {
+    ProtocolDescriptorRef::forSwift(&ProtocolCOM),
+    ProtocolDescriptorRef::forSwift(&ProtocolCOMBase)
+  };
+  RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
+    [&]() -> const ExistentialTypeMetadata * {
+      auto special =
+          swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                           /*superclass=*/nullptr,
+                                           2, comProtocolChain);
+      EXPECT_EQ(0U, special->Flags.getNumWitnessTables());
+      EXPECT_EQ(SpecialProtocol::COM, special->Flags.getSpecialProtocol());
+      EXPECT_EQ(ExistentialTypeRepresentation::COM,
+                special->getRepresentation());
+      EXPECT_EQ(sizeof(void *), special->vw_size());
+      return special;
+    });
+
+  ProtocolDescriptorRef comProtocolList[] = {
+    ProtocolDescriptorRef::forSwift(&ProtocolCOM)
+  };
+  RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
+    [&]() -> const ExistentialTypeMetadata * {
+      auto special =
+          swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                           /*superclass=*/nullptr,
+                                           1, comProtocolList);
+      EXPECT_EQ(MetadataKind::Existential, special->getKind());
+      EXPECT_EQ(0U, special->Flags.getNumWitnessTables());
+      EXPECT_EQ(SpecialProtocol::COM, special->Flags.getSpecialProtocol());
+      EXPECT_EQ(ExistentialTypeRepresentation::COM,
+                special->getRepresentation());
+      EXPECT_EQ(sizeof(void *), special->vw_size());
+      EXPECT_EQ(sizeof(void *), special->vw_stride());
+      EXPECT_EQ(alignof(void *), special->vw_alignment());
+      EXPECT_EQ(1U, special->vw_getNumExtraInhabitants());
+      EXPECT_EQ(nullptr, special->getSuperclassConstraint());
+      return special;
+    });
+
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
       ProtocolDescriptorRef protoList10[] = {
@@ -415,6 +477,71 @@ TEST(MetadataTest, getExistentialMetadata) {
                 special->getSuperclassConstraint());
       return special;
     });
+}
+
+TEST(MetadataTest, getCOMInterfaceID) {
+  EXPECT_EQ(ProtocolCOMStorage.InterfaceID.Bytes,
+            ProtocolCOM.getCOMInterfaceID());
+  EXPECT_EQ(nullptr, ProtocolA.getCOMInterfaceID());
+}
+
+namespace {
+struct COMTestInterface {
+  void **VTable;
+  unsigned RefCount;
+  unsigned AddRefCalls;
+  unsigned ReleaseCalls;
+};
+
+uint32_t comTestAddRef(void *value) {
+  auto *interface = static_cast<COMTestInterface *>(value);
+  ++interface->AddRefCalls;
+  return ++interface->RefCount;
+}
+
+uint32_t comTestRelease(void *value) {
+  auto *interface = static_cast<COMTestInterface *>(value);
+  ++interface->ReleaseCalls;
+  return --interface->RefCount;
+}
+} // namespace
+
+TEST(MetadataTest, COMExistentialValueWitnesses) {
+  ProtocolDescriptorRef protocols[] = {
+    ProtocolDescriptorRef::forSwift(&ProtocolCOM)
+  };
+  auto metadata =
+      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                       /*superclass=*/nullptr,
+                                       1, protocols);
+
+  void *vtable[] = {
+    nullptr,
+    reinterpret_cast<void *>(&comTestAddRef),
+    reinterpret_cast<void *>(&comTestRelease),
+  };
+  COMTestInterface object{vtable, 1, 0, 0};
+  void *source = &object;
+  void *destination = nullptr;
+
+  metadata->vw_initializeWithCopy(reinterpret_cast<OpaqueValue *>(&destination),
+                                  reinterpret_cast<OpaqueValue *>(&source));
+  EXPECT_EQ(source, destination);
+  EXPECT_EQ(2U, object.RefCount);
+  EXPECT_EQ(1U, object.AddRefCalls);
+
+  metadata->vw_destroy(reinterpret_cast<OpaqueValue *>(&destination));
+  EXPECT_EQ(1U, object.RefCount);
+  EXPECT_EQ(1U, object.ReleaseCalls);
+
+  void *optionalPayload = source;
+  EXPECT_EQ(0U,metadata->vw_getEnumTagSinglePayload(
+                    reinterpret_cast<OpaqueValue *>(&optionalPayload), 1));
+  metadata->vw_storeEnumTagSinglePayload(
+      reinterpret_cast<OpaqueValue *>(&optionalPayload), 1, 1);
+  EXPECT_EQ(nullptr, optionalPayload);
+  EXPECT_EQ(1U, metadata->vw_getEnumTagSinglePayload(
+                    reinterpret_cast<OpaqueValue *>(&optionalPayload), 1));
 }
 
 static ProtocolDescriptor OpaqueProto1 = { "OpaqueProto1", nullptr,

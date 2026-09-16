@@ -138,7 +138,7 @@ bb0(%0 : @owned $C):
 // CHECK:       } // end sil function 'open_existential_ref'
 sil [ossa] @open_existential_ref : $@convention(thin) (@owned any P) -> () {
 bb0(%0 : @owned $any P):
-  %1 = open_existential_ref %0 to $@opened("01234567-89ab-cdef-0123-000000000001", P) Self
+  %1 = open_existential_ref %0 to $@opened(1, P) Self
   end_lifetime %1
   %r = tuple ()
   return %r
@@ -237,6 +237,11 @@ bb3:
 // CHECK-LABEL: sil [ossa] @debug_user :
 // CHECK:       bb0(%0 : @owned $D):
 // CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    debug_value %0, let, name "x", transform {
+// CHECK:           bb0(%0 : $D):
+// CHECK-NEXT:        %1 = upcast %0 to $C
+// CHECK-NEXT:        return %1
+// CHECK-NEXT:    }
 // CHECK-NEXT:    tuple
 // CHECK:       } // end sil function 'debug_user'
 sil [ossa] @debug_user : $@convention(thin) (@owned D) -> () {

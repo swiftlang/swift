@@ -20,10 +20,10 @@
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Heap.h"
+#include "swift/Runtime/SmallPtrSet.h"
 #include "swift/Threading/ThreadLocalStorage.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include <new>
-#include <set>
 
 #if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
@@ -189,9 +189,7 @@ void TaskLocal::Storage::initializeLinkParent(AsyncTask* task,
   // because it is the most "specific"/"recent" binding and any other binding
   // of a key does not matter for the target task as it will never be able to
   // observe it.
-    std::set<const HeapObject *,
-               std::less<const HeapObject *>,
-               swift::cxx_allocator<const HeapObject *>> copied = {};
+  swift::runtime::SmallPtrSet<const HeapObject *, 8> copied;
 
   // If we are a child task in a task group, it may happen that we are calling
   // addTask specifically in such shape:
@@ -214,7 +212,8 @@ void TaskLocal::Storage::initializeLinkParent(AsyncTask* task,
     auto valueItem = cast<ValueItem>(item);
     // we only have to copy an item if it is the most recent binding of a key.
     // i.e. if we've already seen an item for this key, we can skip it.
-    if (copied.emplace(valueItem->key).second) {
+    bool alreadyCopied = !copied.insert(valueItem->key);
+    if (!alreadyCopied) {
       valueItem->copyTo(task);
     } else {
       SWIFT_TASK_LOCAL_DEBUG_LOG(
@@ -510,16 +509,15 @@ void TaskLocal::Storage::copyTo(AsyncTask *target) {
   // because it is the most "specific"/"recent" binding and any other binding
   // of a key does not matter for the target task as it will never be able to
   // observe it.
-  std::set<const HeapObject *,
-           std::less<const HeapObject *>,
-           swift::cxx_allocator<const HeapObject *>> copied = {};
+  swift::runtime::SmallPtrSet<const HeapObject *, 8> copied;
 
   auto item = head;
   while (item) {
     if (auto valueItem = dyn_cast<ValueItem>(item)) {
       // we only have to copy an item if it is the most recent binding of a key.
       // i.e. if we've already seen an item for this key, we can skip it.
-      if (copied.emplace(valueItem->key).second) {
+      bool alreadyCopied = !copied.insert(valueItem->key);
+      if (!alreadyCopied) {
         valueItem->copyTo(target);
       } else {
         SWIFT_TASK_LOCAL_DEBUG_LOG(

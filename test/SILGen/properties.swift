@@ -204,7 +204,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // -- getters and setters
   // -- val.ref.val_prop
   // CHECK: [[BORROW:%.*]] = begin_borrow [[VAL_REF]]
-  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!modify : (Ref) -> ()
+  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!modify : (Ref) -> @yield_once () yields (inout Val) -> ()
   // CHECK: ([[VAL_REF_VAL_PROP_MAT:%[0-9]+]], [[TOKEN:%.*]]) = begin_apply [[MAT_VAL_PROP_METHOD]]([[BORROW]])
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
@@ -542,6 +542,7 @@ struct ReferenceStorageTypeRValues {
 // CHECK-NEXT:   debug_value [[ARG]] : $ReferenceStorageTypeRValues
 // CHECK-NEXT:   [[UNOWNED_ARG_FIELD:%.*]] = struct_extract [[ARG]] : $ReferenceStorageTypeRValues, #ReferenceStorageTypeRValues.p1
 // CHECK-NEXT:   [[COPIED_VALUE:%.*]] = strong_copy_unowned_value [[UNOWNED_ARG_FIELD]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   return [[COPIED_VALUE]] : $Ref
 
   init() {
@@ -647,6 +648,7 @@ class ClassWithLetProperty {
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr [[ARG]] : $ClassWithLetProperty, #ClassWithLetProperty.p
 // CHECK-NEXT:    [[VAL:%[0-9]+]] = load [trivial] [[PTR]] : $*Int
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   return [[VAL]] : $Int
 
 
@@ -826,17 +828,18 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   apply [[GETTER]]([[C_FIELD_BOX]], [[C_BORROW]]) : $@convention(method) (@guaranteed ReferenceType) -> @out any NonmutatingProtocol
 // CHECK-NEXT:   end_borrow [[C_BORROW]]
 
-// CHECK-NEXT:   [[C_FIELD_PAYLOAD:%.*]] = open_existential_addr immutable_access [[C_FIELD_BOX]] : $*any NonmutatingProtocol to $*@opened("{{.*}}", any NonmutatingProtocol) Self
-// CHECK-NEXT:   [[C_FIELD_COPY:%.*]] = alloc_stack $@opened("{{.*}}", any NonmutatingProtocol) Self
-// CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [init] [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
+// CHECK-NEXT:   [[C_FIELD_PAYLOAD:%.*]] = open_existential_addr immutable_access [[C_FIELD_BOX]] : $*any NonmutatingProtocol to $*@opened({{.*}}, any NonmutatingProtocol) Self
+// CHECK-NEXT:   [[C_FIELD_COPY:%.*]] = alloc_stack $@opened({{.*}}, any NonmutatingProtocol) Self
+// CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [init] [[C_FIELD_COPY]] : $*@opened({{.*}}, any NonmutatingProtocol) Self
 // CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
-// CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}", any NonmutatingProtocol) Self, #NonmutatingProtocol.x!getter : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
-// CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}", any NonmutatingProtocol) Self>([[C_FIELD_COPY]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened({{.*}}, any NonmutatingProtocol) Self, #NonmutatingProtocol.x!getter : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened({{.*}}, any NonmutatingProtocol) Self : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened({{.*}}, any NonmutatingProtocol) Self>([[C_FIELD_COPY]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   ignored_use
-// CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
-// CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
+// CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened({{.*}}, any NonmutatingProtocol) Self
+// CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened({{.*}}, any NonmutatingProtocol) Self
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*any NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_BOX]] : $*any NonmutatingProtocol
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
 

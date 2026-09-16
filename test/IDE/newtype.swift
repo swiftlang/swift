@@ -45,10 +45,10 @@
 // PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  struct MyFloat : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
-// PRINT-NEXT:    init(_ rawValue: Float)
-// PRINT-NEXT:    init(rawValue: Float)
-// PRINT-NEXT:    let rawValue: Float
-// PRINT-NEXT:    typealias RawValue = Float
+// PRINT-NEXT:    init(_ rawValue: CFloat)
+// PRINT-NEXT:    init(rawValue: CFloat)
+// PRINT-NEXT:    let rawValue: CFloat
+// PRINT-NEXT:    typealias RawValue = CFloat
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyFloat {
 // PRINT-NEXT:    static let globalFloat: MyFloat{{$}}
@@ -57,16 +57,16 @@
 // PRINT-NEXT:  }
 //
 // PRINT-LABEL: struct MyInt : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
-// PRINT-NEXT:    init(_ rawValue: Int32)
-// PRINT-NEXT:    init(rawValue: Int32)
-// PRINT-NEXT:    let rawValue: Int32
-// PRINT-NEXT:    typealias RawValue = Int32
+// PRINT-NEXT:    init(_ rawValue: CInt)
+// PRINT-NEXT:    init(rawValue: CInt)
+// PRINT-NEXT:    let rawValue: CInt
+// PRINT-NEXT:    typealias RawValue = CInt
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyInt {
 // PRINT-NEXT:    static let zero: MyInt{{$}}
 // PRINT-NEXT:    static let one: MyInt{{$}}
 // PRINT-NEXT:  }
-// PRINT-NEXT:  let kRawInt: Int32
+// PRINT-NEXT:  let kRawInt: CInt
 // PRINT-NEXT:  func takesMyInt(_: MyInt)
 //
 // PRINT-LABEL: extension NSURLResourceKey {
@@ -129,8 +129,8 @@
 //
 // PRINT-NEXT:  struct NSSomeContext {
 // PRINT-NEXT:    init()
-// PRINT-NEXT:    init(i: Int32)
-// PRINT-NEXT:    var i: Int32
+// PRINT-NEXT:    init(i: CInt)
+// PRINT-NEXT:    var i: CInt
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension NSSomeContext {
 // PRINT-NEXT:    struct Name : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {

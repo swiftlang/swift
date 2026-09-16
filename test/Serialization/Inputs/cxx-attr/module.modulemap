@@ -1,0 +1,4 @@
+module CxxAttr {
+  header "cxx_attr.h"
+  requires cplusplus
+}

@@ -17,13 +17,11 @@
 
 #define DEBUG_TYPE "sil-existential-specializer"
 #include "ExistentialTransform.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 
@@ -138,7 +136,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
   /// function arguments.  The same SIL argument index is used for both caller
   /// and callee side arguments.
   auto origCalleeConv = Apply.getOrigCalleeConv();
-  assert(Apply.getCalleeArgIndexOfFirstAppliedArg() == 0);
+  assert(Apply.getSubstCalleeArgIndexOfFirstAppliedArg() == 0);
   for (unsigned Idx = 0, Num = CalleeArgs.size(); Idx < Num; ++Idx) {
     auto CalleeArg = CalleeArgs[Idx];
     auto ArgType = CalleeArg->getType();

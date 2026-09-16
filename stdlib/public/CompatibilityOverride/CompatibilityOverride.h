@@ -81,10 +81,23 @@
 #ifndef COMPATIBILITY_OVERRIDE_H
 #define COMPATIBILITY_OVERRIDE_H
 
+// Neither Private.h nor Runtime/Metadata.h is used directly by this file;
+// they're included here only so that clients which don't include them
+// themselves (e.g. the hosted-only CompatibilityOverrideRuntime unittest)
+// still see their declarations (Demangler, TypeLookupErrorOr, std::string
+// nameForMetadata, etc.) transitively. Those declarations pull in
+// hosted-only STL headers (<string>, <functional>), so keep this
+// hosted-only. The embedded Concurrency runtime never needs anything from
+// either header: SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT is always off for
+// Embedded Swift (see AddSwiftStdlib.cmake), so the back-deployment
+// machinery in this file compiles down to a direct pass-through that
+// doesn't reference Metadata/WitnessTable/etc. by name.
+#if __STDC_HOSTED__
 #include "../runtime/Private.h"
+#include "swift/Runtime/Metadata.h"
+#endif
 #include "swift/Runtime/CMakeConfig.h"
 #include "swift/Runtime/Concurrency.h"
-#include "swift/Runtime/Metadata.h"
 #include <atomic>
 #include <type_traits>
 
@@ -201,16 +214,24 @@ namespace swift {
       uintptr_t fn, Original_##name defaultImpl) {                             \
     constexpr uintptr_t DEFAULT_IMPL_SENTINEL = 0x1;                           \
     if (SWIFT_UNLIKELY(fn == 0x0)) {                                           \
-      fn = (uintptr_t)getOverride_##name();                                    \
-      if (fn == 0x0) {                                                         \
+      Override_##name overrideFn = getOverride_##name();                       \
+      if (overrideFn == nullptr) {                                             \
         Override.store(DEFAULT_IMPL_SENTINEL,                                  \
                        std::memory_order::memory_order_relaxed);               \
         return defaultImpl COMPATIBILITY_PAREN(namedArgs);                     \
       }                                                                        \
-      Override.store(fn, std::memory_order::memory_order_relaxed);             \
+      Override.store((uintptr_t)swift_sign_code_address(                       \
+                         (void *)overrideFn, &Override,                        \
+                         SpecialPointerAuthDiscriminators::                    \
+                             CompatibilityOverride),                           \
+                     std::memory_order::memory_order_relaxed);                 \
+      return overrideFn(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs)            \
+                            defaultImpl);                                      \
     }                                                                          \
-    return ((Override_##name)fn)(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs)   \
-                                     defaultImpl);                             \
+    return ((Override_##name)swift_auth_code_address(                          \
+        (void *)fn, &Override,                                                 \
+        SpecialPointerAuthDiscriminators::CompatibilityOverride))(             \
+        COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs) defaultImpl);              \
   }                                                                            \
   attrs ccAttrs ret namespace swift_##name COMPATIBILITY_PAREN(typedArgs) {    \
     constexpr uintptr_t DEFAULT_IMPL_SENTINEL = 0x1;                           \
@@ -223,8 +244,10 @@ namespace swift {
                                     Override,                                  \
                                 fn, &swift_##name##Impl);                      \
     }                                                                          \
-    return ((Override_##name)fn)(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs) & \
-                                 swift_##name##Impl);                          \
+    return ((Override_##name)swift_auth_code_address(                          \
+        (void *)fn, &Override,                                                 \
+        SpecialPointerAuthDiscriminators::CompatibilityOverride))(             \
+        COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs) & swift_##name##Impl);     \
   }
 
 #endif // #else SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT

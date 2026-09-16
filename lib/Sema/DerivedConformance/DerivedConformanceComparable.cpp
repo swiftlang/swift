@@ -27,10 +27,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "llvm/ADT/APInt.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -200,13 +196,9 @@ deriveComparable_lt(
   auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
-    auto *param = new (C) ParamDecl(SourceLoc(),
-                                    SourceLoc(), Identifier(), SourceLoc(),
-                                    C.getIdentifier(s), parentDC);
-    param->setSpecifier(ParamSpecifier::Default);
-    param->setInterfaceType(selfIfaceTy);
-    param->setImplicit();
-    return param;
+    return ParamDecl::createImplicit(C, Identifier(), C.getIdentifier(s),
+                                     selfIfaceTy, parentDC,
+                                     ParamSpecifier::Default);
   };
 
   ParameterList *params = ParameterList::create(C, {

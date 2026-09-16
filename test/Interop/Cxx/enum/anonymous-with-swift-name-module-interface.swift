@@ -1,11 +1,11 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=AnonymousWithSwiftName -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
-// CHECK-NOT: typealias CFColorMask = UInt32
+// CHECK-NOT: typealias CFColorMask = CUnsignedInt
 
 // CHECK: struct CFColorMask : OptionSet {
-// CHECK:   init(rawValue: UInt32)
-// CHECK:   let rawValue: UInt32
-// CHECK:   typealias RawValue = UInt32
+// CHECK:   init(rawValue: CUnsignedInt)
+// CHECK:   let rawValue: CUnsignedInt
+// CHECK:   typealias RawValue = CUnsignedInt
 // CHECK:   typealias Element = CFColorMask
 // CHECK:   typealias ArrayLiteralElement = CFColorMask
 
@@ -37,11 +37,11 @@
 // CHECK: extension ParentStruct {
 // CHECK:     func childFn() -> CFColorMask
 // CHECK:     @available(*, unavailable, message: "Not available in Swift")
-// CHECK:     typealias NewName = UInt32
+// CHECK:     typealias NewName = CUnsignedInt
 // CHECK:     struct NewName : OptionSet, @unchecked Sendable {
-// CHECK:         init(rawValue: UInt32)
-// CHECK:         let rawValue: UInt32
-// CHECK:         typealias RawValue = UInt32
+// CHECK:         init(rawValue: CUnsignedInt)
+// CHECK:         let rawValue: CUnsignedInt
+// CHECK:         typealias RawValue = CUnsignedInt
 // CHECK:         typealias Element = ParentStruct.NewName
 // CHECK:         typealias ArrayLiteralElement = ParentStruct.NewName
 // CHECK:         static var one: ParentStruct.NewName { get }
@@ -60,14 +60,14 @@
 // CHECK: @available(swift, obsoleted: 3, renamed: "ParentStruct.NewName")
 // CHECK: typealias OldName = ParentStruct.NewName
 // CHECK: @available(*, unavailable, message: "Not available in Swift")
-// CHECK: typealias GlobalNewName = UInt32
+// CHECK: typealias GlobalNewName = CUnsignedInt
 // CHECK: @available(swift, obsoleted: 3, renamed: "GlobalNewName")
 // CHECK: @available(*, unavailable, message: "Not available in Swift")
 // CHECK: typealias GlobalOldName = GlobalNewName
 // CHECK: struct GlobalNewName : OptionSet, @unchecked Sendable {
-// CHECK:     init(rawValue: UInt32)
-// CHECK:     let rawValue: UInt32
-// CHECK:     typealias RawValue = UInt32
+// CHECK:     init(rawValue: CUnsignedInt)
+// CHECK:     let rawValue: CUnsignedInt
+// CHECK:     typealias RawValue = CUnsignedInt
 // CHECK:     typealias Element = GlobalNewName
 // CHECK:     typealias ArrayLiteralElement = GlobalNewName
 // CHECK:     static var one: GlobalNewName { get }

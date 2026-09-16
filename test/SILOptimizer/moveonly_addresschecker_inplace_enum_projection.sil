@@ -1,0 +1,207 @@
+// RUN: %target-sil-opt -sil-print-types -module-name moveonly -sil-move-only-address-checker -enable-sil-verify-all %s | %FileCheck %s
+
+// This is a regression test for a MoveOnlyChecker bug where a destroy inserted
+// on a liveness boundary edge whose first instruction was an
+// `unchecked_inplace_enum_data_addr` would reuse that instruction as the
+// payload projection (because it reflexively "dominates" itself) and then
+// synthesize a struct sub-projection *before* it, producing SIL that failed
+// verification with "instruction isn't dominated by its operand".
+//
+// rdar://reproducer distilled from Network.ECN.reset(path:).
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+enum ECNState {
+  case probing
+  case disabled
+}
+
+struct ECNPathState : ~Copyable {
+  @_hasStorage var state: ECNState { get set }
+  @_hasStorage var extra: Int { get set }
+}
+
+class QUICPath {
+  @_hasStorage var ecnState: Optional<ECNPathState> { get set }
+}
+
+class LogPrefixer {}
+
+struct ECN {
+  @_hasStorage var log: LogPrefixer { get set }
+}
+
+sil @ecnMarkingEnabled : $@convention(method) (@guaranteed ECNPathState) -> Bool
+sil @autoclosure : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Bool>
+sil @nilCoalescing : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in Optional<τ_0_0>, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>) -> (@out τ_0_0, @error any Error)
+sil @resetValidationCounters : $@convention(method) (@inout ECNPathState) -> ()
+
+// Make sure this verifies (i.e. the inplace enum data addr is defined before
+// the struct_element_addr that projects out of it).
+//
+// CHECK-LABEL: sil hidden [ossa] @test_reset :
+// CHECK: bb12:
+// CHECK-NEXT: unchecked_inplace_enum_data_addr
+// CHECK: } // end sil function 'test_reset'
+sil hidden [ossa] @test_reset : $@convention(method) (@guaranteed Optional<QUICPath>, @guaranteed ECN) -> () {
+bb0(%0 : @guaranteed $Optional<QUICPath>, %1 : @guaranteed $ECN):
+  debug_value %0, let, name "path", argno 1
+  %6 = copy_value %0
+  switch_enum %6, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  br bb19
+
+bb2(%9 : @owned $QUICPath):
+  %10 = move_value [lexical] [var_decl] %9
+  debug_value %10, let, name "path"
+  %12 = alloc_stack $Bool
+  %13 = begin_borrow %10
+  %14 = ref_element_addr %13, #QUICPath.ecnState
+  %15 = begin_access [read] [dynamic] %14
+  %16 = mark_unresolved_non_copyable_value [no_consume_or_assign] %15
+  %17 = begin_access [read] [static] [no_nested_conflict] %16
+  %18 = load_borrow %17
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = integer_literal $Builtin.Int1, 0
+  %21 = select_enum %18, case #Optional.some!enumelt: %19, default %20 : $Builtin.Int1
+  cond_br %21, bb3, bb10
+
+bb3:
+  %23 = unchecked_enum_data %18, #Optional.some!enumelt
+  %24 = function_ref @ecnMarkingEnabled : $@convention(method) (@guaranteed ECNPathState) -> Bool
+  %25 = apply %24(%23) : $@convention(method) (@guaranteed ECNPathState) -> Bool
+  end_borrow %18
+  end_access %17
+  end_access %15
+  %29 = enum $Optional<Bool>, #Optional.some!enumelt, %25
+  end_borrow %13
+  br bb4(%29)
+
+bb4(%32 : $Optional<Bool>):
+  %33 = alloc_stack $Optional<Bool>
+  store %32 to [trivial] %33
+  %35 = function_ref @autoclosure : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Bool>
+  %36 = thin_to_thick_function %35 to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Bool>
+  %37 = function_ref @nilCoalescing : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in Optional<τ_0_0>, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>) -> (@out τ_0_0, @error any Error)
+  try_apply %37<Bool>(%12, %33, %36) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in Optional<τ_0_0>, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>) -> (@out τ_0_0, @error any Error), normal bb5, error bb23
+
+bb5(%39 : $()):
+  dealloc_stack %33
+  %41 = struct_element_addr %12, #Bool._value
+  %42 = load [trivial] %41
+  dealloc_stack %12
+  cond_br %42, bb6, bb11
+
+bb6:
+  %45 = begin_borrow %10
+  %46 = ref_element_addr %45, #QUICPath.ecnState
+  %47 = begin_access [modify] [dynamic] %46
+  %48 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %47
+  %49 = integer_literal $Builtin.Int1, -1
+  %50 = integer_literal $Builtin.Int1, 0
+  %51 = select_enum_addr %48, case #Optional.some!enumelt: %49, default %50 : $Builtin.Int1
+  cond_br %51, bb7, bb9
+
+bb7:
+  %53 = unchecked_inplace_enum_data_addr %48, #Optional.some!enumelt
+  %54 = metatype $@thin ECNState.Type
+  %55 = enum $ECNState, #ECNState.probing!enumelt
+  %56 = struct_element_addr %53, #ECNPathState.state
+  store %55 to [trivial] %56
+  end_access %47
+  end_borrow %45
+  %60 = tuple ()
+  %61 = enum $Optional<()>, #Optional.some!enumelt, %60
+  br bb8(%61)
+
+bb8(%63 : $Optional<()>):
+  br bb15
+
+bb9:
+  end_access %47
+  end_borrow %45
+  %67 = enum $Optional<()>, #Optional.none!enumelt
+  br bb8(%67)
+
+bb10:
+  end_borrow %18
+  end_access %17
+  end_access %15
+  end_borrow %13
+  %73 = enum $Optional<Bool>, #Optional.none!enumelt
+  br bb4(%73)
+
+bb11:
+  %75 = begin_borrow %10
+  %76 = ref_element_addr %75, #QUICPath.ecnState
+  %77 = begin_access [modify] [dynamic] %76
+  %78 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %77
+  %79 = integer_literal $Builtin.Int1, -1
+  %80 = integer_literal $Builtin.Int1, 0
+  %81 = select_enum_addr %78, case #Optional.some!enumelt: %79, default %80 : $Builtin.Int1
+  cond_br %81, bb12, bb14
+
+bb12:
+  %83 = unchecked_inplace_enum_data_addr %78, #Optional.some!enumelt
+  %84 = metatype $@thin ECNState.Type
+  %85 = enum $ECNState, #ECNState.disabled!enumelt
+  %86 = struct_element_addr %83, #ECNPathState.state
+  store %85 to [trivial] %86
+  end_access %77
+  end_borrow %75
+  %90 = tuple ()
+  %91 = enum $Optional<()>, #Optional.some!enumelt, %90
+  br bb13(%91)
+
+bb13(%93 : $Optional<()>):
+  br bb15
+
+bb14:
+  end_access %77
+  end_borrow %75
+  %97 = enum $Optional<()>, #Optional.none!enumelt
+  br bb13(%97)
+
+bb15:
+  %99 = begin_borrow %10
+  %100 = ref_element_addr %99, #QUICPath.ecnState
+  %101 = begin_access [modify] [dynamic] %100
+  %102 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %101
+  %103 = integer_literal $Builtin.Int1, -1
+  %104 = integer_literal $Builtin.Int1, 0
+  %105 = select_enum_addr %102, case #Optional.some!enumelt: %103, default %104 : $Builtin.Int1
+  cond_br %105, bb16, bb18
+
+bb16:
+  %107 = unchecked_inplace_enum_data_addr %102, #Optional.some!enumelt
+  %108 = function_ref @resetValidationCounters : $@convention(method) (@inout ECNPathState) -> ()
+  %109 = apply %108(%107) : $@convention(method) (@inout ECNPathState) -> ()
+  end_access %101
+  end_borrow %99
+  %112 = tuple ()
+  %113 = enum $Optional<()>, #Optional.some!enumelt, %112
+  br bb17(%113)
+
+bb17(%115 : $Optional<()>):
+  destroy_value %10
+  br bb19
+
+bb18:
+  end_access %101
+  end_borrow %99
+  %140 = enum $Optional<()>, #Optional.none!enumelt
+  br bb17(%140)
+
+bb19:
+  %212 = tuple ()
+  return %212
+
+bb23(%214 : @owned $any Error):
+  destroy_value [dead_end] %214
+  destroy_value [dead_end] %10
+  unreachable
+}

@@ -644,7 +644,7 @@ public:
       SmallVectorImpl<ModuleDecl *> &overlays);
 
   /// Returns true if this module is the Clang header import module.
-  bool isClangHeaderImportModule() const;
+  bool isClangBridgingHeaderImportModule() const;
 
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
@@ -1107,8 +1107,11 @@ public:
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
 
   /// Finds all top-level decls of this module including auxiliary decls.
-  void
-  getTopLevelDeclsWithAuxiliaryDecls(SmallVectorImpl<Decl *> &Results) const;
+  ///
+  /// \p visitFreestanding When \c true (the default), includes any top-level
+  /// freestanding macro expansions.
+  void getTopLevelDeclsWithAuxiliaryDecls(SmallVectorImpl<Decl *> &Results,
+                                          bool visitFreestanding = true) const;
 
   void getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const;
 

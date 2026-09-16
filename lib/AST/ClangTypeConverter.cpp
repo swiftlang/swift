@@ -31,9 +31,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 
 #include "clang/AST/ASTContext.h"
@@ -217,6 +215,7 @@ ClangTypeConverter::getFunctionType(ArrayRef<SILParameterInfo> params,
     return nullptr;
 
   switch (repr) {
+  case SILFunctionType::Representation::COMMethod:
   case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::CFunctionPointer:
     return ClangASTContext.getPointerType(fn).getTypePtr();

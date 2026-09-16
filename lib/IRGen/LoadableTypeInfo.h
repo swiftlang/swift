@@ -56,6 +56,14 @@ public:
 /// memory.
 class LoadableTypeInfo : public FixedTypeInfo {
 protected:
+  LoadableTypeInfo(
+      IRGenModule &IGM,
+      const SerializableLoadableTypeInfoRepresentation &representation);
+
+  void populateSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &IGM,
+      SerializableLoadableTypeInfoRepresentation &representation) const;
+
   LoadableTypeInfo(llvm::Type *type, Size size,
                    const SpareBitVector &spareBits,
                    Alignment align,
@@ -91,7 +99,10 @@ protected:
 public:
   // This is useful for metaprogramming.
   static bool isLoadable() { return true; }
-  
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const override;
+
   /// Return the number of elements in an explosion of this type.
   virtual unsigned getExplosionSize() const = 0;
 

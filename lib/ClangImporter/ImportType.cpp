@@ -39,7 +39,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
@@ -52,6 +51,7 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 #include <optional>
 
@@ -304,7 +304,7 @@ namespace {
                                                     const Type &pointeeType) {
     auto funcTy = pointeeType->castTo<FunctionType>();
     return {FunctionType::get(
-                funcTy->getParams(), funcTy->getResult(),
+                funcTy->getParams(), funcTy->getYields(), funcTy->getResult(),
                 funcTy->getExtInfo()
                     .intoBuilder()
                     .withRepresentation(
@@ -385,19 +385,6 @@ namespace {
       return T;
     }
 
-    constexpr bool isCCharBuiltinType(clang::BuiltinType::Kind kind) {
-      switch (kind) {
-      default:
-        return false;
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)
-        /* Intentionally empty; fallback to default label. */
-#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)          \
-    case clang::BuiltinType::CLANG_BUILTIN_KIND:
-#include "swift/ClangImporter/BuiltinMappedTypes.def"
-        return true;
-      }
-    }
-
     ImportResult VisitBuiltinType(const clang::BuiltinType *type) {
       const clang::BuiltinType::Kind kind = type->getKind();
       if (kind == clang::BuiltinType::Void)
@@ -407,12 +394,7 @@ namespace {
       if (!swiftTypeName)
         return Type();
 
-      Type swiftType =
-          Impl.getNamedSwiftType(Impl.getStdlibModule(), *swiftTypeName);
-      // FIXME: stop unwrapping typealiases
-      if (!isCCharBuiltinType(kind))
-        swiftType = unwrapCType(swiftType);
-      return swiftType;
+      return Impl.getNamedSwiftType(Impl.getStdlibModule(), *swiftTypeName);
     }
 
     ImportResult VisitBitIntType(const clang::BitIntType *type) {
@@ -648,8 +630,8 @@ namespace {
               .withRepresentation(FunctionType::Representation::Block)
               .withClangFunctionType(type)
               .build();
-      auto funcTy =
-          FunctionType::get(fTy->getParams(), fTy->getResult(), extInfo);
+      auto funcTy = FunctionType::get(fTy->getParams(), fTy->getYields(),
+                                      fTy->getResult(), extInfo);
       return { funcTy, ImportHint::Block };
     }
 
@@ -795,9 +777,13 @@ namespace {
         }
 
         auto paramQualType = *param;
-        if (paramQualType->isReferenceType() &&
-            paramQualType->getPointeeType().isConstQualified())
-          paramQualType = paramQualType->getPointeeType();
+        // `inout` is not expressible in `@convention(c)`, so a mutable lvalue
+        // reference stays a pointer; SIL passes it directly to match. Every
+        // other reference kind is lowered indirectly, so it has to be
+        // flattened to the pointee here.
+        if (auto ref = classifyCxxReferenceParameter(paramQualType))
+          if (ref->kind != CxxReferenceParameterKind::Mutating)
+            paramQualType = ref->pointeeType;
 
         // Mark any `sending` parameters if need be.
         ImportTypeAttrs paramAttributes;
@@ -837,7 +823,7 @@ namespace {
       }
 
       // Form the function type.
-      return FunctionType::get(params, resultTy, extInfo);
+      return FunctionType::get(params, /* yields */ {}, resultTy, extInfo);
     }
 
     ImportResult
@@ -851,7 +837,7 @@ namespace {
 
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      return FunctionType::get({}, resultTy, info);
+      return FunctionType::get({}, /* yields */ {}, resultTy, info);
     }
 
     ImportResult VisitParenType(const clang::ParenType *type) {
@@ -983,27 +969,21 @@ namespace {
           break;
         }
 
-        static const llvm::StringLiteral vaListNames[] = {
-          "va_list", "__gnuc_va_list", "__va_list"
-        };
-
-        ImportHint hint = ImportHint::None;
-        if (type->getDecl()->getName() == "BOOL") {
-          hint = ImportHint::Boolean;
-        } else if (type->getDecl()->getName() == "Boolean") {
-          // FIXME: Darwin only?
-          hint = ImportHint::Boolean;
-        } else if (type->getDecl()->getName() == "NSUInteger") {
-          hint = ImportHint::NSUInteger;
-        } else if (llvm::is_contained(vaListNames,
-                                      type->getDecl()->getName())) {
-          hint = ImportHint::VAList;
-        } else if (isImportedCFPointer(type->desugar(), mappedType)) {
-          hint = ImportHint::CFPointer;
-        } else if (mappedType->isAnyExistentialType()) { // id, Class
-          hint = ImportHint::ObjCPointer;
-        } else if (type->isPointerType() || type->isBlockPointerType()) {
-          hint = ImportHint::OtherPointer;
+        ImportHint hint =
+            llvm::StringSwitch<ImportHint>(type->getDecl()->getName())
+                // FIXME: Is "Boolean" Darwin only?
+                .Cases({"BOOL", "Boolean"}, ImportHint::Boolean)
+                .Case("NSUInteger", ImportHint::NSUInteger)
+                .Cases({"va_list", "__gnuc_va_list", "__va_list"},
+                       ImportHint::VAList)
+                .Default(ImportHint::None);
+        if (hint == ImportHint::None) {
+          if (isImportedCFPointer(type->desugar(), mappedType))
+            hint = ImportHint::CFPointer;
+          else if (mappedType->isAnyExistentialType()) // id, Class
+            hint = ImportHint::ObjCPointer;
+          else if (type->isPointerType() || type->isBlockPointerType())
+            hint = ImportHint::OtherPointer;
         }
         // Any other interesting mapped types should be hinted here.
         return { mappedType, hint };
@@ -1098,14 +1078,10 @@ namespace {
       if (!decl)
         return nullptr;
 
-      if (Bridging == Bridgeability::Full)
-        for (const auto *attr : decl->getAttrs())
-          if (const auto *customAttr = dyn_cast<CustomAttr>(attr))
-            if (customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
-                    "_refCountedPtr")) {
-              return ImportResult(decl->getDeclaredInterfaceType(),
-                                  ImportHint::IntrusivelyRefCountedSmartPtr);
-            }
+      if (Bridging == Bridgeability::Full &&
+          importer::getRefCountedPtrAttr(decl))
+        return ImportResult(decl->getDeclaredInterfaceType(),
+                            ImportHint::IntrusivelyRefCountedSmartPtr);
 
       return decl->getDeclaredInterfaceType();
     }
@@ -2563,14 +2539,9 @@ static bool isParameterContextGlobalActorIsolated(DeclContext *dc,
   if (getActorIsolationOfContext(dc).isGlobalActor())
     return true;
 
-  if (!parent->hasAttrs())
-    return false;
-
-  for (const auto *attr : parent->getAttrs()) {
-    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      if (isMainActorAttr(swiftAttr))
-        return true;
-    }
+  for (const auto *swiftAttr : parent->specific_attrs<clang::SwiftAttrAttr>()) {
+    if (isMainActorAttr(swiftAttr))
+      return true;
   }
 
   return false;
@@ -2676,25 +2647,16 @@ ClangImporter::Implementation::importParameterType(
   if (!swiftParamTy) {
     // C++ reference types are brought in as direct
     // types most commonly.
-    if (auto refPointeeType =
-            getCxxReferencePointeeTypeOrNone(paramTy.getTypePtr())) {
+    if (auto ref = classifyCxxReferenceParameter(paramTy)) {
       // We don't support reference type to a dependent type, just bail.
-      if ((*refPointeeType)->isDependentType()) {
+      if (ref->pointeeType->isDependentType())
         return std::nullopt;
-      }
 
-      bool isRvalueRef = paramTy->isRValueReferenceType();
-      // A C++ parameter of type `const <type> &` or `<type> &` becomes `<type>`
-      // or `inout <type>`. Moreover, `const <type> &&` or `<type> &&`
-      // becomes `<type>` or `consuming <type>`. Note that SILGen will use the
-      // indirect parameter convention for such a type.
-      paramTy = *refPointeeType;
-      if (!paramTy.isConstQualified()) {
-        if (isRvalueRef)
-          isConsuming = true;
-        else
-          isInOut = true;
-      }
+      // Note that SILGen will use the indirect parameter convention for such
+      // a type.
+      paramTy = ref->pointeeType;
+      isInOut |= ref->kind == CxxReferenceParameterKind::Mutating;
+      isConsuming |= ref->kind == CxxReferenceParameterKind::Consuming;
       bridging = Bridgeability::None;
     }
   }
@@ -2750,14 +2712,17 @@ ClangImporter::Implementation::importParameterType(
     swiftParamTy = importedType.getType();
   }
 
-  // `isInOut` is set above if we stripped off a mutable `&` before importing
-  // the type. Normally, we want to use an `inout` parameter in this situation.
-  // However, if the parameter belongs to a foreign reference type *and* the
-  // reference we stripped out was directly to that type (rather than to a
-  // pointer to that type), the foreign reference type should "eat" the
-  // indirection of the `&`, so we *don't* want to use an `inout` parameter.
-  if (isInOut && isDirectUseOfForeignReferenceType(paramTy, swiftParamTy))
+  // `isInOut`/`isConsuming` is set above if we stripped off a mutable `&` or an
+  // `&&` before importing the type. Normally, we want an `inout`/`consuming`
+  // parameter in that situation. However, if the parameter belongs to a foreign
+  // reference type *and* the reference we stripped out was directly to that type
+  // (rather than to a pointer to that type), the foreign reference type should
+  // "eat" the indirection of the reference, so we don't want either.
+  if ((isInOut || isConsuming) &&
+      isDirectUseOfForeignReferenceType(paramTy, swiftParamTy)) {
     isInOut = false;
+    isConsuming = false;
+  }
 
   return ImportParameterTypeResult{swiftParamTy, isInOut, isConsuming,
                                    isParamTypeImplicitlyUnwrapped};
@@ -2836,9 +2801,10 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // If SendingArgsAndResults are enabled and we have a sending argument,
   // set that the param was sending.
   if (ASTContext.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
-    if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
+    for (auto *attr : param->specific_attrs<clang::SwiftAttrAttr>()) {
       if (attr->getAttribute() == "sending") {
         paramInfo->setSending();
+        break;
       }
     }
   }

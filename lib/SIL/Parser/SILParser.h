@@ -62,11 +62,10 @@ private:
   llvm::DenseMap<Identifier, SILBasicBlock *> BlocksByName;
   llvm::DenseMap<SILBasicBlock *, Located<Identifier>> UndefinedBlocks;
 
-  /// The set of opened packs in the function, indexed by UUID.
-  /// Note that we don't currently support parsing references to
-  /// opened packs prior to their instruction, although this is
-  /// theoretically possible if basic blocks are not sorted in
-  /// dominance order.
+  /// The set of opened packs in the function, indexed by environment ID.
+  /// Note that we don't currently support parsing references to opened
+  /// packs prior to their instruction, although this is theoretically
+  /// possible if basic blocks are not sorted in dominance order.
   SILTypeResolutionContext::OpenedPackElementsMap OpenedPackElements;
 
   /// Data structures used to perform name lookup for local values.
@@ -299,11 +298,23 @@ public:
   }
   /// @}
 
+  enum class ValueDeclPredicate {
+    None,
+    Storage,
+    Var,
+    StoredVar
+  };
+  bool applyValueDeclPredicate(ValueDeclPredicate predicate,
+                               ValueDecl *&Decl,
+                               SmallVectorImpl<ValueDecl *> &values);
+
   bool parseSILDottedPath(ValueDecl *&Decl,
                           SmallVectorImpl<ValueDecl *> &values);
-  bool parseSILDottedPath(ValueDecl *&Decl) {
+  bool parseSILDottedPath(ValueDecl *&Decl, ValueDeclPredicate predicate) {
     SmallVector<ValueDecl *, 4> values;
-    return parseSILDottedPath(Decl, values);
+    if (parseSILDottedPath(Decl, values))
+      return true;
+    return applyValueDeclPredicate(predicate, Decl, values);
   }
   bool parseSILDottedPathWithoutPound(ValueDecl *&Decl,
                                       SmallVectorImpl<ValueDecl *> &values);

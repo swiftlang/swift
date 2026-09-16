@@ -13,12 +13,15 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Once.h"
 
+#include <errno.h>
 #include <time.h>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
 #include <realtimeapiset.h>
+
+#pragma comment(lib, "OneCore.Lib")
 #endif
 
 #if __has_include(<chrono>) && __STDC_HOSTED__

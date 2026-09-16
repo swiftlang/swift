@@ -64,8 +64,12 @@
 public func foo() {}
 
 //--- Client.swift
+// expected-warning@<unknown> * {{libc not found for }}
+
 import Lib // expected-remark {{rebuilding module 'Lib' from interface}}
 
 //--- Client_NoRebuild.swift
+// expected-warning@<unknown> * {{libc not found for }}
+
 import Lib
 

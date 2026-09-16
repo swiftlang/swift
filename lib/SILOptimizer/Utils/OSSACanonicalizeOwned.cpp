@@ -67,7 +67,6 @@
 
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -77,9 +76,7 @@
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/Statistic.h"
 
 using namespace swift;
@@ -188,7 +185,7 @@ bool OSSACanonicalizeOwned::computeCanonicalLiveness() {
           // interesting.
           if (liveness->getBlockLiveness(dvi->getParent()) !=
               PrunedLiveBlocks::LiveOut) {
-            recordDebugValue(dvi);
+            recordDebugUse(use);
           }
           continue;
         }
@@ -1366,12 +1363,13 @@ void OSSACanonicalizeOwned::rewriteCopies(
     for (auto *destroy : newDestroys) {
       liveness->updateForUse(destroy, /*lifetimeEnding=*/true);
     }
-    for (auto *dvi : debugValues) {
+    for (auto *use : debugUses) {
+      auto *dvi = cast<DebugValueInst>(use->getUser());
       if (liveness->isWithinBoundary(dvi)) {
         continue;
       }
       LLVM_DEBUG(llvm::dbgs() << "  Killing debug_value: " << *dvi);
-      dvi->killOperand();
+      dvi->killOperand(use->getOperandNumber());
     }
   }
 

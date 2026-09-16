@@ -308,6 +308,11 @@ static const WitnessTable *getNSErrorConformanceToError() {
   // safe to assume that that's been linked in if a user is using NSError in
   // their Swift source.
 
+#ifdef SWIFT_STDLIB_ENABLE_LAZY_LINK
+  extern const ProtocolConformanceDescriptor MANGLE_SYM(
+      So10CFErrorRefas5Error10FoundationMc);
+  auto *conformance = &MANGLE_SYM(So10CFErrorRefas5Error10FoundationMc);
+#else
   auto *conformance = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<const ProtocolConformanceDescriptor *>(
       dlsym(RTLD_DEFAULT,
@@ -315,12 +320,18 @@ static const WitnessTable *getNSErrorConformanceToError() {
   assert(conformance &&
          "Foundation overlay not loaded, or 'CFError : Error' conformance "
          "not available");
+#endif
   return swift_getWitnessTable(conformance,
                                conformance->getCanonicalTypeMetadata(),
                                nullptr);
 }
 
 static const HashableWitnessTable *getNSErrorConformanceToHashable() {
+#ifdef SWIFT_STDLIB_ENABLE_LAZY_LINK
+  extern const ProtocolConformanceDescriptor MANGLE_SYM(
+      So8NSObjectCSH10ObjectiveCMc);
+  auto *conformance = &MANGLE_SYM(So8NSObjectCSH10ObjectiveCMc);
+#else
   auto *conformance = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<const ProtocolConformanceDescriptor *>(
       dlsym(RTLD_DEFAULT,
@@ -328,6 +339,7 @@ static const HashableWitnessTable *getNSErrorConformanceToHashable() {
   assert(conformance &&
          "ObjectiveC overlay not loaded, or 'NSObject : Hashable' conformance "
          "not available");
+#endif
   return (const HashableWitnessTable *)swift_getWitnessTable(
            conformance,
            conformance->getCanonicalTypeMetadata(),
@@ -452,12 +464,24 @@ id getErrorUserInfoNSDictionary(
                 const Metadata *T,
                 const WitnessTable *Error);
 
+#ifdef SWIFT_STDLIB_ENABLE_LAZY_LINK
+// public func Foundation._getErrorDefaultUserInfo<T: Error>(_ error: T)
+//   -> AnyObject?
+extern "C" SWIFT_CC(swift) NSDictionary *MANGLE_SYM(
+    10Foundation24_getErrorDefaultUserInfoyyXlSgxs0C0RzlF)(
+    const OpaqueValue *error, const Metadata *T, const WitnessTable *Error);
+#endif
+
 // @_silgen_name("_swift_stdlib_getErrorDefaultUserInfo")
 // internal func _getErrorDefaultUserInfo<T : Error>(_ x: T) -> AnyObject
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 id _swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
                                          const Metadata *T,
                                          const WitnessTable *Error) {
+#ifdef SWIFT_STDLIB_ENABLE_LAZY_LINK
+  auto foundationGetDefaultUserInfo =
+      MANGLE_SYM(10Foundation24_getErrorDefaultUserInfoyyXlSgxs0C0RzlF);
+#else
   // public func Foundation._getErrorDefaultUserInfo<T: Error>(_ error: T)
   //   -> AnyObject?
   typedef SWIFT_CC(swift) NSDictionary *(*GetErrorDefaultUserInfoFunction)(
@@ -472,6 +496,7 @@ id _swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
   if (!foundationGetDefaultUserInfo) {
     return nullptr;
   }
+#endif
 
   // +0 Convention: In the case where we have the +1 convention, this will
   // destroy the error for us, otherwise, it will take the value guaranteed. The
@@ -565,6 +590,19 @@ isKindOfClass(HeapObject *object, Class cls) {
   return [reinterpret_cast<id>(object) isKindOfClass: cls];
 }
 
+#ifdef SWIFT_STDLIB_ENABLE_LAZY_LINK
+// public func Foundation._bridgeNSErrorToError<
+//   T : _ObjectiveCBridgeableError
+// >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
+extern "C" SWIFT_CC(swift) bool MANGLE_SYM(
+    10Foundation21_bridgeNSErrorToError_3outSbSo0C0C_SpyxGtAA021_ObjectiveCBridgeableE0RzlF)(
+    NSError *, OpaqueValue *, const Metadata *, const WitnessTable *);
+
+// protocol _ObjectiveCBridgeableError
+extern ProtocolDescriptor
+    MANGLE_SYM(10Foundation26_ObjectiveCBridgeableErrorMp);
+#endif
+
 bool
 swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
                                           OpaqueValue *dest,
@@ -590,6 +628,12 @@ swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
                              theErrorTy, destType, flags);
   }
 
+#ifdef SWIFT_STDLIB_ENABLE_LAZY_LINK
+  auto bridgeNSErrorToError = MANGLE_SYM(
+      10Foundation21_bridgeNSErrorToError_3outSbSo0C0C_SpyxGtAA021_ObjectiveCBridgeableE0RzlF);
+  auto TheObjectiveCBridgeableError =
+      &MANGLE_SYM(10Foundation26_ObjectiveCBridgeableErrorMp);
+#else
   // public func Foundation._bridgeNSErrorToError<
   //   T : _ObjectiveCBridgeableError
   // >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
@@ -611,6 +655,7 @@ swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
   // bridged.
   if (!bridgeNSErrorToError || !TheObjectiveCBridgeableError)
     return false;
+#endif
 
   // Is the target type a bridgeable error?
   auto witness = swift_conformsToProtocolCommon(destType,

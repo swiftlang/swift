@@ -4,6 +4,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: std_span
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import StdSpan

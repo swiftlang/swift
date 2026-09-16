@@ -28,15 +28,12 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
-#include "swift/SIL/SILVTableVisitor.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
@@ -59,7 +56,6 @@
 #include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
-#include "HeapTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -295,6 +291,11 @@ namespace {
     void maybeAddCxxRecordBases(ClassDecl *cd) {
       auto cxxRecord = dyn_cast_or_null<clang::CXXRecordDecl>(cd->getClangDecl());
       if (!cxxRecord)
+        return;
+
+      // A foreign reference type is imported even when it is only declared, and
+      // an incomplete type has neither bases nor a layout to ask for.
+      if (!cxxRecord->isCompleteDefinition())
         return;
 
       auto bases = getBasesAndOffsets(cxxRecord);
@@ -1023,7 +1024,12 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
                               size, alignMask);
 
   selfValue = emitCastToHeapObject(IGF, selfValue);
-  emitDeallocateClassInstance(IGF, selfValue, size, alignMask);
+  auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
+                                             /*forBackwardDeployment=*/false);
+  auto maybeDescriptor =
+      classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, selfType);
+  emitDeallocateClassInstance(IGF, selfValue, size, alignMask, maybeDescriptor);
 }
 
 void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
@@ -1038,8 +1044,13 @@ void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                               size, alignMask);
 
   selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.RefCountedPtrTy);
+  auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
+                                             /*forBackwardDeployment=*/false);
+  auto maybeDescriptor =
+      classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, selfType);
   emitDeallocatePartialClassInstance(IGF, selfValue, metadataValue,
-                                     size, alignMask);
+                                     size, alignMask, maybeDescriptor);
 }
 
 /// emitClassDecl - Emit all the declarations associated with this class type.

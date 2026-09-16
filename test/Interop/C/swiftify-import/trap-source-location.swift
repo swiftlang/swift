@@ -1,5 +1,6 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
+// UNSUPPORTED: back_deployment_runtime || use_os_stdlib
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t

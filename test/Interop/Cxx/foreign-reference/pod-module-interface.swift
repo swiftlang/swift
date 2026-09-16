@@ -2,8 +2,8 @@
 
 // CHECK: class Empty {
 // CHECK: init
-// CHECK:   func test() -> Int32
-// CHECK:   func testMutable() -> Int32
+// CHECK:   func test() -> CInt
+// CHECK:   func testMutable() -> CInt
 // CHECK:   class func create() -> Empty
 // CHECK: }
 // CHECK: func takesConstRefEmpty(_ e: Empty)
@@ -13,17 +13,17 @@
 
 // CHECK: class MultipleAttrs {
 // CHECK: init
-// CHECK:   func test() -> Int32
-// CHECK:   func testMutable() -> Int32
+// CHECK:   func test() -> CInt
+// CHECK:   func testMutable() -> CInt
 // CHECK:   class func create() -> MultipleAttrs
 // CHECK: }
 
 // CHECK: class IntPair {
 // CHECK: init
-// CHECK:   var a: Int32
-// CHECK:   var b: Int32
-// CHECK:   func test() -> Int32
-// CHECK:   func testMutable() -> Int32
+// CHECK:   var a: CInt
+// CHECK:   var b: CInt
+// CHECK:   func test() -> CInt
+// CHECK:   func testMutable() -> CInt
 // CHECK:   func instancePassThroughByRef(_ ref: IntPair) -> IntPair
 // CHECK:   class func staticPassThroughByRef(_ ref: IntPair) -> IntPair
 // CHECK:   class func create() -> IntPair
@@ -35,36 +35,36 @@
 // CHECK: class RefHoldingPair {
 // CHECK: init
 // CHECK-NOT: pair
-// CHECK:   var otherValue: Int32
-// CHECK:   func test() -> Int32
-// CHECK:   func testMutable() -> Int32
+// CHECK:   var otherValue: CInt
+// CHECK:   func test() -> CInt
+// CHECK:   func testMutable() -> CInt
 // CHECK:   class func create() -> RefHoldingPair
 // CHECK: }
 
 // CHECK: class RefHoldingPairRef {
 // CHECK: init
 // CHECK:   var pair: IntPair
-// CHECK:   var otherValue: Int32
-// CHECK:   func test() -> Int32
-// CHECK:   func testMutable() -> Int32
+// CHECK:   var otherValue: CInt
+// CHECK:   func test() -> CInt
+// CHECK:   func testMutable() -> CInt
 // CHECK:   class func create() -> RefHoldingPairRef
 // CHECK: }
 
 // CHECK: class RefHoldingPairPtr {
 // CHECK: init
 // CHECK:   var pair: IntPair
-// CHECK:   var otherValue: Int32
-// CHECK:   func test() -> Int32
-// CHECK:   func testMutable() -> Int32
+// CHECK:   var otherValue: CInt
+// CHECK:   func test() -> CInt
+// CHECK:   func testMutable() -> CInt
 // CHECK:   class func create() -> RefHoldingPairPtr
 // CHECK: }
 
 // CHECK: struct ValueHoldingPair {
 // CHECK-NOT: pair
 // CHECK:   init()
-// CHECK:   var otherValue: Int32
-// CHECK:   func test() -> Int32
-// CHECK:   mutating func testMutable() -> Int32
+// CHECK:   var otherValue: CInt
+// CHECK:   func test() -> CInt
+// CHECK:   mutating func testMutable() -> CInt
 // CHECK:   static func create() -> UnsafeMutablePointer<ValueHoldingPair>
 // CHECK: }
 
@@ -72,17 +72,17 @@
 // CHECK-NEXT:   init(pair: IntPair)
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   var pair: IntPair
-// CHECK-NEXT:   func sub(_ other: IntPair) -> Int32
+// CHECK-NEXT:   func sub(_ other: IntPair) -> CInt
 // CHECK-NEXT:   func max(_ other: IntPair) -> IntPair
 // CHECK-NEXT: }
 
 // CHECK: class BigType {
 // CHECK: init
-// CHECK:   var a: Int32
-// CHECK:   var b: Int32
+// CHECK:   var a: CInt
+// CHECK:   var b: CInt
 // CHECK:   var buffer:
-// CHECK:   func test() -> Int32
-// CHECK:   func testMutable() -> Int32
+// CHECK:   func test() -> CInt
+// CHECK:   func testMutable() -> CInt
 // CHECK:   class func create() -> BigType
 // CHECK: }
 // CHECK: func mutateIt(_ x: BigType)

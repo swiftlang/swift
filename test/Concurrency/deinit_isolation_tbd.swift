@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-availability-checking -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target %target-swift-6.1-abi-triple -emit-ir %s | %FileCheck %s
 
 
 public class Foo {

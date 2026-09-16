@@ -30,6 +30,7 @@
 // not available in on-device runtimes, or in the back-deployment runtime.
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Swift
 

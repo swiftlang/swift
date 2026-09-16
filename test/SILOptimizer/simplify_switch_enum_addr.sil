@@ -1,0 +1,362 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=switch_enum_addr | %FileCheck %s
+
+import Swift
+import Builtin
+
+class C {}
+
+class Klass {}
+
+enum E {
+  case a(C)
+  case b(C)
+  case c
+}
+
+enum E2 {
+  case a
+  case b
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_promotion : $@convention(thin) (@inout Optional<C>) -> () {
+// CHECK:       bb0(%0 : $*Optional<C>):
+// CHECK-NEXT:    %1 = load_borrow
+// CHECK-NEXT:    switch_enum %1
+// CHECK:       bb1([[PL:%.*]] : @guaranteed $C):
+// CHECK-NEXT:     end_borrow %1
+// CHECK-NEXT:     tuple
+// CHECK:       bb2:
+// CHECK-NEXT:     end_borrow %1
+// CHECK-NEXT:     unreachable
+// CHECK:       } // end sil function 'unchecked_take_enum_data_addr_promotion'
+sil [ossa] @unchecked_take_enum_data_addr_promotion : $@convention(thin) (@inout Optional<C>) -> () {
+bb0(%0 : $*Optional<C>):
+  switch_enum_addr %0, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  %3 = tuple ()
+  return %3
+
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_promotion_trivial : $@convention(thin) (@inout Optional<Int>) -> () {
+// CHECK:       bb0(%0 : $*Optional<Int>):
+// CHECK-NEXT:    %1 = load [trivial] %0
+// CHECK-NEXT:    switch_enum %1
+// CHECK:       bb1([[PL:%.*]] : $Int)
+// CHECK-NEXT:     tuple
+// CHECK:       bb2:
+// CHECK-NEXT:     unreachable
+// CHECK:       } // end sil function 'unchecked_take_enum_data_addr_promotion_trivial'
+sil [ossa] @unchecked_take_enum_data_addr_promotion_trivial : $@convention(thin) (@inout Optional<Int>) -> () {
+bb0(%0 : $*Optional<Int>):
+  switch_enum_addr %0, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  %3 = tuple ()
+  return %3
+
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil @unchecked_take_enum_data_addr_promotion_non_ossa : $@convention(thin) (@inout Optional<C>) -> () {
+// CHECK:       bb0(%0 : $*Optional<C>):
+// CHECK-NEXT:    %1 = load %0
+// CHECK-NEXT:    switch_enum %1
+// CHECK:       bb1:
+// CHECK-NEXT:     tuple
+// CHECK:       bb2:
+// CHECK-NEXT:     unreachable
+// CHECK:       } // end sil function 'unchecked_take_enum_data_addr_promotion_non_ossa'
+sil @unchecked_take_enum_data_addr_promotion_non_ossa : $@convention(thin) (@inout Optional<C>) -> () {
+bb0(%0 : $*Optional<C>):
+  switch_enum_addr %0, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  %3 = tuple ()
+  return %3
+
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @promote_with_unique_default_case : $@convention(thin) (@inout Optional<C>) -> () {
+// CHECK:       bb0(%0 : $*Optional<C>):
+// CHECK-NEXT:    %1 = load_borrow
+// CHECK-NEXT:    switch_enum %1
+// CHECK:       bb1([[PL:%.*]] : @guaranteed $C):
+// CHECK-NEXT:     end_borrow %1
+// CHECK-NEXT:     tuple
+// CHECK:       bb2:
+// CHECK-NEXT:     end_borrow %1
+// CHECK-NEXT:     unreachable
+// CHECK:       } // end sil function 'promote_with_unique_default_case'
+sil [ossa] @promote_with_unique_default_case : $@convention(thin) (@inout Optional<C>) -> () {
+bb0(%0 : $*Optional<C>):
+  switch_enum_addr %0, case #Optional.none!enumelt: bb2, default bb1
+
+bb1:
+  %3 = tuple ()
+  return %3
+
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @promote_with_non_unique_default_case : $@convention(thin) (@inout E) -> () {
+// CHECK:       bb0(%0 : $*E):
+// CHECK-NEXT:    %1 = load_borrow
+// CHECK-NEXT:    switch_enum %1
+// CHECK:       bb1([[PL:%.*]] : @guaranteed $C):
+// CHECK-NEXT:     end_borrow %1
+// CHECK-NEXT:     tuple
+// CHECK:       bb2([[E:%.*]] : @guaranteed $E):
+// CHECK-NEXT:     end_borrow %1
+// CHECK-NEXT:     unreachable
+// CHECK:       } // end sil function 'promote_with_non_unique_default_case'
+sil [ossa] @promote_with_non_unique_default_case : $@convention(thin) (@inout E) -> () {
+bb0(%0 : $*E):
+  switch_enum_addr %0, case #E.a!enumelt: bb1, default bb2
+
+bb1:
+  %3 = tuple ()
+  return %3
+
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dont_promote_non_loadable_type : $@convention(thin) <T> (@inout Optional<T>) -> () {
+// CHECK:         switch_enum_addr
+// CHECK:       } // end sil function 'dont_promote_non_loadable_type'
+sil [ossa] @dont_promote_non_loadable_type : $@convention(thin) <T> (@inout Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  switch_enum_addr %0, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  %3 = tuple ()
+  return %3
+
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @constant_fold_simple :
+// CHECK:         inject_enum_addr %0
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'constant_fold_simple'
+sil [ossa] @constant_fold_simple : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<C>
+  debug_value %0, let, name "e2", expr op_deref
+  inject_enum_addr %0, #Optional.none!enumelt
+  switch_enum_addr %0, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2 
+
+bb1:
+  destroy_addr %0
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @constant_fold_with_payload :
+// CHECK:         inject_enum_addr %1
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'constant_fold_with_payload'
+sil [ossa] @constant_fold_with_payload : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = alloc_stack $Optional<C>
+  %2 = init_enum_data_addr %1, #Optional.some!enumelt
+  store %0 to [init] %2
+  inject_enum_addr %1, #Optional.some!enumelt
+  switch_enum_addr %1, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2 
+
+bb1:
+  destroy_addr %1
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @resilient_enum_case_propagation :
+// CHECK-NOT:     switch_enum
+// CHECK:       } // end sil function 'resilient_enum_case_propagation'
+sil [ossa] @resilient_enum_case_propagation : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = alloc_stack $FloatingPointRoundingRule
+  inject_enum_addr %0, #FloatingPointRoundingRule.toNearestOrEven!enumelt
+  %2 = alloc_stack $FloatingPointRoundingRule
+  copy_addr %0 to [init] %2
+  destroy_addr %0
+  switch_enum_addr %2, case #FloatingPointRoundingRule.toNearestOrAwayFromZero!enumelt: bb1, default bb2
+
+bb1:
+  %6 = integer_literal $Builtin.Int64, 1
+  br bb3(%6)
+
+bb2:
+  destroy_addr %2
+  %9 = integer_literal $Builtin.Int64, 0
+  br bb3(%9)
+
+bb3(%11 : $Builtin.Int64):
+  dealloc_stack %2
+  dealloc_stack %0
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @dont_constant_fold_multiple_injects :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_constant_fold_multiple_injects'
+sil [ossa] @dont_constant_fold_multiple_injects : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $E2
+  inject_enum_addr %0, #E2.a!enumelt
+  inject_enum_addr %0, #E2.b!enumelt
+  switch_enum_addr %0, case #E2.a!enumelt: bb1, case #E2.b!enumelt: bb2 
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_constant_fold_inject_and_copy :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_constant_fold_inject_and_copy'
+sil [ossa] @dont_constant_fold_inject_and_copy : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $E2
+  inject_enum_addr %0, #E2.a!enumelt
+  %1 = alloc_stack $E2
+  copy_addr %0 to [init] %1
+  inject_enum_addr %1, #E2.b!enumelt
+  switch_enum_addr %1, case #E2.a!enumelt: bb1, case #E2.b!enumelt: bb2 
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %1
+  dealloc_stack %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_constant_fold_multiple_copies :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_constant_fold_multiple_copies'
+sil [ossa] @dont_constant_fold_multiple_copies : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $E2
+  inject_enum_addr %0, #E2.a!enumelt
+  %1 = alloc_stack $E2
+  inject_enum_addr %1, #E2.b!enumelt
+  %2 = alloc_stack $E2
+  copy_addr %0 to [init] %2
+  copy_addr %1 to [init] %2
+  switch_enum_addr %2, case #E2.a!enumelt: bb1, case #E2.b!enumelt: bb2 
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %2
+  dealloc_stack %1
+  dealloc_stack %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @constant_fold_with_read_only_apply :
+// CHECK-NOT:     switch_enum
+// CHECK:       } // end sil function 'constant_fold_with_read_only_apply'
+sil [ossa] @constant_fold_with_read_only_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $E2
+  inject_enum_addr %0, #E2.a!enumelt
+  %1 = apply undef(%0) : $@convention(thin) (@in_guaranteed E2) -> ()
+  switch_enum_addr %0, case #E2.a!enumelt: bb1, case #E2.b!enumelt: bb2 
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_constant_fold_multiple_writes :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_constant_fold_multiple_writes'
+sil [ossa] @dont_constant_fold_multiple_writes : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $E2
+  inject_enum_addr %0, #E2.a!enumelt
+  %1 = apply undef(%0) : $@convention(thin) (@inout E2) -> ()
+  switch_enum_addr %0, case #E2.a!enumelt: bb1, case #E2.b!enumelt: bb2 
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_constant_fold_copy_from_unknown_source :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_constant_fold_copy_from_unknown_source'
+sil [ossa] @dont_constant_fold_copy_from_unknown_source : $@convention(thin) (@in_guaranteed E2) -> () {
+bb0(%0 : $*E2):
+  %1 = alloc_stack $E2
+  copy_addr %0 to [init] %1
+  switch_enum_addr %1, case #E2.a!enumelt: bb1, case #E2.b!enumelt: bb2 
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+

@@ -200,7 +200,8 @@ struct X : Differentiable {
   mutating func move(by offset: X.TangentVector)
 }
 
-sil [transparent] [thunk] @subset_parameter_thunk : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float, Double) -> X.TangentVector) -> X.TangentVector
+// A sample valid mangled name for AutoDiff subset parameters thunk (detection relies on demangling).
+sil [transparent] [thunk] @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float, Double) -> X.TangentVector) -> X.TangentVector
 
 sil @pullback_f : $@convention(thin) (Float, Double) -> X.TangentVector
 
@@ -215,7 +216,7 @@ sil hidden [ossa] @$s5test21g1xSfAA1XV_tFTJrSpSr : $@convention(thin) (X) -> (Fl
 bb0(%0 : $X):
   // CHECK:         sil shared [ossa] @$s10pullback_g0A2_fTf1nc_n : $@convention(thin) (Float) -> X.TangentVector {
   // CHECK:         bb0(%0 : $Float):
-  // CHECK:           %[[#D3:]] = function_ref @subset_parameter_thunk : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float, Double) -> X.TangentVector) -> X.TangentVector
+  // CHECK:           %[[#D3:]] = function_ref @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float, Double) -> X.TangentVector) -> X.TangentVector
   // CHECK:           %[[#D1:]] = function_ref @pullback_f : $@convention(thin) (Float, Double) -> X.TangentVector
   // CHECK:           %[[#D2:]] = thin_to_thick_function %[[#D1]] : $@convention(thin) (Float, Double) -> X.TangentVector to $@callee_guaranteed (Float, Double) -> X.TangentVector
   // COMBINE:         %[[#D5:]] = apply %[[#D3]](%0, %[[#D2]]) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float, Double) -> X.TangentVector) -> X.TangentVector
@@ -225,7 +226,7 @@ bb0(%0 : $X):
   // CHECK:         bb0(%0 : $X):
   // CHECK:           %[[#D6:]] = struct_extract %0 : $X, #X.a
   // COMBINE-NOT:     function_ref @pullback_f
-  // COMBINE-NOT:     function_ref @subset_parameter_thunk
+  // COMBINE-NOT:     function_ref @$sS3fIegydd_TJSpSSUpSrUSUP
   // CHECK:           %[[#D7:]] = function_ref @$s10pullback_g0A2_fTf1nc_n : $@convention(thin) (Float) -> X.TangentVector
   // COMBINE:         %[[#D8:]] = thin_to_thick_function %[[#D7]] : $@convention(thin) (Float) -> X.TangentVector to $@callee_guaranteed (Float) -> X.TangentVector
   // CHECK:           %[[#D9:]] = tuple (%[[#D6]] : $Float, %[[#D8]] : $@callee_guaranteed (Float) -> X.TangentVector)
@@ -235,8 +236,8 @@ bb0(%0 : $X):
   // function_ref pullback_f
   %2 = function_ref @pullback_f : $@convention(thin) (Float, Double) -> X.TangentVector
   %3 = thin_to_thick_function %2 : $@convention(thin) (Float, Double) -> X.TangentVector to $@callee_guaranteed (Float, Double) -> X.TangentVector
-  // function_ref subset_parameter_thunk
-  %4 = function_ref @subset_parameter_thunk : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float, Double) -> X.TangentVector) -> X.TangentVector
+  // function_ref $sS3fIegydd_TJSpSSUpSrUSUP
+  %4 = function_ref @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float, Double) -> X.TangentVector) -> X.TangentVector
   %5 = partial_apply [callee_guaranteed] %4(%3) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float, Double) -> X.TangentVector) -> X.TangentVector
   // function_ref pullback_g
   %6 = function_ref @pullback_g : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> X.TangentVector) -> X.TangentVector
@@ -271,33 +272,31 @@ bb0(%0 : $Float, %1 : @owned $@callee_guaranteed (Float) -> Float):
 // reverse-mode derivative of h(x:)
 sil hidden [ossa] @$s5test21h1xS2f_tFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 bb0(%0 : $Float):
-  // CHECK:         sil private [signature_optimized_thunk] [heuristic_always_inline] [ossa] @$s10pullback_h073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbackti1_j5FZSf_J6SfcfU_S2fTf1nE_n : $@convention(thin) (Float, Float, Float) -> Float {
-  // CHECK:         bb0(%0 : $Float, %1 : $Float, %2 : $Float):
-  // CHECK:           %[[#E8:]] = function_ref @$sS2fIegnr_S2fIegyd_TR : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float
-  // CHECK:           %[[#E6:]] = function_ref @pullback_f_specialized : $@convention(thin) (@in_guaranteed Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) -> @out Float
-  // CHECK:           %[[#E3:]] = function_ref @$sS3fIegydd_S3fIegnrr_TR : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> (@out Float, @out Float)
-  // CHECK:           %[[#E1:]] = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
-  // CHECK:           %[[#E2:]] = partial_apply [callee_guaranteed] %[[#E1]](%1, %2) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
-  // CHECK:           %[[#E4:]] = partial_apply [callee_guaranteed] %[[#E3]](%[[#E2]]) : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> (@out Float, @out Float)
-  // CHECK:           %[[#E5:]] = convert_function %[[#E4]] : $@callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float) to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>
-  // CHECK:           %[[#E7:]] = partial_apply [callee_guaranteed] %[[#E6]](%[[#E5]]) : $@convention(thin) (@in_guaranteed Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) -> @out Float
+  // COMBINE:       sil private [signature_optimized_thunk] [heuristic_always_inline] [ossa] @$s10pullback_h0A14_f_specializedxq_q0_Ri_zRi0_zRi__Ri0__Ri_0_Ri0_0_r1_lyS3fIsegnrr_Tf1nE_n : $@convention(thin) (Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) -> Float {
+  // COMBINE:       bb0(%0 : $Float, %1 : @owned $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>):
+  // COMBINE:         %[[#E8:]] = function_ref @$sS2fIegnr_S2fIegyd_TR : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float
+  // COMBINE:         %[[#E6:]] = function_ref @pullback_f_specialized : $@convention(thin) (@in_guaranteed Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) -> @out Float
+  // COMBINE:         %[[#E7:]] = partial_apply [callee_guaranteed] %[[#E6]](%1) : $@convention(thin) (@in_guaranteed Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) -> @out Float
   // COMBINE:         %[[#E10:]] = apply %[[#E8]](%0, %[[#E7]]) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float
   // COMBINE:         destroy_value %[[#E7]] : $@callee_guaranteed (@in_guaranteed Float) -> @out Float
-  // CHECK:           return %[[#E10]]
+  // COMBINE:         return %[[#E10]] : $Float
 
-  // CHECK:         sil hidden [ossa] @$s5test21h1xS2f_tFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
-  // CHECK:         bb0(%0 : $Float):
-  // CHECK:           %[[#E11:]] = struct_extract %0 : $Float, #Float._value
-  // CHECK:           %[[#E12:]] = builtin "fmul_FPIEEE32"(%[[#E11]] : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-  // COMBINE-NOT:     function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_
-  // COMBINE-NOT:     function_ref @$sS3fIegydd_S3fIegnrr_TR
-  // COMBINE-NOT:     function_ref @pullback_f_specialized
-  // COMBINE-NOT:     function_ref @$sS2fIegnr_S2fIegyd_TR
-  // CHECK:           %[[#E13:]] = struct $Float (%[[#E12]] : $Builtin.FPIEEE32)
-  // CHECK:           %[[#E14:]] = function_ref @$s10pullback_h073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbackti1_j5FZSf_J6SfcfU_S2fTf1nE_n : $@convention(thin) (Float, Float, Float) -> Float
-  // CHECK:           %[[#E15:]] = partial_apply [callee_guaranteed] %[[#E14]](%0, %0) : $@convention(thin) (Float, Float, Float) -> Float
-  // CHECK:           %[[#E16:]] = tuple (%[[#E13]] : $Float, %[[#E15]] : $@callee_guaranteed (Float) -> Float)
-  // CHECK:           return %[[#E16]]
+  // COMBINE:       sil hidden [ossa] @$s5test21h1xS2f_tFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+  // COMBINE:       bb0(%0 : $Float):
+  // COMBINE:         %[[#E11:]] = struct_extract %0 : $Float, #Float._value
+  // COMBINE:         %[[#E12:]] = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+  // COMBINE-NOT:   function_ref @pullback_f_specialized
+  // COMBINE-NOT:   function_ref @$sS2fIegnr_S2fIegyd_TR
+  // COMBINE:         %[[#E3:]] = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  // COMBINE:         %[[#E4:]] = partial_apply [callee_guaranteed] %[[#E3]](%0, %0) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  // COMBINE:         %[[#E5:]] = function_ref @$sS3fIegydd_S3fIegnrr_TR : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> (@out Float, @out Float)
+  // COMBINE:         %[[#E6:]] = partial_apply [callee_guaranteed] %[[#E5]](%[[#E4]]) : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> (@out Float, @out Float)
+  // COMBINE:         %[[#E7:]] = convert_function %[[#E6]] : $@callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float) to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>
+  // COMBINE:         %[[#E13:]] = struct $Float (%[[#E12]] : $Builtin.FPIEEE32)
+  // COMBINE:         %[[#E14:]] = function_ref @$s10pullback_h0A14_f_specializedxq_q0_Ri_zRi0_zRi__Ri0__Ri_0_Ri0_0_r1_lyS3fIsegnrr_Tf1nE_n : $@convention(thin) (Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) -> Float
+  // COMBINE:         %[[#E15:]] = partial_apply [callee_guaranteed] %9(%7) : $@convention(thin) (Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) -> Float
+  // COMBINE:         %[[#E16:]] = tuple (%[[#E13]] : $Float, %[[#E15]] : $@callee_guaranteed (Float) -> Float)
+  // COMBINE:         return %[[#E16]] : $(Float, @callee_guaranteed (Float) -> Float)
 
   %1 = struct_extract %0 : $Float, #Float._value
   %2 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32

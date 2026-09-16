@@ -22,11 +22,9 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintGraph.h"
@@ -38,7 +36,6 @@
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include <utility>
@@ -571,7 +568,7 @@ namespace {
       // to the input type of the subscript operator.
       auto addApplicableFn = [&]() {
         CS.addApplicationConstraint(
-            FunctionType::get(params, outputTy), memberTy,
+            FunctionType::get(params, /* yields */ {}, outputTy), memberTy,
             /*trailingClosureMatching=*/std::nullopt, CurDC, fnLocator);
       };
 
@@ -649,9 +646,9 @@ namespace {
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
-      CS.addApplicationConstraint(FunctionType::get(params, outputTy), memberTy,
-                                  /*trailingClosureMatching=*/std::nullopt,
-                                  CurDC, fnLocator);
+      CS.addApplicationConstraint(
+          FunctionType::get(params, /* yields */ {}, outputTy), memberTy,
+          /*trailingClosureMatching=*/std::nullopt, CurDC, fnLocator);
       return outputTy;
     }
 
@@ -974,7 +971,7 @@ namespace {
           TVO_CanBindToNoEscape);
 
       CS.addApplicationConstraint(
-          FunctionType::get(params, resultType), memberType,
+          FunctionType::get(params, /* yields */ {}, resultType), memberType,
           /*trailingClosureMatching=*/std::nullopt, CurDC, fnLoc);
 
       if (constr->isFailable())
@@ -2070,7 +2067,8 @@ namespace {
         extInfo = extInfo.withSendable();
       }
 
-      auto *fnTy = FunctionType::get(closureParams, resultTy, extInfo);
+      auto *fnTy =
+          FunctionType::get(closureParams, /* yields */ {}, resultTy, extInfo);
       return CS.replaceInferableTypesWithTypeVars(
           fnTy, CS.getConstraintLocator(closure))->castTo<FunctionType>();
     }
@@ -2544,7 +2542,8 @@ namespace {
           // Equal constraints require ExtInfo comparison.
           // FIXME: Verify ExtInfo state is correct, not working by accident.
           FunctionType::ExtInfo info;
-          Type functionType = FunctionType::get(params, outputType, info);
+          Type functionType =
+              FunctionType::get(params, /* yields */ {}, outputType, info);
 
           // TODO: Convert to own constraint? Note that ApplicableFn isn't quite
           // right, as pattern matching has data flowing *into* the apply result
@@ -2854,7 +2853,8 @@ namespace {
       getMatchingParams(expr->getArgs(), params);
 
       CS.addApplicationConstraint(
-          FunctionType::get(params, resultType, extInfo), CS.getType(fnExpr),
+          FunctionType::get(params, /* yields */ {}, resultType, extInfo),
+          CS.getType(fnExpr),
           /*trailingClosureMatching=*/std::nullopt, CurDC,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
@@ -3627,12 +3627,9 @@ namespace {
           TVO_CanBindToNoEscape);
 
       CS.addApplicationConstraint(
-          FunctionType::get(params, resultType),
-          macroRefType,
-          /*trailingClosureMatching=*/std::nullopt,
-          CurDC,
-          CS.getConstraintLocator(
-            expr, ConstraintLocator::ApplyFunction));
+          FunctionType::get(params, /* yields */ {}, resultType), macroRefType,
+          /*trailingClosureMatching=*/std::nullopt, CurDC,
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
       return resultType;
     }

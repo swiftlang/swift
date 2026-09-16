@@ -5,6 +5,7 @@
 // RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -verify-ignore-unrelated \
+// RUN:   -Xcc -Wno-nullability-completeness \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h \
 // RUN:   -verify-additional-prefix LIFETIMES- \
 // RUN:   -enable-experimental-feature LifetimeDependence
@@ -13,6 +14,7 @@
 // RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -verify-ignore-unrelated \
+// RUN:   -Xcc -Wno-nullability-completeness \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h \
 // RUN:   -verify-additional-prefix NO-LIFETIMES-
 
@@ -40,6 +42,13 @@ private:
 struct SWIFT_ESCAPABLE Owner {
     int data;
 };
+
+class SharedFRT {
+public:
+    int data;
+} SWIFT_SHARED_REFERENCE(retainSharedFRT, releaseSharedFRT);
+inline void retainSharedFRT(SharedFRT *) {}
+inline void releaseSharedFRT(SharedFRT *) {}
 
 template<typename T>
 struct SWIFT_ESCAPABLE TemplatedOwner {
@@ -75,6 +84,36 @@ View g(int* x) {
     return View(x);
 }
 
+// expected-warning@+2 {{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-LIFETIMES-error@+1 {{cannot borrow the lifetime of 'o', which is passed by value on a function}}
+View gByValue(Owner o);
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+
+// expected-warning@+2 {{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-LIFETIMES-error@+1 {{cannot borrow the lifetime of 'o', which is passed by value on a function}}
+View gByRvalueRef(Owner &&o);
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+
+// expected-warning@+2 {{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-LIFETIMES-error@+1 {{cannot borrow the lifetime of 'parameter #1', which is passed by value on a function}}
+View gByValueUnnamed(Owner);
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+
+// expected-warning@+2 {{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+View gByPointer(Owner *o);
+
+// expected-warning@+2 {{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+View gByFRTPointer(SharedFRT *_Nonnull p);
+
+struct SWIFT_NONESCAPABLE ViewByValueCtor {
+    // expected-warning@+2 {{the returned type 'ViewByValueCtor' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+    // expected-LIFETIMES-error@+1 {{cannot borrow the lifetime of 'o', which is passed by value on an initializer}}
+    ViewByValueCtor(Owner o);
+    // expected-NO-LIFETIMES-error@-1 {{an initializer cannot return a ~Escapable result}}
+};
+
 template<typename F, typename S>
 struct SWIFT_ESCAPABLE_IF(F, S) MyPair {
     F first;
@@ -89,6 +128,18 @@ MyPair<Owner, View> h2(int* x);
 
 // OK; MyPair<Owner, Owner> is not ~Escapable
 MyPair<Owner, Owner> h3(int* x);
+
+// SWIFT_ESCAPABLE_IF is found even when another swift_attr precedes it.
+template<typename F>
+struct SWIFT_UNCHECKED_SENDABLE SWIFT_ESCAPABLE_IF(F) MySendablePair {
+    F first;
+};
+
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+MySendablePair<View> h4(int* x);
+
+// OK; MySendablePair<Owner> is not ~Escapable
+MySendablePair<Owner> h5(int* x);
 
 // expected-error@+3 {{template parameter 'Missing' does not exist}}
 // expected-error@+2 {{template parameter 'Missing' does not exist}}
@@ -161,6 +212,8 @@ OwnerVector l2();
 const View* usedToCrash(const View* p) {
     return p;
 }
+
+View* usedToCrashAsInit(const int* p) SWIFT_NAME(View.init(p:));
 
 // expected-note@+1 {{escapable record 'Invalid' cannot have non-escapable field 'v'}}
 struct SWIFT_ESCAPABLE Invalid {
@@ -331,6 +384,12 @@ public func importInvalid(_ x: Invalid) {}
 // expected-error@+1 {{cannot find type 'Invalid2' in scope}}
 public func importInvalid(_ x: Invalid2) {}
 
+// 'usedToCrashAsInit' returns a pointer to a non-escapable type, which cannot
+// be imported, so no 'init(p:)' is added to 'View'.
+public func droppedInitializer() {
+    _ = View(p: nil) // expected-error {{extraneous argument label 'p:' in call}}
+}
+
 // expected-LIFETIMES-error@+3 {{a function with a ~Escapable result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+2 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 // expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
@@ -343,6 +402,8 @@ public func noAnnotations() -> View {
     h1(nil)
     h2(nil)
     h3(nil)
+    h4(nil)
+    h5(nil)
     i1()
     i2()
     j1()
@@ -354,6 +415,19 @@ public func noAnnotations() -> View {
     l1()
     l2()
     return View()
+}
+
+public func diagnoseByValue(_ o: Owner) {
+    gByValue(o)
+    gByRvalueRef(consuming: Owner(data: 0))
+    gByValueUnnamed(o)
+    _ = ViewByValueCtor(o)
+}
+
+@available(SwiftStdlib 5.8, *)
+public func doNotDiagnoseIndirectlyPassedRecords(_ o: UnsafeMutablePointer<Owner>, _ p: SharedFRT) {
+    gByPointer(o)
+    gByFRTPointer(p)
 }
 
 public func diagnoseInvalidSwiftAttributes() {

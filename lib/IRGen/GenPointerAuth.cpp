@@ -21,13 +21,10 @@
 #include "IRGenFunction.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/TypeLowering.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/Support/SipHash.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace irgen;
@@ -179,6 +176,7 @@ static const PointerAuthSchema &getFunctionPointerSchema(IRGenModule &IGM,
                                                    CanSILFunctionType fnType) {
   auto &options = IGM.getOptions().PointerAuth;
   switch (fnType->getRepresentation()) {
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
     return options.FunctionPointers;
@@ -512,6 +510,7 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
     }
     
     // C function pointers are undiscriminated.
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::CFunctionPointer:
       return llvm::ConstantInt::get(IGM.Int64Ty, 0);

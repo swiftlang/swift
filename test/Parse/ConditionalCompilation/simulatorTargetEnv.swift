@@ -2,6 +2,8 @@
 // RUN: %swift -swift-version 4 -typecheck %s -verify -target x86_64-unknown-linux-simulator -parse-stdlib
 // RUN: %swift-ide-test -swift-version 4 -test-input-complete -source-filename=%s -target x86_64-apple-ios7.0-simulator
 
+// expected-warning@<unknown> * {{libc not found for 'x86_64-unknown-linux-simulator'; C stdlib may be unavailable}}
+
 #if !targetEnvironment(simulator)
 // This block should not be type checked.
 let i: Int = "Hello"

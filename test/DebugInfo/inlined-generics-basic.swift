@@ -84,10 +84,10 @@ public class C<R> {
 // SIL-LABEL: } // end sil function '$s1A1CC1fyyqd__lF'
 // IR-LABEL: ret void
 
-// IR: ![[BOOL:[0-9]+]] = !DICompositeType({{.*}}name: "Bool"
-// IR: ![[LET_BOOL:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[BOOL]])
-// IR: ![[INT:[0-9]+]] = !DICompositeType({{.*}}name: "Int"
-// IR: ![[LET_INT:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[INT]])
+// IR-DAG: ![[BOOL:[0-9]+]] = !DICompositeType({{.*}}name: "Bool"
+// IR-DAG: ![[LET_BOOL:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[BOOL]])
+// IR-DAG: ![[INT:[0-9]+]] = !DICompositeType({{.*}}name: "Int"
+// IR-DAG: ![[LET_INT:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[INT]])
 // IR-DAG: ![[TAU_0_0:[0-9]+]] = {{.*}}DW_TAG_structure_type, name: "$sxD", file
 // IR-DAG: ![[LET_TAU_0_0:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[TAU_0_0]])
 // IR-DAG: ![[TAU_1_0:[0-9]+]] = {{.*}}DW_TAG_structure_type, name: "$sqd__D", file

@@ -11,33 +11,33 @@
 // CHECK-NEXT:     case ecc
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct Enum : Hashable, Equatable, RawRepresentable {
-// CHECK-NEXT:     init(_ rawValue: {{UInt32|Int32}})
-// CHECK-NEXT:     init(rawValue: {{UInt32|Int32}})
-// CHECK-NEXT:     var rawValue: {{UInt32|Int32}}
-// CHECK-NEXT:     typealias RawValue = {{UInt32|Int32}}
+// CHECK-NEXT:     init(_ rawValue: {{CUnsignedInt|CInt}})
+// CHECK-NEXT:     init(rawValue: {{CUnsignedInt|CInt}})
+// CHECK-NEXT:     var rawValue: {{CUnsignedInt|CInt}}
+// CHECK-NEXT:     typealias RawValue = {{CUnsignedInt|CInt}}
 // CHECK-NEXT:   }
 // CHECK-NEXT:   static var ea: Base.Enum { get }
 // CHECK-NEXT:   static var eb: Base.Enum { get }
 // CHECK-NEXT:   static var ec: Base.Enum { get }
 // CHECK-NEXT:   struct Struct {
-// CHECK-NEXT:     init(sa: Int32, sb: Int32)
+// CHECK-NEXT:     init(sa: CInt, sb: CInt)
 // CHECK-NEXT:     init()
-// CHECK-NEXT:     var sa: Int32
-// CHECK-NEXT:     var sb: Int32
+// CHECK-NEXT:     var sa: CInt
+// CHECK-NEXT:     var sb: CInt
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct Parent {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:     struct Child {
-// CHECK-NEXT:       init(pca: Int32)
+// CHECK-NEXT:       init(pca: CInt)
 // CHECK-NEXT:       init()
-// CHECK-NEXT:       var pca: Int32
+// CHECK-NEXT:       var pca: CInt
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct Union {
-// CHECK-NEXT:     init(ua: Int32)
+// CHECK-NEXT:     init(ua: CInt)
 // CHECK-NEXT:     init(ub: Base.Struct)
 // CHECK-NEXT:     init()
-// CHECK-NEXT:     var ua: Int32
+// CHECK-NEXT:     var ua: CInt
 // CHECK-NEXT:     var ub: Base.Struct
 // CHECK-NEXT:   }
 // CHECK-NEXT: }

@@ -12,9 +12,7 @@
 
 #include "swift/Serialization/Serialization.h"
 #include "swift/APIDigester/ModuleAnalyzerNodes.h"
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileSystem.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
@@ -116,7 +114,7 @@ void swift::serializeToBuffers(
                                "Serialization, swiftsourceinfo, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
-    serialization::writeSourceInfoToStream(stream, DC);
+    serialization::writeSourceInfoToStream(stream, DC, options);
     (void)withOutputPath(
         getContext(DC).Diags, getContext(DC).getOutputBackend(),
         options.SourceInfoOutputPath, [&](raw_ostream &out) {
@@ -172,7 +170,7 @@ void swift::serialize(
         options.SourceInfoOutputPath, [&](raw_ostream &out) {
           FrontendStatsTracer tracer(getContext(DC).Stats,
                                      "Serialization, swiftsourceinfo");
-          serialization::writeSourceInfoToStream(out, DC);
+          serialization::writeSourceInfoToStream(out, DC, options);
           return false;
         });
   }

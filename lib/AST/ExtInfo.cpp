@@ -158,6 +158,9 @@ void ASTExtInfoBuilder::checkInvariants() const {
   }
   if (sendableDependentType)
     ASSERT(!isSendable() && sendableDependentType->hasTypeVariable());
+
+  if (calledOnceDependentType)
+    ASSERT(!isCalledOnce() && calledOnceDependentType->hasTypeVariable());
 }
 
 // MARK: - ASTExtInfo

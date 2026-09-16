@@ -38,7 +38,6 @@
 #include "Signature.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "llvm/IR/Function.h"
@@ -140,7 +139,7 @@ void IRGenThunk::prepareArguments() {
     witnessMetadata.SelfMetadata = original.takeLast();
   }
 
-  SILFunctionConventions conv(origTy, IGF.getSILModule());
+  SILFunctionConventions conv(origTy, IGF.IGM.silConv);
 
   // swiftself is the last parameter here (any witness metadata was popped
   // above), so claim it now so the typed-error claim below lands on the
@@ -354,7 +353,7 @@ void IRGenThunk::emit() {
   Explosion result;
 
   // Determine if the result is returned indirectly.
-  SILFunctionConventions conv(origTy, IGF.getSILModule());
+  SILFunctionConventions conv(origTy, IGF.IGM.silConv);
   SILType directResultType = conv.getSILResultType(expansionContext);
   auto &directResultTL = IGF.IGM.getTypeInfo(directResultType);
   auto &schema = directResultTL.nativeReturnValueSchema(IGF.IGM);

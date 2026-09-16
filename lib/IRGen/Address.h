@@ -18,11 +18,11 @@
 #define SWIFT_IRGEN_ADDRESS_H
 
 #include "IRGen.h"
+#include "swift/Basic/PointerIntPair.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 
@@ -40,9 +40,6 @@ public:
 
   Address(llvm::Value *addr, llvm::Type *elementType, Alignment align)
       : Addr(addr), ElementType(elementType), Align(align) {
-    if (addr == llvm::DenseMapInfo<llvm::Value *>::getEmptyKey() ||
-        llvm::DenseMapInfo<llvm::Value *>::getTombstoneKey())
-      return;
     assert(addr != nullptr && "building an invalid address");
   }
 
@@ -173,7 +170,7 @@ public:
   /// The address of an object of type T.
   Address Addr;
 
-  llvm::PointerIntPair<llvm::Value*, 3, Kind> ExtraInfoAndKind;
+  swift::PointerIntPair<llvm::Value*, 3, Kind> ExtraInfoAndKind;
 
 public:
   StackAddress() : ExtraInfoAndKind(nullptr, StaticAlloca) {}

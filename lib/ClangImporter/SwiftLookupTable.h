@@ -28,11 +28,9 @@
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/Compiler.h"
-#include <functional>
 #include <optional>
 #include <utility>
+#include "llvm/ADT/TinyPtrVector.h"
 
 namespace llvm {
 class BitstreamWriter;
@@ -280,7 +278,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 25; // No more __Unsafe in lookup table
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 26; // APINotes macro renames
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.

@@ -22,7 +22,7 @@ using namespace swift;
 
 /// Return true if all OperandOwnership invariants hold.
 bool swift::checkOperandOwnershipInvariants(const Operand *operand,
-                                            SILModuleConventions *silConv) {
+                                            SILAddressConventions *silConv) {
   OperandOwnership opOwnership = operand->getOperandOwnership(silConv);
   if (opOwnership == OperandOwnership::Borrow) {
     // Must be a valid BorrowingOperand.
@@ -40,9 +40,10 @@ namespace {
 class OperandOwnershipClassifier
   : public SILInstructionVisitor<OperandOwnershipClassifier, OperandOwnership> {
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
-  // Allow module conventions to be overridden while lowering between canonical
-  // and lowered SIL stages.
-  SILModuleConventions silConv;
+  // Address conventions for classifying this operand. Overridable so
+  // AddressLowering can classify operands in address form before the function's
+  // lowered bit is set.
+  SILAddressConventions silConv;
 
   const Operand &op;
 
@@ -54,7 +55,7 @@ public:
   /// should be the subobject and Value should be the parent object. An example
   /// of where one would want to do this is in the case of value projections
   /// like struct_extract.
-  OperandOwnershipClassifier(SILModuleConventions silConv, const Operand &op)
+  OperandOwnershipClassifier(SILAddressConventions silConv, const Operand &op)
       : mod(silConv.getModule()), silConv(silConv), op(op) {}
 
   SILValue getValue() const { return op.get(); }
@@ -218,9 +219,12 @@ OPERAND_OWNERSHIP(TrivialUse, DereferenceBorrow)
 OPERAND_OWNERSHIP(TrivialUse, DereferenceAddrBorrow)
 OPERAND_OWNERSHIP(TrivialUse, DereferenceBorrowAddr)
 
-// The dealloc_stack_ref operand needs to have NonUse ownership because
-// this use comes after the last consuming use (which is usually a dealloc_ref).
+// A dealloc_stack_ref or end_formal_scope operand needs to have NonUse
+// ownership because this use comes after the last consuming use (which is
+// usually a dealloc_ref).
 OPERAND_OWNERSHIP(NonUse, DeallocStackRef)
+OPERAND_OWNERSHIP(NonUse, EndFormalScope)
+
 OPERAND_OWNERSHIP(InstantaneousUse, IgnoredUse)
 
 // Use an owned or guaranteed value only for the duration of the operation.
@@ -250,6 +254,7 @@ OPERAND_OWNERSHIP(UnownedInstantaneousUse, CopyBlock)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, CopyValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, ExplicitCopyValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, ObjCMethod)
+OPERAND_OWNERSHIP(UnownedInstantaneousUse, COMMethod)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, ObjCSuperMethod)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedRetainValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedReleaseValue)
@@ -271,7 +276,25 @@ OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedAutoreleaseValue)
 OPERAND_OWNERSHIP(PointerEscape, ProjectBox) // The result is a T*.
 OPERAND_OWNERSHIP(PointerEscape, ProjectExistentialBox)
 OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
-OPERAND_OWNERSHIP(PointerEscape, ConvertEscapeToNoEscape)
+
+// For an ordinary (copyable) escaping closure, the pre-conversion operand
+// may still be used again after the conversion (e.g. a `var` read again
+// later), so treat the conversion conservatively as a non-consuming pointer
+// escape.
+//
+// A `@called(once)` function value is single-owner and move-only-checked,
+// so pre-conversion value doesn't survive to be used again -- any further
+// use would already be diagnosed as a double consumption by the move-only
+// checker. Treat the conversion as an ordinary forwarding consume in that
+// case, matching how `convert_function` and other function type conversions
+// are already treated, so ownership-based analyses don't need to
+// special-case this instruction.
+OperandOwnership OperandOwnershipClassifier::visitConvertEscapeToNoEscapeInst(
+    ConvertEscapeToNoEscapeInst *i) {
+  return i->getType().castTo<SILFunctionType>()->isCalledOnce()
+             ? OperandOwnership::ForwardingConsume
+             : OperandOwnership::PointerEscape;
+}
 
 // UncheckedBitwiseCast ownership behaves like RefToUnowned. It produces an
 // Unowned value from a non-trivial value, without consuming or borrowing the
@@ -383,6 +406,7 @@ OPERAND_OWNERSHIP(EndBorrow, AbortApply)
         /*allowUnowned*/ false);                                               \
   }
 FORWARDING_OWNERSHIP(OpenExistentialRef)
+FORWARDING_OWNERSHIP(OpenCOMExistential)
 FORWARDING_OWNERSHIP(ConvertFunction)
 FORWARDING_OWNERSHIP(RefToBridgeObject)
 FORWARDING_OWNERSHIP(BridgeObjectToRef)
@@ -578,7 +602,7 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
     if (apply.isCalleeOperand(op)) {
       return SILArgumentConvention(calleeTy->getCalleeConvention());
     } else {
-      unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg()
+      unsigned calleeArgIdx = apply.getSubstCalleeArgIndexOfFirstAppliedArg()
                               + apply.getAppliedArgIndex(op);
       return silConv.getFunctionConventions(calleeTy).getSILArgumentConvention(
           calleeArgIdx);
@@ -629,13 +653,13 @@ OperandOwnershipClassifier::visitPartialApplyInst(PartialApplyInst *i) {
     if (operandTy.isTrivial(*i->getFunction())) {
       return OperandOwnership::TrivialUse;
     }
-    
+
     // Borrowing of address operands is ultimately handled by the move-only
     // address checker and/or exclusivity checker rather than by value ownership.
     if (operandTy.isAddress()) {
       return OperandOwnership::TrivialUse;
     }
-  
+
     return OperandOwnership::Borrow;
   }
   // All non-trivial types should be captured.
@@ -783,7 +807,7 @@ namespace {
 struct OperandOwnershipBuiltinClassifier
     : SILBuiltinVisitor<OperandOwnershipBuiltinClassifier, OperandOwnership> {
   using Map = OperandOwnership;
-      
+
   const Operand &op;
   OperandOwnershipBuiltinClassifier(const Operand &op) : op(op) {}
 
@@ -824,6 +848,8 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Add)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericAdd)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Alignof)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AllocRaw)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AllocRawTyped)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AllocErrorBoxTyped)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, And)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericAnd)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssertConf)
@@ -846,6 +872,8 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CmpXChg)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CondUnreachable)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CopyArray)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DeallocRaw)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DeallocRawTyped)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DeallocErrorBoxTyped)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyArray)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ExactSDiv)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericExactSDiv)
@@ -940,6 +968,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ShuffleVector)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Interleave)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Deinterleave)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Sizeof)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypedAllocationID)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StaticReport)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Strideof)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StringObjectOr)
@@ -1018,7 +1047,7 @@ OperandOwnershipBuiltinClassifier
     // The result buffer pointer is a trivial use.
     return OperandOwnership::TrivialUse;
   }
-  
+
   // The closure is borrowed while the async let task is executing.
   return OperandOwnership::Borrow;
 }
@@ -1037,6 +1066,32 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
     return OperandOwnership::DestroyingConsume;
 
   return OperandOwnership::InstantaneousUse;
+}
+
+// Both AddTaskLocalValue and TaskLocalValuePush have the same signature:
+// operand 0 is the key (Builtin.RawPointer), always trivial; operand 1 is
+// the generic value that is consumed.
+static OperandOwnership visitTaskLocalValueOperand(const Operand &op,
+                                                   BuiltinInst *bi) {
+  if (&op == &bi->getOperandRef(0))
+    return OperandOwnership::TrivialUse;
+
+  assert(&op == &bi->getOperandRef(1));
+  if (op.get()->getType().isAddress())
+    return OperandOwnership::TrivialUse;
+  return OperandOwnership::DestroyingConsume;
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitAddTaskLocalValue(BuiltinInst *bi,
+                                                          StringRef attr) {
+  return visitTaskLocalValueOperand(op, bi);
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitTaskLocalValuePush(BuiltinInst *bi,
+                                                           StringRef attr) {
+  return visitTaskLocalValueOperand(op, bi);
 }
 
 OperandOwnership OperandOwnershipBuiltinClassifier::
@@ -1092,21 +1147,29 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContextWithType)
 
 // InstantaneousUse since we take in a closure at +0.
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddCancellationHandler)
+// InstantaneousUse since we take in a closure at +0.
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddCancellationHandlerWithReason)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemoveCancellationHandler)
 // InstantaneousUse since we take in a closure at +0.
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddPriorityEscalationHandler)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemovePriorityEscalationHandler)
-// This is a trivial use since our first operand is a Builtin.RawPointer and our
-// second is an address to our generic Value.
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskLocalValuePush)
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AddTaskLocalValue)
 // Trivial use of the token result of AddTaskLocalValue.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, RemoveTaskLocalValue)
-
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPush)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)
+
+// TaskCancellationScopePush takes no operands.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePush)
+// Trivial use since our operand is just an UnsafeRawPointer.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePop)
+
+// TaskPushDeadline takes two borrowed generic operands passed by
+// address; at the SIL level address operands are trivial.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPushDeadline)
+// Trivial use since our operand is just an UnsafeRawPointer.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)
 
 #undef BUILTIN_OPERAND_OWNERSHIP
 
@@ -1140,7 +1203,7 @@ OperandOwnership OperandOwnershipClassifier::visitBuiltinInst(BuiltinInst *bi) {
 //===----------------------------------------------------------------------===//
 
 OperandOwnership
-Operand::getOperandOwnership(SILModuleConventions *silConv) const {
+Operand::getOperandOwnership(SILAddressConventions *silConv) const {
   // A type-dependent operand is a NonUse (as opposed to say an
   // InstantaneousUse) because it does not require liveness.
   if (isTypeDependent())
@@ -1161,8 +1224,12 @@ Operand::getOperandOwnership(SILModuleConventions *silConv) const {
       return OperandOwnership(OperandOwnership::InstantaneousUse);
     }
   }
-  SILModuleConventions overrideConv =
-      silConv ? *silConv : SILModuleConventions(getUser()->getModule());
+  // Default to the lowered-addresses state of the function containing this
+  // operand's user, not the module stage: an already-lowered function must
+  // classify its operands in address form even while the module flag is false.
+  SILAddressConventions overrideConv =
+      silConv ? *silConv
+              : SILAddressConventions::forFunction(*getUser()->getFunction());
   OperandOwnershipClassifier classifier(overrideConv, *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }

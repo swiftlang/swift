@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "llvm/ADT/STLExtras.h"
 #include "ImporterImpl.h"
 
 using namespace swift;
@@ -282,12 +283,11 @@ ClangImporter::printPolyglotAST(StringRef Filename, raw_ostream &OS) {
 
   // Sort imported declarations in source order.
   auto &ClangSM = getClangASTContext().getSourceManager();
-  std::sort(ClangDecls.begin(), ClangDecls.end(),
-            [&](const clang::Decl *LHS, const clang::Decl *RHS) -> bool {
-              return ClangSM.isBeforeInTranslationUnit(
-                                            LHS->getLocation(),
-                                            RHS->getLocation());
-            });
+  llvm::sort(ClangDecls,
+             [&](const clang::Decl *LHS, const clang::Decl *RHS) -> bool {
+               return ClangSM.isBeforeInTranslationUnit(LHS->getLocation(),
+                                                        RHS->getLocation());
+             });
 
   auto Json = llvm::json::OStream(OS, /*indent*/2);
   Json.object([&] {

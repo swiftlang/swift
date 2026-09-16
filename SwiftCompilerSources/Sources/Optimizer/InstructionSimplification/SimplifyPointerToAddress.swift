@@ -211,8 +211,12 @@ private extension PointerToAddressInst {
     case .unlimitedLifetime:
       return false
     case .limitedLifetime:
-      var addressUses = AddressUses(of: self, context)
+      var addressUses = AddressUses(context)
       defer { addressUses.deinitialize() }
+      if addressUses.walkDownUses(ofAddress: self, path: UnusedWalkingPath()) == .abortWalk {
+        // We cannot reason about all uses (e.g. a reborrowed `load_borrow`), so bail conservatively.
+        return true
+      }
       return addressUses.hasUsesOutside(of: lifetimeFrontier, beginInstruction: baseAddress)
     }
   }
@@ -259,9 +263,8 @@ private extension AccessBase {
 private struct AddressUses : AddressDefUseWalker {
   var users: InstructionWorklist
 
-  init(of address: Value, _ context: SimplifyContext) {
+  init(_ context: SimplifyContext) {
     users = InstructionWorklist(context)
-    _ = walkDownUses(ofAddress: address, path: UnusedWalkingPath())
   }
 
   mutating func deinitialize() {
@@ -274,6 +277,22 @@ private struct AddressUses : AddressDefUseWalker {
       return walkDownUses(ofAddress: ia, path: path)
     }
     users.pushIfNotVisited(address.instruction)
+
+    if let loadBorrow = address.instruction as? LoadBorrowInst {
+      // A `load_borrow` opens a borrow scope which borrows the memory of the address. If the address
+      // is an interior pointer into a borrowed object, that scope must be nested within the object's
+      // borrow scope. The scope can extend beyond the `load_borrow` itself, so its scope-ending
+      // `end_borrow`s are the relevant latest uses of the interior pointer and must be checked against
+      // the object's lifetime.
+      for endOperand in loadBorrow.scopeEndingOperands {
+        // A `load_borrow` can be reborrowed, in which case its scope is ended by a `br` instead of an
+        // `end_borrow`. We cannot track the reborrowed value's uses here, so bail conservatively.
+        guard let endBorrow = endOperand.instruction as? EndBorrowInst else {
+          return .abortWalk
+        }
+        users.pushIfNotVisited(endBorrow)
+      }
+    }
     return .continueWalk
   }
 

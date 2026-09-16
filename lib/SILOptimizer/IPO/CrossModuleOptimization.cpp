@@ -17,12 +17,11 @@
 #define DEBUG_TYPE "cross-module-serialization-setup"
 #include "swift/AST/Module.h"
 #include "swift/AST/ImportCache.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/TBDGen.h"
-#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -30,7 +29,6 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -157,23 +155,53 @@ private:
   VisitMode mode;
   bool isInstSerializable = true;
 
+  /// Temporary blocks created by `remapBasicBlock`, which are deleted again in
+  /// `postProcess`.
+  llvm::SmallVector<SILBasicBlock *, 2> tempBlocks;
+
+  void eraseTempBlocks() {
+    if (tempBlocks.empty())
+      return;
+
+    SILFunction *f = &getBuilder().getFunction();
+    // Deleting a block sets the `needBreakInfiniteLoops` flag. But the temporary
+    // blocks are empty and not reachable, so they cannot create infinite loops.
+    bool origFlag = f->needBreakInfiniteLoops();
+    for (SILBasicBlock *tempBlock : tempBlocks)
+      tempBlock->eraseFromParent();
+    tempBlocks.clear();
+    f->setNeedBreakInfiniteLoops(origFlag);
+  }
+
 public:
   InstructionVisitor(SILFunction &F, CrossModuleOptimization &CMS, VisitMode visitMode) :
     SILCloner(F), CMS(CMS), mode(visitMode) {}
 
   ~InstructionVisitor() {
+    // In case a visited instruction was not recorded as cloned instruction,
+    // `postProcess` didn't run and the temporary blocks are still around.
+    eraseTempBlocks();
+
     // We use the cloner for type visiting which may clone `unreachable` instructions.
     // However, this does not introduce any incomplete lifetimes.
     Builder.getFunction().setNeedCompleteLifetimes(false);
   }
 
-  SILType remapType(SILType Ty) {
-    if (Ty.hasLocalArchetype()) {
-      Ty = Ty.subst(getBuilder().getModule(),
+  /// Replaces local archetypes with the local archetypes of the new generic
+  /// environments which the cloner created for cloned instructions which
+  /// define local archetypes (e.g. `open_existential_addr`).
+  SILType substLocalArchetypes(SILType Ty) {
+    if (!Ty.hasLocalArchetype())
+      return Ty;
+
+    return Ty.subst(getBuilder().getModule(),
                     Functor, Functor, CanGenericSignature(),
                     SubstFlags::SubstitutePrimaryArchetypes |
-                    SubstFlags::SubstituteLocalArchetypes);
-    }
+                        SubstFlags::SubstituteLocalArchetypes);
+  }
+
+  SILType remapType(SILType Ty) {
+    Ty = substLocalArchetypes(Ty);
 
     switch (mode) {
       case VisitMode::DetectSerializableInst:
@@ -246,6 +274,10 @@ public:
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     SILCloner<InstructionVisitor>::postProcess(Orig, Cloned);
     Cloned->eraseFromParent();
+
+    // The cloned instruction was the only user of the temporary blocks which
+    // `remapBasicBlock` created for it.
+    eraseTempBlocks();
   }
 
   // This method retrieves the operand passed as \p Value as mapped
@@ -270,14 +302,56 @@ public:
     case VisitMode::SerializeInst:
       break;
     }
+
+    // If the operand type contains local archetypes, the cloner re-mapped
+    // those archetypes to newly created generic environments (see
+    // `substLocalArchetypes`). But because we don't really clone - the cloned
+    // instructions are deleted immediately in `postProcess` - operands are not
+    // re-mapped and their types still refer to the original local archetypes.
+    // That would create instructions whose (re-mapped) type doesn't match the
+    // type of its operands, which some SILBuilder APIs check, e.g.
+    // `createValueMetatype`.
+    // Therefore use an undef value with the re-mapped type in this case.
+    SILType substTy = substLocalArchetypes(Value->getType());
+    if (substTy != Value->getType())
+      return SILUndef::get(&getBuilder().getFunction(), substTy);
+
     return Value;
   }
 
-  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
+  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) {
+    // The successor blocks of a cloned terminator are not cloned - we return
+    // the original blocks here. Therefore their arguments still refer to the
+    // original local archetypes, whereas the terminator's operands are
+    // re-mapped (see `getMappedValue`). That would create terminators whose
+    // successor argument types don't match the types of its operands, which
+    // some SILBuilder APIs check, e.g. `createCheckedCastBranch`.
+    // Therefore use a temporary block with re-mapped argument types in this
+    // case. It's deleted again in `postProcess`, together with the cloned
+    // terminator.
+    if (llvm::none_of(BB->getArguments(), [&](SILArgument *arg) {
+          return substLocalArchetypes(arg->getType()) != arg->getType();
+        })) {
+      return BB;
+    }
+
+    SILBasicBlock *tempBlock = getBuilder().getFunction().createBasicBlock();
+    for (SILArgument *arg : BB->getArguments()) {
+      tempBlock->createPhiArgument(substLocalArchetypes(arg->getType()),
+                                   arg->getOwnershipKind());
+    }
+    tempBlocks.push_back(tempBlock);
+    return tempBlock;
+  }
 
   bool canSerializeTypesInInst(SILInstruction *inst) {
     return isInstSerializable;
   }
+
+  /// Debug info must never change what gets optimized, so debug values are not
+  /// visited. They are not serialized except in Embedded Swift, where all
+  /// types are usable anyway.
+  void visitDebugValueInst(DebugValueInst *inst) {}
 };
 
 static bool isPackageCMOEnabled(ModuleDecl *mod) {

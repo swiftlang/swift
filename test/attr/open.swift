@@ -16,6 +16,9 @@ open typealias OpenIsNotAllowedOnTypeAliases = Int // expected-error {{only clas
 open struct OpenIsNotAllowedOnStructs {} // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}}
 open enum OpenIsNotAllowedOnEnums_AtLeastNotYet {} // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}}
 
+@available(SwiftStdlib 5.1, *)
+open actor OpenIsNotAllowedOnActor {} // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}}
+
 /**** Open entities are at least public. ****/
 
 func foo(object: ExternalOpenClass) {
@@ -118,6 +121,28 @@ public class PublicSubClass : ExternalOpenClass {
   public override subscript(index: MarkerForOpenSubscripts) -> Int {
     get { return 0 }
     set {}
+  }
+}
+
+internal struct InternalBox {
+  open class NestedOpenSubClass : ExternalOpenClass {
+    internal override func openMethod() {}
+    internal override var openProperty: Int { get{return 0} set{} }
+    internal override subscript(index: MarkerForOpenSubscripts) -> Int {
+      get { return 0 }
+      set {}
+    }
+  }
+}
+
+public struct PublicBox {
+  open class NestedOpenSubClass : ExternalOpenClass {
+    internal override func openMethod() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{5-13=open}}
+    internal override var openProperty: Int { get{return 0} set{} } // expected-error {{overriding property must be as accessible as the declaration it overrides}} {{5-13=open}}
+    internal override subscript(index: MarkerForOpenSubscripts) -> Int { // expected-error {{overriding subscript must be as accessible as the declaration it overrides}} {{5-13=open}}
+      get { return 0 }
+      set {}
+    }
   }
 }
 

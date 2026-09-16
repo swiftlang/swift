@@ -22,9 +22,6 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PlaygroundOption.h"
-#include "swift/Basic/Range.h"
-#include "swift/Config.h"
-#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/raw_ostream.h"
@@ -32,6 +29,23 @@
 #include <optional>
 
 using namespace swift;
+
+StringRef LangOptions::getCOMInteropModelConditionalCompilationFlag() const {
+  if (!EnableCOMInterop || !COMModel)
+    return {};
+
+  switch (*COMModel) {
+  case COMInteropModel::Microsoft:
+    return "$_MicrosoftCOM";
+  case COMInteropModel::CoreFoundation:
+    return "$_CoreFoundationCOM";
+  }
+  llvm_unreachable("unhandled COM interop model");
+}
+
+bool LangOptions::isCOMInteropModelConditionalCompilationFlag(StringRef Name) {
+  return Name == "$_MicrosoftCOM" || Name == "$_CoreFoundationCOM";
+}
 
 LangOptions::LangOptions() {
   // Add all promoted language features

@@ -16,7 +16,6 @@
 #include "llvm/ADT/Statistic.h"
 
 #include "swift/AST/Expr.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -24,7 +23,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/DistributedActor.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -294,7 +292,7 @@ static void tryToResignIdentity(SILLocation loc, SILBuilder &B,
   if (var != nomDecl->getDistributedActorIDProperty())
     return;
 
-  emitResignIdentityCall(B, loc, cast<ClassDecl>(nomDecl),
+  emitResignIDCall(B, loc, cast<ClassDecl>(nomDecl),
                          actorInst, idRef);
 }
 
@@ -1221,8 +1219,7 @@ bool ElementUseCollector::addClosureElementUses(PartialApplyInst *pai,
   if (!VisitedClosures.insert(callee).second)
     return false;
 
-  unsigned argIndex = ApplySite(pai).getCalleeArgIndex(*argUse);
-  SILArgument *arg = callee->getArgument(argIndex);
+  SILArgument *arg = ApplySite(pai).getCalleeArgument(callee, *argUse);
   
   // Bail if arg is not the original 'self' object, but e.g. a projected member.
   assert(TheMemory.getType().isObject());

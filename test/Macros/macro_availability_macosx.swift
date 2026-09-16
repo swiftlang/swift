@@ -24,6 +24,9 @@ macro MemberThatCallsCode(_ codeString: String) = #externalMacro(module: "MacroD
 @attached(peer, names: arbitrary)
 macro PeerMethodThatCallsCode(_ codeString: String) = #externalMacro(module: "MacroDefinition", type: "PeerMethodThatCallsCodeMacro")
 
+@attached(peer, names: arbitrary)
+macro PeerFuncThatCallsCode(_ codeString: String) = #externalMacro(module: "MacroDefinition", type: "PeerFuncThatCallsCodeMacro")
+
 @attached(accessor)
 macro GetterThatCallsCode(_ codeString: String) = #externalMacro(module: "MacroDefinition", type: "GetterThatCallsCodeMacro")
 
@@ -160,3 +163,30 @@ expected-expansion@-2:32{{
   expected-note@3:5 {{add 'if #available' version check}}
 }}
 */
+
+func hasLocalDeclsWithPeers() {
+  // expected-note@-1 {{add '@available' attribute to enclosing global function}}
+  if #available(macOS 12.0, *) {
+    @PeerFuncThatCallsCode("onlyInMacOS12()")
+    func gatedLocalFunc() {}
+    gatedLocalFunc()
+  }
+
+  @PeerFuncThatCallsCode("onlyInMacOS12()")
+  // expected-note@-1 2{{in expansion of macro 'PeerFuncThatCallsCode' on local function 'ungatedLocalFunc()' here}}
+  func ungatedLocalFunc() {}
+  /*
+  expected-expansion@-2:29{{
+    expected-error@2:3 {{'onlyInMacOS12()' is only available in macOS 12.0 or newer}}
+    expected-note@2:3 {{add 'if #available' version check}}
+  }}
+  */
+  ungatedLocalFunc()
+}
+
+func hasLocalDeclWithPeerInGuardFallthrough() {
+  guard #available(macOS 12.0, *) else { return }
+  @PeerFuncThatCallsCode("onlyInMacOS12()")
+  func gatedLocalFunc() {}
+  gatedLocalFunc()
+}

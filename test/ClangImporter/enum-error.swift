@@ -124,9 +124,9 @@ class ObjCTest {
 #endif
 
 // HEADER: struct TestError : _BridgedStoredNSError {
-// HEADER:   enum Code : Int32, _ErrorCodeProtocol, @unchecked Sendable {
-// HEADER:     init?(rawValue: Int32)
-// HEADER:     var rawValue: Int32 { get }
+// HEADER:   enum Code : CInt, _ErrorCodeProtocol, @unchecked Sendable {
+// HEADER:     init?(rawValue: CInt)
+// HEADER:     var rawValue: CInt { get }
 // HEADER:     typealias _ErrorType = TestError
 // HEADER:     case TENone
 // HEADER:     case TEOne
@@ -136,9 +136,9 @@ class ObjCTest {
 // HEADER: func getErr() -> TestError.Code
 
 // HEADER-NO-PRIVATE: struct TestError : CustomNSError, Hashable, Error {
-// HEADER-NO-PRIVATE:   enum Code : Int32, @unchecked Sendable, Equatable {
-// HEADER-NO-PRIVATE:     init?(rawValue: Int32)
-// HEADER-NO-PRIVATE:     var rawValue: Int32 { get }
+// HEADER-NO-PRIVATE:   enum Code : CInt, @unchecked Sendable, Equatable {
+// HEADER-NO-PRIVATE:     init?(rawValue: CInt)
+// HEADER-NO-PRIVATE:     var rawValue: CInt { get }
 // HEADER-NO-PRIVATE:     typealias _ErrorType = TestError
 // HEADER-NO-PRIVATE:     case TENone
 // HEADER-NO-PRIVATE:     case TEOne

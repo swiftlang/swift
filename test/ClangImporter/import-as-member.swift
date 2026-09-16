@@ -6,6 +6,8 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -F %S/Inputs/frameworks -I %S/Inputs/custom-modules -module-cache-path %t.mcp %s -verify -verify-ignore-unrelated
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import ImportAsMember
 import ImportAsMember_Private
 import ImportAsMemberSubmodules

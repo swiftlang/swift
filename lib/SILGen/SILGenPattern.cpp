@@ -1446,6 +1446,12 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
 
   SGF.VarLocs[var] = SILGenFunction::VarLoc(bindValue.getValue(),
                                             SILAccessEnforcement::Unknown);
+
+  // Rewind to the bound value's definition so the buffer's insertion-point
+  // marker dominates it, while its cleanup is still pushed after the value's.
+  SavedInsertionPointRAII savedIP(SGF.B,
+                                  bindValue.getValue()->getDefiningInstruction());
+  SGF.enterLocalVariableAddressableBufferScope(var);
 }
 
 /// Evaluate a guard expression and, if it returns false, branch to
@@ -1871,7 +1877,8 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
 
   // Figure out if we need the value to be in a temporary.
   bool requiresAddress =
-    !canSILUseScalarCheckedCastInstructions(SGF.SGM.M, sourceType, targetType);
+    !canSILUseScalarCheckedCastInstructions(
+        SGF.SGM.M, SGF.F.hasLoweredAddresses(), sourceType, targetType);
 
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);
@@ -1886,7 +1893,7 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   // We know that we must have a loadable type at this point since address only
   // types do not need reabstraction and are addresses. So we should have exited
   // above already.
-  assert(src.getType().isLoadable(SGF.F) &&
+  assert(src.getType().isLoadableOrOpaque(SGF.F) &&
          "Should have a loadable value at this point");
 
   // Since our finalValue is loadable, we could not have had a take_on_success
@@ -2212,7 +2219,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
         ManagedValue boxedValue =
             SGF.B.createProjectBox(loc, eltCMV.getFinalManagedValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue.getType());
-        if (eltTL->isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+        if (eltTL->isLoadableOrOpaque(SGF.F)) {
           boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
           eltCMV = {boxedValue, CastConsumptionKind::BorrowAlways};
         } else {
@@ -3031,6 +3038,8 @@ void PatternMatchEmission::emitSharedCaseBlocks(
       // for the pattern match.
       SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
       SGF.B.emitDebugDescription(vd, mv.getValue(), dbgVar);
+      
+      SGF.enterFormalScopeCleanup(vd, mv.getValue());
 
       if (vd->isLet()) {
         // Just emit a let and leave the cleanup alone.
@@ -4122,4 +4131,3 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   }
 
 }
-

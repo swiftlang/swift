@@ -96,3 +96,12 @@ struct FRT_IMMORTAL VirtuallyDerived : virtual Base {
     return instance;
   }
 };
+
+struct FRT_IMMORTAL AnotherBase {
+  virtual int virtualMethod(int i) const { return i; }
+  virtual ~AnotherBase() = default;
+};
+
+struct DerivedFromAnotherBase : AnotherBase {
+  int virtualMethod(int i) const override { return i + 1; }
+};

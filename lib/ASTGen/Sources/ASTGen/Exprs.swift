@@ -266,6 +266,7 @@ extension ASTGenVisitor {
 
   func generate(closureCapture node: ClosureCaptureSyntax, capturedSelfDecl: inout BridgedVarDecl?) -> BridgedCaptureListEntry {
     let ownership: BridgedReferenceOwnership
+    var sending: Bool = false
     switch node.specifier?.specifier.rawText {
     case nil:
       ownership = .strong
@@ -281,6 +282,9 @@ extension ASTGenVisitor {
         // TODO: Diagnose.
         fatalError("invalid ownership")
       }
+    case "sending":
+      sending = true
+      ownership = .strong
     default:
       // TODO: Diagnose.
       fatalError("invalid ownership")
@@ -302,6 +306,7 @@ extension ASTGenVisitor {
       declContext: self.declContext,
       ownership: ownership,
       ownershipRange: self.generateSourceRange(node.specifier),
+      sending: sending,
       name: nameAndLoc.identifier,
       nameLoc: nameAndLoc.sourceLoc,
       equalLoc: equalLoc,

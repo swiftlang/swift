@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
-// RUN: not --crash %target-typecheck-verify-swift -verify-ignore-unrelated -DSALVAGE
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage-
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -solver-disable-diagnose-valid-salvage
 
 // The next two sets of examples cause difficulties because our
 // subtype lattice is not actually a lattice; existentials fail
@@ -108,9 +108,8 @@ do {
     let _: [any Command] = [a, b].flatMap { [$0] }
     // expected-error@-1 {{cannot convert value of type '[Super]' to closure result type '(any Command)?'}}
 
-    #if SALVAGE
     let _: [any Command] = [[a], [b]].flatMap { $0 }
-    #endif
+    // expected-salvage-error@-1 {{failed to produce diagnostic for expression; please submit a bug report}}
   }
 }
 

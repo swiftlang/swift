@@ -17,6 +17,8 @@ EXCEPTIONAL_FILES = [
     # Tests for UnknownFeature not existing
     pathlib.Path("test/Frontend/features/upcoming_feature.swift"),
     pathlib.Path("test/Frontend/features/strict_features.swift"),
+    # Tests that a compiler-owned COM condition is not a language feature
+    pathlib.Path("test/Parse/ConditionalCompilation/com_interop_model.swift"),
     # Tests for ModuleInterfaceExportAs being ignored
     pathlib.Path("test/ModuleInterface/swift-export-as.swift"),
     # Uses the pseudo-feature AvailabilityMacro=

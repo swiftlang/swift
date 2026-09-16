@@ -36,11 +36,6 @@
 public struct UniqueArray<Element: ~Copyable>: ~Copyable {
   @usableFromInline
   internal var _storage: _RigidArray<Element>
-
-  @export(implementation)
-  internal init(_storage: consuming _RigidArray<Element>) {
-    self._storage = _storage
-  }
 }
 
 @available(SwiftStdlib 6.4, *)

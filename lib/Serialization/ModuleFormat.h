@@ -21,10 +21,8 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
-#include "swift/AST/Types.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/Bitcode/BitcodeConvenience.h"
-#include "llvm/Bitstream/BitCodes.h"
 
 namespace swift {
 class ModuleFile;
@@ -58,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1011; // widen extension-table dataLength to uint32
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1026; // COMMethodInst
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -318,6 +316,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   KeyPathAccessorSetter,
   KeyPathAccessorEquals,
   KeyPathAccessorHash,
+  COMMethod,
 };
 using SILFunctionTypeRepresentationField = BCFixed<5>;
 
@@ -1411,7 +1410,9 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
-    BCFixed<1>                       // has sending result
+    BCFixed<1>,                      // has sending result
+    BCFixed<1>,                      // called once
+    BCFixed<1>                       // coroutine?
     // trailed by parameters
     // Optionally lifetime dependence info
   );
@@ -1431,6 +1432,12 @@ namespace decls_block {
                      BCFixed<1>,              // constValue
                      BCFixed<1>,              // sending
                      BCFixed<1>               // addressable
+                     >;
+
+  using FunctionYieldLayout =
+      BCRecordLayout<FUNCTION_YIELD,
+                     TypeIDField,             // type
+                     ParamDeclSpecifierField // inout, shared or owned?
                      >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
@@ -1512,7 +1519,9 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
-    BCFixed<1>,                      // has sending result
+    BCFixed<1>,                      // has sending result,
+    BCFixed<1>,                      // called once
+    BCFixed<1>,                      // coroutine?
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
@@ -1529,6 +1538,7 @@ namespace decls_block {
     BCFixed<1>,                         // pseudogeneric?
     BCFixed<1>,                         // noescape?
     BCFixed<1>,                         // unimplementable?
+    BCFixed<1>,                         // @called(once)?
     SILFunctionTypeIsolationField,      // isolation
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
@@ -2016,7 +2026,6 @@ namespace decls_block {
     DeclIDField, // extended nominal
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit flag
-    BCFixed<1>,  // isMetatypeExtension flag
     GenericSignatureIDField,  // generic environment
     BCVBR<4>,    // # of protocol conformances
     BCVBR<4>,    // number of inherited types
@@ -2321,6 +2330,7 @@ namespace decls_block {
   using SectionDeclAttrLayout = BCRecordLayout<
     Section_DECL_ATTR,
     BCFixed<1>, // implicit flag
+    BCFixed<1>, // default flag
     BCBlob      // _section
   >;
 
@@ -2329,6 +2339,12 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCFixed<1>, // underscored flag
     BCBlob      // cname
+  >;
+
+  using CxxDeclDeclAttrLayout = BCRecordLayout<
+    CxxDecl_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCBlob      // cxx name
   >;
 
   using ImplementsDeclAttrLayout = BCRecordLayout<
@@ -2377,6 +2393,12 @@ namespace decls_block {
     Semantics_DECL_ATTR,
     BCFixed<1>, // implicit flag
     BCBlob      // semantics value
+  >;
+
+  using TargetDeclAttrLayout = BCRecordLayout<
+    Target_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCBlob      // target string
   >;
 
   using EffectsDeclAttrLayout = BCRecordLayout<
@@ -2566,12 +2588,17 @@ namespace decls_block {
       BCArray<IdentifierIDField> // properties
   >;
 
+  using DifferentiationParamIndicesLayout = BCRecordLayout<
+    DIFF_PARAM_INDICES,
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+  >;
+
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
     DifferentiabilityKindField, // Differentiability kind.
-    GenericSignatureIDField, // Derivative generic signature.
-    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+    GenericSignatureIDField // Derivative generic signature.
+    // Trailed by differentiation parameter indices' bitvector.
   >;
 
   using DerivativeDeclAttrLayout = BCRecordLayout<
@@ -2579,16 +2606,16 @@ namespace decls_block {
     BCFixed<1>, // Implicit flag.
     BCFixed<1>, // Has original accessor kind?
     AccessorKindField, // Original accessor kind.
-    DeclIDField, // Original function declaration.
     AutoDiffDerivativeFunctionKindField, // Derivative function kind.
-    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+    BCArray<DeclIDField> // Original function declarations
+    // Trailed by differentiation parameter indices' bitvector.
   >;
 
   using TransposeDeclAttrLayout = BCRecordLayout<
     Transpose_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
-    DeclIDField, // Original function declaration.
-    BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
+    DeclIDField // Original function declaration.
+    // Trailed by transposed parameter indices' bitvector.
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
@@ -2670,6 +2697,12 @@ namespace decls_block {
                      BCFixed<1>  // implicit flag
                      >;
 
+  using UnsafeDeclAttrLayout =
+      BCRecordLayout<Unsafe_DECL_ATTR,
+                     BCFixed<1>, // whether this is '@unsafe(always)'
+                     BCFixed<1>  // implicit flag
+                     >;
+
   using MacroRoleDeclAttrLayout = BCRecordLayout<
     MacroRole_DECL_ATTR,
     BCFixed<1>,                // implicit flag
@@ -2704,6 +2737,16 @@ namespace decls_block {
                                            BCFixed<1>,  // interface
                                            BCFixed<3>,  // threading model
                                            BCBlob>;     // IID/CLSID
+
+  using CalledDeclAttrLayout = BCRecordLayout<
+    Called_DECL_ATTR,
+    BCFixed<2> // execution semantics
+  >;
+
+  using HiddenTypeLayoutInfoLayout = BCRecordLayout<
+    HIDDEN_TYPE_LAYOUT_INFO,
+    DeclIDField // declaration whose hidden layout will be represented
+  >;
 
   // clang-format on
 

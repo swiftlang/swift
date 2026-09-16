@@ -17,6 +17,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
 #include "Private.h"
+#include "swift/Basic/Malloc.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/shims/RuntimeShims.h"
 #include <algorithm>

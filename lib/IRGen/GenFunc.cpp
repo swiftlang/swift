@@ -68,7 +68,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
@@ -77,12 +76,12 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/Linking.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CodeGenOptions.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -90,13 +89,11 @@
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ProfileData/InstrProf.h"
-#include "llvm/Support/Debug.h"
 
 #include "BitPatternBuilder.h"
 #include "CallEmission.h"
 #include "Callee.h"
 #include "ConstantBuilder.h"
-#include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenCall.h"
@@ -626,6 +623,7 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
       
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::COMMethod:
   case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::WitnessMethod:
   case SILFunctionType::Representation::CFunctionPointer:
@@ -654,8 +652,8 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
     // contexts into the pointer value, so let's not take any spare bits from
     // it.
     spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
-    
-    if (T->isNoEscape()) {
+
+    if (T->isTrivialNoEscape()) {
       // @noescape thick functions are trivial types.
       return FuncTypeInfo::create(
           CanSILFunctionType(T), IGM.NoEscapeFunctionPairTy,
@@ -718,6 +716,7 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::CFunctionPointer:
   case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::COMMethod:
   case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::WitnessMethod:
   case SILFunctionType::Representation::Closure:
@@ -911,6 +910,32 @@ FunctionPointer irgen::getCoroFrameAllocStubFunctionPointer(IRGenModule &IGM) {
                                     sig);
 }
 
+llvm::Constant *irgen::getCoroFrameDeallocTypedStubFn(IRGenFunction &IGF) {
+  auto &IGM = IGF.IGM;
+  llvm::SmallString<64> name;
+  llvm::raw_svector_ostream(name) << "__swift_coroFrameDeallocTypedStub_"
+                                  << IGF.CurFn->getName();
+  auto *typeId = IGF.getMallocTypeId();
+  return IGM.getOrCreateHelperFunction(
+      name, IGM.VoidTy, {IGM.Int8PtrTy},
+      [&](IRGenFunction &stubIGF) {
+        auto parameters = stubIGF.collectParameters();
+        auto *ptr = parameters.claimNext();
+        stubIGF.Builder.CreateCall(
+            stubIGF.IGM.getCoroFrameDeallocTypedFunctionPointer(),
+            {ptr, typeId});
+        stubIGF.Builder.CreateRetVoid();
+      },
+      /*setIsNoInline=*/false,
+      /*forPrologue=*/false,
+      /*isPerformanceConstraint=*/false,
+      /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C,
+      /*transformAttrs=*/[&IGM](llvm::AttributeList &attrs) {
+        attrs = attrs.addFnAttribute(IGM.getLLVMContext(),
+                                      llvm::Attribute::AlwaysInline);
+      });
+}
+
 static Size getOffsetOfOpaqueIsolationField(IRGenModule &IGM,
                                       const LoadableTypeInfo &isolationTI) {
   auto offset = IGM.RefCountedStructSize;
@@ -1009,8 +1034,8 @@ protected:
       : IGM(IGM), subIGF(subIGF), fwd(fwd), staticFnPtr(staticFnPtr),
         calleeHasContext(calleeHasContext), origSig(origSig),
         origType(origType), substType(substType), outType(outType), subs(subs),
-        conventions(conventions), origConv(origType, IGM.getSILModule()),
-        outConv(outType, IGM.getSILModule()),
+        conventions(conventions),
+        origConv(origType, IGM.silConv), outConv(outType, IGM.silConv),
         origParams(subIGF.collectParameters()) {}
 
 public:
@@ -1025,7 +1050,7 @@ public:
     // Lower the forwarded arguments in the original function's generic context.
     GenericContextScope scope(IGM, origType->getInvocationGenericSignature());
 
-    SILFunctionConventions origConv(origType, IGM.getSILModule());
+    SILFunctionConventions origConv(origType, IGM.silConv);
     auto &outResultTI = IGM.getTypeInfo(
         outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
     auto &nativeResultSchema = outResultTI.nativeReturnValueSchema(IGM);
@@ -1245,7 +1270,7 @@ public:
   }
   void createReturn(llvm::CallInst *call) override {
     // Reabstract the result value as substituted.
-    SILFunctionConventions origConv(origType, IGM.getSILModule());
+    SILFunctionConventions origConv(origType, IGM.silConv);
     auto &outResultTI = IGM.getTypeInfo(
         outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
     auto &nativeResultSchema = outResultTI.nativeReturnValueSchema(IGM);
@@ -1517,9 +1542,18 @@ public:
     llvm::Value *buffer = origParams.claimNext();
     llvm::Value *id;
     if (subIGF.IGM.getOptions().EmitTypeMallocForCoroFrame) {
-      // Use swift_coroFrameAllocStub to emit our allocator.
-      auto coroAllocFn = subIGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(subIGF.IGM));
       auto mallocTypeId = subIGF.getMallocTypeId();
+      llvm::Constant *coroAllocFn;
+      if (subIGF.IGM.isTypedAllocationAvailable()) {
+        coroAllocFn =
+            subIGF.IGM.getOpaquePtr(subIGF.IGM.getCoroFrameAllocTypedFn());
+        deallocFn =
+            subIGF.IGM.getOpaquePtr(getCoroFrameDeallocTypedStubFn(subIGF));
+      } else {
+        // Use swift_coroFrameAllocStub to emit our allocator.
+        coroAllocFn =
+            subIGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(subIGF.IGM));
+      }
       id = subIGF.Builder.CreateIntrinsicCall(
         llvm::Intrinsic::coro_id_retcon_once,
         {llvm::ConstantInt::get(
@@ -1744,6 +1778,52 @@ getPartialApplicationForwarderEmission(
   }
 }
 
+/// This is a parameter convention-aware version of \c createDtorFn.
+///
+/// It's used by the partial application forwarder emitter to avoid
+/// destroying non-Copyable value captures that are moved into the
+/// call when the parameter convention is `Direct_Owned`.
+void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
+                           HeapLayout const *layout, llvm::Value *rawContextPtr,
+                           Address contextPtr,
+                           const llvm::BitVector &consumedFields) {
+  if (!layout) {
+    forwarder.emitNativeStrongRelease(rawContextPtr,
+                                      forwarder.getDefaultAtomicity());
+    return;
+  }
+
+  // If none of the parameters are owned, let's use release that would
+  // destroy all of the captures (fields of the closure context).
+  if (consumedFields.empty() || consumedFields.none()) {
+    forwarder.emitNativeStrongRelease(rawContextPtr,
+                                      forwarder.getDefaultAtomicity());
+    return;
+  }
+
+  HeapNonFixedOffsets offsets(forwarder, *layout);
+
+  // If not all of the parameters are owned by the call, let's destroy
+  // the un-owned ones which would completely de-initialize the
+  // context object and let us deallocate it as-if it was uninitialized.
+  llvm::BitVector fieldsToDestroy(consumedFields);
+  fieldsToDestroy.flip();
+  for (unsigned elementIdx : fieldsToDestroy.set_bits()) {
+    auto &field = layout->getElement(elementIdx);
+    if (field.isTriviallyDestroyable())
+      continue;
+
+    auto fieldTy = layout->getElementTypes()[elementIdx];
+    field.getType().destroy(
+        forwarder, field.project(forwarder, contextPtr, offsets), fieldTy,
+        /*isOutlined=*/true);
+  }
+
+  emitDeallocateUninitializedHeapObject(
+      forwarder, rawContextPtr, offsets.getSize(), offsets.getAlignMask(),
+      layout->computeTypedMallocTypeDescriptor(IGM));
+}
+
 } // end anonymous namespace
 
 /// Emit the forwarding stub function for a partial application.
@@ -1760,7 +1840,7 @@ static llvm::Value *emitPartialApplicationForwarder(
   auto outSig = IGM.getSignature(outType);
   llvm::AttributeList outAttrs = outSig.getAttributes();
   llvm::FunctionType *fwdTy = outSig.getType();
-  SILFunctionConventions outConv(outType, IGM.getSILModule());
+  SILFunctionConventions outConv(outType, IGM.silConv);
   std::optional<AsyncContextLayout> asyncLayout;
 
   StringRef FnName;
@@ -1934,8 +2014,8 @@ static llvm::Value *emitPartialApplicationForwarder(
   bool isMethodCallee =
       origType->getRepresentation() == SILFunctionTypeRepresentation::Method;
   Explosion witnessMethodSelfValue;
-
   llvm::Value *lastCapturedFieldPtr = nullptr;
+  llvm::BitVector consumedFields(layout ? layout->getElements().size() : 0);
 
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
@@ -2112,8 +2192,14 @@ static llvm::Value *emitPartialApplicationForwarder(
         cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
         break;
       case ParameterConvention::Direct_Owned:
-        // Copy the value out at +1.
-        cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
+        if (outType->isCalledOnce()) {
+          // Move value into the apply.
+          cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
+          consumedFields.set(fieldIndex);
+        } else {
+          // Copy the value out at +1.
+          cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
+        }
         break;
       }
       
@@ -2167,7 +2253,7 @@ static llvm::Value *emitPartialApplicationForwarder(
     // nor any of the loads can throw.
     if (consumesContext && !dependsOnContextLifetime && rawData) {
       assert(!outType->isNoEscape() && "Trivial context must not be released");
-      subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
+      destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields);
     }
 
     // Now that we have bound generic parameters from the captured arguments
@@ -2288,7 +2374,7 @@ static llvm::Value *emitPartialApplicationForwarder(
   // If the parameters depended on the context, consume the context now.
   if (rawData && consumesContext && dependsOnContextLifetime) {
     assert(!outType->isNoEscape() && "Trivial context must not be released");
-    subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
+    destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields);
   }
 
   emission->createReturn(call);
@@ -2350,9 +2436,12 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
-    // Empty values don't matter.
+    // Empty values don't matter, unless they still require a nontrivial
+    // destroy (e.g. a zero-sized `~Copyable` type with a user-defined
+    // deinit captured by a `@called(once)` closure).
     auto schema = ti.getSchema();
-    if (schema.empty() && !param.isFormalIndirect())
+    if (schema.empty() && !param.isFormalIndirect() &&
+        ti.isTriviallyDestroyable(ResilienceExpansion::Maximal))
       return;
 
     argValTypes.push_back(argType);
@@ -2568,7 +2657,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   std::optional<StackAddress> stackAddr;
 
-  if (args.empty() && layout.isKnownEmpty()) {
+  if (args.empty() && layout.isKnownEmpty() &&
+      layout.isTriviallyDestroyable()) {
     if (outType->isNoEscape())
       data = llvm::ConstantPointerNull::get(IGF.IGM.OpaquePtrTy);
     else

@@ -42,7 +42,7 @@ public:
   static inline swift::AbstractConformance *getFromVoidPointer(void *ptr) {
     return (swift::AbstractConformance *)ptr;
   }
-  enum { NumLowBitsAvailable = swift::TypeAlignInBits };
+  enum { NumLowBitsAvailable = swift::ConformanceAlignInBits };
 };
 }
 
@@ -171,12 +171,6 @@ public:
   bool forEachIsolatedConformance(
       llvm::function_ref<bool(ProtocolConformanceRef)> body
   ) const;
-
-  /// Returns the availability restriction that restricts use of this
-  /// conformance in the given context, or \c nullopt if the conformance is
-  /// available.
-  std::optional<AvailabilityRestriction>
-  getAvailabilityRestriction(DeclContext *dc, SourceLoc loc) const;
 
   using OpaqueValue = void*;
   OpaqueValue getOpaqueValue() const { return Union.getOpaqueValue(); }

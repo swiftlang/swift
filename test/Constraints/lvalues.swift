@@ -337,3 +337,34 @@ func test_invalid_inout_base_of_mutating_operator() {
     }
   }
 }
+
+// Regression from fine-grained adjacency tracking that was not caught by existing tests
+do {
+  // Note: this needs to be 'var' so that it's an @lvalue
+  var s = 0
+  // expected-warning@-1 {{variable 's' was never mutated; consider changing to 'let' constant}}
+
+  var array1: [Int]
+  // expected-warning@-1 {{variable 'array1' was written to, but never read}}
+
+  array1 = [s]
+
+  var array2: [(Int, Int)]
+  // expected-warning@-1 {{variable 'array2' was written to, but never read}}
+
+  array2 = [(s, s)]
+}
+
+// In this expression we produce an lvalue supertype binding.
+//
+// FIXME: We need more examples of this so that we can properly exercise type join
+// support for lvalues.
+do {
+  class Chain {
+    var next: Chain?
+  }
+
+  func f(chain: Chain) {
+    _ = (chain.next?.next)?.next?.next
+  }
+}

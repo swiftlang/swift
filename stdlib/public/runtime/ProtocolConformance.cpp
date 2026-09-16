@@ -107,8 +107,19 @@ void ProtocolDescriptorFlags::dump() const {
   printf("Needs Witness Table: %s.\n",
          (needsWitnessTable() ? "true" : "false"));
   printf("Is Resilient: %s.\n", (isResilient() ? "true" : "false"));
-  printf("Special Protocol: %s.\n",
-         (bool(getSpecialProtocol()) ? "Error" : "None"));
+  const char *specialProtocol;
+  switch (getSpecialProtocol()) {
+  case SpecialProtocol::None:
+    specialProtocol = "None";
+    break;
+  case SpecialProtocol::Error:
+    specialProtocol = "Error";
+    break;
+  case SpecialProtocol::COM:
+    specialProtocol = "COM";
+    break;
+  }
+  printf("Special Protocol: %s.\n", specialProtocol);
   printf("Class Constraint: %s.\n",
          (bool(getClassConstraint()) ? "Class" : "Any"));
   printf("Dispatch Strategy: %s.\n",

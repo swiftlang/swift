@@ -94,7 +94,7 @@ class GenericRuncer<T> : Gizmo {
 // Use a constant indirect field access instead of a non-constant direct
 // access because the layout dependents on the alignment of y.
 
-// CHECK: define hidden swiftcc i64 @"$s10objc_super13GenericRuncerC1xSo5GizmoCSgvg"(ptr swiftself %0)
+// CHECK: define hidden swiftcc ptr @"$s10objc_super13GenericRuncerC1xSo5GizmoCSgvg"(ptr swiftself %0)
 // CHECK:    inttoptr
 // CHECK:   [[ISA:%.*]] = load i64, ptr %0
 // CHECK:   [[ISAMASK:%.*]] = load i64, ptr @swift_isaMask
@@ -103,10 +103,9 @@ class GenericRuncer<T> : Gizmo {
 // CHECK:   [[OFFSETADDR:%.*]] = getelementptr inbounds i64, ptr [[TY]], i64 11
 // CHECK:   [[FIELDOFFSET:%.*]] = load i64, ptr [[OFFSETADDR]]
 // CHECK:   [[FIELDADDR:%.*]] = getelementptr inbounds i8, ptr %0, i64 [[FIELDOFFSET]]
-// CHECK:   [[OPTIONAL:%.*]] = load i64, ptr [[FIELDADDR]]
-// CHECK:   [[OBJ:%.*]] = inttoptr i64 [[OPTIONAL]] to ptr
+// CHECK:   [[OBJ:%.*]] = load ptr, ptr [[FIELDADDR]]
 // CHECK:   call ptr @llvm.objc.retain(ptr [[OBJ]])
-// CHECK:   ret i64 [[OPTIONAL]]
+// CHECK:   ret ptr [[OBJ]]
 
   // CHECK: define hidden swiftcc void @"$s10objc_super13GenericRuncerC5runceyyFZ"(ptr swiftself %0) {{.*}} {
   override class func runce() {

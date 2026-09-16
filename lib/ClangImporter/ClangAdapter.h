@@ -20,7 +20,6 @@
 
 #include "swift/Basic/StringExtras.h"
 #include "clang/Basic/Specifiers.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include <optional>
 
 #include "ImportName.h"
@@ -29,6 +28,7 @@ namespace clang {
 class ASTContext;
 class Decl;
 class DeclContext;
+class FunctionDecl;
 class MacroInfo;
 class Module;
 class NamedDecl;
@@ -87,6 +87,24 @@ getDefinitionForClangTypeDecl(const clang::Decl *D);
 /// returns \p D itself.
 const clang::Decl *
 getFirstNonLocalDecl(const clang::Decl *D);
+
+/// Among all redeclarations of \p fn, returns the one whose imported Swift
+/// signature is the most refined — i.e. carries the most nullability
+/// (\c _Nonnull) and bounds-safety (\c __sized_by / \c CountAttributedType)
+/// annotations across its return type and parameters.
+///
+/// A C function can have redeclarations across modules that import to different
+/// Swift signatures (e.g. a plain and a bounds-safe \c memcpy sharing one
+/// redeclaration chain). ClangImporter collapses the chain to a single Swift
+/// decl keyed by the canonical decl, so the choice of which redecl supplies the
+/// signature must be stable. Clang's "most recent" redecl is sensitive to
+/// module visitation order; selecting the most refined redecl instead is
+/// order-independent and matches the annotated signature that prebuilt
+/// \c .swiftinterface XRefs record.
+///
+/// Ties (including the common single-redecl case) resolve to \p fn itself.
+const clang::FunctionDecl *
+mostRefinedFunctionRedecl(const clang::FunctionDecl *fn);
 
 /// Returns the module \p D comes from, or \c None if \p D does not have
 /// a valid associated module.

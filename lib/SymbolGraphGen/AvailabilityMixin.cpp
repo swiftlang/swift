@@ -12,23 +12,32 @@
 
 #include "AvailabilityMixin.h"
 #include "JSON.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace symbolgraphgen;
 
 StringRef Availability::getDomainDescription(AvailabilityDomain Domain) {
-  // FIXME: [avalailability] Move the definition of these strings into
-  // AvailabilityDomain so that new domains are handled automatically.
-
-  if (Domain.isPackageDescription())
-    return { "SwiftPM" };
-
-  if (Domain.isSwiftLanguageMode())
+  // The strings returned below are part of the symbol graph format and need to
+  // match the domains that SymbolKit knows about.
+  switch (Domain.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+    return { "*" };
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
     return { "Swift" };
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+    return { "SwiftToolchain" };
+  case AvailabilityDomain::Kind::PackageDescription:
+    return { "SwiftPM" };
+  case AvailabilityDomain::Kind::Embedded:
+    return { "Embedded" };
+  case AvailabilityDomain::Kind::Custom:
+    return Domain.getCustomDomain()->getName().str();
+  case AvailabilityDomain::Kind::Platform:
+    break;
+  }
 
   // Platform-specific availability.
-  switch (Domain.getPlatformKind()) {
+  switch (*Domain.getPlatformKind()) {
     case swift::PlatformKind::iOS:
       return { "iOS" };
     case swift::PlatformKind::macCatalyst:
@@ -56,7 +65,7 @@ StringRef Availability::getDomainDescription(AvailabilityDomain Domain) {
     case PlatformKind::DriverKit:
       return { "DriverKit" };
     case swift::PlatformKind::Swift:
-      return { "Swift" };
+      return { "SwiftToolchain" };
     case PlatformKind::anyAppleOS:
       return { "Any Apple OS" };
     case swift::PlatformKind::FreeBSD:
@@ -67,8 +76,6 @@ StringRef Availability::getDomainDescription(AvailabilityDomain Domain) {
       return { "Windows" };
     case swift::PlatformKind::Android:
       return { "Android" };
-    case swift::PlatformKind::none:
-      return { "*" };
   }
   llvm_unreachable("invalid platform kind");
 }

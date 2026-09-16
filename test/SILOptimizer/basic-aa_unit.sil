@@ -774,3 +774,24 @@ bb0(%0 :  @guaranteed $X):
   return %7 : $()
 }
 
+struct WrapperAA {
+  @_hasStorage var x: X
+}
+
+sil [ossa] @borrow_accessor_aa : $@convention(method) (@in_guaranteed WrapperAA) -> @guaranteed_address X
+
+// CHECK-LABEL: @test_borrow_accessor_alias
+// CHECK:       PAIR #2.
+// CHECK-NEXT:      %0 = argument of bb0 : $*WrapperAA
+// CHECK-NEXT:      %2 = apply %1(%0)
+// CHECK-NEXT:    MayAlias
+sil [ossa] @test_borrow_accessor_alias : $@convention(thin) (@inout WrapperAA) -> () {
+bb0(%0 : $*WrapperAA):
+  specify_test "aliasing"
+  %1 = function_ref @borrow_accessor_aa : $@convention(method) (@in_guaranteed WrapperAA) -> @guaranteed_address X
+  %2 = apply %1(%0) : $@convention(method) (@in_guaranteed WrapperAA) -> @guaranteed_address X
+  %r = tuple ()
+  return %r : $()
+}
+
+

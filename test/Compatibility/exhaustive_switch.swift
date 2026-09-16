@@ -365,10 +365,7 @@ enum Runcible {
 
 func checkDiagnosticMinimality(x: Runcible?) {
   switch (x!, x!) { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 {{add missing case: '(.fork, _)'}}
-  // expected-note@-2 {{add missing case: '(.hat, .hat)'}}
-  // expected-note@-3 {{add missing case: '(_, .fork)'}}
-  // expected-note@-4 {{add missing cases}} {{+11:3-3=case (.fork, _):\n<#code#>\ncase (.hat, .hat):\n<#code#>\ncase (_, .fork):\n<#code#>\n}}
+  // expected-note@-1 {{add missing cases: '(.fork, _)', '(.hat, .hat)', '(_, .fork)'}} {{+8:3-3=case (.fork, _):\n<#code#>\ncase (.hat, .hat):\n<#code#>\ncase (_, .fork):\n<#code#>\n}}
   case (.spoon, .spoon):
     break
   case (.spoon, .hat):
@@ -378,11 +375,7 @@ func checkDiagnosticMinimality(x: Runcible?) {
   }
 
   switch (x!, x!) { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 {{add missing case: '(.fork, _)'}}
-  // expected-note@-2 {{add missing case: '(.hat, .spoon)'}}
-  // expected-note@-3 {{add missing case: '(.spoon, .hat)'}}
-  // expected-note@-4 {{add missing case: '(_, .fork)'}}
-  // expected-note@-5 {{add missing cases}} {{+10:3-3=case (.fork, _):\n<#code#>\ncase (.hat, .spoon):\n<#code#>\ncase (.spoon, .hat):\n<#code#>\ncase (_, .fork):\n<#code#>\n}}
+  // expected-note@-1 {{add missing cases: '(.fork, _)', '(.hat, .spoon)', '(.spoon, .hat)', '(_, .fork)'}} {{+6:3-3=case (.fork, _):\n<#code#>\ncase (.hat, .spoon):\n<#code#>\ncase (.spoon, .hat):\n<#code#>\ncase (_, .fork):\n<#code#>\n}}
   case (.spoon, .spoon):
     break
   case (.hat, .hat):
@@ -406,8 +399,7 @@ enum LargeSpaceEnum {
 
 func notQuiteBigEnough() -> Bool {
   switch (LargeSpaceEnum.case1, LargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 110 {{add missing case:}}
-  // expected-note@-2 {{add missing cases}}
+  // expected-note@-1 {{add missing cases: '(.case10, .case0)', '(.case10, .case1)', '(.case10, .case2)', ...}}
   case (.case0, .case0): return true
   case (.case1, .case1): return true
   case (.case2, .case2): return true
@@ -445,8 +437,7 @@ enum ContainsOverlyLargeEnum {
 
 func quiteBigEnough() -> Bool {
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 132 {{add missing case:}}
-  // expected-note@-2 {{add missing cases}}
+  // expected-note@-1 {{add missing cases: '(.case11, .case0)', '(.case11, .case1)', '(.case11, .case2)', ...}}
   case (.case0, .case0): return true
   case (.case1, .case1): return true
   case (.case2, .case2): return true
@@ -547,7 +538,7 @@ func quiteBigEnough() -> Bool {
   }
 
   // Make sure we haven't just stopped emitting diagnostics.
-  switch OverlyLargeSpaceEnum.case1 { // expected-error {{switch must be exhaustive}} expected-note 12 {{add missing case}} expected-note {{add missing cases}}
+  switch OverlyLargeSpaceEnum.case1 { // expected-error {{switch must be exhaustive}} expected-note {{add missing cases: '.case0', '.case1', '.case2', '.case3', '.case4', '.case5', '.case6', '.case7', ...}}
   }
 }
 
@@ -567,15 +558,13 @@ indirect enum MutuallyRecursive {
 
 func infinitelySized() -> Bool {
   switch (InfinitelySized.one, InfinitelySized.one) { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 8 {{add missing case:}}
-  // expected-note@-2 {{add missing cases}}
+  // expected-note@-1 {{add missing cases: '(.recur(_), _)', '(.mutualRecur(_, _), _)', '(.two, .one)', ...}}
   case (.one, .one): return true
   case (.two, .two): return true
   }
   
   switch (MutuallyRecursive.one, MutuallyRecursive.one) { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 8 {{add missing case:}}
-  // expected-note@-2 {{add missing cases}}
+  // expected-note@-1 {{add missing cases: '(.recur(_), _)', '(.mutualRecur(_, _), _)', '(.two, .one)', ...}}
   case (.one, .one): return true
   case (.two, .two): return true
   }
@@ -874,9 +863,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
 
   switch value { 
   // expected-warning@-1 {{switch must be exhaustive}} {{none}}
-  // expected-note@-2 {{add missing case: '.a'}} {{+5:3-3=case .a:\n<#code#>\n}} 
-  // expected-note@-3 {{add missing case: '.b'}} {{+5:3-3=case .b:\n<#code#>\n}} 
-  // expected-note@-4 {{add missing cases}} {{+5:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n}}
+  // expected-note@-2 {{add missing cases: '.a', '.b'}} {{+3:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n}}
   @unknown case _: break
   }
 
@@ -1033,9 +1020,7 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   }
 
   switch value { // expected-warning {{switch must be exhaustive}} {{none}} 
-  // expected-note@-1 {{add missing case: '.a'}} {{+4:3-3=case .a:\n<#code#>\n}} 
-  // expected-note@-2 {{add missing case: '.b'}} {{+4:3-3=case .b:\n<#code#>\n}} 
-  // expected-note@-3 {{add missing cases}} {{+4:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n}}
+  // expected-note@-1 {{add missing cases: '.a', '.b'}} {{+2:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n}}
   @unknown case _: break
   }
 

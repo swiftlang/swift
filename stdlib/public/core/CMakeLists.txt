@@ -227,7 +227,6 @@ split_embedded_sources(
   EMBEDDED SwiftNativeNSArray.swift
   EMBEDDED SwiftifyImport.swift
   EMBEDDED TemporaryAllocation.swift
-    NORMAL ThreadLocalStorage.swift
   EMBEDDED UInt128.swift
   EMBEDDED UIntBuffer.swift
 
@@ -345,6 +344,9 @@ elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "LINUX")
   endif()
 elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WINDOWS")
   list(APPEND swift_core_private_link_libraries shell32;DbgHelp;Synchronization)
+  # Low-address heap pointers can overlap the inline UTF-16 count encoding.
+  list(APPEND swift_stdlib_compile_flags
+    "-DWORKAROUND_LOW_ENTROPY_VA_BREADCRUMBS")
 endif()
 
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
@@ -380,16 +382,9 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAnd
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowInout")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
-if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
-  set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
-  set(swift_lib_dir "${CMAKE_BINARY_DIR}/lib")
-else()
-  set(swift_bin_dir "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
-  set(swift_lib_dir "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib")
-endif()
-
-# For `@DebugDescription`.
-list(APPEND swift_stdlib_compile_flags "-plugin-path" "${swift_lib_dir}/swift/host/plugins")
+# For `@DebugDescription`. `SWIFT_HOST_PLUGINS_DIR` is computed once in
+# stdlib/public/CMakeLists.txt.
+list(APPEND swift_stdlib_compile_flags "-plugin-path" "${SWIFT_HOST_PLUGINS_DIR}")
 
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntimeCore)

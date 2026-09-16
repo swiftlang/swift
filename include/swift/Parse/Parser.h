@@ -27,14 +27,12 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/ParserResult.h"
 #include "swift/Parse/PatternBindingState.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 
 namespace llvm {
   template <typename...  PTs> class PointerUnion;
@@ -52,7 +50,6 @@ namespace swift {
   class RequirementRepr;
   class SILParserStateBase;
   class SourceManager;
-  class UUID;
 
   struct EnumElementInfo;
 
@@ -586,8 +583,8 @@ public:
 
   bool isContextualYieldKeyword() {
     return (Tok.isContextualKeyword("yield") &&
-            isa<AccessorDecl>(CurDeclContext) &&
-            cast<AccessorDecl>(CurDeclContext)->isCoroutine());
+            (isa<AbstractFunctionDecl>(CurDeclContext) &&
+             cast<AbstractFunctionDecl>(CurDeclContext)->isCoroutine()));
   }
 
   /// Whether the current token is the contextual keyword for a \c then
@@ -837,7 +834,7 @@ public:
   /// emit the specified error diagnostic, and a note at the specified note
   /// location.
   bool parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
-                            DiagRef D);
+                            DiagRef D, bool justChecking = false);
 
   /// The parser expects that \p K is next token in the input.  If so,
   /// it is consumed and false is returned.
@@ -1045,11 +1042,6 @@ public:
   ParserResult<AvailableAttr>
   parseExtendedAvailabilitySpecList(SourceLoc AtLoc, SourceLoc AttrLoc,
                                     StringRef AttrName);
-
-  /// Parse a string literal whose contents can be interpreted as a UUID.
-  ///
-  /// \returns false on success, true on error.
-  bool parseUUIDString(UUID &uuid, Diag<> diag, bool justChecking = false);
 
   /// Parse the Objective-C selector inside @objc
   void parseObjCSelector(SmallVector<Identifier, 4> &Names,
@@ -1657,16 +1649,11 @@ public:
                                       ParameterList *&BodyParams,
                                       ParameterContextKind paramContext,
                                       DefaultArgumentInfo &defaultArgs);
-  ParserStatus parseFunctionSignature(DeclBaseName functionName,
-                                      DeclName &fullName,
-                                      ParameterList *&bodyParams,
-                                      DefaultArgumentInfo &defaultArgs,
-                                      SourceLoc &asyncLoc,
-                                      bool &reasync,
-                                      SourceLoc &throws,
-                                      bool &rethrows,
-                                      TypeRepr *&thrownType,
-                                      TypeRepr *&retType);
+  ParserStatus parseFunctionSignature(
+      DeclBaseName functionName, DeclName &fullName, ParameterList *&bodyParams,
+      DefaultArgumentInfo &defaultArgs, SourceLoc &asyncLoc, bool &reasync,
+      SourceLoc &throws, bool &rethrows, TypeRepr *&thrownType,
+      YieldList *&bodyYields, TypeRepr *&retType);
 
   /// Parse 'async' and 'throws', if present, putting the locations of the
   /// keywords into the \c SourceLoc parameters.
@@ -1684,6 +1671,8 @@ public:
                                       SourceLoc &asyncLoc, bool *reasync,
                                       SourceLoc &throwsLoc, bool *rethrows,
                                       TypeRepr *&thrownType);
+
+  ParserStatus parseYieldTypes(TupleTypeRepr *&yieldTypes);
 
   /// Returns 'true' if \p T is consider a throwing effect specifier.
   static bool isThrowsEffectSpecifier(const Token &T);

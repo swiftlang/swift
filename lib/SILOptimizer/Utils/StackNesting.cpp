@@ -12,8 +12,8 @@
 
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/PointerIntPair.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/StackAllocation.h"
@@ -202,6 +202,8 @@ static void createDealloc(SILBuilder &B, SILLocation loc, SILInstruction *alloc)
   case StackAllocationKind::BuiltinAddTaskLocalValue:
   case StackAllocationKind::BuiltinTaskAddPriorityEscalationHandler:
   case StackAllocationKind::BuiltinTaskAddCancellationHandler:
+  case StackAllocationKind::BuiltinTaskPushDeadline:
+  case StackAllocationKind::BuiltinTaskCancellationScopePush:
     llvm_unreachable("cannot insert this builtin; not safely reorderable");
     return;
   case StackAllocationKind::AllocPackMetadata:
@@ -236,6 +238,8 @@ static bool isUnreorderableAllocation(StackAllocation allocation) {
   case StackAllocationKind::BuiltinAddTaskLocalValue:
   case StackAllocationKind::BuiltinTaskAddPriorityEscalationHandler:
   case StackAllocationKind::BuiltinTaskAddCancellationHandler:
+  case StackAllocationKind::BuiltinTaskPushDeadline:
+  case StackAllocationKind::BuiltinTaskCancellationScopePush:
     return true;
   }
   llvm_unreachable("unknown stack allocation");
@@ -286,30 +290,23 @@ static StringRef getNameForStatus(AllocationStatus status) {
 }
 
 class ActiveAllocation {
-  llvm::PointerIntPair<SILInstruction*, 3, AllocationStatus> valueAndStatus;
+  swift::PointerIntPair<SILInstruction*, 3, AllocationStatus> valueAndStatus;
 
 public:
   explicit ActiveAllocation(SILInstruction *value)
     : valueAndStatus(value, AllocationStatus::Allocated) {}
 
-  SILInstruction *getValue() const {
-    return valueAndStatus.getPointer();
-  }
-
-  AllocationStatus getStatus() const {
-    return valueAndStatus.getInt();
-  }
+  SILInstruction *getValue() const { return valueAndStatus.getPointer(); }
+  AllocationStatus getStatus() const { return valueAndStatus.getInt(); }
 
   void setPending() {
     assert(getStatus() == AllocationStatus::Allocated);
     valueAndStatus.setInt(AllocationStatus::Pending);
   }
-
   void setNonNested() {
     assert(getStatus() == AllocationStatus::Allocated);
     valueAndStatus.setInt(AllocationStatus::AllocatedAndNonNested);
   }
-
   void setDeallocated(bool expectPending) {
     assert(expectPending
              ? getStatus() == AllocationStatus::Pending
@@ -317,7 +314,6 @@ public:
                 getStatus() == AllocationStatus::AllocatedAndNonNested));
     valueAndStatus.setInt(AllocationStatus::Deallocated);
   }
-
   void setUndeallocatable() {
     valueAndStatus.setInt(AllocationStatus::Undeallocatable);
   }

@@ -22,6 +22,8 @@
 // RUN: %target-typecheck-verify-swift -sdk %t/sdk -Fsystem %t/sdk/System/Library/Frameworks -I %t/sdk/usr/lib/swift/ -module-cache-path %t/MCP -prebuilt-module-cache-path %t/prebuilt
 // RUN: not %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Normal-*.swiftmodule
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import Normal
 import Flat
 import FMWK

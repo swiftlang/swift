@@ -22,18 +22,16 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/GenericParamList.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/STLExtras.h"
@@ -234,10 +232,24 @@ public:
         moduleContext(moduleContext), declPrinter(declPrinter),
         typeUseKind(typeUseKind) {}
 
-  void printInoutTypeModifier() {
-    os << (languageMode == swift::OutputLanguageMode::Cxx ? " &"
-                                                          : " * _Nonnull");
+  /// Print the '&' of a parameter that is passed as a C++ reference, i.e. one
+  /// for which the callee sees the caller's object rather than a copy of it.
+  void printReferenceTypeModifier() {
+    os << '&';
+    printedParamAsReference = true;
   }
+
+  void printInoutTypeModifier() {
+    if (languageMode == swift::OutputLanguageMode::Cxx) {
+      os << " ";
+      printReferenceTypeModifier();
+      return;
+    }
+    os << " * _Nonnull";
+  }
+
+  /// Whether the type just printed for a parameter is a C++ reference.
+  bool didPrintParamAsReference() const { return printedParamAsReference; }
 
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               std::optional<OptionalTypeKind> optionalKind,
@@ -257,8 +269,9 @@ public:
       }
     });
     if (!isInOutParam && shouldPrintOptional &&
-        typeUseKind == FunctionSignatureTypeUse::ParamType)
-      os << '&';
+        typeUseKind == FunctionSignatureTypeUse::ParamType) {
+      printReferenceTypeModifier();
+    }
     if (isInOutParam)
       printInoutTypeModifier();
     return true;
@@ -381,7 +394,7 @@ public:
           .printPrimaryCxxTypeName(cd, moduleContext);
     });
     if (typeUseKind == FunctionSignatureTypeUse::ParamType)
-      os << "&";
+      printReferenceTypeModifier();
     return ClangRepresentation::representable;
   }
 
@@ -441,8 +454,9 @@ public:
           !isInOutParam)
         os << "const ";
       printOptional(optionalKind, [&]() { handler.printTypeName(decl->getASTContext(), os); });
-      if (typeUseKind == FunctionSignatureTypeUse::ParamType)
-        os << '&';
+      if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
+        printReferenceTypeModifier();
+      }
       return ClangRepresentation::representable;
     }
 
@@ -455,7 +469,7 @@ public:
         ClangSyntaxPrinter(decl->getASTContext(), os).printPrimaryCxxTypeName(decl, moduleContext);
         result = visitGenericArgs(genericArgs);
       });
-      os << '&';
+      printReferenceTypeModifier();
       return result;
     }
 
@@ -559,8 +573,9 @@ public:
       ClangSyntaxPrinter(genericTpt->getASTContext(), os).printGenericTypeParamTypeName(genericTpt);
     });
     // Pass a reference to the template type.
-    if (isParam)
-      os << '&';
+    if (isParam) {
+      printReferenceTypeModifier();
+    }
     return ClangRepresentation::representable;
   }
 
@@ -595,6 +610,7 @@ private:
   const ModuleDecl *moduleContext;
   DeclAndTypePrinter &declPrinter;
   FunctionSignatureTypeUse typeUseKind;
+  bool printedParamAsReference = false;
 };
 
 } // end namespace
@@ -797,6 +813,21 @@ static void renameCxxParameterIfNeeded(const AbstractFunctionDecl *FD,
   }
 }
 
+/// The lifetime dependency of `FD`'s result, if it has one.
+///
+/// The sources of that dependency are the arguments whose lifetime the returned
+/// value is tied to; they are indexed by the function's parameter indices, with
+/// 'self' following the last parameter.
+static std::optional<LifetimeDependenceInfo>
+getResultLifetimeDependence(const AbstractFunctionDecl *FD) {
+  auto dependencies = FD->getLifetimeDependencies();
+  if (!dependencies)
+    return std::nullopt;
+  unsigned resultIndex =
+      FD->getParameters()->size() + (FD->isInstanceMethod() ? 1 : 0);
+  return getLifetimeDependenceFor(*dependencies, resultIndex);
+}
+
 ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
     StringRef name, Type resultTy, FunctionSignatureKind kind,
@@ -838,14 +869,16 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   auto print =
       [&, this](Type ty, std::optional<OptionalTypeKind> optionalKind,
                 StringRef name, bool isInOutParam,
-                CFunctionSignatureTypePrinterModifierDelegate delegate = {})
-      -> ClangRepresentation {
+                CFunctionSignatureTypePrinterModifierDelegate delegate = {},
+                bool *printedAsReference = nullptr) -> ClangRepresentation {
     // FIXME: add support for noescape and PrintMultiPartType,
     // see DeclAndTypePrinter::print.
     CFunctionSignatureTypePrinter typePrinter(
         functionSignatureOS, cPrologueOS, typeMapping, outputLang,
         interopContext, delegate, emittedModule, declPrinter);
     auto result = typePrinter.visit(ty, optionalKind, isInOutParam);
+    if (printedAsReference)
+      *printedAsReference = typePrinter.didPrintParamAsReference();
 
     if (!name.empty()) {
       functionSignatureOS << ' ';
@@ -1073,6 +1106,25 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
 
   // Print out the C++ parameter types.
   auto params = FD->getParameters();
+  // Mark the arguments that the result's lifetime depends on, so that Clang's
+  // lifetime analyses can check the calls to this thunk.
+  auto resultLifetimeDependence = getResultLifetimeDependence(FD);
+  auto isLifetimeSource = [&](unsigned index, bool isPassedByReference) {
+    if (!resultLifetimeDependence)
+      return false;
+    // A scoped dependency borrows the argument's storage, which is what
+    // 'lifetimebound' means, but only if the callee sees the caller's object.
+    if (resultLifetimeDependence->checkScope(index))
+      return isPassedByReference;
+    // An inherited dependency ties the result to the lifetime the argument
+    // itself depends on, rather than to the argument's storage. That is what
+    // 'lifetimebound' means for an argument passed by value; for one passed by
+    // reference there is no way to spell it, so leave the parameter
+    // unannotated.
+    if (resultLifetimeDependence->checkInherit(index))
+      return !isPassedByReference;
+    return false;
+  };
   if (params->size()) {
     if (HasParams)
       functionSignatureOS << ", ";
@@ -1095,8 +1147,12 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
             llvm::raw_string_ostream os(paramName);
             os << "_" << paramIndex;
           }
-          resultingRepresentation.merge(
-              print(objTy, argKind, paramName, param->isInOut()));
+          bool printedAsReference = false;
+          resultingRepresentation.merge(print(objTy, argKind, paramName,
+                                              param->isInOut(), {},
+                                              &printedAsReference));
+          if (isLifetimeSource(paramIndex - 1, printedAsReference))
+            functionSignatureOS << " SWIFT_LIFETIMEBOUND";
           ++paramIndex;
         });
     if (resultingRepresentation.isUnsupported()) {
@@ -1108,6 +1164,12 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     functionSignatureOS << " const";
   if (modifiers.isNoexcept)
     functionSignatureOS << " noexcept";
+  // 'self' is the implicit object parameter of a member thunk, which always
+  // refers to the caller's object, so its annotation goes after the parameter
+  // list.
+  if (FD->isInstanceMethod() &&
+      isLifetimeSource(params->size(), /*isPassedByReference=*/true))
+    functionSignatureOS << " SWIFT_SELF_LIFETIMEBOUND";
   if (modifiers.hasSymbolUSR)
     ClangSyntaxPrinter(FD->getASTContext(), functionSignatureOS)
         .printSymbolUSRAttribute(
@@ -1842,7 +1904,7 @@ bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
 }
 
 void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
-    const SmallVector<Type> &neededTypes, bool NeedsReturnTypes,
+    ArrayRef<Type> neededTypes, bool NeedsReturnTypes,
     PrinterTy retTypeAndNamePrinter, PrinterTy paramPrinter, bool isConstFunc,
     PrinterTy bodyPrinter, ValueDecl *valueDecl, ModuleDecl *emittedModule,
     raw_ostream &outOfLineOS) {

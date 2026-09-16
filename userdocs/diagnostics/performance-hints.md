@@ -29,6 +29,8 @@ can also be enabled or controlled independently:
 - <doc:untyped-throws>: Warns on untyped `throws` declarations, where the use of
   `any Error` incurs a heap allocation on each `throw`.
 
+- <doc:heap-allocation>: Warns on operations that perform heap allocation in Embedded Swift, such as creating a class instance or an escaping closure.
+
 For example, to enable only the `UntypedThrows` checks as warnings:
 
 ```

@@ -21,6 +21,16 @@
 #define __has_builtin(x) 0
 #endif
 
+#if defined(_WIN32) && (defined(_M_IX86) || defined(__i386__))
+#if defined(_MSC_VER)
+#define __SWIFT_STDCALL __stdcall
+#else
+#define __SWIFT_STDCALL __attribute__((__stdcall__))
+#endif
+#else
+#define __SWIFT_STDCALL
+#endif
+
 // Is the target platform a simulator? We can't use TargetConditionals
 // when included from SwiftShims, so use the builtin.
 #if __has_builtin(__is_target_environment)

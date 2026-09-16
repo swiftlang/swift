@@ -65,7 +65,7 @@ protocol P {
 
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype24testCovariantSelfMethod11pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $any P, let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfMethod1 : <Self where Self : P> (Self) -> () -> Self
 // CHECK: [[DEST:%[0-9]+]] = init_existential_addr [[LET]] : $*any P, $@opened([[OPENED_ID]], any P) Self
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[DEST]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
@@ -74,7 +74,7 @@ func testCovariantSelfMethod1(p: any P) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype24testCovariantSelfMethod21pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $Optional<any P>, let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfMethod2 : <Self where Self : P> (Self) -> () -> Self?
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>(%{{[0-9]+}}, [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
 // CHECK: init_existential_addr %{{[0-9]+}} : $*any P, $@opened([[OPENED_ID]], any P) Self
@@ -82,7 +82,7 @@ func testCovariantSelfMethod2(p: any P) {
   let x = p.covariantSelfMethod2()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype24testCovariantSelfMethod31pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfMethod3 : <Self where Self : P> (Self) -> () -> Self.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick (@opened([[OPENED_ID]], any P) Self).Type, $@thick any P.Type
@@ -93,7 +93,7 @@ func testCovariantSelfMethod3(p: any P) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype24testCovariantSelfMethod41pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $(any P, any P), let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfMethod4 : <Self where Self : P> (Self) -> () -> (Self, Self)
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[SRC_0:%[0-9]+]], [[SRC_1:%[0-9]+]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
 // CHECK: init_existential_addr %{{[0-9]+}} : $*any P, $@opened([[OPENED_ID]], any P) Self
@@ -102,7 +102,7 @@ func testCovariantSelfMethod4(p: any P) {
   let x = p.covariantSelfMethod4()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype24testCovariantSelfMethod51pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfMethod5 : <Self where Self : P> (Self) -> () -> Array<Self>
 // CHECK: [[ARRAY:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Array<τ_0_0>
 // CHECK: [[ARRAY_UPCAST_FN:%[0-9]+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
@@ -112,7 +112,7 @@ func testCovariantSelfMethod5(p: any P) {
   let x = p.covariantSelfMethod5()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype24testCovariantSelfMethod61pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfMethod6 : <Self where Self : P> (Self) -> () -> [String : Self]
 // CHECK: [[DICT:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Dictionary<String, τ_0_0>
 // CHECK: [[DICT_UPCAST_FN:%[0-9]+]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
@@ -122,7 +122,7 @@ func testCovariantSelfMethod6(p: any P) {
   let x = p.covariantSelfMethod6()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype24testCovariantSelfMethod71pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[THUNK:%[0-9]+]] = function_ref @$s42existential_member_accesses_self_assoctype1P_pIgn_xIegn_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @guaranteed @noescape @callee_guaranteed (@in_guaranteed any P) -> ()) -> ()
 // CHECK: [[STEP1:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK]]<@opened([[OPENED_ID]], any P) Self>
 // CHECK: [[STEP2:%[0-9]+]] = convert_function [[STEP1]] : $@callee_guaranteed (@in_guaranteed @opened([[OPENED_ID]], any P) Self) -> () to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <@opened([[OPENED_ID]], any P) Self>
@@ -133,7 +133,7 @@ func testCovariantSelfMethod7(p: any P) {
   p.covariantSelfMethod7 { _ in }
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype24testCovariantSelfMethod81pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPENED_TY:@opened\("[0-9A-F-]+", any P\) Self]]
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPENED_TY:@opened\([0-9]+, any P\) Self]]
 // CHECK: [[THUNK:%[0-9]+]] = function_ref @[[SELF_ARRAY_THUNK_NAME:\$[0-9a-zA-Z_]+]] : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@guaranteed Array<τ_0_0>, @guaranteed @noescape @callee_guaranteed (@guaranteed Array<any P>) -> ()) -> ()
 // CHECK: [[STEP1:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK]]<[[OPENED_TY]]>
 // CHECK: [[STEP2:%[0-9]+]] = convert_function [[STEP1]] : $@callee_guaranteed (@guaranteed Array<[[OPENED_TY]]>) -> () to $@callee_guaranteed @substituted <τ_0_0> (@guaranteed Array<τ_0_0>) -> () for <[[OPENED_TY]]>
@@ -151,7 +151,7 @@ func testCovariantSelfMethod8(p: any P) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype26testCovariantSelfProperty11pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $any P, let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfProperty1!getter : <Self where Self : P> (Self) -> () -> Self
 // CHECK: [[DEST:%[0-9]+]] = init_existential_addr [[LET]] : $*any P, $@opened([[OPENED_ID]], any P) Self
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[DEST]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
@@ -160,7 +160,7 @@ func testCovariantSelfProperty1(p: any P) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype26testCovariantSelfProperty21pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $Optional<any P>, let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfProperty2!getter : <Self where Self : P> (Self) -> () -> Self?
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPTIONAL:%[0-9]+]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
 // CHECK: init_existential_addr %{{[0-9]+}} : $*any P, $@opened([[OPENED_ID]], any P) Self
@@ -168,7 +168,7 @@ func testCovariantSelfProperty2(p: any P) {
   let x = p.covariantSelfProperty2
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype26testCovariantSelfProperty31pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfProperty3!getter : <Self where Self : P> (Self) -> () -> Self.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick (@opened([[OPENED_ID]], any P) Self).Type, $@thick any P.Type
@@ -179,7 +179,7 @@ func testCovariantSelfProperty3(p: any P) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype26testCovariantSelfProperty41pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $(any P, any P), let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfProperty4!getter : <Self where Self : P> (Self) -> () -> (Self, Self)
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[SRC_0:%[0-9]+]], [[SRC_1:%[0-9]+]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
 // CHECK: [[DEST_0_INITED:%[0-9]+]] = init_existential_addr %{{[0-9]+}} : $*any P, $@opened([[OPENED_ID]], any P) Self
@@ -188,7 +188,7 @@ func testCovariantSelfProperty4(p: any P) {
   let x = p.covariantSelfProperty4
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype26testCovariantSelfProperty51pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfProperty5!getter : <Self where Self : P> (Self) -> () -> Array<Self>
 // CHECK: [[ARRAY:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Array<τ_0_0>
 // CHECK: [[ARRAY_UPCAST_FN:%[0-9]+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
@@ -198,7 +198,7 @@ func testCovariantSelfProperty5(p: any P) {
   let x = p.covariantSelfProperty5
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype26testCovariantSelfProperty61pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantSelfProperty6!getter : <Self where Self : P> (Self) -> () -> [String : Self]
 // CHECK: [[DICT:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Dictionary<String, τ_0_0>
 // CHECK: [[DICT_UPCAST_FN:%[0-9]+]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
@@ -208,7 +208,7 @@ func testCovariantSelfProperty6(p: any P) {
   let x = p.covariantSelfProperty6
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype26testCovariantSelfProperty71pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self,  #P.covariantSelfProperty7!getter : <Self where Self : P> (Self) -> () -> ((Self) -> ()) -> ()
 // CHECK: [[RESULT_FN:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed @substituted <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>) -> () for <τ_0_0>
 // CHECK: [[STEP1:%[0-9]+]] = convert_function [[RESULT_FN]] : $@callee_guaranteed @substituted <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>) -> () for <@opened([[OPENED_ID]], any P) Self> to $@callee_guaranteed (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <@opened([[OPENED_ID]], any P) Self>) -> ()
@@ -219,7 +219,7 @@ func testCovariantSelfProperty7(p: any P) {
   let x = p.covariantSelfProperty7
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype26testCovariantSelfProperty81pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPENED_TY:@opened\("[0-9A-F-]+", any P\) Self]]
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPENED_TY:@opened\([0-9]+, any P\) Self]]
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $[[OPENED_TY]],  #P.covariantSelfProperty8!getter : <Self where Self : P> (Self) -> () -> ((Self...) -> ()) -> ()
 // CHECK: [[RESULT_FN:%[0-9]+]] = apply [[WITNESS]]<[[OPENED_TY]]>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed @substituted <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@guaranteed Array<τ_0_0>) -> () for <τ_0_0>) -> () for <τ_0_0>
 // CHECK: [[STEP1:%[0-9]+]] = convert_function [[RESULT_FN]] : $@callee_guaranteed @substituted <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@guaranteed Array<τ_0_0>) -> () for <τ_0_0>) -> () for <[[OPENED_TY]]> to $@callee_guaranteed (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@guaranteed Array<τ_0_0>) -> () for <[[OPENED_TY]]>) -> ()
@@ -238,7 +238,7 @@ func testCovariantSelfProperty8(p: any P) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantSelfSubscript11pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $any P, let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> Self
 // CHECK: [[DEST:%[0-9]+]] = init_existential_addr [[LET]] : $*any P, $@opened([[OPENED_ID]], any P) Self
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[DEST]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
@@ -247,7 +247,7 @@ func testCovariantSelfSubscript1(p: any P) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantSelfSubscript21pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $Optional<any P>, let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> Self?
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPTIONAL:%[0-9]+]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
 // CHECK: init_existential_addr %{{[0-9]+}} : $*any P, $@opened([[OPENED_ID]], any P) Self
@@ -255,7 +255,7 @@ func testCovariantSelfSubscript2(p: any P) {
   let x = p[covariantSelfSubscript2: ()]
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantSelfSubscript31pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> Self.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick (@opened([[OPENED_ID]], any P) Self).Type, $@thick any P.Type
@@ -266,7 +266,7 @@ func testCovariantSelfSubscript3(p: any P) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantSelfSubscript41pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $(any P, any P), let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> (Self, Self)
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[SRC_0:%[0-9]+]], [[SRC_1:%[0-9]+]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
 // CHECK: init_existential_addr %{{[0-9]+}} : $*any P, $@opened([[OPENED_ID]], any P) Self
@@ -275,7 +275,7 @@ func testCovariantSelfSubscript4(p: any P) {
   let x = p[covariantSelfSubscript4: ()]
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantSelfSubscript51pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> Array<Self>
 // CHECK: [[ARRAY:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Array<τ_0_0>
 // CHECK: [[ARRAY_UPCAST_FN:%[0-9]+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
@@ -285,7 +285,7 @@ func testCovariantSelfSubscript5(p: any P) {
   let x = p[covariantSelfSubscript5: ()]
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantSelfSubscript61pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> [String : Self]
 // CHECK: [[DICT:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Dictionary<String, τ_0_0>
 // CHECK: [[DICT_UPCAST_FN:%[0-9]+]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
@@ -295,7 +295,7 @@ func testCovariantSelfSubscript6(p: any P) {
   let x = p[covariantSelfSubscript6: ()]
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantSelfSubscript71pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[THUNK:%[0-9]+]] = function_ref @$s42existential_member_accesses_self_assoctype1P_pIgn_xIegn_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @guaranteed @noescape @callee_guaranteed (@in_guaranteed any P) -> ()) -> ()
 // CHECK: [[STEP1:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK]]<@opened([[OPENED_ID]], any P) Self>
 // CHECK: [[STEP2:%[0-9]+]] = convert_function [[STEP1]] : $@callee_guaranteed (@in_guaranteed @opened([[OPENED_ID]], any P) Self) -> () to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <@opened([[OPENED_ID]], any P) Self>
@@ -306,7 +306,7 @@ func testCovariantSelfSubscript7(p: any P) {
   _ = p[covariantSelfSubscript7: { _ in }]
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantSelfSubscript81pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPENED_TY:@opened\("[0-9A-F-]+", any P\) Self]]
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPENED_TY:@opened\([0-9]+, any P\) Self]]
 // CHECK: [[THUNK:%[0-9]+]] = function_ref @[[SELF_ARRAY_THUNK_NAME]] : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@guaranteed Array<τ_0_0>, @guaranteed @noescape @callee_guaranteed (@guaranteed Array<any P>) -> ()) -> ()
 // CHECK: [[STEP1:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK]]<[[OPENED_TY]]>
 // CHECK: [[STEP2:%[0-9]+]] = convert_function [[STEP1]] : $@callee_guaranteed (@guaranteed Array<[[OPENED_TY]]>) -> () to $@callee_guaranteed @substituted <τ_0_0> (@guaranteed Array<τ_0_0>) -> () for <[[OPENED_TY]]>
@@ -319,7 +319,7 @@ func testCovariantSelfSubscript8(p: any P) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype25testCovariantAssocMethod11pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $Any, let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocMethod1 : <Self where Self : P> (Self) -> () -> Self.A
 // CHECK: [[DEST:%[0-9]+]] = init_existential_addr [[LET]] : $*Any, $(@opened([[OPENED_ID]], any P) Self).A
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[DEST]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0.A
@@ -328,7 +328,7 @@ func testCovariantAssocMethod1(p: any P) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype25testCovariantAssocMethod21pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $Optional<Any>, let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocMethod2 : <Self where Self : P> (Self) -> () -> Self.A?
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>(%{{[0-9]+}}, [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0.A>
 // CHECK: init_existential_addr %{{[0-9]+}} : $*Any, $(@opened([[OPENED_ID]], any P) Self).A
@@ -336,7 +336,7 @@ func testCovariantAssocMethod2(p: any P) {
   let x = p.covariantAssocMethod2()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype25testCovariantAssocMethod31pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocMethod3 : <Self where Self : P> (Self) -> () -> Self.A.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.A.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick ((@opened([[OPENED_ID]], any P) Self).A).Type, $@thick any Any.Type
@@ -347,7 +347,7 @@ func testCovariantAssocMethod3(p: any P) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype25testCovariantAssocMethod41pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $(Any, Any), let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocMethod4 : <Self where Self : P> (Self) -> () -> (Self.A, Self.A)
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>(%{{[0-9]+}}, %{{[0-9]+}}, [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (@out τ_0_0.A, @out τ_0_0.A)
 // CHECK: init_existential_addr %{{[0-9]+}} : $*Any, $(@opened([[OPENED_ID]], any P) Self).A
@@ -356,7 +356,7 @@ func testCovariantAssocMethod4(p: any P) {
   let x = p.covariantAssocMethod4()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype25testCovariantAssocMethod51pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocMethod5 : <Self where Self : P> (Self) -> () -> Array<Self.A>
 // CHECK: [[ARRAY:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Array<τ_0_0.A>
 // CHECK: [[ARRAY_UPCAST_FN:%[0-9]+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
@@ -366,7 +366,7 @@ func testCovariantAssocMethod5(p: any P) {
   let x = p.covariantAssocMethod5()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype25testCovariantAssocMethod61pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocMethod6 : <Self where Self : P> (Self) -> () -> [String : Self.A]
 // CHECK: [[DICT:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Dictionary<String, τ_0_0.A>
 // CHECK: [[DICT_UPCAST_FN:%[0-9]+]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
@@ -376,7 +376,7 @@ func testCovariantAssocMethod6(p: any P) {
   let x = p.covariantAssocMethod6()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype25testCovariantAssocMethod71pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: function_ref thunk for @callee_guaranteed (@in_guaranteed Any) -> ()
 // CHECK-NEXT: function_ref @$sypIgn_1A42existential_member_accesses_self_assoctype1PPQzIegn_AbCRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0.A, @guaranteed @noescape @callee_guaranteed (@in_guaranteed Any) -> ()) -> ()
 // CHECK: [[STEP1:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK]]<@opened([[OPENED_ID]], any P) Self>
@@ -388,7 +388,7 @@ func testCovariantAssocMethod7(p: any P) {
   p.covariantAssocMethod7 { _ in }
 }
 // CHECK-LABEL: sil hidden [ossa]  @$s42existential_member_accesses_self_assoctype25testCovariantAssocMethod81pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPENED_TY:@opened\("[0-9A-F-]+", any P\) Self]]
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPENED_TY:@opened\([0-9]+, any P\) Self]]
 // CHECK: [[THUNK:%[0-9]+]] = function_ref @[[ASSOCTYPE_ARRAY_THUNK_NAME:\$[0-9a-zA-Z_]+]] : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@guaranteed Array<τ_0_0.A>, @guaranteed @noescape @callee_guaranteed (@guaranteed Array<Any>) -> ()) -> ()
 // CHECK: [[STEP1:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK]]<[[OPENED_TY]]>
 // CHECK: [[STEP2:%[0-9]+]] = convert_function [[STEP1]] : $@callee_guaranteed (@guaranteed Array<([[OPENED_TY]]).A>) -> () to $@callee_guaranteed @substituted <τ_0_0> (@guaranteed Array<τ_0_0>) -> () for <([[OPENED_TY]]).A>
@@ -406,7 +406,7 @@ func testCovariantAssocMethod8(p: any P) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantAssocProperty11pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $Any, let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocProperty1!getter : <Self where Self : P> (Self) -> () -> Self.A
 // CHECK: [[DEST:%[0-9]+]] = init_existential_addr [[LET]] : $*Any, $(@opened([[OPENED_ID]], any P) Self).A
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[DEST]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0.A
@@ -415,7 +415,7 @@ func testCovariantAssocProperty1(p: any P) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantAssocProperty21pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $Optional<Any>, let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocProperty2!getter : <Self where Self : P> (Self) -> () -> Self.A?
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>(%{{[0-9]+}}, [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0.A>
 // CHECK: init_existential_addr %{{[0-9]+}} : $*Any, $(@opened([[OPENED_ID]], any P) Self).A
@@ -423,7 +423,7 @@ func testCovariantAssocProperty2(p: any P) {
   let x = p.covariantAssocProperty2
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantAssocProperty31pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocProperty3!getter : <Self where Self : P> (Self) -> () -> Self.A.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.A.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick ((@opened([[OPENED_ID]], any P) Self).A).Type, $@thick any Any.Type
@@ -434,7 +434,7 @@ func testCovariantAssocProperty3(p: any P) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantAssocProperty41pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $(Any, Any), let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocProperty4!getter : <Self where Self : P> (Self) -> () -> (Self.A, Self.A)
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>(%{{[0-9]+}}, %{{[0-9]+}}, [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (@out τ_0_0.A, @out τ_0_0.A)
 // CHECK: init_existential_addr %{{[0-9]+}} : $*Any, $(@opened([[OPENED_ID]], any P) Self).A
@@ -443,7 +443,7 @@ func testCovariantAssocProperty4(p: any P) {
   let x = p.covariantAssocProperty4
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantAssocProperty51pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocProperty5!getter : <Self where Self : P> (Self) -> () -> Array<Self.A>
 // CHECK: [[ARRAY:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Array<τ_0_0.A>
 // CHECK: [[ARRAY_UPCAST_FN:%[0-9]+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
@@ -453,7 +453,7 @@ func testCovariantAssocProperty5(p: any P) {
   let x = p.covariantAssocProperty5
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantAssocProperty61pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.covariantAssocProperty6!getter : <Self where Self : P> (Self) -> () -> [String : Self.A]
 // CHECK: [[DICT:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Dictionary<String, τ_0_0.A>
 // CHECK: [[DICT_UPCAST_FN:%[0-9]+]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
@@ -463,7 +463,7 @@ func testCovariantAssocProperty6(p: any P) {
   let x = p.covariantAssocProperty6
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantAssocProperty71pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self,  #P.covariantAssocProperty7!getter : <Self where Self : P> (Self) -> () -> ((Self.A) -> ()) -> ()
 // CHECK: [[RESULT_FN:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed @substituted <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>) -> () for <τ_0_0.A>
 // CHECK: [[STEP1:%[0-9]+]] = convert_function [[RESULT_FN]] : $@callee_guaranteed @substituted <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>) -> () for <(@opened([[OPENED_ID]], any P) Self).A> to $@callee_guaranteed (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <(@opened([[OPENED_ID]], any P) Self).A>) -> ()
@@ -474,7 +474,7 @@ func testCovariantAssocProperty7(p: any P) {
   let x = p.covariantAssocProperty7
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype27testCovariantAssocProperty81pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPENED_TY:@opened\("[0-9A-F-]+", any P\) Self]]
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPENED_TY:@opened\([0-9]+, any P\) Self]]
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $[[OPENED_TY]],  #P.covariantAssocProperty8!getter : <Self where Self : P> (Self) -> () -> ((Self.A...) -> ()) -> ()
 // CHECK: [[RESULT_FN:%[0-9]+]] = apply [[WITNESS]]<[[OPENED_TY]]>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed @substituted <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@guaranteed Array<τ_0_0>) -> () for <τ_0_0>) -> () for <τ_0_0.A>
 // CHECK: [[STEP1:%[0-9]+]] = convert_function [[RESULT_FN]] : $@callee_guaranteed @substituted <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@guaranteed Array<τ_0_0>) -> () for <τ_0_0>) -> () for <([[OPENED_TY]]).A> to $@callee_guaranteed (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@guaranteed Array<τ_0_0>) -> () for <([[OPENED_TY]]).A>) -> ()
@@ -492,7 +492,7 @@ func testCovariantAssocProperty8(p: any P) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype28testCovariantAssocSubscript11pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $Any, let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> Self.A
 // CHECK: [[DEST:%[0-9]+]] = init_existential_addr [[LET]] : $*Any, $(@opened([[OPENED_ID]], any P) Self).A
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[DEST]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0.A
@@ -501,7 +501,7 @@ func testCovariantAssocSubscript1(p: any P) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype28testCovariantAssocSubscript21pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $Optional<Any>, let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> Self.A?
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>(%{{[0-9]+}}, [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0.A>
 // CHECK: init_existential_addr %{{[0-9]+}} : $*Any, $(@opened([[OPENED_ID]], any P) Self).A
@@ -509,7 +509,7 @@ func testCovariantAssocSubscript2(p: any P) {
   let x = p[covariantAssocSubscript2: ()]
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype28testCovariantAssocSubscript31pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> Self.A.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.A.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick ((@opened([[OPENED_ID]], any P) Self).A).Type, $@thick any Any.Type
@@ -520,7 +520,7 @@ func testCovariantAssocSubscript3(p: any P) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype28testCovariantAssocSubscript41pyAA1P_p_tF
 // CHECK: [[LET:%[0-9]+]] = alloc_stack [lexical] [var_decl] $(Any, Any), let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> (Self.A, Self.A)
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>(%{{[0-9]+}}, %{{[0-9]+}}, [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (@out τ_0_0.A, @out τ_0_0.A)
 // CHECK: init_existential_addr %{{[0-9]+}} : $*Any, $(@opened([[OPENED_ID]], any P) Self).A
@@ -529,7 +529,7 @@ func testCovariantAssocSubscript4(p: any P) {
   let x = p[covariantAssocSubscript4: ()]
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype28testCovariantAssocSubscript51pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> Array<Self.A>
 // CHECK: [[ARRAY:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Array<τ_0_0.A>
 // CHECK: [[ARRAY_UPCAST_FN:%[0-9]+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
@@ -539,7 +539,7 @@ func testCovariantAssocSubscript5(p: any P) {
   let x = p[covariantAssocSubscript5: ()]
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype28testCovariantAssocSubscript61pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P) Self, #P.subscript!getter : <Self where Self : P> (Self) -> (()) -> [String : Self.A]
 // CHECK: [[DICT:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Dictionary<String, τ_0_0.A>
 // CHECK: [[DICT_UPCAST_FN:%[0-9]+]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
@@ -549,7 +549,7 @@ func testCovariantAssocSubscript6(p: any P) {
   let x = p[covariantAssocSubscript6: ()]
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype28testCovariantAssocSubscript71pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*@opened([[OPENED_ID:[0-9]+]], any P) Self
 // CHECK: [[THUNK:%[0-9]+]] = function_ref @$sypIgn_1A42existential_member_accesses_self_assoctype1PPQzIegn_AbCRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0.A, @guaranteed @noescape @callee_guaranteed (@in_guaranteed Any) -> ()) -> ()
 // CHECK: [[STEP1:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK]]<@opened([[OPENED_ID]], any P) Self>
 // CHECK: [[STEP2:%[0-9]+]] = convert_function [[STEP1]] : $@callee_guaranteed (@in_guaranteed (@opened([[OPENED_ID]], any P) Self).A) -> () to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <(@opened([[OPENED_ID]], any P) Self).A>
@@ -560,7 +560,7 @@ func testCovariantAssocSubscript7(p: any P) {
   _ = p[covariantAssocSubscript7: { _ in }]
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype28testCovariantAssocSubscript81pyAA1P_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPENED_TY:@opened\("[0-9A-F-]+", any P\) Self]]
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPENED_TY:@opened\([0-9]+, any P\) Self]]
 // CHECK: [[THUNK:%[0-9]+]] = function_ref @[[ASSOCTYPE_ARRAY_THUNK_NAME]] : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@guaranteed Array<τ_0_0.A>, @guaranteed @noescape @callee_guaranteed (@guaranteed Array<Any>) -> ()) -> ()
 // CHECK: [[STEP1:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK]]<[[OPENED_TY]]>
 // CHECK: [[STEP2:%[0-9]+]] = convert_function [[STEP1]] : $@callee_guaranteed (@guaranteed Array<([[OPENED_TY]]).A>) -> () to $@callee_guaranteed @substituted <τ_0_0> (@guaranteed Array<τ_0_0>) -> () for <([[OPENED_TY]]).A>
@@ -579,7 +579,7 @@ class Class {}
 protocol P2: P where A: Class & P {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype36testCovariantAssocMethod1Constrained2p2yAA2P2_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P2) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:[0-9]+]], any P2) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P2) Self, #P.covariantAssocMethod1 : <Self where Self : P> (Self) -> () -> Self.A
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P2) Self>(%{{[0-9]+}}, [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0.A
 // CHECK: init_existential_ref %{{[0-9]+}} : $(@opened([[OPENED_ID]], any P2) Self).A : $(@opened([[OPENED_ID]], any P2) Self).A, $any Class & P
@@ -588,7 +588,7 @@ func testCovariantAssocMethod1Constrained(p2: any P2) {
   let x = p2.covariantAssocMethod1()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype36testCovariantAssocMethod2Constrained2p2yAA2P2_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P2) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:[0-9]+]], any P2) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P2) Self, #P.covariantAssocMethod2 : <Self where Self : P> (Self) -> () -> Self.A?
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P2) Self>(%{{[0-9]+}}, [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0.A>
 // CHECK: init_existential_ref %{{[0-9]+}} : $(@opened([[OPENED_ID]], any P2) Self).A : $(@opened([[OPENED_ID]], any P2) Self).A, $any Class & P
@@ -597,7 +597,7 @@ func testCovariantAssocMethod2Constrained(p2: any P2) {
   let x = p2.covariantAssocMethod2()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype36testCovariantAssocMethod3Constrained2p2yAA2P2_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P2) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:[0-9]+]], any P2) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P2) Self, #P.covariantAssocMethod3 : <Self where Self : P> (Self) -> () -> Self.A.Type
 // CHECK: [[META:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P2) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @thick τ_0_0.A.Type
 // CHECK: [[EXIST_META:%[0-9]+]] = init_existential_metatype [[META]] : $@thick ((@opened([[OPENED_ID]], any P2) Self).A).Type, $@thick any (Class & P).Type
@@ -607,7 +607,7 @@ func testCovariantAssocMethod3Constrained(p2: any P2) {
   let x = p2.covariantAssocMethod3()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype36testCovariantAssocMethod4Constrained2p2yAA2P2_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P2) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:[0-9]+]], any P2) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P2) Self, #P.covariantAssocMethod4 : <Self where Self : P> (Self) -> () -> (Self.A, Self.A)
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P2) Self>(%{{[0-9]+}}, %{{[0-9]+}}, [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (@out τ_0_0.A, @out τ_0_0.A)
 // CHECK: init_existential_ref %{{[0-9]+}} : $(@opened([[OPENED_ID]], any P2) Self).A : $(@opened([[OPENED_ID]], any P2) Self).A, $any Class & P
@@ -617,7 +617,7 @@ func testCovariantAssocMethod4Constrained(p2: any P2) {
   let x = p2.covariantAssocMethod4()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype36testCovariantAssocMethod5Constrained2p2yAA2P2_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P2) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:[0-9]+]], any P2) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P2) Self, #P.covariantAssocMethod5 : <Self where Self : P> (Self) -> () -> Array<Self.A>
 // CHECK: [[ARRAY:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P2) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Array<τ_0_0.A>
 // CHECK: [[ARRAY_UPCAST_FN:%[0-9]+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
@@ -627,7 +627,7 @@ func testCovariantAssocMethod5Constrained(p2: any P2) {
   let x = p2.covariantAssocMethod5()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype36testCovariantAssocMethod6Constrained2p2yAA2P2_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P2) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:[0-9]+]], any P2) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P2) Self, #P.covariantAssocMethod6 : <Self where Self : P> (Self) -> () -> [String : Self.A]
 // CHECK: [[DICT:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P2) Self>([[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Dictionary<String, τ_0_0.A>
 // CHECK: [[DICT_UPCAST_FN:%[0-9]+]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
@@ -637,7 +637,7 @@ func testCovariantAssocMethod6Constrained(p2: any P2) {
   let x = p2.covariantAssocMethod6()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype36testCovariantAssocMethod7Constrained2p2yAA2P2_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P2) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:[0-9]+]], any P2) Self
 // CHECK: function_ref thunk for @callee_guaranteed (@guaranteed Class & P) -> ()
 // CHECK-NEXT: [[THUNK1:%[0-9]+]] = function_ref @$s42existential_member_accesses_self_assoctype1P_AA5ClassCXcIgg_1AAaBPQzIegn_AA2P2RzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0.A, @guaranteed @noescape @callee_guaranteed (@guaranteed any Class & P) -> ()) -> ()
 // CHECK-NEXT: [[STEP1:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK1]]<@opened([[OPENED_ID]], any P2) Self>
@@ -660,7 +660,7 @@ protocol P3: P where A == Bool {
 // -----------------------------------------------------------------------------
 
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype33testCovariantAssocMethod1Concrete2p3yAA2P3_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P3 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P3) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P3 to $*@opened([[OPENED_ID:[0-9]+]], any P3) Self
 // CHECK: [[BOOL_ADDR:%[0-9]+]] = alloc_stack $Bool
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P3) Self, #P.covariantAssocMethod1 : <Self where Self : P> (Self) -> () -> Self.A
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P3) Self>([[BOOL_ADDR]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0.A
@@ -671,14 +671,14 @@ func testCovariantAssocMethod1Concrete(p3: any P3) {
   let x = p3.covariantAssocMethod1()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype37testContravariantAssocMethod1Concrete2p3yAA2P3_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P3 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P3) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P3 to $*@opened([[OPENED_ID:[0-9]+]], any P3) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P3) Self, #P3.contravariantAssocMethod1 : <Self where Self : P3> (Self) -> (Self.A) -> ()
 // CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P3) Self>(%{{[0-9]+}}, [[OPENED]]) : $@convention(witness_method: P3) <τ_0_0 where τ_0_0 : P3> (Bool, @in_guaranteed τ_0_0) -> ()
 func testContravariantAssocMethod1Concrete(p3: any P3) {
   p3.contravariantAssocMethod1(true)
 }
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype33testInvariantAssocMethod1Concrete2p3yAA2P3_p_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P3 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P3) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P3 to $*@opened([[OPENED_ID:[0-9]+]], any P3) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P3) Self, #P3.invariantAssocMethod1 : <Self where Self : P3> (Self) -> () -> GenericStruct<Self.A>
 // CHECK: [[RESULT:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P3) Self>([[OPENED]]) : $@convention(witness_method: P3) <τ_0_0 where τ_0_0 : P3> (@in_guaranteed τ_0_0) -> GenericStruct<Bool>
 // CHECK: [[MV:%.*]] = move_value [var_decl] [[RESULT]] : $GenericStruct<Bool>
@@ -707,7 +707,7 @@ protocol P5<A>{
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype30testCovariantAssocGenericClass2p5AA0iJ0CySiGAA2P5_pSi1AAaGPRts_XP_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P5<Int> to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P5<Int>) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P5<Int> to $*@opened([[OPENED_ID:[0-9]+]], any P5<Int>) Self
 // CHECK: [[APPLY:%[0-9]+]] = apply [[WITNESS]]<@opened([[OPENED_ID]], any P5<Int>) Self>([[OPENED]]) : $@convention(witness_method: P5) <τ_0_0 where τ_0_0 : P5> (@in_guaranteed τ_0_0) -> @owned τ_0_0.B
 // CHECK: [[UPCAST:%[0-9]+]] = upcast [[APPLY]] : $(@opened([[OPENED_ID]], any P5<Int>) Self).B to $GenericClass<Int>
 // CHECK: return %{{[0-9]+}} : $GenericClass<Int>
@@ -718,7 +718,7 @@ func testCovariantAssocGenericClass(p5: any P5<Int>) -> GenericClass<Int> {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype33testCovariantAssocGenericSubClass2p5AA0ijK0CySbGAA2P5_pSb1AAaGPRts_XP_tF
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P5<Bool> to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P5<Bool>) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P5<Bool> to $*@opened([[OPENED_ID:[0-9]+]], any P5<Bool>) Self
 // CHECK: apply %3<@opened([[OPENED_ID]], any P5<Bool>) Self>([[OPENED]]) : $@convention(witness_method: P5) <τ_0_0 where τ_0_0 : P5> (@in_guaranteed τ_0_0) -> @owned τ_0_0.C
 // CHECK: [[UPCAST:%[0-9]+]] = upcast [[APPLY:%[0-9]+]] : $(@opened([[OPENED_ID]], any P5<Bool>) Self).C to $GenericSubClass<Bool>
 // CHECK: return %{{[0-9]+}} : $GenericSubClass<Bool>
@@ -738,7 +738,7 @@ protocol P4: P where A == (B, B) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype42testCovariantAssocMethod1PartiallyConcrete2p4yAA2P4_p_tF
 // CHECK: alloc_stack [lexical] [var_decl] $(any P4, any P4), let, name "x"
-// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P4 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P4) Self
+// CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P4 to $*@opened([[OPENED_ID:[0-9]+]], any P4) Self
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P4) Self, #P.covariantAssocMethod1 : <Self where Self : P> (Self) -> () -> Self.A
 // CHECK: apply %4<@opened([[OPENED_ID]], any P4) Self>(%{{[0-9]+}}, [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0.A
 // CHECK: init_existential_addr %{{[0-9]+}} : $*any P4, $(@opened([[OPENED_ID]], any P4) Self).B

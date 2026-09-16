@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -Wwarning EmbeddedRestrictions -verify-additional-prefix nonembedded-
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Embedded -verify-additional-prefix embedded-
-// RUN: %target-swift-frontend -typecheck %s -suppress-warnings -enable-experimental-feature Embedded -DSUPPRESS_WEAK
+// RUN: %target-swift-frontend -typecheck %s -suppress-warnings -enable-experimental-feature Embedded -DSUPPRESS_WEAK -DSUPPRESS_CASTS
 // REQUIRES: swift_feature_Embedded
 
 // ---------------------------------------------------------------------------
@@ -64,10 +64,13 @@ public struct MyStruct {
 
 protocol P { }
 
+// A generic method of a class is dispatched statically and kept out of the
+// vtable, so it is fine as long as nothing can override it. Only `open` and
+// `override` are rejected; see classes-generic-methods.swift.
 class MyGenericClass<T> {
-  func f<U>(value: U) { } // expected-warning{{generic instance method 'f(value:)' in a class must be 'final' in Embedded Swift}}
+  func f<U>(value: U) { } // okay, statically dispatched
   func g() { }
-  class func h() where T: P { } // expected-warning{{generic class method 'h()' in a class must be 'final' in Embedded Swift}}
+  class func h() where T: P { } // okay, statically dispatched
 
   init<U>(value: U) { } // okay, can be directly called
 
@@ -114,20 +117,25 @@ class ConformsToQ: Q {
   func okay() { }
 }
 
+#if !SUPPRESS_CASTS
 func dynamicCasting(object: AnyObject, cq: ConformsToQ) {
-  // expected-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-nonembedded-warning@+2{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-embedded-error@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
   if let q = object as? any AnyObject & Q {
     _ = q
   }
 
-  // expected-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-nonembedded-warning@+2{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-embedded-error@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
   if object is any AnyObject & Q { }
 
-  // expected-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-nonembedded-warning@+2{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-embedded-error@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
   _ = object as! AnyObject & Q
 
   _ = cq as AnyObject & Q
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // #if handling to suppress diagnostics for non-Embedded-only code
@@ -135,12 +143,14 @@ func dynamicCasting(object: AnyObject, cq: ConformsToQ) {
 
 #if $Embedded
 
+#if !SUPPRESS_CASTS
 func stillProblematic(object: AnyObject) {
-  // expected-embedded-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-embedded-error@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
   if let q = object as? any AnyObject & Q {
     _ = q
   }
 }
+#endif
 
 #else
 

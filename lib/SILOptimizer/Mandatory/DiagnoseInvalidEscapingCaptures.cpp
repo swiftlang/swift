@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/LayoutConstraint.h"
 #include "swift/SIL/SILValue.h"
 #define DEBUG_TYPE "sil-diagnose-invalid-escaping-captures"
 
@@ -24,7 +23,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
@@ -109,10 +107,9 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
     return false;
   }
 
-  if (auto *CBI = dyn_cast<CondBranchInst>(user)) {
-    const SILPhiArgument *arg = CBI->getArgForOperand(oper);
-    if (arg) // If the use isn't the branch condition, follow it.
-      followUses(arg);
+  if (isa<CondBranchInst>(user)) {
+    // A cond_br only uses its condition operand and passes no branch arguments,
+    // so there is nothing to follow through it.
     return false;
   }
 
@@ -492,9 +489,7 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
 
     // Map an operand of an apply instruction to an argument inside
     // the callee.
-    auto args = F->getArguments();
-    auto argIndex = site.getCalleeArgIndex(*oper);
-    auto arg = args[argIndex];
+    auto *arg = site.getCalleeArgument(*oper);
 
     // Look for a usage of the callee argument.
     for (Operand *use : arg->getUses())

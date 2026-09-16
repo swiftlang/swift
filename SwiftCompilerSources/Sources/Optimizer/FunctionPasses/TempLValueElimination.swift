@@ -257,7 +257,7 @@ private func combineWithDestroy(copy: CopyAddrInst, _ context: FunctionPassConte
       // Don't let debug info think that the value is still valid after the `copy [take]`.
       context.erase(instructions: debugInsts)
       return
-    case let debugInst as DebugValueInst where debugInst.operand.value == copy.source:
+    case let debugInst as DebugValueInst where debugInst.operands.contains(where: { $0.value == copy.source }):
       debugInsts.append(debugInst)
     default:
       if inst.mayReadOrWriteMemory {

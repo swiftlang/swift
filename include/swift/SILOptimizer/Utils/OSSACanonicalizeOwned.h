@@ -275,10 +275,10 @@ private:
   /// pruned liveness does not consider destroy_values.
   llvm::SmallSetVector<SILBasicBlock *, 8> consumingBlocks;
 
-  /// Record all interesting debug_value instructions here rather then treating
+  /// Record all interesting debug_value operands here rather then treating
   /// them like a normal use. An interesting debug_value is one that may lie
   /// outside the pruned liveness at the time it is discovered.
-  llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
+  llvm::SmallPtrSet<Operand *, 8> debugUses;
 
   struct Def {
     enum Kind {
@@ -364,7 +364,7 @@ public:
 
   void initializeLiveness(SILValue def,
                           ArrayRef<SILInstruction *> lexicalLifetimeEnds) {
-    assert(consumingBlocks.empty() && debugValues.empty());
+    assert(consumingBlocks.empty() && debugUses.empty());
     clear();
 
     currentDef = def;
@@ -383,7 +383,7 @@ public:
     accessBlocks = nullptr;
 
     consumingBlocks.clear();
-    debugValues.clear();
+    debugUses.clear();
     discoveredBlocks.clear();
     consumes.clear();
     destroys.clear();
@@ -493,7 +493,7 @@ private:
     return module.getASTContext().SILOpts.supportsLexicalLifetimes(module);
   }
 
-  void recordDebugValue(DebugValueInst *dvi) { debugValues.insert(dvi); }
+  void recordDebugUse(Operand *use) { debugUses.insert(use); }
 
   void recordConsumingUse(Operand *use) { recordConsumingUser(use->getUser()); }
   /// Record that the value is consumed at `user`.

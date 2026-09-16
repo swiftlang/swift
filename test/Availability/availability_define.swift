@@ -59,7 +59,7 @@ func client() {
   onMacOS50()
   onMacOS51_0() // expected-error {{is only available in macOS 51.0 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}
-  onMacOSDeprecated()
+  onMacOSDeprecated() // expected-warning {{'onMacOSDeprecated()' was deprecated in macOS 50}}
 
   if #available(_iOS54Aligned, *) {
     onMacOS51_0()
@@ -72,7 +72,7 @@ func client() {
     onMacOS51_0()
   }
 
-  if #available(_unknownMacro, *) { } // expected-warning {{unrecognized platform name '_unknownMacro'}}
+  if #available(_unknownMacro, *) { } // expected-warning {{cannot find availability domain '_unknownMacro'}}
 }
 
 public func doIt(_ closure: () -> ()) {
@@ -92,16 +92,16 @@ public func forbidMacrosInInlinableCode() {
   }
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 public func forbidMacrosInInlinableCode1() {
-  if #available(_iOS54Aligned, *) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
-  if #available(_iOS54, _macOS51_0, *) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
-  if #available(iOS 54.0, _macOS51_0, tvOS 54.0, *) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
-  if #unavailable(_iOS54Aligned) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
-  if #unavailable(_iOS54, _macOS51_0) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
-  if #unavailable(iOS 54.0, _macOS51_0, tvOS 54.0) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
+  if #available(_iOS54Aligned, *) { } // expected-error {{availability macro cannot be used in an '@export(implementation)' function}}
+  if #available(_iOS54, _macOS51_0, *) { } // expected-error {{availability macro cannot be used in an '@export(implementation)' function}}
+  if #available(iOS 54.0, _macOS51_0, tvOS 54.0, *) { } // expected-error {{availability macro cannot be used in an '@export(implementation)' function}}
+  if #unavailable(_iOS54Aligned) { } // expected-error {{availability macro cannot be used in an '@export(implementation)' function}}
+  if #unavailable(_iOS54, _macOS51_0) { } // expected-error {{availability macro cannot be used in an '@export(implementation)' function}}
+  if #unavailable(iOS 54.0, _macOS51_0, tvOS 54.0) { } // expected-error {{availability macro cannot be used in an '@export(implementation)' function}}
   doIt {
-    if #available(_iOS54Aligned, *) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
+    if #available(_iOS54Aligned, *) { } // expected-error {{availability macro cannot be used in an '@export(implementation)' function}}
   }
 }
 

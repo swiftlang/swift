@@ -6,8 +6,7 @@
 // RUN:   -verify -verify-additional-file %t%{fs-sep}namespace.h -Rmacro-expansions -strict-memory-safety -o %t/out.swiftmodule -import-bridging-header %t/bridging.h -eager-macro-checking
 
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default %t/namespace.swift -typecheck \
-// RUN:   -dump-source-file-imports -import-bridging-header %t/bridging.h 2>&1 | %FileCheck --dry-run > %t/imports.txt
-// RUN: %diff %t/imports.txt %t/imports.txt.expected
+// RUN:   -dump-source-file-imports -import-bridging-header %t/bridging.h 2>&1 | %PathSanitizingDiff %t/imports.txt.expected
 
 // This test checks that macro expansions can access symbols from namespaces
 // (which are dumped into the __ObjC module) despite not having an implicit
@@ -48,7 +47,6 @@ imports for @__swiftmacro_So3bazO0A5_func15_SwiftifyImportfMp_.swift:
 	_StringProcessing
 	_SwiftConcurrencyShims
 	_Concurrency
-
 //--- bridging.h
 const int FOO = 42; // not used
 
@@ -68,8 +66,8 @@ namespace foo {
 
 // expected-expansion@+10:141{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bar(_ p: UnsafeMutableBufferPointer<Float>, _ extra: foo.foo_t) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bar(_ p: UnsafeMutableBufferPointer<CFloat>, _ extra: foo.foo_t) {|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe bar(p.baseAddress, len, extra)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}

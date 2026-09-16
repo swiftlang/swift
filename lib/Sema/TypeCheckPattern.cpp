@@ -19,17 +19,13 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/StringExtras.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/SourceFile.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "llvm/Support/SaveAndRestore.h"
-#include <utility>
 using namespace swift;
 
 /// If the given VarDecl is a computed property whose getter always returns a

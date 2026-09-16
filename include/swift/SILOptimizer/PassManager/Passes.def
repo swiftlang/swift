@@ -61,6 +61,8 @@
 
 PASS(AllocBoxToStack, "allocbox-to-stack",
      "stack promotion of box objects")
+PASS(CopySinking, "copy-sinking",
+     "Sinks copy instructions over terminator instructions")
 PASS(CopyToBorrowOptimization, "copy-to-borrow-optimization",
      "Convert load [copy] instructions to load_borrow and remove copies of borrowed values")
 PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
@@ -95,6 +97,8 @@ PASS(EarlyRedundantLoadElimination, "early-redundant-load-elimination",
      "Early Redundant Load Elimination")
 PASS(RedundantLoadElimination, "redundant-load-elimination",
      "Redundant Load Elimination")
+PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
+     "Redundant Overflow Check Removal")
 PASS(DeadAccessScopeElimination, "dead-access-scope-elimination",
      "Removes dead, non-conflicting access scopes")
 PASS(DeadStoreElimination, "dead-store-elimination",
@@ -108,6 +112,10 @@ PASS(LifetimeDependenceInsertion,
 PASS(LifetimeDependenceScopeFixup,
      "lifetime-dependence-scope-fixup",
      "Fixup scope for lifetime dependence")
+PASS(RemoveSILGenLifetimes, "remove-silgen-lifetimes",
+     "Remove SILGen's lifetimes in preparation for LifetimeResolution")
+PASS(LifetimeResolution, "lifetime-resolution",
+     "Resolve lifetimes based on uses")
 PASS(MergeBorrowScopes, "merge-borrow-scopes",
      "Merge borrow scopes")
 PASS(MergeCondFails, "merge-cond_fails",
@@ -118,6 +126,9 @@ PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
 PASS(DeinitDevirtualizer, "deinit-devirtualizer",
      "Devirtualizes destroys of non-copyable values")
+PASS(ClassDestroyDevirtualizer, "class-destroy-devirtualizer",
+     "Devirtualizes final destroys of classes")
+// TODO: remove the ReleaseDevirtualizer once the ClassDestroyDevirtualizer runs on OSSA
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(LetPropertyLowering, "let-property-lowering",
@@ -134,6 +145,8 @@ PASS(CleanupDebugSteps, "cleanup-debug-steps",
     "Cleanup debug_step instructions for Onone")
 PASS(KillInvalidDebugValues, "kill-invalid-debug-values",
     "Kill debug_value instructions that appear after destroying consumers")
+PASS(DeadDebugVariableElimination, "dead-debug-variable-elimination",
+    "Eliminate debug_value instructions in dead scopes")
 PASS(NamedReturnValueOptimization, "named-return-value-optimization",
     "Optimize copies to an indirect return value")
 PASS(StripObjectHeaders, "strip-object-headers",
@@ -264,8 +277,6 @@ LEGACY_PASS(EpilogueARCMatcherDumper, "sil-epilogue-arc-dumper",
      "Print Epilogue retains of Returned Values and Argument releases")
 LEGACY_PASS(EpilogueRetainReleaseMatcherDumper, "sil-epilogue-retain-release-dumper",
      "Print Epilogue retains of Returned Values and Argument releases")
-LEGACY_PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
-     "Redundant Overflow Check Removal")
 LEGACY_PASS(DCE, "dce",
      "Dead Code Elimination")
 LEGACY_PASS(DeadArgSignatureOpt, "dead-arg-signature-opt",
@@ -311,8 +322,6 @@ LEGACY_PASS(FunctionSignatureOpts, "function-signature-opts",
      "Function Signature Optimization")
 LEGACY_PASS(ARCSequenceOpts, "arc-sequence-opts",
      "ARC Sequence Optimization")
-LEGACY_PASS(ARCLoopOpts, "arc-loop-opts",
-     "ARC Loop Optimization")
 LEGACY_PASS(GenericSpecializer, "generic-specializer",
      "Generic Function Specialization on Static Types")
 LEGACY_PASS(ExistentialSpecializer, "existential-specializer",
@@ -346,8 +355,6 @@ LEGACY_PASS(LoopInfoPrinter, "loop-info-printer",
      "Print Loop Information for Testing")
 LEGACY_PASS(LoopRegionViewText, "loop-region-view-text",
      "Print Loop Region Information for Testing")
-LEGACY_PASS(LoopRegionViewCFG, "loop-region-view-cfg",
-     "View Loop Region CFG")
 LEGACY_PASS(LoopRotate, "loop-rotate",
      "Loop Rotation")
 LEGACY_PASS(LoopUnroll, "loop-unroll",
@@ -372,8 +379,6 @@ LEGACY_PASS(NestedSemanticFunctionCheck, "nested-semantic-function-check",
      "Diagnose improperly nested '@_semantics' functions")
 LEGACY_PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
-LEGACY_PASS(AlwaysInlineInliner, "always-inline",
-     "Inline always inline functions")
 LEGACY_PASS(PerfInliner, "inline",
      "Performance Function Inlining")
 LEGACY_PASS(PerformanceConstantPropagation, "performance-constant-propagation",
@@ -418,10 +423,6 @@ LEGACY_PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 LEGACY_PASS(SimplifyCFG, "simplify-cfg",
      "SIL CFG Simplification")
-LEGACY_PASS(SplitAllCriticalEdges, "split-critical-edges",
-     "Split all Critical Edges in the SIL CFG")
-LEGACY_PASS(SplitNonCondBrCriticalEdges, "split-non-cond_br-critical-edges",
-     "Split all Critical Edges not from SIL cond_br")
 LEGACY_PASS(StringOptimization, "string-optimization",
      "Optimization for String operations")
 LEGACY_PASS(SwiftArrayPropertyOpt, "array-property-opt",
@@ -434,8 +435,6 @@ LEGACY_PASS(OwnershipVerifierTextualErrorDumper, "ownership-verifier-textual-err
      "Run ownership verification on all functions, emitting FileCheck-able textual errors instead of asserting")
 LEGACY_PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
-LEGACY_PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-blocks",
-     "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 LEGACY_PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
 LEGACY_PASS(UnitTestRunner, "test-runner",
@@ -459,8 +458,6 @@ LEGACY_PASS(MoveOnlyTempAllocationFromLetTester, "sil-move-only-temp-allocation-
      "Pass that allows us to run separately SIL test cases for the eliminateTemporaryAllocationsFromLet utility")
 LEGACY_PASS(ConsumeOperatorCopyableValuesChecker, "sil-consume-operator-copyable-values-checker",
      "Pass that performs checking of the consume operator for copyable values")
-LEGACY_PASS(TrivialMoveOnlyTypeEliminator, "sil-trivial-move-only-type-eliminator",
-     "Pass that rewrites SIL to remove move only types from values of trivial type")
 LEGACY_PASS(MoveOnlyTypeEliminator, "sil-move-only-type-eliminator",
      "Pass that rewrites SIL to remove move only types from all values")
 LEGACY_PASS(LexicalLifetimeEliminator, "sil-lexical-lifetime-eliminator",
@@ -489,8 +486,6 @@ LEGACY_PASS(ThunkLowering, "sil-thunk-lowering",
      "Lower thunk instructions to actual thunks")
 LEGACY_PASS(MarkNeverWrittenMutableClosureBoxesAsImmutable, "mark-never-written-mutable-closure-boxes-as-immutable",
      "Mark never written mutable closure boxes as immutable")
-LEGACY_PASS(PruneVTables, "prune-vtables",
-     "Mark class methods that do not require vtable dispatch")
 
 //===----------------------------------------------------------------------===//
 //

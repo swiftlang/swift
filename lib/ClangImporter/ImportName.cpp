@@ -28,12 +28,10 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/ParseDeclName.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
@@ -47,6 +45,7 @@
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <memory>
@@ -59,6 +58,20 @@ STATISTIC(ImportNameNumCacheMisses, "# of times the import name cache was missed
 
 using namespace swift;
 using namespace importer;
+
+void ImportNameVersion::dump(llvm::raw_ostream &out) const {
+  if (*this == raw())
+    out << "raw";
+  else
+    out << asClangVersionTuple().getAsString();
+  if (supportsConcurrency())
+    out << " (concurrency)";
+}
+
+void ImportNameVersion::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << "\n";
+}
 
 Identifier importer::getOperatorName(ASTContext &ctx,
                                      clang::OverloadedOperatorKind op) {
@@ -429,13 +442,9 @@ namespace {
     using OverriddenName = std::pair<const DeclType *, ImportedName>;
     llvm::SmallPtrSet<DeclName, 4> known;
     (void)known.insert(DeclName());
-    overriddenNames.erase(
-        std::remove_if(overriddenNames.begin(), overriddenNames.end(),
-                       [&](OverriddenName overridden) {
-                         return !known.insert(overridden.second.getDeclName())
-                                     .second;
-                       }),
-        overriddenNames.end());
+    llvm::erase_if(overriddenNames, [&](OverriddenName overridden) {
+      return !known.insert(overridden.second.getDeclName()).second;
+    });
 
     if (overriddenNames.size() < 2)
       return;
@@ -1323,12 +1332,12 @@ NameImporter::considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
 }
 
 bool swift::isCompletionHandlerParamName(StringRef paramName) {
-  return paramName == "completionHandler" ||
-      paramName == "withCompletionHandler" ||
-      paramName == "completion" || paramName == "withCompletion" ||
-      paramName == "completionBlock" || paramName == "withCompletionBlock" ||
-      paramName == "reply" || paramName == "withReply" ||
-      paramName == "replyTo" || paramName == "withReplyTo";
+  return llvm::StringSwitch<bool>(paramName)
+      .Cases({"completionHandler", "withCompletionHandler", "completion",
+              "withCompletion", "completionBlock", "withCompletionBlock"},
+             true)
+      .Cases({"reply", "withReply", "replyTo", "withReplyTo"}, true)
+      .Default(false);
 }
 
 // Determine whether the given type is a nullable NSError type.
@@ -2255,11 +2264,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       auto argName = selector.getNameForSlot(0).substr(initializerPrefixLen);
 
       // Drop "With" if present after the "init".
-      bool droppedWith = false;
-      if (argName.starts_with("With")) {
-        argName = argName.substr(4);
-        droppedWith = true;
-      }
+      bool droppedWith = argName.consume_front("With");
 
       // Lowercase the remaining argument name.
       argName = camel_case::toLowercaseWord(argName, selectorSplitScratch);
@@ -2336,8 +2341,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     StringRef removePrefix = enumInfo.getConstantNamePrefix();
     if (!removePrefix.empty()) {
-      if (baseName.starts_with(removePrefix)) {
-        baseName = baseName.substr(removePrefix.size());
+      if (baseName.consume_front(removePrefix)) {
         strippedPrefix = true;
       } else if (givenName) {
         // Calculate the new prefix.
@@ -2377,7 +2381,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (objcProto->hasDefinition()) {
       if (hasNamingConflict(D, objcProto->getIdentifier(), nullptr)) {
         baseNameWithProtocolSuffix = baseName;
-        baseNameWithProtocolSuffix += SWIFT_PROTOCOL_SUFFIX;
+        baseNameWithProtocolSuffix += ProtocolSuffix;
         baseName = baseNameWithProtocolSuffix;
       }
     }
@@ -2402,7 +2406,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           dyn_cast<clang::ClassTemplateSpecializationDecl>(D)) {
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
       auto name = printClassTemplateSpecializationName(classTemplateSpecDecl,
-                                                       swiftCtx, this, version);
+                                                       this, version);
       baseName = swiftCtx.getIdentifier(name).get();
     }
   }
@@ -2453,12 +2457,13 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         newName += "Consuming";
       baseName = newName;
     }
-    if (method->isImplicit() &&
-        baseName.starts_with("__synthesizedVirtualCall_")) {
+    constexpr llvm::StringLiteral virtualCallPrefix =
+        "__synthesizedVirtualCall_";
+    if (method->isImplicit() && baseName.starts_with(virtualCallPrefix)) {
       // If this is a thunk for a virtual method of a C++ reference type, we
       // strip away the underscored prefix. This method should be visible and
       // callable from Swift.
-      newName = baseName.substr(StringRef("__synthesizedVirtualCall_").size());
+      newName = baseName.substr(virtualCallPrefix.size());
       baseName = newName;
     }
 
@@ -2618,16 +2623,33 @@ Identifier ImportedName::getBaseIdentifier(ASTContext &ctx) const {
 }
 
 Identifier
-NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
-                              const clang::MacroInfo *macro) {
+NameImporter::importMacroName(const clang::IdentifierInfo *II,
+                              const clang::MacroInfo *MI,
+                              const clang::Module *M,
+                              Identifier *invalidCustomName) {
+  if (invalidCustomName)
+    *invalidCustomName = Identifier();
+
   // If we're supposed to ignore this macro, return an empty identifier.
-  if (::shouldIgnoreMacro(clangIdentifier->getName(), macro,
-                          getClangPreprocessor()))
+  if (::shouldIgnoreMacro(II->getName(), MI, getClangPreprocessor()))
     return Identifier();
 
-  // No transformation is applied to the name.
-  StringRef name = clangIdentifier->getName();
-  return swiftCtx.getIdentifier(name);
+  // Honor an APINotes 'SwiftName:' override, if one applies. A macro constant
+  // can only be renamed to a simple identifier, so reject function, operator,
+  // and member names, which are meaningless here.
+  if (auto notes = getClangSema().ProcessAPINotes(M, II, MI->getDefinitionLoc())) {
+    if (!notes->SwiftName.empty()) {
+      ParsedDeclName ident = parseDeclName(notes->SwiftName);
+      if (ident && !ident.isOperator() && !ident.IsFunctionName &&
+          !ident.isMember())
+        return swiftCtx.getIdentifier(ident.BaseName);
+      if (invalidCustomName)
+        *invalidCustomName = swiftCtx.getIdentifier(notes->SwiftName);
+    }
+  }
+
+  // Otherwise, no transformation is applied to the name.
+  return swiftCtx.getIdentifier(II->getName());
 }
 
 ImportedName NameImporter::importName(const clang::NamedDecl *decl,

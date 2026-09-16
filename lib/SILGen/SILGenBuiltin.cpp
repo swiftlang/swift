@@ -1256,7 +1256,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   assert(derivativeFnType->isTrivialNoEscape());
 
   // Do the apply for the indirect result / error case.
-  if (SGF.SGM.M.useLoweredAddresses() &&
+  if (SGF.useLoweredAddresses() &&
       (derivativeFnType->hasIndirectFormalResults() ||
        derivativeFnType->hasIndirectErrorResult())) {
     assert(derivativeFnType->hasIndirectFormalResults() &&
@@ -1556,6 +1556,57 @@ static ManagedValue emitBuiltinAlignof(
       loc, BuiltinNames::Alignof, SILType::getBuiltinWordType(ctx), subs, {}));
 }
 
+// Emit SIL for typedAllocationID.
+// This formally takes a metatype argument that's never actually used,
+// so we ignore it.
+static ManagedValue emitBuiltinTypedAllocationID(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  return ManagedValue::forObjectRValueWithoutOwnership(SGF.B.createBuiltin(
+      loc, BuiltinNames::TypedAllocationID,
+      SILType::getBuiltinIntegerType(64, ctx), subs, {}));
+}
+
+/// Emit SIL for allocRawTyped/deallocRawTyped. These formally take a trailing
+/// T.Type argument that's only used at compile time, to recover the pointee
+/// type for the typed-malloc descriptor computed in IRGen.
+static ManagedValue emitBuiltinAllocRawTyped(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  SILType rawPointerType = SILType::getRawPointerType(ctx);
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 3);
+  if (!argsOrError)
+    return SGF.emitUndef(rawPointerType);
+  auto args = *argsOrError;
+  SILValue size = SGF.emitRValue(args[0]).forwardAsSingleValue(SGF, args[0]);
+  SILValue align = SGF.emitRValue(args[1]).forwardAsSingleValue(SGF, args[1]);
+  SILValue result = SGF.B.createBuiltin(loc, BuiltinNames::AllocRawTyped,
+                                        rawPointerType, subs, {size, align});
+  return ManagedValue::forObjectRValueWithoutOwnership(result);
+}
+
+static ManagedValue emitBuiltinDeallocRawTyped(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 4);
+  if (!argsOrError)
+    return ManagedValue::forObjectRValueWithoutOwnership(
+        SGF.emitEmptyTuple(loc));
+  auto args = *argsOrError;
+  SILValue pointer =
+      SGF.emitRValue(args[0]).forwardAsSingleValue(SGF, args[0]);
+  SILValue size = SGF.emitRValue(args[1]).forwardAsSingleValue(SGF, args[1]);
+  SILValue align = SGF.emitRValue(args[2]).forwardAsSingleValue(SGF, args[2]);
+  SGF.B.createBuiltin(loc, BuiltinNames::DeallocRawTyped,
+                      SILType::getEmptyTupleType(ctx), subs,
+                      {pointer, size, align});
+  return ManagedValue::forObjectRValueWithoutOwnership(
+      SGF.emitEmptyTuple(loc));
+}
+
 enum class CreateTaskOptions {
   /// The builtin has optional arguments for everything.
   OptionalEverything = 0x1,
@@ -1683,7 +1734,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
     // <T> () async throws -> T
     CanType functionTy =
-        GenericFunctionType::get(genericSig, {}, genericResult, extInfo)
+        GenericFunctionType::get(genericSig, {}, {}, genericResult, extInfo)
             ->getCanonicalType();
     AbstractionPattern origParamType(genericSig, functionTy);
     CanType substParamType = fnArg.getSubstRValueType();
@@ -1825,7 +1876,7 @@ SILGenFunction::emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
   bool hasSending = ctx.LangOpts.hasFeature(Feature::SendingArgsAndResults);
   CanType functionType =
       FunctionType::get(
-          {}, ctx.TheEmptyTupleType,
+          {}, {}, ctx.TheEmptyTupleType,
           ASTExtInfo().withAsync().withThrows().withSendable(!hasSending))
           ->getCanonicalType();
 
@@ -2230,6 +2281,16 @@ static ManagedValue emitBuiltinTaskAddCancellationHandler(
   return ManagedValue::forRValueWithoutOwnership(b);
 }
 
+static ManagedValue emitBuiltinTaskAddCancellationHandlerWithReason(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  auto *b =
+      SGF.B.createBuiltin(loc, BuiltinNames::TaskAddCancellationHandlerWithReason,
+                          SILType::getUnsafeRawPointer(SGF.getASTContext()),
+                          subs, {args[0].getValue()});
+  return ManagedValue::forRValueWithoutOwnership(b);
+}
+
 static ManagedValue emitBuiltinTaskAddPriorityEscalationHandler(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
@@ -2255,7 +2316,7 @@ static ManagedValue emitBorrowObject(
   ArgumentSource &&arg) {
 
   // Loadable referent (therefore loadable borrow).
-  assert(loweredBorrowTy.isLoadable(SGF.F)
+  assert(loweredBorrowTy.isLoadableOrOpaque(SGF.F)
          && "borrow must be loadable if referent is");
 
   auto referent = std::move(arg).getAsSingleValue(

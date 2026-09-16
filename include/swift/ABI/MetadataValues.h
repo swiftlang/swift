@@ -68,6 +68,9 @@ enum {
   /// The number of words in an AsyncLet (flags + child task context & allocation)
   NumWords_AsyncLet = 80, // 640 bytes ought to be enough for anyone
 
+  /// The number of words in a task deadline record.
+  NumWords_TaskDeadline = 16,
+
   /// The size of a unique hash.
   NumBytes_UniqueHash = 16,
 
@@ -155,6 +158,9 @@ const size_t Alignment_TaskGroup = MaximumAlignment;
 
 /// The alignment of an AsyncLet.
 const size_t Alignment_AsyncLet = MaximumAlignment;
+
+/// The alignment of a TaskDeadline record slot.
+const size_t Alignment_TaskDeadline = MaximumAlignment;
 
 /// Flags stored in the value-witness table.
 template <typename int_type>
@@ -534,6 +540,8 @@ enum class SpecialProtocol: uint8_t {
   None = 0,
   /// The Error protocol.
   Error = 1,
+  /// A COM interface protocol.
+  COM = 2,
 };
 
 /// Flags for protocol descriptors.
@@ -1290,15 +1298,17 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 template <typename int_type>
 class TargetExtendedFunctionTypeFlags {
   enum : int_type {
-    TypedThrowsMask        = 0x00000001U,
-    IsolationMask          = 0x0000000EU, // three bits
+    TypedThrowsMask = 0x00000001U,
+    IsolationMask = 0x0000000EU, // three bits
 
     // Values for the enumerated isolation kinds
-    IsolatedAny            = 0x00000002U,
-    NonIsolatedNonsending  = 0x00000004U,
+    IsolatedAny = 0x00000002U,
+    NonIsolatedNonsending = 0x00000004U,
 
     // Values if we have a sending result.
-    HasSendingResult  = 0x00000010U,
+    HasSendingResult = 0x00000010U,
+
+    IsCalledOnce = 0x00000020U,
 
     /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,
@@ -1341,6 +1351,12 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
+  withCalledOnce(bool newValue = true) const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+        (Data & ~IsCalledOnce) | (newValue ? IsCalledOnce : 0));
+  }
+
+  const TargetExtendedFunctionTypeFlags<int_type>
   withInvertedProtocols(InvertibleProtocolSet inverted) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
         (Data & ~InvertedProtocolMask) |
@@ -1359,6 +1375,10 @@ public:
 
   bool hasSendingResult() const {
     return bool(Data & HasSendingResult);
+  }
+
+  bool isCalledOnce() const {
+    return bool(Data & IsCalledOnce);
   }
 
   int_type getIntValue() const {
@@ -1769,12 +1789,16 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncContextResume = 0xd707; // = 55047
   const uint16_t AsyncContextYield = 0xe207; // = 57863
   const uint16_t CancellationNotificationFunction = 0x0f08; // = 3848
+  const uint16_t CancellationNotificationWithReasonFunction = 0x89d1; // = 35281
   const uint16_t EscalationNotificationFunction = 0x7861; // = 30817
   const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
   const uint16_t AsyncFutureFunction = 0x720f; // = 29199
 
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
+
+  /// AsyncTask pointer in the AsyncLetImpl record.
+  const uint16_t AsyncLetTaskPointer = 0x6451; // = 25681
 
   // C type TaskContinuationFunction* descriminator.
   const uint16_t ClangTypeTaskContinuationFunction = 0x2abe; // = 10942
@@ -1803,11 +1827,24 @@ namespace SpecialPointerAuthDiscriminators {
   /// concurrency runtime.
   const uint16_t IsCurrentGlobalActorFunction = 0xd1b8; // = 53688
 
+  /// Concurrency hook variables. They are address-diversified, so one
+  /// discriminator covers all of them.
+  const uint16_t ConcurrencyHook = 0xc0a1; // = 49313
+
+  /// ThreadSanitizer interop hook variables (_swift_tsan_acquire,
+  /// _swift_tsan_release). Address-diversified, so one discriminator
+  /// covers both.
+  const uint16_t ThreadSanitizerHook = 0x8f52; // = 36690
+
   /// Function pointers stored in the coro allocator struct.
   const uint16_t CoroAllocationFunction = 0x5f95;   // = 24469
   const uint16_t CoroDeallocationFunction = 0x9faf; // = 40879
   const uint16_t CoroFrameAllocationFunction = 0xd251;   // = 53841
   const uint16_t CoroFrameDeallocationFunction = 0x5ba8; // = 23464
+
+  /// The compatibility-override cache in each hooked runtime entry point.
+  /// The slot is address-diversified, so one discriminator covers all of them.
+  const uint16_t CompatibilityOverride = 0xf50b; // = 62731
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -2906,6 +2943,28 @@ enum class TaskStatusRecordKind : uint8_t {
 
   /// Deprecated: A human-readable task name, replaced by `NameFragment`.
   // DEPRECATED: TaskName = 6,
+
+  /// A TaskDeadlineStatusRecord, which represents a point in time at which
+  /// the deadline scope should trigger scope cancellation.
+  ///
+  /// Introduced in Swift 6.5
+  Deadline = 7,
+
+  /// A TaskCancellationScopeRecord, which represents a scoped cancellation
+  /// domain that is independent of whole-task cancellation. Not public API.
+  ///
+  /// Introduced in Swift 6.5
+  TaskCancellationScope = 8,
+
+  /// A TaskCancellationShieldRecord, present iff a cancellation shield is
+  /// currently active.
+  ///
+  /// This was introduced after the initial task cancellation shield
+  /// introduction, / because task cancellation scope nesting necessitates
+  /// tracking nesting of shields and scopes.
+  ///
+  /// Introduced in Swift 6.5
+  CancellationShield = 9,
 
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,

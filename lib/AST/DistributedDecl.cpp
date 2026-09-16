@@ -16,16 +16,12 @@
 
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessRequests.h"
-#include "swift/AST/AccessScope.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ForeignAsyncConvention.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
@@ -33,30 +29,16 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/AST/ParseRequests.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/ResilienceExpansion.h"
-#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
-#include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/raw_ostream.h"
 
-#include "clang/Basic/CharInfo.h"
-#include "clang/Basic/Module.h"
-#include "clang/AST/Attr.h"
-#include "clang/AST/DeclObjC.h"
 
 #include <algorithm>
 
@@ -203,6 +185,10 @@ Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
   // Dig out the actor system type.
   Type selfType = actor->getSelfInterfaceType();
   auto conformance = lookupConformance(selfType, DA);
+
+  if (!conformance || conformance.isInvalid())
+    return ErrorType::get(C);
+
   return conformance.getTypeWitnessByName(C.Id_ActorSystem);
 }
 
@@ -465,6 +451,9 @@ Type swift::getAssociatedTypeOfDistributedSystemOfActor(
   auto sig = actorOrExtension->getGenericSignatureOfContext();
 
   auto *actorType = actorOrExtension->getSelfNominalTypeDecl();
+  if (!actorType)
+    return ErrorType::get(ctx);
+
   if (isa<ProtocolDecl>(actorType))
     return memberTy->getReducedType(sig);
 
@@ -543,6 +532,9 @@ bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
   if (type->hasError())
     return false;
 
+  if (!type->isExistentialType())
+    return false;
+
   auto encodable = C.getProtocol(KnownProtocolKind::Encodable);
   auto decodable = C.getProtocol(KnownProtocolKind::Decodable);
 
@@ -580,6 +572,8 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   auto systemNominal = DC->getSelfNominalTypeDecl();
+  if (!systemNominal)
+    return false;
   auto distSystemConformance = lookupConformance(
       systemNominal->getDeclaredInterfaceType(), systemProto);
 
@@ -592,200 +586,131 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
     return false;
   }
 
-  // === Structural Checks
-  // -- Must be throwing
-  if (!hasThrows()) {
+  // === Structural checks: must be throwing, async, and non-mutating
+  //     (use a class to implement a system instead of a mutating struct)
+  if (!hasThrows() || !hasAsync() || func->isMutating())
     return false;
-  }
 
-  // -- Must be async
-  if (!hasAsync()) {
-    return false;
-  }
-
-  // -- Must not be mutating, use classes to implement a system instead
-  if (func->isMutating()) {
-    return false;
-  }
-
-  // === Check generics
-  if (!hasGenericParamList()) {
-    return false;
-  }
-
-  // --- Check number of generic parameters
+  // === Check generic parameters: <Act, Err[, Res]>
+  //     `Res` is present only for non-void calls.
   auto genericParams = getGenericParams();
-  unsigned int expectedGenericParamNum = isVoidReturn ? 2 : 3;
-
-  if (genericParams->size() != expectedGenericParamNum) {
+  unsigned expectedGenericParamNum =
+      1 /*Act*/ + 1 /*Err*/ + (isVoidReturn ? 0 : 1 /*Res*/);
+  if (genericParams->size() != expectedGenericParamNum)
     return false;
-  }
 
-  // === Get the SerializationRequirement
-  SmallPtrSet<ProtocolDecl*, 2> requirementProtos;
-  if (!getDistributedSerializationRequirements(
-          systemNominal, systemProto, requirementProtos)) {
+  // === The protocols the result type must serialize through (none for void)
+  SmallPtrSet<ProtocolDecl *, 2> requirementProtos;
+  if (!getDistributedSerializationRequirements(systemNominal, systemProto,
+                                               requirementProtos))
     return false;
-  }
+  size_t serializationRequirementsNum =
+      isVoidReturn ? 0 : requirementProtos.size();
 
-  // -- Check number of generic requirements
-  size_t expectedRequirementsNum = 3;
-  size_t serializationRequirementsNum = 0;
-  if (!isVoidReturn) {
-    serializationRequirementsNum = requirementProtos.size();
-    expectedRequirementsNum += serializationRequirementsNum;
-  }
-
-  // === Check all parameters
+  // === Check all parameters: (on:target:invocation:throwing:[returning:])
   auto params = getParameters();
-
-  // --- Count of parameters depends on if we're void returning or not
-  unsigned int expectedParamNum = isVoidReturn ? 4 : 5;
-  if (!params || params->size() != expectedParamNum) {
+  unsigned expectedParamNum =
+      3 + (isVoidReturn ? 1 /*throwing:*/ : 2 /*throwing: + returning:*/);
+  if (!params || params->size() != expectedParamNum)
     return false;
-  }
 
-  // --- Check parameter: on: Actor
-  auto actorParam = params->get(0);
-  if (actorParam->getArgumentName() != C.Id_on) {
+  // --- on: Actor, target: RemoteCallTarget, invocation: inout InvocationEncoder
+  if (params->get(0)->getArgumentName() != C.Id_on)
     return false;
-  }
-
-  // --- Check parameter: target RemoteCallTarget
-  auto targetParam = params->get(1);
-  if (targetParam->getArgumentName() != C.Id_target) {
+  if (params->get(1)->getArgumentName() != C.Id_target)
     return false;
-  }
-
-  // --- Check parameter: invocation: inout InvocationEncoder
   auto invocationParam = params->get(2);
-  if (invocationParam->getArgumentName() != C.Id_invocation) {
+  if (invocationParam->getArgumentName() != C.Id_invocation ||
+      !invocationParam->isInOut())
     return false;
-  }
-  if (!invocationParam->isInOut()) {
-    return false;
-  }
 
-  // --- Check parameter: throwing: Err.Type
-  auto thrownTypeParam = params->get(3);
-  if (thrownTypeParam->getArgumentName() != C.Id_throwing) {
+  // --- throwing: Err.Type [, returning: Res.Type]
+  if (params->get(3)->getArgumentName() != C.Id_throwing)
     return false;
-  }
-
-  // --- Check parameter: returning: Res.Type
-  if (!isVoidReturn) {
-    auto returnedTypeParam = params->get(4);
-    if (returnedTypeParam->getArgumentName() != C.Id_returning) {
-      return false;
-    }
-  }
+  if (!isVoidReturn && params->get(4)->getArgumentName() != C.Id_returning)
+    return false;
 
   // === Check generic parameters in detail
-  // --- Check: Act: DistributedActor,
-  //            Act.ID == Self.ActorID
+  // --- Act: DistributedActor
   GenericTypeParamDecl *ActParam = genericParams->getParams()[0];
   auto ActConformance = lookupConformance(
       mapTypeIntoEnvironment(ActParam->getDeclaredInterfaceType()),
       C.getProtocol(KnownProtocolKind::DistributedActor));
-  if (ActConformance.isInvalid()) {
+  if (ActConformance.isInvalid())
     return false;
-  }
 
-  // --- Check: Err: Error
+  // --- Err: Error
   GenericTypeParamDecl *ErrParam = genericParams->getParams()[1];
   auto ErrConformance = lookupConformance(
       mapTypeIntoEnvironment(ErrParam->getDeclaredInterfaceType()),
       C.getProtocol(KnownProtocolKind::Error));
-  if (ErrConformance.isInvalid()) {
+  if (ErrConformance.isInvalid())
     return false;
-  }
 
-  // --- Check: Res: SerializationRequirement
-  // We could have the `SerializationRequirement = Any` in which case there are
-  // no requirements to check on `Res`
-  GenericTypeParamDecl *ResParam = nullptr;
-  if (!isVoidReturn) {
-    ResParam = genericParams->getParams().back();
-  }
+  // --- Res: SerializationRequirement. `Res` is always the last generic
+  //     parameter for non-void calls. `SerializationRequirement == Any` means
+  //     there are no requirements to check on `Res`.
+  GenericTypeParamDecl *ResParam =
+      isVoidReturn ? nullptr : genericParams->getParams().back();
 
+  // === Check the generic requirements, in order:
+  //       conforms_to: Act DistributedActor
+  //       conforms_to: Err Error
+  //     [ conforms_to: Res <each SerializationRequirement> ]   (non-void)
+  //       same_type:   Act.ID Self.ActorID                     (LAST)
   auto sig = getGenericSignature();
-
   SmallVector<Requirement, 2> reqs;
   SmallVector<InverseRequirement, 2> inverseReqs;
   sig->getRequirementsWithInverses(reqs, inverseReqs);
   assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
 
-  if (reqs.size() != expectedRequirementsNum) {
+  size_t expectedRequirementsNum = 1 /*Act*/ +
+                                   1 /*Err*/ +
+                                   serializationRequirementsNum +
+                                   1 /*Act.ID == Self.ActorID*/;
+  if (reqs.size() != expectedRequirementsNum)
     return false;
-  }
 
-  // --- Check the expected requirements
   // conforms_to: Act DistributedActor
-  // conforms_to: Err Error
-  // --- all the Res requirements ---
-  // conforms_to: Res Decodable
-  // conforms_to: Res Encodable
-  // ...
-  // --------------------------------
-  // same_type: Act.ID FakeActorSystem.ActorID // LAST one
-
-  // --- Check requirement: conforms_to: Act DistributedActor
   auto actorReq = reqs[0];
-  if (actorReq.getKind() != RequirementKind::Conformance) {
+  if (actorReq.getKind() != RequirementKind::Conformance ||
+      !actorReq.getProtocolDecl()->isSpecificProtocol(
+          KnownProtocolKind::DistributedActor))
     return false;
-  }
-  if (!actorReq.getProtocolDecl()->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
-    return false;
-  }
 
-  // --- Check requirement: conforms_to: Err Error
+  // conforms_to: Err Error
   auto errorReq = reqs[1];
-  if (errorReq.getKind() != RequirementKind::Conformance) {
+  if (errorReq.getKind() != RequirementKind::Conformance ||
+      !errorReq.getProtocolDecl()->isSpecificProtocol(KnownProtocolKind::Error))
     return false;
-  }
-  if (!errorReq.getProtocolDecl()->isSpecificProtocol(KnownProtocolKind::Error)) {
-    return false;
-  }
 
-  // --- Check requirement: Res either Void or all SerializationRequirements
+  // Res is either Void, or conforms to every SerializationRequirement protocol
   if (isVoidReturn) {
-    if (auto func = dyn_cast<FuncDecl>(this)) {
-      if (!func->getResultInterfaceType()->isVoid()) {
-        return false;
-      }
-    }
-  } else if (ResParam) {
-    assert(ResParam && "Non void function, yet no Res generic parameter found");
-    if (auto func = dyn_cast<FuncDecl>(this)) {
-      auto resultType = func->mapTypeIntoEnvironment(func->getResultInterfaceType())
-                            ->getMetatypeInstanceType();
-      auto resultParamType = func->mapTypeIntoEnvironment(
-          ResParam->getDeclaredInterfaceType());
-      // The result of the function must be the `Res` generic argument.
-      if (!resultType->isEqual(resultParamType)) {
-        return false;
-      }
-
-      for (auto requirementProto : requirementProtos) {
-        auto conformance = lookupConformance(resultType, requirementProto);
-        if (conformance.isInvalid()) {
-          return false;
-        }
-      }
-    } else {
+    if (!func->getResultInterfaceType()->isVoid())
       return false;
+  } else if (ResParam) {
+    auto resultType =
+        func->mapTypeIntoEnvironment(func->getResultInterfaceType())
+            ->getMetatypeInstanceType();
+    auto resultParamType =
+        func->mapTypeIntoEnvironment(ResParam->getDeclaredInterfaceType());
+    // The result of the function must be the `Res` generic argument.
+    if (!resultType->isEqual(resultParamType))
+      return false;
+    for (auto requirementProto : requirementProtos) {
+      auto conformance = lookupConformance(resultType, requirementProto);
+      if (conformance.isInvalid())
+        return false;
     }
   }
 
-  // -- Check requirement: same_type Actor.ID Self.ActorID
+  // same_type: Act.ID Self.ActorID (LAST)
   auto actorIdReq = reqs.back();
-  if (actorIdReq.getKind() != RequirementKind::SameType) {
+  if (actorIdReq.getKind() != RequirementKind::SameType)
     return false;
-  }
   auto expectedActorIdTy = getDistributedActorSystemActorIDType(systemNominal);
-  if (!actorIdReq.getSecondType()->isEqual(expectedActorIdTy)) {
+  if (!actorIdReq.getSecondType()->isEqual(expectedActorIdTy))
     return false;
-  }
 
   return true;
 }
@@ -833,6 +758,24 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitut
   if (!fd) {
     return false;
   }
+
+  // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
+  ProtocolDecl *encoderProto =
+      C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  if (!encoderProto) {
+    return false;
+  }
+
+  auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
+  if (!encoderNominal) {
+    return false;
+  }
+  auto protocolConformance = lookupConformance(
+      encoderNominal->getDeclaredInterfaceType(), encoderProto);
+  if (protocolConformance.isInvalid()) {
+    return false;
+  }
+
   if (fd->getParameters()->size() != 1) {
     return false;
   }
@@ -842,11 +785,29 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitut
   if (!fd->hasThrows()) {
     return false;
   }
-  // TODO(distributed): more checks
 
   // A single generic parameter.
   auto genericParamList = fd->getGenericParams();
-  if (genericParamList->size() != 1) {
+  if (!genericParamList || genericParamList->size() != 1) {
+    return false;
+  }
+
+  // --- Check parameter: _ type: T.Type
+  // The single parameter must be the metatype of the single generic parameter,
+  // i.e. 'recordGenericSubstitution<T>(_ type: T.Type)'.
+  GenericTypeParamDecl *typeGenericParam = genericParamList->getParams()[0];
+  auto typeParam = fd->getParameters()->get(0);
+  if (!typeParam->getArgumentName().empty()) {
+    return false;
+  }
+  auto typeParamTy = mapTypeIntoEnvironment(typeParam->getInterfaceType());
+  auto metatypeTy = typeParamTy->getAs<AnyMetatypeType>();
+  if (!metatypeTy) {
+    return false;
+  }
+  auto expectedInstanceTy =
+      mapTypeIntoEnvironment(typeGenericParam->getDeclaredInterfaceType());
+  if (!metatypeTy->getInstanceType()->isEqual(expectedInstanceTy)) {
     return false;
   }
 
@@ -1483,10 +1444,8 @@ ValueDecl::isSpecialDistributedActorProperty(bool onlyCheckName) const {
   // The synthesized bit doesn't get preserved by serialization or module
   // interfaces, we only need to check it when compiling a SourceFile though
   // since we'll diagnose any conflicting user-defined versions.
-  if (!isSynthesized() && DC->getParentSourceFile() &&
-      !DC->isInSwiftinterface()) {
+  if (!isSynthesized() && DC->isInSwiftSourceFile())
     return std::nullopt;
-  }
 
   return kind;
 }

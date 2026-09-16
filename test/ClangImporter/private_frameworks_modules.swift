@@ -13,7 +13,7 @@ import PrivateAsParallel_Private
 #error("OLD or NEW must be defined")
 #endif
 
-let _: Bool = PSGlobal // expected-error {{type 'Int32' cannot be used as a boolean}}
-let _: Bool = PSPrivateGlobal // expected-error {{type 'Int32' cannot be used as a boolean}}
-let _: Bool = PPGlobal // expected-error {{type 'Int32' cannot be used as a boolean}}
-let _: Bool = PPPrivateGlobal // expected-error {{type 'Int32' cannot be used as a boolean}}
+let _: Bool = PSGlobal // expected-error {{type 'CInt' (aka 'Int32') cannot be used as a boolean; test for '!= 0' instead}}
+let _: Bool = PSPrivateGlobal // expected-error {{type 'CInt' (aka 'Int32') cannot be used as a boolean; test for '!= 0' instead}}
+let _: Bool = PPGlobal // expected-error {{type 'CInt' (aka 'Int32') cannot be used as a boolean; test for '!= 0' instead}}
+let _: Bool = PPPrivateGlobal // expected-error {{type 'CInt' (aka 'Int32') cannot be used as a boolean; test for '!= 0' instead}}

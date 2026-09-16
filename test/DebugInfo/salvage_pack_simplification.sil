@@ -1,0 +1,33 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -simplification %s | %FileCheck %s
+
+// When alloc_pack is simplified to alloc_stack in a generic context, the
+// salvaged debug_value must have an op_deref and the correct object type.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @use : $@convention(thin) <T> (@in_guaranteed T) -> Int
+
+// CHECK-LABEL: sil @test_pack_debug_value_salvage
+// CHECK: [[STACK:%[0-9]+]] = alloc_stack $Value
+// CHECK: debug_value [[STACK]], let, name "items", argno 1, expr op_deref
+// CHECK-NOT: type $*
+// CHECK: return
+sil @test_pack_debug_value_salvage : $@convention(thin) <Value> (@in_guaranteed Value) -> Int {
+bb0(%0 : $*Value):
+  %pack = alloc_pack $Pack{Value}
+  %stack = alloc_stack $Value
+  copy_addr %0 to [init] %stack
+  %idx = scalar_pack_index 0 of $Pack{Value}
+  pack_element_set %stack into %idx of %pack
+  debug_value %pack, let, name "items", argno 1, expr op_deref
+  %get = pack_element_get %idx of %pack as $*Value
+  %fn = function_ref @use : $@convention(thin) <T> (@in_guaranteed T) -> Int
+  %result = apply %fn<Value>(%get) : $@convention(thin) <T> (@in_guaranteed T) -> Int
+  destroy_addr %stack
+  dealloc_stack %stack
+  dealloc_pack %pack
+  return %result : $Int
+}

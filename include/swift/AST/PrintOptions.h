@@ -362,7 +362,7 @@ public:
   bool SkipUnderscoredSystemProtocols = false;
 
   /// Whether to skip unsafe C++ class methods that were renamed
-  /// (e.g. __fooUnsafe). See IsSafeUseOfCxxDecl.
+  /// (e.g. __fooUnsafe).
   bool SkipUnsafeCXXMethods = false;
 
   /// Whether to skip extensions that don't add protocols or no members.
@@ -427,6 +427,9 @@ public:
   /// Suppress @inline(always) attribute and emit @inline(__always) instead.
   bool SuppressInlineAlways = false;
 
+  /// Suppress the argument of @unsafe(always) and emit @unsafe instead.
+  bool SuppressUnsafeAlways = false;
+
   /// Suppress printing of ~Sendable in inheritance and requirement lists.
   bool SuppressTildeSendable = false;
 
@@ -483,6 +486,10 @@ public:
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
   std::vector<AnyAttrKind> ExclusiveAttrList;
+
+  /// List of attribute kinds that should always be printed, even when they
+  /// would otherwise be hidden because they are implicit or user-inaccessible.
+  std::vector<AnyAttrKind> AlwaysIncludeAttrList;
 
   /// List of decls that should be printed even if they are implicit and \c SkipImplicit is set to true.
   std::vector<const Decl*> TreatAsExplicitDeclList;
@@ -710,6 +717,13 @@ public:
       return std::none_of(ExclusiveAttrList.begin(), ExclusiveAttrList.end(),
                           [K](AnyAttrKind other) { return other == K; });
     return false;
+  }
+
+  /// Whether the given attribute kind should be printed even if it would
+  /// otherwise be suppressed for being implicit or user-inaccessible.
+  bool alwaysIncludeAttrKind(AnyAttrKind K) const {
+    return std::any_of(AlwaysIncludeAttrList.begin(), AlwaysIncludeAttrList.end(),
+                       [K](AnyAttrKind other) { return other == K; });
   }
 
   bool excludeAttr(const DeclAttribute *DA) const;

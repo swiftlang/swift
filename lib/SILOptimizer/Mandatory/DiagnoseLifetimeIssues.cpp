@@ -31,16 +31,13 @@
 
 #define DEBUG_TYPE "diagnose-lifetime-issues"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -294,9 +291,8 @@ getArgumentState(ApplySite ai, Operand *applyOperand, int callDepth) {
   if (!ai.isArgumentOperand(*applyOperand))
     return CanEscape;
 
-  SILBasicBlock *entryBlock = callee->getEntryBlock();
-  unsigned calleeIdx = ai.getCalleeArgIndex(*applyOperand);
-  auto *arg = cast<SILFunctionArgument>(entryBlock->getArgument(calleeIdx));
+  auto *arg =
+      cast<SILFunctionArgument>(ai.getCalleeArgument(callee, *applyOperand));
 
   // Check if we already cached the analysis result.
   auto iter = argumentStates.find(arg);

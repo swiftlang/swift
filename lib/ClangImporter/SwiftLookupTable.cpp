@@ -18,8 +18,6 @@
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/ParseDeclName.h"
@@ -2083,17 +2081,31 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
       }
 
       // Add this entry.
-      auto name = nameImporter.importMacroName(macro.first, info);
+      const clang::Module *Module =
+          moduleMacro ? moduleMacro->getOwningModule() : nullptr;
+      auto name = nameImporter.importMacroName(macro.first, info, Module);
       if (name.empty())
         return;
-      if (moduleMacro)
-        table.addEntry(name, moduleMacro, tu);
-      else
-        table.addEntry(name, info, tu);
+
+      auto addEntry = [&](Identifier entryName) {
+        if (moduleMacro)
+          table.addEntry(entryName, moduleMacro, tu);
+        else
+          table.addEntry(entryName, info, tu);
+      };
+
+      addEntry(name);
+
+      // If APINotes renamed this macro, also register it under its original C
+      // name so that a reference to the old name still resolves (to an
+      // unavailable redirect synthesized in importMacro).
+      auto rawName = nameImporter.getIdentifier(macro.first->getName());
+      if (!rawName.empty() && rawName != name)
+        addEntry(rawName);
     };
 
     ArrayRef<clang::ModuleMacro *> moduleMacros =
-        macro.second.getActiveModuleMacros(pp, macro.first);
+        macro.second.getModuleInfo(pp, macro.first).ActiveModuleMacros;
     if (moduleMacros.empty()) {
       // Handle the bridging header case.
       clang::MacroDirective *MD = pp.getLocalMacroDirective(macro.first);

@@ -151,3 +151,12 @@ public enum Moptional<Wrapped: ~Copyable & ~Escapable>: ~Copyable, ~Escapable {
 }
 extension Moptional: Copyable where Wrapped: Copyable, Wrapped: ~Escapable {}
 extension Moptional: Escapable where Wrapped: Escapable, Wrapped: ~Copyable {}
+
+public struct GenericNCContainer<Element: ~Copyable>: ~Copyable { }
+
+// rdar://183466980
+struct InternalElement: ~Copyable {}
+extension GenericNCContainer: Publik where Element == InternalElement {}
+
+extension GenericNCContainer: P where Element == Int {}
+

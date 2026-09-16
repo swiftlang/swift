@@ -260,6 +260,13 @@ extension UnsafePointer: CustomReflectable where Pointee: ~Copyable {}
 #endif
 
 extension UnsafePointer where Pointee: ~Copyable {
+  @export(implementation)
+  @_transparent
+  internal static func _dangling() -> Self {
+    let align = MemoryLayout<Pointee>.alignment
+    return unsafe Self(bitPattern: align)._unsafelyUnwrappedUnchecked
+  }
+
   /// Deallocates the memory block previously allocated at this pointer.
   ///
   /// This pointer must be a pointer to the start of a previously allocated
@@ -272,7 +279,26 @@ extension UnsafePointer where Pointee: ~Copyable {
     // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
     // always uses the "aligned allocation" path, this ensures that the
     // runtime's allocation and deallocation paths are compatible.
+#if $BuiltinAllocRawTyped
+    Builtin.deallocRawTyped(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue, Pointee.self)
+#else
     Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
+#endif
+  }
+
+  @export(implementation)
+  @_preInverseGenerics
+  internal func _deallocate(capacity: Int) {
+    let size = MemoryLayout<Pointee>.stride * capacity
+    // Passing zero alignment to the runtime forces "aligned
+    // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
+    // always uses the "aligned allocation" path, this ensures that the
+    // runtime's allocation and deallocation paths are compatible.
+#if $BuiltinAllocRawTyped
+    Builtin.deallocRawTyped(_rawValue, size._builtinWordValue, (0)._builtinWordValue, Pointee.self)
+#else
+    Builtin.deallocRaw(_rawValue, size._builtinWordValue, (0)._builtinWordValue)
+#endif
   }
 }
 
@@ -766,6 +792,12 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 }
 
 extension UnsafeMutablePointer where Pointee: ~Copyable {
+  @export(implementation)
+  @_transparent
+  internal static func _dangling() -> Self {
+    unsafe Self(mutating: ._dangling())
+  }
+
   /// Allocates uninitialized memory for the specified number of instances of
   /// type `Pointee`.
   ///
@@ -815,13 +847,15 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     if Int(align) <= _minAllocationAlignment() {
       align = (0)._builtinWordValue
     }
+#if $BuiltinAllocRawTyped
+    let rawPtr = Builtin.allocRawTyped(size._builtinWordValue, align, Pointee.self)
+#else
     let rawPtr = Builtin.allocRaw(size._builtinWordValue, align)
+#endif
     Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
     return unsafe UnsafeMutablePointer(rawPtr)
   }
-}
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Deallocates the memory block previously allocated at this pointer.
   ///
   /// This pointer must be a pointer to the start of a previously allocated
@@ -834,7 +868,26 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
     // always uses the "aligned allocation" path, this ensures that the
     // runtime's allocation and deallocation paths are compatible.
+#if $BuiltinAllocRawTyped
+    Builtin.deallocRawTyped(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue, Pointee.self)
+#else
     Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
+#endif
+  }
+
+  @export(implementation)
+  @_preInverseGenerics
+  internal func _deallocate(capacity: Int) {
+    let size = MemoryLayout<Pointee>.stride * capacity
+    // Passing zero alignment to the runtime forces "aligned
+    // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
+    // always uses the "aligned allocation" path, this ensures that the
+    // runtime's allocation and deallocation paths are compatible.
+#if $BuiltinAllocRawTyped
+    Builtin.deallocRawTyped(_rawValue, size._builtinWordValue, (0)._builtinWordValue, Pointee.self)
+#else
+    Builtin.deallocRaw(_rawValue, size._builtinWordValue, (0)._builtinWordValue)
+#endif
   }
 }
 

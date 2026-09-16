@@ -137,45 +137,45 @@ public struct GenericType<T, U> {}
   // expected-error @-1 {{struct 'PrivateImportType' is private and cannot be referenced from an '@inlinable' function}}
 }
 
-@_alwaysEmitIntoClient public func alwaysEmitIntoClient() {
+@export(implementation) public func alwaysEmitIntoClient() {
 
   PublicFunc()
-  InternalFunc() // expected-error {{global function 'InternalFunc()' is internal and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+  InternalFunc() // expected-error {{global function 'InternalFunc()' is internal and cannot be referenced from an '@export(implementation)' function}}
 
   let _: PublicImportType
-  let _: InternalImportType // expected-error {{struct 'InternalImportType' is internal and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+  let _: InternalImportType // expected-error {{struct 'InternalImportType' is internal and cannot be referenced from an '@export(implementation)' function}}
 
   let _ = PublicImportType()
-  let _ = PrivateImportType() // expected-error {{struct 'PrivateImportType' is private and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
-  // expected-error @-1 {{initializer 'init()' is private and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+  let _ = PrivateImportType() // expected-error {{struct 'PrivateImportType' is private and cannot be referenced from an '@export(implementation)' function}}
+  // expected-error @-1 {{initializer 'init()' is private and cannot be referenced from an '@export(implementation)' function}}
 
   let _: any PublicImportProto
-  let _: any InternalImportProto // expected-error {{protocol 'InternalImportProto' is internal and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+  let _: any InternalImportProto // expected-error {{protocol 'InternalImportProto' is internal and cannot be referenced from an '@export(implementation)' function}}
 
-  let _: any FileprivateImportProto & InternalImportProto // expected-error {{protocol 'FileprivateImportProto' is fileprivate and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
-  // expected-error @-1 {{protocol 'InternalImportProto' is internal and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+  let _: any FileprivateImportProto & InternalImportProto // expected-error {{protocol 'FileprivateImportProto' is fileprivate and cannot be referenced from an '@export(implementation)' function}}
+  // expected-error @-1 {{protocol 'InternalImportProto' is internal and cannot be referenced from an '@export(implementation)' function}}
 
   func PublicFuncUsesPublic(_: PublicImportType) {}
-  func PublicFuncUsesPackage(_: PackageImportType) {} // expected-error {{struct 'PackageImportType' is package and cannot be referenced from an '@_alwaysEmitIntoClient' function}}}
+  func PublicFuncUsesPackage(_: PackageImportType) {} // expected-error {{struct 'PackageImportType' is package and cannot be referenced from an '@export(implementation)' function}}}
 
   func PublicFuncUsesPublic() -> PublicImportType {
     fatalError()
   }
-  func PublicFuncReturnUsesInternal() -> InternalImportType { // expected-error {{struct 'InternalImportType' is internal and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+  func PublicFuncReturnUsesInternal() -> InternalImportType { // expected-error {{struct 'InternalImportType' is internal and cannot be referenced from an '@export(implementation)' function}}
     fatalError()
   }
 
   @PublicImportWrapper
   var wrappedPublic: PublicImportType
 
-  @FileprivateImportWrapper // expected-error {{initializer 'init(wrappedValue:)' is fileprivate and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
-  // expected-error @-1 {{generic struct 'FileprivateImportWrapper' is fileprivate and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
-  // expected-error @-2 {{property 'wrappedValue' is fileprivate and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+  @FileprivateImportWrapper // expected-error {{initializer 'init(wrappedValue:)' is fileprivate and cannot be referenced from an '@export(implementation)' function}}
+  // expected-error @-1 {{generic struct 'FileprivateImportWrapper' is fileprivate and cannot be referenced from an '@export(implementation)' function}}
+  // expected-error @-2 {{property 'wrappedValue' is fileprivate and cannot be referenced from an '@export(implementation)' function}}
   var wrappedFileprivate: PublicImportType
 
   let _: GenericType<PublicImportType, PublicImportType>
-  let _: GenericType<InternalImportType, PrivateImportType> // expected-error {{struct 'InternalImportType' is internal and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
-  // expected-error @-1 {{struct 'PrivateImportType' is private and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+  let _: GenericType<InternalImportType, PrivateImportType> // expected-error {{struct 'InternalImportType' is internal and cannot be referenced from an '@export(implementation)' function}}
+  // expected-error @-1 {{struct 'PrivateImportType' is private and cannot be referenced from an '@export(implementation)' function}}
 }
 
 @frozen public struct BadFields1 {

@@ -9,6 +9,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %t -enable-objc-interop -import-objc-header %t/bridge.pch %s -verify
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %t -enable-objc-interop -import-objc-header %S/Inputs/import-mixed-framework-with-forward.h -pch-output-dir %t/pch %s -verify
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 
 import Mixed
 

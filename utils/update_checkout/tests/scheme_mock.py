@@ -147,28 +147,6 @@ def get_path_from_url(url: str) -> str:
     return urllib.parse.urlsplit(url).path
 
 
-def configure_git_identity(repo_path):
-    """Configure a deterministic local git identity and disable commit signing
-    for the clone at `repo_path`.
-
-    update-checkout's own clones (under `source_root`) do not set these up, so a
-    test that commits into such a clone must call this first; otherwise the
-    commit depends on an ambient global identity, which is absent on a pristine
-    CI worker, and aborts. The harness's `local_path` clones go through this too,
-    via `setup_mock_remote`.
-    """
-    call_quietly(
-        ["git", "config", "--local", "user.name", "swift_test"], cwd=repo_path
-    )
-    call_quietly(
-        ["git", "config", "--local", "user.email", "no-reply@swift.org"],
-        cwd=repo_path,
-    )
-    call_quietly(
-        ["git", "config", "--local", "commit.gpgsign", "false"], cwd=repo_path
-    )
-
-
 # TODO: Move this to SchemeMockTestCase.
 def setup_mock_remote(test_case, base_dir, base_config, remotes_path, local_path):
     for local_repo_name in base_config["repos"].keys():
@@ -182,7 +160,6 @@ def setup_mock_remote(test_case, base_dir, base_config, remotes_path, local_path
             ["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=remote_repo_path
         )
         call_quietly(["git", "clone", "-l", remote_repo_path, local_repo_path])
-        configure_git_identity(local_repo_path)
         call_quietly(
             ["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=local_repo_path
         )
@@ -295,20 +272,24 @@ class SchemeMockTestCase(unittest.TestCase):
     def _compute_remote_path(self, *, repo_name: str):
         remote_info = self.config["repos"][repo_name]["remote"]
         id = remote_info.get("id")
-        url = remote_info.get("url")
         if id is not None:
             return os.path.join(self._remotes_path, remote_info["id"])
-        elif url is not None:
+
+        for url_key in ("url", "https-url", "ssh-url"):
+            url = remote_info.get(url_key)
+            if url is None:
+                continue
             url_path = get_path_from_url(url)
             workspace_path = os.path.dirname(self._remotes_path)
             self.assertEqual(
                 os.path.commonpath((workspace_path, url_path)), workspace_path
             )
             return os.path.join(self._remotes_path, os.path.basename(url_path))
-        else:
-            raise RuntimeError(
-                f"'remote' for '{local_repo_name}' must have an 'id' or 'url' item"
-            )
+
+        raise RuntimeError(
+            f"'remote' for '{repo_name}' must have an 'id', 'url', 'https-url' "
+            "or 'ssh-url' item"
+        )
 
     def remote_path(self, *, repo_name: str):
         return self._compute_remote_path(repo_name=repo_name)

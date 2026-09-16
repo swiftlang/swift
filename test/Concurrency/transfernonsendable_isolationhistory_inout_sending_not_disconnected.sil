@@ -1,0 +1,142 @@
+// RUN: %target-sil-opt -send-non-sendable -sil-region-isolation-emit-isolation-history -strict-concurrency=complete %s -o /dev/null -verify
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// SIL coverage for isolation-history notes on the
+// InOutSendingNotDisconnectedAtExit diagnostic, which fires when an
+// 'inout sending' parameter's region is not disconnected at a function exit.
+// The primary diagnostic says only that the parameter is isolated at the
+// return; the history notes say *how* it got that way, by rewinding the
+// partition captured at the exiting terminator.
+//
+// The task-isolated first parameter is the isolated source in every case
+// here: a nonisolated @async function's non-sending arguments are
+// task-isolated, so merging the 'inout sending' parameter with one is the
+// smallest shape that reaches the diagnostic. `debug_value` supplies the
+// user-visible names the notes need — an unnamed link is silently dropped,
+// so a case that forgets it proves nothing.
+//
+// The primary warning and its non-history note use empty-body matchers so
+// this file survives unrelated diagnostic rewording. The chain notes have
+// their full text matched, since they are what is under test.
+//
+// NOT COVERED, and why: README.md §5 asks every work item for a suppression
+// case where the element is *directly* isolated rather than merged into an
+// isolated region, so that there is no chain to explain. That case cannot be
+// constructed for this diagnostic. SILIsolationInfo::get returns
+// getDisconnected() unconditionally for a sending function argument ("Sending
+// is always disconnected", SILIsolationInfo.cpp), and this diagnostic only
+// ever fires for an @sil_sending @inout parameter, so the element the chain
+// starts from is disconnected by construction and always got isolated by some
+// merge. The gate-off negative case instead lives in
+// transfernonsendable_isolationhistory_diagnose_attr.swift, which does not
+// pass -sil-region-isolation-emit-isolation-history.
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+class NonSendableKlass {}
+
+sil @mergeOne  : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+sil @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
+// MARK: One hop — the 'inout sending' parameter is stored to directly from the
+// task-isolated parameter, so a single terminal note explains the whole chain.
+sil [ossa] @inout_sending_one_hop : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_sending @inout NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass, %out : $*NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+  debug_value %out : $*NonSendableKlass, var, name "out", argno 2, expr op_deref
+
+  %c = copy_value %x : $NonSendableKlass
+  %acc = begin_access [modify] [unknown] %out : $*NonSendableKlass
+  // expected-note@+1 {{'out' is connected to 'x' which is accessible to code in the current isolation context}}
+  store %c to [assign] %acc : $*NonSendableKlass
+  end_access %acc : $*NonSendableKlass
+
+  %r = tuple ()
+  return %r : $() // expected-warning {{}} expected-note {{}}
+}
+
+// MARK: Two hops — routed through a named intermediate local 'y'. The chain
+// reads outward from the parameter: 'out' to 'y', 'y' to the apply result, and
+// the apply result to the task-isolated 'x'.
+sil [ossa] @inout_sending_two_hop : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_sending @inout NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass, %out : $*NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+  debug_value %out : $*NonSendableKlass, var, name "out", argno 2, expr op_deref
+
+  %f1 = function_ref @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  // expected-note@+1 {{result of 'mergeOne()' is connected to 'x' which is accessible to code in the current isolation context}}
+  %r1 = apply %f1(%x) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass // expected-note {{'y' is connected to result of 'mergeOne()'}}
+  debug_value %y : $NonSendableKlass, let, name "y"
+
+  %c = copy_value %y : $NonSendableKlass
+  %acc = begin_access [modify] [unknown] %out : $*NonSendableKlass
+  store %c to [assign] %acc : $*NonSendableKlass // expected-note {{'out' is connected to 'y'}}
+  end_access %acc : $*NonSendableKlass
+
+  destroy_value %y : $NonSendableKlass
+  %r = tuple ()
+  return %r : $() // expected-warning {{}} expected-note {{}}
+}
+
+// MARK: CFG diamond — the merge that isolates 'out' happens in one arm only.
+// The other arm assigns a fresh disconnected value and performs merges of its
+// own, none of which reach 'out'. The note must land in the merging arm, and
+// the unrelated arm must produce none: this is what exercises
+// prepareStatesForPredecessors' candidate filter, since the error is anchored
+// at a terminator rather than at an apply.
+sil [ossa] @inout_sending_diamond : $@convention(thin) @async (@guaranteed NonSendableKlass, @sil_sending @inout NonSendableKlass, Builtin.Int1) -> () {
+bb0(%x : @guaranteed $NonSendableKlass, %out : $*NonSendableKlass, %cond : $Builtin.Int1):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+  debug_value %out : $*NonSendableKlass, var, name "out", argno 2, expr op_deref
+  cond_br %cond, bb1, bb2
+
+// The merging arm: 'out' picks up the task-isolated region here.
+bb1:
+  %c1 = copy_value %x : $NonSendableKlass
+  %acc1 = begin_access [modify] [unknown] %out : $*NonSendableKlass
+  // expected-note@+1 {{'out' is connected to 'x' which is accessible to code in the current isolation context}}
+  store %c1 to [assign] %acc1 : $*NonSendableKlass
+  end_access %acc1 : $*NonSendableKlass
+  br bb3
+
+// The unrelated arm: a fresh value, merged with another fresh value, stored
+// into 'out'. Nothing here touches the isolated region, so nothing here should
+// be reported.
+bb2:
+  %mk = function_ref @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
+  %fresh = apply %mk() : $@convention(thin) () -> @owned NonSendableKlass
+  %w = move_value [lexical] [var_decl] %fresh : $NonSendableKlass
+  debug_value %w : $NonSendableKlass, let, name "w"
+  %f1 = function_ref @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %wb = begin_borrow %w : $NonSendableKlass
+  %r2 = apply %f1(%wb) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  end_borrow %wb : $NonSendableKlass
+  %v = move_value [lexical] [var_decl] %r2 : $NonSendableKlass
+  debug_value %v : $NonSendableKlass, let, name "v"
+  %c2 = copy_value %v : $NonSendableKlass
+  %acc2 = begin_access [modify] [unknown] %out : $*NonSendableKlass
+  store %c2 to [assign] %acc2 : $*NonSendableKlass
+  end_access %acc2 : $*NonSendableKlass
+  destroy_value %v : $NonSendableKlass
+  destroy_value %w : $NonSendableKlass
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $() // expected-warning {{}} expected-note {{}}
+}

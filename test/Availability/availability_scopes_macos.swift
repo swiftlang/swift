@@ -7,9 +7,11 @@
 
 // CHECK-NEXT: {{^}}  (decl version=51 decl=SomeClass
 // CHECK-NEXT: {{^}}    (decl version=52 decl=someMethod()
-// CHECK-NEXT: {{^}}      (decl version=53 decl=someInnerFunc()
-// CHECK-NEXT: {{^}}      (decl version=53 decl=InnerClass
-// CHECK-NEXT: {{^}}        (decl version=54 decl=innerClassMethod
+// CHECK-NEXT: {{^}}      (decl_implicit version=52 decl=someInnerFunc()
+// CHECK-NEXT: {{^}}        (decl version=53 decl=someInnerFunc()
+// CHECK-NEXT: {{^}}      (decl_implicit version=52 decl=InnerClass
+// CHECK-NEXT: {{^}}        (decl version=53 decl=InnerClass
+// CHECK-NEXT: {{^}}          (decl version=54 decl=innerClassMethod
 // CHECK-NEXT: {{^}}    (decl_implicit version=51 decl=someStaticProperty
 // CHECK-NEXT: {{^}}      (decl version=52 decl=someStaticProperty
 // CHECK-NEXT: {{^}}    (decl_implicit version=51 decl=someStaticPropertyInferredType
@@ -89,12 +91,15 @@ extension SomeClass {
 // CHECK-NEXT: {{^}}      (condition_following_availability version=54
 // CHECK-NEXT: {{^}}      (if_then version=54
 // CHECK-NEXT: {{^}}        (condition_following_availability version=55
-// CHECK-NEXT: {{^}}        (decl version=55 decl=funcInGuardElse()
+// CHECK-NEXT: {{^}}        (decl_implicit version=54 decl=funcInGuardElse()
+// CHECK-NEXT: {{^}}          (decl version=55 decl=funcInGuardElse()
 // CHECK-NEXT: {{^}}        (guard_fallthrough version=55
 // CHECK-NEXT: {{^}}          (condition_following_availability version=56
 // CHECK-NEXT: {{^}}          (guard_fallthrough version=56
-// CHECK-NEXT: {{^}}      (decl version=57 decl=funcInInnerIfElse()
-// CHECK-NEXT: {{^}}    (decl version=53 decl=funcInOuterIfElse()
+// CHECK-NEXT: {{^}}      (decl_implicit version=53 decl=funcInInnerIfElse()
+// CHECK-NEXT: {{^}}        (decl version=57 decl=funcInInnerIfElse()
+// CHECK-NEXT: {{^}}    (decl_implicit version=51 decl=funcInOuterIfElse()
+// CHECK-NEXT: {{^}}      (decl version=53 decl=funcInOuterIfElse()
 @available(OSX 51, *)
 func functionWithStmtCondition() {
   if #available(OSX 52, *),
@@ -148,7 +153,8 @@ func functionWithUnnecessaryStmtCondition() {
 
 // CHECK-NEXT: {{^}}  (decl version=51 decl=functionWithUnnecessaryStmtConditionsHavingElseBranch
 // CHECK-NEXT: {{^}}    (if_else version=none
-// CHECK-NEXT: {{^}}      (decl version=none decl=funcInInnerIfElse()
+// CHECK-NEXT: {{^}}      (decl_implicit version=none decl=funcInInnerIfElse()
+// CHECK-NEXT: {{^}}        (decl version=none decl=funcInInnerIfElse()
 // CHECK-NEXT: {{^}}    (if_else version=none
 // CHECK-NEXT: {{^}}    (guard_else version=none
 // CHECK-NEXT: {{^}}    (guard_else version=none
@@ -202,7 +208,8 @@ func functionWithUnnecessaryStmtConditionsHavingElseBranch(p: Int?) {
 // CHECK-NEXT: {{^}}  (decl version=51 decl=functionWithWhile()
 // CHECK-NEXT: {{^}}    (condition_following_availability version=52
 // CHECK-NEXT: {{^}}    (while_body version=52
-// CHECK-NEXT: {{^}}      (decl version=54 decl=funcInWhileBody()
+// CHECK-NEXT: {{^}}      (decl_implicit version=52 decl=funcInWhileBody()
+// CHECK-NEXT: {{^}}        (decl version=54 decl=funcInWhileBody()
 @available(OSX 51, *)
 func functionWithWhile() {
   while #available(OSX 52, *),
@@ -260,12 +267,15 @@ extension SomeClass {
 // CHECK-NEXT: {{^}}          (condition_following_availability version=54 unavailable=macOS
 // CHECK-NEXT: {{^}}          (if_then version=54 unavailable=macOS
 // CHECK-NEXT: {{^}}            (condition_following_availability version=55 unavailable=macOS
-// CHECK-NEXT: {{^}}            (decl version=54 unavailable=macOS decl=funcInGuardElse()
+// CHECK-NEXT: {{^}}            (decl_implicit version=54 unavailable=macOS decl=funcInGuardElse()
+// CHECK-NEXT: {{^}}              (decl version=54 unavailable=macOS decl=funcInGuardElse()
 // CHECK-NEXT: {{^}}            (guard_fallthrough version=55 unavailable=macOS
 // CHECK-NEXT: {{^}}              (condition_following_availability version=56 unavailable=macOS
 // CHECK-NEXT: {{^}}              (guard_fallthrough version=56 unavailable=macOS
-// CHECK-NEXT: {{^}}          (decl version=53 unavailable=macOS decl=funcInInnerIfElse()
-// CHECK-NEXT: {{^}}        (decl version=50 unavailable=macOS decl=funcInOuterIfElse()
+// CHECK-NEXT: {{^}}          (decl_implicit version=53 unavailable=macOS decl=funcInInnerIfElse()
+// CHECK-NEXT: {{^}}            (decl version=53 unavailable=macOS decl=funcInInnerIfElse()
+// CHECK-NEXT: {{^}}        (decl_implicit version=50 unavailable=macOS decl=funcInOuterIfElse()
+// CHECK-NEXT: {{^}}          (decl version=50 unavailable=macOS decl=funcInOuterIfElse()
 @available(OSX, unavailable)
 extension SomeClass {
   @available(OSX 51, *)
@@ -351,7 +361,8 @@ enum SomeEnum {
 // CHECK-NEXT: {{^}}      (switch_case_body version=52
 // CHECK-NEXT: {{^}}        (condition_following_availability version=53
 // CHECK-NEXT: {{^}}        (if_then version=53
-// CHECK-NEXT: {{^}}          (decl version=54 decl=funcInIfThen()
+// CHECK-NEXT: {{^}}          (decl_implicit version=53 decl=funcInIfThen()
+// CHECK-NEXT: {{^}}            (decl version=54 decl=funcInIfThen()
 // CHECK-NEXT: {{^}}      (switch_case_body version=53
 // CHECK-NEXT: {{^}}      (switch_case_body version=53
 // CHECK-NEXT: {{^}}      (switch_case_body version=51 unavailable=macOS
@@ -511,6 +522,54 @@ func deprecatedOnMacOS() {
 
 @available(iOS, introduced: 53)
 func availableOniOS() { }
+
+// CHECK-NEXT: {{^}}  (decl version=51 decl=localDeclsInAvailabilityScopes()
+// CHECK-NEXT: {{^}}    (condition_following_availability version=52
+// CHECK-NEXT: {{^}}    (if_then version=52
+// CHECK-NEXT: {{^}}      (decl_implicit version=52 decl=unannotatedFuncInIfThen()
+// CHECK-NEXT: {{^}}        (decl version=52 decl=unannotatedFuncInIfThen()
+// CHECK-NEXT: {{^}}      (decl_implicit version=52 decl=lessAvailableFuncInIfThen()
+// CHECK-NEXT: {{^}}        (decl version=53 decl=lessAvailableFuncInIfThen()
+// CHECK-NEXT: {{^}}      (decl_implicit version=52 decl=moreAvailableFuncInIfThen()
+// CHECK-NEXT: {{^}}        (decl version=52 decl=moreAvailableFuncInIfThen()
+// CHECK-NEXT: {{^}}      (decl_implicit version=52 decl=unavailableFuncInIfThen()
+// CHECK-NEXT: {{^}}        (decl version=52 unavailable=macOS decl=unavailableFuncInIfThen()
+// CHECK-NEXT: {{^}}      (decl_implicit version=52 decl=LessAvailableStructInIfThen
+// CHECK-NEXT: {{^}}        (decl version=53 decl=LessAvailableStructInIfThen
+// CHECK-NEXT: {{^}}          (decl version=54 decl=lessAvailableMethod()
+// CHECK-NEXT: {{^}}    (condition_following_availability version=52
+// CHECK-NEXT: {{^}}    (guard_fallthrough version=52
+// CHECK-NEXT: {{^}}      (decl_implicit version=52 decl=funcInGuardFallthrough()
+// CHECK-NEXT: {{^}}        (decl version=53 decl=funcInGuardFallthrough()
+
+@available(OSX 51, *)
+func localDeclsInAvailabilityScopes() {
+  if #available(OSX 52, *) {
+    func unannotatedFuncInIfThen() { }
+
+    @available(OSX 53, *)
+    func lessAvailableFuncInIfThen() { }
+
+    @available(OSX 51, *)
+    func moreAvailableFuncInIfThen() { }
+
+    @available(OSX, unavailable)
+    func unavailableFuncInIfThen() { }
+
+    @available(OSX 53, *)
+    struct LessAvailableStructInIfThen {
+      func method() { }
+
+      @available(OSX 54, *)
+      func lessAvailableMethod() { }
+    }
+  }
+
+  guard #available(OSX 52, *) else { return }
+
+  @available(OSX 53, *)
+  func funcInGuardFallthrough() { }
+}
 
 // CHECK-NEXT: {{^}}  (decl version=51 decl=FinalDecl
 

@@ -363,6 +363,19 @@ HeapObject* swift_bufferAllocate(
   return swift::swift_allocObject(bufferType, size, alignMask);
 }
 
+/// Get a box's allocation size, raising a fatal error if it is not
+/// representable.
+static size_t getBoxAllocSizeOrTrap(const GenericBoxHeapMetadata *metadata) {
+  size_t allocSize;
+  if (SWIFT_UNLIKELY(!metadata->getAllocSizeCheckingOverflow(allocSize))) {
+    swift::fatalError(0,
+                      "box of type %s has an allocation size that is too large "
+                      "to be representable\n",
+                      swift_getTypeName(metadata->BoxedType, true).data);
+  }
+  return allocSize;
+}
+
 namespace {
 /// Heap object destructor for a generic box allocated with swift_allocBox.
 static SWIFT_CC(swift) void destroyGenericBox(SWIFT_CONTEXT HeapObject *o) {
@@ -440,7 +453,7 @@ BoxPair swift::swift_allocBox(const Metadata *type) {
   auto metadata = &Boxes.getOrInsert(type).first->Data;
 
   // Allocate and project the box.
-  auto allocation = swift_allocObject(metadata, metadata->getAllocSize(),
+  auto allocation = swift_allocObject(metadata, getBoxAllocSizeOrTrap(metadata),
                                       metadata->getAllocAlignMask());
   auto projection = metadata->project(allocation);
 
@@ -517,7 +530,17 @@ SWIFT_ALWAYS_INLINE static HeapObject *_swift_retain_(HeapObject *object) {
 }
 
 #ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+// We play a game with the function's asm name to hide the function body from
+// the compiler. A direct tail call to this function from swift_retain somehow
+// causes swift_retain to have a stack frame. By defining the function under a
+// different name at the C++ level, the compiler doesn't see where the call to
+// _swift_retain_adapter goes, and this prevents it from adding a stack frame.
+// The `used` attribute keeps the definition alive, otherwise the compiler would
+// see this as an unused static and eliminate it entirely.
 SWIFT_REFCOUNT_CC
+static HeapObject *_swift_retain_adapterImpl(HeapObject *object)
+    SWIFT_ASM_LABEL_WITH_PREFIX("_swift_retain_adapter");
+SWIFT_REFCOUNT_CC __attribute__((used))
 static HeapObject *_swift_retain_adapterImpl(HeapObject *object) {
   HeapObject *masked =
       (HeapObject *)((uintptr_t)object & ~heap_object_abi::UntaggedNonNativeBridgeObjectBits);
@@ -525,11 +548,8 @@ static HeapObject *_swift_retain_adapterImpl(HeapObject *object) {
   return object;
 }
 
-// This strange construct prevents the compiler from creating an unnecessary
-// stack frame in swift_retain. A direct tail call to _swift_retain_adapterImpl
-// somehow causes clang to emit a stack frame.
-static HeapObject *(*SWIFT_REFCOUNT_CC volatile _swift_retain_adapter)(
-    HeapObject *object) = _swift_retain_adapterImpl;
+extern "C" SWIFT_REFCOUNT_CC HeapObject *_swift_retain_adapter(
+    HeapObject *object);
 #endif
 
 HeapObject *swift::swift_retain(HeapObject *object) {
@@ -1022,9 +1042,16 @@ static inline void swift_deallocObjectImpl(HeapObject *object,
   assert(object->refCounts.isDeiniting());
   SWIFT_RT_TRACK_INVOCATION(object, swift_deallocObject);
 #if SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
+  // `allocatedSize` measures the whole allocation from its base, `addressPoint`
+  // measures the prefix of the object. Clobbering
+  // `allocatedSize - sizeof(HeapObject)` bytes starting at the header would run
+  // `addressPoint` bytes past the end of the allocation and corrupt the
+  // adjacent block's allocator metadata. Only poison the stored properties that
+  // actually fit between the header and the end of the allocation.
+  size_t addressPoint = getInstanceAddressPoint(object->metadata);
   memset_pattern8((uint8_t *)object + sizeof(HeapObject),
                   "\xF0\xEF\xBE\xAD\xDE\xED\xFE\x0F", // 0x0ffeeddeadbeeff0
-                  allocatedSize - sizeof(HeapObject));
+                  allocatedSize - addressPoint - sizeof(HeapObject));
 #endif
 
   // If we are tracking leaks, stop tracking this object.

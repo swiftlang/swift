@@ -85,6 +85,14 @@ class WASIStdlib(cmake_product.CMakeProduct):
         cmake_options.define('SWIFT_DRIVER_TEST_OPTIONS:STRING',
                              ' ' + ' '.join(test_driver_options))
 
+        # The threads subclass overrides these below, so its (unserved) stdlib is left unmapped.
+        prefix_map = wasisysroot.file_prefix_map()
+        if prefix_map:
+            cmake_options.define('SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS:STRING',
+                                 '-file-prefix-map;' + prefix_map)
+            cmake_options.define('SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS:STRING',
+                                 '-ffile-prefix-map=' + prefix_map)
+
         self._append_threading_options(cmake_options)
 
     def _append_threading_options(self, cmake_options):

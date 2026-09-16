@@ -19,6 +19,35 @@ import SwiftShims
 // FIXME: We could go farther with this simplification, e.g. avoiding
 // UnsafeMutablePointer
 
+/// Error kinds, which match up with `swift_error_kind_t` in EmbeddedPlatform.h.
+///
+/// These are represented as plain `Int` values rather than a dedicated type so
+/// that the error-reporting entrypoints can offer an integer-based variant
+/// (emitted into clients via `@export(implementation)`) without introducing a
+/// new type into the standard library's ABI. They are exposed as methods rather
+/// than computed properties: a computed property on the public `Int` type would
+/// emit a property descriptor into the ABI, whereas an `@export(implementation)`
+/// method is emitted purely into clients and adds nothing to the ABI.
+extension Int {
+  @export(implementation)
+  internal static func fatal() -> Int { 0 }
+  @export(implementation)
+  internal static func precondition() -> Int { 1 }
+  @export(implementation)
+  internal static func assertion() -> Int { 2 }
+
+  /// The human-readable prefix printed ahead of the error message for this
+  /// error kind, used on platforms that report errors as text.
+  @export(implementation)
+  internal func _failureMessagePrefix() -> StaticString {
+    switch self {
+    case 1: return "Precondition failed" // .precondition()
+    case 2: return "Assertion failed"    // .assertion()
+    default: return "Fatal error"        // .fatal()
+    }
+  }
+}
+
 @_transparent
 public // @testable
 func _isDebugAssertConfiguration() -> Bool {
@@ -87,6 +116,9 @@ internal func _fatalErrorFlags() -> UInt32 {
 /// This function should not be inlined in desktop Swift because it is cold and
 /// inlining just bloats code. In Embedded Swift, we force inlining as this
 /// function is typically just a trap (in release configurations).
+///
+/// This is the prefix-based ABI entrypoint. New code should use the
+/// error-kind-based (`Int`) overload below, which is emitted into clients.
 @usableFromInline
 #if !$Embedded
 @inline(never)
@@ -120,9 +152,37 @@ internal func _assertionFailure(
     _embeddedReportFatalErrorInFile(prefix: prefix, message: message,
       file: file, line: line)
   }
+#endif  
+  Builtin.condfail_message(true._value, message.unsafeRawPointer)
+  // condfail doesn't return Never, hence the unreachable.
+  Builtin.unreachable()
+}
+
+/// Error-kind-based variant of the above, emitted into clients (rather than
+/// added to the ABI) via `@export(implementation)`. `kind` is an `Int` matching
+/// `swift_error_kind_t`; see the `Int` extension near the top of this file.
+@export(implementation)
+#if $Embedded
+@inline(__always) @_transparent
 #endif
-  Builtin.condfail_message(false._value, message.unsafeRawPointer)
-  Builtin.int_trap()
+@_semantics("programtermination_point")
+internal func _assertionFailure(
+  kind: Int, _ message: StaticString,
+  file: StaticString, line: UInt,
+  flags: UInt32
+) -> Never {
+#if !$Embedded
+  _assertionFailure(kind._failureMessagePrefix(), message,
+    file: file, line: line, flags: flags)
+#else
+  if _isDebugAssertConfiguration() {
+    _embeddedReportFatalErrorInFile(kind: kind, message: message,
+      file: file, line: line)
+  }
+  Builtin.condfail_message(true._value, message.unsafeRawPointer)
+  // condfail doesn't return Never, hence the unreachable.
+  Builtin.unreachable()
+#endif
 }
 
 /// This function should be used only in the implementation of user-level
@@ -131,6 +191,9 @@ internal func _assertionFailure(
 /// This function should not be inlined in desktop Swift because it is cold and
 /// inlining just bloats code. In Embedded Swift, we force inlining as this
 /// function is typically just a trap (in release configurations).
+///
+/// This is the prefix-based ABI entrypoint. New code should use the
+/// error-kind-based (`Int`) overload below, which is emitted into clients.
 @usableFromInline
 #if !$Embedded
 @inline(never)
@@ -172,12 +235,58 @@ internal func _assertionFailure(
   Builtin.int_trap()
 }
 
+/// Error-kind-based variant of the above, emitted into clients via
+/// `@export(implementation)`.
+@export(implementation)
+#if $Embedded
+@_disfavoredOverload
+@inline(__always)
+#endif
+@_semantics("programtermination_point")
+internal func _assertionFailure(
+  kind: Int, _ message: String,
+  file: StaticString, line: UInt,
+  flags: UInt32
+) -> Never {
+#if !$Embedded
+  _assertionFailure(
+    kind._failureMessagePrefix(), message, file: file, line: line, flags: flags
+  )
+#else
+  if _isDebugAssertConfiguration() {
+    var message = message
+    message.withUTF8 { (messageUTF8) -> Void in
+      unsafe _embeddedReportFatalErrorInFile(kind: kind, message: messageUTF8, file: file, line: line)
+    }
+  }
+  Builtin.int_trap()
+#endif
+}
+
+/// An opaque wrapper around `_assertionFailure`. This function should be used
+/// only in the implementation of user-level assertions.
+///
+/// Conceals the `Never`-returning nature of `_assertionFailure()` from the
+/// mandatory inlining pass.
+@export(implementation)
+@inline(never)
+internal func _opaqueAssertionFailure(
+  kind: Int, _ message: String,
+  file: StaticString, line: UInt,
+  flags: UInt32
+) {
+  _assertionFailure(kind: kind, message, file: file, line: line, flags: flags)
+}
+
 /// This function should be used only in the implementation of user-level
 /// assertions.
 ///
 /// This function should not be inlined in desktop Swift because it is cold and
 /// inlining just bloats code. In Embedded Swift, we force inlining as this
 /// function is typically just a trap (in release configurations).
+///
+/// This is the prefix-based ABI entrypoint. New code should use the
+/// error-kind-based (`Int`) overload below, which is emitted into clients.
 @usableFromInline
 #if !$Embedded
 @inline(never)
@@ -205,7 +314,21 @@ internal func _assertionFailure(
   Builtin.int_trap()
 }
 
+/// Error-kind-based variant of the above, emitted into clients via
+/// `@export(implementation)`.
+@export(implementation)
+@_semantics("programtermination_point")
+@_unavailableInEmbedded
+internal func _assertionFailure(
+  kind: Int, _ message: String,
+  flags: UInt32
+) -> Never {
+  _assertionFailure(kind._failureMessagePrefix(), message, flags: flags)
+}
+
 #if $Embedded
+/// This is the prefix-based entrypoint (Embedded-only). New code should use the
+/// error-kind-based (`Int`) overload below.
 @usableFromInline
 @inline(never)
 @_semantics("programtermination_point")
@@ -217,8 +340,24 @@ internal func _assertionFailure(
     _embeddedReportFatalError(prefix: prefix, message: message)
   }
 
-  Builtin.condfail_message(false._value, message.unsafeRawPointer)
-  Builtin.int_trap()
+  Builtin.condfail_message(true._value, message.unsafeRawPointer)
+  Builtin.unreachable()
+}
+
+/// Error-kind-based variant of the above, emitted into clients via
+/// `@export(implementation)`.
+@export(implementation)
+@_semantics("programtermination_point")
+internal func _assertionFailure(
+  kind: Int, _ message: StaticString,
+  flags: UInt32
+) -> Never {
+  if _isDebugAssertConfiguration() {
+    _embeddedReportFatalError(kind: kind, message: message)
+  }
+
+  Builtin.condfail_message(true._value, message.unsafeRawPointer)
+  Builtin.unreachable()
 }
 #endif
 
@@ -228,6 +367,9 @@ internal func _assertionFailure(
 /// This function should not be inlined in desktop Swift because it is cold and
 /// inlining just bloats code. In Embedded Swift, we force inlining as this
 /// function is typically just a trap (in release configurations).
+///
+/// This is the prefix-based ABI entrypoint. New code should use the
+/// error-kind-based (`Int`) overload below, which is emitted into clients.
 @usableFromInline
 #if !$Embedded
 @inline(never)
@@ -241,6 +383,21 @@ internal func _fatalErrorMessage(
   flags: UInt32
 ) -> Never {
   _assertionFailure(prefix, message, file: file, line: line, flags: flags)
+}
+
+/// Error-kind-based variant of the above, emitted into clients via
+/// `@export(implementation)`.
+@export(implementation)
+#if $Embedded
+@inline(__always) @_transparent
+#endif
+@_semantics("programtermination_point")
+internal func _fatalErrorMessage(
+  kind: Int, _ message: StaticString,
+  file: StaticString, line: UInt,
+  flags: UInt32
+) -> Never {
+  _assertionFailure(kind: kind, message, file: file, line: line, flags: flags)
 }
 
 /// Prints a fatal error message when an unimplemented initializer gets
@@ -300,7 +457,7 @@ internal func _undefined<T>(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
-  _assertionFailure("Fatal error", message(), file: file, line: line, flags: 0)
+  _assertionFailure(kind: .fatal(), message(), file: file, line: line, flags: 0)
 }
 
 #else
@@ -311,7 +468,7 @@ internal func _undefined<T>(
   _ message: @autoclosure () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
-  _assertionFailure("Fatal error", message(), file: file, line: line, flags: 0)
+  _assertionFailure(kind: .fatal(), message(), file: file, line: line, flags: 0)
 }
 
 #endif
@@ -337,7 +494,7 @@ internal func _undefinedEditorPlaceholder(
   _line: Builtin.Word
 ) -> Never {
   _assertionFailure(
-    "Fatal error",
+    kind: .fatal(),
     "attempt to evaluate editor placeholder",
     file: StaticString(
             _start: _filenameStart,
@@ -368,7 +525,7 @@ internal func _diagnoseUnexpectedEnumCaseValue<SwitchedValue, RawValue>(
   rawValue: RawValue
 ) -> Never {
 #if !$Embedded
-  _assertionFailure("Fatal error",
+  _assertionFailure(kind: .fatal(),
                     "unexpected enum case '\(type)(rawValue: \(rawValue))'",
                     flags: _fatalErrorFlags())
 #else
@@ -396,7 +553,7 @@ internal func _diagnoseUnexpectedEnumCase<SwitchedValue>(
 ) -> Never {
 #if !$Embedded
   _assertionFailure(
-    "Fatal error",
+    kind: .fatal(),
     "unexpected enum case while switching on value of type '\(type)'",
     flags: _fatalErrorFlags())
 #else
@@ -421,5 +578,5 @@ internal func _diagnoseUnexpectedEnumCase<SwitchedValue>(
 @usableFromInline // COMPILER_INTRINSIC
 internal func _diagnoseUnavailableCodeReached() -> Never {
   _assertionFailure(
-    "Fatal error", "Unavailable code reached", flags: _fatalErrorFlags())
+    kind: .fatal(), "Unavailable code reached", flags: _fatalErrorFlags())
 }

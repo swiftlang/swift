@@ -140,119 +140,16 @@ This \index{request}\IndexDefinition{abstract generic signature request}request 
 Like the inferred generic signature request, the abstract generic signature request decomposes, desugars and minimizes requirements; for this reason, it is preferred over using the primitive constructor. Often this request is invoked with a list of \index{substituted requirement}substituted requirements obtained by applying a substitution map to each requirement of some original generic signature. This request is used in various places:
 \begin{itemize}
 \item Computing the generic signature of an opaque type declaration (\ChapRef{chap:opaque result types}).
-\item Computing the generic signature for an opened existential type (\SecRef{open existential archetypes}).
+\item Computing the generic signature for an opened existential type (\SecRef{sec:opening existentials}).
 \item Checking that a method override declared by a subclass satisfies the generic requirements of the overridden method in the superclass.
 \end{itemize}
 
 This request does not perform \index{requirement inference}requirement inference. No \index{diagnostic!from abstract generic signature request}diagnostics are emitted either; instead, an error value is returned which is checked by the caller.
 
-\iffalse
-
-When a subclass overrides a method from a superclass, the type checker must ensure the subclass method is compatible with the superclass method in order to guarantee that instances of the subclass are dynamically interchangeable with a superclass. If neither the superclass nor the subclass are generic, the compatibility check simply compares the fully concrete parameter and return types of the non-generic declarations. Otherwise, the superclass substitution map plays a critical role yet again, because the compatibility relation must project the superclass method's type into the subclass to meaningfully compare it with the override.
-
-\paragraph{Non-generic overrides}
-The simple case is when the superclass or subclass is generic, but the superclass method does not define generic parameters of its own, either explicitly or via the opaque parameters of \SecRef{sec:requirements}. Let's call such a method ``non-generic,'' even if the class it appears inside is generic. So a non-generic method has the same generic signature as its parent context, which in our case is a class. In the non-generic case, the superclass substitution map is enough to understand the relation between the interface type of the superclass method and its override.
-
-\begin{listing}\captionabove{Some method overrides}\label{method overrides}
-\begin{Verbatim}
-class Outer<T> {
-  class Inner<U> {
-    func doStuff(_: T, _: U) {}
-
-    func doGeneric<A: Equatable>(_: A) {}
-  }
-}
-
-class Derived<V>: Outer<Int>.Inner<(V, V)> {
-  func doStuff(_: Int, _: (V, V)) {}
-
-  override func doGeneric<A>(_: A) {}
-}
-\end{Verbatim}
-\end{listing}
-
-In \ListingRef{method overrides}, the \texttt{Derived} class overrides the \texttt{doStuff()} method from \texttt{Outer.Inner}. Dropping the first level of function application from the interface type of \texttt{doStuff()} leaves us with \texttt{(T, U) -> ()}, to which we apply the superclass substitution map for \texttt{Derived} to get the final result:
-\[
-\texttt{(T, U) -> ()} \otimes
-\SubstMap{
-\SubstType{T}{Int}\\
-\SubstType{U}{(V, V)}
-} =
-\texttt{(Int, (V, V)) -> ()}
-\]
-This happens to exactly equal the interface type of the subclass method \texttt{doStuff()} in \texttt{Derived}, again not including the self clause. An override with an exact type match is valid. (In fact, some variance in parameter and return types is permitted as well, but it's not particularly interesting from a generics point of view, so here is the executive summary: an override can narrow the return type, and widen the parameter types. This means it is valid to override a method returning \texttt{Optional<T>} with a method returning \tT, because a \tT\ can also trivially become a \texttt{Optional<T>} via an injection. Similarly, if \texttt{A} is a superclass of \texttt{B}, a method returning \texttt{A} can be overridden to return \texttt{B}, because a \texttt{B} is always an \texttt{A}. A dual set of rules are in play in method parameter position; if the original method takes an \texttt{Int} the override can accept \texttt{Optional<Int>}, etc.)
-
-\paragraph{Generic overrides}
-In the non-generic case, applying the superclass substitution map directly to the interface type of a superclass method tells us what ``the type of the superclass method should be'' in the subclass, and this happens to work because the superclass method had the same generic signature as the superclass. Once this is no longer required to be so, the problem becomes more complicated, and the below details were not worked out until \IndexSwift{5.2}Swift 5.2 \cite{sr4206}.
-
-The generic signature of the superclass (resp. override) method is built by adding any additional generic parameters and requirements to the generic signature of the superclass (resp. subclass) itself. To relate these four generic signatures together, we generalize the superclass substitution map into something called the \emph{attaching map}. Once we can compute an attaching map, applying it to the interface type of the superclass method produces a substituted type which can be compared against the interface type of the override, just as before. However, while this part is still necessary, it is no longer sufficient, since we also need to compare the \emph{generic signatures} of the superclass method and its override for compatibility. Here the attaching map also plays a role.
-
-Overrides with a different number of innermost generic parameters are immediately known to be invalid, and no further checking needs to take place. (Interestingly enough, the names of generic parameters do not matter. Generic parameters are uniquely identified by depth and index, not name.) Once it is known that both generic signatures have the same number of innermost parameters, we can define a 1:1 correspondence between the two generic parameter lists which preserves the index but possibly changes the depth.
-
-We build the attaching map by ``extending'' the superclass substitution map, adding replacement types for the superclass method's innermost generic parameters, which map to the subclass method's generic parameters via the above correspondence. In addition to new replacement types, the attaching map stores conformances not present in the superclass substitution map, if the superclass method introduces conformance requirements.
-
-\begin{algorithm}[Compute attaching map for generic method override]\label{superclass attaching map} As input, takes the superclass method's generic signature \texttt{G}, the \index{superclass declaration}superclass declaration \texttt{B}, and some subclass declaration \texttt{D}. Outputs a substitution map for \texttt{G}.
-\begin{enumerate}
-\item Initialize \texttt{R} to an empty list of replacement types.
-\item Initialize \texttt{C} to an empty list of conformances.
-\item Let $\texttt{G}'$ be the generic signature of \texttt{B}, and let \tT\ be the declared interface type of \texttt{D}.
-\item (Trivial case) If $\texttt{D}=\texttt{B}$, return \texttt{G}.
-\item (Remapping) Let \texttt{S} be the context substitution map of \tT\ for the declaration context of \texttt{B}.
-\item (Replacements) For each generic parameter of \texttt{G}, check if this is a valid generic parameter in $\texttt{G}'$. If so, this is a generic parameter of the superclass, so apply \texttt{S} and record the replacement type in \texttt{R}. Otherwise, this is an innermost generic parameter of the superclass method. Adjust the depth of this parameter by subtracting the generic context depth of \texttt{B} and adding the generic context depth of \texttt{D}, and record a new generic parameter type with the adjusted depth but identical index in \texttt{R}.
-
-\item (Conformances) For each conformance requirement \texttt{T:\ P} of \texttt{G}, first check if \tT\ is a valid type in $\texttt{G}'$, and if \tT\ conforms to \texttt{P} in $\texttt{G}'$. If so, look up the conformance \texttt{T:\ P} in \texttt{S} and record the result in \texttt{C}. Otherwise, this is a new conformance requirement present in \texttt{G} but not $\texttt{G}'$. Record the abstract conformance to \texttt{P} in \texttt{C}.
-
-\item (Return) Return the substitution map for \texttt{G} from \texttt{R} and \texttt{C}.
-\end{enumerate}
-\end{algorithm}
-
-\begin{example}
-To continue the \texttt{doGeneric()} example from \ListingRef{method overrides}, the superclass method defines a generic parameter \texttt{A} at depth 2, but the ``same'' parameter has depth 1 in the subclass method of \texttt{Derived}. For clarity, the attaching map is written with canonical types (otherwise, it would replace \texttt{A} with \texttt{A}, with a different meaning of \texttt{A} on each side):
-\begin{align*}
-\SubstMapC{
-&\SubstType{\ttgp{0}{0}}{Int},\\
-&\SubstType{\ttgp{1}{0}}{(\ttgp{0}{0}, \ttgp{0}{0})},\\
-&\SubstType{\ttgp{2}{0}}{\ttgp{1}{0}}
-}{
-\\
-&\SubstConf{\ttgp{1}{0}}{(\ttgp{0}{0}, \ttgp{0}{0})}{Equatable}
-}
-\end{align*}
-\end{example}
-
-\paragraph{The override signature}
-The attaching map is called such because it allows us to ``glue'' together the generic signature of the superclass method with the generic signature of the subclass type, and build the expected generic signature of the subclass method, also known as the \emph{override signature}. The expected generic signature can then be compared against the actual generic signature of the subclass method.
-
-The actual generic signature of the subclass method is constructed from three parts:
-\begin{enumerate}
-\item the generic signature of the subclass type
-\item the subclass method's innermost generic parameters
-\item any additional generic requirements imposed by the subclass method
-\end{enumerate}
-The computation of the expected generic signature is similar, except in place of the third step, we build the additional requirements by applying the attaching map to each requirement of the \emph{superclass} method.
-\begin{algorithm}[Compute override generic signature] As input, takes the superclass method's generic signature \texttt{G}, the \index{superclass declaration}superclass declaration \texttt{B}, and some subclass declaration \texttt{D}. Outputs a new generic signature.
-\begin{enumerate}
-\item Initialize \texttt{P} to an empty list of generic parameter types.
-\item Initialize \texttt{R} to an empty list of generic requirements.
-\item Let \texttt{S} be the attaching map for \texttt{G}, \texttt{B} and \texttt{D} computed using \AlgRef{superclass attaching map}.
-\item (Parent signature) Let $\texttt{G}''$ be the generic signature of \texttt{D}. (In \AlgRef{superclass attaching map}, $\texttt{G}'$ was used for the generic signature of \texttt{B}.)
-\item (Additional parameters) For each generic parameter of \texttt{G} at the innermost depth, apply \texttt{S} to the generic parameter. By construction, the result is another generic parameter type; record this type in \texttt{P}.
-\item (Additional requirements) For each requirement of \texttt{G}, apply \texttt{S} to the requirement and record the result in \texttt{R}.
-\item (Return) Build a minimized generic signature from $\texttt{G}''$, \texttt{P} and \texttt{R}, and return the result.
-\end{enumerate}
-\end{algorithm}
-
-For the override to satisfy the contract of the superclass method, it should accept any valid set of concrete type arguments also accepted by the superclass method. The override might be more permissive, however. The correct relation is that each generic requirement of the actual override signature must be satisfied by the expected override signature, but not necessarily vice versa. This uses the same mechanism as conditional requirement checking for conditional conformances, described in \SecRef{sec:conditional conformances}. The requirements of one signature can be mapped to archetypes of the primary generic environment of another signature. This makes the requirement types concrete, which allows the \texttt{isSatisfied()} predicate to be checked against the substituted requirement.
-
-\begin{example} In \ListingRef{method overrides}, the superclass method generic signature is \texttt{<T, U, A where A: Equatable>}. The generic parameter \texttt{A} belongs to the method; the other two are from the generic signature of the superclass. The override signature glues together the innermost generic parameters and their requirements from the superclass method with the generic signature of the subclass, which is \texttt{<V>}. This operation produces the signature \texttt{<V, A where A:\ Equatable>}. This is different from the actual override generic signature of \texttt{doStuff()} in \texttt{Derived}, which is \texttt{<V, A>}. However, the actual signature's requirements are satisfied by the expected signature.
-\end{example}
-
-\fi
-
-\paragraph{Requirement signature request.} This \index{request}\IndexDefinition{requirement signature request}request builds the \index{requirement signature}requirement signature for a given \index{protocol component}\emph{protocol component}, or a collection of one or more mutually-recursive protocols, as we will see in \SecRef{protocol component}. The evaluation function begins by evaluating two subordinate requests to collect the user-written requirements of each protocol:
+\paragraph{Requirement signature request.} This \index{request}\IndexDefinition{requirement signature request}request builds the \index{requirement signature}requirement signature for a given \index{protocol component}\emph{protocol component}, or a collection of one or more mutually-recursive protocols, which we will define later in \SecRef{protocol component}. The evaluation function begins by evaluating two subordinate requests to collect the user-written requirements of each protocol:
 \begin{itemize}
 \item The \IndexDefinition{structural requirements request}\Request{structural requirements request} collects \index{associated requirement}associated requirements from the protocol’s inheritance clause, \index{associated type declaration!inheritance clause}associated type \index{inheritance clause!associated type declaration}inheritance clauses, any \Index{where clause@\texttt{where} clause!associated type declaration}\texttt{where} clauses on the protocol’s associated types, and the \Index{where clause@\texttt{where} clause!protocol declaration}\texttt{where} clause on the protocol itself. Refer to \SecRef{protocols} for a description of the syntax.
-\item The \IndexDefinition{type alias requirements request}\Request{type alias requirements request} collects \index{protocol type alias}protocol type aliases and converts them to same-type requirements. These are discussed further in \SecRef{protocol type aliases}.
+\item The \IndexDefinition{type alias requirements request}\Request{type alias requirements request} implements some source compatibility behaviors around \index{protocol type alias}protocol type aliases, discussed in \SecRef{protocol type aliases}.
 \end{itemize}
 The requirement signature request takes these user-written associated requirements, and decomposes, desugars and minimizes them, much like the requirements of a generic signature. There is also a primitive constructor for requirement signatures. It is the last step of the requirement signature request. We also use it after reading a protocol from a \index{serialized module}serialized module, because the requirements were already minimal when serialized.
 
@@ -310,7 +207,7 @@ protocol Bad {
          ^
 \end{Verbatim}
 
-A mistake of this sort is baked into the standard library's \texttt{SIMDScalar} protocol. The \tSelf\ type of \texttt{SIMDScalar} must conform to all of \texttt{Equatable}, \texttt{Hashable}, \texttt{Encodable} and \texttt{Decodable}, via an associated same-type requirement:
+A mistake of this sort is baked into the \index{standard library}standard library's \IndexProto{SIMDScalar}\texttt{SIMDScalar} protocol. The \tSelf\ type of \texttt{SIMDScalar} must conform to all of \IndexProto{Equatable}\texttt{Equatable}, \IndexProto{Hashable}\texttt{Hashable}, \IndexProto{Encodable}\texttt{Encodable}, and \IndexProto{Decodable}\texttt{Decodable}, via an associated same-type requirement:
 \begin{Verbatim}
 public protocol SIMDScalar {
   ...
@@ -333,7 +230,7 @@ Consider a function that returns the unique elements of a collection:
 func uniqueElements<S: Sequence>(_ seq: S) -> Set<S.Element>
     where S.Element: Hashable {...}
 \end{Verbatim}
-When \index{type resolution}resolving the function's return type, we must establish that the \index{generic argument}generic argument \texttt{\rT.Element} satisfies the requirements in the generic signature of the \texttt{Set} type declared in the standard library:
+When \index{type resolution}resolving the function's return type, we must establish that the \index{generic argument}generic argument \texttt{\rT.Element} satisfies the requirements in the generic signature of the \texttt{Set} type declared in the \index{standard library}standard library:
 \begin{Verbatim}
 struct Set<Element: Hashable> {...}
 \end{Verbatim}
@@ -346,7 +243,7 @@ These \emph{inferred requirements} are not the derived requirements in the sense
 
 \paragraph{Inferred requirements.} When building the generic signature of a declaration, we collect inferred requirements by visiting \index{type representation}type representations written in the following specific positions:
 \begin{enumerate}
-\item The parameter and return types of \index{function declaration}function and \index{subscript declaration}subscript declarations, if the generic declaration we're given is one of those. In our \texttt{uniqueElements()} example, we infer requirements from the function's return type.
+\item The parameter and return types of \index{function declaration}function, \index{constructor declaration}constructor, and \index{subscript declaration}subscript declarations, if the generic declaration is one of those. In our \texttt{uniqueElements()} example, we infer requirements from the function's return type.
 
 \item Types appearing in \index{inheritance clause!generic parameter declaration}inheritance clauses of \index{generic parameter declaration}generic parameter declarations. The only interesting case is a \index{generic class}\index{superclass requirement!requirement inference}generic superclass bound. Here, the generic signature of \texttt{Foo} has the explicit superclass requirement $\ConfReq{\rT}{Base<\rU>}$ and an inferred requirement $\ConfReq{\rU}{Equatable}$, the latter written in the commented-out \texttt{where} clause:
 \begin{Verbatim}
@@ -361,7 +258,7 @@ struct Foo<T: Sequence, U>
     where T.Element == Set<U> /*, U: Hashable */ {...}
 \end{Verbatim}
 
-\item The typed throws feature, introduced with \IndexSwift{6.0}Swift~6 \cite{se0413}, allows specifying the type of error thrown by a function. For function, subscript and constructor declarations, we infer a conformance requirement to \texttt{Error} with the declaration's thrown error type as the subject type:
+\item The \index{typed throws}typed throws feature, introduced with \IndexSwift{6.0}Swift~6 \cite{se0413}, allows specifying the type of error thrown by a function. For function, constructor, and subscript declarations, we infer a conformance requirement to \texttt{Error} with the declaration's thrown error type as the subject type:
 \begin{Verbatim}
 func f<E>(_: Int) throws(E) /* where E: Error */ {...}
 \end{Verbatim}
@@ -374,20 +271,20 @@ func f<E>(_: () throws(E) -> ()) /* where E: Error */ {...}
 
 We resolve each of the enumerated type representations in the \index{structural resolution stage}structural resolution stage, because the generic signature of the current declaration isn't known; we're building it right now. Let's say that $H$ is the generic signature being built; we can still talk about $H$ in the abstract, we just can't define anything concrete to depend on generic signature queries against~$H$. The resolved type possibly contains type parameters of $H$, so it is element of $\TypeObj{H}$. From the resolved type, we obtain a set of inferred requirements by walking its child types recursively. We look for children that are generic nominal types or generic type alias types, and extract a \index{substitution map}substitution map from each one:
 \begin{itemize}
-\item For a \index{generic nominal type}generic nominal type, we take the context substitution map (\SecRef{contextsubstmap}).
-\item For a generic \index{type alias type}type alias type, we take the substitution map stored inside the type.
+\item For a \index{generic nominal type}generic nominal type, we use the context substitution map, constructed from the type's list of generic arguments (\SecRef{sec:nominal types}).
+\item For a generic \index{type alias type}type alias type, we similarly construct a substitution map from the generic arguments of the type alias type.
 \end{itemize}
-Let's call this substitution map $\Sigma$, and let $G$ be the \index{input generic signature}input generic signature of $\Sigma$. This is the generic signature of the referenced nominal type or type alias declaration. The \index{output generic signature}output generic signature of $\Sigma$ is $H$, so $\Sigma\in\SubMapObj{G}{H}$. We proceed as if we were checking generic arguments, applying $\Sigma$ to each requirement of $G$. This gives us a substituted requirement in $\ReqObj{H}$. (Recall that when checking generic arguments in the interface stage, we worked with archetypes, so we'd get something in $\ReqObj{\EquivClass{H}}$; here, we instead want the substituted requirement to talk about type parameters).
+Let's call this substitution map $\Sigma$, and let $G$ be the \index{input generic signature}input generic signature of $\Sigma$. This is the generic signature of the referenced nominal type or type alias declaration. The \index{output generic signature}output generic signature of $\Sigma$ is $H$, so $\Sigma\in\SubMapObj{G}{H}$. We proceed as if we were checking generic arguments, applying $\Sigma$ to each requirement of $G$. This gives us a substituted requirement in $\ReqObj{H}$. (However, when checking generic arguments, we work with archetypes, so we get something in $\ReqObj{\EquivClass{H}}$; here, we instead want the substituted requirement to talk about type parameters).
 
-In all examples we've seen so far, the inferred requirement's subject type was a type parameter of~$H$, and the inferred requirement was just added to~$H$ unchanged. To preview the next section, the requirement's subject type might be \index{fully-concrete type}fully concrete after substitution; for example, here we get the useless inferred requirement $\ConfReq{Int}{Hashable}$:
+In all examples we've seen so far, the inferred requirement's subject type was a type parameter of~$H$, and the inferred requirement was just added to~$H$ unchanged. We might also get a \index{fully-concrete type}fully concrete type after substitution. In the next example, we infer the requirement $\ConfReq{Int}{Hashable}$. This is not a statement about the type parameters of \texttt{f()} at all; it is ``always true,'' and it does not affect the generic signature of \texttt{f()}:
 \begin{Verbatim}
 func f<T>(_: T, _: Set<Int>) {}
 \end{Verbatim}
-This requirement is not a statement about the type parameters of \texttt{f()} at all; it is just ``always true,'' so it does not affect the generic signature of \texttt{f()}. A more complex scenario is possible with \index{conditional conformance}conditional conformances. In the next example, the inferred requirement is $\ConfReq{\rT}{Hashable}$:
+A more complex scenario is possible with \index{conditional conformance}conditional conformances. In the next example, the inferred requirement is $\ConfReq{\rT}{Hashable}$:
 \begin{Verbatim}
 func f<T>(_: Set<Array<T>>) /* where T: Hashable */ {}
 \end{Verbatim}
-From the generic nominal type \texttt{Set<Array<\rT>>}, we obtain the inferred conformance requirement $\ConfReq{Array<\rT>}{Hashable}$. The standard library declares a conditional conformance of \texttt{Array} to \texttt{Hashable} when the element type is \texttt{Hashable}. We replace our original requirement with the conditional requirements of this conformance, which gives us $\ConfReq{\rT}{Hashable}$.
+To understand why, first note the generic nominal type \texttt{Set<Array<\rT>>} gives us the inferred requirement $\ConfReq{Array<\rT>}{Hashable}$. The \index{standard library}standard library declares a conditional conformance of \texttt{Array} to \texttt{Hashable} when the element type is \texttt{Hashable}. We replace our original requirement with the conditional requirements of this conformance, which gives us $\ConfReq{\rT}{Hashable}$.
 
 In general, when a requirement's subject type is not a type parameter, we repeatedly rewrite it into a (possibly empty) set of simpler requirements, until only requirements about type parameters remain; this \emph{requirement desugaring} procedure is described in the next section.
 
@@ -418,7 +315,7 @@ typealias OptionalElement<T: Sequence> = Optional<T.Element>
 let x: OptionalElement<Array<Int>> = ...
 \end{Verbatim}
 
-In the above, we form the substituted underlying type \texttt{Optional<Int>} by applying a substitution map that replaces $\rT$ with \texttt{Array<Int>} to the underlying type of the type alias declaration, \texttt{Optional<T.Element>}. This gives us the \index{structural components}structural components of a type alias type: a reference to a type alias declaration, a substituted underlying type, and a substitution map. The substitution map is used when printing the sugared type's generic arguments. Crucially to our topic at hand, this substitution map is also considered by requirement inference, making this one of a handful of language features where the appearance of a sugared type \emph{does} have a semantic effect. In this example, we infer the requirement $\rTSequence$ from considering \texttt{OptionalElement<\rT>}:
+In the above, we form the substituted underlying type \texttt{Optional<Int>} by applying a substitution map that replaces $\rT$ with \texttt{Array<Int>} to the underlying type of the type alias declaration, \texttt{Optional<\rT.Element>}. This gives us the \index{structural components}structural components of a type alias type: a reference to a type alias declaration, a substituted underlying type, and a substitution map. The substitution map is used when printing the sugared type's generic arguments. Crucially to our topic at hand, this substitution map is also considered by requirement inference, making this one of a handful of language features where the appearance of a sugared type \emph{does} have a semantic effect. In this example, we infer the requirement $\rTSequence$ from considering \texttt{OptionalElement<\rT>}:
 \begin{Verbatim}
 func maybePickElement<T>(_ sequence: T) -> OptionalElement<T>
 \end{Verbatim}
@@ -438,12 +335,12 @@ The inheritance clause entry introduces the requirement $\ConfReq{\rT}{Any}$; th
 \SubstType{\rT}{\rT},\,\SubstType{\rU}{Int}
 }{\SubstConf{\rT}{\rT}{Sequence}}
 \]
-Applying $\Sigma$ to the generic signature of \texttt{SequenceOf} gives us our two inferred requirements:
+To get our two inferred requirements, we apply $\Sigma$ to each requirement in the generic signature of \texttt{SequenceOf}:
 \begin{gather*}
 \rTSequence\otimes\Sigma = \rTSequence\\
 \SameReq{\rU}{\rT.Element}\otimes\Sigma = \SameReq{\rU}{Int}
 \end{gather*}
-These requirements survive minimization and appear in the generic signature of \texttt{sum()}. We get the same generic signature as both of the following: 
+These requirements survive minimization and appear in the generic signature of \texttt{sum()}. We get the same generic signature as both of the following:
 \begin{Verbatim}
 func sum<S: Sequence<Int>>(_: T) {...}
 func sum<S: Sequence>(_: T) where S.Element == Int {...}
@@ -470,7 +367,7 @@ Before proceeding to requirement minimization, we eliminate some unneeded genera
 \end{itemize}
 In the \index{derived requirement!decomposition}derived requirements formalism, the right-hand side of a \index{conformance requirement!decomposition}conformance requirement is always a protocol type, however in the syntax we can also write a protocol composition type, or a parameterized protocol type. Such conformance requirements must be split up---this is \emph{requirement decomposition}. We also recall that the left-hand side of a derived requirement is always a type parameter, whereas requirement inference (or even the user) can write down a requirement with any subject type. Such requirements are also split up into zero or more simpler requirements, which gives us \emph{requirement desugaring}.
 
-\paragraph{Decomposition.} This \IndexDefinition{requirement decomposition}formalizes the syntax sugar from \SecRef{sec:requirements}~and~\SecRef{protocols}. For example, the standard library defines the \texttt{Codable} \index{type alias type}type alias, whose underlying type is a \index{protocol composition type!decomposition}composition of two protocols, \texttt{Decodable} and \texttt{Encodable}:
+\paragraph{Decomposition.} This \IndexDefinition{requirement decomposition}formalizes the syntax sugar from \SecRef{sec:requirements}~and~\SecRef{protocols}. For example, the \index{standard library}standard library defines the \texttt{Codable} \index{type alias type}type alias, whose underlying type is a \index{protocol composition type!decomposition}composition of two protocols, \texttt{Decodable} and \texttt{Encodable}:
 \begin{Verbatim}
 typealias Codable = Decodable & Encodable
 \end{Verbatim}
@@ -595,7 +492,7 @@ Takes an arbitrary requirement as input. Outputs a list of desugared requirement
 \item For a \index{superclass requirement!desugaring}\textbf{superclass requirement} $\TC$:
 \begin{enumerate}
 \item If \tT\ and \tC\ are two specializations of the same \index{generic class type}\index{class declaration}class declaration, add the same-type requirement $\SameReq{T}{C}$ to the worklist.
-\item If \tT\ does not have a \index{superclass type}superclass type (\SecRef{classinheritance}), then \tT\ cannot be a subclass of~\tC; add $\TC$ to the conflict list.
+\item If \tT\ does not have a \index{superclass type}superclass type (\SecRef{sec:subclassing}), then \tT\ cannot be a subclass of~\tC; add $\TC$ to the conflict list.
 \item Otherwise, let $\tTp$ be the superclass type of \tT. Add the superclass requirement $\ConfReq{$\tTp$}{C}$ to the worklist.
 \end{enumerate}
 \item For a \index{layout requirement!desugaring}\textbf{layout requirement} $\TAnyObject$, any type parameters contained in the concrete type \tT\ have no bearing on the outcome. It suffices to apply \AlgRef{reqissatisfied}. If unsatisfied, add $\TAnyObject$ to the conflict list.
@@ -774,7 +671,7 @@ We now state the general result. We need this for the proof of \ThmRef{valid the
 Let $G$ be an arbitrary generic signature. Suppose that $G\vdash\tT$ and $G\vdash\TP$ for some type parameter \tT\ and protocol \tP. Then if we take a valid type parameter or derived requirement of~$\GP$ and replace \tSelf\ with \tT\ throughout, we get a valid type parameter or derived requirement of~$G$, just rooted in \tT. That is:
 \begin{itemize}
 \item If $\GP\vdash\SelfU$, then $G\vdash\texttt{T.U}$.
-\item If $\GP\vdash R$, then $G\vdash R^\prime$, where $R^\prime$ is the substituted requirement obtained by replacing \tSelf\ with \tT\ in $R$.
+\item If $\GP\vdash R$, then $G\vdash R'$, where $R'$ is the substituted requirement obtained by replacing \tSelf\ with \tT\ in $R$.
 \end{itemize}
 \end{lemma}
 
@@ -950,7 +847,7 @@ This completes the induction. To prove the second part of the theorem, we furthe
 
 The last step shown in \FigRef{inferred generic signature request figure}~and~\ref{abstract generic signature request figure} is called \IndexDefinition{requirement minimization}\emph{requirement minimization}. To finish building our generic signature, we must transform the list of desugared requirements into a list of \emph{minimal} requirements. These minimal requirements are then given to the \index{generic signature constructor}primitive constructor, together with the list of generic parameter types collected at the start of the process, and we have our generic signature!
 
-Because of the central role that generic signatures play in the Swift \index{ABI}ABI, it is worth describing the requirement minimization problem in the abstract, which is our goal in the present section. The implementation itself will be revealed in \PartRef{part rqm}, when we build a convergent rewriting system from desugared requirements (\SecRef{building rules}) and then perform rewrite rule minimization (\ChapRef{rqm minimization}). The material in this section was based on~\cite{gensig}, an earlier write-up about the \Index{GenericSignatureBuilder@\texttt{GenericSignatureBuilder}}\texttt{GenericSignatureBuilder}.
+Because of the central role that generic signatures play in the Swift \index{ABI}ABI, it is worth describing the requirement minimization problem in the abstract, which is our goal in the present section. The implementation itself will be revealed in \PartRef{part:rqm}, when we build a \emph{finite complete rewriting system} from desugared requirements (\SecRef{building rules}) and then perform the minimization procedure (\ChapRef{chap:minimization}). The material in this section was based on~\cite{gensig}, an earlier write-up about the \Index{GenericSignatureBuilder@\texttt{GenericSignatureBuilder}}\texttt{GenericSignatureBuilder}.
 
 We can summarize the key behaviors of requirement minimization:
 \begin{enumerate}
@@ -962,7 +859,7 @@ Type substitution only accepts bound dependent member types. To ensure that we c
 \item We need to detect and \index{diagnostic!conflicting requirement}diagnose generic signatures with \emph{conflicting requirements} that cannot be satisfied by any \index{well-formed substitution map}well-formed substitution map. This allows us to assume that all generic signatures in the \index{main module}main module are satisfiable as long as no diagnostics are emitted during type checking.
 \end{enumerate}
 
-\paragraph{Equivalence of requirements.} In our derived requirements formalism, a generic signature is just a list of requirements. We saw in the previous section that the only real assumption we need from those requirements is that they are \index{desugared requirement}desugared requirements. Thus, when taken with the list of generic parameter types, the desugared requirements given to minimization already form a generic signature in our theory. 
+\paragraph{Equivalence of requirements.} In our derived requirements formalism, a generic signature is just a list of requirements. We saw in the previous section that the only real assumption we need from those requirements is that they are \index{desugared requirement}desugared requirements. Thus, when taken with the list of generic parameter types, the desugared requirements given to minimization already form a generic signature in our theory.
 
 We will define a \emph{minimal} generic signature as one satisfying the additional conditions we just described. We will understand requirement minimization as a mathematical \index{function}function that takes a generic signature and outputs a minimal generic signature. In the implementation, all generic signatures come from requirement minimization, and so all generic signatures are actually minimal. To justify this transformation, we introduce the notion of \emph{equivalent} generic signatures. Two generic signatures are equivalent if they generate the same \emph{theory}; that is, they have the same set of \index{valid type parameter!equivalence}valid type parameters and \index{derived requirement!equivalence}derived requirements. Note that in particular, if two generic signatures~$G_1$ and $G_2$ are equivalent, then~$G_1$ is well-formed if and only if~$G_2$ is well-formed.
 
@@ -1039,7 +936,7 @@ We can similarly show that this is an equivalent list:
 \end{align*}
 However, the reduced type of \texttt{T.Iterator.Element} is \texttt{T.[Sequence]Element}, because of the associated same-type requirement in \texttt{Sequence}, so in fact we can simplify the second conformance requirement further without changing the theory:
 \[\{\ConfReq{T}{Sequence},\,\ConfReq{T.[Sequence]Element}{Hashable}\}\]
-This is a list of \emph{reduced} requirements, because the subject type of each is a reduced type parameter in our generic signature. We will define reduced requirements more generally now. In what follows, there is an important distinction between same-type requirements between type parameters ($\SameReq{T.A}{T.B}$), and same-type requirements where the right hand side is a concrete type ($\SameReq{T.A}{Array<T.B>}$). We will treat them as essentially two different kinds of requirements. The below definition is straightforward for every \index{requirement kind}requirement kind, except for a same-type requirement between type parameters. 
+This is a list of \emph{reduced} requirements, because the subject type of each is a reduced type parameter in our generic signature. We will define reduced requirements more generally now. In what follows, there is an important distinction between same-type requirements between type parameters ($\SameReq{T.A}{T.B}$), and same-type requirements where the right hand side is a concrete type ($\SameReq{T.A}{Array<T.B>}$). We will treat them as essentially two different kinds of requirements. The below definition is straightforward for every \index{requirement kind}requirement kind, except for a same-type requirement between type parameters.
 
 \begin{definition}\label{reduced requirement}
 Let $G$ be a generic signature, and let $R$ be an explicit requirement of~$G$. We say $R$ is a \IndexDefinition{reduced requirement}\emph{reduced requirement} if the following holds:
@@ -1145,7 +1042,7 @@ The third and fourth requirements do not give us anything new, because they can 
 \end{itemize}
 \end{definition}
 
-The next example shows that a list of reduced requirements may have more than one \emph{distinct} minimal subset. 
+The next example shows that a list of reduced requirements may have more than one \emph{distinct} minimal subset.
 We declare three generic structs that only differ in conformance requirements; the reader may again want to try this with \texttt{-debug-generic-signatures}:
 \begin{Verbatim}
 struct Knot1<T, U> where T: N, T == U.A,       U == T.A {}
@@ -1238,7 +1135,7 @@ We then build a substitution map for $G$ by replacing each generic parameter typ
 
 With \index{superclass requirement!conflicts}superclass, \index{layout requirement!conflicts}layout, and concrete \index{same-type requirement!conflicts}same-type requirements, the picture is more complicated. When type parameters are required to have specific concrete types, we cannot ``collapse'' the entire generic signature down to a single point. Indeed, as we said, \index{conflicting requirement}\emph{conflicting requirements} might prevent our generic signature from being \index{satisfied requirement}satisfied by \emph{any} substitution map. There is another complication. While we can write derivations involving these ``exotic'' \index{requirement kind}requirement kinds, \index{limitation!of derived requirements}certain \index{inference rule}inference rules are missing. The \index{type substitution}type substitution algebra will fill in some of these gaps.
 
-Suppose that $\Sigma$ is a substitution map where all replacement types are \index{fully-concrete type}fully concrete, so we can apply $\Sigma$ to a requirement and then apply \AlgRef{reqissatisfied} to check if its satisfied. Further, let's say that we can derive two concrete \index{same-type requirement!conflicting}same-type requirements, where both have the same subject type parameter~\tT\ of $G$:
+Suppose that $\Sigma$ is a substitution map where all replacement types are \index{fully-concrete type}fully concrete, so we can apply $\Sigma$ to a requirement and then apply \AlgRef{reqissatisfied} to check if its satisfied. Further, let's say that we can derive two concrete \index{same-type requirement!conflicts}same-type requirements, where both have the same subject type parameter~\tT\ of $G$:
 \begin{gather*}
 \AnyStep{\SameReq{T}{$\tX_1$}}{1}\\
 \AnyStep{\SameReq{T}{$\tX_2$}}{2}
@@ -1291,16 +1188,16 @@ func f2<T: Foo>(_: T) where T.A == Set<Int> {}
 // `T.A == Array<T.C>'
 \end{Verbatim}
 
-What if \emph{both} of our same-type requirements are explicit? We now take this protocol:
+What if \emph{both} same-type requirements are explicit? Let's declare this protocol:
 \begin{Verbatim}
 protocol Foe {
   associatedtype X
   associatedtype Y
 }
 \end{Verbatim}
-So that we can define this function:
+Now, consider this function:
 \begin{Verbatim}
-func f3<T: Foe>(_: T) where T.X == Set<T.Y>, T.A == Set<Int> {}
+func f3<T: Foe>(_: T) where T.X == Set<T.Y>, T.X == Set<Int> {}
 \end{Verbatim}
 In \texttt{f3()}, we can replace \emph{either} requirement with $\SameReq{T.X}{Int}$ without changing the ``meaning'' of our generic signature, but since the first requirement's subject type is not reduced, we replace it first. Thus, we get the following generic signature:
 \begin{quote}
@@ -1328,7 +1225,7 @@ Let $G$ be a \index{well-formed generic signature}well-formed generic signature.
 We say $G$ is \emph{conflict-free} if it does not have any pairs of conflicting requirements.
 \end{definition}
 
-We will investigate the compiler's implementation of superclass, layout, and concrete same-type requirements in \ChapRef{propertymap}, but in this section, we're just going to look at a couple of examples.
+We will investigate the compiler's implementation of superclass, layout, and concrete same-type requirements in \ChapRef{chap:property map}, but in this section, we're just going to look at a couple of examples.
 
 \smallskip
 
@@ -1345,7 +1242,7 @@ We will investigate the compiler's implementation of superclass, layout, and con
 \end{tikzpicture}
 \end{wrapfigure}
 
-Our next example involves superclass requirements. While a description of generic classes awaits us in \ChapRef{classinheritance}, we only need non-generic classes to demonstrate the key ideas in requirement minimization. Since it is such a clich\'e at this point, we're going to follow the trend and go with the classic object oriented ``shape hierarchy'', shown on the right. We also introduce a \texttt{Canvas} protocol, which subjects it associated type to an \index{associated superclass requirement}associated superclass requirement $\AssocConfReq{Self.Boundary}{Polygon}{Canvas}$:
+Our next example involves superclass requirements. While a description of generic classes awaits us in \ChapRef{sec:subclassing}, we only need non-generic classes to demonstrate the key ideas in requirement minimization. Since it is such a clich\'e at this point, we're going to follow the trend and go with the classic object oriented ``shape hierarchy'', shown on the right. We also introduce a \texttt{Canvas} protocol, which subjects it associated type to an \index{associated superclass requirement}associated superclass requirement $\AssocConfReq{Self.Boundary}{Polygon}{Canvas}$:
 
 \begin{Verbatim}
 class Shape {}
@@ -1405,7 +1302,7 @@ Once we have our minimal requirements, the last step is to sort them in a canoni
 \item (Subject) Compare the subject types of the two requirements with \AlgRef{type parameter order}. Return the result if it is ``$<$'' or ``$>$''. Otherwise, both requirements have the same subject type.
 \item (Kind)  Compare their kinds. If they have different kinds, return ``$<$'' or ``$>$'' based on the relative order below:
 \[\text{superclass} < \text{layout} < \text{conformance} < \text{same-type}\]
-Otherwise, both requirements have the same subject type and the same kind. 
+Otherwise, both requirements have the same subject type and the same kind.
 \item (Protocol) If both are conformance requirements, compare their protocols with \AlgRef{linear protocol order}, and return one of ``$<$'', ``$=$'', or ``$>$''.
 \item (Incomparable) Otherwise, both requirements have the same subject type and kind, and they're not conformance requirements. Return ``$\bot$''.
 \end{enumerate}
@@ -1414,6 +1311,113 @@ Otherwise, both requirements have the same subject type and the same kind.
 \paragraph{Requirement signatures.} The \index{associated requirement}associated requirements in a protocol's \index{requirement signature}requirement signature are minimized just like the explicit requirements of a generic signature. The proof of \PropRef{equiv generic signatures} can be tweaked slightly to instead use a \index{equivalence relation}equivalence relation on requirement signatures. (The key idea is that for every associated requirement of a protocol~\tP, we can derive the corresponding requirement in the \index{protocol generic signature}protocol generic signature~$\GP$.) Minimal and reduced associated requirements are defined in the same way, and the \index{requirement signature request}\Request{requirement signature request} always outputs a \IndexDefinition{minimal requirement signature}minimal requirement signature. We can describe the \index{conflicting requirement}conflicts among the associated requirements using \DefRef{conflicting req def}, and finally, sort the minimal associated requirements in a requirement signature using \AlgRef{requirement order}.
 
 The major difference is that we must minimize all requirement signatures of a set of mutually-dependent protocols, or a \index{protocol component}\emph{protocol component}, simultaneously. We will discuss this again in \SecRef{protocol component} and see an example in \SecRef{homotopy reduction}.
+
+\ifWIP
+
+\section{Overriding Class Methods}\label{sec:overriding class methods}
+
+When a subclass overrides a method from a superclass, the type checker must ensure the subclass method is compatible with the superclass method in order to guarantee that instances of the subclass are dynamically interchangeable with a superclass. If neither the superclass nor the subclass are generic, the compatibility check simply compares the fully concrete parameter and return types of the non-generic declarations. Otherwise, the superclass substitution map plays a critical role yet again, because the compatibility relation must project the superclass method's type into the subclass to meaningfully compare it with the override.
+
+\paragraph{Non-generic overrides.}
+The simple case is when the superclass or subclass is generic, but the superclass method does not define generic parameters of its own, either explicitly or via the opaque parameters of \SecRef{sec:requirements}. Let's call such a method ``non-generic,'' even if the class it appears inside is generic. So a non-generic method has the same generic signature as its parent context, which in our case is a class. In the non-generic case, the superclass substitution map is enough to understand the relation between the interface type of the superclass method and its override.
+
+\begin{listing}\captionabove{Some method overrides}\label{method overrides}
+\begin{Verbatim}
+class Outer<T> {
+  class Inner<U> {
+    func doStuff(_: T, _: U) {}
+
+    func doGeneric<A: Equatable>(_: A) {}
+  }
+}
+
+class Derived<V>: Outer<Int>.Inner<(V, V)> {
+  func doStuff(_: Int, _: (V, V)) {}
+
+  override func doGeneric<A>(_: A) {}
+}
+\end{Verbatim}
+\end{listing}
+
+In \ListingRef{method overrides}, the \texttt{Derived} class overrides the \texttt{doStuff()} method from \texttt{Outer.Inner}. Dropping the first level of function application from the interface type of \texttt{doStuff()} leaves us with \texttt{(T, U) -> ()}, to which we apply the superclass substitution map for \texttt{Derived} to get the final result:
+\[
+\texttt{(T, U) -> ()} \otimes
+\SubstMap{
+\SubstType{T}{Int}\\
+\SubstType{U}{(V, V)}
+} =
+\texttt{(Int, (V, V)) -> ()}
+\]
+This happens to exactly equal the interface type of the subclass method \texttt{doStuff()} in \texttt{Derived}, again not including the self clause. An override with an exact type match is valid. (In fact, some variance in parameter and return types is permitted as well, but it's not particularly interesting from a generics point of view, so here is the executive summary: an override can narrow the return type, and widen the parameter types. This means it is valid to override a method returning \texttt{Optional<T>} with a method returning \tT, because a \tT\ can also trivially become a \texttt{Optional<T>} via an injection. Similarly, if \texttt{A} is a superclass of \texttt{B}, a method returning \texttt{A} can be overridden to return \texttt{B}, because a \texttt{B} is always an \texttt{A}. A dual set of rules are in play in method parameter position; if the original method takes an \texttt{Int} the override can accept \texttt{Optional<Int>}, etc.)
+
+\paragraph{Generic overrides.}
+
+\index{abstract generic signature request!method override check}
+In the non-generic case, applying the superclass substitution map directly to the interface type of a superclass method tells us what ``the type of the superclass method should be'' in the subclass, and this happens to work because the superclass method had the same generic signature as the superclass. Once this is no longer required to be so, the problem becomes more complicated, and the below details were not worked out until \IndexSwift{5.2}Swift 5.2 \cite{sr4206}.
+
+The generic signature of the superclass (resp. override) method is built by adding any additional generic parameters and requirements to the generic signature of the superclass (resp. subclass) itself. To relate these four generic signatures together, we generalize the superclass substitution map into something called the \emph{attaching map}. Once we can compute an attaching map, applying it to the interface type of the superclass method produces a substituted type which can be compared against the interface type of the override, just as before. However, while this part is still necessary, it is no longer sufficient, since we also need to compare the \emph{generic signatures} of the superclass method and its override for compatibility. Here the attaching map also plays a role.
+
+Overrides with a different number of innermost generic parameters are immediately known to be invalid, and no further checking needs to take place. (Interestingly enough, the names of generic parameters do not matter. Generic parameters are uniquely identified by depth and index, not name.) Once it is known that both generic signatures have the same number of innermost parameters, we can define a 1:1 correspondence between the two generic parameter lists which preserves the index but possibly changes the depth.
+
+We build the attaching map by ``extending'' the superclass substitution map, adding replacement types for the superclass method's innermost generic parameters, which map to the subclass method's generic parameters via the above correspondence. In addition to new replacement types, the attaching map stores conformances not present in the superclass substitution map, if the superclass method introduces conformance requirements.
+
+\begin{algorithm}[Compute attaching map for generic method override]\label{superclass attaching map} As input, takes the superclass method's generic signature \texttt{G}, the \index{superclass declaration}superclass declaration \texttt{B}, and some subclass declaration \texttt{D}. Outputs a substitution map for \texttt{G}.
+\begin{enumerate}
+\item Initialize \texttt{R} to an empty list of replacement types.
+\item Initialize \texttt{C} to an empty list of conformances.
+\item Let $\texttt{G}'$ be the generic signature of \texttt{B}, and let \tT\ be the declared interface type of \texttt{D}.
+\item (Trivial case) If $\texttt{D}=\texttt{B}$, return \texttt{G}.
+\item (Remapping) Let \texttt{S} be the context substitution map of \tT\ for the declaration context of \texttt{B}.
+\item (Replacements) For each generic parameter of \texttt{G}, check if this is a valid generic parameter in $\texttt{G}'$. If so, this is a generic parameter of the superclass, so apply \texttt{S} and record the replacement type in \texttt{R}. Otherwise, this is an innermost generic parameter of the superclass method. Adjust the depth of this parameter by subtracting the generic context depth of \texttt{B} and adding the generic context depth of \texttt{D}, and record a new generic parameter type with the adjusted depth but identical index in \texttt{R}.
+
+\item (Conformances) For each conformance requirement \texttt{T:\ P} of \texttt{G}, first check if \tT\ is a valid type in $\texttt{G}'$, and if \tT\ conforms to \texttt{P} in $\texttt{G}'$. If so, look up the conformance \texttt{T:\ P} in \texttt{S} and record the result in \texttt{C}. Otherwise, this is a new conformance requirement present in \texttt{G} but not $\texttt{G}'$. Record the abstract conformance to \texttt{P} in \texttt{C}.
+
+\item (Return) Return the substitution map for \texttt{G} from \texttt{R} and \texttt{C}.
+\end{enumerate}
+\end{algorithm}
+
+\begin{example}
+To continue the \texttt{doGeneric()} example from \ListingRef{method overrides}, the superclass method defines a generic parameter \texttt{A} at depth 2, but the ``same'' parameter has depth 1 in the subclass method of \texttt{Derived}. For clarity, the attaching map is written with canonical types (otherwise, it would replace \texttt{A} with \texttt{A}, with a different meaning of \texttt{A} on each side):
+\begin{align*}
+\SubstMapC{
+&\SubstType{\ttgp{0}{0}}{Int},\\
+&\SubstType{\ttgp{1}{0}}{(\ttgp{0}{0}, \ttgp{0}{0})},\\
+&\SubstType{\ttgp{2}{0}}{\ttgp{1}{0}}
+}{
+\\
+&\SubstConf{\ttgp{1}{0}}{(\ttgp{0}{0}, \ttgp{0}{0})}{Equatable}
+}
+\end{align*}
+\end{example}
+
+\paragraph{The override signature.}
+The attaching map is called such because it allows us to ``glue'' together the generic signature of the superclass method with the generic signature of the subclass type, and build the expected generic signature of the subclass method, also known as the \emph{override signature}. The expected generic signature can then be compared against the actual generic signature of the subclass method.
+
+The actual generic signature of the subclass method is constructed from three parts:
+\begin{enumerate}
+\item the generic signature of the subclass type
+\item the subclass method's innermost generic parameters
+\item any additional generic requirements imposed by the subclass method
+\end{enumerate}
+The computation of the expected generic signature is similar, except in place of the third step, we build the additional requirements by applying the attaching map to each requirement of the \emph{superclass} method.
+\begin{algorithm}[Compute override generic signature] As input, takes the superclass method's generic signature \texttt{G}, the \index{superclass declaration}superclass declaration \texttt{B}, and some subclass declaration \texttt{D}. Outputs a new generic signature.
+\begin{enumerate}
+\item Initialize \texttt{P} to an empty list of generic parameter types.
+\item Initialize \texttt{R} to an empty list of generic requirements.
+\item Let \texttt{S} be the attaching map for \texttt{G}, \texttt{B} and \texttt{D} computed using \AlgRef{superclass attaching map}.
+\item (Parent signature) Let $\texttt{G}''$ be the generic signature of \texttt{D}. (In \AlgRef{superclass attaching map}, $\texttt{G}'$ was used for the generic signature of \texttt{B}.)
+\item (Additional parameters) For each generic parameter of \texttt{G} at the innermost depth, apply \texttt{S} to the generic parameter. By construction, the result is another generic parameter type; record this type in \texttt{P}.
+\item (Additional requirements) For each requirement of \texttt{G}, apply \texttt{S} to the requirement and record the result in \texttt{R}.
+\item (Return) Build a minimized generic signature from $\texttt{G}''$, \texttt{P} and \texttt{R}, and return the result.
+\end{enumerate}
+\end{algorithm}
+
+For the override to satisfy the contract of the superclass method, it should accept any valid set of concrete type arguments also accepted by the superclass method. The override might be more permissive, however. The correct relation is that each generic requirement of the actual override signature must be satisfied by the expected override signature, but not necessarily vice versa. This uses the same mechanism as conditional requirement checking for conditional conformances, described in \SecRef{sec:conditional conformances}. The requirements of one signature can be mapped to archetypes of the primary generic environment of another signature. This makes the requirement types concrete, which allows the \texttt{isSatisfied()} predicate to be checked against the substituted requirement.
+
+\begin{example} In \ListingRef{method overrides}, the superclass method generic signature is \texttt{<T, U, A where A: Equatable>}. The generic parameter \texttt{A} belongs to the method; the other two are from the generic signature of the superclass. The override signature glues together the innermost generic parameters and their requirements from the superclass method with the generic signature of the subclass, which is \texttt{<V>}. This operation produces the signature \texttt{<V, A where A:\ Equatable>}. This is different from the actual override generic signature of \texttt{doStuff()} in \texttt{Derived}, which is \texttt{<V, A>}. However, the actual signature's requirements are satisfied by the expected signature.
+\end{example}
+
+\fi
 
 \section{Source Code Reference}\label{src:building generic signatures}
 
@@ -1487,7 +1491,7 @@ Error flags returned by \texttt{AbstractGenericSignatureRequest}. We will see th
 \begin{itemize}
 \item \texttt{HasInvalidRequirements}: the original requirements were not \IndexSource{well-formed requirement}well-formed, or were in \IndexSource{conflicting requirement}conflict with each other. Any errors in the requirements handed to this request usually mean there was another error diagnosed elsewhere, like an invalid conformance, so this flag being set is not really actionable to the rest of the compiler. Without \IndexSource{source location}source location information, this error cannot be diagnosed in a friendly manner.
 \item \texttt{HasConcreteConformances}: the generic signature had non-redundant concrete conformance requirements, which is an internal flag used to prevent the requirement machine from being installed. It does not indicate an error condition to the caller. See \SecRef{concrete contraction} for discussion.
-\item \texttt{CompletionFailed}: the \index{completion}completion procedure could not construct a \index{convergent rewriting system}convergent rewriting system within the maximum number of steps (see the discussion of termination that immediately follows \AlgRef{knuthbendix}). This is actually fatal, so the \texttt{buildGenericSignature()} wrapper function aborts the compiler in this case.
+\item \texttt{CompletionFailed}: the \index{completion}completion procedure could not construct a \index{complete presentation}\index{finite complete presentation}finite complete rewriting system within the maximum number of steps (see the discussion of termination that immediately follows \AlgRef{knuthbendix}). This is actually fatal, so the \texttt{buildGenericSignature()} wrapper function aborts the compiler in this case.
 \end{itemize}
 
 \IndexSource{requirement signature constructor}
@@ -1507,7 +1511,7 @@ The \texttt{ProtocolDecl::getStructuralRequirements()} method evaluates this req
 
 \IndexSource{type alias requirements request}
 \apiref{TypeAliasRequirementsRequest}{class}
-The \texttt{ProtocolDecl::getTypeAliasRequirements()} method evaluates this request to collect the type alias declarations in a protocol and converts them into requirements from which the protocol's requirement signature is formed.
+The \texttt{ProtocolDecl::getTypeAliasRequirements()} method evaluates this request to collect same-type requirements implied by a type aliases in protocol extensions that have the same name as an associated type of an inherited protocol. This implements a source compatibility behavior, because normally, protocol extension type alises do not participate in rewriting, unlike type aliases declared in the protocol itself (\ExRef{ex:gsb legacy type alias}).
 
 \subsection*{Requirement Resolution}
 
@@ -1563,7 +1567,7 @@ Key source files:
 \begin{itemize}
 \item \SourceFile{lib/AST/GenericSignature.cpp}
 \end{itemize}
-Just as \SecRef{minimal requirements} only describes the invariants around minimization, here we only call out the code related to checking those invariants. For the actual implementation of minimization, see \SecRef{rqm minimization source ref}.
+Just as \SecRef{minimal requirements} only describes the invariants around minimization, here we only call out the code related to checking those invariants. For the actual implementation of minimization, see \SecRef{src:minimization}.
 
 \IndexSource{requirement order}
 \apiref{Requirement}{class}
@@ -1575,7 +1579,7 @@ See also \SecRef{src:generic signatures}.
 \item 0 if the two requirements are equal,
 \item 1 if this requirement follows the right hand side.
 \end{itemize}
-This method will assert if the two requirements are incomparable; an example is when two superclass requirements have the same subject type. Incomparable requirements should not appear in a generic signature. 
+This method will assert if the two requirements are incomparable; an example is when two superclass requirements have the same subject type. Incomparable requirements should not appear in a generic signature.
 \end{itemize}
 
 \IndexSource{minimal requirement}

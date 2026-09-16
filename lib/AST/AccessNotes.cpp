@@ -21,7 +21,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h" // DeclContext::isModuleScopeContext()
-#include "swift/Basic/Assertions.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"

@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Unicode.h"
@@ -23,7 +24,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTWalker.h"
@@ -33,7 +33,6 @@
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -1367,8 +1366,8 @@ CaptureListEntry::CaptureListEntry(PatternBindingDecl *PBD) : PBD(PBD) {
 
 CaptureListEntry CaptureListEntry::createParsed(
     ASTContext &Ctx, ReferenceOwnership ownershipKind,
-    SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
-    SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
+    SourceRange ownershipRange, bool isSending, Identifier name,
+    SourceLoc nameLoc, SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
 
   bool forceVar = ownershipKind == ReferenceOwnership::Weak &&
                   !Ctx.LangOpts.hasFeature(Feature::ImmutableWeakCaptures);
@@ -1389,6 +1388,9 @@ CaptureListEntry CaptureListEntry::createParsed(
 
   if (CLE.isSimpleSelfCapture())
     VD->setIsSelfParamCapture();
+
+  if (isSending)
+    VD->setIsSendingCapture();
 
   return CLE;
 }
@@ -1626,6 +1628,10 @@ static ValueDecl *getCalledValue(Expr *E, bool skipFunctionConversions) {
   }
 
   Expr *E2 = E->getValueProvidingExpr();
+
+  if (auto *L = dyn_cast<LoadExpr>(E2))
+    E2 = L->getSubExpr()->getValueProvidingExpr();
+
   if (E != E2)
     return getCalledValue(E2, skipFunctionConversions);
 
@@ -2073,52 +2079,38 @@ std::optional<Type> AbstractClosureExpr::getEffectiveThrownType() const {
   return std::nullopt;
 }
 
-bool AbstractClosureExpr::isBodyThrowing() const {
-  if (!getType() || getType()->hasError()) {
+static FunctionType::ExtInfo
+getOrComputeExtInfo(const AbstractClosureExpr *closure) {
+  auto closureType = closure->getType();
+  if (!closureType || closureType->hasError()) {
     // Scan the closure body to infer effects.
-    if (auto closure = dyn_cast<ClosureExpr>(this)) {
+    if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
       return evaluateOrDefault(
-          getASTContext().evaluator,
-          ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
-          FunctionType::ExtInfo()).isThrowing();
+          closure->getASTContext().evaluator,
+          ClosureEffectsRequest{const_cast<ClosureExpr *>(explicitClosure)},
+          FunctionType::ExtInfo());
     }
 
-    return false;
+    return {};
   }
-  
-  return getType()->castTo<FunctionType>()->getExtInfo().isThrowing();
+
+  return closureType->castTo<FunctionType>()->getExtInfo();
+}
+
+bool AbstractClosureExpr::isBodyThrowing() const {
+  return getOrComputeExtInfo(this).isThrowing();
 }
 
 bool AbstractClosureExpr::isSendable() const {
-  if (!getType() || getType()->hasError()) {
-    // Scan the closure body to infer effects.
-    if (auto closure = dyn_cast<ClosureExpr>(this)) {
-      return evaluateOrDefault(
-          getASTContext().evaluator,
-          ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
-          FunctionType::ExtInfo()).isSendable();
-    }
-
-    return false;
-  }
-
-  return getType()->castTo<FunctionType>()->getExtInfo().isSendable();
+  return getOrComputeExtInfo(this).isSendable();
 }
 
 bool AbstractClosureExpr::isBodyAsync() const {
-  if (!getType() || getType()->hasError()) {
-    // Scan the closure body to infer effects.
-    if (auto closure = dyn_cast<ClosureExpr>(this)) {
-      return evaluateOrDefault(
-          getASTContext().evaluator,
-          ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
-          FunctionType::ExtInfo()).isAsync();
-    }
+  return getOrComputeExtInfo(this).isAsync();
+}
 
-    return false;
-  }
-
-  return getType()->castTo<FunctionType>()->getExtInfo().isAsync();
+bool AbstractClosureExpr::isCalledOnce() const {
+  return getOrComputeExtInfo(this).isCalledOnce();
 }
 
 bool AbstractClosureExpr::hasSingleExpressionBody() const {
@@ -2126,6 +2118,11 @@ bool AbstractClosureExpr::hasSingleExpressionBody() const {
     return closure->hasSingleExpressionBody();
 
   return true;
+}
+
+std::optional<StringRef> AbstractClosureExpr::getSection() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SectionForDeclRequest{this}, std::nullopt);
 }
 
 Expr *AbstractClosureExpr::getSingleExpressionBody() const {
@@ -2991,11 +2988,25 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "expression";
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           const AbstractClosureExpr *CE) {
+  if (!CE) {
+    out << "(null)";
+    return;
+  }
+
+  out << "closure";
+}
+
 SourceLoc swift::extractNearestSourceLoc(const ClosureExpr *expr) {
   return expr->getLoc();
 }
 
 SourceLoc swift::extractNearestSourceLoc(const Expr *expr) {
+  return expr->getLoc();
+}
+
+SourceLoc swift::extractNearestSourceLoc(const AbstractClosureExpr *expr) {
   return expr->getLoc();
 }
 
@@ -3067,6 +3078,10 @@ const Expr *Expr::findOriginalValue() const {
 Type Expr::findOriginalType() const {
   auto *expr = findOriginalValue();
   return expr->getType()->getRValueType();
+}
+
+bool Expr::isFromSyntheticMacroExpansion(const DeclContext *DC) const {
+  return ::isFromSyntheticMacroExpansion(DC->getParentModule(), getStartLoc());
 }
 
 ThrownErrorDestination
