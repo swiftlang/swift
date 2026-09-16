@@ -29,6 +29,7 @@
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -3330,12 +3331,20 @@ public:
     return Action::Continue;
   }
 
-  // We diagnose unserializable Clang function types in the
-  // post-visitor so that we diagnose any unexportable component
-  // types first.
   Action walkToTypePost(Type T) override {
-    if (Where.mustOnlyReferenceExportedDecls()) {
-      if (auto fnType = T->getAs<AnyFunctionType>()) {
+    if (auto fnType = T->getAs<AnyFunctionType>()) {
+      // A typed throws clause requires the thrown error type to conform to
+      // 'Error', so that conformance must be available too.
+      if (auto thrownError = fnType->getThrownError()) {
+        auto &ctx = Where.getDeclContext()->getASTContext();
+        (void)diagnoseConformanceAvailability(Loc, thrownError,
+                                              ctx.getErrorDecl(), Where);
+      }
+
+      // We diagnose unserializable Clang function types here in the
+      // post-visitor so that we diagnose any unexportable component
+      // types first.
+      if (Where.mustOnlyReferenceExportedDecls()) {
         if (auto clangType = fnType->getClangTypeInfo().getType()) {
           auto *DC = Where.getDeclContext();
           auto &ctx = DC->getASTContext();
@@ -3357,15 +3366,16 @@ public:
 
 }
 
-void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
+bool swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
                                      const ExportContext &where,
                                      DeclAvailabilityFlags flags) {
   if (diagnoseTypeReprAvailability(TR, where, flags))
-    return;
+    return true;
 
   if (!T)
-    return;
+    return false;
   T.walk(ProblematicTypeFinder(loc, where, flags));
+  return false;
 }
 
 static void diagnoseMissingConformance(
@@ -3513,6 +3523,34 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     return true;
 
   return false;
+}
+
+bool swift::diagnoseConformanceAvailability(SourceLoc loc, Type type,
+                                            ProtocolDecl *proto,
+                                            const ExportContext &where) {
+  if (!type || type->hasError() || !proto)
+    return false;
+
+  auto *DC = where.getDeclContext();
+
+  // Resolving the conformance requires a contextual type. Conditional
+  // conformances, in particular, can only be established once the requirements
+  // of the enclosing generic signature are known.
+  if (type->hasTypeParameter()) {
+    // Without a generic environment the conformance is unknowable here. It is
+    // checked at the point where the generic parameters are substituted.
+    auto *env = DC->getGenericEnvironmentOfContext();
+    if (!env)
+      return false;
+
+    type = env->mapTypeIntoEnvironment(type);
+  }
+
+  auto conformance = checkConformance(type, proto, /*allowMissing=*/false);
+  if (conformance.isInvalid())
+    return false;
+
+  return diagnoseConformanceAvailability(loc, conformance, where);
 }
 
 bool diagnoseSubstitutionMapAvailability(
