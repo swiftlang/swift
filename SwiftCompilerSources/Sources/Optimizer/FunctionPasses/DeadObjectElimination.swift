@@ -240,7 +240,6 @@ private struct UseCollector : AddressDefUseWalker {
           addMutatingAccess(access, at: destroy, path: subPath, &ssaUpdater, context)
         }
       case .store(let store):
-        context.salvageDebugInfo(of: store)
         addMutatingAccess(access, at: store, path: subPath, &ssaUpdater, context)
       case .load(let load, let operand):
         loads.append((subPath: subPath, load: load, operand: operand))

@@ -84,6 +84,9 @@ SIMPLE_LOCATOR_PATH_ELT(ExistentialConstraintType)
 /// The argument type of a function.
 SIMPLE_LOCATOR_PATH_ELT(FunctionArgument)
 
+/// The yielded type of a function.
+SIMPLE_LOCATOR_PATH_ELT(FunctionYield)
+
 /// The result type of a function.
 SIMPLE_LOCATOR_PATH_ELT(FunctionResult)
 

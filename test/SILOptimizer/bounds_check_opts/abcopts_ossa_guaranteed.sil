@@ -1646,7 +1646,7 @@ sil @escape : $@convention(thin) (@inout Array<Int>) -> ()
 // CHECK: [[CHECK:%[0-9]+]] = function_ref @checkSubscript
 // The subscript check must not be hoisted into the preheader.
 // CHECK-NOT: apply [[CHECK]]
-// Loop header.
+// CHECK: // Loop header
 // CHECK: bb3({{.*}}):
 // The check stays in the loop, applied to the array reloaded there.
 // CHECK: [[ARR:%[0-9]+]] = load_borrow %{{[0-9]+}} : $*Array<Int>
@@ -1724,13 +1724,17 @@ bb6(%68 : $Int):
   return %68 : $Int
 }
 
-// 2-D variant of the reproducer above (see 2dbug.swift): the array being
-// bounds-checked is itself an *element* of an outer array, and the whole
-// inner array is reassigned inside the loop via a store to the element
-// address (`matrix[0] = small`).  The destination of that store is an array
-// element address, so `isAddressOfArrayElement(dest)` is true and
-// `mayChangeArraySize` returns kNone -- symmetric to the alloc_stack kNone
-// case above.  Replacing `matrix[0]` with a smaller array changes the size of
+// 2-D variant of the reproducer above:
+//   for _ in 0..<n {
+//       s &+= matrix[0][idx]        // check_subscript on inner array matrix[0]
+//       matrix[0] = small           // whole-array store to element 0 of outer
+//   }
+// The array being bounds-checked is itself an element of an outer array,
+// and the whole inner array is reassigned inside the loop via a store to the element address. 
+// The destination of that store is an array element address, so 
+// `isAddressOfArrayElement(dest)` is true and `mayChangeArraySize` returns kNone 
+// which is symmetric to the alloc_stack kNone case above.
+// Replacing the inner array with a smaller array changes the size of
 // the array whose check_subscript we would otherwise hoist, so the check must
 // stay in the loop.
 
@@ -1746,7 +1750,7 @@ sil @escapeOuter : $@convention(thin) (@inout Array<Array<Int>>) -> ()
 // CHECK: [[CHECK:%[0-9]+]] = function_ref @checkSubscript
 // The subscript check must not be hoisted into the preheader.
 // CHECK-NOT: apply [[CHECK]]
-// Loop header.
+// CHECK: // Loop header
 // CHECK: bb3({{.*}}):
 // The check stays in the loop, applied to the inner array reloaded there.
 // CHECK: [[ARR:%[0-9]+]] = load_borrow %{{[0-9]+}} : $*Array<Int>

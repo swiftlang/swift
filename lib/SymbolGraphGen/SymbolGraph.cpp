@@ -10,13 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/SymbolGraphGen/DocumentationCategory.h"
@@ -851,7 +852,10 @@ bool SymbolGraph::isImplicitlyPrivate(
 /// FIXME: [availability] This should use Decl::getUnavailableAttr() or similar.
 bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) const {
   for (auto Attr : D->getSemanticAvailableAttrs()) {
-    if (!Attr.isPlatformSpecific() && Attr.isUnconditionallyUnavailable())
+    // Unconditional unavailability in a single domain, such as a custom
+    // domain or Embedded Swift, says nothing about the other domains, so only
+    // the universal domain hides the declaration from the graph.
+    if (Attr.getDomain().isUniversal() && Attr.isUnconditionallyUnavailable())
       return true;
   }
 

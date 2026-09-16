@@ -2972,6 +2972,16 @@ SILCloner<ImplClass>::visitObjCMethodInst(ObjCMethodInst *Inst) {
                 Inst->getMember(), getOpType(Inst->getType())));
 }
 
+template <typename T>
+void SILCloner<T>::visitCOMMethodInst(COMMethodInst *Inst) {
+  auto &B = getBuilder();
+  B.setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto clone = B.createCOMMethod(getOpLocation(Inst->getLoc()),
+                                 getOpValue(Inst->getOperand()),
+                                 Inst->getMember(), getOpType(Inst->getType()));
+  recordClonedInstruction(Inst, clone);
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitObjCSuperMethodInst(ObjCSuperMethodInst *Inst) {
@@ -3077,6 +3087,20 @@ visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
                 getBuilder().hasOwnership()
                     ? Inst->getForwardingOwnershipKind()
                     : ValueOwnershipKind(OwnershipKind::None)));
+}
+
+template <typename T>
+void SILCloner<T>::visitOpenCOMExistentialInst(OpenCOMExistentialInst *Inst) {
+  remapRootOpenedType(Inst->getDefinedOpenedArchetype());
+
+  auto &B = getBuilder();
+  B.setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto ownership = B.hasOwnership() ? Inst->getForwardingOwnershipKind()
+                                    : ValueOwnershipKind(OwnershipKind::None);
+  auto clone = B.createOpenCOMExistential(
+      getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+      getOpType(Inst->getType()), ownership);
+  recordClonedInstruction(Inst, clone);
 }
 
 template<typename ImplClass>

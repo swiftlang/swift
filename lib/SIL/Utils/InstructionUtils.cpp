@@ -16,16 +16,12 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/NullablePtr.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/CommandLine.h"
@@ -520,6 +516,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::StringLiteralInst:
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::COMMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst:
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::AddressToPointerInst:
@@ -770,6 +767,11 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::OpenExistentialRefInst: {
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
+  }
+
+  case SILInstructionKind::OpenCOMExistentialInst: {
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::Existential;
   }
 
   case SILInstructionKind::UnconditionalCheckedCastInst:

@@ -14,7 +14,6 @@ import AST
 import SIL
 
 /// Diagnoses violations of Embedded Swift language restrictions.
-///
 let embeddedSwiftDiagnostics = ModulePass(name: "embedded-swift-diagnostics") {
   (moduleContext: ModulePassContext) in
 
@@ -301,7 +300,11 @@ private struct FunctionChecker {
     if !apply.callee.type.hasValidSignatureForEmbedded,
        // Some runtime functions have generic parameters in SIL, which are not used in IRGen.
        // Therefore exclude runtime functions at all.
-       !apply.callsEmbeddedRuntimeFunction
+       !apply.callsEmbeddedRuntimeFunction,
+       // Some requirements in Distributed module have an "ad-hoc" SerializationRequirement
+       // generic requirement; Due to limitations put on distributed actor system in embedded
+       // this will always be a concrete type, so we don't need to diagnose it as otherwise unsupported.
+       !apply.parentFunction.isDistributedAdHocSerializationRequirementWitness
     {
       switch apply.callee {
       case let cmi as ClassMethodInst:

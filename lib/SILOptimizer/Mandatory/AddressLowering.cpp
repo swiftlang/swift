@@ -162,10 +162,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-#include <complex>
 
 using namespace swift;
 using llvm::SmallSetVector;
@@ -937,11 +935,12 @@ void OpaqueValueVisitor::canonicalizeReturnValues() {
       continue;
 
     assert(oldResult->getType().is<TupleType>());
-    if (oldResult->hasOneUse()) {
-      assert(isPseudoReturnValue(oldResult));
+    if (isPseudoReturnValue(oldResult)) {
       continue;
     }
-    // There is another nonconsuming use of the returned tuple.
+    // The returned tuple is not already the canonical pseudo-return value.
+    // Destructure it and rebuild a pseudo-return tuple of the individual
+    // results.
     SILBuilderWithScope returnBuilder(returnInst);
     auto loc = pass.genLoc();
     auto *destructure = returnBuilder.createDestructureTuple(loc, oldResult);
@@ -4254,7 +4253,6 @@ emitEndBorrowsAtEnclosingGuaranteedBoundary(SILValue lifetimeToEnd,
 
 // Extract from an opaque struct or tuple.
 void UseRewriter::emitExtract(SingleValueInstruction *extractInst) {
-  auto source = extractInst->getOperand(0);
   AddressMaterialization addrMat(pass, extractInst, builder);
   SILValue extractAddr = addrMat.materializeDefProjection(extractInst);
 
@@ -4286,7 +4284,8 @@ void UseRewriter::emitExtract(SingleValueInstruction *extractInst) {
   SILValue loadElement =
       builder.emitLoadBorrowOperation(extractInst->getLoc(), extractAddr);
   replaceUsesWithLoad(extractInst, loadElement);
-  emitEndBorrowsAtEnclosingGuaranteedBoundary(loadElement, source, pass);
+  // End the borrow at the load_borrow's liveness boundary.
+  emitEndBorrows(loadElement, pass);
 }
 
 void UseRewriter::visitStructExtractInst(StructExtractInst *extractInst) {

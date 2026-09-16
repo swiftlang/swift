@@ -43,7 +43,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 using namespace Lowering;
@@ -3596,6 +3595,23 @@ namespace {
         FormalRValueType(formalRValueType), AccessKind(accessKind) {}
 
     void emitUsingStrategy(AccessStrategy strategy) {
+      // Foreign COM interfaces provide getters and setters, not Swift
+      // coroutine accessors. Materialize read-write accesses through them.
+      if (AccessKind == SGFAccessKind::ReadWrite &&
+          strategy.getKind() == AccessStrategy::DispatchToAccessor) {
+        auto *protocol = dyn_cast<ProtocolDecl>(Storage->getDeclContext());
+        if (protocol && protocol->isCOMInterface()) {
+          Type selfType = protocol->getSelfInterfaceType().subst(Subs);
+          if (selfType->is<ExistentialArchetypeType>()) {
+            strategy = AccessStrategy::getMaterializeToTemporary(
+                AccessStrategy::getAccessor(AccessorKind::Get,
+                                            /*dispatched=*/true),
+                AccessStrategy::getAccessor(AccessorKind::Set,
+                                            /*dispatched=*/true));
+          }
+        }
+      }
+
       switch (strategy.getKind()) {
       case AccessStrategy::Storage: {
         auto typeData =

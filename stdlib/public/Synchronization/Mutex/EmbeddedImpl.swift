@@ -53,7 +53,7 @@ public struct _MutexHandle: ~Copyable {
   let storage: _Cell<_SwiftEmbeddedMutex>
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public init() {
     storage = _Cell(.init(repeating: 0))
@@ -65,21 +65,21 @@ public struct _MutexHandle: ~Copyable {
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _lock() {
     unsafe _swift_mutex_lock(UnsafeMutableRawPointer(storage._address))
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _tryLock() -> Bool {
     unsafe _swift_mutex_tryLock(UnsafeMutableRawPointer(storage._address)) != 0
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _unlock() {
     unsafe _swift_mutex_unlock(UnsafeMutableRawPointer(storage._address))

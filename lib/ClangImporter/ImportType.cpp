@@ -39,7 +39,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
@@ -305,7 +304,7 @@ namespace {
                                                     const Type &pointeeType) {
     auto funcTy = pointeeType->castTo<FunctionType>();
     return {FunctionType::get(
-                funcTy->getParams(), funcTy->getResult(),
+                funcTy->getParams(), funcTy->getYields(), funcTy->getResult(),
                 funcTy->getExtInfo()
                     .intoBuilder()
                     .withRepresentation(
@@ -631,8 +630,8 @@ namespace {
               .withRepresentation(FunctionType::Representation::Block)
               .withClangFunctionType(type)
               .build();
-      auto funcTy =
-          FunctionType::get(fTy->getParams(), fTy->getResult(), extInfo);
+      auto funcTy = FunctionType::get(fTy->getParams(), fTy->getYields(),
+                                      fTy->getResult(), extInfo);
       return { funcTy, ImportHint::Block };
     }
 
@@ -824,7 +823,7 @@ namespace {
       }
 
       // Form the function type.
-      return FunctionType::get(params, resultTy, extInfo);
+      return FunctionType::get(params, /* yields */ {}, resultTy, extInfo);
     }
 
     ImportResult
@@ -838,7 +837,7 @@ namespace {
 
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      return FunctionType::get({}, resultTy, info);
+      return FunctionType::get({}, /* yields */ {}, resultTy, info);
     }
 
     ImportResult VisitParenType(const clang::ParenType *type) {
@@ -2479,14 +2478,38 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
   returnType = desugarIfBoundsAttributed(returnType);
 
+  // An explicit nullability specifier on a dependent return type, such as
+  // `T _Nullable` or `T *_Nullable`, decides the optionality of the generic
+  // result. Strip it so the template type parameter can be matched below.
+  OptionalTypeKind optionalityOfDependentReturn = OTK_None;
+  if (auto attributedTy = dyn_cast<clang::AttributedType>(returnType)) {
+    if (auto nullability = attributedTy->getImmediateNullability();
+        nullability && attributedTy->getModifiedType()->isDependentType()) {
+      optionalityOfDependentReturn = translateNullability(*nullability);
+      clang::AttributedType::stripOuterNullability(returnType);
+    }
+  }
+  auto wrapDependentReturn = [&](Type type) -> ImportedType {
+    if (!type)
+      return {type, false};
+    switch (optionalityOfDependentReturn) {
+    case OTK_None:
+      return {type, false};
+    case OTK_Optional:
+      return {OptionalType::get(type), false};
+    case OTK_ImplicitlyUnwrappedOptional:
+      return {OptionalType::get(type), true};
+    }
+    llvm_unreachable("invalid optionality");
+  };
+
   ImportedType importedType = importer::findOptionSetEnum(returnType, *this);
 
   if (auto templateType =
           dyn_cast<clang::TemplateTypeParmType>(returnType)) {
-    importedType = {findGenericTypeInGenericDecls(
-                        *this, templateType, genericParams,
-                        getImportTypeAttrs(clangDecl), addDiag),
-                    false};
+    importedType = wrapDependentReturn(findGenericTypeInGenericDecls(
+        *this, templateType, genericParams, getImportTypeAttrs(clangDecl),
+        addDiag));
   } else if ((isa<clang::PointerType>(returnType) ||
           isa<clang::ReferenceType>(returnType)) &&
          isa<clang::TemplateTypeParmType>(returnType->getPointeeType())) {
@@ -2501,7 +2524,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
     auto genericPointerType = genericType->wrapInPointer(pointerKind);
     if (!genericPointerType)
       addDiag(Diagnostic(diag::bridged_pointer_type_not_found, pointerKind));
-    importedType = {genericPointerType, false};
+    importedType = wrapDependentReturn(genericPointerType);
   } else if (!(isa<clang::RecordType>(returnType) ||
                isa<clang::TemplateSpecializationType>(returnType)) ||
              // TODO: we currently don't lazily load operator return types, but
@@ -2572,8 +2595,18 @@ ClangImporter::Implementation::importParameterType(
   // If this type has a _Nullable/_Nonnull attribute, drop it, since we already
   // have that information in optionalityOfParam.
   if (auto attributedTy = dyn_cast<clang::AttributedType>(paramTy)) {
-    if (attributedTy->getImmediateNullability())
+    if (attributedTy->getImmediateNullability()) {
       clang::AttributedType::stripOuterNullability(paramTy);
+      // In a function template specialization, the substituted template
+      // argument can carry its own specifier underneath, e.g. `T _Nullable`
+      // instantiated with `FRT *_Nonnull`. The outer specifier wins, so drop
+      // the inner one as well.
+      while (auto substTy =
+                 dyn_cast<clang::SubstTemplateTypeParmType>(paramTy)) {
+        paramTy = substTy->desugar();
+        clang::AttributedType::stripOuterNullability(paramTy);
+      }
+    }
   }
 
   ImportTypeKind importKind = paramIsCompletionHandler
@@ -2642,6 +2675,21 @@ ClangImporter::Implementation::importParameterType(
                  dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
     swiftParamTy = findGenericTypeInGenericDecls(
         *this, templateParamType, genericParams, attrs, addImportDiagnosticFn);
+    // A template type parameter is only optional when it carries an explicit
+    // nullability specifier (`T _Nullable x`).
+    if (param->getType()->getNullability()) {
+      switch (optionalityOfParam) {
+      case OTK_Optional:
+        swiftParamTy = OptionalType::get(swiftParamTy);
+        break;
+      case OTK_ImplicitlyUnwrappedOptional:
+        swiftParamTy = OptionalType::get(swiftParamTy);
+        isParamTypeImplicitlyUnwrapped = true;
+        break;
+      case OTK_None:
+        break;
+      }
+    }
   }
 
   Bridgeability bridging = Bridgeability::Full;

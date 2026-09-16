@@ -21,7 +21,6 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/FileSystem.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -29,7 +28,6 @@
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
@@ -40,22 +38,18 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/Basic/PathRemapper.h"
-#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/Serialization.h"
 #include "swift/Serialization/SerializationOptions.h"
@@ -69,15 +63,9 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Bitcode/BitcodeConvenience.h"
 #include "llvm/Bitstream/BitstreamWriter.h"
-#include "llvm/Config/config.h"
-#include "llvm/Support/Allocator.h"
 #include "llvm/Support/Chrono.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
-#include "llvm/Support/Error.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -4060,6 +4048,19 @@ private:
         S.DeclTypeAbbrCodes[DifferentiationParamIndicesLayout::Code];
     DifferentiationParamIndicesLayout::emitRecord(S.Out, S.ScratchRecord,
                                                   abbrCode, paramIndicesVector);
+    }
+    
+  void WriteYieldList(const SmallVector<AnyFunctionType::Yield, 1> &yields) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionYieldLayout::Code];
+    for (auto &yield : yields) {
+      auto paramFlags = yield.getFlags();
+      auto rawOwnership =
+          getRawStableParamDeclSpecifier(paramFlags.getOwnershipSpecifier());
+      FunctionYieldLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                      S.addTypeRef(yield.getType()),
+                                      rawOwnership);
+    }
   }
 
   /// Writes an array of members for a decl context.
@@ -5097,6 +5098,14 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
+    // Write the body yields
+    {
+      SmallVector<AnyFunctionType::Yield, 1> yields;
+      fn->getYieldInterfaceTypes(yields);
+      assert(yields.empty() == !fn->isCoroutine());
+      WriteYieldList(yields);
+    }
+
     writeLifetimeDependenciesIfNeeded(fn);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
@@ -5234,6 +5243,7 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
+    // We do not write yields, these are inferred from the storage
     writeLifetimeDependenciesIfNeeded(fn);
 
     if (auto errorConvention = fn->getForeignErrorConvention())
@@ -6169,6 +6179,19 @@ public:
     }
   }
 
+  void serializeFunctionTypeYields(const AnyFunctionType *fnTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionYieldLayout::Code];
+    for (auto &yield : fnTy->getYields()) {
+      auto paramFlags = yield.getFlags();
+      auto rawOwnership =
+          getRawStableParamDeclSpecifier(paramFlags.getOwnershipSpecifier());
+      FunctionYieldLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          S.addTypeRef(yield.getType()), rawOwnership);
+    }
+  }
+
   TypeID encodeIsolation(swift::FunctionTypeIsolation isolation) {
     switch (isolation.getKind()) {
     case swift::FunctionTypeIsolation::Kind::NonIsolated:
@@ -6224,9 +6247,11 @@ public:
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation,
         fnTy->hasSendingResult(),
-        fnTy->isCalledOnce());
+        fnTy->isCalledOnce(),
+        fnTy->isCoroutine());
 
     serializeFunctionTypeParams(fnTy);
+    serializeFunctionTypeYields(fnTy);
 
     auto lifetimeDependencies = fnTy->getLifetimeDependencies();
     if (!lifetimeDependencies.empty()) {
@@ -6247,9 +6272,11 @@ public:
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation, fnTy->hasSendingResult(), fnTy->isCalledOnce(),
+        fnTy->isCoroutine(),                                          
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
+    serializeFunctionTypeYields(fnTy);
 
     auto lifetimeDependencies = fnTy->getLifetimeDependencies();
     if (!lifetimeDependencies.empty()) {
@@ -6656,6 +6683,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TupleTypeEltLayout>();
   registerDeclTypeAbbr<FunctionTypeLayout>();
   registerDeclTypeAbbr<FunctionParamLayout>();
+  registerDeclTypeAbbr<FunctionYieldLayout>();
   registerDeclTypeAbbr<MetatypeTypeLayout>();
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
   registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();

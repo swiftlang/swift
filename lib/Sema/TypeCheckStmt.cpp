@@ -38,7 +38,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TopCollection.h"
@@ -47,9 +46,6 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -1431,8 +1427,14 @@ public:
 
     SmallVector<AnyFunctionType::Yield, 4> buffer;
     auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
-    auto yieldResults = TheFunc->getBodyYieldResults(buffer);
+    // Checking yields requires proper interface type. If decl is invalid, then
+    // we already emitted diagnostics elsewhere.
+    if (auto *AFD = TheFunc->getAbstractFunctionDecl()) {
+      if (AFD->isInvalid())
+        return YS;
+    }
 
+    auto yieldResults = TheFunc->getBodyYieldResults(buffer);
     auto yieldExprs = YS->getMutableYields();
     if (yieldExprs.size() != yieldResults.size()) {
       getASTContext().Diags.diagnose(YS->getYieldLoc(), diag::bad_yield_count,
@@ -3810,11 +3812,17 @@ public:
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
     if (!ctx.LangOpts.DisableAvailabilityChecking) {
-      if (auto restriction = seqConformanceRef.getAvailabilityRestriction(
-              dc, stmt->getForLoc())) {
-        emitDiagnosticsForUnavailableConformance(seqType, restriction.value());
+      auto availability =
+          AvailabilityContext::forLocation(stmt->getForLoc(), dc);
+      bool diagnosed =
+          availability.enumerateUnsatisfiedRestrictionsForConformance(
+              seqConformanceRef,
+              [&](const Decl *decl, AvailabilityRestriction restriction) {
+                emitDiagnosticsForUnavailableConformance(seqType, restriction);
+                return true;
+              });
+      if (diagnosed)
         return nullptr;
-      }
     }
 
     buildMakeIteratorVar();
@@ -3839,20 +3847,15 @@ private:
     auto loc = stmt->getForLoc();
     auto protoDecl = seqConformanceRef.getProtocol();
 
-    auto domainAndRange = restriction.getDomainAndRange(ctx);
-    auto domain = domainAndRange.getDomain();
-    auto range = domainAndRange.getRange();
-    if (domain.isVersioned() && range.hasMinimumVersion()) {
-      ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
-                         seqType, protoDecl,
-                         domain.getNameForAttributePrinting(),
-                         range.getVersionString());
+    llvm::SmallString<64> scratch;
+    ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
+                       seqType, protoDecl,
+                       restriction.getDiagnosticDescription(scratch, ctx));
+
+    // A restriction that is unavailable cannot be satisfied with a runtime
+    // availability query, so only offer a fix-it for the other restrictions.
+    if (!restriction.isUnavailable())
       fixAvailability(loc, dc, restriction.getFixItDomainAndRange(ctx), ctx);
-    } else {
-      ctx.Diags.diagnose(
-          loc, diag::for_loop_sequence_conformance_unavailable_unconditionally,
-          seqType, protoDecl);
-    }
   }
 
   void buildMakeIteratorVar() {

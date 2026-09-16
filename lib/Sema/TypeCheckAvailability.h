@@ -22,8 +22,8 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/ArrayRef.h"
 #include <optional>
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
   class ApplyExpr;
@@ -46,7 +46,8 @@ enum class DeclAvailabilityFlag : uint8_t {
   /// We allow a type to conform to a protocol that is less available than the
   /// type itself. This enables a type to retroactively model or directly conform
   /// to a protocol only available on newer OSes and yet still be used on older
-  /// OSes.
+  /// OSes. This exception only applies to platform domains; potential
+  /// unavailability in other domains, like custom domains, is still diagnosed.
   AllowPotentiallyUnavailableProtocol = 1 << 0,
 
   /// Diagnose uses of declarations in versions before they were introduced, but

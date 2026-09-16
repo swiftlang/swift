@@ -154,3 +154,7 @@ module LibkernOwnership {
   header "libkern-ownership.hpp"
   requires cplusplus
 }
+
+module CDeclFRT {
+  header "cdecl.h"
+}

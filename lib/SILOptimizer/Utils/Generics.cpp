@@ -21,7 +21,6 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -33,7 +32,6 @@
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Serialization/SerializedSILLoader.h"
-#include "swift/Strings.h"
 
 using namespace swift;
 
@@ -2854,6 +2852,18 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     // Let go of borrows introduced for stack closures.
     if (pai->isOnStack() && pai->getFunction()->hasOwnership()) {
       pai->visitOnStackLifetimeEnds([&](Operand *op) -> bool {
+        // A `@called(once)` closure's context can be consumed directly by a
+        // `try_apply`, a terminator with no single "next instruction" to
+        // insert after -- the cleanup has to be duplicated at the start of
+        // every successor block instead.
+        if (auto *term = dyn_cast<TermInst>(op->getUser())) {
+          for (auto *successor : term->getSuccessorBlocks()) {
+            SILBuilderWithScope successorBuilder(successor->begin());
+            cleanupCallArguments(successorBuilder, loc, arguments,
+                                 argsNeedingEndBorrow);
+          }
+          return true;
+        }
         SILBuilderWithScope argBuilder(op->getUser()->getNextInstruction());
         cleanupCallArguments(argBuilder, loc, arguments, argsNeedingEndBorrow);
         return true;

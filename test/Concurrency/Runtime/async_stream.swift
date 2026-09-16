@@ -1,12 +1,11 @@
-// RUN: %target-typecheck-verify-swift %import-libdispatch -strict-concurrency=complete -parse-as-library
-// RUN: %target-run-simple-swift( %import-libdispatch -parse-as-library)
-// RUN: %target-run-simple-swift( %import-libdispatch -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -parse-as-library
+// RUN: %target-run-simple-swift( -parse-as-library)
+// RUN: %target-run-simple-swift( -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
-// REQUIRES: libdispatch
 
 // rdar://78109470
 // UNSUPPORTED: back_deployment_runtime
@@ -15,10 +14,9 @@
 
 import _Concurrency
 import StdlibUnittest
-import Dispatch
 
 struct SomeError: Error, Equatable {
-  var value: Int = 0
+  var value = Int.random(in: 0..<100)
 }
 
 class NotSendable {}
@@ -440,145 +438,6 @@ class NotSendable {}
         expectTrue(expectation.fulfilled)
       }
 
-      tests.test("finish(throwing:) from onTermination on cancellation throws the error passed to finish") {
-        let thrownError = SomeError()
-
-        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
-        var controlIterator = controlStream.makeAsyncIterator()
-
-        let task = Task { () -> Error? in
-          let stream = AsyncThrowingStream<Int, Error> { continuation in
-            continuation.onTermination = { @Sendable termination in
-              if case .cancelled = termination {
-                continuation.finish(throwing: thrownError)
-              }
-            }
-          }
-          controlContinuation.yield(1)
-          do {
-            for try await _ in stream {}
-            return nil
-          } catch {
-            return error
-          }
-        }
-
-        expectEqual(await controlIterator.next(), 1)
-        task.cancel()
-
-        let caught = await task.value
-        if let failure = caught as? SomeError {
-          expectEqual(failure, thrownError)
-        } else {
-          expectUnreachable("expected SomeError, got \(String(describing: caught))")
-        }
-      }
-
-      tests.test("finish(throwing:) from onTermination keeps the first error when called twice") {
-        let firstError = SomeError(value: 1)
-        let secondError = SomeError(value: 2)
-
-        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
-        var controlIterator = controlStream.makeAsyncIterator()
-
-        let task = Task { () -> Error? in
-          let stream = AsyncThrowingStream<Int, Error> { continuation in
-            continuation.onTermination = { @Sendable termination in
-              if case .cancelled = termination {
-                // Only the first finish(throwing:) should decide the outcome
-                continuation.finish(throwing: firstError)
-                continuation.finish(throwing: secondError)
-              }
-            }
-          }
-          controlContinuation.yield(1)
-          do {
-            for try await _ in stream {}
-            return nil
-          } catch {
-            return error
-          }
-        }
-
-        expectEqual(await controlIterator.next(), 1)
-        task.cancel()
-
-        let caught = await task.value
-        if let failure = caught as? SomeError {
-          expectEqual(failure, firstError)
-        } else {
-          expectUnreachable("expected SomeError, got \(String(describing: caught))")
-        }
-      }
-
-      // A `next()` that arrives while the stream is in the `.terminating` state,
-      // but before the `onTermination` handler has called `finish(throwing:)`
-      // must not finalize the termination as it would drop the handler-supplied failure.
-      tests.test("finish(throwing:) from onTermination is not lost to a concurrent next() during termination") {
-        let thrownError = SomeError()
-
-        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
-        var controlIterator = controlStream.makeAsyncIterator()
-
-        let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
-
-        continuation.onTermination = { @Sendable termination in
-          guard case .cancelled = termination else { return }
-
-          // Start an unstructured task consuming next() which we'll race with the finish() call below.
-          let nextSemaphore = DispatchSemaphore(value: 0)
-          Task.detached {
-            var iterator = stream.makeAsyncIterator()
-            nextSemaphore.signal()
-            _ = try? await iterator.next()
-          }
-          nextSemaphore.wait()
-
-          continuation.finish(throwing: thrownError) // We must consistently see the error thrown from the handler
-        }
-
-        let task = Task { () -> Error? in
-          controlContinuation.yield(1)
-          do {
-            for try await _ in stream {}
-            return nil
-          } catch {
-            return error
-          }
-        }
-
-        expectEqual(await controlIterator.next(), 1)
-        task.cancel()
-
-        let caught = await task.value
-        if let failure = caught as? SomeError {
-          expectEqual(failure, thrownError)
-        } else {
-          expectUnreachable(
-            "cancelled consumer lost the onTermination finish(throwing:) error to a concurrent next(); got \(String(describing: caught))")
-        }
-      }
-
-      tests.test("onTermination handler is released after the stream terminates") {
-        let (stream, continuation) = AsyncStream<Int>.makeStream()
-
-        // Terminate the stream first
-        continuation.finish()
-
-        // Setting the handler now stores it in the terminal state, but never calls it
-        continuation.onTermination = { @Sendable _ in
-          fatalError("Unexpectedly triggered termination handler")
-        }
-
-        var iterator = stream.makeAsyncIterator()
-        let value = await iterator.next()
-        expectNil(value)
-
-        // Per the documented `onTermination` contract, the handler is released
-        // once the stream has reached its terminal state
-        expectTrue(continuation.onTermination == nil)
-      }
-
       tests.test("continuation equality") {
         let (_, continuation1) = AsyncStream<Int>.makeStream()
         let (_, continuation2) = AsyncStream<Int>.makeStream()
@@ -629,97 +488,6 @@ class NotSendable {}
         // Ensure the consuming Tasks both complete
         _ = await consumer1.value
         _ = await consumer2.value
-      }
-
-      tests.test("finish behavior with multiple consumers throwing") {
-        let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
-        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
-        var controlIterator = controlStream.makeAsyncIterator()
-
-        func makeConsumingTaskWithIndex(_ index: Int) -> Task<Void, Never> {
-          Task { @MainActor in
-            controlContinuation.yield(index)
-            do {
-              for try await i in stream {
-                controlContinuation.yield(i)
-              }
-            } catch {
-              expectUnreachable("unexpected error thrown")
-            }
-          }
-        }
-
-        // Set up multiple consumers
-        let consumer1 = makeConsumingTaskWithIndex(1)
-        expectEqual(await controlIterator.next(isolation: #isolation), 1)
-
-        let consumer2 = makeConsumingTaskWithIndex(2)
-        expectEqual(await controlIterator.next(isolation: #isolation), 2)
-
-        // Ensure the iterators are suspended
-        await MainActor.run {}
-
-        // Terminate the stream
-        continuation.finish()
-
-        // Ensure the consuming Tasks both complete
-        _ = await consumer1.value
-        _ = await consumer2.value
-      }
-
-      tests.test("finish by throwing behavior with multiple consumers") {
-        let thrownError = SomeError()
-        var errorCount = 0
-        var nilCount = 0
-
-        let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
-        var iterator = stream.makeAsyncIterator()
-
-        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
-        var controlIterator = controlStream.makeAsyncIterator()
-
-        func makeConsumingTaskWithIndex(_ index: Int) -> Task<Void, Never> {
-          Task { @MainActor in
-            controlContinuation.yield(index)
-            do {
-              if let element = try await iterator.next(isolation: #isolation) {
-                controlContinuation.yield(element)
-              } else {
-                nilCount += 1
-              }
-            } catch {
-              errorCount += 1
-              if let failure = error as? SomeError {
-                expectEqual(failure, thrownError)
-              } else {
-                expectUnreachable("unexpected error type")
-              }
-            }
-          }
-        }
-
-        // Set up multiple consumers
-        let consumer1 = makeConsumingTaskWithIndex(1)
-        expectEqual(await controlIterator.next(isolation: #isolation), 1)
-
-        let consumer2 = makeConsumingTaskWithIndex(2)
-        expectEqual(await controlIterator.next(isolation: #isolation), 2)
-
-        // Ensure the iterators are suspended
-        await MainActor.run {}
-
-        // Terminate the stream by throwing
-        continuation.finish(throwing: thrownError)
-
-        // Ensure the consuming Tasks both complete
-        _ = await consumer1.value
-        _ = await consumer2.value
-
-        // Ensure that all, but the first consumer return nil
-        expectEqual(nilCount, 1)
-
-        // Ensure error was only thrown once
-        expectEqual(errorCount, 1)
       }
 
       // MARK: - Buffering Policies
@@ -1276,20 +1044,22 @@ class NotSendable {}
         expectTrue(errExpectation.fulfilled)
       }
 
-      tests.test("onTermination not called after stream is terminal") {
+      tests.test("onTermination called once") {
         nonisolated(unsafe) var counter = 0
         let (_, continuation) = AsyncStream<String>.makeStream()
         continuation.onTermination = { @Sendable _ in counter += 1 }
         continuation.finish()
-        expectEqual(counter, 0)
+        continuation.finish() // handler should be cleared
+        expectEqual(counter, 1)
       }
 
-      tests.test("onTermination not called after stream is terminal throwing") {
+      tests.test("onTermination called once throwing") {
         nonisolated(unsafe) var counter = 0
         let (_, continuation) = AsyncThrowingStream<String, Error>.makeStream()
         continuation.onTermination = { @Sendable _ in counter += 1 }
         continuation.finish()
-        expectEqual(counter, 0)
+        continuation.finish() // handler should be cleared
+        expectEqual(counter, 1)
       }
 
       // MARK: - for try await

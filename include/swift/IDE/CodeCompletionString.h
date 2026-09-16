@@ -15,12 +15,12 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/Error.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <optional>
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/Error.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 namespace ide {

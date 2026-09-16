@@ -34,7 +34,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessNotes.h"
-#include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -44,7 +43,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/KnownProtocols.h"
@@ -57,11 +55,9 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Bridging/MacroEvaluation.h"
 #include "swift/Parse/Lexer.h"
@@ -70,12 +66,9 @@
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/DJB.h"
 
 using namespace swift;
 
@@ -2284,9 +2277,9 @@ public:
     // We don't do this for members of classes because it happens as part of
     // visiting their ABI members.
     if (!isa<ClassDecl>(decl->getDeclContext())) {
-      decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-        this->visit(auxiliaryDecl);
-      }, /*visitFreestandingExpanded=*/false);
+      decl->visitAuxiliaryDecls(
+          [&](Decl *auxiliaryDecl) { this->visit(auxiliaryDecl); },
+          /*visitFreestandingExpanded=*/false, /*visitExtensions*/ true);
     }
 
     if (auto *Stats = Ctx.Stats)
@@ -3513,8 +3506,14 @@ public:
     if (CD->isActor())
       TypeChecker::checkConcurrencyAvailability(CD->getLoc(), CD);
 
-    for (Decl *Member : CD->getABIMembers())
+    for (Decl *Member : CD->getABIMembers()) {
+      // Since `visit(Decl *)` skips visiting auxiliary decls for classes, we
+      // need to manually handle extension macros here.
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(Member)) {
+        NTD->visitAuxiliaryExtensions([&](Decl *ext) { visit(ext); });
+      }
       visit(Member);
+    }
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -3747,6 +3746,7 @@ public:
       }
 
       TypeChecker::checkParameterList(FD->getParameters(), FD);
+      TypeChecker::checkYieldList(FD->getYields(), FD);
     }
 
     checkDeclCommon(FD);
@@ -4497,6 +4497,10 @@ void TypeChecker::checkParameterList(ParameterList *params,
     // Check for duplicate parameter names.
     diagnoseDuplicateDecls(*params);
   }
+}
+
+void TypeChecker::checkYieldList(YieldList *yields, AbstractFunctionDecl *AFD) {
+  // TODO: Reject yields on non-coroutines
 }
 
 std::optional<unsigned>

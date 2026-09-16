@@ -354,6 +354,19 @@ public:
 
   virtual bool isUnsafeCXXMethod(const FuncDecl *func) = 0;
 
+  /// Emit a note explaining why \p decl or \p type was imported as unsafe,
+  /// located at the responsible C++ declaration.
+  ///
+  /// Emits nothing when the entity did not come from C++, when the unsafety
+  /// was spelled out in the header, or when no reason can be attributed with
+  /// confidence: a missing explanation is preferable to a wrong one.
+  ///
+  /// \param decl The unsafe declaration, or null when only a type is known.
+  /// \param type The unsafe type, or null when only a declaration is known.
+  /// \param useLoc Fallback location, used if the C++ location is invalid.
+  virtual void diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
+                                         SourceLoc useLoc) = 0;
+
   virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
 
   /// Determine whether this is a functional C++ type, e.g. std::function, for

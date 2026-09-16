@@ -47,6 +47,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
@@ -1401,12 +1402,14 @@ public:
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
   void visitObjCMethodInst(ObjCMethodInst *i);
+  void visitCOMMethodInst(COMMethodInst *i);
   void visitObjCSuperMethodInst(ObjCSuperMethodInst *i);
   void visitWitnessMethodInst(WitnessMethodInst *i);
 
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *i);
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
+  void visitOpenCOMExistentialInst(OpenCOMExistentialInst *i);
   void visitOpenExistentialValueInst(OpenExistentialValueInst *i);
   void visitInitExistentialAddrInst(InitExistentialAddrInst *i);
   void visitInitExistentialValueInst(InitExistentialValueInst *i);
@@ -2458,9 +2461,24 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   unsigned nextArgTyIdx = 0;
 
-  // Handle the arguments of an ObjC method.
-  if (IGF.CurSILFn->getRepresentation() ==
-        SILFunctionTypeRepresentation::ObjCMethod) {
+  // COM puts self first in the foreign ABI, while SIL puts it last.
+  if (funcTy->getRepresentation() == SILFunctionTypeRepresentation::COMMethod) {
+    SILArgument *selfArg = args.back();
+    args = args.drop_back();
+    auto *selfValue = params.claimNext();
+    if (selfArg->getType().isAddress()) {
+      auto storage = IGF.createAlloca(
+          IGF.IGM.Int8PtrTy, IGF.IGM.getPointerAlignment(), "com.self");
+      IGF.Builder.CreateStore(selfValue, storage);
+      IGF.setLoweredAddress(selfArg, storage);
+    } else {
+      Explosion self;
+      self.add(selfValue);
+      IGF.setLoweredExplosion(selfArg, self);
+    }
+    nextArgTyIdx = 1;
+  } else if (IGF.CurSILFn->getRepresentation() ==
+             SILFunctionTypeRepresentation::ObjCMethod) {
     // Claim the self argument from the end of the formal arguments.
     SILArgument *selfArg = args.back();
     args = args.slice(0, args.size() - 1);
@@ -3948,6 +3966,13 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
     if (selfArg->getType().isObject()) {
       selfValue = getLoweredSingletonExplosion(selfArg);
+    } else if (origCalleeType->getRepresentation() ==
+               SILFunctionTypeRepresentation::COMMethod) {
+      // The foreign receiver is the interface pointer in the temporary,
+      // rather than the address used to pass self in SIL.
+      Address storage(getLoweredAddress(selfArg).getAddress(), IGM.Int8PtrTy,
+                      IGM.getPointerAlignment());
+      selfValue = Builder.CreateLoad(storage, "com.self");
     } else {
       selfValue = getLoweredAddress(selfArg).getAddress();
     }
@@ -8253,7 +8278,9 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
       auto &ti = getTypeInfo(operand->getType());
       auto ty = operand->getType();
       auto alignMask = ti.getAlignmentMask(*this, ty);
-      if (i != 0) {
+      // Round up to this operand's alignment. We can skip this for
+      // the first operand unless there are generic requirements.
+      if (i != 0 || !I->getSubstitutions().empty()) {
         auto notAlignMask = Builder.CreateNot(alignMask);
         argsBufSize = Builder.CreateAdd(argsBufSize, alignMask);
         argsBufSize = Builder.CreateAnd(argsBufSize, notAlignMask);
@@ -8448,6 +8475,15 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
   llvm::Value *instance
     = emitClassExistentialProjection(*this, base, baseTy, openedArchetype);
   result.add(instance);
+  setLoweredExplosion(i, result);
+}
+
+void IRGenSILFunction::visitOpenCOMExistentialInst(OpenCOMExistentialInst *i) {
+  Explosion base = getLoweredExplosion(i->getOperand());
+
+  Explosion result;
+  result.add(base.claimNext());
+  assert(base.empty() && "COM existential must contain exactly one pointer");
   setLoweredExplosion(i, result);
 }
 
@@ -8996,6 +9032,80 @@ void IRGenSILFunction::visitObjCMethodInst(swift::ObjCMethodInst *i) {
   // to happen when the method is called.
   assert(i->getMember().isForeign);
   setLoweredObjCMethod(i, i->getMember());
+}
+
+namespace {
+class COMMethodSlotVisitor final
+    : public SILWitnessVisitor<COMMethodSlotVisitor> {
+  SILDeclRef Target;
+  // `QueryInterface`, `AddRef`, `Release` are the common prefix for every COM
+  // interface vtable.
+  unsigned NextSlot = 3;
+  std::optional<unsigned> TargetSlot;
+  bool HasMissingRequirement = false;
+
+public:
+  explicit COMMethodSlotVisitor(SILDeclRef target) : Target(target) {}
+
+  void addProtocolConformanceDescriptor() {}
+  void addOutOfLineBaseProtocol(ProtocolDecl *) {}
+  void addAssociatedType(AssociatedTypeDecl *) {}
+  void addAssociatedConformance(AssociatedConformance) {}
+
+  void addMethod(SILDeclRef method) {
+    // Swift's synthesized coroutine accessors are not foreign entry points.
+    if (auto *accessor = dyn_cast<AccessorDecl>(method.getDecl())) {
+      if (!accessor->isGetterOrSetter())
+        return;
+    }
+    if (method == Target)
+      TargetSlot = NextSlot;
+    ++NextSlot;
+  }
+  void addPlaceholder(MissingMemberDecl *) { HasMissingRequirement = true; }
+
+  std::optional<unsigned> getTargetSlot() const {
+    return HasMissingRequirement ? std::nullopt : TargetSlot;
+  }
+};
+} // namespace
+
+void IRGenSILFunction::visitCOMMethodInst(swift::COMMethodInst *i) {
+  SILDeclRef member = i->getMember();
+  auto *protocol = cast<ProtocolDecl>(member.getDecl()->getDeclContext());
+  auto *hierarchy = protocol->getCOMInterfaceHierarchy();
+  assert(hierarchy && !hierarchy->isInvalid());
+
+  COMMethodSlotVisitor visitor(member);
+  for (auto *interface : hierarchy->getABIChain())
+    visitor.visitProtocolDecl(interface);
+
+  auto index = visitor.getTargetSlot();
+  if (!index)
+    IGM.fatal_unimplemented(
+        i->getLoc().getSourceLoc(),
+        "COM method without a complete foreign interface layout");
+
+  llvm::Value *interface;
+  if (i->getOperand()->getType().isAddress()) {
+    Address storage(getLoweredAddress(i->getOperand()).getAddress(),
+                    IGM.Int8PtrTy, IGM.getPointerAlignment());
+    interface = Builder.CreateLoad(storage, "com.interface");
+  } else {
+    interface = getLoweredSingletonExplosion(i->getOperand());
+  }
+  Address pUnk(interface, IGM.Int8PtrTy, IGM.getPointerAlignment());
+  auto *vtable = Builder.CreateLoad(pUnk, "com.vtable");
+  Address lpVtbl(vtable, IGM.Int8PtrTy, IGM.getPointerAlignment());
+  auto slot = Builder.CreateConstArrayGEP(lpVtbl, *index, IGM.getPointerSize(),
+                                          "com.method.slot");
+  auto *method = Builder.CreateLoad(slot, "com.method");
+
+  auto FTy = i->getType().castTo<SILFunctionType>();
+  auto signature = IGM.getSignature(FTy);
+  auto function = FunctionPointer::createUnsigned(
+      FunctionPointer::Kind::Function, method, signature);
+  setLoweredFunctionPointer(i, function);
 }
 
 void IRGenSILFunction::visitGetAsyncContinuationInst(

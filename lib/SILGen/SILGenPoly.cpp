@@ -1264,7 +1264,7 @@ class ParamInfo {
       // Can only store_borrow into a temporary allocation for @in_guaranteed.
       return false;
     }
-    if (tl.isTrivial()) {
+    if (tl.isTrivial(&SGF.F)) {
       // Can't store_borrow a trivial type.
       return false;
     }
@@ -5913,6 +5913,9 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   assert(expectedType->getLanguage() ==
          fn.getType().castTo<SILFunctionType>()->getLanguage() &&
          "bridging in re-abstraction thunk?");
+  // We cannot reabstract coroutines (yet)
+  assert(!expectedType->isCoroutine() && !sourceType->isCoroutine() &&
+         "cannot reabstract a coroutine");
 
   // Declare the thunk.
   SubstitutionMap interfaceSubs;

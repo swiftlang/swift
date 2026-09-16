@@ -172,9 +172,11 @@ public func replacePhiWithIncomingValue(phi: Phi, _ context: some MutatingContex
   }
   if let borrowedFrom = phi.borrowedFrom {
     borrowedFrom.replace(with: uniqueIncomingValue, context)
-  } else {
-    phi.value.uses.replaceAll(with: uniqueIncomingValue, context)
   }
+  // Beside its `borrowed_from` instruction, a reborrow phi can also be used as enclosing value
+  // in `borrowed_from` instructions of other reborrow phis in the same block.
+  // Those uses need to be replaced, too.
+  phi.value.uses.replaceAll(with: uniqueIncomingValue, context)
 
   erasePhiArgument(phi: phi, context)
   return true

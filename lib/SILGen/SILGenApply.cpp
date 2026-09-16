@@ -45,7 +45,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -55,7 +54,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
-#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -166,7 +164,8 @@ getPartialApplyOfDynamicMethodFormalType(SILGenModule &SGM, SILDeclRef member,
   auto extInfo = completeMethodTy->getExtInfo()
                    .withRepresentation(FunctionTypeRepresentation::Swift);
 
-  auto fnType = CanFunctionType::get(params, resultType, extInfo);
+  auto fnType = CanFunctionType::get(params, completeMethodTy.getYields(),
+                                     resultType, extInfo);
   return fnType;
 }
 
@@ -443,6 +442,29 @@ private:
             getSubstFormalInterfaceType(substFormalType, subs)),
         Substitutions(subs), Loc(l) {}
 
+  /// Only opened COM existentials dispatch through the foreign interface.
+  /// Generic receivers continue to use Swift witness tables.
+  bool isCOMExistentialMethod() const {
+    if (kind != Kind::WitnessMethod)
+      return false;
+
+    auto *proto = cast<ProtocolDecl>(Constant.getDecl()->getDeclContext());
+    auto selfType = proto->getSelfInterfaceType()->getCanonicalType();
+    return proto->isCOMInterface() &&
+           selfType.subst(Substitutions)->is<ExistentialArchetypeType>();
+  }
+
+  SILType getWitnessMethodType(SILType type) const {
+    ASSERT(kind == Kind::WitnessMethod);
+    if (!isCOMExistentialMethod())
+      return type;
+
+    auto FTy = Lowering::adjustFunctionType(
+        type.castTo<SILFunctionType>(),
+        SILFunctionTypeRepresentation::COMMethod, ProtocolConformanceRef());
+    return SILType::getPrimitiveObjectType(FTy);
+  }
+
 public:
 
   static Callee forIndirect(ManagedValue indirectValue,
@@ -608,7 +630,7 @@ public:
     case Kind::WitnessMethod:
       if (Constant.isForeign)
         return true;
-      return false;
+      return isCOMExistentialMethod();
     case Kind::ClassMethod:
     case Kind::SuperMethod:
     case Kind::DynamicMethod:
@@ -737,7 +759,11 @@ public:
       ArgumentScope S(SGF, Loc);
 
       SILValue fn;
-      if (!constant->isForeign) {
+      if (isCOMExistentialMethod()) {
+        auto SILTy = constantInfo.getSILType();
+        fn = SGF.B.createCOMMethod(Loc, borrowedSelf->getValue(), *constant,
+                                   getWitnessMethodType(SILTy));
+      } else if (!constant->isForeign) {
         fn = SGF.B.createWitnessMethod(
           Loc, lookupType, conformance, *constant,
           constantInfo.getSILType());
@@ -815,7 +841,8 @@ public:
 
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
-      return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
+      return createCalleeTypeInfo(
+          SGF, constant, getWitnessMethodType(constantInfo.getSILType()));
     }
     case Kind::DynamicMethod: {
       auto formalType = getDynamicMethodLoweredType(
@@ -1869,8 +1896,9 @@ public:
       auto substSelfType = dynamicMemberRef->getBase()->getType()->getCanonicalType();
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      substFormalType = CanFunctionType::get(
-          {AnyFunctionType::Param(substSelfType)}, substFormalType, info);
+      substFormalType =
+          CanFunctionType::get({AnyFunctionType::Param(substSelfType)},
+                               /* yields */ {}, substFormalType, info);
 
       setCallee(Callee::forDynamic(SGF, member,
                                    memberRef.getSubstitutions(),
@@ -3119,7 +3147,7 @@ private:
       // Create a new value-dependence here if the primary result is
       // trivial.
       auto &valueTL = SGF.getTypeLowering(value.getType());
-      if (valueTL.isTrivial()) {
+      if (valueTL.isTrivial(&SGF.F)) {
         SILValue dependentValue =
           SGF.B.createMarkDependence(eval, value.forward(SGF),
                                      owner.getValue(),
@@ -3951,6 +3979,12 @@ private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType,
             bool isAddressable,
             std::optional<AnyFunctionType::Param> origParam = std::nullopt) {
+    // An @in_cxx argument is consumed, so it cannot borrow a variable's storage
+    // in place; materialize a temporary the caller destroys instead.
+    if (isAddressable && ParamInfos.front().getConvention() ==
+                             ParameterConvention::Indirect_In_CXX)
+      isAddressable = false;
+
     if (isAddressable) {
       // If the function takes an addressable parameter, and its argument is
       // a reference to an addressable declaration with compatible ownership,
@@ -3961,7 +3995,7 @@ private:
       } else if (isMutatingParameter(ParamInfos.front().getConvention())) {
         paramOwnership = ValueOwnership::InOut;
       } else {
-        paramOwnership = ValueOwnership::Owned;      
+        paramOwnership = ValueOwnership::Owned;
       }
       if (auto addr = SGF.tryEmitAddressableParameterAsAddress(std::move(arg),
                                                               paramOwnership)) {
@@ -4559,7 +4593,7 @@ private:
                                 SILValue packExpansionIndex,
                                 SILValue packIndex) {
       auto partialCleanup = CleanupHandle::invalid();
-      if (!tupleTL.isTrivial()) {
+      if (!tupleTL.isTrivial(&SGF.F)) {
         partialCleanup =
           SGF.enterPartialDestroyPackCleanup(packAddr, formalPackType,
                                              packComponentIndex,
@@ -4630,7 +4664,7 @@ private:
     });
 
     // If the tuple is trivial, we don't need a cleanup.
-    if (tupleTL.isTrivial())
+    if (tupleTL.isTrivial(&SGF.F))
       return CleanupHandle::invalid();
 
     // Otherwise, push a full-tuple cleanup for it.
@@ -4663,7 +4697,7 @@ private:
     // scope, then pop the scope and recreate the cleanup.
     auto eltAddr = eltInit->getManagedAddress().forward(SGF);
     scope.pop();
-    auto cleanup = (paramTL.isTrivial()
+    auto cleanup = (paramTL.isTrivial(&SGF.F)
                       ? CleanupHandle::invalid()
                       : SGF.enterDestroyCleanup(eltAddr));
 
@@ -7875,7 +7909,7 @@ static void collectFakeIndexParameters(SILGenFunction &SGF,
     // storage.
     if (tl.getRecursiveProperties().isAddressOnly()) {
       convention = ParameterConvention::Indirect_In_Guaranteed;
-    } else if (tl.isTrivial()) {
+    } else if (tl.isTrivial(&SGF.F)) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
       convention = ParameterConvention::Direct_Guaranteed;
@@ -7888,7 +7922,7 @@ static void collectFakeIndexParameters(SILGenFunction &SGF,
     // component then copies for each accessor it runs.
     if (tl.getRecursiveProperties().isAddressOnly()) {
       convention = ParameterConvention::Indirect_In;
-    } else if (tl.isTrivial()) {
+    } else if (tl.isTrivial(&SGF.F)) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
       convention = ParameterConvention::Direct_Owned;
@@ -8571,7 +8605,7 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
     if (isa<VarDecl>(memberRef.getDecl())) {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      methodTy = CanFunctionType::get({}, valueTy, info);
+      methodTy = CanFunctionType::get({}, {}, valueTy, info);
     } else {
       methodTy = cast<FunctionType>(valueTy);
     }
@@ -8585,7 +8619,8 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo info;
     FunctionType::Param arg(operand->getType().getASTType());
-    auto memberFnTy = CanFunctionType::get({arg}, methodTy, info);
+    auto memberFnTy =
+        CanFunctionType::get({arg}, /* yields */ {}, methodTy, info);
 
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        memberFnTy);
@@ -8676,15 +8711,16 @@ SILGenFunction::emitDynamicSubscriptGetterApply(SILLocation loc,
 
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo methodInfo;
-    const auto methodTy =
-        CanFunctionType::get(indexArgs.getParams(), valueTy, methodInfo);
+    const auto methodTy = CanFunctionType::get(
+        indexArgs.getParams(), /* yields */ {}, valueTy, methodInfo);
     auto foreignMethodTy =
         getPartialApplyOfDynamicMethodFormalType(SGM, member, subscriptRef);
 
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo functionInfo;
     FunctionType::Param baseArg(operand->getType().getASTType());
-    auto functionTy = CanFunctionType::get({baseArg}, methodTy, functionInfo);
+    auto functionTy = CanFunctionType::get({baseArg}, /* yields */ {}, methodTy,
+                                           functionInfo);
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        functionTy);
     SILValue memberArg =

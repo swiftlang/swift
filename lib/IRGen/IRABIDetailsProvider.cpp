@@ -28,14 +28,10 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
-#include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "llvm/IR/DerivedTypes.h"
 #include <optional>

@@ -17,7 +17,6 @@
 #include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include <cstdint>
 
 namespace swift {
