@@ -117,17 +117,24 @@ function(get_bootstrapping_swift_lib_dir bs_lib_dir bootstrapping)
       get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
 
       # Detect and handle swiftly-managed hosts.
-      if(swift_bin_dir MATCHES ".*/swiftly/bin")
-        execute_process(COMMAND swiftly use --print-location
+      if("x${swift_bin_dir}" MATCHES "x$ENV{SWIFTLY_BIN_DIR}")
+        set(_find_toolchain_cmd swiftly use -p)
+        execute_process(
+          COMMAND ${_find_toolchain_cmd}
+          TIMEOUT 10
+          RESULT_VARIABLE _result
+          ERROR_VARIABLE _stderr
           OUTPUT_VARIABLE swiftly_dir
-          ERROR_VARIABLE err)
-        if(err)
-          message(SEND_ERROR "Failed to find swiftly Swift compiler")
+          OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(_result)
+          message(FATAL_ERROR
+            "Failed to find swiftly Swift compiler: ${_find_toolchain_cmd}"
+            "${_stderr}"
+          )
         endif()
-        string(STRIP "${swiftly_dir}" swiftly_dir)
         set(swift_dir "${swiftly_dir}/usr")
       endif()
-
       set(bs_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
     endif()
   endif()
