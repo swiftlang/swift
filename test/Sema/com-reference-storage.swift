@@ -65,3 +65,17 @@ final class NativeHolder {
     unmanagedValue = value
   }
 }
+
+final class InterfaceHolder {
+  unowned(unsafe) var value: any IValue
+  unowned(unsafe) var optional: (any IValue)?
+  unowned(unsafe) var classValue: any IClassValue
+  unowned(unsafe) var optionalClassValue: (any IClassValue)?
+
+  init(_ value: any IValue, _ classValue: any IClassValue) {
+    self.value = value
+    self.optional = value
+    self.classValue = classValue
+    self.optionalClassValue = classValue
+  }
+}
