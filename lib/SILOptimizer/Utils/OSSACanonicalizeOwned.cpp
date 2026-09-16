@@ -130,6 +130,9 @@ bool OSSACanonicalizeOwned::computeCanonicalLiveness() {
   LLVM_DEBUG(llvm::dbgs() << "Computing canonical liveness from:\n";
              getCurrentDef()->print(llvm::dbgs()));
   SmallVector<unsigned, 8> indexWorklist;
+  // Debug uses are handled in a second pass, after the liveness of all other
+  // uses is known. \see handleDeferredDebugUses.
+  SmallVector<Operand *, 8> deferredDebugUses;
   ValueSet visitedDefs(getCurrentDef()->getFunction());
   auto addDefToWorklist = [&](Def def) {
     if (!visitedDefs.insert(def.value))
@@ -178,17 +181,13 @@ bool OSSACanonicalizeOwned::computeCanonicalLiveness() {
         addDefToWorklist(Def::borrowedFrom(bfi));
         continue;
       }
-      // Handle debug_value instructions separately.
-      if (pruneDebugMode) {
-        if (auto *dvi = dyn_cast<DebugValueInst>(user)) {
-          // Only instructions potentially outside current pruned liveness are
-          // interesting.
-          if (liveness->getBlockLiveness(dvi->getParent()) !=
-              PrunedLiveBlocks::LiveOut) {
-            recordDebugUse(use);
-          }
-          continue;
-        }
+      // Handle debug uses separately. A debug use does not have to be within
+      // the lifetime of its operand (OperandOwnership::DebugUse). Whether it
+      // affects liveness at all can only be decided once the liveness of all
+      // other uses is known.
+      if (use->getOperandOwnership() == OperandOwnership::DebugUse) {
+        deferredDebugUses.push_back(use);
+        continue;
       }
       switch (use->getOperandOwnership()) {
       case OperandOwnership::NonUse:
@@ -216,9 +215,10 @@ bool OSSACanonicalizeOwned::computeCanonicalLiveness() {
         return false;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
-      case OperandOwnership::DebugUse:
         liveness->updateForUse(user, /*lifetimeEnding*/ false);
         break;
+      case OperandOwnership::DebugUse:
+        llvm_unreachable("debug uses are deferred to a second pass");
       case OperandOwnership::ForwardingConsume:
         recordConsumingUse(use);
         liveness->updateForUse(user, /*lifetimeEnding*/ true);
@@ -288,7 +288,42 @@ bool OSSACanonicalizeOwned::computeCanonicalLiveness() {
       }
     }
   }
+  handleDeferredDebugUses(deferredDebugUses);
   return true;
+}
+
+/// A `debug_value` is an `OperandOwnership::DebugUse`, which - unlike all other
+/// uses - is allowed to be outside the lifetime of its operand.
+///
+/// In pruneDebugMode such a debug use is removed later if it turns out to be
+/// outside the final boundary. Otherwise liveness is extended to keep the debug
+/// value meaningful - but only within blocks which are live anyway:
+/// liveness must stay within the region which is post-dominated by the
+/// consuming uses, because `findOriginalBoundary` computes the boundary by
+/// walking backward from the consuming blocks. Making an otherwise dead block
+/// live would place liveness beyond the consumes, where the boundary - and
+/// therefore the destroys which `insertDestroysOnBoundary` has to create -
+/// cannot be found anymore.
+void OSSACanonicalizeOwned::handleDeferredDebugUses(
+    ArrayRef<Operand *> deferredDebugUses) {
+  for (Operand *use : deferredDebugUses) {
+    auto *dvi = cast<DebugValueInst>(use->getUser());
+    auto blockLiveness = liveness->getBlockLiveness(dvi->getParent());
+    if (pruneDebugMode) {
+      // Only instructions potentially outside current pruned liveness are
+      // interesting.
+      if (blockLiveness != PrunedLiveBlocks::LiveOut) {
+        recordDebugUse(use);
+      }
+      continue;
+    }
+    if (blockLiveness == PrunedLiveBlocks::Dead) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  Not extending liveness into dead block for " << *dvi);
+      continue;
+    }
+    liveness->updateForUse(dvi, /*lifetimeEnding*/ false);
+  }
 }
 
 /// Extend liveness to the availability boundary of currentDef.  Even if a copy
