@@ -58,6 +58,9 @@ public enum CompactImageMapFormat {
   /// Maximum number of bytes in a build ID
   static let maxBuildIdLength = 1_024
 
+  /// Sentinel for Embedded Darwin framework versions
+  static let embeddedDarwinFrameworkVersion: UInt8 = 1
+
   /// Run a closure for each prefix of the specified string
   static func forEachPrefix(of str: String.UTF8View.SubSequence,
                             body: (String) -> ()) {
@@ -235,7 +238,7 @@ public enum CompactImageMapFormat {
 
           #if DEBUG_COMPACT_IMAGE_MAP
           let name = String(decoding: nameBytes, as: UTF8.self)
-          if version == 1 {
+          if version == embeddedDarwinFrameworkVersion {
             print("framewk (embedded) name='\(name)'")
           } else {
             let versionChar = String(Unicode.Scalar(version))
@@ -243,7 +246,7 @@ public enum CompactImageMapFormat {
           }
           #endif
 
-          if version == 1 {
+          if version == embeddedDarwinFrameworkVersion {
             // embedded Darwin
             resultBytes.append(slash)
             resultBytes.append(contentsOf: nameBytes)
@@ -783,7 +786,7 @@ public enum CompactImageMapFormat {
                 let framework = "/\(name).framework/\(name)"
                 if remainingPath.elementsEqual(framework.utf8) {
                   self.remainingPath = remainingPath.suffix(nameCount)
-                  version = 1
+                  version = embeddedDarwinFrameworkVersion
 
                   state = .version
                   return 0x40 | UInt8(exactly: nameCount - 1)!
