@@ -372,7 +372,7 @@ private:
 
     auto bufType = getRemappedTangentType(originalBuffer->getType());
     // Set insertion point for local allocation builder: before the last local
-    // allocation, or at the start of the pullback function's entry if no local
+    // allocation, or at the start of the differential function's entry if no local
     // allocations exist yet.
     auto debugInfo = findDebugLocationAndVariable(originalBuffer);
     SILLocation loc = debugInfo ? debugInfo->first.getLocation()
