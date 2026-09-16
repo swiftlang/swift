@@ -1111,14 +1111,14 @@ namespace swift {
     bool SolverEnableEnumerateSupertypes = true;
 
     /// Enable type variable joins. This will be on by default eventually.
-    bool SolverEnableTypeVariableJoins = false;
+    bool SolverEnableTypeVariableJoins = true;
 
     /// Enable supertype binding promotion. This will be on by default eventually.
-    bool SolverEnablePromoteSupertypes = false;
+    bool SolverEnablePromoteSupertypes = true;
 
     /// Enable modeling optional conversions without disjunctions.
     /// This will be on by default eventually.
-    bool SolverEnableShortConversions = false;
+    bool SolverEnableShortConversions = true;
 
     /// Enable more conditions for edge contraction for closure parameters.
     /// This will be on by default eventually.
