@@ -1,0 +1,58 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name M -sil-verify-all -emit-ir %s | %FileCheck %s --implicit-check-not=swift_retain --implicit-check-not=swift_release --implicit-check-not=swift_getExistentialTypeMetadata
+
+sil_stage canonical
+import Builtin
+import Swift
+
+// An opened value has the same interface pointer and COM ownership as its source.
+// CHECK-LABEL: define{{.*}} @destroy_opened(
+// CHECK-SAME: ptr [[SELF:%.*]])
+// CHECK: [[VTABLE:%.*]] = load ptr, ptr [[SELF]]
+// CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[VTABLE]], i{{32|64}} 2
+// CHECK: [[RELEASE:%.*]] = load ptr, ptr [[SLOT]]
+// CHECK: call {{(x86_stdcallcc )?}}i32 [[RELEASE]](ptr [[SELF]])
+// CHECK: ret void
+sil [ossa] @destroy_opened : $@convention(thin) (@owned ISwiftObject) -> () {
+bb0(%value : @owned $ISwiftObject):
+  %opened = open_com_existential %value : $ISwiftObject to $@opened(1, ISwiftObject) Self
+  destroy_value %opened : $@opened(1, ISwiftObject) Self
+  %result = tuple ()
+  return %result : $()
+}
+
+// Class constraints do not turn an opened COM interface into a Swift heap pointer.
+// CHECK-LABEL: define{{.*}} @copy_class_opened(
+// CHECK-SAME: ptr [[SELF:%.*]])
+// CHECK: [[VTABLE:%.*]] = load ptr, ptr [[SELF]]
+// CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[VTABLE]], i{{32|64}} 1
+// CHECK: [[ADDREF:%.*]] = load ptr, ptr [[SLOT]]
+// CHECK: call {{(x86_stdcallcc )?}}i32 [[ADDREF]](ptr [[SELF]])
+// CHECK: [[VTABLE:%.*]] = load ptr, ptr [[SELF]]
+// CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[VTABLE]], i{{32|64}} 2
+// CHECK: [[RELEASE:%.*]] = load ptr, ptr [[SLOT]]
+// CHECK: call {{(x86_stdcallcc )?}}i32 [[RELEASE]](ptr [[SELF]])
+// CHECK: ret void
+sil [ossa] @copy_class_opened : $@convention(thin) (@guaranteed IUnknown) -> () {
+bb0(%value : @guaranteed $IUnknown):
+  %opened = open_com_existential %value : $IUnknown to $@opened(2, IUnknown) Self
+  %copy = copy_value %opened : $@opened(2, IUnknown) Self
+  destroy_value %copy : $@opened(2, IUnknown) Self
+  %result = tuple ()
+  return %result : $()
+}
+
+// Generic COM-constrained values retain their Swift generic representation.
+// CHECK-LABEL: define{{.*}} @destroy_generic(
+// CHECK: [[WITNESSES:%.*]] = load ptr, ptr
+// CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[WITNESSES]], i32 1
+// CHECK: [[DESTROY:%.*]] = load ptr, ptr [[SLOT]]
+// CHECK: call void [[DESTROY]](ptr {{.*}}, ptr {{.*}})
+// CHECK: ret void
+sil [ossa] @destroy_generic : $@convention(thin) <T: ISwiftObject> (@in T) -> () {
+bb0(%value : $*T):
+  destroy_addr %value : $*T
+  %result = tuple ()
+  return %result : $()
+}

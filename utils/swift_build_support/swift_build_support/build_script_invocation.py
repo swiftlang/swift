@@ -284,6 +284,18 @@ class BuildScriptInvocation(object):
                 args.extra_cmake_options.append(
                     '-DSWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL=TRUE')
 
+        if args.build_sarif:
+            sarif_src = os.path.join(self.workspace.source_root,
+                                     "swift-toolchain-sarif")
+            args.extra_cmake_options.append(
+                '-DSWIFT_PATH_TO_SARIF_SOURCE:PATH={}'.format(sarif_src))
+            collections_src = os.path.join(self.workspace.source_root,
+                                           "swift-collections")
+            args.extra_cmake_options.append(
+                '-DSWIFT_PATH_TO_SWIFT_COLLECTIONS_SOURCE:PATH={}'.format(
+                    collections_src))
+            args.extra_cmake_options.append('-DSWIFT_BUILD_SARIF:BOOL=TRUE')
+
         if args.build_early_swift_driver:
             configuration = 'release' if str(args.build_variant) in [
                 'Release',
