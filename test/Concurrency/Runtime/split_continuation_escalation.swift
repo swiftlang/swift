@@ -17,7 +17,7 @@
 // UNSUPPORTED: DARWIN_SIMULATOR=ios
 // UNSUPPORTED: DARWIN_SIMULATOR=tvos
 
-@_spi(Concurrency) import _Concurrency
+@_spi(Concurrency) @_spi(SplitContinuation) import _Concurrency
 import Synchronization
 
 // A task executor that queues jobs instead of running them, so tests can
