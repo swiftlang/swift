@@ -50,7 +50,7 @@
 #include <cstring>
 #include <cerrno>
 
-extern "C" SWIFT_RUNTIME_EXPORT uint64_t _swift_concurrency_task_registry_addr = 0;
+SWIFT_RUNTIME_EXPORT uint64_t _swift_concurrency_task_registry_addr = 0;
 
 #ifdef _WIN32
 // We'll probably want dbghelp.h here
