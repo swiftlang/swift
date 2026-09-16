@@ -6,11 +6,6 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_SplitContinuations
 
-// Serializing and deserializing a bound split continuation must preserve
-// the continuation, the resume buffer and both successors of the
-// await.  The two forms are checked with separate prefixes because
-// deserialization does not preserve the order of the functions.
-
 import Builtin
 import Swift
 import _Concurrency
