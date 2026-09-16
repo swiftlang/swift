@@ -21,7 +21,6 @@
 #ifndef SWIFT_EXISTENTIAL_LAYOUT_H
 #define SWIFT_EXISTENTIAL_LAYOUT_H
 
-#include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 

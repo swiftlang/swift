@@ -17,9 +17,7 @@
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/PreparedOverload.h"
@@ -34,7 +32,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <memory>
-#include <tuple>
 
 using namespace swift;
 using namespace constraints;

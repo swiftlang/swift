@@ -12,7 +12,6 @@
 
 #include "AvailabilityMixin.h"
 #include "JSON.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace symbolgraphgen;

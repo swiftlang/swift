@@ -15,10 +15,7 @@
 
 #include "swift/SIL/GenericSpecializationMangler.h"
 
-#include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/NamespaceMacros.h"
-#include "swift/Basic/NullablePtr.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILFunction.h"
 

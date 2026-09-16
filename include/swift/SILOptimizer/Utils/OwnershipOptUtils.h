@@ -19,11 +19,9 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_OWNERSHIPOPTUTILS_H
 #define SWIFT_SILOPTIMIZER_UTILS_OWNERSHIPOPTUTILS_H
 
-#include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 
 namespace swift {

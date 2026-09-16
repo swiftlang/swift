@@ -20,12 +20,9 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/EndianStream.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/SipHash.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
@@ -33,7 +30,6 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/SILModule.h"
 
-#include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"

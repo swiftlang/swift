@@ -18,7 +18,6 @@
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_THUNK_H
 
 #include "swift/AST/AutoDiff.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILBuilder.h"
 
 namespace swift {

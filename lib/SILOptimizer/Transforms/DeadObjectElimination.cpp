@@ -24,9 +24,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dead-object-elim"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/IndexTrie.h"
-#include "swift/AST/ResilienceExpansion.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"

@@ -49,8 +49,6 @@
 
 #define DEBUG_TYPE "access-enforcement-dom"
 
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"

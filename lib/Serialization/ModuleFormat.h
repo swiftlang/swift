@@ -21,10 +21,8 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
-#include "swift/AST/Types.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/Bitcode/BitcodeConvenience.h"
-#include "llvm/Bitstream/BitCodes.h"
 
 namespace swift {
 class ModuleFile;
@@ -58,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1026; // COMMethodInst
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1027; // hasOwnershipForTrivialValues bit in SILFunction
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
