@@ -8255,7 +8255,9 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
       auto &ti = getTypeInfo(operand->getType());
       auto ty = operand->getType();
       auto alignMask = ti.getAlignmentMask(*this, ty);
-      if (i != 0) {
+      // Round up to this operand's alignment. We can skip this for
+      // the first operand unless there are generic requirements.
+      if (i != 0 || !I->getSubstitutions().empty()) {
         auto notAlignMask = Builder.CreateNot(alignMask);
         argsBufSize = Builder.CreateAdd(argsBufSize, alignMask);
         argsBufSize = Builder.CreateAnd(argsBufSize, notAlignMask);
