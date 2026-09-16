@@ -258,3 +258,30 @@ bb0(%0 : $*T):
   %2 = struct_extract %1, #T.x
   return %2
 }
+
+sil [readonly] @makeKlass : $@convention(thin) () -> @owned Klass
+
+// This test verifies that two derived uses of an apply don't cause a crash
+// while trying to be deleted twice.
+// TODO: This should leave undef debug_values behind (PR #91910).
+
+// CHECK-LABEL: sil [ossa] @multi_operand_apply
+// CHECK:       bb0:
+// CHECK-NEXT:    [[T:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[T]]
+// CHECK-NEXT:  } // end sil function 'multi_operand_apply'
+sil [ossa] @multi_operand_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @makeKlass : $@convention(thin) () -> @owned Klass
+  %1 = apply %0() : $@convention(thin) () -> @owned Klass
+  %2 = copy_value %1 : $Klass
+  debug_value (%1, %2), let, name "pair", transform {
+  bb0(%0 : $Klass, %1 : $Klass):
+    %2 = tuple (%0, %1)
+    return %2
+  }
+  destroy_value %2 : $Klass
+  destroy_value %1 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
