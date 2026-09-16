@@ -66,6 +66,11 @@ int main() {
   // CHECK: returnsNullableRetainedNode=42 live=1
   releaseNode(nonNull);
 
+  Node *passedThrough = Node::passThrough(&node);
+  printf("passThrough=%d live=%d\n", passedThrough->value, liveNodes);
+  // CHECK: passThrough=42 live=1
+  releaseNode(passedThrough);
+
   Leaf leaf{7};
   Leaf *returnedLeaf = returnsRetainedLeaf(&leaf);
   printf("returnsRetainedLeaf=%d live=%d\n", returnedLeaf->value, liveLeaves);

@@ -29,6 +29,11 @@ func returnsNullableRetainedNode(_ n: Node, _ null: Int32) -> Node? {
   return null != 0 ? nil : n
 }
 
+extension Node {
+  @cxx @implementation
+  static func passThrough(_ n: Node) -> Node { return n }
+}
+
 
 // A result returned unretained (+0) is not supported yet: the Swift body
 // always produces a retained (+1) value.
