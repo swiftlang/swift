@@ -311,7 +311,7 @@ private:
   ///
   /// Helper for `createFunctionLocalAllocation`.
   SILBasicBlock::iterator getNextFunctionLocalAllocationInsertionPoint() {
-    // If there are no local allocations, insert at the pullback entry start.
+    // If there are no local allocations, insert at the differential entry start.
     if (differentialLocalAllocations.empty())
       return getDifferential().getEntryBlock()->begin();
     // Otherwise, insert before the last local allocation. Inserting before
@@ -323,16 +323,16 @@ private:
 
   /// Creates and returns a local allocation with the given type.
   ///
-  /// Local allocations are created uninitialized in the pullback entry and
-  /// deallocated in the pullback exit. All local allocations not in
-  /// `destroyedLocalAllocations` are also destroyed in the pullback exit.
+  /// Local allocations are created uninitialized in the differential entry and
+  /// deallocated in the differential exit. All local allocations not in
+  /// `destroyedLocalAllocations` are also destroyed in the differential exit.
   ///
   /// Helper for `getAdjointBuffer`.
   AllocStackInst *createFunctionLocalAllocation(
       SILType type, SILLocation loc, bool zeroInitialize = false,
       std::optional<SILDebugVariable> varInfo = std::nullopt) {
     // Set insertion point for local allocation builder: before the last local
-    // allocation, or at the start of the pullback function's entry if no local
+    // allocation, or at the start of the differential function's entry if no local
     // allocations exist yet.
     diffLocalAllocBuilder.setInsertionPoint(
         getDifferential().getEntryBlock(),
