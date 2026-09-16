@@ -9030,10 +9030,9 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
   // getSplitContinuationAddr binds a continuation created in another frame
   // to this one, so the suspension is set up from its operands rather than from
   // a get_async_continuation in this frame.
-  if (auto *splitGet = dyn_cast<BuiltinInst>(i->getOperand())) {
-    assert(splitGet->getBuiltinInfo().ID ==
-               BuiltinValueKind::GetSplitContinuationAddr &&
-           "unexpected builtin awaited as a continuation");
+  auto *splitGet = dyn_cast<BuiltinInst>(i->getOperand());
+  if (splitGet && splitGet->getBuiltinInfo().ID ==
+                      BuiltinValueKind::GetSplitContinuationAddr) {
     llvm::Value *continuation =
         getLoweredSingletonExplosion(splitGet->getArguments()[0]);
     Address resumeBuffer = getLoweredAddress(splitGet->getArguments()[1]);
