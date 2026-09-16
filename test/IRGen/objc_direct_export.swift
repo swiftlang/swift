@@ -1,13 +1,14 @@
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_ObjCDirect
 
 // RUN: %target-swift-frontend -emit-ir -package-name objc_direct_pkg \
-// RUN:   -Xcc -fobjc-direct-precondition-thunk %s \
+// RUN:   -enable-experimental-feature ObjCDirect %s \
 // RUN:   | %FileCheck %s --implicit-check-not='-[_TtC' \
 // RUN:     --implicit-check-not='L_selector_data(bar)' \
 // RUN:     --implicit-check-not='L_selector_data(initWithValue:)'
 //
 // RUN: %target-swift-frontend -O -emit-ir -package-name objc_direct_pkg \
-// RUN:   -Xcc -fobjc-direct-precondition-thunk %s | %FileCheck %s -check-prefix=OPT
+// RUN:   -enable-experimental-feature ObjCDirect %s | %FileCheck %s -check-prefix=OPT
 
 import Foundation
 
