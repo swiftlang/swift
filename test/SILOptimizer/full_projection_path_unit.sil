@@ -1,0 +1,12 @@
+// RUN: %target-sil-opt -test-runner -sil-disable-input-verify %s -o /dev/null
+
+// Unit tests for FullProjectionPath. The test is self-checking (asserts internally); it takes no
+// arguments and does not inspect the function, so an empty function body suffices.
+
+sil_stage raw
+
+sil @full_projection_path_unit_tests : $@convention(thin) () -> () {
+bb0:
+  specify_test "full_projection_path"
+  unreachable
+}
