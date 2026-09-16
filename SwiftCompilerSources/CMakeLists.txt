@@ -220,16 +220,22 @@ function(add_swift_compiler_modules_library name)
     # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
     list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fmodule-format=raw")
 
-  elseif(swift_exec_bin_dir MATCHES ".*/swiftly/bin")
-    # Detect and handle swiftly-managed hosts.
-    execute_process(COMMAND swiftly use --print-location
-      OUTPUT_VARIABLE swiftly_dir
-      ERROR_VARIABLE err)
-    if(err)
-      message(SEND_ERROR "Failed to find swiftly Swift compiler")
+    elseif(DEFINED ENV{SWIFTLY_BIN_DIR} AND "x${swift_exec_bin_dir}" MATCHES "x$ENV{SWIFTLY_BIN_DIR}")
+      set(_find_toolchain_cmd swiftly use -p)
+      execute_process(
+        COMMAND ${_find_toolchain_cmd}
+        TIMEOUT 10
+        RESULT_VARIABLE _result
+        ERROR_VARIABLE _stderr
+        OUTPUT_VARIABLE swiftly_dir
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+      if(_result)
+        message(FATAL_ERROR
+          "Failed to find swiftly Swift compiler: ${_find_toolchain_cmd}"
+          "${_stderr}"
+      )
     endif()
-    string(STRIP "${swiftly_dir}" swiftly_dir)
-
     list(APPEND sdk_option "-I" "${swiftly_dir}/usr/lib" "-I" "${swiftly_dir}/usr/lib")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "EMSCRIPTEN")
     list(APPEND sdk_option "-I" "${SWIFT_PATH_TO_SWIFT_SDK}/lib")
