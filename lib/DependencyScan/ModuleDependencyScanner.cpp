@@ -181,6 +181,19 @@ std::string ModuleDependencyScanner::clangModuleOutputPathLookup(
   return outputPath.str().str();
 }
 
+/// The clang system VFS overlay created by ClangImporter (see
+/// ClangImporter::getClangSystemOverlayFile) is a virtual in-memory file that
+/// does not exist on disk, so exclude it from any list of paths that is
+/// expected to name only files that build systems can track or validate:
+/// the Clang dependency scanner reports every -ivfsoverlay file as a file
+/// dependency, and the -vfsoverlay options forwarded to the swift frontend
+/// are similarly filtered to drop entries that clang cannot re-read.
+static void filterClangSystemVFSOverlay(std::vector<std::string> &files,
+                                         const SearchPathOptions &Opts) {
+  std::string overlay = ClangImporter::getClangSystemOverlayFile(Opts);
+  llvm::erase(files, overlay);
+}
+
 static std::vector<std::string> inputSpecificClangScannerCommand(
     const std::vector<std::string> &baseCommandLineArgs,
     std::optional<StringRef> sourceFileName) {
@@ -1642,6 +1655,8 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
               });
           llvm::copy(headerScanResult->FileDeps,
                      std::back_inserter(headerFileInputs));
+          filterClangSystemVFSOverlay(headerFileInputs,
+                                      ScanASTContext.SearchPathOpts);
           auto bridgedDependencyIDs = llvm::map_range(
               headerScanResult->ClangModuleDeps, [](auto &input) {
                 return ModuleDependencyID{input.ModuleName,
@@ -2054,6 +2069,8 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
             });
         llvm::copy(headerScanResult->FileDeps,
                    std::back_inserter(headerFileInputs));
+        filterClangSystemVFSOverlay(headerFileInputs,
+                                    ScanASTContext.SearchPathOpts);
         auto bridgedDependencyIDs =
             llvm::map_range(headerScanResult->ClangModuleDeps, [](auto &input) {
               return ModuleDependencyID{input.ModuleName,
@@ -2219,11 +2236,7 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
 
   if (!ScanASTContext.CASOpts.EnableCaching) {
     auto &overlayFiles = invocation.getMutHeaderSearchOpts().VFSOverlayFiles;
-
-    // clang system overlay file is a virtual file that is not an actual file.
-    auto clangSystemOverlayFile =
-        ClangImporter::getClangSystemOverlayFile(ScanASTContext.SearchPathOpts);
-    llvm::erase(overlayFiles, clangSystemOverlayFile);
+    filterClangSystemVFSOverlay(overlayFiles, ScanASTContext.SearchPathOpts);
 
     // FIXME: workaround for rdar://105684525: find the -ivfsoverlay option
     // from clang scanner and pass to swift.
