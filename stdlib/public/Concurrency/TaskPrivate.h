@@ -2099,6 +2099,18 @@ bool mustSwitchToRun(SerialExecutorRef currentSerialExecutor,
                      TaskExecutorRef currentTaskExecutor,
                      TaskExecutorRef newTaskExecutor);
 
+// ==== Split continuations ---------------------------------------------------
+
+/// Resume `continuation` if it is a split continuation, storing `error` as the
+/// result first when it is non-null.
+///
+/// A raw continuation is either a task or the task-shaped storage of a split
+/// continuation; this tells them apart by reading the marker word. Returns
+/// false for an ordinary task, leaving it untouched, so that the ordinary
+/// swift_continuation_*Resume* entry points can fall through to their own
+/// implementation.
+bool tryResumeSplitContinuation(void *continuation, SwiftError *error);
+
 // ==== Task Local Values -----------------------------------------------------
 
 inline void AsyncTask::localValuePush(const HeapObject *key,
