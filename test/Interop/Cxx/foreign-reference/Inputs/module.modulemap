@@ -158,3 +158,8 @@ module LibkernOwnership {
 module CDeclFRT {
   header "cdecl.h"
 }
+
+module FRTProtocolSuperclass {
+  header "frt-protocol-superclass.h"
+  requires cplusplus
+}

@@ -6614,6 +6614,11 @@ ERROR(any_not_existential,none,
 ERROR(incorrect_optional_any,none,
       "optional 'any' type must be written %0",
       (Type))
+ERROR(existential_foreign_reference_type_bound,none,
+      "cannot form existential type %0 because %1 is a foreign reference type",
+      (Type, Type))
+NOTE(existential_foreign_reference_type_bound_note,none,
+     "use a generic parameter constrained to %0 instead", (Type))
 
 GROUPED_ERROR(existential_requires_any,ExistentialAny,none,
               "use of %select{protocol |}2%0 as a type must be written %1",
