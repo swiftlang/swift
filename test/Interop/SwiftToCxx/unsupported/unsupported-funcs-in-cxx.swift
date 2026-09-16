@@ -35,6 +35,15 @@ public struct HasMethods {
         }
     }
 
+    // Note: `@_expose` cannot be applied to subscripts directly; the
+    // all-public FileCheck lines below ensure a throwing subscript is not
+    // exposed (and does not produce a non-compiling header).
+    public subscript(index: Int) -> Int {
+        get throws {
+            return index
+        }
+    }
+
     @_expose(Cxx) // expected-error {{property 'unsupportedAEICProp' can not be exposed to C++ as it requires code to be emitted into client}}
     @_alwaysEmitIntoClient
     public var unsupportedAEICProp: Bool {
@@ -42,8 +51,17 @@ public struct HasMethods {
     }
 }
 
-// CHECK: HasMethods
-// CHECK: supported
+// The throwing property and subscript accessors must not be exposed
+// anywhere: neither in the class body (anchored below between the class
+// definition and the 'supported' thunk that follows it), nor among the
+// out-of-line member definitions (anchored between the 'supported' thunk
+// and the trailing unavailability comments).
+// CHECK: class SWIFT_SYMBOL("s:9Functions10HasMethodsV") HasMethods final {
+// CHECK-NOT: operator [](
+// CHECK-NOT: unsupportedProp
+// CHECK: SWIFT_INLINE_THUNK void supported()
+// CHECK-NOT: operator [](
+// CHECK-NOT: unsupportedProp
 
 // CHECK: // Unavailable in C++: Swift global function 'unsupportedAEIC()'.{{.*}}can not be exposed to C++ as it requires code to be emitted into client.
 // CHECK-EMPTY:
