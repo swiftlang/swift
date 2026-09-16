@@ -194,7 +194,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(MissingMember);
   TRIVIAL_KIND(Macro);
   TRIVIAL_KIND(MacroExpansion);
-  TRIVIAL_KIND(Using);
+  TRIVIAL_KIND(FileDefault);
 
   case DeclKind::HiddenTypeLayoutInfo:
     llvm_unreachable("hidden layout declarations are not diagnostic entities");
@@ -415,7 +415,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(OpaqueVarType, "type");
   ENTRY(Macro, "macro");
   ENTRY(MacroExpansion, "pound literal");
-  ENTRY(Using, "using");
+  ENTRY(FileDefault, "file-level default");
   ENTRY(BorrowAccessor, "borrow accessor");
   ENTRY(MutateAccessor, "mutate accessor");
   ENTRY(YieldingBorrowAccessor, "yielding borrow accessor");
@@ -1913,7 +1913,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
   case DeclKind::HiddenTypeLayoutInfo:
     llvm_unreachable("not a ValueDecl");
 
@@ -2042,15 +2042,16 @@ bool ImportDecl::isAccessLevelImplicit() const {
   return true;
 }
 
-UsingDecl::UsingDecl(SourceLoc usingLoc, DeclAttributes specifiedAttributes,
-                     DeclContext *parent)
-    : Decl(DeclKind::Using, parent), UsingLoc(usingLoc),
+FileDefaultDecl::FileDefaultDecl(SourceLoc defaultLoc,
+                                 DeclAttributes specifiedAttributes,
+                                 DeclContext *parent)
+    : Decl(DeclKind::FileDefault, parent), DefaultLoc(defaultLoc),
       SpecifiedAttributes(specifiedAttributes) {}
 
-UsingDecl *UsingDecl::create(ASTContext &ctx, SourceLoc usingLoc,
-                             DeclAttributes specifiedAttributes,
-                             DeclContext *parent) {
-  return new (ctx) UsingDecl(usingLoc, specifiedAttributes, parent);
+FileDefaultDecl *FileDefaultDecl::create(ASTContext &ctx, SourceLoc defaultLoc,
+                                         DeclAttributes specifiedAttributes,
+                                         DeclContext *parent) {
+  return new (ctx) FileDefaultDecl(defaultLoc, specifiedAttributes, parent);
 }
 
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
@@ -4287,7 +4288,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
   case DeclKind::HiddenTypeLayoutInfo:
     llvm_unreachable("Not a ValueDecl");
 
@@ -5401,7 +5402,7 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
   case DeclKind::BuiltinTuple:
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
   case DeclKind::HiddenTypeLayoutInfo:
     // These don't take attributes.
     return SourceLoc();

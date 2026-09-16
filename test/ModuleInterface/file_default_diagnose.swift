@@ -1,17 +1,17 @@
 // REQUIRES: swift_feature_DefaultIsolationPerFile
 
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name UsingDiagnose \
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name FileDefaultDiagnose \
 // RUN:   -enable-library-evolution \
 // RUN:   -enable-experimental-feature DefaultIsolationPerFile
-// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name UsingDiagnose
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name FileDefaultDiagnose
 // RUN: %FileCheck %s < %t.swiftinterface
 
-// `@diagnose` is an in-file source-warning control. Neither the `using`
+// `@diagnose` is an in-file source-warning control. Neither the `default`
 // declaration nor the attr should appear in the interface.
 // CHECK-NOT: @diagnose
-// CHECK-NOT: using @diagnose
+// CHECK-NOT: default @diagnose
 
-using @diagnose(DeprecatedDeclaration, as: ignored)
+default @diagnose(DeprecatedDeclaration, as: ignored)
 
 // CHECK: public func someFunc()
 public func someFunc() {}

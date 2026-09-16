@@ -45,7 +45,7 @@ public struct AddExtMacro: ExtensionMacro {
 }
 
 //--- main_actor.swift
-using @MainActor
+default @MainActor
 
 @attached(extension, names: named(generated))
 macro AddExt(_ isolation: String = "") = #externalMacro(module: "MacroDefinition", type: "AddExtMacro")
@@ -67,7 +67,7 @@ struct Explicit {}
 // MAIN-NEXT: // Isolation: nonisolated
 
 //--- nonisolated_override.swift
-using nonisolated
+default nonisolated
 
 @attached(extension, names: named(generated))
 macro AddExt(_ isolation: String = "") = #externalMacro(module: "MacroDefinition", type: "AddExtMacro")

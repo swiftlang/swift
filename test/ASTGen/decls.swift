@@ -35,11 +35,11 @@ import func Swift.max
 import var Swift._playgroundPrintHook
 
 
-using @MainActor
-// FIXME: cannot add `using nonisolated` here because it's a re-declaration
-using @diagnose(StrictMemorySafety, as: error)
-using @diagnose(DeprecatedDeclaration, as: warning, reason: "round-trip the reason: argument")
-using @available(*, deprecated, message: "deprecation message")
+default @MainActor
+// FIXME: cannot add `default nonisolated` here because it's a re-declaration
+default @diagnose(StrictMemorySafety, as: error)
+default @diagnose(DeprecatedDeclaration, as: warning, reason: "round-trip the reason: argument")
+default @available(*, deprecated, message: "deprecation message")
 
 func
 test1
