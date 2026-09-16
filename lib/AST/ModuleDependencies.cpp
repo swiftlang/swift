@@ -24,9 +24,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Strings.h"
-#include "clang/Lex/HeaderSearchOptions.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
-#include "llvm/Config/config.h"
 #include "llvm/Support/Path.h"
 using namespace swift;
 

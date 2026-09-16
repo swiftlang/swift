@@ -21,12 +21,11 @@
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
 #include <memory>
 #include <string>
-#include <utility>
 #include <vector>
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 

@@ -18,16 +18,11 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-lower-aggregate-instrs"
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"

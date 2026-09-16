@@ -14,11 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;

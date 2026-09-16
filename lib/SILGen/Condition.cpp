@@ -14,7 +14,6 @@
 #include "Initialization.h"
 #include "ManagedValue.h"
 #include "RValue.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 using namespace swift;

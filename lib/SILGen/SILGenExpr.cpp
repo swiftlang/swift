@@ -36,7 +36,6 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ExtInfo.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/KnownProtocols.h"
@@ -48,7 +47,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/type_traits.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -59,7 +57,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -76,7 +73,7 @@ ManagedValue SILGenFunction::emitManagedCopy(SILLocation loc, SILValue v) {
 ManagedValue SILGenFunction::emitManagedCopy(SILLocation loc, SILValue v,
                                              const TypeLowering &lowering) {
   assert(lowering.getLoweredType() == v->getType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(v);
   if (v->getType().isObject() && v->getOwnershipKind() == OwnershipKind::None)
     return ManagedValue::forObjectRValueWithoutOwnership(v);
@@ -98,7 +95,7 @@ SILGenFunction::emitManagedFormalEvaluationCopy(SILLocation loc, SILValue v,
                                                 const TypeLowering &lowering) {
   assert(lowering.getLoweredType() == v->getType());
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(v);
   if (v->getType().isObject() && v->getOwnershipKind() == OwnershipKind::None)
     return ManagedValue::forObjectRValueWithoutOwnership(v);
@@ -118,7 +115,7 @@ ManagedValue SILGenFunction::emitManagedLoadCopy(SILLocation loc, SILValue v,
                                                  const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getAddressType() == v->getType());
   v = lowering.emitLoadOfCopy(B, loc, v, IsNotTake);
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(v);
   if (v->getOwnershipKind() == OwnershipKind::None)
     return ManagedValue::forObjectRValueWithoutOwnership(v);
@@ -137,7 +134,7 @@ ManagedValue
 SILGenFunction::emitManagedLoadBorrow(SILLocation loc, SILValue v,
                                       const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getAddressType() == v->getType());
-  if (lowering.isTrivial()) {
+  if (lowering.isTrivial(&F)) {
     v = lowering.emitLoadOfCopy(B, loc, v, IsNotTake);
     return ManagedValue::forObjectRValueWithoutOwnership(v);
   }
@@ -157,7 +154,7 @@ ManagedValue SILGenFunction::emitManagedStoreBorrow(SILLocation loc, SILValue v,
 ManagedValue SILGenFunction::emitManagedStoreBorrow(
     SILLocation loc, SILValue v, SILValue addr, const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getObjectType() == v->getType());
-  if (lowering.isTrivial() || v->getOwnershipKind() == OwnershipKind::None) {
+  if (lowering.isTrivial(&F) || v->getOwnershipKind() == OwnershipKind::None) {
     lowering.emitStore(B, loc, v, addr, StoreOwnershipQualifier::Trivial);
     return ManagedValue::forTrivialAddressRValue(addr);
   }
@@ -179,7 +176,7 @@ SILGenFunction::emitManagedBeginBorrow(SILLocation loc, SILValue v,
                                        const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getObjectType() ==
          v->getType().getObjectType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(v);
 
   if (v->getType().isAddress())
@@ -266,7 +263,7 @@ ManagedValue SILGenFunction::emitFormalEvaluationManagedBeginBorrow(
     SILLocation loc, SILValue v, const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getObjectType() ==
          v->getType().getObjectType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(v);
   if (v->getOwnershipKind() == OwnershipKind::Guaranteed)
     return ManagedValue::forBorrowedRValue(v);
@@ -278,7 +275,7 @@ ManagedValue SILGenFunction::emitFormalEvaluationManagedBeginBorrow(
 ManagedValue SILGenFunction::emitFormalEvaluationManagedStoreBorrow(
     SILLocation loc, SILValue v, SILValue addr) {
   auto &lowering = getTypeLowering(v->getType());
-  if (lowering.isTrivial() || v->getOwnershipKind() == OwnershipKind::None) {
+  if (lowering.isTrivial(&F) || v->getOwnershipKind() == OwnershipKind::None) {
     lowering.emitStore(B, loc, v, addr, StoreOwnershipQualifier::Trivial);
     return ManagedValue::forTrivialAddressRValue(addr);
   }
@@ -301,7 +298,7 @@ SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
     const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getObjectType() ==
          original->getType().getObjectType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(borrowed);
 
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
@@ -344,7 +341,7 @@ ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
     SILValue borrowed, const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getObjectType() ==
          borrowed->getType().getObjectType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(borrowed);
 
   if (borrowed->getType().isObject() &&
@@ -362,7 +359,7 @@ ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
     SILValue original, SILValue borrowed, const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getObjectType() ==
          original->getType().getObjectType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(borrowed);
 
   if (original->getType().isObject() &&
@@ -382,7 +379,7 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
                                                const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getObjectType() ==
          v->getType().getObjectType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(v);
   if (v->getType().isObject() && v->getOwnershipKind() == OwnershipKind::None) {
     return ManagedValue::forRValueWithoutOwnership(v);
@@ -399,7 +396,7 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
                                                const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getAddressType() == v->getType() ||
          !silConv.useLoweredAddresses());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forTrivialAddressRValue(v);
 
   return ManagedValue::forOwnedAddressRValue(v, enterDestroyCleanup(v));
@@ -1192,7 +1189,7 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
     return ManagedValue::forInContext();
   
   // Add a cleanup for the temporary we allocated.
-  if (bufferTL.isTrivial())
+  if (bufferTL.isTrivial(&F))
     return ManagedValue::forTrivialAddressRValue(buffer);
 
   return ManagedValue::forOwnedAddressRValue(buffer,
@@ -2456,7 +2453,7 @@ ManagedValue SILGenFunction::getManagedValue(SILLocation loc,
   auto &valueTL = getTypeLowering(valueTy);
 
   // If the type is trivial, it's always +1.
-  if (valueTL.isTrivial())
+  if (valueTL.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(value.getValue());
 
   // If it's an object...
@@ -5365,7 +5362,7 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
     // full vector has been constructed.
 
     CleanupHandle destCleanup = CleanupHandle::invalid();
-    if (!eltTL.isTrivial()) {
+    if (!eltTL.isTrivial(&SGF.F)) {
       destCleanup = SGF.enterDestroyCleanup(destAddr);
       SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
       cleanups.push_back(destCleanup);
@@ -5442,7 +5439,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     // full array has been constructed.
 
     CleanupHandle destCleanup = CleanupHandle::invalid();
-    if (!destTL.isTrivial()) {
+    if (!destTL.isTrivial(&SGF.F)) {
       destCleanup = SGF.enterDestroyCleanup(destAddr);
       SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
       cleanups.push_back(destCleanup);
@@ -7099,7 +7096,7 @@ SILValue LValueToPointerFormalAccess::enter(SILGenFunction &SGF,
   SILValue pointer = SGF.B.createAddressToPointer(
     loc, address, SILType::getRawPointerType(SGF.getASTContext()),
     /*needsStackProtection=*/ true);
-  if (!lowering.isTrivial()) {
+  if (!lowering.isTrivial(&SGF.F)) {
     assert(SGF.isInFormalEvaluationScope() &&
            "Must be in formal evaluation scope");
     auto &cleanup = SGF.Cleanups.pushCleanup<FixLifetimeLValueCleanup>();

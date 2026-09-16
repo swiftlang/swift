@@ -513,6 +513,9 @@ private:
   /// Set when this function's arguments and instructions have been lowered to
   /// address form by the AddressLowering function pass.
   unsigned HasLoweredAddresses : 1;
+  
+  /// Set when this function gives trivial values explicit ownership.
+  unsigned HasOwnershipForTrivialValues : 1;
 
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
@@ -799,6 +802,13 @@ public:
   bool hasLoweredAddresses() const;
 
   void setHasLoweredAddresses(bool val = true) { HasLoweredAddresses = val; }
+  
+  bool hasOwnershipForTrivialValues() const {
+    return HasOwnershipForTrivialValues; 
+  }
+  void setOwnershipForTrivialValues(bool val = true) {
+    HasOwnershipForTrivialValues = val; 
+  }
 
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
     return ForceEnableLexicalLifetimes_t(ForceEnableLexicalLifetimes);

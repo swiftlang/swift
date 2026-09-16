@@ -27,7 +27,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Basic/Assertions.h"
 #include "clang/AST/DeclObjC.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/Basic/SourceManager.h"
@@ -40,9 +39,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/FileSystem.h"
 #include <optional>
-#include <tuple>
 
 using namespace swift;
 using namespace swift::index;

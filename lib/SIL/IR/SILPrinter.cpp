@@ -60,7 +60,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormattedStream.h"
-#include <set>
 
 using namespace swift;
 using ID = SILPrintContext::ID;
@@ -3856,12 +3855,15 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (hasUnsafeNonEscapableResult()) {
     OS << "[unsafe_nonescapable_result] ";
   }
-
   if (isExactSelfClass()) {
     OS << "[exact_self_class] ";
   }
-  if (isWithoutActuallyEscapingThunk())
+  if (isWithoutActuallyEscapingThunk()) {
     OS << "[without_actually_escaping] ";
+  }
+  if (hasOwnershipForTrivialValues()) {
+    OS << "[ownership_for_trivial] ";
+  }
 
   switch (getSpecialPurpose()) {
   case SILFunction::Purpose::None:

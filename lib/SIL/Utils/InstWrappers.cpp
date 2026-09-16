@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/SILFunction.h"
 

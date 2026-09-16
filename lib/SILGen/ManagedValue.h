@@ -22,7 +22,6 @@
 
 #include "Cleanup.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILValue.h"
 
