@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -I %S/Inputs \
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %s -I %S/Inputs \
 // RUN:   -cxx-interoperability-mode=default -disable-availability-checking
 
 // Foreign reference types are imported as classes, but unlike other imported
@@ -22,12 +22,16 @@ import CDeclFRT
 // 'Unmanaged' is only available for types that are compatible with
 // 'AnyObject', which foreign reference types are not: they use their own
 // retain/release operations rather than Swift's.
+//
+// The note is anchored at 'Unmanaged', so it lands in Unmanaged.swift when
+// SWIFT_STDLIB_ENABLE_SOURCE_INFO is enabled and at the use site otherwise.
+// Using '*' with '-verify-ignore-unrelated' accepts either.
 @c(unmanagedShared) func unmanagedShared(_ x: Unmanaged<Shared>) { }
 // expected-error@-1 {{'Unmanaged' requires that 'Shared' be a class type}}
-// expected-note@-2 {{requirement specified as 'Instance' : 'AnyObject' [with Instance = Shared]}}
+// expected-note@-2 * {{requirement specified as 'Instance' : 'AnyObject' [with Instance = Shared]}}
 @c(unmanagedImmortal) func unmanagedImmortal() -> Unmanaged<Immortal> { fatalError() }
 // expected-error@-1 {{'Unmanaged' requires that 'Immortal' be a class type}}
-// expected-note@-2 {{requirement specified as 'Instance' : 'AnyObject' [with Instance = Immortal]}}
+// expected-note@-2 * {{requirement specified as 'Instance' : 'AnyObject' [with Instance = Immortal]}}
 
 // A '@c' function cannot be the retain or release operation of a foreign
 // reference type it takes as a parameter, because the entry point retains and
