@@ -21,6 +21,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILValue.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -206,7 +207,7 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
 ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
                                             ManagedValue originalValue,
                                             const TypeLowering &lowering) {
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&SGF.F))
     return originalValue;
 
   SILType ty = originalValue.getType();
@@ -405,7 +406,7 @@ SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
                                            ManagedValue originalValue) {
   SILType ty = originalValue.getType();
   const auto &lowering = SGF.getTypeLowering(ty);
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&SGF.F))
     return originalValue;
 
   assert(lowering.isLoadableOrOpaque(SGF.F) &&
@@ -452,7 +453,7 @@ SILGenBuilder::bufferForExpr(SILLocation loc, SILType ty,
   }
 
   // Add a cleanup for the temporary we allocated.
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&SGF.F))
     return ManagedValue::forTrivialAddressRValue(address);
 
   return SGF.emitManagedBufferWithCleanup(address);
@@ -480,7 +481,7 @@ ManagedValue SILGenBuilder::formalAccessBufferForExpr(
   }
 
   // Add a cleanup for the temporary we allocated.
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&SGF.F))
     return ManagedValue::forTrivialAddressRValue(address);
 
   return SGF.emitFormalAccessManagedBufferWithCleanup(loc, address);
@@ -551,7 +552,7 @@ ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
   assert(lowering.getLoweredType().getAddressType() == v.getType());
   SILValue result =
       lowering.emitLoadOfCopy(*this, loc, v.forward(SGF), IsTake);
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&SGF.F))
     return ManagedValue::forObjectRValueWithoutOwnership(result);
   assert(lowering.isLoadableOrOpaque(SGF.F) &&
          "cannot retain an unloadable type");
@@ -582,7 +583,7 @@ ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v,
   assert(lowering.getLoweredType().getAddressType() == v.getType());
   SILValue result =
       lowering.emitLoadOfCopy(*this, loc, v.getValue(), IsNotTake);
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&SGF.F))
     return ManagedValue::forObjectRValueWithoutOwnership(result);
   assert(lowering.isLoadableOrOpaque(SGF.F) &&
          "cannot retain an unloadable type");
@@ -600,7 +601,8 @@ static ManagedValue createInputFunctionArgument(
   assert((F.isBare() || isFormalParameterPack || decl || isImplicitParameter) &&
          "explicit function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
-  if (auto *pd = dyn_cast_or_null<ParamDecl>(decl)) {
+  auto *pd = dyn_cast_or_null<ParamDecl>(decl);
+  if (pd) {
     if (!arg->getType().isMoveOnly()) {
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
@@ -622,11 +624,22 @@ static ManagedValue createInputFunctionArgument(
     // Guaranteed parameters are passed at +0.
     return ManagedValue::forBorrowedRValue(arg);
   case SILArgumentConvention::Direct_Unowned:
+    // For trivial types with ownership enabled, the argument is outwardly
+    // unowned, but we treat it locally as if it were nontrivial, following
+    // the ownership policy (if any) from the formal argument.
+    if (SGF.F.hasOwnershipForTrivialValues()
+        && SGF.getTypeProperties(arg->getType()).isTrivial()) {
+      if (pd && pd->getValueOwnership() == ValueOwnership::Owned) {
+        arg->setOwnershipKind(OwnershipKind::Owned);
+        return SGF.emitManagedRValueWithCleanup(arg);
+      } else {
+        // Default to guaranteed, like nontrivial parameters do.
+        arg->setOwnershipKind(OwnershipKind::Guaranteed);
+        return ManagedValue::forBorrowedRValue(arg);
+      }
+    }
     // Unowned parameters are only guaranteed at the instant of the call, so we
     // must retain them even if we're in a context that can accept a +0 value.
-    //
-    // NOTE: If we have a trivial value, the copy will do nothing, so this is
-    // just a convenient way to avoid writing conditional code.
     return SGF.B.copyOwnedObjectRValue(loc, arg,
                                        ManagedValue::ScopeKind::Lexical);
 
@@ -869,6 +882,15 @@ ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
   SILValue openedExistential =
       createOpenExistentialRef(loc, original.forward(SGF), type);
   return cloner.clone(openedExistential);
+}
+
+ManagedValue SILGenBuilder::createOpenCOMExistential(SILLocation loc,
+                                                     ManagedValue original,
+                                                     SILType type) {
+  CleanupCloner cloner(*this, original);
+  SILValue openedCOMExistential =
+      createOpenCOMExistential(loc, original.forward(SGF), type);
+  return cloner.clone(openedCOMExistential);
 }
 
 ManagedValue SILGenBuilder::createOpenExistentialValue(SILLocation loc,

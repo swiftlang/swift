@@ -1264,7 +1264,7 @@ class ParamInfo {
       // Can only store_borrow into a temporary allocation for @in_guaranteed.
       return false;
     }
-    if (tl.isTrivial()) {
+    if (tl.isTrivial(&SGF.F)) {
       // Can't store_borrow a trivial type.
       return false;
     }

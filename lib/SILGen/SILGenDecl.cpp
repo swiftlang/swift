@@ -1323,7 +1323,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
         if (mv.getType().isAddress()) {
           // If the enum is address-only, take from the enum we have and load it
           // if the element value is loadable.
-          assert((eltTL.isTrivial() || mv.hasCleanup()) &&
+          assert((eltTL.isTrivial(&SGF.F) || mv.hasCleanup()) &&
                  "must be able to consume value");
           mv = SGF.B.createUncheckedEnumDataAddrForTake(loc, mv, eltDecl, eltTy);
           // Load a loadable data value.
@@ -2369,7 +2369,7 @@ SILGenFunction::useBufferAsTemporary(SILValue addr,
 CleanupHandle
 SILGenFunction::enterDormantTemporaryCleanup(SILValue addr,
                                              const TypeLowering &tempTL) {
-  if (tempTL.isTrivial())
+  if (tempTL.isTrivial(&F))
     return CleanupHandle::invalid();
 
   Cleanups.pushCleanupInState<ReleaseValueCleanup>(CleanupState::Dormant, addr);
@@ -2424,7 +2424,7 @@ SILGenFunction::emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
                                                          SILValue addr) {
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &lowering = getTypeLowering(addr->getType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forTrivialAddressRValue(addr);
 
   auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
@@ -2439,7 +2439,7 @@ SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
                                                          SILValue value) {
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &lowering = getTypeLowering(value->getType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(value);
 
   auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
@@ -2452,7 +2452,7 @@ SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
 CleanupHandle SILGenFunction::enterDormantFormalAccessTemporaryCleanup(
     SILValue addr, SILLocation loc, const TypeLowering &tempTL) {
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
-  if (tempTL.isTrivial())
+  if (tempTL.isTrivial(&F))
     return CleanupHandle::invalid();
 
   auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();

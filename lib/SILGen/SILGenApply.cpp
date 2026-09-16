@@ -442,6 +442,29 @@ private:
             getSubstFormalInterfaceType(substFormalType, subs)),
         Substitutions(subs), Loc(l) {}
 
+  /// Only opened COM existentials dispatch through the foreign interface.
+  /// Generic receivers continue to use Swift witness tables.
+  bool isCOMExistentialMethod() const {
+    if (kind != Kind::WitnessMethod)
+      return false;
+
+    auto *proto = cast<ProtocolDecl>(Constant.getDecl()->getDeclContext());
+    auto selfType = proto->getSelfInterfaceType()->getCanonicalType();
+    return proto->isCOMInterface() &&
+           selfType.subst(Substitutions)->is<ExistentialArchetypeType>();
+  }
+
+  SILType getWitnessMethodType(SILType type) const {
+    ASSERT(kind == Kind::WitnessMethod);
+    if (!isCOMExistentialMethod())
+      return type;
+
+    auto FTy = Lowering::adjustFunctionType(
+        type.castTo<SILFunctionType>(),
+        SILFunctionTypeRepresentation::COMMethod, ProtocolConformanceRef());
+    return SILType::getPrimitiveObjectType(FTy);
+  }
+
 public:
 
   static Callee forIndirect(ManagedValue indirectValue,
@@ -607,7 +630,7 @@ public:
     case Kind::WitnessMethod:
       if (Constant.isForeign)
         return true;
-      return false;
+      return isCOMExistentialMethod();
     case Kind::ClassMethod:
     case Kind::SuperMethod:
     case Kind::DynamicMethod:
@@ -736,7 +759,11 @@ public:
       ArgumentScope S(SGF, Loc);
 
       SILValue fn;
-      if (!constant->isForeign) {
+      if (isCOMExistentialMethod()) {
+        auto SILTy = constantInfo.getSILType();
+        fn = SGF.B.createCOMMethod(Loc, borrowedSelf->getValue(), *constant,
+                                   getWitnessMethodType(SILTy));
+      } else if (!constant->isForeign) {
         fn = SGF.B.createWitnessMethod(
           Loc, lookupType, conformance, *constant,
           constantInfo.getSILType());
@@ -814,7 +841,8 @@ public:
 
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
-      return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
+      return createCalleeTypeInfo(
+          SGF, constant, getWitnessMethodType(constantInfo.getSILType()));
     }
     case Kind::DynamicMethod: {
       auto formalType = getDynamicMethodLoweredType(
@@ -3119,7 +3147,7 @@ private:
       // Create a new value-dependence here if the primary result is
       // trivial.
       auto &valueTL = SGF.getTypeLowering(value.getType());
-      if (valueTL.isTrivial()) {
+      if (valueTL.isTrivial(&SGF.F)) {
         SILValue dependentValue =
           SGF.B.createMarkDependence(eval, value.forward(SGF),
                                      owner.getValue(),
@@ -3967,7 +3995,7 @@ private:
       } else if (isMutatingParameter(ParamInfos.front().getConvention())) {
         paramOwnership = ValueOwnership::InOut;
       } else {
-        paramOwnership = ValueOwnership::Owned;      
+        paramOwnership = ValueOwnership::Owned;
       }
       if (auto addr = SGF.tryEmitAddressableParameterAsAddress(std::move(arg),
                                                               paramOwnership)) {
@@ -4565,7 +4593,7 @@ private:
                                 SILValue packExpansionIndex,
                                 SILValue packIndex) {
       auto partialCleanup = CleanupHandle::invalid();
-      if (!tupleTL.isTrivial()) {
+      if (!tupleTL.isTrivial(&SGF.F)) {
         partialCleanup =
           SGF.enterPartialDestroyPackCleanup(packAddr, formalPackType,
                                              packComponentIndex,
@@ -4636,7 +4664,7 @@ private:
     });
 
     // If the tuple is trivial, we don't need a cleanup.
-    if (tupleTL.isTrivial())
+    if (tupleTL.isTrivial(&SGF.F))
       return CleanupHandle::invalid();
 
     // Otherwise, push a full-tuple cleanup for it.
@@ -4669,7 +4697,7 @@ private:
     // scope, then pop the scope and recreate the cleanup.
     auto eltAddr = eltInit->getManagedAddress().forward(SGF);
     scope.pop();
-    auto cleanup = (paramTL.isTrivial()
+    auto cleanup = (paramTL.isTrivial(&SGF.F)
                       ? CleanupHandle::invalid()
                       : SGF.enterDestroyCleanup(eltAddr));
 
@@ -7881,7 +7909,7 @@ static void collectFakeIndexParameters(SILGenFunction &SGF,
     // storage.
     if (tl.getRecursiveProperties().isAddressOnly()) {
       convention = ParameterConvention::Indirect_In_Guaranteed;
-    } else if (tl.isTrivial()) {
+    } else if (tl.isTrivial(&SGF.F)) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
       convention = ParameterConvention::Direct_Guaranteed;
@@ -7894,7 +7922,7 @@ static void collectFakeIndexParameters(SILGenFunction &SGF,
     // component then copies for each accessor it runs.
     if (tl.getRecursiveProperties().isAddressOnly()) {
       convention = ParameterConvention::Indirect_In;
-    } else if (tl.isTrivial()) {
+    } else if (tl.isTrivial(&SGF.F)) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
       convention = ParameterConvention::Direct_Owned;

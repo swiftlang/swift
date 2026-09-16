@@ -1588,11 +1588,11 @@ void SILGenFunction::emitProlog(
       // Opaque values are always passed 'owned', so add a clean up if needed.
       //
       // TODO: Should this be tied to the mv?
-      if (!lowering.isTrivial())
+      if (!lowering.isTrivial(&F))
         enterDestroyCleanup(val);
 
       ManagedValue mv;
-      if (lowering.isTrivial())
+      if (lowering.isTrivial(&F))
         mv = ManagedValue::forObjectRValueWithoutOwnership(val);
       else
         mv = ManagedValue::forUnmanagedOwnedValue(val);
