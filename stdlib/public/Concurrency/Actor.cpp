@@ -110,7 +110,8 @@ static bool shouldYieldThread() {
 /// Linux) or is a plain global (embedded), give it a stable name and protected
 /// visibility, enabling debuggers to locate the symbol by name and ensuring it
 /// survives stripping the symbol table.
-/// Bump _concurrency_current_task_storage_kind in Debug.h if this changes.
+/// Update swift_concurrency_current_task_storage_kind in
+/// swift/Runtime/ConcurrencyDebug.h if this changes.
 #ifdef SWIFT_THREAD_LOCAL
 extern "C" {
 // (windows) dllexport is not allowed on thread-local variables.

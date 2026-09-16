@@ -221,10 +221,10 @@ public:
   SWIFT_THREAD_LOCAL swift::ThreadLocal<TYPE>
 #if SWIFT_THREADING_NONE
 #define SWIFT_THREAD_LOCAL_STORAGE_KIND                                        \
-  _concurrency_current_task_storage_kind::global
+  SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_GLOBAL
 #else
 #define SWIFT_THREAD_LOCAL_STORAGE_KIND                                        \
-  _concurrency_current_task_storage_kind::cxx_thread_local
+  SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_CXX_THREAD_LOCAL
 #endif
 #elif SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 #define SWIFT_THREAD_LOCAL_TYPE(TYPE, KEY)                                     \
@@ -235,13 +235,13 @@ public:
   SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_DEFERRED_FLAG
 #else
 #define SWIFT_THREAD_LOCAL_STORAGE_KIND                                        \
-  _concurrency_current_task_storage_kind::pthread_reserved_key
+  SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_PTHREAD_RESERVED_KEY
 #endif
 #else
 #define SWIFT_THREAD_LOCAL_TYPE(TYPE, KEY)                                     \
   swift::ThreadLocal<TYPE, swift::ThreadLocalKey>
 #define SWIFT_THREAD_LOCAL_STORAGE_KIND                                        \
-  _concurrency_current_task_storage_kind::pthread_allocated_key
+  SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_PTHREAD_ALLOCATED_KEY
 #endif
 
 #endif // SWIFT_THREADING_THREADLOCALSTORAGE_H

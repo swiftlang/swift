@@ -41,18 +41,6 @@ enum swift_concurrency_current_task_storage_kind {
 #define SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_DEFERRED_FLAG 0x80u
 
 #ifdef __cplusplus
-namespace swift {
-
-enum class _concurrency_current_task_storage_kind : uint8_t {
-  cxx_thread_local =
-      SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_CXX_THREAD_LOCAL,
-  global = SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_GLOBAL,
-  pthread_reserved_key =
-      SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_PTHREAD_RESERVED_KEY,
-  pthread_allocated_key =
-      SWIFT_CONCURRENCY_CURRENT_TASK_STORAGE_KIND_PTHREAD_ALLOCATED_KEY,
-};
-
 extern "C" {
 #endif
 
@@ -68,7 +56,6 @@ extern uint32_t _swift_concurrency_debug_current_task_storage_kind;
 
 #ifdef __cplusplus
 }
-} // namespace swift
 #endif
 
 #endif // SWIFT_RUNTIME_CONCURRENCYDEBUG_H
