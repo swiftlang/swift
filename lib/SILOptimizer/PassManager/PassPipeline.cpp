@@ -298,6 +298,7 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
     if (P.getOptions().EnableLifetimeDependenceDiagnostics)
       P.addLifetimeDependenceInsertion();
 
+    P.addMandatoryAllocBoxToStack();
     P.addRemoveSILGenLifetimes();
     P.addLifetimeResolution();
     return P;
