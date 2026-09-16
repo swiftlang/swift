@@ -171,6 +171,19 @@ do {
   s3.append(contentsOf: [(x, 3), (x, 4), (x, 4)])
 }
 
+// More tuple label weirdness
+do {
+  func g(_: [(a: Int, b: Int)]) {}
+
+  let x = 0
+  let y = 1
+
+  func f(b: Bool) {
+      g([(aa: x, bb: x), (y, y)])
+      g(b ? [(aa: x, bb: x), (y, y)] : [])
+  }
+}
+
 do {
   struct S {
     let a = 0.0
