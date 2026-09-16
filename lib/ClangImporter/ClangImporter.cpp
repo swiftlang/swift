@@ -535,7 +535,8 @@ getClangSupportedSanitizers(const llvm::Triple &triple) {
       driver.BuildCompilation(argv));
   if (!compilation)
     return {};
-  return compilation->getDefaultToolChain().getSupportedSanitizers();
+  return compilation->getDefaultToolChain().getSupportedSanitizers(
+      /*BoundArch=*/{}, clang::driver::Action::OFK_None);
 }
 
 void importer::getNormalInvocationArguments(

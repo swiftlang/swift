@@ -2916,7 +2916,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   if (castStorageToType)
     storageType = cast<ClassTypeInfo>(ti).getClassLayoutType();
 
-  return Address(addr, storageType, Alignment(gvar->getAlignment()));
+  return Address(addr, storageType, Alignment(gvar->getAlign().valueOrOne().value()));
 }
 
 llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
@@ -5929,7 +5929,7 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
   llvm::Constant *&entry = cache[entity];
   if (entry) {
     auto existing = cast<llvm::GlobalVariable>(entry);
-    assert(alignment == Alignment(existing->getAlignment()));
+    assert(alignment == Alignment(existing->getAlign().valueOrOne().value()));
     if (forDefinition) updateLinkageForDefinition(IGM, existing, entity);
     return Address(entry, type, alignment);
   }
