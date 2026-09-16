@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/SearchPathOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/Errc.h"
 

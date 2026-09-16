@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "insert-hop-to-executor"
 
 #include "swift/AST/ConformanceLookup.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"

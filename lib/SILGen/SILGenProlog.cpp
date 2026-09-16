@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ArgumentSource.h"
 #include "ExecutorBreadcrumb.h"
 #include "FunctionInputGenerator.h"
 #include "Initialization.h"
@@ -19,12 +18,10 @@
 #include "Scope.h"
 #include "TupleGenerators.h"
 
-#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Generators.h"
 #include "swift/SIL/SILArgument.h"

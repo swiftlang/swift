@@ -17,7 +17,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

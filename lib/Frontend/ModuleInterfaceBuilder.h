@@ -18,7 +18,6 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Serialization/SerializationOptions.h"
-#include "llvm/Support/StringSaver.h"
 
 namespace llvm {
 namespace vfs {

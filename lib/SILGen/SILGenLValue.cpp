@@ -43,7 +43,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 using namespace Lowering;

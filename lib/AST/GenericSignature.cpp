@@ -24,9 +24,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/STLExtras.h"
 #include "RequirementMachine/RequirementMachine.h"
-#include <functional>
 
 using namespace swift;
 

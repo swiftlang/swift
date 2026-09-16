@@ -10,32 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <fstream>
 
 #include "ToolChains.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Basic/Range.h"
-#include "swift/Basic/TaskQueue.h"
-#include "swift/Config.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
-#include "swift/IDETool/CompilerInvocation.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
-#include "clang/Basic/Version.h"
-#include "clang/Driver/Util.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
-#include "llvm/Support/Program.h"
 
 using namespace swift;
 using namespace swift::driver;

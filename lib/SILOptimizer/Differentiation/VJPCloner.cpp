@@ -19,7 +19,6 @@
 
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"

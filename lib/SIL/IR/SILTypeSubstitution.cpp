@@ -20,10 +20,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/AST/InFlightSubstitution.h"
-#include "swift/AST/PackConformance.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/CanTypeVisitor.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace Lowering;
