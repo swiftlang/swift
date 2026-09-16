@@ -7,35 +7,15 @@
 // convention; Linux emits an ordinary declare for the same symbol.
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=xros
 
-// IRGen for the split (split) continuation builtins.
-//
-// The companion check is in builtins.sil, which is *unmodified* by the change
-// that added these: resuming a split continuation emits exactly the sequence
-// it always did.  This file pins the other half -- what create, get/await and
-// destroy lower to -- and in particular the two things the design rests on:
-//
-//   * the continuation is read as if it were a task, so that a resume needs no knowledge
-//     of which flavour it has, and
-//   * the awaiting frame binds its own Parent/ResumeParent into the continuation
-//     context immediately before suspending, because create deliberately bound
-//     nothing.
-
 sil_stage canonical
 
 import Builtin
 import Swift
 import _Concurrency
 
-// Create takes only the result metadata: a split continuation carries no
-// AsyncContinuationFlags, because it can always throw and the other two flags an
-// ordinary continuation understands cannot apply to it.
-//
 // CHECK-LABEL: define{{.*}} swiftcc ptr @split_create()
 // CHECK:   call swiftcc ptr @swift_continuation_createSplit(ptr
 // CHECK: }
-// The reference is `extern_weak`, not a hard one: these entry points are gated on
-// the SplitContinuation feature availability, so a client whose deployment target
-// predates it gets a guarded reference rather than one that fails to resolve.
 // CHECK: declare extern_weak swiftcc ptr @swift_continuation_createSplit(ptr)
 sil @split_create : $@convention(thin) () -> Builtin.RawUnsafeContinuation {
 bb0:
@@ -44,8 +24,6 @@ bb0:
   return %tok : $Builtin.RawUnsafeContinuation
 }
 
-// Destroy is handed the continuation, which is where the allocation starts.
-//
 // CHECK-LABEL: define{{.*}} swiftcc void @split_destroy(ptr %0)
 // CHECK:   call swiftcc void @swift_continuation_destroySplit(ptr %0)
 // CHECK: }
@@ -57,15 +35,6 @@ bb0(%continuation : $Builtin.RawUnsafeContinuation):
   return %t : $()
 }
 
-// Awaiting a continuation bound with getSplitContinuationAddr:
-//
-//   * the context is loaded out of the continuation by reading the field at which
-//     an AsyncTask keeps its own ResumeContext -- the continuation is shaped like
-//     the front of a task, and this is where that shape is relied on;
-//   * this frame's async context is stored as Parent and a fresh coro resume
-//     function as ResumeParent, since create bound neither; and
-//   * the suspension tail-calls swift_continuation_awaitSplit with the continuation.
-//
 // CHECK-LABEL: define{{.*}} swifttailcc void @split_await(ptr swiftasync %0, ptr %1)
 // CHECK:   [[CTXADDR:%.*]] = getelementptr inbounds nuw %swift.task, ptr %1, i32 0, i32 {{[0-9]+}}
 // CHECK:   [[CTX:%.*]] = load ptr, ptr [[CTXADDR]]
@@ -77,11 +46,6 @@ bb0(%continuation : $Builtin.RawUnsafeContinuation):
 // CHECK:   musttail call swifttailcc void @swift_continuation_awaitSplit(ptr %1)
 // CHECK: }
 
-// On resume the value is taken out of the context's own result storage -- which
-// is where a resume that raced ahead of the await wrote it -- and moved into this
-// frame's resume buffer.  NormalResult is field 4 of the continuation context,
-// the layout IRGen fixes and which therefore must not move.
-//
 // CHECK-LABEL: define internal swifttailcc void @split_awaitTQ0_(ptr swiftasync %0)
 // CHECK:   [[RESULTADDR:%.*]] = getelementptr inbounds nuw %swift.continuation_context, ptr {{%.*}}, i32 0, i32 4
 // CHECK:   [[RESULT:%.*]] = load ptr, ptr [[RESULTADDR]]

@@ -2,11 +2,6 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_SplitContinuations
 
-// Round-trip (parse -> print -> parse -> print) and verify the
-// split-continuation builtins.  Awaiting one reuses await_async_continuation:
-// the only new piece is getSplitContinuationAddr, which binds a continuation created
-// elsewhere to this function.
-
 import Builtin
 import Swift
 import _Concurrency
@@ -22,11 +17,6 @@ bb0:
   return %tok : $Builtin.RawUnsafeContinuation
 }
 
-// getSplitContinuationAddr binds a split continuation to this function's resume
-// buffer; the suspension itself is the ordinary await_async_continuation.  The
-// non-throwing form has only a resume successor, which takes no arguments
-// because the value is delivered into the resume buffer.
-//
 // CHECK-LABEL: sil @split_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
 sil @split_await : $@async (Builtin.RawUnsafeContinuation) -> () {
 // CHECK: bb0([[TOK:%.*]] : $Builtin.RawUnsafeContinuation):
@@ -45,9 +35,6 @@ bb1:
   return undef : $()
 }
 
-// The throwing form has both successors, and the error successor takes the
-// error as its single argument.
-//
 // CHECK-LABEL: sil @split_await_throws : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
 sil @split_await_throws : $@async (Builtin.RawUnsafeContinuation) -> () {
 // CHECK: bb0([[TOK:%.*]] : $Builtin.RawUnsafeContinuation):
@@ -71,9 +58,6 @@ bb3:
   return undef : $()
 }
 
-// A split continuation is resumed with the ordinary resume builtins: it is
-// task-shaped, so the context is loaded out of it exactly as it is from a task.
-//
 // CHECK-LABEL: sil @split_resume : $@convention(thin) (Builtin.RawUnsafeContinuation, @in Builtin.Int32) -> () {
 sil @split_resume : $@convention(thin) (Builtin.RawUnsafeContinuation, @in Builtin.Int32) -> () {
 bb0(%continuation : $Builtin.RawUnsafeContinuation, %val : $*Builtin.Int32):
