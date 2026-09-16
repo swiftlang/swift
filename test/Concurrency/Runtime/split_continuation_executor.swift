@@ -7,6 +7,8 @@
 // REQUIRES: swift_feature_SplitContinuations
 // UNSUPPORTED: back_deployment_runtime
 
+// A pre-existing OptimizeHopToExecutor bug.
+// Tracked by https://github.com/swiftlang/swift/issues/92356
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 @_spi(Concurrency) import _Concurrency
