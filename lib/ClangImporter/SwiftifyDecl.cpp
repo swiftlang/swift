@@ -1042,8 +1042,8 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     return;
 
   DLOG("Attaching safe interop macro: " << MacroString << "\n");
-  if (clang::RawComment *raw =
-          getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
+  if (const clang::RawComment *raw =
+          getClangASTContext().getRawCommentForAnyRedecl(ClangDecl)) {
     // swift::RawDocCommentAttr doesn't contain its text directly, but instead
     // references the source range of the parsed comment. Instead of creating
     // a new source file just to parse the doc comment, we can add the

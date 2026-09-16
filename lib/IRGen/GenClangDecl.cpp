@@ -201,8 +201,8 @@ clang::Decl *getDeclWithExecutableCode(clang::Sema &clangSema,
     // If this is a defaulted comparison op, we will have body once we define
     // it.
     if (fd->isDefaulted() && !fd->isDeleted() &&
-        clangSema.getDefaultedComparisonKind(fd) !=
-            clang::Sema::DefaultedComparisonKind::None)
+        fd->getDefaultedComparisonKind() !=
+            clang::DefaultedComparisonKind::None)
       return fd;
   } else if (auto vd = dyn_cast<clang::VarDecl>(decl)) {
     clang::VarDecl *initializingDecl = vd->getInitializingDeclaration();
@@ -289,8 +289,8 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
       // have a body until explicitly defined. Define them here.
       if (fn->isDefaulted() && !fn->isDeleted() &&
           !fn->doesThisDeclarationHaveABody()) {
-        auto DCK = clangSema.getDefaultedComparisonKind(fn);
-        if (DCK != clang::Sema::DefaultedComparisonKind::None)
+        auto DCK = fn->getDefaultedComparisonKind();
+        if (DCK != clang::DefaultedComparisonKind::None)
           clangSema.DefineDefaultedComparison(fn->getLocation(), fn, DCK);
       }
     }
