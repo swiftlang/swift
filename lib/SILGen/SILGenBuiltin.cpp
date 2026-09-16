@@ -1340,13 +1340,27 @@ static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
   }
 }
 
+static Expr *lookThroughFunctionConversionExpr(Expr *E) {
+  if (auto FunctionConversion = dyn_cast<FunctionConversionExpr>(E)) {
+    return lookThroughFunctionConversionExpr(FunctionConversion->getSubExpr());
+  }
+
+  return E;
+}
+
 static ManagedValue emitBuiltinApplyDerivative(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
     ArrayRef<ManagedValue> args, SGFContext C) {
   auto *callExpr = loc.castToASTNode<CallExpr>();
-  auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
-      cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
+
+  // Peel off function conversions (e.g. implicitly added @Sendable conversion)
+  auto *directCallee =
+      lookThroughFunctionConversionExpr(callExpr->getDirectCallee());
+
+  auto builtinDecl = cast<FuncDecl>(
+      cast<DeclRefExpr>(cast<DotSyntaxBaseIgnoredExpr>(directCallee)->getRHS())
           ->getDecl());
+
   const auto builtinName = builtinDecl->getBaseIdentifier().str();
   AutoDiffDerivativeFunctionKind kind;
   unsigned arity;
