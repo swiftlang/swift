@@ -2308,8 +2308,13 @@ class ExprAvailabilityWalker : public BaseDiagnosticWalker {
   }
 
 public:
-  explicit ExprAvailabilityWalker(const ExportContext &Where)
-    : Context(Where.getDeclContext()->getASTContext()), Where(Where) {}
+  explicit ExprAvailabilityWalker(const ExportContext &Where,
+                                  bool preconcurrency = false)
+      : Context(Where.getDeclContext()->getASTContext()), Where(Where) {
+    if (preconcurrency) {
+      PreconcurrencyCalleeStack.push_back(true);
+    }
+  }
 
   PreWalkAction walkToArgumentPre(const Argument &Arg) override {
     // Arguments should be walked in their own member access context which
@@ -2464,15 +2469,11 @@ public:
                                               EE->getLoc(),
                                               Where.getDeclContext());
 
-      bool preconcurrency = false;
-      if (!PreconcurrencyCalleeStack.empty()) {
-        preconcurrency = PreconcurrencyCalleeStack.back();
-      }
-
       for (ProtocolConformanceRef C : EE->getConformances()) {
-        diagnoseConformanceAvailability(E->getLoc(), C, Where, Type(), Type(),
-                                        /*useConformanceAvailabilityErrorsOpt=*/true,
-                                        /*preconcurrency=*/preconcurrency);
+        diagnoseConformanceAvailability(
+            E->getLoc(), C, Where, Type(), Type(),
+            /*useConformanceAvailabilityErrorsOpt=*/true,
+            /*preconcurrency=*/preconcurrency());
       }
     }
 
@@ -2511,18 +2512,25 @@ public:
     // differ, e.g for things like `guard #available(...)`.
     class StmtRecurseWalker : public BaseDiagnosticWalker {
       DeclContext *DC;
+      bool preconcurrency;
 
     public:
-      StmtRecurseWalker(DeclContext *DC) : DC(DC) {}
+      StmtRecurseWalker(DeclContext *DC, bool inPreconcurrency)
+          : DC(DC), preconcurrency(inPreconcurrency) {}
 
       PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-        diagnoseExprAvailability(E, DC);
+        diagnoseExprAvailability(E, DC, preconcurrency);
         return Action::SkipNode(E);
       }
     };
-    StmtRecurseWalker W(Where.getDeclContext());
+    StmtRecurseWalker W(Where.getDeclContext(), preconcurrency());
     S->walk(W);
     return Action::SkipNode(S);
+  }
+
+  bool preconcurrency() const {
+    return PreconcurrencyCalleeStack.empty() ? false
+                                             : PreconcurrencyCalleeStack.back();
   }
 
   bool
@@ -2725,7 +2733,15 @@ private:
     auto where = ExportContext::forFunctionBody(closure, closure->getStartLoc());
     if (where.isImplicit())
       return;
-    ExprAvailabilityWalker walker(where);
+
+    bool preconcurrency = false;
+    if (auto closureExpr = dyn_cast<ClosureExpr>(closure)) {
+      if (closureExpr->isConversionClosure()) {
+        preconcurrency = this->preconcurrency();
+      }
+    }
+
+    ExprAvailabilityWalker walker(where, preconcurrency);
 
     // Manually dive into the body
     closure->getBody()->walk(walker);
@@ -3095,7 +3111,8 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 }
 
 /// Diagnose uses of unavailable declarations.
-void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
+void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC,
+                                     bool preconcurrency) {
   auto where = ExportContext::forFunctionBody(DC, E->getStartLoc());
   // FIXME: We skip availability checking for expressions in synthesized
   // derivation macros to match the behavior of the old built-in conformance
@@ -3106,7 +3123,7 @@ void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
   // https://github.com/swiftlang/swift/issues/77589.
   if (where.isImplicit() || E->isFromSyntheticMacroExpansion(DC))
     return;
-  ExprAvailabilityWalker walker(where);
+  ExprAvailabilityWalker walker(where, preconcurrency);
   const_cast<Expr *>(E)->walk(walker);
 }
 
