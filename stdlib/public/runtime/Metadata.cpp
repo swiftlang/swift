@@ -1072,6 +1072,10 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
     return theClass;
   }
 
+  if (auto *prespecialized =
+          getLibPrespecializedObjCClassWrapperMetadata(theClass))
+    return prespecialized;
+
   return &ObjCClassWrappers.getOrInsert(theClass).first->Data;
 }
 
