@@ -8361,12 +8361,14 @@ std::pair<Expr *, ArgumentList *> ExprRewriter::buildDynamicCallable(
                                DeclNameLoc(), loc, loc,
                                /*implicit=*/true, AccessSemantics::Ordinary);
 
+  auto argsRange = args->getSourceRange();
+
   // Construct argument to the method (either an array or dictionary
   // expression).
   Expr *argExpr = nullptr;
   if (!useKwargsMethod) {
-    argExpr = ArrayExpr::create(ctx, SourceLoc(), args->getArgExprs(), {},
-                                SourceLoc());
+    argExpr = ArrayExpr::create(ctx, argsRange.Start, args->getArgExprs(), {},
+                                argsRange.End);
     cs.setType(argExpr, argumentType);
     finishArrayExpr(cast<ArrayExpr>(argExpr));
   } else {
@@ -8378,9 +8380,15 @@ std::pair<Expr *, ArgumentList *> ExprRewriter::buildDynamicCallable(
     SmallVector<Identifier, 4> names;
     SmallVector<Expr *, 4> dictElements;
     for (auto arg : *args) {
+      // An unlabeled argument contributes an empty key, so fall back to the
+      // start of the argument for the same reason as above.
+      auto labelLoc = arg.getLabelLoc();
+      if (labelLoc.isInvalid())
+        labelLoc = arg.getStartLoc();
+
       Expr *labelExpr =
-        new (ctx) StringLiteralExpr(arg.getLabel().get(), arg.getLabelLoc(),
-                                    /*Implicit*/ true);
+          new (ctx) StringLiteralExpr(arg.getLabel().get(), labelLoc,
+                                      /*Implicit*/ true);
       cs.setType(labelExpr, keyType);
       handleStringLiteralExpr(cast<LiteralExpr>(labelExpr));
 
@@ -8391,8 +8399,8 @@ std::pair<Expr *, ArgumentList *> ExprRewriter::buildDynamicCallable(
       cs.setType(pair, TupleType::get(eltTypes, ctx));
       dictElements.push_back(pair);
     }
-    argExpr = DictionaryExpr::create(ctx, SourceLoc(), dictElements, {},
-                                     SourceLoc());
+    argExpr = DictionaryExpr::create(ctx, argsRange.Start, dictElements, {},
+                                     argsRange.End);
     cs.setType(argExpr, argumentType);
     finishDictionaryExpr(cast<DictionaryExpr>(argExpr));
   }
