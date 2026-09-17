@@ -63,6 +63,24 @@ static int32_t COM_CALL Multiply(struct Interface *self, int32_t factor) {
   return self->Owner->StoredValue * factor;
 }
 
+static int32_t COM_CALL GetValue(struct Interface *self,
+                                 struct Interface **result) {
+  assert(self == &self->Owner->Value);
+  ++MethodCalls;
+  if (!result)
+    return (int32_t)0x80004003u; // E_POINTER
+  AddRef(self);
+  *result = self;
+  return 0;
+}
+
+static int32_t COM_CALL Matches(struct Interface *self,
+                                struct Interface *other) {
+  assert(self == &self->Owner->Value);
+  ++MethodCalls;
+  return self == other;
+}
+
 static int32_t COM_CALL get_Value(struct Interface *self) {
   assert(self == &self->Owner->Property);
   ++MethodCalls;
@@ -97,7 +115,10 @@ static const struct {
   struct IdentityVTable Identity;
   int32_t(COM_CALL *Value)(struct Interface *, int32_t);
   int32_t(COM_CALL *Multiply)(struct Interface *, int32_t);
-} ValueVTable = {{QueryInterface, AddRef, Release}, Value, Multiply};
+  int32_t(COM_CALL *GetValue)(struct Interface *, struct Interface **);
+  int32_t(COM_CALL *Matches)(struct Interface *, struct Interface *);
+} ValueVTable = {
+    {QueryInterface, AddRef, Release}, Value, Multiply, GetValue, Matches};
 
 static const struct {
   struct IdentityVTable Identity;

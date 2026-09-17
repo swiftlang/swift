@@ -3247,6 +3247,18 @@ bool TypeBase::hasRetainablePointerRepresentation() {
   return ::hasRetainablePointerRepresentation(getCanonicalType());
 }
 
+bool TypeBase::hasCCompatibleForeignReferenceRepresentation() {
+  Type type(this);
+  if (auto objectType = type->getOptionalObjectType())
+    type = objectType;
+
+  if (auto existential = type->getAs<ExistentialType>())
+    type = existential->getConstraintType();
+
+  return type->isExistentialType() &&
+         type->getExistentialLayout().getCOMInterface();
+}
+
 bool TypeBase::isBridgeableObjectType() {
   return ::isBridgeableObjectType(getCanonicalType());
 }
@@ -3359,6 +3371,11 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   // If type has an error let's fail early.
   if (type->hasError())
     return failure();
+
+  // A COM existential is representable in C as its bare interface pointer.
+  if (language == ForeignLanguage::C &&
+      type->hasCCompatibleForeignReferenceRepresentation())
+    return {ForeignRepresentableKind::Trivial, nullptr};
 
   // Look through one level of optional type, but remember that we did.
   bool wasOptional = false;
