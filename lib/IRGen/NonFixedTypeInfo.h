@@ -151,6 +151,12 @@ public:
     return new Self(type, abiAccessible);
   }
 
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   void bitwiseCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
                    SILType T, bool isOutlined) const {
     IGF.Builder.CreateMemCpy(destAddr, srcAddr, getSize(IGF, T));

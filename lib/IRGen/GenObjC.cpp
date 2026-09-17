@@ -196,6 +196,12 @@ namespace {
                      align) {
     }
 
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     /// AnyObject requires ObjC reference-counting.
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Unknown;
@@ -224,6 +230,12 @@ namespace {
                  SpareBitVector spareBits, Alignment align)
       : HeapTypeInfo(ReferenceCounting::Bridge, storageType, size, spareBits,
                      align) {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     /// Builtin.BridgeObject uses its own specialized refcounting implementation.
     ReferenceCounting getReferenceCounting() const {

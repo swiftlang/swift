@@ -41,6 +41,7 @@
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"
+#include "swift/SIL/SILTypeProperties.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/ValueUtils.h"
 #include "swift/Strings.h"
@@ -2050,11 +2051,6 @@ enum UsesMoveableValueDebugInfo_t : bool {
 enum HasDynamicLifetime_t : bool {
   DoesNotHaveDynamicLifetime = false,
   HasDynamicLifetime = true,
-};
-
-enum IsLexical_t : bool {
-  IsNotLexical = false,
-  IsLexical = true,
 };
 
 enum HasPointerEscape_t : bool {
