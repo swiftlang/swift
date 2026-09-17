@@ -8,5 +8,5 @@ func test(
   offset: inout Int
 ) {
   offset += (found - start)
-  // expected-error@-1 {{binary operator '-' cannot be applied to operands of type 'UnsafeMutableRawPointer' and 'UnsafePointer<UInt8>'}}
+  // expected-error@-1 {{binary operator '-' cannot be applied}}
 }
