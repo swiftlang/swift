@@ -109,6 +109,13 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
   for (auto elt : enumDecl->getAllElements()) {
     ++elementCount;
 
+    if (auto *unavailableElementCase =
+            DerivedConformance::unavailableEnumElementCaseStmt(
+                enumType, elt, ltDecl, /*subPatternCount=*/2)) {
+      cases.push_back(unavailableElementCase);
+      continue;
+    }
+
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 4> lhsPayloadVars;
     auto *lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(

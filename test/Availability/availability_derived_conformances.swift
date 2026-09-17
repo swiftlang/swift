@@ -223,6 +223,89 @@ public enum PayloadEnum: Hashable {
   // CHECK-NEXT:   }
 }
 
+// CHECK-LABEL:  public enum ComparableNoPayloadEnum : Comparable {
+
+public enum ComparableNoPayloadEnum: Comparable {
+  case alwaysAvailable
+
+  @available(*, unavailable)
+  case universallyUnavailable
+
+  @available(swift, obsoleted: 4)
+  case obsoletedInSwift4
+
+  // CHECK-LABEL:   @_implements(Comparable, <(_:_:)) public static func __derived_enum_less_than(_ a: ComparableNoPayloadEnum, _ b: ComparableNoPayloadEnum) -> Bool {
+  // CHECK-NEXT:     var index_a: Int
+  // CHECK-NEXT:     switch a {
+  // CHECK-NEXT:     case .alwaysAvailable:
+  // CHECK-NEXT:       index_a = 0
+  // CHECK-NEXT:     case .universallyUnavailable:
+  // CHECK-NEXT:       _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:     case .obsoletedInSwift4:
+  // CHECK-NEXT:       index_a = 1
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:     var index_b: Int
+  // CHECK-NEXT:     switch b {
+  // CHECK-NEXT:     case .alwaysAvailable:
+  // CHECK-NEXT:       index_b = 0
+  // CHECK-NEXT:     case .universallyUnavailable:
+  // CHECK-NEXT:       _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:     case .obsoletedInSwift4:
+  // CHECK-NEXT:       index_b = 1
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:     return index_a < index_b
+  // CHECK-NEXT:   }
+}
+
+// CHECK-LABEL:  public enum ComparablePayloadEnum : Comparable {
+
+public enum ComparablePayloadEnum: Comparable {
+  case alwaysAvailable(Int)
+
+  @available(*, unavailable)
+  case universallyUnavailable(Int)
+
+  @available(swift, obsoleted: 4)
+  case obsoletedInSwift4(Int)
+
+  // CHECK-LABEL:   @_implements(Comparable, <(_:_:)) public static func __derived_enum_less_than(_ a: ComparablePayloadEnum, _ b: ComparablePayloadEnum) -> Bool {
+  // CHECK-NEXT:     switch (a, b) {
+  // CHECK-NEXT:     case (.alwaysAvailable(let l0), .alwaysAvailable(let r0)):
+  // CHECK-NEXT:       guard l0 == r0 else {
+  // CHECK-NEXT:         return l0 < r0
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       return false
+  // CHECK-NEXT:     case (.universallyUnavailable, .universallyUnavailable):
+  // CHECK-NEXT:       _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:     case (.obsoletedInSwift4(let l0), .obsoletedInSwift4(let r0)):
+  // CHECK-NEXT:       guard l0 == r0 else {
+  // CHECK-NEXT:         return l0 < r0
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       return false
+  // CHECK-NEXT:     default:
+  // CHECK-NEXT:       var index_a: Int
+  // CHECK-NEXT:       switch a {
+  // CHECK-NEXT:       case .alwaysAvailable:
+  // CHECK-NEXT:         index_a = 0
+  // CHECK-NEXT:       case .universallyUnavailable:
+  // CHECK-NEXT:         _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:       case .obsoletedInSwift4:
+  // CHECK-NEXT:         index_a = 1
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       var index_b: Int
+  // CHECK-NEXT:       switch b {
+  // CHECK-NEXT:       case .alwaysAvailable:
+  // CHECK-NEXT:         index_b = 0
+  // CHECK-NEXT:       case .universallyUnavailable:
+  // CHECK-NEXT:         _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:       case .obsoletedInSwift4:
+  // CHECK-NEXT:         index_b = 1
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       return index_a < index_b
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+}
+
 // CHECK-LABEL:  public enum UnavailableEnum : Int {
 
 @available(*, unavailable)
