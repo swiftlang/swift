@@ -15,6 +15,9 @@
 // It's enough to verify cache behavior on one platform.
 // REQUIRES: OS=macosx
 
+// This test measures RSS growth via a fixed byte threshold, which ASan invalidates rather than releasing
+// UNSUPPORTED: asan
+
 import Distributed
 import FakeDistributedActorSystems
 
