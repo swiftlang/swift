@@ -40,6 +40,7 @@
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
+#include "swift/SILOptimizer/Transforms/AddressLowering.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
@@ -2856,6 +2857,7 @@ bool PullbackCloner::Implementation::run() {
     auto *pm = &getContext().getPassManager();
     pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(&pullback);
     completeAllLifetimes(pm, &pullback);
+    lowerAddress(pm, &pullback);
     pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
   }
 
