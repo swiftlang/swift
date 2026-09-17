@@ -669,11 +669,13 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
       auto *lhsFunc = lhs->castTo<FunctionType>();
       auto *rhsFunc = rhs->castTo<FunctionType>();
 
-      // Note: getConversionBehavior() guarantees the function types don't
-      // contain any parameter packs, so we may assume their lengths are
-      // known.
-      if (lhsFunc->getNumParams() != rhsFunc->getNumParams())
-        return ConflictReason(ConflictFlag::FunctionParamCount);
+      auto lhsInfo = lhsFunc->getExtInfo();
+      auto rhsInfo = rhsFunc->getExtInfo();
+      auto reason = checkExtInfoConversion(cache,
+                                           lhsFunc, rhsFunc,
+                                           lhsInfo, rhsInfo, sig);
+      if (reason)
+        return reason;
 
       auto result = checkConversion(cache,
                                     lhsFunc->getResult(),
@@ -682,9 +684,54 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
       if (result)
         return result | ConflictFlag::FunctionResult;
 
-      for (unsigned i : indices(lhsFunc->getParams())) {
-        auto lhsParam = lhsFunc->getParams()[i];
-        auto rhsParam = rhsFunc->getParams()[i];
+      auto lhsParams = lhsFunc->getParams();
+      auto rhsParams = rhsFunc->getParams();
+
+      // Note: getConversionBehavior() guarantees the function types don't
+      // contain any parameter packs, so we may assume their lengths are
+      // known.
+      if (lhsFunc->getNumParams() != rhsFunc->getNumParams()) {
+        // Handle the "tuple splat" special case.
+        if (isSingleTupleParam(rhsParams) &&
+            AnyFunctionType::canComposeTuple(lhsParams)) {
+          // Implode the left-hand side arguments into a tuple and compare
+          // against the right-hand side parameter type.
+          auto lhsType = AnyFunctionType::composeTuple(
+              lhsFunc->getASTContext(),
+              lhsParams,
+              ParameterFlagHandling::IgnoreNonEmpty);
+          auto rhsType = rhsParams[0].getPlainType();
+          auto result = checkConversion(cache, lhsType, rhsType, sig);
+          if (result)
+            return result | ConflictFlag::FunctionTupleSplat;
+
+          // Success.
+          break;
+        } else if (isSingleTupleParam(lhsParams) &&
+                   AnyFunctionType::canComposeTuple(rhsParams)) {
+          // Implode the right-hand side parameters into a tuple and
+          // compare against the left-hand side argument type.
+          auto lhsType = lhsParams[0].getPlainType();
+          auto rhsType = AnyFunctionType::composeTuple(
+              lhsFunc->getASTContext(),
+              lhsParams,
+              ParameterFlagHandling::IgnoreNonEmpty);
+          auto result = checkConversion(cache, lhsType, rhsType, sig);
+          if (result)
+            return result | ConflictFlag::FunctionTupleSplat;
+
+          // Success.
+
+        }
+
+        // Otherwise, it's a conflict.
+        return ConflictReason(ConflictFlag::FunctionParamCount);
+      }
+
+      // Check each parameter against each argument.
+      for (unsigned i : indices(lhsParams)) {
+        auto lhsParam = lhsParams[i];
+        auto rhsParam = rhsParams[i];
 
         if (lhsParam.isInOut() != rhsParam.isInOut())
           return ConflictReason(ConflictFlag::FunctionParamFlags);
@@ -707,14 +754,6 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
             return result | ConflictFlag::FunctionParamType;
         }
       }
-
-      auto lhsInfo = lhsFunc->getExtInfo();
-      auto rhsInfo = rhsFunc->getExtInfo();
-      auto reason = checkExtInfoConversion(cache,
-                                           lhsFunc, rhsFunc,
-                                           lhsInfo, rhsInfo, sig);
-      if (reason)
-        return reason;
 
       break;
     }
@@ -1877,4 +1916,6 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " function_throws";
   if (reason.contains(ConflictFlag::FunctionSendable))
     out << " function_sendable";
+  if (reason.contains(ConflictFlag::FunctionTupleSplat))
+    out << " function_tuple_splat";
 }

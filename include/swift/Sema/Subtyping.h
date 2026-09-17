@@ -176,7 +176,8 @@ enum ConflictFlag : unsigned {
   FunctionNoEscape = 1 << 18,
   FunctionAsync = 1 << 19,
   FunctionThrows = 1 << 20,
-  FunctionSendable = 1 << 21
+  FunctionSendable = 1 << 21,
+  FunctionTupleSplat = 1 << 22
 };
 using ConflictReason = OptionSet<ConflictFlag>;
 
