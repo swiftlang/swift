@@ -346,6 +346,12 @@ struct PotentialBindings {
 
   void infer(Constraint *constraint);
 
+  /// Determine if the given typeVar, or any of the type variables in its
+  /// equivalence class, have a locator indicating they are from a single
+  /// expression closure and thus will convert to Void and need a fallback
+  /// binding kind
+  static bool isToVoidTypeVar(TypeVariableType *typeVar, ConstraintSystem *CS);
+
   /// Retract all bindings and other information related to a given
   /// constraint from this binding set.
   ///

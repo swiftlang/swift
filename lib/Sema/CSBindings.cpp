@@ -3620,12 +3620,19 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   }
 
   // We allow a funny function conversion (...) -> T conv (...) -> Void
-  // in certain positions. To handle this correctly, we must not attempt
-  // a Void binding too soon in this situation. Handle it like a fallback
-  // instead of a real subtype relationship, since it isn't one.
+  // in locations with single expression closures (SEC), regardless of the
+  // declared type. To handle this correctly, we must avoid binding to Void too
+  // soon, and thus produce a Fallback binding when the constraint locator has
+  // result conversion kind indicating (SEC), or if TypeVar or any member of its
+  // equivalence class has a locator with the same property.
+  // The constraint locator check identifies cases with a concrete result type but a
+  // type variable inside the closure
+  // The type variable locator check handles the other cases, including where equivalence
+  // class merging has made the closure result non-representative.
   if (kind == AllowedBindingKind::Subtypes && type->isVoid()) {
-    auto subkind = CS.getImpliedResultConversionKind(constraint->getLocator());
-    if (subkind == ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
+    auto conRKind = CS.getImpliedResultConversionKind(constraint->getLocator());
+    if (conRKind == ConstraintSystem::ImpliedResultConversionKind::ToVoid ||
+        isToVoidTypeVar(TypeVar, &CS)) {
       kind = AllowedBindingKind::Fallback;
     }
   }
@@ -3634,6 +3641,23 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 }
 
 #undef DEBUG_BAILOUT
+
+bool PotentialBindings::isToVoidTypeVar(TypeVariableType *typeVar,
+                                        ConstraintSystem *CS) {
+  if (CS->getImpliedResultConversionKind(typeVar->getImpl().getLocator()) ==
+      ConstraintSystem::ImpliedResultConversionKind::ToVoid)
+    return true;
+  auto &typeNode = CS->getConstraintGraph()[typeVar];
+  auto equivalenceClass = typeNode.getEquivalenceClass();
+  for (auto tv : equivalenceClass) {
+    auto tvRKind =
+        CS->getImpliedResultConversionKind(tv->getImpl().getLocator());
+    if (tvRKind == ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
