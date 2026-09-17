@@ -163,12 +163,14 @@ public:
   /// `unsatisfiedRestrictionForDecl()`. The enumerated restrictions may apply
   /// to the protocol, to the conformance declaration itself, to the members of
   /// a pack conformance, or to an associated conformance. \p callback is
-  /// invoked with each restricted declaration and its strongest unsatisfied
-  /// restriction. To stop the enumeration, return `true` from \p callback.
-  /// Returns `true` if the enumeration stopped early.
+  /// invoked with each restricted declaration, the protocol of the conformance
+  /// whose use is restricted, and the strongest unsatisfied restriction. To
+  /// stop the enumeration, return `true` from \p callback. Returns `true` if
+  /// the enumeration stopped early.
   bool enumerateUnsatisfiedRestrictionsForConformance(
       ProtocolConformanceRef conformance,
-      llvm::function_ref<bool(const Decl *, AvailabilityRestriction)> callback,
+      llvm::function_ref<bool(const Decl *, const ProtocolDecl *,
+                              AvailabilityRestriction)> callback,
       AvailabilityRestrictionFlags flags = std::nullopt);
 
   /// Returns true if any availability restriction must be satisfied to use
