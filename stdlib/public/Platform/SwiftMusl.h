@@ -115,7 +115,9 @@
 #include <sys/fsuid.h>
 #include <sys/inotify.h>
 #include <sys/ioctl.h>
+#if defined(__x86_64__) || defined(__i386__)
 #include <sys/io.h>
+#endif
 #include <sys/klog.h>
 #include <sys/membarrier.h>
 #include <sys/mount.h>
