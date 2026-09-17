@@ -2934,6 +2934,21 @@ static std::string getContextHash(const CompilerInvocation &CI,
           ? CI.getLangOptions().Target
           : getTargetSpecificModuleTriple(CI.getLangOptions().Target);
 
+  // Similarly, include the target variant triple. A zippered target passes the
+  // variant down to Clang as '-darwin-target-variant-triple'. A zippered and a
+  // plain target that share a '-target' therefore depend on different PCMs. If
+  // the variant was absent here, both would also agree on one '.swiftmodule'
+  // path, so the two configurations would share a single file in the module
+  // store that was built against only one of those PCMs.
+  std::string targetVariantStr = "";
+  if (CI.getLangOptions().TargetVariant) {
+    auto targetVariantToHash =
+        useStrictCacheHash
+            ? *CI.getLangOptions().TargetVariant
+            : getTargetSpecificModuleTriple(*CI.getLangOptions().TargetVariant);
+    targetVariantStr = targetVariantToHash.str();
+  }
+
   std::string sdkBuildVersion = getSDKBuildVersion(sdkPath);
 
   llvm::hash_code H = llvm::hash_combine(
@@ -2950,6 +2965,9 @@ static std::string getContextHash(const CompilerInvocation &CI,
 
       // The target triple to hash.
       targetToHash.str(),
+
+      // The target variant to hash.
+      targetVariantStr,
 
       // The SDK path is going to affect how this module is imported, so
       // include it.
