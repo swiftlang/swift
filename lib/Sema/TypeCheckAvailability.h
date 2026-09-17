@@ -233,8 +233,9 @@ void diagnoseExprAvailability(const Expr *E, DeclContext *DC);
 void diagnoseStmtAvailability(const Stmt *S, DeclContext *DC);
 
 /// Checks both a TypeRepr and a Type, but avoids emitting duplicate
-/// diagnostics by only checking the Type if the TypeRepr succeeded.
-void diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
+/// diagnostics by only checking the Type if the TypeRepr succeeded. Returns
+/// true if the TypeRepr was diagnosed as unavailable.
+bool diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
                               const ExportContext &context,
                               DeclAvailabilityFlags flags = std::nullopt);
 
@@ -246,6 +247,16 @@ diagnoseConformanceAvailability(SourceLoc loc,
                                 Type replacementTy=Type(),
                                 bool warnIfConformanceUnavailablePreSwift6 = false,
                                 bool preconcurrency = false);
+
+/// Resolve the conformance of \p type to \p proto and diagnose its
+/// availability. This is for a conformance that a declaration's interface
+/// requires implicitly, and that therefore has no `TypeRepr` of its own; the
+/// thrown error type of a typed throws clause is one. Does nothing if \p proto
+/// is null or if the conformance cannot be resolved in this context. Returns
+/// true if a diagnostic was emitted.
+bool diagnoseConformanceAvailability(SourceLoc loc, Type type,
+                                     ProtocolDecl *proto,
+                                     const ExportContext &where);
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.

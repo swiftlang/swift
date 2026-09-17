@@ -1154,7 +1154,8 @@ public:
     if (isNeverThrownError(thrownError))
       return result;
 
-    assert(!thrownError->hasError());
+    if (thrownError->hasError())
+      return forInvalidCode();
 
     result.ThrowKind = conditionalKind;
     result.ThrowReason = reason;
