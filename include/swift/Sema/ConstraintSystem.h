@@ -4487,8 +4487,6 @@ Type isPlaceholderVar(PatternBindingDecl *PB);
 /// Dump an anchor node for a constraint locator or contextual type.
 void dumpAnchor(ASTNode anchor, SourceManager *SM, raw_ostream &out);
 
-bool isPackExpansionType(Type type);
-
 /// Check whether the type is a tuple consisting of a single unlabeled element
 /// of \c PackExpansionType or a type variable that represents a pack expansion
 /// type.

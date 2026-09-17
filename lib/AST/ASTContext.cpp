@@ -5269,6 +5269,29 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
   return type;
 }
 
+bool AnyFunctionType::canComposeTuple(ArrayRef<Param> params) {
+  if (params.size() == 1)
+    return false;
+
+  for (auto &param : params) {
+    // We generally cannot handle parameter flags, though we can carve out an
+    // exception for ownership flags such as __owned, which we can thunk, and
+    // flags that can freely dropped from a function type such as
+    // @_nonEphemeral. Note that @noDerivative can also be freely dropped, as
+    // we've already ensured that the destination function is not
+    // @differentiable.
+    auto flags = param.getParameterFlags();
+    flags = flags.withOwnershipSpecifier(
+        param.isInOut() ? ParamSpecifier::InOut : ParamSpecifier::Default);
+    flags = flags.withNonEphemeral(false)
+                 .withNoDerivative(false);
+    if (!flags.isNone())
+      return false;
+  }
+
+  return true;
+}
+
 Type AnyFunctionType::composeTuple(ASTContext &ctx, ArrayRef<Param> params,
                                    ParameterFlagHandling paramFlagHandling) {
   SmallVector<TupleTypeElt, 4> elements;

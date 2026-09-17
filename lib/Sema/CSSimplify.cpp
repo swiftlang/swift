@@ -131,16 +131,6 @@ static std::optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   return dist;
 }
 
-bool constraints::isPackExpansionType(Type type) {
-  if (type->is<PackExpansionType>())
-    return true;
-
-  if (auto *typeVar = type->getAs<TypeVariableType>())
-    return typeVar->getImpl().isPackExpansion();
-
-  return false;
-}
-
 bool constraints::isSingleUnlabeledPackExpansionTuple(Type type) {
   auto *tuple = type->getRValueType()->getAs<TupleType>();
   return tuple && (tuple->getNumElements() == 1) &&
@@ -2540,35 +2530,6 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
-/// Check whether given parameter list represents a single tuple
-/// or type variable which could be later resolved to tuple.
-/// This is useful for SE-0110 related fixes in `matchFunctionTypes`.
-static bool isSingleTupleParam(ASTContext &ctx,
-                               ArrayRef<AnyFunctionType::Param> params) {
-  if (params.size() != 1)
-    return false;
-
-  const auto &param = params.front();
-  if ((param.isVariadic() || isPackExpansionType(param.getPlainType())) ||
-      param.isInOut() || param.hasLabel() || param.isIsolated())
-    return false;
-
-  auto paramType = param.getPlainType();
-
-  // Support following case which was allowed until 5:
-  //
-  // func bar(_: (Int, Int) -> Void) {}
-  // let foo: ((Int, Int)?) -> Void = { _ in }
-  //
-  // bar(foo) // Ok
-  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5))
-    paramType = paramType->lookThroughAllOptionalTypes();
-
-  // Parameter type should either a tuple or something that can become a
-  // tuple later on.
-  return (paramType->is<TupleType>() || paramType->isTypeVariableOrMember());
-}
-
 static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
                                             Type type2, ASTNode anchor,
                                             ArrayRef<LocatorPathElt> path);
@@ -2706,7 +2667,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
   // (which might be anonymous), it's most likely used as a
   // tuple e.g. `$0.0`.
   std::optional<TypeBase *> argumentTuple;
-  if (isSingleTupleParam(ctx, args)) {
+  if (isSingleTupleParam(args)) {
     auto argType = args.back().getPlainType();
     // Let's unpack argument tuple into N arguments, this corresponds
     // to something like `foo { (bar: (Int, Int)) in }` where `foo`
@@ -3462,29 +3423,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // arity);
   auto canImplodeParams = [&](ArrayRef<AnyFunctionType::Param> params,
                               const FunctionType *destFn) {
-    if (params.size() == 1)
-      return false;
-
     // We do not support imploding into a @differentiable function.
     if (destFn->isDifferentiable())
       return false;
 
-    for (auto &param : params) {
-      // We generally cannot handle parameter flags, though we can carve out an
-      // exception for ownership flags such as __owned, which we can thunk, and
-      // flags that can freely dropped from a function type such as
-      // @_nonEphemeral. Note that @noDerivative can also be freely dropped, as
-      // we've already ensured that the destination function is not
-      // @differentiable.
-      auto flags = param.getParameterFlags();
-      flags = flags.withOwnershipSpecifier(
-          param.isInOut() ? ParamSpecifier::InOut : ParamSpecifier::Default);
-      flags = flags.withNonEphemeral(false)
-                   .withNoDerivative(false);
-      if (!flags.isNone())
-        return false;
-    }
-    return true;
+    return AnyFunctionType::canComposeTuple(params);
   };
 
   auto implodeParams = [&](SmallVectorImpl<AnyFunctionType::Param> &params) {
@@ -3526,12 +3469,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     auto &ctx = getASTContext();
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
-        if (isSingleTupleParam(ctx, func2Params) &&
+        if (isSingleTupleParam(func2Params) &&
             canImplodeParams(func1Params, /*destFn*/ func2)) {
           implodeParams(func1Params);
           increaseScore(SK_FunctionConversion, locator);
         } else if (!ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
-                   isSingleTupleParam(ctx, func1Params) &&
+                   isSingleTupleParam(func1Params) &&
                    canImplodeParams(func2Params,  /*destFn*/ func1)) {
           auto *simplified = locator.trySimplifyToExpr();
           // We somehow let tuple unsplatting function conversions
@@ -3587,11 +3530,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         //
         // 2. `case .bar(let tuple) = e` allows to match multiple
         //    parameters with a single tuple argument.
-        if (isSingleTupleParam(ctx, func1Params) &&
+        if (isSingleTupleParam(func1Params) &&
             canImplodeParams(func2Params, /*destFn*/ func1)) {
           implodeParams(func2Params);
           increaseScore(SK_FunctionConversion, locator);
-        } else if (isSingleTupleParam(ctx, func2Params) &&
+        } else if (isSingleTupleParam(func2Params) &&
                    canImplodeParams(func1Params, /*destFn*/ func2)) {
           implodeParams(func1Params);
           increaseScore(SK_FunctionConversion, locator);
@@ -3602,7 +3545,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (shouldAttemptFixes()) {
       auto *anchor = locator.trySimplifyToExpr();
       if (isa_and_nonnull<ClosureExpr>(anchor) &&
-          isSingleTupleParam(ctx, func2Params) &&
+          isSingleTupleParam(func2Params) &&
           canImplodeParams(func1Params, /*destFn*/ func2)) {
         auto *fix = AllowClosureParamDestructuring::create(
             *this, func2, getConstraintLocator(anchor));
@@ -3634,7 +3577,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
-        if (isSingleTupleParam(getASTContext(), func1Params) &&
+        if (isSingleTupleParam(func1Params) &&
             func1Params[0].getOldType()->isVoid()) {
           if (func2Params.empty()) {
             func2Params.emplace_back(getASTContext().TheEmptyTupleType);

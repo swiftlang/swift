@@ -1786,6 +1786,48 @@ Type swift::constraints::openTypeJoinsAndMeets(ConstraintSystem &cs, Type type,
   return openTypeJoinsAndMeetsRec(cs, type, locator);
 }
 
+bool swift::constraints::isPackExpansionType(Type type) {
+  if (type->is<PackExpansionType>())
+    return true;
+
+  if (auto *typeVar = type->getAs<TypeVariableType>())
+    return typeVar->getImpl().isPackExpansion();
+
+  return false;
+}
+
+/// Check whether given parameter list represents a single tuple
+/// or type variable which could be later resolved to tuple.
+/// This is useful for SE-0110 related fixes in `matchFunctionTypes`.
+bool swift::constraints::isSingleTupleParam(ArrayRef<AnyFunctionType::Param> params) {
+  if (params.size() != 1)
+    return false;
+
+  const auto &param = params.front();
+  if ((param.isVariadic() || isPackExpansionType(param.getPlainType())) ||
+      param.isInOut() || param.hasLabel() || param.isIsolated())
+    return false;
+
+  auto paramType = param.getPlainType();
+
+  // Support following case which was allowed until 5:
+  //
+  // func bar(_: (Int, Int) -> Void) {}
+  // let foo: ((Int, Int)?) -> Void = { _ in }
+  //
+  // bar(foo) // Ok
+  if (!paramType->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
+    paramType = paramType->lookThroughAllOptionalTypes();
+
+  // Parameter type should either a tuple or something that can become a
+  // tuple later on. Note that type parameters can appear here when we're
+  // called from disjunction selection to compare a function argument
+  // type against an unopened overload's parameter type.
+  return (paramType->is<TupleType>() ||
+          paramType->isTypeVariableOrMember() ||
+          paramType->isTypeParameter());
+}
+
 void swift::constraints::simple_display(llvm::raw_ostream &out,
                                         ConflictReason reason) {
   if (!reason)

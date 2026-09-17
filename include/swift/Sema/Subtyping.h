@@ -263,6 +263,11 @@ Type subtypeMeet(Type lhs, Type rhs, bool *uninhabited);
 Type openTypeJoinsAndMeets(ConstraintSystem &cs, Type type,
                            ConstraintLocator *locator);
 
+bool isPackExpansionType(Type type);
+
+/// Whether this parameter list can be the *destination* of a tuple splat.
+bool isSingleTupleParam(ArrayRef<AnyFunctionType::Param> params);
+
 }  // end namespace constraints
 
 }  // end namespace swift
