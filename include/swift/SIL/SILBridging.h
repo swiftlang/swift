@@ -1004,6 +1004,7 @@ struct BridgedInstruction {
       CheckedCastBranch_getCheckedCastOptions() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType CheckedCastAddrBranch_getSourceFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType CheckedCastAddrBranch_getTargetFormalType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType CheckedCastAddrBranch_getTargetLoweredType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastAddrBranch_getSuccessBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastAddrBranch_getFailureBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CheckedCastInstOptions
@@ -1389,7 +1390,7 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUpcast(BridgedValue op, BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCheckedCastAddrBranch(
       BridgedValue source, BridgedCanType sourceFormalType,
-      BridgedValue destination, BridgedCanType targetFormalType,
+      OptionalBridgedValue destination, BridgedCanType targetFormalType,
       BridgedInstruction::CheckedCastInstOptions options,
       BridgedInstruction::CastConsumptionKind consumptionKind,
       BridgedBasicBlock successBlock, BridgedBasicBlock failureBlock) const;

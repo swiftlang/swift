@@ -342,16 +342,20 @@ public struct Builder {
     return notifyNew(cast.getAs(UpcastInst.self))
   }
   
+  /// - Parameter destination: must be nil for a `.TestOnly` cast, which
+  ///   produces no value, and non-nil for every other consumption kind.
   @discardableResult
   public func createCheckedCastAddrBranch(
     source: Value, sourceFormalType: CanonicalType,
-    destination: Value, targetFormalType: CanonicalType,
+    destination: Value?, targetFormalType: CanonicalType,
     options: CheckedCastInstOptions,
     consumptionKind: CheckedCastAddrBranchInst.CastConsumptionKind,
     successBlock: BasicBlock,
     failureBlock: BasicBlock
   ) -> CheckedCastAddrBranchInst {
-    
+    precondition((consumptionKind == .TestOnly) == (destination == nil),
+                 "a test_only cast has no destination; every other kind needs one")
+
     let bridgedConsumption: BridgedInstruction.CastConsumptionKind
     switch consumptionKind {
       case .TakeAlways:    bridgedConsumption = .TakeAlways

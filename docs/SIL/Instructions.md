@@ -5423,7 +5423,7 @@ sil-terminator ::= 'checked_cast_addr_br'
                     sil-prohibit-isolated-conformances?
                     sil-cast-consumption-kind
                     sil-type 'in' sil-operand 'to'
-                    sil-stype 'in' sil-operand ','
+                    sil-stype ('in' sil-operand)? ','
                     sil-identifier ',' sil-identifier
 sil-cast-consumption-kind ::= 'take_always'
 sil-cast-consumption-kind ::= 'take_on_success'
@@ -5435,8 +5435,8 @@ checked_cast_addr_br take_always $A in %0 : $*@thick A to $B in %2 : $*@thick B,
 // bb1 must take a single argument of type $*B
 // bb2 must take no arguments
 
-checked_cast_addr_br test_only $A in %0 : $*@thick A to $B in undef : $*@thick B, bb1, bb2
-// A 'test_only' cast must name 'undef' as its destination
+checked_cast_addr_br test_only $A in %0 : $*@thick A to $B, bb1, bb2
+// A 'test_only' cast has no destination operand
 ```
 
 Performs a checked indirect conversion from `$A` to `$B`. If the
@@ -5451,10 +5451,10 @@ into the destination on success.
 
 `test_only` is different in kind: it reports only whether the conversion would
 have succeeded, and produces **no destination value at all**. The source is
-neither taken nor copied, and the destination operand must be `undef`, which the
-verifier enforces. Passes that read the destination of a cast must skip it for
-`test_only`; the `undef` operand makes a missed case show up in the IR rather
-than as a value that was silently never written.
+neither taken nor copied, and the instruction carries no destination operand, so
+it names only the target type. `CheckedCastAddrBranchInst::getDest()` returns an
+invalid `SILValue` for it, and `hasDest()` says so up front; code that reads the
+destination of a cast must check.
 
 `test_only` exists because some values cannot answer a cast question any other
 way. Producing the result of the cast would copy a payload whose type forbids

@@ -4663,7 +4663,18 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     auto consumptionKind = kind.value();
 
-    if (parseSourceAndDestAddress() || parseConditionalBranchDestinations() ||
+    // A test_only cast produces no value, so it names only a formal target
+    // type where the other kinds name a destination address:
+    //   checked_cast_addr_br test_only $A in %0 : $*A to $B, bb1, bb2
+    if (consumptionKind == CastConsumptionKind::TestOnly) {
+      if (parseFormalTypeAndValue(SourceType, SourceAddr) ||
+          parseVerbatim("to") || parseASTType(TargetType))
+        return true;
+    } else if (parseSourceAndDestAddress()) {
+      return true;
+    }
+
+    if (parseConditionalBranchDestinations() ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 

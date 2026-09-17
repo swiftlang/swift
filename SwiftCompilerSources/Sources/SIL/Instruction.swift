@@ -2480,16 +2480,27 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
 
 final public class CheckedCastAddrBranchInst : TermInst {
   public var sourceOperand: Operand { return operands[0] }
-  public var destinationOperand: Operand { return operands[1] }
+
+  /// The destination operand, or nil for a `test_only` cast, which produces
+  /// no value and so has no destination.
+  public var destinationOperand: Operand? {
+    consumptionKind == .TestOnly ? nil : operands[1]
+  }
 
   public var source: Value { sourceOperand.value }
-  public var destination: Value { destinationOperand.value }
+  public var destination: Value? { destinationOperand?.value }
 
   public var sourceFormalType: CanonicalType {
     CanonicalType(bridged: bridged.CheckedCastAddrBranch_getSourceFormalType())
   }
   public var targetFormalType: CanonicalType {
     CanonicalType(bridged: bridged.CheckedCastAddrBranch_getTargetFormalType())
+  }
+
+  /// The lowered address type of the cast's target. Available even for a
+  /// `test_only` cast, which has no destination operand to read it from.
+  public var targetLoweredType: Type {
+    bridged.CheckedCastAddrBranch_getTargetLoweredType().type
   }
 
   public var successBlock: BasicBlock { bridged.CheckedCastAddrBranch_getSuccessBlock().block }
@@ -2511,8 +2522,7 @@ final public class CheckedCastAddrBranchInst : TermInst {
 
     /// The cast only reports whether it would have succeeded. The source is
     /// neither taken nor copied, and no destination value is produced -- the
-    /// destination operand is `SILUndef` and must not be read or tracked as
-    /// initialized.
+    /// instruction has no destination operand at all.
     case TestOnly
   }
 

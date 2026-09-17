@@ -5411,15 +5411,25 @@ public:
   void checkCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
     require(CCABI->getSrc()->getType().isAddress(),
             "checked_cast_addr_br src must be an address");
-    require(CCABI->getDest()->getType().isAddress(),
-            "checked_cast_addr_br dest must be an address");
 
-    // A test_only cast produces no value, so it must not name storage that
-    // something could mistake for an initialized destination.
-    // Note that undef can occur on other cast types.
-    if (CCABI->getConsumptionKind() == CastConsumptionKind::TestOnly) {
-      require(isa<SILUndef>(CCABI->getDest()),
-              "checked_cast_addr_br with test_only must have an undef dest");
+    // hasDest() is derived from the consumption kind, and the operand list
+    // [src, dest?, typeDependentOperands...] is built to agree with it. If the
+    // two ever disagree, getDest() reads past the end of the operand list and
+    // getNumTypeDependentOperands() underflows, so pin it down here.
+    require(CCABI->getAllOperands().size() >= (CCABI->hasDest() ? 2u : 1u),
+            "checked_cast_addr_br operand list does not match its consumption "
+            "kind");
+
+    // A test_only cast produces no value, so it has no destination operand
+    // at all; see CheckedCastAddrBranchInst::hasDest().
+    if (CCABI->hasDest()) {
+      require(CCABI->getDest()->getType().isAddress(),
+              "checked_cast_addr_br dest must be an address");
+      // The target's lowered type is stored separately, because a test_only
+      // cast has no destination to read it back from. Where there is a
+      // destination the two must not drift apart.
+      require(CCABI->getDest()->getType() == CCABI->getTargetLoweredType(),
+              "checked_cast_addr_br dest must have the cast's target type");
     }
 
     require(

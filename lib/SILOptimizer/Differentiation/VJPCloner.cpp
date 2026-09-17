@@ -448,7 +448,8 @@ public:
         ccabi->getCheckedCastOptions(),
         ccabi->getConsumptionKind(),
         getOpValue(ccabi->getSrc()), getOpASTType(ccabi->getSourceFormalType()),
-        getOpValue(ccabi->getDest()),
+        // A test_only cast has no destination operand.
+        ccabi->hasDest() ? getOpValue(ccabi->getDest()) : SILValue(),
         getOpASTType(ccabi->getTargetFormalType()),
         createTrampolineBasicBlock(ccabi, pbTupleVal, ccabi->getSuccessBB()),
         createTrampolineBasicBlock(ccabi, pbTupleVal, ccabi->getFailureBB()),

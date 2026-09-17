@@ -2072,6 +2072,10 @@ BridgedCanType BridgedInstruction::CheckedCastAddrBranch_getTargetFormalType() c
   return {getAs<swift::CheckedCastAddrBranchInst>()->getTargetFormalType()};
 }
 
+BridgedType BridgedInstruction::CheckedCastAddrBranch_getTargetLoweredType() const {
+  return {getAs<swift::CheckedCastAddrBranchInst>()->getTargetLoweredType()};
+}
+
 BridgedBasicBlock BridgedInstruction::CheckedCastAddrBranch_getSuccessBlock() const {
   return {getAs<swift::CheckedCastAddrBranchInst>()->getSuccessBB()};
 }
@@ -2858,7 +2862,7 @@ BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType typ
 
 BridgedInstruction BridgedBuilder::createCheckedCastAddrBranch(
     BridgedValue source, BridgedCanType sourceFormalType,
-    BridgedValue destination, BridgedCanType targetFormalType,
+    OptionalBridgedValue destination, BridgedCanType targetFormalType,
     BridgedInstruction::CheckedCastInstOptions options,
     BridgedInstruction::CastConsumptionKind consumptionKind,
     BridgedBasicBlock successBlock, BridgedBasicBlock failureBlock) const

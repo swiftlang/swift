@@ -658,10 +658,9 @@ void MemoryLifetimeVerifier::setBitsOfPredecessor(Bits &getSet, Bits &killSet,
     case CastConsumptionKind::TestOnly:
       break;
     }
-    // A test_only cast produces no value; its dest is undef, so there is
+    // A test_only cast produces no value and has no destination, so there is
     // nothing to mark initialized on the success edge.
-    if (castInst->getSuccessBB() == block &&
-        producesDestinationValue(castInst->getConsumptionKind()))
+    if (castInst->getSuccessBB() == block && castInst->hasDest())
       locations.genBits(getSet, killSet, castInst->getDest());
   }
 }
@@ -917,7 +916,9 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::CheckedCastAddrBranchInst: {
         auto *castInst = cast<CheckedCastAddrBranchInst>(&I);
         requireBitsSet(bits, castInst->getSrc(), &I);
-        requireBitsClear(bits & nonTrivialLocations, castInst->getDest(), &I);
+        // A test_only cast has no destination to require uninitialized.
+        if (castInst->hasDest())
+          requireBitsClear(bits & nonTrivialLocations, castInst->getDest(), &I);
         break;
       }
       case SILInstructionKind::PartialApplyInst:

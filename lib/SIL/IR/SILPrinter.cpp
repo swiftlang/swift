@@ -2341,9 +2341,11 @@ public:
     printCheckedCastInstOptions(CI->getCheckedCastOptions());
     *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
           << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
-          << " to " << CI->getTargetFormalType() << " in "
-          << getIDAndType(CI->getDest()) << ", "
-          << Ctx.getID(CI->getSuccessBB()) << ", "
+          << " to " << CI->getTargetFormalType();
+    // A test_only cast produces no value, so it has no destination operand.
+    if (CI->hasDest())
+      *this << " in " << getIDAndType(CI->getDest());
+    *this << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
     if (CI->getTrueBBCount())
       *this << " !true_count(" << CI->getTrueBBCount().getValue() << ")";

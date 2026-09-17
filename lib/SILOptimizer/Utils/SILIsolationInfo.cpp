@@ -1253,7 +1253,9 @@ SILIsolationInfo SILIsolationInfo::getForCastConformances(
   return {};
 }
 
-/// Retrieve a suitable destination value for the cast instruction.
+/// Retrieve a suitable destination value for the cast instruction, or an
+/// invalid value if the cast produces none -- `checked_cast_addr_br test_only`
+/// reports only whether the cast would succeed.
 ///
 /// TODO: This should probably be SILDynamicCastInst::getDest(), but that has
 /// unimplemented TODOs.
@@ -1285,8 +1287,13 @@ SILIsolationInfo SILIsolationInfo::getConformanceIsolation(SILInstruction *inst)
 
   // Dynamic casts.
   if (auto dynCast = SILDynamicCastInst::getAs(inst)) {
+    // A cast that produces no value has nothing to carry an isolated
+    // conformance.
+    SILValue dest = destValueForDynamicCast(dynCast);
+    if (!dest)
+      return {};
     return getForCastConformances(
-        destValueForDynamicCast(dynCast),
+        dest,
         dynCast.getSourceFormalType(),
         dynCast.getTargetFormalType());
   }

@@ -3953,8 +3953,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         MF->getType(ListOfValues[5])->getCanonicalType();
     SILType targetLoweredType =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    SILValue dest = getLocalValue(Builder.maybeGetFunction(), ListOfValues[6],
-                                  targetLoweredType);
+    SILValue dest;
+    if (producesDestinationValue(consumption)) {
+      dest = getLocalValue(Builder.maybeGetFunction(), ListOfValues[6],
+                           targetLoweredType);
+    }
 
     auto *successBB = getBBForReference(Fn, ListOfValues[7]);
     auto *failureBB = getBBForReference(Fn, ListOfValues[8]);

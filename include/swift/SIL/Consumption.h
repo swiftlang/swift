@@ -65,16 +65,16 @@ enum class CastConsumptionKind : uint8_t {
 
   /// The cast only reports whether it would have succeeded. The source value is
   /// never taken and never copied, and *no destination value is produced* --
-  /// the destination operand must be `SILUndef`, which the verifier enforces.
+  /// `checked_cast_addr_br test_only` has no destination operand at all.
   ///
   /// This is what lets `is` and `case is T` apply to a value that cannot be
   /// copied: producing the result at all would be a copy the type forbids, and
   /// taking it would destroy the very thing being asked about.
   ///
   /// NOTE: Unlike the cases above, this constrains the *destination* as well as
-  /// the source. Anything reading the destination of a cast must skip it here;
-  /// with `SILUndef` in place, forgetting to do so shows up as undef in the IR
-  /// rather than as a value that was silently never written.
+  /// the source. Code that reads the destination of a cast must skip it here;
+  /// with the operand gone, `getDest()` returns an invalid SILValue rather than
+  /// storage that was silently never written.
   TestOnly,
 };
 
@@ -108,8 +108,8 @@ inline IsTake_t shouldTakeOnSuccess(CastConsumptionKind kind) {
 
 /// Does this cast produce a value in its destination operand?
 ///
-/// When false, the destination operand is `SILUndef` and must not be read,
-/// written, or tracked as initialized.
+/// When false there is no destination operand: see
+/// `CheckedCastAddrBranchInst::hasDest()`.
 inline bool producesDestinationValue(CastConsumptionKind kind) {
   switch (kind) {
   case CastConsumptionKind::TakeAlways:
