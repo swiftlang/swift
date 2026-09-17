@@ -13,6 +13,9 @@
 #include "swift/Index/Index.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilitySpec.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -27,8 +30,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/USRGeneration.h"
-#include "clang/AST/DeclObjC.h"
-#include "swift/AST/ClangModuleLoader.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -36,6 +37,7 @@
 #include "swift/Markup/Markup.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -105,6 +107,17 @@ static SourceLoc getLocForExtension(ExtensionDecl *D) {
   if (auto *repr = D->getExtendedTypeRepr())
     return repr->getLoc();
   return SourceLoc();
+}
+
+static bool hasUsefulRoleInSystemModule(SymbolRoleSet roles) {
+  return roles & ((SymbolRoleSet)SymbolRole::Definition |
+                  (SymbolRoleSet)SymbolRole::Declaration |
+                  (SymbolRoleSet)SymbolRole::RelationChildOf |
+                  (SymbolRoleSet)SymbolRole::RelationBaseOf |
+                  (SymbolRoleSet)SymbolRole::RelationOverrideOf |
+                  (SymbolRoleSet)SymbolRole::RelationExtendedBy |
+                  (SymbolRoleSet)SymbolRole::RelationAccessorOf |
+                  (SymbolRoleSet)SymbolRole::RelationIBTypeOf);
 }
 
 namespace {
@@ -438,6 +451,7 @@ struct MappedLoc {
 class IndexSwiftASTWalker : public SourceEntityWalker {
   IndexDataConsumer &IdxConsumer;
   SourceManager &SrcMgr;
+  SourceFile *SF;
   std::optional<unsigned> BufferID;
   bool enableWarnings;
 
@@ -600,7 +614,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
                       SourceFile *SF = nullptr)
-      : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr),
+      : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr), SF(SF),
         BufferID(SF ? std::optional(SF->getBufferID()) : std::nullopt),
         enableWarnings(IdxConsumer.enableWarnings()) {}
 
@@ -637,6 +651,10 @@ private:
           ManuallyVisitedAccessorStack.back() != AD)
         return false; // already handled as part of the var decl.
     }
+
+    if (!handleAvailabilityDomainRefs(D))
+      return false;
+
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (!report(VD))
         return false;
@@ -683,6 +701,90 @@ private:
             return false;
         }
       }
+    }
+    return true;
+  }
+
+  /// Reports a reference to the declaration that defines \p domain, if the
+  /// domain has one.
+  ///
+  /// If \p container is non-null, the reference is contained by it rather than
+  /// by the active container. An `@available` attribute needs this because the
+  /// active container is not the attributed decl when the walker visits a
+  /// variable in a pattern binding with more than one variable.
+  bool reportAvailabilityDomainRef(AvailabilityDomain domain, SourceLoc loc,
+                                   Decl *container = nullptr) {
+    auto *domainDecl = domain.getDecl();
+    if (!domainDecl)
+      return true;
+
+    if (!shouldIndex(domainDecl, /*IsRef=*/true))
+      return true;
+
+    IndexSymbol Info;
+    auto updateInfo = [&](IndexSymbol &info) {
+      if (!container)
+        return false;
+
+      // Keep the active container if the decl will not appear in the index.
+      if (auto *VD = dyn_cast<ValueDecl>(container))
+        if (!shouldIndex(VD, /*IsRef=*/true))
+          return false;
+
+      info.Relations.clear();
+      info.roles &= ~(SymbolRoleSet)SymbolRole::RelationContainedBy;
+      return addRelation(info, (SymbolRoleSet)SymbolRole::RelationContainedBy,
+                         container);
+    };
+    if (initIndexSymbol(domainDecl, loc, /*IsRef=*/true, Info, updateInfo))
+      return true;
+
+    // Like any other plain reference, a reference to a domain is not useful
+    // enough to record for a system module.
+    if (isSystemModule && !hasUsefulRoleInSystemModule(Info.roles))
+      return true;
+
+    if (!startEntity(domainDecl, Info, /*IsRef=*/true))
+      return !Cancelled;
+    return finishCurrentEntity();
+  }
+
+  /// Reports refs to the declarations behind the custom availability domains
+  /// named by the `@available` attributes attached to \p D, as in
+  /// `\@available(SomeDomain)`.
+  bool handleAvailabilityDomainRefs(Decl *D) {
+    for (auto *attr : D->getAttrs().getAttributes<AvailableAttr, true>()) {
+      if (attr->isImplicit())
+        continue;
+
+      // Resolve the domain with the singular request rather than
+      // `getSemanticAvailableAttrs()`, which synthesizes attributes as a side
+      // effect.
+      auto semanticAttr = D->getSemanticAvailableAttr(attr);
+      if (!semanticAttr)
+        continue;
+
+      auto macroLoc = attr->getMacroLoc();
+      auto loc = macroLoc.isValid() ? macroLoc : attr->getDomainLoc();
+      if (!reportAvailabilityDomainRef(semanticAttr->getDomain(), loc, D))
+        return false;
+    }
+    return true;
+  }
+
+  /// Reports refs to the declarations behind the custom availability domains
+  /// queried by an `if #available` or `if #unavailable` condition.
+  bool handleAvailabilityDomainRefs(PoundAvailableInfo *info) {
+    for (auto *spec : info->getQueries()) {
+      if (spec->isInvalid())
+        continue;
+      auto domain = spec->getDomainOrIdentifier().getAsDomain();
+      if (!domain)
+        continue;
+      auto macroLoc = spec->getMacroLoc();
+      auto loc = macroLoc.isValid() ? macroLoc : spec->getStartLoc();
+      if (!reportAvailabilityDomainRef(*domain, loc))
+        return false;
     }
     return true;
   }
@@ -803,11 +905,20 @@ private:
     if (Cancelled)
       return false;
 
-    // Record any same named captures/shorthand if let bindings so we can
-    // treat their references as references to the original decl.
     if (auto *condition = dyn_cast<LabeledConditionalStmt>(stmt)) {
+      // Record any same named captures/shorthand if let bindings so we can
+      // treat their references as references to the original decl.
       for (auto shadows : getShorthandShadows(condition)) {
         sameNamedCaptures[shadows.first] = shadows.second;
+      }
+
+      // `PoundAvailableInfo` is neither a `Stmt` nor an `Expr`, so the walker
+      // never reaches it on its own.
+      for (auto &elt : condition->getCond()) {
+        if (elt.getKind() != StmtConditionElement::CK_Availability)
+          continue;
+        if (!handleAvailabilityDomainRefs(elt.getAvailability()))
+          return false;
       }
     }
     return true;
@@ -1868,17 +1979,6 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
   }
 
   return !Cancelled;
-}
-
-static bool hasUsefulRoleInSystemModule(SymbolRoleSet roles) {
-  return roles & ((SymbolRoleSet)SymbolRole::Definition |
-  (SymbolRoleSet)SymbolRole::Declaration |
-  (SymbolRoleSet)SymbolRole::RelationChildOf |
-  (SymbolRoleSet)SymbolRole::RelationBaseOf |
-  (SymbolRoleSet)SymbolRole::RelationOverrideOf |
-  (SymbolRoleSet)SymbolRole::RelationExtendedBy |
-  (SymbolRoleSet)SymbolRole::RelationAccessorOf |
-  (SymbolRoleSet)SymbolRole::RelationIBTypeOf);
 }
 
 bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
