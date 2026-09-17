@@ -155,6 +155,10 @@ public struct ImageMap: Collection, Sendable, Hashable {
     return capture(for: mach_task_self())
     #elseif os(Windows)
     return capture(for: UInt(bitPattern: GetCurrentProcess()))
+    #elseif os(Linux)
+    // Use UncachedLocalMemoryReader on Linux to avoid crashes because other
+    // threads are modifying the memory map
+    return capture(using: UncachedLocalMemoryReader())
     #else
     return capture(using: UnsafeLocalMemoryReader())
     #endif
