@@ -1629,6 +1629,9 @@ static ValueDecl *getCalledValue(Expr *E, bool skipFunctionConversions) {
                             skipFunctionConversions);
   }
 
+  if (auto *DSBI = dyn_cast<DotSyntaxBaseIgnoredExpr>(E))
+    return getCalledValue(DSBI->getRHS(), skipFunctionConversions);
+
   Expr *E2 = E->getValueProvidingExpr();
 
   if (auto *L = dyn_cast<LoadExpr>(E2))
