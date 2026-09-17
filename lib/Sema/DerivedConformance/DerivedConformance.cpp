@@ -15,12 +15,15 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/SynthesizedDeclBuilder.h"
@@ -30,12 +33,35 @@
 #include "swift/Basic/QuotedString.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
 enum NonconformingMemberKind { AssociatedValue, StoredProperty };
+
+std::optional<AvailabilityRestriction>
+swift::availabilityRestrictionPreventingSynthesis(
+    ProtocolConformanceRef conformance, AvailabilityContext availability) {
+  auto &ctx = conformance.getProtocol()->getASTContext();
+
+  // Availability checking is disabled, so availability must not change which
+  // conformances the compiler is able to derive.
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return std::nullopt;
+
+  return availability.unsatisfiedRestrictionForConformance(conformance);
+}
+
+bool swift::conformanceIsUsableForSynthesis(Type type, ProtocolDecl *protocol,
+                                            AvailabilityContext availability) {
+  auto conformance = checkConformance(type, protocol);
+  if (conformance.isInvalid())
+    return false;
+
+  return !availabilityRestrictionPreventingSynthesis(conformance, availability);
+}
 
 DerivedConformance::DerivedConformance(
     const NormalProtocolConformance *conformance, NominalTypeDecl *nominal,
@@ -184,22 +210,35 @@ bool DerivedConformance::derivesProtocolConformance(
   return false;
 }
 
-SmallVector<VarDecl *, 3>
-DerivedConformance::storedPropertiesNotConformingToProtocol(
+SmallVector<NonconformingMember, 3>
+DerivedConformance::storedPropertiesPreventingSynthesis(
     DeclContext *DC, StructDecl *theStruct, ProtocolDecl *protocol) {
+  auto baseAvailability = AvailabilityContext::forDeclContext(DC);
   auto storedProperties = theStruct->getStoredProperties();
-  SmallVector<VarDecl *, 3> nonconformingProperties;
+  SmallVector<NonconformingMember, 3> nonconformingProperties;
   for (auto propertyDecl : storedProperties) {
     if (!propertyDecl->isUserAccessible())
       continue;
 
+    auto loc = propertyDecl->getLoc();
     auto type = propertyDecl->getValueInterfaceType();
-    if (!type)
-      nonconformingProperties.push_back(propertyDecl);
-
-    if (!checkConformance(DC->mapTypeIntoEnvironment(type), protocol)) {
-      nonconformingProperties.push_back(propertyDecl);
+    if (!type) {
+      nonconformingProperties.push_back({propertyDecl, loc, std::nullopt});
+      continue;
     }
+
+    auto conformance =
+        checkConformance(DC->mapTypeIntoEnvironment(type), protocol);
+    if (conformance.isInvalid()) {
+      nonconformingProperties.push_back({propertyDecl, loc, std::nullopt});
+      continue;
+    }
+
+    // The property's type conforms, but the synthesized implementations can
+    // only use the conformance if availability does not restrict it.
+    if (auto restriction = availabilityRestrictionPreventingSynthesis(
+            conformance, baseAvailability))
+      nonconformingProperties.push_back({propertyDecl, loc, restriction});
   }
   return nonconformingProperties;
 }
@@ -210,7 +249,7 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
   auto knownProtocol = protocol->getKnownProtocolKind();
   if (!knownProtocol)
     return;
-  
+
   if (*knownProtocol == KnownProtocolKind::Equatable) {
     tryDiagnoseFailedEquatableDerivation(DC, nominal);
   }
@@ -232,37 +271,53 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
   }
 }
 
+/// Emits a note explaining that \p nonconforming prevents the synthesis of a
+/// conformance of \p nominal to \p protocol.
+static void
+diagnoseNonconformingMember(const NonconformingMember &nonconforming,
+                            NonconformingMemberKind kind,
+                            NominalTypeDecl *nominal, ProtocolDecl *protocol) {
+  auto &ctx = nominal->getASTContext();
+  auto loc = nonconforming.loc;
+  auto memberType = nonconforming.member->getInterfaceType();
+  auto protocolType = protocol->getDeclaredInterfaceType();
+  auto nominalType = nominal->getDeclaredInterfaceType();
+
+  if (!nonconforming.restriction) {
+    ctx.Diags.diagnose(loc,
+                       diag::missing_member_type_conformance_prevents_synthesis,
+                       kind, memberType, protocolType, nominalType);
+    return;
+  }
+
+  // The member's type does conform, but availability restricts the
+  // conformance. Describe the restriction so that the reader knows how to
+  // satisfy it.
+  llvm::SmallString<64> scratch;
+  auto description =
+      nonconforming.restriction->getDiagnosticDescription(scratch, ctx);
+  ctx.Diags.diagnose(
+      loc, diag::unavailable_member_type_conformance_prevents_synthesis, kind,
+      memberType, protocolType, nominalType, description);
+}
+
 void DerivedConformance::diagnoseAnyNonConformingMemberTypes(
     DeclContext *DC, NominalTypeDecl *nominal, ProtocolDecl *protocol) {
-  ASTContext &ctx = DC->getASTContext();
-
   if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
-    auto nonconformingAssociatedTypes =
-        associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
-    for (auto *typeToDiagnose : nonconformingAssociatedTypes) {
-      SourceLoc reprLoc;
-      if (auto *repr = typeToDiagnose->getTypeRepr())
-        reprLoc = repr->getStartLoc();
-      ctx.Diags.diagnose(
-          reprLoc, diag::missing_member_type_conformance_prevents_synthesis,
-          NonconformingMemberKind::AssociatedValue,
-          typeToDiagnose->getInterfaceType(),
-          protocol->getDeclaredInterfaceType(),
-          nominal->getDeclaredInterfaceType());
+    for (auto &nonconforming :
+         associatedValuesPreventingSynthesis(DC, enumDecl, protocol)) {
+      diagnoseNonconformingMember(nonconforming,
+                                  NonconformingMemberKind::AssociatedValue,
+                                  nominal, protocol);
     }
   }
 
   if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
-    auto nonconformingStoredProperties =
-        storedPropertiesNotConformingToProtocol(DC, structDecl, protocol);
-    for (auto *propertyToDiagnose : nonconformingStoredProperties) {
-      ctx.Diags.diagnose(
-          propertyToDiagnose->getLoc(),
-          diag::missing_member_type_conformance_prevents_synthesis,
-          NonconformingMemberKind::StoredProperty,
-          propertyToDiagnose->getInterfaceType(),
-          protocol->getDeclaredInterfaceType(),
-          nominal->getDeclaredInterfaceType());
+    for (auto &nonconforming :
+         storedPropertiesPreventingSynthesis(DC, structDecl, protocol)) {
+      diagnoseNonconformingMember(nonconforming,
+                                  NonconformingMemberKind::StoredProperty,
+                                  nominal, protocol);
     }
   }
 }
@@ -822,39 +877,67 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
                              AccessSemantics::Ordinary, intType);
 }
 
-/// Returns the ParamDecl for each associated value of the given enum whose type
-/// does not conform to a protocol
+/// Returns each associated value of the given enum whose type prevents the
+/// synthesis of a conformance to a protocol.
+/// \p DC The context that declares the conformance being synthesized.
 /// \p theEnum The enum whose elements and associated values should be checked.
 /// \p protocol The protocol being requested.
-/// \return The ParamDecl of each associated value whose type does not conform.
-SmallVector<ParamDecl *, 4>
-DerivedConformance::associatedValuesNotConformingToProtocol(
+SmallVector<NonconformingMember, 4>
+DerivedConformance::associatedValuesPreventingSynthesis(
     DeclContext *DC, EnumDecl *theEnum, ProtocolDecl *protocol) {
-  SmallVector<ParamDecl *, 4> nonconformingAssociatedValues;
+  auto baseAvailability = AvailabilityContext::forDeclContext(DC);
+  SmallVector<NonconformingMember, 4> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
     auto PL = elt->getParameterList();
     if (!PL)
       continue;
 
+    // A synthesized case that matches this element only ever executes for a
+    // value of this element, and such a value can only exist at runtime where
+    // the element is available. The conformances that the element's associated
+    // values need are therefore only required where the element is available.
+    auto elementAvailability = baseAvailability;
+    elementAvailability.constrainWithDecl(elt);
+
     for (auto param : *PL) {
+      // Point at the type of the associated value. A parameter that has no
+      // type representation, and an unlabeled parameter, have no location of
+      // their own, so fall back to the element that declares them.
+      SourceLoc loc;
+      if (auto *repr = param->getTypeRepr())
+        loc = repr->getStartLoc();
+      if (loc.isInvalid())
+        loc = param->getLoc();
+      if (loc.isInvalid())
+        loc = elt->getLoc();
+
       auto type = param->getInterfaceType();
-      if (checkConformance(DC->mapTypeIntoEnvironment(type), protocol).isInvalid()) {
-        nonconformingAssociatedValues.push_back(param);
+      auto conformance =
+          checkConformance(DC->mapTypeIntoEnvironment(type), protocol);
+      if (conformance.isInvalid()) {
+        nonconformingAssociatedValues.push_back({param, loc, std::nullopt});
+        continue;
       }
+
+      // The associated value's type conforms, but the synthesized
+      // implementations can only use the conformance if availability does not
+      // restrict it.
+      if (auto restriction = availabilityRestrictionPreventingSynthesis(
+              conformance, elementAvailability))
+        nonconformingAssociatedValues.push_back({param, loc, restriction});
     }
   }
   return nonconformingAssociatedValues;
 }
 
-/// Returns true if, for every element of the given enum, it either has no
-/// associated values or all of them conform to a protocol.
+/// Returns true if any associated value of any element of the given enum
+/// prevents the synthesis of a conformance to a protocol.
+/// \p DC The context that declares the conformance being synthesized.
 /// \p theEnum The enum whose elements and associated values should be checked.
 /// \p protocol The protocol being requested.
-/// \return True if all associated values of all elements of the enum conform.
-bool DerivedConformance::allAssociatedValuesConformToProtocol(DeclContext *DC,
-                                                 EnumDecl *theEnum,
-                                                 ProtocolDecl *protocol) {
-  return associatedValuesNotConformingToProtocol(DC, theEnum, protocol).empty();
+bool DerivedConformance::anyAssociatedValuePreventsSynthesis(
+    DeclContext *DC, EnumDecl *theEnum, ProtocolDecl *protocol) {
+  return !associatedValuesPreventingSynthesis(DC, theEnum, protocol).empty();
 }
 
 /// Returns the pattern used to match and bind the associated values (if any) of
@@ -924,20 +1007,32 @@ Pattern *DerivedConformance::enumElementPayloadSubpattern(
   return ParenPattern::createImplicit(C, letPattern);
 }
 
+/// Returns true if \p elt can never be reached at runtime.
+static bool isUnreachableEnumElement(const EnumElementDecl *elt) {
+  return elt->isUnreachableAtRuntime() &&
+         !elt->getParentEnum()->isUnreachableAtRuntime();
+}
+
+bool DerivedConformance::synthesizesUnavailableEnumElementCase(
+    EnumElementDecl *elt) {
+  // The case is only replaced for an element that cannot be reached at
+  // runtime.
+  if (!isUnreachableEnumElement(elt))
+    return false;
+
+  // If the stdlib isn't new enough to contain the helper function for
+  // diagnosing execution of unavailable code then the case is synthesized
+  // normally.
+  return elt->getASTContext().getDiagnoseUnavailableCodeReached() != nullptr;
+}
+
 CaseStmt *DerivedConformance::unavailableEnumElementCaseStmt(
     Type enumType, EnumElementDecl *elt, DeclContext *parentDC,
     unsigned subPatternCount) {
   assert(subPatternCount > 0);
 
   ASTContext &C = parentDC->getASTContext();
-  if (!elt->isUnreachableAtRuntime() ||
-      elt->getParentEnum()->isUnreachableAtRuntime())
-    return nullptr;
-
-  // If the stdlib isn't new enough to contain the helper function for
-  // diagnosing execution of unavailable code then just synthesize this case
-  // normally.
-  if (!C.getDiagnoseUnavailableCodeReached())
+  if (!synthesizesUnavailableEnumElementCase(elt))
     return nullptr;
 
   auto createElementPattern = [&]() -> EnumElementPattern * {
@@ -1166,12 +1261,7 @@ bool swift::checkAvailabilityForElement(
   // appropriate `#if` condition, which we cannot do in code synthesis. Leaving
   // the case out also keeps its raw value from appearing in the generated code,
   // which matters for an element that is hidden behind a disabled domain.
-  //
-  // An element of an enum that is itself unreachable is exempt. Every element
-  // of such an enum inherits its unreachability, so honoring it here would
-  // leave init(rawValue:) with no cases at all.
-  if (elt->isUnreachableAtRuntime() &&
-      !elt->getParentEnum()->isUnreachableAtRuntime())
+  if (isUnreachableEnumElement(elt))
     return false;
 
   for (auto const &restriction :
@@ -1285,8 +1375,7 @@ static void printEnumCaseInfo(llvm::raw_ostream &out,
   SmallVector<AvailabilityQuery, 2> availabilityQueries;
   bool isConstructible = checkAvailabilityForElement(decl, availabilityContext,
                                                      availabilityQueries);
-  bool isReachable = !decl->isUnreachableAtRuntime() ||
-                     decl->getParentEnum()->isUnreachableAtRuntime();
+  bool isReachable = !isUnreachableEnumElement(decl);
 
   out << "], isReachable: " << (isReachable ? "true" : "false")
       << ", isConstructible: " << (isConstructible ? "true" : "false")

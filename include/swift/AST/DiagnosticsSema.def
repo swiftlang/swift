@@ -4418,6 +4418,9 @@ NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
 NOTE(codable_non_conforming_property_here,none,
      "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, TypeLoc))
+NOTE(codable_unavailable_property_conformance_here,none,
+     "cannot automatically synthesize %0 because the conformance of %1 to %0 "
+     "%2", (Type, TypeLoc, StringRef))
 NOTE(codable_non_decoded_property_here,none,
      "cannot automatically synthesize %0 because %1 does not have a matching "
      "CodingKey and does not have a default value", (Type, Identifier))
@@ -4466,9 +4469,17 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "protocol %2, preventing synthesized conformance "
      "of %3 to %2",
      (unsigned, Type, Type, Type))
+NOTE(unavailable_member_type_conformance_prevents_synthesis, none,
+     "the conformance of %select{associated value|stored property}0 type %1 "
+     "to %2 %4, preventing synthesized conformance of %3 to %2",
+     (unsigned, Type, Type, Type, StringRef))
 NOTE(automatic_protocol_synthesis_unsupported,none,
     "automatic synthesis of %0 is not supported for %kindonly1 declarations",
     (const ProtocolDecl *, const NominalTypeDecl *))
+NOTE(unavailable_raw_type_conformance_prevents_synthesis, none,
+     "the conformance of raw type %0 to 'Equatable' %1, preventing "
+     "synthesized conformance of %2 to 'RawRepresentable'",
+     (Type, StringRef, Type))
 NOTE(comparable_synthesis_raw_value_not_allowed, none,
      "enum declares raw type %0, preventing synthesized conformance of %1 to %2", 
      (Type, Type, Type))

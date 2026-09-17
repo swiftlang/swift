@@ -273,7 +273,9 @@ DerivedConformance::canDeriveComparable(DeclContext *context, EnumDecl *enumerat
       return false; // not sure what should be done here instead
   }
   // The cases must not have non-comparable associated values or raw backing
-  return allAssociatedValuesConformToProtocol(context, enumeration, comparable) && !enumeration->hasRawType();
+  return !anyAssociatedValuePreventsSynthesis(context, enumeration,
+                                              comparable) &&
+         !enumeration->hasRawType();
 }
 
 ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {

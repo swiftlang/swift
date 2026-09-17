@@ -21,13 +21,16 @@
 #include "TypeCheckDecl.h"
 #include "TypeChecker.h"
 #include "swift/AST/AvailabilityQuery.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/AvailabilitySpec.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 
@@ -423,12 +426,17 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
       inherited.front().isError())
     return false;
 
+  auto &C = type->getASTContext();
+
   // The raw type must be Equatable, so that we have a suitable ~= for
-  // synthesized switch statements.
-  if (!TypeChecker::conformsToKnownProtocol(rawType, KnownProtocolKind::Equatable))
+  // synthesized switch statements. The synthesized implementations cannot use
+  // the conformance if availability restricts it.
+  auto *equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
+  if (!equatableProto ||
+      !conformanceIsUsableForSynthesis(rawType, equatableProto,
+                                       AvailabilityContext::forDeclContext(DC)))
     return false;
 
-  auto &C = type->getASTContext();
   auto rawValueDecls = enumDecl->lookupDirect(DeclName(C.Id_RawValue));
   if (rawValueDecls.size() > 1)
     return false;
@@ -495,4 +503,40 @@ Type DerivedConformance::deriveRawRepresentable(AssociatedTypeDecl *assocType) {
   Context.Diags.diagnose(assocType->getLoc(),
                          diag::broken_raw_representable_requirement);
   return nullptr;
+}
+
+void DerivedConformance::tryDiagnoseFailedRawRepresentableDerivation(
+    DeclContext *DC, NominalTypeDecl *nominal) {
+  auto *enumDecl = dyn_cast<EnumDecl>(nominal);
+  if (!enumDecl || !enumDecl->hasRawType())
+    return;
+
+  auto rawType = enumDecl->getRawType();
+  if (rawType->hasError())
+    return;
+
+  // The only member conformance that the synthesized implementations need is
+  // the conformance of the raw type to `Equatable`, which supplies the `~=`
+  // that the synthesized switch statements use.
+  auto &ctx = DC->getASTContext();
+  auto *equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
+  if (!equatableProto)
+    return;
+
+  auto conformance =
+      checkConformance(DC->mapTypeIntoEnvironment(rawType), equatableProto);
+  if (conformance.isInvalid())
+    return;
+
+  auto restriction = availabilityRestrictionPreventingSynthesis(
+      conformance, AvailabilityContext::forDeclContext(DC));
+  if (!restriction)
+    return;
+
+  llvm::SmallString<64> scratch;
+  ctx.Diags.diagnose(enumDecl->getInherited().getStartLoc(),
+                     diag::unavailable_raw_type_conformance_prevents_synthesis,
+                     rawType,
+                     restriction->getDiagnosticDescription(scratch, ctx),
+                     nominal->getDeclaredInterfaceType());
 }
