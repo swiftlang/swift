@@ -58,7 +58,7 @@ func syncTest() {
   do {
    let _ = try invoke(fn: throwingTask) // expected-error{{'async' call in a function that does not support concurrency}}
    let _ = try asyncThrows() // expected-error{{'async' call in a function that does not support concurrency}}
-  } catch {
+  } catch _ {
     // ignore it
   }
 }
@@ -144,7 +144,7 @@ func asyncTest() async {
     // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{17-17=await }}
     let _ = try invokeAuto(await throwingTask())  // expected-note{{call is 'async'}}
     let _ = try await invokeAuto(await throwingTask())
-  } catch {
+  } catch _ {
     // ignore
   }
 }

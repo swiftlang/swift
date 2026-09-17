@@ -99,7 +99,7 @@ class ErrantClass : ErrantBaseClass {
     y = 10
     do {
       try super.init()
-    } catch {}
+    } catch _ {}
   } // expected-error {{'self' used inside 'catch' block reachable from super.init call}}
 
   init(invalidEscapeDesignated2: ()) throws {
@@ -137,7 +137,7 @@ class ErrantClass : ErrantBaseClass {
   convenience init(invalidEscapeConvenience: ()) {
     do {
       try self.init()
-    } catch {}
+    } catch _ {}
   } // expected-error {{'self.init' isn't called on all paths}}
 
   convenience init(okEscapeConvenience2: ()) throws {

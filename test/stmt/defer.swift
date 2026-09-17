@@ -40,7 +40,7 @@ func throwInDeferOK1() {
   defer {
     do {
       throw DeferThrowError.someError
-    } catch {}
+    } catch _ {}
   }
   print("Bar")
 }
@@ -49,7 +49,7 @@ func throwInDeferOK2() throws {
   defer {
     do {
       throw DeferThrowError.someError
-    } catch {}
+    } catch _ {}
   }
   print("Bar")
 }
@@ -63,7 +63,7 @@ func throwingFuncInDefer1a() throws {
   defer {
     do {
       try throwingFunctionCalledInDefer()
-    } catch {}
+    } catch _ {}
   }
   print("Bar")
 }
@@ -81,7 +81,7 @@ func throwingFuncInDefer2a() throws {
       // expected-note@-2 {{did you mean to use 'try'?}}
       // expected-note@-3 {{did you mean to handle error as optional value?}}
       // expected-note@-4 {{did you mean to disable error propagation?}}
-    } catch {}
+    } catch _ {}
   }
   print("Bar")
 }
@@ -95,7 +95,7 @@ func throwingFuncInDefer3a() {
   defer {
     do {
       try throwingFunctionCalledInDefer()
-    } catch {}
+    } catch _ {}
   }
   print("Bar")
 }
@@ -113,7 +113,7 @@ func throwingFuncInDefer4a() {
       // expected-note@-2 {{did you mean to use 'try'?}}
       // expected-note@-3 {{did you mean to handle error as optional value?}}
       // expected-note@-4 {{did you mean to disable error propagation?}}
-    } catch {}
+    } catch _ {}
   }
   print("Bar")
 }
