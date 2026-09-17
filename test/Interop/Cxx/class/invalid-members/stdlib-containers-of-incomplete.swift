@@ -69,9 +69,13 @@ struct GoodStruct {
 };
 // CHECK:      struct GoodStruct {
 // CHECK-NEXT:   init()
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func returnOptional() -> Never
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func returnMapKey() -> Never
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func returnMapValue() -> Never
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func returnVector() -> Never
 // CHECK-NEXT: }
 
@@ -109,9 +113,13 @@ using UsableTemplate = Template<Incomplete>;
 
 // CHECK:      struct Template<Incomplete> {
 // CHECK-NEXT:   init()
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func returnOptional() -> Never
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func returnMapKey() -> Never
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func returnMapValue() -> Never
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func returnVector() -> Never
 // CHECK-NEXT: }
 
