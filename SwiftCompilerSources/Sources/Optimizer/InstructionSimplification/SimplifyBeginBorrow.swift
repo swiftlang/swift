@@ -252,11 +252,6 @@ func replaceGuaranteed(value: SingleValueInstruction, withOwnedValue ownedValue:
       result = replaceGuaranteed(value: fwdInst, withOwnedValue: fwdInst, context)
     case is EndBorrowInst:
       break
-    case let dv as DebugValueInst where dv != value.next:
-      // Move the debug_value immediatly after the value definition to avoid a use-after-consume
-      // in case the debug_value is originally located after the forwarding instruction.
-      dv.move(before: value.next!, context)
-      fallthrough
     default:
       precondition(use.canAccept(ownership: .owned))
       use.set(to: ownedValue, context)

@@ -200,18 +200,18 @@ bb0:
   %29 = begin_borrow [lexical] %26 // users: %32, %31, %39
   debug_value %28, let, name "x", argno 2, scope 3 // id: %30
   debug_value %29, let, name "f", argno 1, scope 3 // id: %31
+  // CHECK: debug_value %[[#A7]], let, name "f", argno 1
   %32 = differentiable_function_extract [original] %29 // users: %37, %35
 
   %33 = alloc_stack $Double // users: %38, %37, %36, %34
+  // CHECK: %[[#A8:]] = alloc_stack $Double
   store %28 to [trivial] %33 // id: %34
 
   debug_value %32, let, name "f", argno 1, scope 5 // id: %35
-  // CHECK: debug_value %[[#A5]]
-  // CHECK: debug_value %[[#A7]]
+  // CHECK: debug_value %[[#A5]], let, name "f", argno 1
 
   debug_value %33, let, name "x", argno 2, expr op_deref, scope 5 // id: %36
 
-  // CHECK: %[[#A8:]] = alloc_stack $Double
   %37 = apply %32(%0, %33) : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
   // CHECK: %[[#]] = apply %[[#A0]](%0, %[[#A8]], %[[#A2]])
 
