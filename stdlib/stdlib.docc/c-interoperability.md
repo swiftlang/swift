@@ -23,7 +23,7 @@ Access a pointer to a variable in memory for explicit passing to C functions.
 - ``Swift/withUnsafePointer(to:_:)-9fjn6``
 - ``Swift/withUnsafePointer(to:_:)-35wrn``
 - ``Swift/withUnsafeMutablePointer(to:_:)``
-- ``Swift/withUnsafeBytes(of:_:)-5zxtl``
+- ``Swift/withUnsafeBytes(of:_:)-3ywhh``
 - ``Swift/withUnsafeBytes(of:_:)-5gesg``
 - ``Swift/withUnsafeMutableBytes(of:_:)``
 

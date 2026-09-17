@@ -34,7 +34,7 @@
 
 ### Accessing the Current Task's Name
 
-- ``Swift/Task/name``
+- ``Swift/Task/name-swift.type.property``
 
 ### Canceling Tasks
 
@@ -43,7 +43,14 @@
 - ``Swift/Task/isCancelled-swift.property``
 - ``Swift/Task/isCancelled-swift.type.property``
 - ``Swift/Task/checkCancellation()``
+- ``Swift/withTaskCancellationHandler(operation:onCancel:)``
 - ``Swift/withTaskCancellationHandler(operation:onCancel:isolation:)``
+
+### Shielding Tasks from Cancellation
+
+- ``Swift/hasActiveCancellationShield``
+- ``Swift/withTaskCancellationShield(operation:)-2lzl8``
+- ``Swift/withTaskCancellationShield(operation:)-8zlgh``
 
 ### Suspending Execution
 
@@ -78,3 +85,4 @@
 - ``Swift/Task/withCancellationHandler(handler:operation:)``
 - ``Swift/withTaskCancellationHandler(handler:operation:)``
 - ``Swift/Task/withGroup(resultType:returning:body:)``
+- ``Swift/withTaskCancellationHandler(handler:operation:)``

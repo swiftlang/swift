@@ -22,6 +22,9 @@ Write generic code that works with any collection, or build your own collection 
 ### Manual Iteration
 
 - ``Swift/IteratorProtocol``
+- ``Swift/BorrowingIteratorProtocol``
+- ``Swift/BorrowingIteratorAdapter``
+- ``Swift/BorrowingSequence``
 
 ### Algebraic Sets
 

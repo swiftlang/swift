@@ -20,6 +20,11 @@ and standard comparison operators.
 - ``Swift/BitwiseCopyable``
 - ``Swift/Escapable``
 
+### Borrowing
+
+- ``Swift/Ref``
+- ``Swift/MutableRef``
+
 ### Sets and Dictionaries
 
 Store your custom types in sets or use them as dictionary keys.
