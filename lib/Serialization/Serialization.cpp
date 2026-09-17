@@ -6745,6 +6745,7 @@ static unsigned encodeLLVMTypeID(llvm::Type::TypeID kind) {
   case llvm::Type::ScalableVectorTyID:
   case llvm::Type::TypedPointerTyID:
   case llvm::Type::TargetExtTyID:
+  case llvm::Type::ByteTyID:
     llvm_unreachable("unsupported serialized LLVM type");
   }
   llvm_unreachable("unhandled LLVM type kind");
