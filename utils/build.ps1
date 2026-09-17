@@ -112,7 +112,7 @@ If no such Windows SDK is installed, it will be downloaded from nuget.
 
 .PARAMETER WindowsSDKArchitectures
 An array of architectures for which the Windows Swift SDK should be built.
-Default: @("X64","X86","ARM64")
+Default: @("X64")
 
 .PARAMETER Clean
 Remove selected build outputs before building.
@@ -212,7 +212,7 @@ param
   [switch] $Windows = $false,
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
-  [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
+  [string[]] $WindowsSDKArchitectures = @("X64"),
   [ValidateSet("dynamic", "static")]
   [string[]] $WindowsSDKLinkModes = @("dynamic", "static"),
 
@@ -655,6 +655,13 @@ $WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
 
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
 $CurrentOperation = $null
+
+$script:TestFailures = New-Object System.Collections.Generic.List[string]
+
+function Write-TestFailure([string] $Name, $ErrorRecord) {
+  Write-Host "Test suite '$Name' failed: $ErrorRecord" -ForegroundColor Red
+  $script:TestFailures.Add($Name)
+}
 
 function Add-TimingData {
   param
@@ -3479,13 +3486,29 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
     $Targets = @("swift-test-stdlib") + $Targets
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+
+    $Failures = @()
+    try {
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+    } catch {
+      Write-Host "Tests failed for targets [$($Targets -join ', ')]: $_" -ForegroundColor Red
+      $Failures += $_
+    }
 
     if ($LLDBTargets) {
-      Invoke-IsolatingEnvVars {
-        $env:SDKROOT = $SwiftSDK
-        Build-CMakeProject @BuildCMakeArgs -BuildTargets $LLDBTargets
+      try {
+        Invoke-IsolatingEnvVars {
+          $env:SDKROOT = $SwiftSDK
+          Build-CMakeProject @BuildCMakeArgs -BuildTargets $LLDBTargets
+        }
+      } catch {
+        Write-Host "Tests failed for targets [$($LLDBTargets -join ', ')]: $_" -ForegroundColor Red
+        $Failures += $_
       }
+    }
+
+    if ($Failures.Count -gt 0) {
+      throw "One or more test suites failed:`n$($Failures -join "`n")"
     }
   }
 }
@@ -6218,19 +6241,39 @@ if (-not $IsCrossCompiling) {
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
     }
-    Invoke-BuildStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests
+    try {
+      Invoke-BuildStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests
+    } catch {
+      Write-TestFailure "compilers" $_
+    }
   }
 
   # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
   # functions hardcode their platform needs.
-  if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
-  if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
-  if ($Test -contains "xctest") { Invoke-BuildStep Test-XCTest $BuildPlatform }
-  if ($Test -contains "testing") { Invoke-BuildStep Test-Testing $BuildPlatform }
-  if ($Test -contains "llbuild") { Invoke-BuildStep Test-LLBuild $BuildPlatform }
-  if ($Test -contains "swiftpm") { Invoke-BuildStep Test-PackageManager $BuildPlatform }
-  if ($Test -contains "swift-format") { Invoke-BuildStep Test-Format $BuildPlatform }
-  if ($Test -contains "sourcekit-lsp") { Invoke-BuildStep Test-SourceKitLSP $BuildPlatform}
+  if ($Test -contains "dispatch") {
+    try { Invoke-BuildStep Test-Dispatch $BuildPlatform } catch { Write-TestFailure "dispatch" $_ }
+  }
+  if ($Test -contains "foundation") {
+    try { Invoke-BuildStep Test-Foundation $BuildPlatform } catch { Write-TestFailure "foundation" $_ }
+  }
+  if ($Test -contains "xctest") {
+    try { Invoke-BuildStep Test-XCTest $BuildPlatform } catch { Write-TestFailure "xctest" $_ }
+  }
+  if ($Test -contains "testing") {
+    try { Invoke-BuildStep Test-Testing $BuildPlatform } catch { Write-TestFailure "testing" $_ }
+  }
+  if ($Test -contains "llbuild") {
+    try { Invoke-BuildStep Test-LLBuild $BuildPlatform } catch { Write-TestFailure "llbuild" $_ }
+  }
+  if ($Test -contains "swiftpm") {
+    try { Invoke-BuildStep Test-PackageManager $BuildPlatform } catch { Write-TestFailure "swiftpm" $_ }
+  }
+  if ($Test -contains "swift-format") {
+    try { Invoke-BuildStep Test-Format $BuildPlatform } catch { Write-TestFailure "swift-format" $_ }
+  }
+  if ($Test -contains "sourcekit-lsp") {
+    try { Invoke-BuildStep Test-SourceKitLSP $BuildPlatform } catch { Write-TestFailure "sourcekit-lsp" $_ }
+  }
 
   # TODO: restore Android Swift runtime tests against the new Runtimes/* layout.
   # The previous `Test-Runtime` reconfigured the in-tree stdlib build (built by
@@ -6267,6 +6310,10 @@ if ($IncludeSBoM) {
       Copy-File $ToolchainIdentifier-sbom.cyclone.xml $Stage
     }
   }
+}
+
+if ($script:TestFailures.Count -gt 0) {
+  throw "The following test suites failed: $($script:TestFailures -join ', ')"
 }
 
 # Custom exception printing for more detailed exception information
