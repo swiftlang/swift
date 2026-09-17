@@ -7676,6 +7676,15 @@ bool ClassDecl::hasRefCountingAnnotations() const {
   return info.isReference() && !info.isImmortal();
 }
 
+ClassDecl *ClassDecl::getForeignReferenceSuperclassOrSelf() const {
+  for (auto cls = const_cast<ClassDecl *>(this); cls;
+       cls = cls->getSuperclassDecl()) {
+    if (cls->isForeignReferenceType())
+      return cls;
+  }
+  return nullptr;
+}
+
 ReferenceCounting ClassDecl::getObjectModel() const {
   if (isForeignReferenceType())
     return hasRefCountingAnnotations() ? ReferenceCounting::Custom
@@ -11998,7 +12007,8 @@ FuncDecl *FuncDecl::createImported(ASTContext &Context, SourceLoc FuncLoc,
                                    Type FnRetType,
                                    GenericParamList *GenericParams,
                                    DeclContext *Parent, ClangNode ClangN) {
-  assert(ClangN);
+  ASSERT(ClangN);
+  ASSERT(FnRetType && "Imported result type must not be null");
   auto *const FD = FuncDecl::createImpl(
       Context, SourceLoc(), StaticSpellingKind::None, FuncLoc, Name, NameLoc,
       Async, SourceLoc(), Throws, SourceLoc(), TypeLoc::withoutLoc(ThrownType),

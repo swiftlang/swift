@@ -36,6 +36,7 @@ struct S {
 
 // CHECK:      struct S {
 // CHECK-NEXT:   init()
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func Err() -> Never
 // CHECK-NEXT:   func Ok()
 // CHECK:      }
