@@ -47,6 +47,7 @@ config.libdispatch_static_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_STATIC_BUILD@
 config.swift_driver_test_options = "@SWIFT_DRIVER_TEST_OPTIONS@"
 config.swift_frontend_test_options = "@SWIFT_FRONTEND_TEST_OPTIONS@"
 config.swift_ide_test_test_options = "@SWIFT_IDE_TEST_TEST_OPTIONS@"
+config.wasi_max_memory = "@SWIFT_WASI_MAX_MEMORY@"
 
 config.cmake_c_compiler = r'''@CMAKE_C_COMPILER@'''
 config.cmake_cxx_compiler = r'''@CMAKE_CXX_COMPILER@'''
