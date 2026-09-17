@@ -3595,12 +3595,18 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   }
 
   // We allow a funny function conversion (...) -> T conv (...) -> Void
-  // in certain positions. To handle this correctly, we must not attempt
-  // a Void binding too soon in this situation. Handle it like a fallback
-  // instead of a real subtype relationship, since it isn't one.
+  // in positions with single expression closures. To handle this correctly,
+  // we must avoid binding to Void too soon, and thus produce a Fallback binding
+  // if the constraint, TypeVar or a member of the equivalence class locator is
+  // in the ToVoid conversion location
   if (kind == AllowedBindingKind::Subtypes && type->isVoid()) {
-    auto subkind = CS.getImpliedResultConversionKind(constraint->getLocator());
-    if (subkind == ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
+    auto &impl = TypeVar->getImpl();
+    auto tvRKind = CS.getImpliedResultConversionKind(impl.getLocator());
+    auto conRKind =
+        CS.getImpliedResultConversionKind(constraint->getLocator());
+    if (tvRKind == ConstraintSystem::ImpliedResultConversionKind::ToVoid ||
+        conRKind == ConstraintSystem::ImpliedResultConversionKind::ToVoid ||
+        impl.isToVoidViaEquivalence(&CS)) {
       kind = AllowedBindingKind::Fallback;
     }
   }
