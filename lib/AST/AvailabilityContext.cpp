@@ -531,7 +531,9 @@ AvailabilityContext::restrictionForDeclInDomain(
 
 bool AvailabilityContext::enumerateUnsatisfiedRestrictionsForConformance(
     ProtocolConformanceRef conformance,
-    llvm::function_ref<bool(const Decl *, AvailabilityRestriction)> callback,
+    llvm::function_ref<bool(const Decl *, const ProtocolDecl *,
+                            AvailabilityRestriction)>
+        callback,
     AvailabilityRestrictionFlags flags) {
   if (conformance.isInvalid() || conformance.isAbstract())
     return false;
@@ -559,14 +561,14 @@ bool AvailabilityContext::enumerateUnsatisfiedRestrictionsForConformance(
   // declaration.
   auto *proto = conformance.getProtocol();
   if (auto restriction = unsatisfiedRestrictionForDecl(proto, flags)) {
-    if (callback(proto, *restriction))
+    if (callback(proto, proto, *restriction))
       return true;
   }
 
   auto *conformanceDecl = rootConf->getDeclContext()->getAsDecl();
   if (auto restriction =
           unsatisfiedRestrictionForDecl(conformanceDecl, flags)) {
-    if (callback(conformanceDecl, *restriction))
+    if (callback(conformanceDecl, proto, *restriction))
       return true;
   }
 
@@ -584,9 +586,8 @@ bool AvailabilityContext::hasUnsatisfiedRestrictionsForConformance(
     ProtocolConformanceRef conformance, AvailabilityRestrictionFlags flags) {
   return enumerateUnsatisfiedRestrictionsForConformance(
       conformance,
-      [](const Decl *decl, AvailabilityRestriction restriction) {
-        return true;
-      },
+      [](const Decl *decl, const ProtocolDecl *proto,
+         AvailabilityRestriction restriction) { return true; },
       flags);
 }
 
