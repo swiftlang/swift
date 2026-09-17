@@ -1,6 +1,11 @@
 import SomeModule
 print(someFunc())
 
+// VERSIONED-UNIT: [[COMPILER_VERSION:.*Swift version.*]]
+// VERSIONED-UNIT: provider: swift-[[COMPILER_VERSION]]{{$}}
+// VERSIONED-UNIT-NEXT: is-system: 1
+// VERSIONED-UNIT-NEXT: is-module: 1
+// VERSIONED-UNIT-NEXT: module-name: SomeModule
 // UNIT: Record | system | SomeModule |
 // SKIP-NOT: Record | system | SomeModule |
 
@@ -20,6 +25,8 @@ print(someFunc())
 // RUN: mkdir -p %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule
 // RUN: %target-swift-frontend \
 // RUN:     -emit-module \
+// RUN:     -disable-implicit-concurrency-module-import \
+// RUN:     -disable-implicit-string-processing-module-import \
 // RUN:     -module-name SomeModule \
 // RUN:     -o %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:     -swift-version 5 \
@@ -31,9 +38,13 @@ print(someFunc())
 // RUN: %empty-directory(%t/idx)
 // RUN: %empty-directory(%t/modulecache)
 //
-// --- Built with indexing
+// --- Built with indexing. Disable implicit imports so SomeModule is the only
+// serialized Swift module indexed by this invocation (-index-ignore-stdlib
+// excludes Swift itself), making the unit filename glob below unambiguous.
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
+// RUN:     -disable-implicit-concurrency-module-import \
+// RUN:     -disable-implicit-string-processing-module-import \
 // RUN:     -index-system-modules \
 // RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
@@ -43,7 +54,9 @@ print(someFunc())
 // RUN:     %s
 //
 // --- Check the index.
-// RUN: c-index-test core -print-unit %t/idx | %FileCheck -check-prefix=UNIT %s
+// RUN: %target-swift-frontend -version > %t/unit.out
+// RUN: c-index-test core -print-unit %t/idx/*/units/%module-target-triple.swiftmodule-* >> %t/unit.out
+// RUN: %FileCheck -check-prefixes=VERSIONED-UNIT,UNIT %s < %t/unit.out
 //
 // --- Built with indexing, SomeModule is outside of the SDK so it's skipped.
 // RUN: %empty-directory(%t/idx)

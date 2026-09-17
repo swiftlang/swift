@@ -23,6 +23,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/PathRemapper.h"
+#include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/Index/Index.h"
@@ -704,8 +705,9 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
 
   auto &fileMgr = clangCI.getFileManager();
   bool isSystem = module->isNonUserModule();
-  // FIXME: Get real values for the following.
-  StringRef swiftVersion;
+  // Use the identity of the compiler that produced the index unit, independent
+  // of the selected Swift language compatibility mode.
+  std::string swiftVersion = version::getSwiftFullVersion();
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
   // For indexing serialized modules 'debug compilation' is irrelevant, so
   // set it to true by default.
@@ -765,8 +767,9 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
   if (!mainFile)
     return false;
 
-  // FIXME: Get real values for the following.
-  StringRef swiftVersion;
+  // Use the identity of the compiler that produced the index unit, independent
+  // of the selected Swift language compatibility mode.
+  std::string swiftVersion = version::getSwiftFullVersion();
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
   IndexUnitWriter unitWriter(
       fileMgr, indexStorePath, "swift", swiftVersion, compress, indexUnitToken,
