@@ -226,6 +226,13 @@ namespace {
       return new ThinFuncTypeInfo(formalType, storageType, size, align,
                                   spareBits);
     }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     void initialize(IRGenFunction &IGF, Explosion &src, Address addr,
                     bool isOutlined) const override {
       auto *fn = src.claimNext();
@@ -255,6 +262,12 @@ namespace {
       return new ObjCFuncTypeInfo(formalType, storageType, size, align,
                                   spareBits);
     }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
 
@@ -279,6 +292,12 @@ namespace {
                                       IsTriviallyDestroyable_t pod) {
       return new FuncTypeInfo(formalType, storageType, size, align,
                               std::move(spareBits), pod);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
     }
     
     // Function types do not satisfy allowsOwnership.
@@ -475,6 +494,12 @@ namespace {
                      align),
         FuncSignatureInfo(ty) {}
 
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Block;
     }
@@ -506,6 +531,12 @@ namespace {
                          IsFixedSize, IsABIAccessible),
         CaptureOffset(captureOffset)
     {}
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
     
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,

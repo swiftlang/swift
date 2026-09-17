@@ -101,6 +101,14 @@ public:
     return ElementLayout(type);
   }
 
+  static ElementLayout
+  getFromSerializedStorage(const TypeInfo &type,
+                           const ElementLayoutStorage &storage) {
+    ElementLayout result(type);
+    result.Storage = storage;
+    return result;
+  }
+
   void completeFrom(const ElementLayout &other) {
     assert(!isCompleted());
     Storage = other.Storage;

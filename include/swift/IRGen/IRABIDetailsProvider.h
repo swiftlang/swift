@@ -28,10 +28,12 @@
 namespace swift {
 
 class ASTContext;
+struct AbstractTypeLayout;
 class IRGenOptions;
 class ModuleDecl;
 class NominalTypeDecl;
 class ParamDecl;
+class SerializableHiddenTypeInfoRepresentation;
 
 class IRABIDetailsProviderImpl;
 
@@ -212,6 +214,9 @@ public:
   /// is not a fixed layout type.
   std::optional<SizeAndAlignment>
   getTypeSizeAlignment(const NominalTypeDecl *TD);
+
+  /// Returns the abstract layout for a hidden nominal type.
+  AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD);
 
   /// An representation of a single type, or a C struct with multiple members
   /// with specified types. The C struct is expected to be passed via swiftcc
