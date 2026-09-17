@@ -255,3 +255,4 @@ copy_library_sources(RegexBuilder "Sources" "Supplemental/StringProcessing"
 
 copy_library_sources("linker-support" "" "Supplemental/Differentiation")
 copy_library_sources(include "" "Supplemental/Distributed")
+copy_library_sources(include "" "Supplemental/Observation")
