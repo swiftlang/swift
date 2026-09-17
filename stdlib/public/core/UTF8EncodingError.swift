@@ -232,6 +232,10 @@ extension UTF8 {
       // apply it to subsequent bytes instead of reporting
       // just `.unexpectedContinuation`.
       var priorError: UTF8.ValidationError? = nil
+      // Remember where an encoding sequence is supposed to end according to the
+      // leading byte. If a continuation byte occurs there or past there, it
+      // is a new and unrelated `.unexpectedContinuation` error.
+      var sequenceEnd = 0
       while true {
         do throws(UTF8.ValidationError) {
           _ = unsafe try bufPtr.baseAddress!._validateUTF8(limitedBy: bufPtr.count)
@@ -243,11 +247,19 @@ extension UTF8 {
           let kind: UTF8.ValidationError.Kind
           if let prior = priorError,
              prior.byteOffsets.upperBound == adjustedRange.lowerBound,
+             adjustedRange.lowerBound < sequenceEnd,
              error.kind == .unexpectedContinuationByte
           {
             kind = prior.kind
           } else {
             kind = error.kind
+            if kind == .unexpectedContinuationByte {
+              sequenceEnd = adjustedRange.upperBound
+            } else {
+              let leading = unsafe bufPtr[error.byteOffsets.lowerBound]
+              sequenceEnd =
+                adjustedRange.lowerBound + _utf8ScalarLength(leading)
+            }
           }
           let adjustedErr = UTF8.ValidationError(kind, adjustedRange)
           priorError = adjustedErr
