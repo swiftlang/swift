@@ -3014,6 +3014,18 @@ namespace {
         if (cxxRecordDecl && cxxRecordDecl->isEffectivelyFinal())
           classDecl->addAttribute(new (Impl.SwiftContext)
                                       FinalAttr(/*IsImplicit=*/true));
+        // A foreign reference type can be subclassed from Swift only if it has
+        // a virtual destructor: deleting a Swift subclass through a base
+        // pointer must run the most-derived destructor.
+        else if (cxxRecordDecl &&
+                 Impl.SwiftContext.LangOpts.hasFeature(
+                     Feature::ForeignReferenceTypeSubclassing)) {
+          auto dtor = cxxRecordDecl->getDestructor();
+          if (dtor && dtor->isVirtual() && !dtor->isDeleted() &&
+              (dtor->getAccess() == clang::AS_public ||
+               dtor->getAccess() == clang::AS_protected))
+            classDecl->overwriteAccess(AccessLevel::Open);
+        }
       }
 
       // If we need it, add an explicit "deinit" to this type.
