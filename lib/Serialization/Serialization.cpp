@@ -2267,7 +2267,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Extension:
   case DeclKind::Module:
   case DeclKind::PrecedenceGroup:
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
   case DeclKind::HiddenTypeLayoutInfo:
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
@@ -5550,8 +5550,8 @@ public:
     llvm_unreachable("import decls should not be serialized");
   }
 
-  void visitUsingDecl(const UsingDecl *) {
-    llvm_unreachable("using decls should not be serialized");
+  void visitFileDefaultDecl(const FileDefaultDecl *) {
+    llvm_unreachable("file default decls should not be serialized");
   }
 
   void visitEnumCaseDecl(const EnumCaseDecl *) {
@@ -7423,7 +7423,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         continue;
       }
       if (isa<MacroExpansionDecl>(D) || isa<TopLevelCodeDecl>(D) ||
-          isa<UsingDecl>(D)) {
+          isa<FileDefaultDecl>(D)) {
         continue;
       }
 

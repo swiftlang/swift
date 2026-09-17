@@ -400,7 +400,7 @@ public:
   VISIT_AND_IGNORE(ParamDecl)
   VISIT_AND_IGNORE(MissingDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
-  VISIT_AND_IGNORE(UsingDecl)
+  VISIT_AND_IGNORE(FileDefaultDecl)
   VISIT_AND_IGNORE(HiddenTypeLayoutInfoDecl)
 
   // This declaration is handled from the PatternBindingDecl

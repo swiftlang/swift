@@ -2,7 +2,7 @@
 
 // REQUIRES: swift_feature_DefaultIsolationPerFile
 
-using @diagnose(DeprecatedDeclaration, as: error)
+default @diagnose(DeprecatedDeclaration, as: error)
 
 @available(*, deprecated)
 func deprecatedThing() {}

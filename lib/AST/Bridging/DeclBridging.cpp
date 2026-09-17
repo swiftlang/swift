@@ -605,13 +605,13 @@ BridgedImportDecl BridgedImportDecl_createParsed(
                             std::move(builder).get());
 }
 
-BridgedUsingDecl BridgedUsingDecl_createParsed(
+BridgedFileDefaultDecl BridgedFileDefaultDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    SourceLoc usingKeywordLoc, BridgedDeclAttributes cSpecifiedAttributes) {
+    SourceLoc defaultKeywordLoc, BridgedDeclAttributes cSpecifiedAttributes) {
   ASTContext &ctx = cContext.unbridged();
-  return UsingDecl::create(ctx, usingKeywordLoc,
-                           cSpecifiedAttributes.unbridged(),
-                           cDeclContext.unbridged());
+  return FileDefaultDecl::create(ctx, defaultKeywordLoc,
+                                 cSpecifiedAttributes.unbridged(),
+                                 cDeclContext.unbridged());
 }
 
 BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(
