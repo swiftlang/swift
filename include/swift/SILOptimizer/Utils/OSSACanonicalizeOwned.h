@@ -510,6 +510,8 @@ private:
   }
   bool computeCanonicalLiveness();
 
+  void handleDeferredDebugUses(ArrayRef<Operand *> deferredDebugUses);
+
   bool endsAccessOverlappingPrunedBoundary(SILInstruction *inst);
 
   void extendLivenessThroughOverlappingAccess();
