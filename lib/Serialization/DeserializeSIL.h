@@ -37,6 +37,11 @@ namespace swift {
     llvm::BitstreamCursor SILCursor;
     llvm::BitstreamCursor SILIndexCursor;
 
+    /// The stage floor the producing compilation committed to. Read eagerly
+    /// from the head of the SIL block, and applied only for a SIB, whose
+    /// module file is the whole module rather than a dependency.
+    SILStage SerializedStageFloor = SILStage::Raw;
+
     class FuncTableInfo;
     using SerializedFuncTable =
       llvm::OnDiskIterableChainedHashTable<FuncTableInfo>;
@@ -318,6 +323,13 @@ namespace swift {
       getAllProperties();
       getAllDifferentiabilityWitnesses();
       getAllMoveOnlyDeinits();
+
+      // A SIB is the whole module, so its recorded floor is the module's. A
+      // .swiftmodule is a dependency, and its functions carry their own stage.
+      // Guard the raise, because commitStage rejects a regression and a second
+      // SIB may record a lower floor than one already loaded.
+      if (MF->isSIB() && SerializedStageFloor > SILMod.getStageFloor())
+        SILMod.commitStage(SerializedStageFloor);
     }
 
     /// Deserialize all SILFunctions inside the module and add them to SILMod.

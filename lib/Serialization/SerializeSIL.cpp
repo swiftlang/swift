@@ -632,6 +632,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
       (unsigned)F.forceEnableLexicalLifetimes(), OnlyReferencedByDebugInfo,
+      (unsigned)F.getFunctionStage(),
       FnID, replacedFunctionID, usedAdHocWitnessFunctionID, genericSigID,
       clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
@@ -3989,6 +3990,16 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DebugValueDelimiterLayout>();
   registerSILAbbr<SILDebugReconstructionBlockLayout>();
   registerSILAbbr<SILExtraStringLayout>();
+
+  // The stage floor must lead the block. The deserializer reads it straight
+  // after the abbrevs, before it jumps to any per-entity offset.
+  //
+  // Emit it unabbreviated. The block declares a 6-bit abbrev width, and the
+  // registrations above already reach ID 63, so a further abbrev would not
+  // encode. One record per module gains nothing from one anyway.
+  ScratchRecord.clear();
+  ScratchRecord.push_back(unsigned(SILMod->getStageFloor()));
+  Out.EmitRecord(unsigned(SIL_STAGE), ScratchRecord);
 
   // Write out VTables first because it may require serializations of
   // non-transparent SILFunctions (body is not needed).

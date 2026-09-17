@@ -210,7 +210,18 @@ SILDeserializer::SILDeserializer(
     return;
 
   // Load any abbrev records at the start of the block.
-  MF->fatalIfUnexpected(SILCursor.advance());
+  llvm::BitstreamEntry firstEntry = MF->fatalIfUnexpected(SILCursor.advance());
+
+  // The stage floor leads the block, ahead of every per-entity record. Reading
+  // it here costs nothing, because every other read jumps to its own offset.
+  if (firstEntry.Kind == llvm::BitstreamEntry::Record) {
+    SmallVector<uint64_t, 1> stageScratch;
+    unsigned stageKind = MF->fatalIfUnexpected(
+        SILCursor.readRecord(firstEntry.ID, stageScratch));
+    if (stageKind == SIL_STAGE && stageScratch.size() == 1 &&
+        stageScratch[0] <= unsigned(SILStage::Lowered))
+      SerializedStageFloor = SILStage(stageScratch[0]);
+  }
 
   llvm::BitstreamCursor cursor = SILIndexCursor;
   // We expect SIL_FUNC_NAMES first, then SIL_VTABLE_NAMES, then
@@ -731,7 +742,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // canonical SIL form.
   assert(!forDebugScope || declarationOnly); // debug scopes must always be read
                                              // declaration only
-  switch (SILMod.getStage()) {
+  switch (SILMod.getStageFloor()) {
   case SILStage::Raw:
   case SILStage::Canonical:
     break;
@@ -815,7 +826,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo;
+      onlyReferencedByDebugInfo, serializedStage;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
@@ -825,7 +836,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo, funcTyID, replacedFunctionID,
+      onlyReferencedByDebugInfo, serializedStage, funcTyID, replacedFunctionID,
       usedAdHocWitnessFunctionID, genericSigID, clangNodeOwnerID,
       parentModuleID, SemanticsIDs);
 
@@ -1051,6 +1062,12 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // after arbitrary optimization and lowering.
   if (!MF->isSIB())
     fn->setWasDeserializedCanonical();
+
+  // Seed the stage from what the container recorded for this function, not from
+  // the container kind. 
+  auto recordedStage = SILStage(serializedStage);
+  if (recordedStage > fn->getFunctionStage())
+    fn->setFunctionStage(recordedStage);
 
   fn->setBare(IsBare);
   if (!fn->getDebugScope()) {
@@ -4325,7 +4342,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo;
+      onlyReferencedByDebugInfo, serializedStage;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
@@ -4335,7 +4352,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo, funcTyID, replacedFunctionID,
+      onlyReferencedByDebugInfo, serializedStage, funcTyID, replacedFunctionID,
       usedAdHocWitnessFunctionID, genericSigID, clangOwnerID, parentModuleID,
       SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);

@@ -2987,7 +2987,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
     Thunk->setOwnershipEliminated();
   }
 
-  Thunk->setHasLoweredAddresses(SpecializedFunc->hasLoweredAddresses());
+  Thunk->inheritDerivedFrom(SpecializedFunc);
 
   if (!Thunk->hasLoweredAddresses()) {
     for (auto SpecArg : SpecializedFunc->getArguments()) {
