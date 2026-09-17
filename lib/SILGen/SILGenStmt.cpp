@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Condition.h"
 #include "Conversion.h"
@@ -994,7 +993,7 @@ void StmtEmitter::visitDiscardStmt(DiscardStmt *S) {
     assert(varDecl->hasStorage());
     auto varType = varDecl->getTypeInContext();
     auto &varTypeLowering = SGF.getTypeLowering(varType);
-    if (!varTypeLowering.isTrivial()) {
+    if (!varTypeLowering.isTrivial(&SGF.F)) {
       diagnose(getASTContext(),
                S->getStartLoc(),
                diag::discard_nontrivial_storage,

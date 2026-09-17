@@ -23,8 +23,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
@@ -1272,15 +1270,18 @@ AllowAnyObjectKeyPathRoot::create(ConstraintSystem &cs,
 
 bool AllowMultiArgFuncKeyPathMismatch::diagnose(const Solution &solution,
                                                 bool asNote) const {
-  MultiArgFuncKeyPathFailure failure(solution, functionType, getLocator());
+  MultiArgFuncKeyPathFailure failure(solution, functionType, expectedType,
+                                     getLocator());
   return failure.diagnose(asNote);
 }
 
 AllowMultiArgFuncKeyPathMismatch *
-AllowMultiArgFuncKeyPathMismatch::create(ConstraintSystem &cs, Type fnType,
+AllowMultiArgFuncKeyPathMismatch::create(ConstraintSystem &cs,
+                                         Type fnType,
+                                         Type expectedType,
                                          ConstraintLocator *locator) {
   return new (cs.getAllocator())
-  AllowMultiArgFuncKeyPathMismatch(cs, fnType, locator);
+      AllowMultiArgFuncKeyPathMismatch(cs, fnType, expectedType, locator);
 }
 
 bool TreatKeyPathSubscriptIndexAsHashable::diagnose(const Solution &solution,
@@ -1291,7 +1292,8 @@ bool TreatKeyPathSubscriptIndexAsHashable::diagnose(const Solution &solution,
 }
 
 TreatKeyPathSubscriptIndexAsHashable *
-TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs, Type type,
+TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs,
+                                             Type type,
                                              ConstraintLocator *locator) {
   return new (cs.getAllocator())
       TreatKeyPathSubscriptIndexAsHashable(cs, type, locator);

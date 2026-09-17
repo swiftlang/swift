@@ -26,13 +26,13 @@
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/UnsafeUse.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -1154,7 +1154,8 @@ public:
     if (isNeverThrownError(thrownError))
       return result;
 
-    assert(!thrownError->hasError());
+    if (thrownError->hasError())
+      return forInvalidCode();
 
     result.ThrowKind = conditionalKind;
     result.ThrowReason = reason;
@@ -5316,12 +5317,11 @@ static ThrownErrorClassification classifyThrownErrorType(Type type) {
 
 ThrownErrorSubtyping
 swift::compareThrownErrorsForSubtyping(
-    Type subThrownError, Type superThrownError, DeclContext *dc
+    Type subThrownError, Type superThrownError
 ) {
   // Deal with NULL errors. This should only occur when there is no standard
   // library.
   if (!subThrownError || !superThrownError) {
-    assert(!dc->getASTContext().getStdlibModule() && "NULL thrown error type");
     return ThrownErrorSubtyping::ExactMatch;
   }
 
@@ -5395,7 +5395,9 @@ swift::compareThrownErrorsForSubtyping(
 
   // Check whether the subtype's thrown error type is convertible to the
   // supertype's thrown error type.
-  if (TypeChecker::isConvertibleTo(subThrownError, superThrownError, dc))
+  constraints::ConformanceCache cache;
+
+  if (canConvertTo(cache, subThrownError, superThrownError))
     return ThrownErrorSubtyping::Subtype;
 
   // We know it doesn't work.

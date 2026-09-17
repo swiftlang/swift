@@ -26,13 +26,10 @@
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/ExportKind.h"
 #include "swift/AST/Import.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/Type.h"
@@ -2204,23 +2201,23 @@ class DeclAvailabilityChecker
     return !func->getName().isSimpleName("flatMap");
   }
 
-  void checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
+  bool checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
                  ExportabilityReason reason,
                  DeclAvailabilityFlags flags = std::nullopt) {
     // Don't bother checking errors.
     if (type && type->hasError())
-      return;
+      return false;
 
-    diagnoseTypeAvailability(typeRepr, type, context->getLoc(),
-                             Where.withReason(reason), flags);
+    return diagnoseTypeAvailability(typeRepr, type, context->getLoc(),
+                                    Where.withReason(reason), flags);
   }
 
 public:
   explicit DeclAvailabilityChecker(ExportContext where)
     : Where(where) {}
 
-  void checkType(Type type, const TypeRepr *typeRepr, const Decl *context) {
-    checkType(type, typeRepr, context, ExportabilityReason::General);
+  bool checkType(Type type, const TypeRepr *typeRepr, const Decl *context) {
+    return checkType(type, typeRepr, context, ExportabilityReason::General);
   }
 
   /// Ignore the where clause for AsyncSequence.flatMap from the
@@ -2235,6 +2232,20 @@ public:
                                    const Decl *context) {
     checkType(type, typeRepr, context, ExportabilityReason::General,
               DeclAvailabilityFlag::DisableUnsafeChecking);
+  }
+
+  void checkThrownErrorType(Type type, const TypeRepr *typeRepr,
+                            const Decl *context) {
+    // If the thrown error type is itself unavailable then diagnosing the
+    // availability of its conformance to 'Error' would be redundant.
+    if (checkType(type, typeRepr, context))
+      return;
+
+    // A typed throws clause requires the thrown error type to conform to
+    // 'Error', so that conformance must be available too.
+    auto loc = typeRepr ? typeRepr->getLoc() : context->getLoc();
+    (void)diagnoseConformanceAvailability(
+        loc, type, context->getASTContext().getErrorDecl(), Where);
   }
 
   void checkAttachedMacros(const Decl *D) {

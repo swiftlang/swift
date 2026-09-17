@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -enable-experimental-feature ThenStatements
+// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -target %target-swift-5.7-abi-triple -enable-experimental-feature ThenStatements
 
 // Required for regex
 // REQUIRES: swift_swift_parser

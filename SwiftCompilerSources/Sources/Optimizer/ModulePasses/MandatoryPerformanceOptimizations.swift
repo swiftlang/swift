@@ -426,15 +426,16 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return true
   }
 
+  if callee.mayBindDynamicSelf {
+    // We don't support inlining a function that binds dynamic self, e.g. into a
+    // global-init function, because the caller cannot provide the self metadata
+    // for the cloner to rewrite the callee's references to.
+    return false
+  }
+
   if apply is BeginApplyInst {
     // Avoid co-routines because they might allocate (their context).
     return true
-  }
-
-  if callee.mayBindDynamicSelf {
-    // We don't support inlining a function that binds dynamic self into a global-init function
-    // because the global-init function cannot provide the self metadata.
-    return false
   }
 
   if apply.parentFunction.isGlobalInitOnceFunction && (
@@ -706,6 +707,10 @@ extension FunctionWorklist {
                                                      visited: inout Set<Conformance>,
                                                      _ context: ModulePassContext)
   {
+    // If an associated type is an opaque result type the conformance is abstract. The witness
+    // methods of the underlying type's conformance still need to be optimized, because IRGen
+    // looks through the opaque type when it emits the witness table entry.
+    let conformance = conformance.lookingThroughOpaqueTypes(context)
     guard conformance.isConcrete,
           visited.insert(conformance).inserted
     else {

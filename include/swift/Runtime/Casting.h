@@ -44,6 +44,31 @@ swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
                   const Metadata *targetType,
                   DynamicCastFlags flags);
 
+/// Test whether a dynamic cast would succeed, without producing a value.
+///
+/// Unlike swift_dynamicCast, this writes no destination and neither copies nor
+/// consumes the source -- it only reads it. This makes it safe to use
+/// with noncopyable values.
+///
+/// \param src Pointer to the source value. Borrowed; unchanged on return.
+///
+/// \param srcType The static type of the source value.
+///
+/// \param targetType The type to test against.
+///
+/// \param flags Flags to control the operation. Unconditional,
+///   TakeOnSuccess and DestroyOnFailure are meaningless here and ignored;
+///   ProhibitIsolatedConformances is honored.
+///
+/// \return true if a conditional swift_dynamicCast from \p srcType to
+///   \p targetType would succeed for this value.
+SWIFT_RUNTIME_EXPORT
+bool
+swift_dynamicCastTest(OpaqueValue *src,
+                      const Metadata *srcType,
+                      const Metadata *targetType,
+                      DynamicCastFlags flags);
+
 /// Checked dynamic cast to a Swift class type.
 ///
 /// \param object The object to cast.

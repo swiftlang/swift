@@ -12,17 +12,43 @@
 
 // RUN: %FileCheck %t/legacy.swift --input-file %t/Legacy.swiftinterface
 
+// RUN: %empty-directory(%t/top)
 // RUN: %target-swift-frontend -emit-module -module-name Ordering \
 // RUN:     -enable-library-evolution \
 // RUN:     -swift-version 5 \
-// RUN:     -o %t/Ordering.swiftmodule \
-// RUN:     -emit-module-interface-path %t/Ordering.swiftinterface \
+// RUN:     -o %t/top/Ordering.swiftmodule \
+// RUN:     -emit-module-interface-path %t/top/Ordering.swiftinterface \
+// RUN:     -enable-experimental-feature DefaultIsolationPerFile \
+// RUN:     -DTOP %t/ordering.swift
+// RUN: %target-swift-typecheck-module-from-interface(%t/top/Ordering.swiftinterface) -module-name Ordering
+// RUN: %FileCheck %t/ordering.swift --input-file %t/top/Ordering.swiftinterface
+
+// RUN: %empty-directory(%t/bottom)
+// RUN: %target-swift-frontend -emit-module -module-name Ordering \
+// RUN:     -enable-library-evolution \
+// RUN:     -swift-version 5 \
+// RUN:     -o %t/bottom/Ordering.swiftmodule \
+// RUN:     -emit-module-interface-path %t/bottom/Ordering.swiftinterface \
+// RUN:     -enable-experimental-feature DefaultIsolationPerFile \
+// RUN:     -DBOTTOM %t/ordering.swift
+// RUN: %target-swift-typecheck-module-from-interface(%t/bottom/Ordering.swiftinterface) -module-name Ordering
+// RUN: %FileCheck %t/ordering.swift --input-file %t/bottom/Ordering.swiftinterface
+
+// RUN: diff %t/top/Ordering.swiftinterface %t/bottom/Ordering.swiftinterface
+
+// make sure filecheck fails with neither flag
+// RUN: %empty-directory(%t/neither)
+// RUN: %target-swift-frontend -emit-module -module-name Ordering \
+// RUN:     -enable-library-evolution \
+// RUN:     -swift-version 5 \
+// RUN:     -o %t/neither/Ordering.swiftmodule \
+// RUN:     -emit-module-interface-path %t/neither/Ordering.swiftinterface \
 // RUN:     -enable-experimental-feature DefaultIsolationPerFile \
 // RUN:     %t/ordering.swift
-// RUN: %target-swift-typecheck-module-from-interface(%t/Ordering.swiftinterface) -module-name Ordering
-// RUN: %FileCheck %t/ordering.swift --input-file %t/Ordering.swiftinterface
+// RUN: not %FileCheck %t/ordering.swift --input-file %t/neither/Ordering.swiftinterface
 
-// RUN: %target-swift-frontend -typecheck -verify %t/consumer.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify %t/consumer.swift -I %t -I %t/top
+// RUN: %target-swift-frontend -typecheck -verify %t/consumer.swift -I %t -I %t/bottom
 
 // REQUIRES: swift_feature_DefaultIsolationPerFile
 
@@ -63,8 +89,10 @@ public func explicitlyDeprecated() {}
 // CHECK-NOT: using @available
 
 // We want multiple available attrs to show up in the right order.
+#if TOP
 using @available(*, deprecated, message: "first default")
 using @available(*, deprecated, message: "second default")
+#endif
 
 // CHECK:      @available(*, deprecated, message: "first default")
 // CHECK-NEXT: @available(*, deprecated, message: "second default")
@@ -77,6 +105,11 @@ public func defaultedOrderedFunc() {}
 // CHECK-NEXT: public func orderedFunc()
 @available(*, deprecated, message: "explicit")
 public func orderedFunc() {}
+
+#if BOTTOM
+using @available(*, deprecated, message: "first default")
+using @available(*, deprecated, message: "second default")
+#endif
 
 //--- consumer.swift
 import Legacy

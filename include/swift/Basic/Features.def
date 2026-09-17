@@ -212,6 +212,7 @@ BASELINE_LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc")
 BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedStackAlloc, 0, "Builtin.unprotectedStackAlloc")
 BASELINE_LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline")
 BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf")
+BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedGepProjection, 0, "Builtin.unprotectedGepProjection")
 BASELINE_LANGUAGE_FEATURE(NewCxxMethodSafetyHeuristics, 0, "Only import C++ methods that return pointers (projections) on owned types as unsafe")
 BASELINE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability")
 BASELINE_LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment")
@@ -535,11 +536,11 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
 /// Do not import non-field C++ record members until requested from Swift.
-EXPERIMENTAL_FEATURE(ImportCxxMembersLazily, true)
+LANGUAGE_FEATURE(ImportCxxMembersLazily, 0, "import C++ members lazily")
 
 /// Import a C++ foreign reference type's primary FRT base as a Swift
 /// superclass.
-EXPERIMENTAL_FEATURE(ForeignReferenceTypeInheritance, true)
+LANGUAGE_FEATURE(ForeignReferenceTypeInheritance, 0, "foreign reference type inheritance hierarchy")
 
 /// Enable @cxx @implementation for implementing C++ functions in Swift.
 EXPERIMENTAL_FEATURE(CxxImplementation, true)
@@ -556,6 +557,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 /// used to disable running the second half after an
 /// error, but no longer has any effect.
 EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
+
+/// normal coroutines (as functions)
+EXPERIMENTAL_FEATURE(CoroutineFunctions, false)
 
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
@@ -621,6 +625,10 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
 
+/// Enable subscript parameters that have ownership (inout, borrowing,
+/// consuming).
+EXPERIMENTAL_FEATURE(SubscriptParametersWithOwnership, true)
+
 /// Emit typed allocation calls in Embedded Swift.
 EXPERIMENTAL_FEATURE(TypedAllocation, true)
 
@@ -681,6 +689,9 @@ EXPERIMENTAL_FEATURE(DistributedActorResignRemoteID, false)
 
 /// Enable @_target, a per-function target-features/CPU override.
 EXPERIMENTAL_FEATURE(TargetAttribute, true)
+
+/// Enable distributed actors in Embedded Swift.
+EXPERIMENTAL_FEATURE(EmbeddedDistributed, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

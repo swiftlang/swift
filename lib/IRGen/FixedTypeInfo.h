@@ -21,8 +21,8 @@
 
 #include "Address.h"
 #include "TypeInfo.h"
-#include "swift/Basic/ClusteredBitVector.h"
 #include "swift/SIL/SILType.h"
+#include "swift/Basic/ClusteredBitVector.h"
 
 namespace llvm {
   class ConstantInt;

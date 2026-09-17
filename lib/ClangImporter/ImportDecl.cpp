@@ -83,7 +83,6 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Lookup.h"
-#include "clang/Sema/SemaDiagnostic.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -92,7 +91,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -974,7 +972,13 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl,
     return false;
   }
 
+  if (isa<clang::FunctionTemplateDecl>(decl))
+    return true;
+
   if (auto *fn = dyn_cast<clang::FunctionDecl>(decl)) {
+    if (fn->getDescribedFunctionTemplate())
+      return true;
+
     switch (fn->getDeclName().getNameKind()) {
     case clang::DeclarationName::CXXOperatorName:
     case clang::DeclarationName::CXXConversionFunctionName:
@@ -2573,18 +2577,15 @@ namespace {
 
           // If this is an inherited foreign reference type, check if it has a
           // suitable superclass.
-          if (Impl.SwiftContext.LangOpts.hasFeature(
-                  Feature::ForeignReferenceTypeInheritance)) {
-            if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
-              if (auto baseDecl = cast_or_null<ClassDecl>(
-                      Impl.importDecl(primaryBase, getVersion()))) {
-                auto classResult = cast<ClassDecl>(result);
-                Type superclassType = baseDecl->getDeclaredInterfaceType();
-                classResult->setSuperclass(superclassType);
-                classResult->setInherited(
-                    Impl.SwiftContext.AllocateCopy(ArrayRef<InheritedEntry>{
-                        TypeLoc::withoutLoc(superclassType)}));
-              }
+          if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
+            if (auto baseDecl = cast_or_null<ClassDecl>(
+                    Impl.importDecl(primaryBase, getVersion()))) {
+              auto classResult = cast<ClassDecl>(result);
+              Type superclassType = baseDecl->getDeclaredInterfaceType();
+              classResult->setSuperclass(superclassType);
+              classResult->setInherited(
+                  Impl.SwiftContext.AllocateCopy(ArrayRef<InheritedEntry>{
+                      TypeLoc::withoutLoc(superclassType)}));
             }
           }
         }
@@ -2652,9 +2653,7 @@ namespace {
         if (nd->getDeclName().isIdentifier())
           allMemberNames.insert(nd->getName());
 
-        if (Impl.SwiftContext.LangOpts.hasFeature(
-                Feature::ImportCxxMembersLazily) &&
-            !shouldEagerlyImportClangRecordMember(nd,
+        if (!shouldEagerlyImportClangRecordMember(nd,
                                                   Impl.SwiftContext.LangOpts))
           continue;
 
@@ -3042,7 +3041,8 @@ namespace {
           Impl.diagnose(HeaderLoc(ann.second),
                         diag::private_fileid_attr_format_invalid,
                         decl->getName());
-          Impl.diagnose({}, diag::private_fileid_attr_format_specification);
+          Impl.diagnose(HeaderLoc(ann.second),
+                        diag::private_fileid_attr_format_specification);
 
           if (ann.first.count('/') > 1) {
             // Try to construct a suggestion from predictable mistakes.
@@ -3059,7 +3059,8 @@ namespace {
               suggestion.append(".swift");
 
             if (SourceFile::FileIDStr::parse(suggestion))
-              Impl.diagnose({}, diag::private_fileid_attr_format_suggestion,
+              Impl.diagnose(HeaderLoc(ann.second),
+                            diag::private_fileid_attr_format_suggestion,
                             suggestion);
           }
         }
@@ -4306,7 +4307,19 @@ namespace {
           !isa<clang::CXXMethodDecl, clang::ObjCMethodDecl>(decl))
         return;
 
-      bool hasSkippedLifetimeAnnotation = false;
+      // The note for a lifetime annotation Swift could not represent. The first
+      // one found is the one reported.
+      std::optional<Diagnostic> skippedLifetime;
+      auto skipLifetime = [&](Diagnostic note) {
+        if (!skippedLifetime)
+          skippedLifetime = note;
+      };
+      // A skipped annotation sits either on a parameter or on 'self', which has
+      // no declaration to name.
+      auto onAnnotated = [](auto id, const clang::NamedDecl *param) {
+        return Diagnostic(id, param != nullptr,
+                          param ? param->getName() : StringRef());
+      };
       auto isEscapable = [this](clang::QualType ty) {
         return evaluateOrDefault(
                    Impl.SwiftContext.evaluator,
@@ -4329,16 +4342,21 @@ namespace {
       if (inferSelfDependence(decl, result, returnIdx))
         return;
 
-      // FIXME: this uses '0' as the result index. That only works for
-      // standalone functions with no parameters.
-      // See markReturnsUnsafeNonescapable() for a general approach.
       auto &ASTContext = result->getASTContext();
+
+      auto retType = decl->getReturnType();
+      // A constructor's return type is 'void'; the value it produces is its
+      // class, so that is what decides whether the result is escapable.
+      clang::QualType resultTypeForEscapability = retType;
+      if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl))
+        resultTypeForEscapability =
+            Impl.getClangASTContext().getRecordType(ctordecl->getParent());
 
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(
-          nullptr, nullptr, 0,
+          nullptr, nullptr, returnIdx,
           LifetimeFlags().withImmortalSpecifier().withAnnotated());
-      if (hasUnsafeAPIAttr(decl) && !isEscapable(decl->getReturnType())) {
+      if (hasUnsafeAPIAttr(decl) && !isEscapable(resultTypeForEscapability)) {
         lifetimeDependencies.push_back(immortalLifetime);
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
@@ -4346,12 +4364,12 @@ namespace {
         return;
       }
 
-      auto retType = decl->getReturnType();
       auto warnForEscapableReturnType = [&] {
         if (isEscapableAnnotatedType(retType.getTypePtr())) {
           // Swift drops lifetime dependencies on Escapable targets, so this
           // annotation is not enforced. Import the API as @unsafe.
-          hasSkippedLifetimeAnnotation = true;
+          skipLifetime(
+              Diagnostic(diag::cxx_unsafe_skipped_lifetime_escapable_result));
           Impl.addImportDiagnostic(
               decl,
               Diagnostic(diag::return_escapable_with_lifetimebound,
@@ -4377,8 +4395,12 @@ namespace {
       auto processLifetimeBound = [&](unsigned idx, clang::QualType ty,
                                       bool forSelf = false) {
         warnForEscapableReturnType();
+        // 'self' has no ParmVarDecl to point at, so it goes unnamed.
+        const clang::NamedDecl *annotated =
+            forSelf ? nullptr : decl->getParamDecl(idx);
         if (importedAsClass(ty, forSelf))
-          hasSkippedLifetimeAnnotation = true;
+          skipLifetime(onAnnotated(
+              diag::cxx_unsafe_skipped_lifetime_imported_as_class, annotated));
         paramHasAnnotation[idx] = true;
         // 'self' and lvalue references borrow the referent's storage.
         if (forSelf || ty->isLValueReferenceType())
@@ -4388,7 +4410,8 @@ namespace {
         // dependency on it, nor can the result inherit its lifetime as if it
         // were passed by value. Import the API as @unsafe.
         else if (ty->isRValueReferenceType())
-          hasSkippedLifetimeAnnotation = true;
+          skipLifetime(onAnnotated(
+              diag::cxx_unsafe_skipped_lifetime_rvalue_reference, annotated));
         // A non-escapable passed by value: the result inherits its lifetime.
         else if (!isEscapable(ty))
           inheritLifetimeParamIndicesForReturn[idx] = true;
@@ -4396,7 +4419,9 @@ namespace {
         // borrowable storage, so we cannot form a scoped lifetime dependency.
         // Import the API as @unsafe.
         else
-          hasSkippedLifetimeAnnotation = true;
+          skipLifetime(onAnnotated(
+              diag::cxx_unsafe_skipped_lifetime_no_borrowable_storage,
+              annotated));
       };
       auto processLifetimeCaptureBy =
           [&](const clang::LifetimeCaptureByAttr *attr, unsigned idx,
@@ -4488,26 +4513,27 @@ namespace {
                 CxxEscapability::Unknown) == CxxEscapability::NonEscapable)
           lifetimeDependencies.push_back(immortalLifetime);
       }
-      clang::QualType resultTypeForEscapability = retType;
-      if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl))
-        resultTypeForEscapability =
-            Impl.getClangASTContext().getRecordType(ctordecl->getParent());
       bool resultIsNonEscapable =
           isNonEscapableAnnotatedType(resultTypeForEscapability.getTypePtr());
       bool resultDependenceIsAnnotated =
           getLifetimeDependenceFor(lifetimeDependencies, returnIdx).has_value();
+      // A '@lifetime(...)' written as a 'swift_attr' is parsed into a
+      // LifetimeAttr and honored by LifetimeDependenceInfoRequest; the author
+      // has said what the result depends on.
+      bool hasHandWrittenLifetimeAttr =
+          result->getAttrs().hasAttribute<LifetimeAttr>();
 
       if (!lifetimeDependencies.empty()) {
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
-      } else if (hasSkippedLifetimeAnnotation && resultIsNonEscapable) {
+      } else if (skippedLifetime && resultIsNonEscapable) {
         // We skipped a lifetime annotation we could not faithfully represent
         // The API is imported @unsafe (below); give the non-escapable result an
         // immortal lifetime so the implicit single-parameter inference does not
         // synthesize a scoped dependency that would be invalid.
         cacheImmortalLifetime(result);
-      } else if (resultIsNonEscapable) {
+      } else if (resultIsNonEscapable && !hasHandWrittenLifetimeAttr) {
         auto policy = Impl.getClangASTContext().getPrintingPolicy();
         policy.SuppressTagKeyword = true;
         Impl.addImportDiagnostic(
@@ -4525,11 +4551,13 @@ namespace {
       bool resultDependenceIsInferred =
           !resultDependenceIsAnnotated &&
           !isEscapable(resultTypeForEscapability) &&
-          !result->getAttrs().hasAttribute<LifetimeAttr>() &&
-          !hasSwiftAttribute(decl, {"safe"});
+          !hasHandWrittenLifetimeAttr && !hasSwiftAttribute(decl, {"safe"});
 
-      if (hasSkippedLifetimeAnnotation || resultDependenceIsInferred) {
+      if (skippedLifetime || resultDependenceIsInferred) {
         result->addAttribute(new (ASTContext) UnsafeAttr(/*implicit=*/true));
+        Impl.LifetimeUnsafetyReasons.insert(
+            {result, skippedLifetime.value_or(Diagnostic(
+                         diag::cxx_unsafe_inferred_result_dependence))});
       } else {
         for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
           if (isEscapable(param->getType()))
@@ -4539,6 +4567,9 @@ namespace {
           // We have a nonescapable parameter that does not have its lifetime
           // annotated nor is it marked noescape.
           result->addAttribute(new (ASTContext) UnsafeAttr(/*implicit=*/true));
+          Impl.LifetimeUnsafetyReasons.insert(
+              {result, Diagnostic(diag::cxx_unsafe_unannotated_nonescapable_param,
+                                  /*named=*/true, param->getName())});
           break;
         }
       }
@@ -4595,15 +4626,27 @@ namespace {
     /// Matching is on the stub name rather than the C++ base name because
     /// '__beginMutatingUnsafe' derives from the imported name 'beginMutating',
     /// not from 'begin'.
-    static bool overlayStillSpellsUnsafeStub(DeclBaseName stubName) {
+    static bool overlayStillSpellsUnsafeStub(DeclBaseName stubName,
+                                             const clang::CXXMethodDecl *decl) {
       if (stubName.isSpecial())
         return false;
-      return llvm::StringSwitch<bool>(stubName.getIdentifier().str())
-          .Cases({"__beginUnsafe", "__endUnsafe", "__beginMutatingUnsafe",
-                  "__endMutatingUnsafe", "__findUnsafe", "__findMutatingUnsafe",
-                  "__eraseUnsafe", "__dataUnsafe"},
-                 true)
-          .Default(false);
+      auto name = stubName.getIdentifier().str();
+      // Spelled in protocol requirements, so they can be witnessed by any
+      // conforming type.
+      if (llvm::StringSwitch<bool>(name)
+              .Cases({"__beginUnsafe", "__endUnsafe", "__beginMutatingUnsafe",
+                      "__endMutatingUnsafe", "__findUnsafe",
+                      "__findMutatingUnsafe", "__eraseUnsafe", "__dataUnsafe"},
+                     true)
+              .Default(false))
+        return true;
+      // Spelled by the overlay only for standard library types
+      // ('CxxSet.insert(_:)', 'std.string.append(_:)'), so a user type's stub
+      // is still deprecated.
+      return decl->getParent()->isInStdNamespace() &&
+             llvm::StringSwitch<bool>(name)
+                 .Cases({"__insertUnsafe", "__appendUnsafe"}, true)
+                 .Default(false);
     }
 
     /// Apply the __Unsafe-method rename to \a imported, imported from \a decl.
@@ -4612,10 +4655,6 @@ namespace {
     /// name (it is marked '@unsafe(always)' by importAttributes instead), and
     /// the renamed spelling is imported a second time as a deprecated migration
     /// stub, which is only '@unsafe'.
-    ///
-    /// Instantiation is gated on ImportCxxMembersLazily; without that
-    /// feature ClangImporter eagerly instantiates typedef members, so the
-    /// return type is usually already instantiated by the time we get here.
     ///
     /// This is done post-import so we don't eagerly instantiate templates for
     /// methods we may not import.
@@ -4629,23 +4668,19 @@ namespace {
         // Does not apply to operators, ctors, dtors, conversions
         return;
 
-      if (Impl.SwiftContext.LangOpts.hasFeature(
-              Feature::ImportCxxMembersLazily)) {
-        using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
+      using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
 
-        auto retTy = desugarIfElaborated(clangDecl->getReturnType());
-        auto *retTemplate =
-            dyn_cast_or_null<ClassTmplSpec>(retTy->getAsTagDecl());
+      auto retTy = desugarIfElaborated(clangDecl->getReturnType());
+      auto *retTemplate =
+          dyn_cast_or_null<ClassTmplSpec>(retTy->getAsTagDecl());
 
-        if (retTemplate && !retTemplate->hasDefinition()) {
-          // N.B. InstantiateClassTemplateSpecialization() returns true if it
-          // encountered an error while instantiating the returned template.
-          (void)Impl.getClangSema().InstantiateClassTemplateSpecialization(
-              clangDecl->getLocation(),
-              const_cast<ClassTmplSpec *>(retTemplate),
-              clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
-              /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
-        }
+      if (retTemplate && !retTemplate->hasDefinition()) {
+        // N.B. InstantiateClassTemplateSpecialization() returns true if it
+        // encountered an error while instantiating the returned template.
+        (void)Impl.getClangSema().InstantiateClassTemplateSpecialization(
+            clangDecl->getLocation(), const_cast<ClassTmplSpec *>(retTemplate),
+            clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
+            /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
       }
 
       auto importedName = Impl.importFullName(clangDecl, Impl.CurrentVersion);
@@ -4668,6 +4703,14 @@ namespace {
         swiftDecl->setName(unsafeName);
         return;
       }
+
+      // Keeping the original name collides with the same-named safe wrapper
+      // that callers are encouraged to hand-write around the '__<name>Unsafe'
+      // spelling (the C++ standard library overlay does this for, e.g.,
+      // 'CxxSet.insert(_:)'). Disfavor the unsafe import so such a wrapper
+      // wins overload resolution instead of becoming ambiguous with it.
+      swiftDecl->addAttribute(new (Impl.SwiftContext)
+                                  DisfavoredOverloadAttr(/*Implicit=*/true));
 
       // Keep the original name, and import the method a second time under the
       // renamed spelling as a migration stub.
@@ -4704,7 +4747,7 @@ namespace {
 
       // A method that C++ already deprecates keeps that deprecation; Clang's
       // message wins at the use site either way.
-      if (!overlayStillSpellsUnsafeStub(unsafeName.getBaseName()) &&
+      if (!overlayStillSpellsUnsafeStub(unsafeName.getBaseName(), clangDecl) &&
           !clangDecl->isDeprecated()) {
         ImportedName primaryName = importedName;
         primaryName.setDeclName(currentName);
@@ -5146,9 +5189,12 @@ namespace {
           importFullName(decl->getAsFunction());
       if (!importedName)
         return nullptr;
-      // All template parameters must be template type parameters.
+      // All template parameters must be template type parameters, and none of
+      // them may be a parameter pack.
       if (!llvm::all_of(*decl->getTemplateParameters(), [](auto param) {
-            return isa<clang::TemplateTypeParmDecl>(param);
+            const auto *typeParam =
+                dyn_cast<clang::TemplateTypeParmDecl>(param);
+            return typeParam && !typeParam->isParameterPack();
           }))
         return nullptr;
       auto *imported = importFunctionDecl(decl->getAsFunction(), importedName,
@@ -9282,7 +9328,10 @@ bool importer::hasSameUnderlyingType(const clang::Type *a,
                                      const clang::TemplateTypeParmDecl *b) {
   while (a->isPointerType() || a->isReferenceType())
     a = a->getPointeeType().getTypePtr();
-  return a == b->getTypeForDecl();
+  // Compare canonical types to look through sugar such as a nullability
+  // specifier on the template type parameter.
+  return a->getCanonicalTypeInternal() ==
+         b->getTypeForDecl()->getCanonicalTypeInternal();
 }
 
 SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
@@ -10469,6 +10518,11 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   if (!ClangDecl)
     return nullptr;
 
+  if (UseCanonicalDecl)
+    if (auto *fn = dyn_cast<clang::FunctionDecl>(ClangDecl))
+      if (fn->getFirstDecl() != fn->getMostRecentDecl())
+        ClangDecl = mostRefinedFunctionRedecl(fn);
+
   FrontendStatsTracer StatsTracer(SwiftContext.Stats,
                                   "import-clang-decl", ClangDecl);
   clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
@@ -11063,10 +11117,20 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
         member->getClangDecl()->getFriendObjectKind() != clang::Decl::FOK_None)
       continue;
 
-    // FIXME: constructors are added eagerly, but shouldn't be
-    // FIXME: subscripts are added eagerly, but shouldn't be
-    if (isa<AccessorDecl, SubscriptDecl, ConstructorDecl>(member))
+    // AccessorDecls should not be directly added as members, so skip them here
+    // if they appear for whatever reason
+    if (isa<AccessorDecl>(member))
       continue;
+
+    // FIXME: subscripts and constructors are imported and added eagerly
+    //        (though they shouldn't be and won't be in the near future).
+    // Skip adding these here to avoid double-adding the same member.
+    if (isa<SubscriptDecl, ConstructorDecl>(member)) {
+      const auto &LangOpts = Impl.SwiftContext.LangOpts;
+      if (auto *nd = dyn_cast_or_null<clang::NamedDecl>(member->getClangDecl());
+          nd && shouldEagerlyImportClangRecordMember(nd, LangOpts))
+        continue;
+    }
 
     swiftDecl->addMember(member);
   }
@@ -11076,13 +11140,10 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
   if ((cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) &&
       cxxRecord->isCompleteDefinition()) {
     const clang::RecordDecl *superclassClangDecl = nullptr;
-    if (Impl.SwiftContext.LangOpts.hasFeature(
-            Feature::ForeignReferenceTypeInheritance)) {
-      auto derivedInfo =
-          evaluateOrDefault(Impl.SwiftContext.evaluator,
-                            ForeignReferenceTypeInfoRequest({cxxRecord}), {});
-      superclassClangDecl = derivedInfo.getPrimarySuperclass();
-    }
+    auto derivedInfo =
+        evaluateOrDefault(Impl.SwiftContext.evaluator,
+                          ForeignReferenceTypeInfoRequest({cxxRecord}), {});
+    superclassClangDecl = derivedInfo.getPrimarySuperclass();
 
     for (auto base : cxxRecord->bases()) {
       if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)

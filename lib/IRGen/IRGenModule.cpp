@@ -17,7 +17,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/DiagnosticsIRGen.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
@@ -46,9 +45,7 @@
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/HeaderSearch.h"
-#include "clang/Lex/HeaderSearchOptions.h"
 #include "clang/Lex/Preprocessor.h"
-#include "clang/Lex/PreprocessorOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1062,6 +1059,16 @@ namespace RuntimeConstants {
   CancellationHandlerWithReasonAvailability(ASTContext &Context) {
     auto featureAvailability =
         Context.getCancellationHandlerWithReasonAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  EmbeddedDistributedSwiftAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getEmbeddedDistributedSwiftAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }

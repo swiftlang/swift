@@ -10,8 +10,9 @@
 // RUN:   -swift-version 5 \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -module-name MyApp \
-// RUN:   %t/test.swift \
-// RUN:   > %t/macro-expansions.txt 2>&1
+// RUN:   %t/test.swift 2>&1 \
+// RUN:   | grep "^[<-][->]" \
+// RUN:   > %t/macro-expansions.txt
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
 

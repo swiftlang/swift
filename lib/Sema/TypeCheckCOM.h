@@ -17,6 +17,7 @@
 
 namespace swift {
 class ClassDecl;
+class ProtocolDecl;
 class NominalTypeDecl;
 class ProtocolConformance;
 enum class KnownProtocolKind : uint8_t;
@@ -29,6 +30,9 @@ deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP);
 
 /// Diagnose declaration-level restrictions on a native COM implementation.
 void validateImplementation(ClassDecl *CD);
+
+/// Validate COM-specific rules for a protocol declaration.
+void validateProtocol(ProtocolDecl *PD);
 
 /// Diagnose restrictions on an explicitly declared COM conformance.
 void validateConformance(ProtocolConformance *conformance);

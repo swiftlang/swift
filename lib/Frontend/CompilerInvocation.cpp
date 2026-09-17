@@ -895,6 +895,15 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   if (!Opts.ClangIncludeTree.empty() || !Opts.ClangIncludeTreeFileList.empty())
     Opts.HasImmutableFileSystem = true;
 
+  Opts.CASFSInputOverlay |= Args.hasArg(OPT_cas_fs_input_overlay);
+  if (Opts.CASFSInputOverlay && Opts.EnableCaching) {
+    // The content of the input files is read from disk, so it no longer
+    // contributes to the cache key.
+    Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+                   "-cas-fs-input-overlay", "-cache-compile-job");
+    return true;
+  }
+
   return false;
 }
 
@@ -4373,6 +4382,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.DebugCallsiteInfo |= Args.hasArg(OPT_debug_callsite_info);
+  // These are the conditions clang uses to emit call site info for optimized
+  // binaries.
+  if (Opts.shouldOptimize() &&
+      Opts.DebugInfoLevel >= IRGenDebugInfoLevel::ASTTypes &&
+      Triple.supportsDebugEntryValues())
+    Opts.DebugCallsiteInfo = true;
 
   if (Args.hasArg(OPT_mergeable_symbols))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,

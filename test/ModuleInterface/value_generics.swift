@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name ValueGeneric -disable-availability-checking
-// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name ValueGeneric -disable-availability-checking
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name ValueGeneric -target %target-swift-6.2-abi-triple
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name ValueGeneric -target %target-swift-6.2-abi-triple
 // RUN: %FileCheck --implicit-check-not=ValueGenericsNameLookup %s < %t.swiftinterface
 
 // CHECK: public struct Slab<Element, let N : Swift::Int>

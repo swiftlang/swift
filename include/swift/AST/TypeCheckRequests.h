@@ -16,7 +16,6 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
-#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/ActorIsolation.h"
@@ -35,7 +34,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/Basic/TypeID.h"
@@ -2663,6 +2661,26 @@ private:
 
   // Evaluation.
   Type evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
+/// Determines the yield type of a coroutine
+class YieldsTypeRequest
+    : public SimpleRequest<YieldsTypeRequest, Type(FuncDecl *, unsigned),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, FuncDecl *decl, unsigned idx) const;
 
 public:
   // Separate caching.

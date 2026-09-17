@@ -373,6 +373,14 @@ BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
 /// used for general pointer arithmetic by chaining index_addr instructions.
 BUILTIN_SIL_OPERATION(GepProjection, "gepProjection", Integer)
 
+/// UnprotectedGepProjection (Builtin.RawPointer, Builtin.Word, T.Type) -> Builtin.RawPointer
+///
+/// Like GepProjection, but doesn't trigger an insertion of stack protectors.
+/// Use this only when the index has already been proven to be in bounds
+/// (e.g. by a preceding, unconditional bounds check on the same value), so
+/// there is no buffer overflow for a stack protector to guard against.
+BUILTIN_SIL_OPERATION(UnprotectedGepProjection, "unprotectedGepProjection", Integer)
+
 /// getTailAddr(Builtin.RawPointer,
 ///             Builtin.Word, T.Type, E.Type) -> Builtin.RawPointer
 ///

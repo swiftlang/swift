@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -typecheck -verify \
-// RUN:   -cxx-interoperability-mode=default -disable-availability-checking \
+// RUN:   -cxx-interoperability-mode=default -target %target-swift-5.8-abi-triple \
 // RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}test.h \
 // RUN:   %t%{fs-sep}test.swift
 

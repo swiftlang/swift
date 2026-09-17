@@ -52,7 +52,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
-#include <functional>
 #include <iterator>
 using namespace swift;
 
@@ -526,8 +525,8 @@ ExistentialLayout::resolveCOMInterface() const {
   COMExistentialInterfaceResolution resolution;
 
   for (ProtocolDecl *protocol : getProtocols()) {
-    if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface)) {
-      resolution.containsCOMInterfaceProtocol = true;
+    if (protocol->isCOMIdentity()) {
+      resolution.identityProtocol = protocol;
       continue;
     }
 
@@ -561,10 +560,7 @@ ExistentialLayout::resolveCOMInterface() const {
 
 ProtocolDecl *ExistentialLayout::getCOMInterface() const {
   COMExistentialInterfaceResolution result = resolveCOMInterface();
-  if (hasExplicitAnyObject || explicitSuperclass ||
-      result.containsCOMInterfaceProtocol ||
-      result.firstIncomparableInterface ||
-      result.firstNonMarkerProtocol)
+  if (hasExplicitAnyObject || explicitSuperclass || result.isInvalid())
     return nullptr;
   return result.interface;
 }
@@ -724,9 +720,8 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   GenericSignature sig = dc->getGenericSignatureOfContext();
   if (auto *genericFn = type->getAs<GenericFunctionType>()) {
     sig = genericFn->getGenericSignature();
-    type = FunctionType::get(genericFn->getParams(),
-                             genericFn->getResult(),
-                             genericFn->getExtInfo());
+    type = FunctionType::get(genericFn->getParams(), genericFn->getYields(),
+                             genericFn->getResult(), genericFn->getExtInfo());
   }
 
   auto selfTy = dc->getSelfInterfaceType();
@@ -734,10 +729,11 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   if (sig) {
     GenericFunctionType::ExtInfo info;
-    return GenericFunctionType::get(sig, {selfParam}, type, info);
+    return GenericFunctionType::get(sig, {selfParam}, /* yields */ {}, type,
+                                    info);
   }
   FunctionType::ExtInfo info;
-  return FunctionType::get({selfParam}, type, info);
+  return FunctionType::get({selfParam}, /* yields */ {}, type, info);
 }
 
 void TypeBase::getTypeVariables(
@@ -1164,9 +1160,11 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
     }
 
     ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
+    ArrayRef<AnyFunctionType::Yield> yields = fnType->getYields();
     Type resultType = fnType->getResult();
 
     SmallVector<AnyFunctionType::Param, 4> newParams;
+    SmallVector<AnyFunctionType::Yield, 1> newYields;
     if (recurse) {
       for (unsigned paramIdx : indices(params)) {
         const auto &param = params[paramIdx];
@@ -1187,6 +1185,13 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
 
       if (!newParams.empty())
         params = newParams;
+
+      for (auto yield : fnType->getYields()) {
+        newYields.emplace_back(
+            yield.getType()->stripConcurrency(recurse, dropGlobalActor),
+            yield.getFlags());
+      }
+      yields = newYields;
 
       resultType =
           resultType->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
@@ -1218,10 +1223,10 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
 
     Type newFnType;
     if (genericSig) {
-      newFnType = GenericFunctionType::get(
-          genericSig, params, resultType, extInfo);
+      newFnType = GenericFunctionType::get(genericSig, params, yields,
+                                           resultType, extInfo);
     } else {
-      newFnType = FunctionType::get(params, resultType, extInfo);
+      newFnType = FunctionType::get(params, yields, resultType, extInfo);
     }
     if (newFnType->isEqual(this))
       return Type(this);
@@ -1448,6 +1453,7 @@ bool TypeBase::isCGFloat() {
   auto *module = DC->getParentModule();
   // On macOS `CGFloat` is part of a `CoreGraphics` module,
   // but on Linux it could be found in `Foundation`.
+  // Keep this list in sync with ASTContext::getCGFloatDecl().
   return (module->getName().is("CoreGraphics") ||
           module->getName().is("Foundation")   ||
           module->getName().is("CoreFoundation")) &&
@@ -1546,11 +1552,12 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
 
   if (auto *genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFnType->getGenericSignature(),
-                                    unlabeledParams, result,
-                                    fnType->getExtInfo());
+                                    unlabeledParams, fnType->getYields(),
+                                    result, fnType->getExtInfo());
   }
 
-  return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
+  return FunctionType::get(unlabeledParams, fnType->getYields(), result,
+                           fnType->getExtInfo());
 }
 
 Type TypeBase::eraseDynamicSelfType() {
@@ -1605,18 +1612,19 @@ Type TypeBase::withCovariantResultType() {
   if (wasOptional)
     resultType = OptionalType::get(resultType);
 
-  resultFnType = FunctionType::get(resultFnType->getParams(), resultType,
-                                   resultFnType->getExtInfo());
+  resultFnType =
+      FunctionType::get(resultFnType->getParams(), resultFnType->getYields(),
+                        resultType, resultFnType->getExtInfo());
 
   // Rebuild the outer function type.
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                    fnType->getParams(), resultFnType,
-                                    fnType->getExtInfo());
+                                    fnType->getParams(), fnType->getYields(),
+                                    resultFnType, fnType->getExtInfo());
   }
-  
-  return FunctionType::get(fnType->getParams(), resultFnType,
-                           fnType->getExtInfo());
+
+  return FunctionType::get(fnType->getParams(), fnType->getYields(),
+                           resultFnType, fnType->getExtInfo());
 }
 
 Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
@@ -1638,6 +1646,11 @@ Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
     std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
       // Fold away the sendable dependence if present, the function type will
       // just become non-Sendable.
+      return std::make_pair(Type(), false);
+    }
+    std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
+      // Fold away the @called(once) dependence if present, the function type will
+      // just become non-@called(once).
       return std::make_pair(Type(), false);
     }
   };
@@ -1865,13 +1878,11 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
 
   if (auto genericFnTy = getAs<GenericFunctionType>()) {
     return GenericFunctionType::get(genericFnTy->getGenericSignature(),
-                                    {selfParam},
-                                    fnTy->getResult(),
-                                    fnTy->getExtInfo());
+                                    {selfParam}, fnTy->getYields(),
+                                    fnTy->getResult(), fnTy->getExtInfo());
   }
 
-  return FunctionType::get({selfParam},
-                           fnTy->getResult(),
+  return FunctionType::get({selfParam}, fnTy->getYields(), fnTy->getResult(),
                            fnTy->getExtInfo());
 }
 
@@ -1997,6 +2008,15 @@ getCanonicalParams(AnyFunctionType *funcType,
   auto origParams = funcType->getParams();
   for (auto param : origParams) {
     canParams.emplace_back(param.getCanonical(genericSig));
+  }
+}
+
+static void
+getCanonicalYields(AnyFunctionType *funcType,
+                   SmallVectorImpl<AnyFunctionType::Yield> &canYields) {
+  auto origYields = funcType->getYields();
+  for (auto yield : origYields) {
+    canYields.emplace_back(yield.getCanonical());
   }
 }
 
@@ -2158,19 +2178,21 @@ CanType TypeBase::computeCanonicalType() {
     if (auto *genericFnTy = dyn_cast<GenericFunctionType>(this))
       genericSig = genericFnTy->getGenericSignature().getCanonicalSignature();
 
-    // Transform the parameter and result types.
+    // Transform the parameter, yield and result types.
     SmallVector<AnyFunctionType::Param, 8> canParams;
     getCanonicalParams(funcTy, genericSig, canParams);
+    SmallVector<AnyFunctionType::Yield, 8> canYields;
+    getCanonicalYields(funcTy, canYields);
     auto resultTy = funcTy->getResult()->getReducedType(genericSig);
 
     std::optional<ASTExtInfo> extInfo = std::nullopt;
     if (funcTy->hasExtInfo())
       extInfo = funcTy->getCanonicalExtInfo(useClangTypes(resultTy));
     if (genericSig) {
-      Result = GenericFunctionType::get(genericSig, canParams, resultTy,
-                                        extInfo);
+      Result = GenericFunctionType::get(genericSig, canParams, canYields,
+                                        resultTy, extInfo);
     } else {
-      Result = FunctionType::get(canParams, resultTy, extInfo);
+      Result = FunctionType::get(canParams, canYields, resultTy, extInfo);
     }
     assert(Result->isCanonical());
     break;
@@ -2961,15 +2983,30 @@ public:
         newParams.push_back(substParam.withType(newParamTy));
         didChange = didChange | (newParamTy != substParam.getPlainType());
       }
-      
+
+      SmallVector<AnyFunctionType::Yield, 1> newYields;
+      for (auto [index, yield] : llvm::enumerate(func->getYields())) {
+        auto substYield = substFunc.getYields()[index];
+        if (yield.getFlags() != substYield.getFlags())
+          return CanType();
+
+        auto newYieldTy = visit(yield.getType(), substYield.getType());
+        if (!newYieldTy)
+          return CanType();
+
+        newYields.emplace_back(newYieldTy, substYield.getFlags());
+        didChange = didChange | (newYieldTy != substYield.getType());
+      }
+
       auto newReturn = visit(func->getResult()->getCanonicalType(),
                              substFunc->getResult()->getCanonicalType());
       if (!newReturn)
         return CanType();
       if (!didChange && newReturn == substFunc.getResult())
         return subst;
-      return FunctionType::get(newParams, newReturn, func->getExtInfo())
-        ->getCanonicalType();
+      return FunctionType::get(newParams, newYields, newReturn,
+                               func->getExtInfo())
+          ->getCanonicalType();
     }
     return CanType();
   }
@@ -3330,6 +3367,15 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     wasOptional = true;
   }
 
+  // 'CFTypeRef' is imported as 'AnyObject', but the C type it stands for
+  // ('const void *') is representable in C and C++. Recognize it
+  // only when it is spelled as 'CFTypeRef' (or a typealias thereof): a type
+  // written as 'AnyObject' is a Swift existential, which is not.
+  //
+  // A value passed this way is reference counted the way 'AnyObject' is.
+  if (language != ForeignLanguage::ObjectiveC && type->isCFTypeRef())
+    return { ForeignRepresentableKind::Trivial, nullptr };
+
   if (auto existential = type->getAs<ExistentialType>())
     type = existential->getConstraintType();
 
@@ -3446,9 +3492,9 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   ASTContext &ctx = nominal->getASTContext();
 
-  // Unmanaged<T> can be trivially represented in Objective-C if T
-  // is trivially represented in Objective-C.
-  if (language == ForeignLanguage::ObjectiveC && type->isUnmanaged()) {
+  // Unmanaged<T> can be trivially represented in a foreign language if T
+  // is trivially represented in that language.
+  if (type->isUnmanaged()) {
     auto boundGenericType = type->getAs<BoundGenericType>();
 
     // Note: works around a broken Unmanaged<> definition.
@@ -3469,15 +3515,20 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     case ForeignLanguage::C:
     case ForeignLanguage::Cxx:
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
-        switch (classDecl->getForeignClassKind()) {
-        case ClassDecl::ForeignKind::Normal:
-        case ClassDecl::ForeignKind::RuntimeOnly:
-          // Imported classes cannot be represented in C or C++.
-          return failure();
-        case ClassDecl::ForeignKind::CFType:
-          // Imported CF types can be represented as trivial pointer types in C
-          // or C++.
-          break;
+        // Foreign reference types are imported as classes, but they are
+        // passed around as a pointer to the underlying C or C++ record, so
+        // they are representable in both languages.
+        if (!classDecl->isForeignReferenceType()) {
+          switch (classDecl->getForeignClassKind()) {
+          case ClassDecl::ForeignKind::Normal:
+          case ClassDecl::ForeignKind::RuntimeOnly:
+            // Imported classes cannot be represented in C or C++.
+            return failure();
+          case ClassDecl::ForeignKind::CFType:
+            // Imported CF types can be represented as trivial pointer types in
+            // C or C++.
+            break;
+          }
         }
       }
 
@@ -4523,6 +4574,17 @@ Type AnyFunctionType::getSendableDependentType() const {
   }
 }
 
+Type AnyFunctionType::getCalledOnceDependentType() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getCalledOnceDependentType();
+  case TypeKind::GenericFunction:
+    return Type();
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
+}
+
 bool AnyFunctionType::isSendable() const {
   ASSERT(!hasSendableDependentType() && "Query Sendable dependence first");
   return getExtInfo().isSendable();
@@ -4573,6 +4635,11 @@ AnyFunctionType::getLifetimeDependenceForResult(const ValueDecl *decl) const {
   return getLifetimeDependenceFor(resultIndex);
 }
 
+bool AnyFunctionType::isCalledOnce() const {
+  ASSERT(!hasCalledOnceDependentType() && "Query CalledOnce dependence first");
+  return getExtInfo().isCalledOnce();
+}
+
 ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
   return getClangTypeInfo().getCanonical();
 }
@@ -4613,11 +4680,15 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
   if (sendableDependentType)
     sendableDependentType = sendableDependentType->getCanonicalType();
 
+  Type calledOnceDependentType = getCalledOnceDependentType();
+  if (calledOnceDependentType)
+    calledOnceDependentType = calledOnceDependentType->getCanonicalType();
+
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
                  globalActor, thrownError, sendableDependentType,
-                 getLifetimeDependencies());
+                 calledOnceDependentType, getLifetimeDependencies());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
@@ -4850,12 +4921,18 @@ ReferenceCounting TypeBase::getReferenceCounting() {
                ? ReferenceCounting::Custom
                : ReferenceCounting::None;
 
-  // In the absence of Objective-C interoperability, everything uses native
-  // reference counting or is the builtin BridgeObject.
+  ReferenceCounting defaultRefCounting = ReferenceCounting::Unknown;
+
+  // In the absence of Objective-C interoperability, almost everything uses
+  // native reference counting or is the builtin BridgeObject.
   if (!ctx.LangOpts.EnableObjCInterop) {
-    return type->getKind() == TypeKind::BuiltinBridgeObject
-             ? ReferenceCounting::Bridge
-             : ReferenceCounting::Native;
+    defaultRefCounting = ReferenceCounting::Native;
+
+    // It is still possible for an FRT to be involved in an archetype or
+    // protocol type, so only short-circuit for cases other than those
+    if (!isa<ArchetypeType, ProtocolType, ProtocolCompositionType>(type))
+      return isa<BuiltinBridgeObjectType>(type) ? ReferenceCounting::Bridge
+                                                : ReferenceCounting::Native;
   }
 
   switch (type->getKind()) {
@@ -4894,21 +4971,17 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::PackArchetype:
   case TypeKind::ElementArchetype: {
     auto archetype = cast<ArchetypeType>(type);
-    auto layout = archetype->getLayoutConstraint();
-    (void)layout;
-    assert(layout && layout->isRefCounted());
     if (auto supertype = archetype->getSuperclass())
       return supertype->getReferenceCounting();
-    return ReferenceCounting::Unknown;
+    return defaultRefCounting;
   }
 
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition: {
     auto layout = type->getExistentialLayout();
-    assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
     if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass())
       return superclass->getReferenceCounting();
-    return ReferenceCounting::Unknown;
+    return defaultRefCounting;
   }
 
   case TypeKind::ParameterizedProtocol: {
@@ -5027,10 +5100,11 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
           .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
           .build();
   if (isa<FunctionType>(this))
-    return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
+    return FunctionType::get(newParams, getYields(), getResult(),
+                             nonDiffExtInfo);
   assert(isa<GenericFunctionType>(this));
   return GenericFunctionType::get(getOptGenericSignature(), newParams,
-                                  getResult(), nonDiffExtInfo);
+                                  getYields(), getResult(), nonDiffExtInfo);
 }
 
 AnyFunctionType *AnyFunctionType::getWithoutThrowing() const {
@@ -5047,6 +5121,23 @@ AnyFunctionType::withIsolation(FunctionTypeIsolation isolation) const {
 AnyFunctionType *AnyFunctionType::withSendable(bool newValue) const {
   auto info = getExtInfo().intoBuilder().withSendable(newValue).build();
   return withExtInfo(info);
+}
+
+AnyFunctionType *AnyFunctionType::withCalledOnce(bool newValue) const {
+  auto info = getExtInfo().intoBuilder().withCalledOnce(newValue).build();
+  return withExtInfo(info);
+}
+  
+AnyFunctionType *AnyFunctionType::getWithoutYields() const {
+  auto resultType = getResult();
+  auto noCoroExtInfo = getExtInfo().intoBuilder()
+                           .withCoroutine(false)
+                           .build();
+  if (isa<FunctionType>(this))
+    return FunctionType::get(getParams(), {}, resultType, noCoroExtInfo);
+  assert(isa<GenericFunctionType>(this));
+  return GenericFunctionType::get(getOptGenericSignature(), getParams(), {},
+                                  resultType, noCoroExtInfo);
 }
 
 std::optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
@@ -5136,6 +5227,26 @@ bool TypeBase::isForeignReferenceType() {
   return false;
 }
 
+bool TypeBase::isCFTypeRef() {
+  Type ty(this);
+
+  if (auto existential = dyn_cast<ExistentialType>(ty.getPointer()))
+    ty = existential->getConstraintType();
+
+  // Walk down to the innermost typealias, so that a typealias of 'CFTypeRef'
+  // is recognized as well.
+  const TypeAliasDecl *aliasDecl = nullptr;
+  while (auto aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
+    aliasDecl = aliasTy->getDecl();
+    ty = aliasTy->getSinglyDesugaredType();
+  }
+
+  if (!aliasDecl || !aliasDecl->hasClangNode())
+    return false;
+
+  return aliasDecl->getName() == getASTContext().Id_CFTypeRef;
+}
+
 bool TypeBase::hasSimpleTypeRepr() const {
   // NOTE: Please keep this logic in sync with TypeRepr::isSimple().
   switch (getKind()) {
@@ -5213,13 +5324,14 @@ bool CanType::isForeignReferenceType() {
 // Creates an `AnyFunctionType` from the given parameters, result type,
 // generic signature, and `ExtInfo`.
 static AnyFunctionType *
-makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
+makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters,
+                 ArrayRef<AnyFunctionType::Yield> yields, Type resultType,
                  GenericSignature genericSignature,
                  AnyFunctionType::ExtInfo extInfo) {
   if (genericSignature)
-    return GenericFunctionType::get(genericSignature, parameters, resultType,
-                                    extInfo);
-  return FunctionType::get(parameters, resultType, extInfo);
+    return GenericFunctionType::get(genericSignature, parameters, yields,
+                                    resultType, extInfo);
+  return FunctionType::get(parameters, yields, resultType, extInfo);
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
@@ -5261,10 +5373,10 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
   retElts.push_back(originalResult);
   retElts.push_back(linearMapType);
   auto retTy = TupleType::get(retElts, ctx);
-  auto *derivativeFunctionType =
-      makeFunctionType(curryLevels.back()->getParams(), retTy,
-                       curryLevels.size() == 1 ? derivativeGenSig : nullptr,
-                       curryLevels.back()->getExtInfo());
+  auto *derivativeFunctionType = makeFunctionType(
+      curryLevels.back()->getParams(), curryLevels.back()->getYields(), retTy,
+      curryLevels.size() == 1 ? derivativeGenSig : nullptr,
+      curryLevels.back()->getExtInfo());
 
   // Wrap the derivative function type in additional curry levels.
   auto curryLevelsWithoutLast =
@@ -5273,7 +5385,8 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
     unsigned i = pair.index();
     auto *curryLevel = pair.value();
     derivativeFunctionType = makeFunctionType(
-        curryLevel->getParams(), derivativeFunctionType,
+        curryLevel->getParams(), curryLevel->getYields(),
+        derivativeFunctionType,
         i == curryLevelsWithoutLast.size() - 1 ? derivativeGenSig : nullptr,
         curryLevel->getExtInfo());
   }
@@ -5374,8 +5487,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
 
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    linearMapType =
-        FunctionType::get(differentialParams, differentialResult, info);
+    linearMapType = FunctionType::get(differentialParams, /* yields */ {},
+                                      differentialResult, info);
     break;
   }
   case AutoDiffLinearMapKind::Pullback: {
@@ -5438,7 +5551,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     }
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    linearMapType = FunctionType::get(pullbackParams, pullbackResult, info);
+    linearMapType = FunctionType::get(pullbackParams, /* yields */ {},
+                                      pullbackResult, info);
     break;
   }
   }

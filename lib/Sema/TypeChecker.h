@@ -18,11 +18,10 @@
 #define TYPECHECKING_H
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AccessScope.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/AvailabilityScope.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
@@ -31,14 +30,14 @@
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/CompletionContextFinder.h"
 #include "swift/Sema/ConstraintSystem.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include <functional>
+#include "llvm/ADT/SetVector.h"
 
 namespace swift {
 
@@ -523,6 +522,7 @@ void checkDeclAttributes(Decl *D);
 void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
 void checkClosureAttributes(ClosureExpr *closure);
 void checkParameterList(ParameterList *params, DeclContext *owner);
+void checkYieldList(YieldList *yields, AbstractFunctionDecl *AFD);
 
 void diagnoseDuplicateBoundVars(Pattern *pattern);
 

@@ -62,7 +62,6 @@ struct GoodStruct {
 // CHECK:      struct GoodStruct {
 // CHECK-NEXT:   init()
 //
-// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func badReturn() -> Never
 //
 // NOTE-MISSING: func badArg(_: Never)

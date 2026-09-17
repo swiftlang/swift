@@ -5574,7 +5574,8 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedConcurrent:
       if (inferredIsolation.source.effectivelyExplicit() &&
-          explicitNonisolatedIsSpecial(nominal)) {
+          getDefaultIsolationForContext(nominal) ==
+              DefaultIsolation::Nonisolated) {
         if (!foundIsolation) {
           // We found an explicitly 'nonisolated' protocol.
           foundIsolation = {
@@ -5592,14 +5593,15 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
     case ActorIsolation::GlobalActor:
       // If we encountered an explicit globally isolated conformance, allow it
       // to override the _nonisolated_ isolation.
-      if (conformance->getSourceKind() == ConformanceEntryKind::Explicit &&
-          (!foundIsolation || foundIsolation->isolation.isNonisolated())) {
+      if (!foundIsolation ||
+          (foundIsolation->isolation.isNonisolatedOrConcurrent() &&
+           conformance->getSourceKind() == ConformanceEntryKind::Explicit)) {
         foundIsolation = {protoIsolation,
                           IsolationSource(proto, IsolationSource::Conformance)};
         continue;
       }
 
-      if (foundIsolation && foundIsolation->isolation != protoIsolation)
+      if (foundIsolation->isolation != protoIsolation)
         return std::nullopt;
 
       break;
@@ -7882,41 +7884,42 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
   ASTContext &ctx = nominal->getASTContext();
   llvm::VersionTuple noVersion;
 
-  // Add platform-version-specific @available attributes. Search from nominal
-  // type declaration through its enclosing declarations to find the first one
-  // with platform-specific attributes.
+  // Add @available(<Domain>, unavailable) attributes for each domain the
+  // declaration has explicit availability in.
   for (Decl *enclosing = nominal;
        enclosing;
        enclosing = enclosing->getDeclContext()
            ? enclosing->getDeclContext()->getAsDecl()
            : nullptr) {
-    bool anyPlatformSpecificAttrs = false;
+    bool addedAvailabilityAttributes = false;
     for (auto available : enclosing->getSemanticAvailableAttrs()) {
-      // FIXME: [availability] Generalize to AvailabilityDomain.
-      auto platform = available.getPlatform();
-      if (!platform)
+      auto domain = available.getDomain();
+
+      // The blanket "unavailable" attribute added below already covers the
+      // universal domain.
+      if (domain.isUniversal())
         continue;
 
+      auto kind = domain.isVersioned() ? AvailableAttr::Kind::Unavailable
+                                       : available.getParsedAttr()->getKind();
+
       auto attr = new (ctx) AvailableAttr(
-          SourceLoc(), SourceRange(),
-          AvailabilityDomain::forPlatform(*platform), SourceLoc(),
-          AvailableAttr::Kind::Unavailable, available.getMessage(),
+          SourceLoc(), SourceRange(), domain, SourceLoc(), kind,
+          available.getMessage(),
           /*Rename=*/"", available.getIntroduced().value_or(noVersion),
           SourceRange(), available.getDeprecated().value_or(noVersion),
           SourceRange(), available.getObsoleted().value_or(noVersion),
           SourceRange(),
           /*Implicit=*/true, available.getParsedAttr()->isSPI());
       ext->addAttribute(attr);
-      anyPlatformSpecificAttrs = true;
+      addedAvailabilityAttributes = true;
     }
 
-    // If we found any platform-specific availability attributes, we're done.
-    if (anyPlatformSpecificAttrs)
+    if (addedAvailabilityAttributes)
       break;
   }
 
-  // Add the blanket "unavailable".
-
+  // Add the blanket '@available(*, unavailable)' attribute.
   ext->addAttribute(
       AvailableAttr::createUniversallyUnavailable(ctx, /*Message=*/""));
 }
@@ -8285,8 +8288,8 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   }
 
   // Rebuild the (inner) function type.
-  fnType = FunctionType::get(
-      newTypeParams, newResultType, fnType->getExtInfo());
+  fnType = FunctionType::get(newTypeParams, /* yields */ {}, newResultType,
+                             fnType->getExtInfo());
 
   if (!outerFnType)
     return fnType;
@@ -8295,11 +8298,11 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   if (auto genericFnType = dyn_cast<GenericFunctionType>(outerFnType)) {
     return GenericFunctionType::get(
         genericFnType->getGenericSignature(), outerFnType->getParams(),
-        Type(fnType), outerFnType->getExtInfo());
+        outerFnType->getYields(), Type(fnType), outerFnType->getExtInfo());
   }
 
-  return FunctionType::get(
-      outerFnType->getParams(), Type(fnType), outerFnType->getExtInfo());
+  return FunctionType::get(outerFnType->getParams(), outerFnType->getYields(),
+                           Type(fnType), outerFnType->getExtInfo());
 }
 
 AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
@@ -8390,13 +8393,13 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
 
   // Rebuild the outer function type around it.
   if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
-    return GenericFunctionType::get(
-        genericFnType->getGenericSignature(), fnType->getParams(),
-        Type(innerFnType), fnType->getExtInfo());
+    return GenericFunctionType::get(genericFnType->getGenericSignature(),
+                                    fnType->getParams(), fnType->getYields(),
+                                    Type(innerFnType), fnType->getExtInfo());
   }
 
-  return FunctionType::get(
-      fnType->getParams(), Type(innerFnType), fnType->getExtInfo());
+  return FunctionType::get(fnType->getParams(), fnType->getYields(),
+                           Type(innerFnType), fnType->getExtInfo());
 }
 
 bool swift::completionContextUsesConcurrencyFeatures(const DeclContext *dc) {

@@ -7,7 +7,6 @@
 // produces invalid ownership SIL under opaque values -- unrelated to deinits,
 // and pre-existing. Several other embedded existential tests XFAIL for the same
 // reason (e.g. dynamic-cast.swift, existential-default-method.swift).
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 var deinits = 0
 

@@ -882,6 +882,22 @@ option(SWIFT_BUILD_SWIFT_SYNTAX
   "Enable building swift syntax"
   FALSE)
 
+# Whether the compiler's own Swift sources are built.
+if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
+  set(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED TRUE)
+else()
+  set(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED FALSE)
+endif()
+
+option(SWIFT_BUILD_SARIF
+  "Enable SARIF diagnostic serialization support (requires swift-toolchain-sarif)"
+  FALSE)
+# SARIF serialization runs through DiagnosticBridge, so it needs those sources.
+if(SWIFT_BUILD_SARIF AND NOT SWIFT_COMPILER_SWIFT_SOURCES_ENABLED)
+  message(WARNING "Force setting SWIFT_BUILD_SARIF=OFF because Swift parser integration is disabled")
+  set(SWIFT_BUILD_SARIF OFF)
+endif()
+
 option(SWIFT_BUILD_IMMEDIATE_MODE
   "Build immediate/-interpret JIT mode (swiftImmediate). Requires LLVM's ORC/ExecutionEngine JIT libraries, which are unavailable on a JIT-less host such as a WebAssembly runtime."
   TRUE)
@@ -1064,7 +1080,7 @@ if(SWIFT_ENABLE_SWIFT_IN_SWIFT)
   endif()
 endif()
 
-if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
+if(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED)
   # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
   if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
@@ -1078,6 +1094,10 @@ if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SW
     endif()
   endif()
   add_definitions(-DSWIFT_BUILD_SWIFT_SYNTAX)
+endif()
+
+if(SWIFT_BUILD_SARIF)
+  add_definitions(-DSWIFT_BUILD_SARIF)
 endif()
 
 if(SWIFT_BUILD_IMMEDIATE_MODE)
@@ -1482,6 +1502,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
   message(STATUS "  C++ Bridging:   ${BRIDGING_MODE}")
   message(STATUS "  Swift parser:   ${SWIFT_BUILD_SWIFT_SYNTAX}")
+  message(STATUS "  SARIF support:  ${SWIFT_BUILD_SARIF}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")

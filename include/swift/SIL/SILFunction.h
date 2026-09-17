@@ -497,6 +497,9 @@ private:
   /// Set when this function's arguments and instructions have been lowered to
   /// address form by the AddressLowering function pass.
   unsigned HasLoweredAddresses : 1;
+  
+  /// Set when this function gives trivial values explicit ownership.
+  unsigned HasOwnershipForTrivialValues : 1;
 
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
@@ -783,6 +786,13 @@ public:
   bool hasLoweredAddresses() const;
 
   void setHasLoweredAddresses(bool val = true) { HasLoweredAddresses = val; }
+  
+  bool hasOwnershipForTrivialValues() const {
+    return HasOwnershipForTrivialValues; 
+  }
+  void setOwnershipForTrivialValues(bool val = true) {
+    HasOwnershipForTrivialValues = val; 
+  }
 
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
     return ForceEnableLexicalLifetimes_t(ForceEnableLexicalLifetimes);
@@ -1311,6 +1321,13 @@ public:
   }
   void copyEffects(SILFunction *from);
   bool hasArgumentEffects() const;
+
+  /// True if the side effects of this function have been computed by the
+  /// ComputeSideEffects pass (as opposed to only having defined effects, like
+  /// escape effects, which can be copied from a generic function when
+  /// specializing it).
+  bool hasComputedSideEffects() const;
+
   void visitArgEffects(std::function<void(int, int, bool)> c) const;
   MemoryBehavior getMemoryBehavior(bool observeRetains);
 

@@ -32,7 +32,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/MD5Stream.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -42,7 +41,6 @@
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/IRGen/TBDGen.h"
 #include "swift/LLVMPasses/Passes.h"
-#include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
@@ -51,8 +49,6 @@
 #include "swift/Subsystems.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
-#include "llvm/ADT/ScopeExit.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/InlineCost.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -75,15 +71,12 @@
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Plugins/PassPlugin.h"
 #include "llvm/ProfileData/InstrProfReader.h"
-#include "llvm/Remarks/Remark.h"
 #include "llvm/Remarks/RemarkStreamer.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputConfig.h"
 #include "llvm/Target/TargetMachine.h"
@@ -98,12 +91,13 @@
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/DCE.h"
+#if LLVM_VERSION_MAJOR >= 23
+#include "llvm/Transforms/Utils/AssignGUID.h"
+#endif
 #include "llvm/Transforms/Utils/Instrumentation.h"
 
-#include "llvm/CodeGen/MachineOptimizationRemarkEmitter.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/LLVMRemarkStreamer.h"
-#include "llvm/Support/ToolOutputFile.h"
 
 #include <thread>
 
@@ -153,6 +147,8 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
   // Explicitly request debugger tuning for LLDB which is the default
   // on Darwin platforms but not on others.
   TargetOpts.DebuggerTuning = llvm::DebuggerKind::LLDB;
+
+  TargetOpts.EmitCallSiteInfo = Opts.DebugCallsiteInfo;
   TargetOpts.FunctionSections = Opts.FunctionSections;
 
   // Set option to UseCASBackend if CAS was enabled on the command line.
@@ -614,6 +610,12 @@ void swift::performLLVMOptimizations(
         TargetMachine->getTargetTriple().getVendor() != llvm::Triple::Apple;
 
     if (Opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
+#if LLVM_VERSION_MAJOR >= 23
+      // ThinLTOBitcodeWriterPass requests ModuleSummaryIndexAnalysis, which
+      // requires a GUID to be assigned to every GlobalValue. The LTO prelink
+      // pipelines do that via AssignGUIDPass, but the O0 pipeline does not.
+      MPM.addPass(AssignGUIDPass());
+#endif
       MPM.addPass(ThinLTOBitcodeWriterPass(*out, nullptr));
     } else {
       if (EmitRegularLTOSummary) {
@@ -623,6 +625,12 @@ void swift::performLLVMOptimizations(
         // lto summary.)
         Module->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit",
                               uint32_t(1));
+#if LLVM_VERSION_MAJOR >= 23
+        // BitcodeWriterPass with EmitSummaryIndex requests
+        // ModuleSummaryIndexAnalysis, which requires a GUID to be assigned to
+        // every GlobalValue; the per-module/O0 pipelines do not do that.
+        MPM.addPass(AssignGUIDPass());
+#endif
       }
       MPM.addPass(BitcodeWriterPass(
           *out, /*ShouldPreserveUseListOrder*/ false, EmitRegularLTOSummary));

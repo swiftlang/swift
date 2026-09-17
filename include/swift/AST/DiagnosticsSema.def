@@ -737,8 +737,9 @@ ERROR(expr_swift_keypath_anyobject_root,none,
 ERROR(expr_keypath_protocol_metatype_static_member,none,
       "key path cannot refer to static member %0 of protocol type %1",
       (DeclNameRef, Type))
-ERROR(expr_keypath_multiparam_func_conversion, none,
-      "cannot convert key path into a multi-argument function type %0", (Type))
+ERROR(expr_keypath_wrong_param_func_conversion, none,
+      "cannot convert key path literal to %0, "
+      "expected single-parameter function type %1", (Type, Type))
 ERROR(cannot_convert_type_to_keypath_subscript_index,none,
       "cannot use value of type %0 as a key path subscript index; argument must be"
       " a key path",
@@ -1791,7 +1792,7 @@ GROUPED_ERROR(invalid_dynamic_callable_type,DynamicCallable,none,
       "'dynamicallyCall(withKeywordArguments:)' method", (Type))
 GROUPED_ERROR(missing_dynamic_callable_kwargs_method,DynamicCallable,none,
       "'@dynamicCallable' type %0 cannot be applied with keyword arguments; "
-      "missing 'dynamicCall(withKeywordArguments:)' method", (Type))
+      "missing 'dynamicallyCall(withKeywordArguments:)' method", (Type))
 
 ERROR(invalid_dynamic_member_lookup_type,none,
       "'@dynamicMemberLookup' requires %0 to have a "
@@ -2004,6 +2005,10 @@ ERROR(attr_objc_implementation_func_not_found,none,
       "could not find imported function '%0' matching %kind1; make sure you "
       "import the module or header that declares it",
       (StringRef, ValueDecl*))
+ERROR(attr_objc_implementation_func_ambiguous_overload,none,
+      "%kind0 could implement any of several imported overloads of '%1' that "
+      "have the same signature in Swift",
+      (ValueDecl*, StringRef))
 NOTE(attr_objc_implementation_fixit_remove_category_name,none,
      "remove arguments to implement the main '@interface' for this class",
      ())
@@ -2020,14 +2025,9 @@ ERROR(attr_objc_implementation_raise_minimum_deployment_target,none,
       "'@implementation' of an Objective-C class requires a minimum deployment "
       "target of at least %0 %1",
       (AvailabilityDomain, AvailabilityRange))
-ERROR(objc_implementation_extension_only_available_in,none,
-      "'@objc @implementation' extension cannot implement %kind0 because it is "
-      "only available in %1%select{| %3 or newer}2",
-      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
-ERROR(objc_implementation_extension_unavailable,none,
-      "'@objc @implementation' extension cannot implement %kind0 because it is "
-      "unavailable%select{ in %2|}1",
-      (const ValueDecl *, bool, AvailabilityDomain))
+ERROR(objc_implementation_extension_restricted,none,
+      "'@objc @implementation' extension cannot implement %kind0 because it %1",
+      (const ValueDecl *, StringRef))
 ERROR(attr_implementation_requires_language,none,
       "'@implementation' used without specifying the language being "
       "implemented",
@@ -2235,6 +2235,17 @@ ERROR(cdecl_throws,none,
 ERROR(cdecl_incompatible_with_objc,none,
       "cannot apply both '@c' and '@objc' to %kindonly0",
       (const Decl *))
+ERROR(cdecl_ref_counting_operation,none,
+      "%0 function implementing the %select{retain|release}1 operation of "
+      "foreign reference type %2 will cause infinite recursion; "
+      "use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`",
+      (DeclAttribute, unsigned, Type))
+ERROR(cdecl_unretained_result_unsupported,none,
+      "%kind0 cannot implement %select{C|C++}1 function '%2' because it "
+      "returns a foreign reference type %select{without a "
+      "'SWIFT_RETURNS_RETAINED' annotation|unretained "
+      "('SWIFT_RETURNS_UNRETAINED')}3, which is not yet supported",
+      (ValueDecl *, bool, StringRef, unsigned))
 
 // @cxx
 ERROR(cxx_attr_requires_cxx_interop,none,
@@ -2250,6 +2261,9 @@ ERROR(cxx_incompatible_with_cdecl,none,
 ERROR(cxx_attr_requires_implementation,none,
       "'@cxx' must be combined with '@implementation'",
       ())
+ERROR(cxx_not_global_or_namespace_member,none,
+      "%0 can only be applied to global functions or functions in extensions "
+      "of C++ namespaces", (DeclAttribute))
 ERROR(cxx_func_defined,none,
       "%kind0 cannot implement C++ function '%1' because it "
       "%select{already has a definition|is declared 'inline'|is 'constexpr' (implicitly 'inline')}2",
@@ -2319,9 +2333,27 @@ ERROR(com_interface_refinement_requires_identity, none,
 ERROR(com_interface_repeated_iid, none,
       "COM interface %0 and inherited interface %1 use the same interface "
       "identifier '%2'", (DeclName, DeclName, StringRef))
-ERROR(com_cominterface_existential, none,
-      "'any COMInterface' is invalid because 'COMInterface' does not identify a COM interface",
-      ())
+ERROR(com_interface_unsupported_requirement, none,
+      "requirement %1 cannot be %select{used|static|generic|async|throwing}0 in a COM interface",
+      (int, DeclName))
+ERROR(com_interface_unsupported_parameter, none,
+      "parameter %0 of COM interface requirement %1 cannot be represented in C",
+      (DeclName, DeclName))
+ERROR(com_interface_unsupported_type, none,
+      "type %0 of COM interface requirement %1 cannot be represented in C",
+      (Type, DeclName))
+ERROR(com_identity_existential, none,
+      "'any %0' is invalid because '%0' describes a COM metatype identity",
+      (StringRef))
+ERROR(com_identity_explicit_conformance, none,
+      "%0 conformance is compiler-managed and cannot be declared explicitly",
+      (DeclName))
+ERROR(com_identity_invalid_requirement, none,
+      "expected '%0' to declare 'var %1: %2 { get }'",
+      (StringRef, StringRef, StringRef))
+ERROR(com_identity_unsupported_requirement, none,
+      "requirement %0 of %1 is not supported by this compiler",
+      (DeclName, DeclName))
 ERROR(com_existential_multiple_interfaces, none,
       "COM existential cannot contain interfaces %0 and %1 because neither refines the other",
       (DeclName, DeclName))
@@ -3546,6 +3578,11 @@ NOTE(protocol_witness_kind_conflict,none,
      "a subscript}0", (RequirementKind))
 NOTE(protocol_witness_type_conflict,none,
      "candidate has non-matching type %0%1", (WitnessType, StringRef))
+NOTE(protocol_witness_iuo_conflict,none,
+     "candidate %select{type|result type|parameter type}0 is "
+     "%select{an optional|an implicitly unwrapped optional}1, but the protocol "
+     "requires %select{an implicitly unwrapped optional|an optional}1%2",
+     (unsigned, bool, StringRef))
 NOTE(protocol_witness_missing_requirement,none,
      "candidate would match if %0 %select{conformed to|subclassed|"
      "was the same type as|%error|%error}2 %1", (Type, Type, unsigned))
@@ -4452,6 +4489,13 @@ ERROR(attr_only_one_decl_kind,none,
       "%0 may only be used on '%1' declarations", (DeclAttribute,StringRef))
 ERROR(attr_only_valid_on_func_or_init_params,none,
       "'%0' may only be used on function or initializer parameters", (StringRef))
+ERROR(subscript_consuming_parameter_separate_accessors,none,
+      "'%0' may not be used on the parameter of a subscript whose read and "
+      "write go through separate accessors; a read-modify-write access would "
+      "consume the argument more than once", (StringRef))
+NOTE(subscript_consuming_parameter_use_coroutine,none,
+      "use a '%0' accessor instead, so that a single accessor performs the "
+      "whole access", (StringRef))
 ERROR(attr_not_on_variadic_parameters,none,
       "'%0' must not be used on variadic parameters", (StringRef))
 ERROR(attr_not_on_stored_properties,none,
@@ -6273,6 +6317,36 @@ ERROR(distributed_actor_func_param_not_codable,none,
       "parameter %0 of type %1 in %kindonly2 does not conform to "
       "serialization requirement '%3'",
       (Identifier, Type, const AbstractFunctionDecl *, StringRef))
+
+ERROR(distributed_embedded_any_some_param_not_supported,none,
+      "parameter %0 of type %1 in %kindonly2 is not supported in Embedded Swift; "
+      "only concrete types, or 'any'/'some' types of an '@Resolvable protocol' "
+      "may appear in 'distributed func' signatures",
+      (Identifier, Type, const AbstractFunctionDecl *))
+ERROR(distributed_embedded_any_some_result_not_supported,none,
+      "return type %0 of %kindonly1 is not supported in Embedded Swift; "
+      "only concrete types, or 'any'/'some' types of an '@Resolvable' protocol may "
+      "appear in 'distributed func' signatures",
+      (Type, const AbstractFunctionDecl *))
+ERROR(distributed_embedded_some_result_not_supported,none,
+      "'some' return type %0 of %kindonly1 is not supported in Embedded Swift; "
+      "use 'any %2' instead",
+      (Type, const AbstractFunctionDecl *, StringRef))
+ERROR(distributed_embedded_generic_func_not_supported,none,
+      "generic 'distributed func' is not supported in Embedded Swift; "
+      "use concrete parameter and return types in %kindonly0",
+      (const AbstractFunctionDecl *))
+ERROR(distributed_embedded_generic_actor_system_not_supported,none,
+      "distributed actor cannot be generic over its actor system in Embedded Swift; "
+      "specify a concrete 'ActorSystem'",
+      ())
+ERROR(distributed_embedded_distributed_var_not_supported,none,
+      "'distributed' computed properties are not supported in Embedded Swift; "
+      "use a 'distributed func' instead",
+      (DeclName))
+ERROR(distributed_embedded_requires_feature,none,
+      "'distributed actor' in Embedded Swift requires '-enable-experimental-feature EmbeddedDistributed'",
+      ())
 ERROR(distributed_actor_func_param_resolvable_actor_system_mismatch,none,
       "parameter %0 of type %1 in %kindonly2 must match the enclosing actor's "
       "ActorSystem (%5)",
@@ -7264,7 +7338,7 @@ ERROR(objc_enum_generic,none,
 ERROR(objc_invalid_on_func_inout,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because inout "
       "parameters cannot be represented in %" FOREIGN_LANG_SELECT "2",
-      (const AbstractFunctionDecl*, unsigned, ForeignLanguage))
+      (const ValueDecl*, unsigned, ForeignLanguage))
 ERROR(objc_invalid_on_func_param_type,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "2 because the type of the "
       "parameter %1 cannot be represented in %" FOREIGN_LANG_SELECT "3",
@@ -7579,8 +7653,8 @@ GROUPED_WARNING(attr_availability_domain_always_available,
                 (AvailabilityDomain))
 
 ERROR(availability_decl_unavailable, none,
-      "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
-      (const ValueDecl *, bool, AvailabilityDomain, StringRef))
+      "%0 %1",
+      (const ValueDecl *, StringRef))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
@@ -7632,8 +7706,8 @@ NOTE(availability_decl_more_than_enclosing_here, none,
      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_decl_only_in, none,
-      "%0 is only available in %1%select{| %3 or newer}2",
-      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
+      "%0 %1",
+      (const ValueDecl *, StringRef))
 
 ERROR(availability_decl_only_in_for_clients, none,
       "%0 is only available in %1%select{| %3 or newer}2"
@@ -7685,9 +7759,8 @@ NOTE(availability_add_attribute, none,
      "add '@available' attribute to enclosing %kindonly0", (const Decl *))
 
 ERROR(availability_inout_accessor_only_in, none,
-      "cannot pass as inout because %0 is only available in %1"
-      "%select{| %3 or newer}2",
-      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
+      "cannot pass as inout because %0 %1",
+      (const ValueDecl *, StringRef))
 
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
@@ -7774,9 +7847,8 @@ NOTE(availability_unavailable_implicit_init, none,
 // Conformance availability checking diagnostics
 
 ERROR(conformance_availability_unavailable, none,
-      "conformance of %0 to %1 is unavailable"
-      "%select{ in %3|}2%select{|: %4}4",
-      (Type, Type, bool, AvailabilityDomain, StringRef))
+      "conformance of %0 to %1 %2",
+      (Type, Type, StringRef))
 
 NOTE(conformance_availability_marked_unavailable, none,
      "conformance of %0 to %1 has been explicitly marked "
@@ -7796,14 +7868,6 @@ GROUPED_WARNING(conformance_availability_deprecated,
                 "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
                 (Type, Type, bool, AvailabilityDomain, bool, AvailabilityRange,
                  StringRef))
-
-ERROR(conformance_availability_only_version_newer, none,
-      "conformance of %0 to %1 is only available in %2 %3 or newer",
-      (Type, Type, AvailabilityDomain, AvailabilityRange))
-
-ERROR(conformance_availability_not_available, none,
-      "conformance of %0 to %1 is only available in %2",
-      (Type, Type, AvailabilityDomain))
 
 GROUPED_WARNING(availability_use_any_apple_os,
                 UseAnyAppleOSAvailability, none,
@@ -8894,14 +8958,8 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       (unsigned))
 
 ERROR(for_loop_sequence_conformance_unavailable,none,
-      "for-in loop requires %0 to conform to %1, which is "
-      "only available in %2 %3 or newer",
-      (Type, ProtocolDecl *, StringRef, StringRef))
-
-ERROR(for_loop_sequence_conformance_unavailable_unconditionally,none,
-      "for-in loop requires %0 to conform to %1, "
-      "but the conformance is unavailable",
-      (Type, ProtocolDecl *))
+      "for-in loop requires %0 to conform to %1, which %2",
+      (Type, ProtocolDecl *, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors
@@ -9262,6 +9320,15 @@ GROUPED_WARNING(open_existential_in_embedded_swift,
                 "cannot open existential type %0 in Embedded Swift",
                 (Type))
 
+GROUPED_WARNING(open_existential_argument_in_embedded_swift,
+                EmbeddedRestrictions, none,
+                "cannot open existential type %0 when passing it as an "
+                "argument to %kind1 in Embedded Swift",
+                (Type, const ValueDecl *))
+NOTE(open_existential_argument_coerce_in_embedded_swift, none,
+     "coerce the argument to %0 to pass the existential value without opening "
+     "it", (Type))
+
 GROUPED_ERROR(self_referential_superclass_in_embedded_swift,
               EmbeddedRestrictions, none,
               "class %0 cannot inherit from %1 in Embedded Swift because "
@@ -9564,10 +9631,6 @@ ERROR(using_decl_invalid_attribute,none,
      (DeclAttribute))
 NOTE(using_decl_invalid_attribute_note,none,
      "'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'", ())
-ERROR(using_decl_must_precede_other_decls,none,
-     "'using' must appear before any non-import declaration", ())
-NOTE(using_decl_must_precede_other_decls_previous,none,
-     "first non-import declaration here", ())
 
 //===----------------------------------------------------------------------===//
 // MARK: `@inline(always)` attribute

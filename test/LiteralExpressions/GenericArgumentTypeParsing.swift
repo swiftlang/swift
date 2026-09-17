@@ -2,7 +2,7 @@
 
 // Parenthesized generic arguments that must resolve as types, not as generic
 // value expressions.
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature LiteralExpressions
+// RUN: %target-typecheck-verify-swift -target %target-swift-6.2-abi-triple -enable-experimental-feature LiteralExpressions
 
 struct G<T> {}
 struct Pair<T, U> {}

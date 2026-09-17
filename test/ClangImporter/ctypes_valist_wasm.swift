@@ -1,4 +1,4 @@
-// RUN: %swift-frontend -target wasm32-unknown-wasip1 -parse-stdlib -module-name Swift -I %S/Inputs/custom-modules -typecheck %s
+// RUN: %swift -target wasm32-unknown-wasip1 -parse-stdlib -module-name Swift -I %S/Inputs/custom-modules -typecheck %s
 
 // REQUIRES: CODEGENERATOR=WebAssembly
 

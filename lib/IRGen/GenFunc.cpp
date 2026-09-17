@@ -68,7 +68,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
@@ -77,7 +76,6 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/Linking.h"
 #include "clang/AST/ASTContext.h"
@@ -91,13 +89,11 @@
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ProfileData/InstrProf.h"
-#include "llvm/Support/Debug.h"
 
 #include "BitPatternBuilder.h"
 #include "CallEmission.h"
 #include "Callee.h"
 #include "ConstantBuilder.h"
-#include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenCall.h"
@@ -627,6 +623,7 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
       
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::COMMethod:
   case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::WitnessMethod:
   case SILFunctionType::Representation::CFunctionPointer:
@@ -719,6 +716,7 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::CFunctionPointer:
   case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::COMMethod:
   case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::WitnessMethod:
   case SILFunctionType::Representation::Closure:

@@ -17,7 +17,6 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/OSSACompleteLifetime.h"
-#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -509,6 +508,9 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   // A specialization of a function goes into the same section as the original
   // function.
   specializedApplySiteCallee->setSection(original->section());
+
+  specializedApplySiteCallee->setHasLoweredAddresses(
+      original->hasLoweredAddresses());
 
   return {specializedApplySiteCallee};
 }

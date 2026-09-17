@@ -20,7 +20,6 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
-#include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/Support/raw_ostream.h"
@@ -213,6 +212,23 @@ public:
   /// from diagnostics describing the restriction.
   bool shouldHideDomainNameInDiagnostics() const;
 
+  /// Formats a human-readable description of the restriction for use in
+  /// diagnostics. Writes the description to \p scratch and returns a
+  /// `StringRef` into it. The description is one of:
+  ///   - "is unavailable"
+  ///   - "is unavailable in <domain>"
+  ///   - "is only available in <domain>"
+  ///   - "is only available in <domain> <version> or newer"
+  ///
+  /// If \p includeMessage is true and there is a `message:` on the attribute
+  /// that creates the restriction, then that message's body is appended to the
+  /// result. The message advises the reader on how to stop using the
+  /// declaration, so pass false when the diagnostic describes something other
+  /// than a use of it.
+  StringRef getDiagnosticDescription(llvm::SmallString<64> &scratch,
+                                     const ASTContext &ctx,
+                                     bool includeMessage = true) const;
+
   void print(raw_ostream &os) const;
 };
 
@@ -260,6 +276,16 @@ enum class AvailabilityRestrictionFlag : uint8_t {
   /// Return restrictions for `@available` attributes indicating deprecation in
   /// a future deployment target.
   IncludeSoftDeprecation = 1 << 3,
+
+  /// Do not return `Unintroduced` restrictions belonging to platform domains.
+  /// This is used when checking the availability of a protocol that a type
+  /// conforms to, since a conformance is allowed to be introduced in a later
+  /// OS version than the conforming type itself.
+  AllowUnintroducedInPlatformDomains = 1 << 4,
+
+  /// Do not return `Unintroduced` restrictions that are satisfied at or below
+  /// the deployment range of the restriction's domain.
+  AllowUnintroducedAtOrBelowDeploymentRange = 1 << 5,
 };
 using AvailabilityRestrictionFlags = OptionSet<AvailabilityRestrictionFlag>;
 

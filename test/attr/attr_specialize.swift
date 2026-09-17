@@ -267,6 +267,12 @@ public func copy2<S>(_ t: S, s: inout S) -> S where S: P{
   return s
 }
 
+@_specialize(where S: _TrivialAtMost(64))
+@inline(never)
+public func copy2NonExported<S>(_ s: S) -> S where S: P {
+  return s
+}
+
 // Check missing alignment.
 @_specialize(where S: _Trivial(64, )) // expected-error{{expected non-negative alignment to be specified in layout constraint}}
 // Check non-numeric size.

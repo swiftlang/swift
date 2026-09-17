@@ -548,6 +548,7 @@ public:
   void visitUnsafeSelfDependentResultAttr(UnsafeSelfDependentResultAttr *attr);
 
   void visitCalledAttr(CalledAttr *attr);
+  void visitCoroutineAttr(CoroutineAttr *attr);
 };
 
 } // end anonymous namespace
@@ -1899,7 +1900,8 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
       attr->setCategoryNameInvalid();
     }
 
-    if (!AFD->getImplementedObjCDecl()) {
+    auto interfaces = AFD->getAllImplementedObjCDecls();
+    if (interfaces.size() != 1) {
       // A @cxx function whose signature is not representable in C++ cannot
       // match anything; the representability diagnostics explain the failure
       // better than "not found" would, so check them first and stand down if
@@ -1914,11 +1916,21 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
           return;
       }
 
-      StringRef name = AFD->getCDeclName();
-      if (name.empty())
-        name = AFD->getNameStr();
-      diagnose(attr->getLocation(),
-               diag::attr_objc_implementation_func_not_found, name, AFD);
+      if (interfaces.empty()) {
+        StringRef name = AFD->getCDeclName();
+        if (name.empty())
+          name = AFD->getNameStr();
+        diagnose(attr->getLocation(),
+                 diag::attr_objc_implementation_func_not_found, name, AFD);
+      } else {
+        // Several imported overloads have the same signature in Swift, so the
+        // function could implement any of them.
+        diagnose(attr->getLocation(),
+                 diag::attr_objc_implementation_func_ambiguous_overload, AFD,
+                 AFD->getCDeclName());
+        for (auto *interface : interfaces)
+          interface->diagnose(diag::found_candidate);
+      }
     }
   }
 }
@@ -2510,9 +2522,12 @@ void AttributeChecker::visitCxxDeclAttr(CxxDeclAttr *attr) {
     diagnose(attr->getLocation(), diag::cxx_attr_requires_cxx_interop,
              attr->getAttrName());
 
-  // Only top-level func decls are currently supported.
-  if (D->getDeclContext()->isTypeContext())
-    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level, attr);
+  // @cxx may appear on a global function or on a function declared in a Swift
+  // extension of an imported C++ namespace.
+  auto *dc = D->getDeclContext();
+  if (dc->isTypeContext() && !importer::isClangNamespace(dc))
+    diagnose(attr->getLocation(), diag::cxx_not_global_or_namespace_member,
+             attr);
 
   // Reject using both @cxx and @objc on the same decl.
   if (D->getAttrs().getAttribute<ObjCAttr>())
@@ -2792,6 +2807,10 @@ void AttributeChecker::visitSILGenNameAttr(SILGenNameAttr *A) {
   if (D->getAttrs().hasAttribute<ABIAttr>()) {
     diagnoseAndRemoveAttr(A, diag::attr_abi_incompatible_with_silgen_name, D);
   }
+}
+
+void AttributeChecker::visitCoroutineAttr(CoroutineAttr *attr) {
+  // FIXME: allow only on @differentiable for modify accessorts
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
@@ -3409,15 +3428,16 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   // `@MainActor () async throws(E) -> Void`
   {
     llvm::SmallVector<Type, 4> mainTypes = {
-        FunctionType::get(/*params*/ {}, context.TheEmptyTupleType,
-                          ASTExtInfoBuilder().withThrows(
-                            true, throwsTypeVar
-                          ).build()),
+        FunctionType::get(
+            /*params*/ {}, /*yields*/ {}, context.TheEmptyTupleType,
+            ASTExtInfoBuilder().withThrows(true, throwsTypeVar).build()),
 
         FunctionType::get(
-            /*params*/ {}, context.TheEmptyTupleType,
-            ASTExtInfoBuilder().withAsync()
-                .withThrows(true, throwsTypeVar).build())};
+            /*params*/ {}, /*yields*/ {}, context.TheEmptyTupleType,
+            ASTExtInfoBuilder()
+                .withAsync()
+                .withThrows(true, throwsTypeVar)
+                .build())};
 
     Type mainActor = context.getMainActorType();
     if (mainActor) {
@@ -3429,10 +3449,10 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
                   Feature::GlobalActorIsolatedTypesUsability));
 
       mainTypes.push_back(FunctionType::get(
-          /*params*/ {}, context.TheEmptyTupleType,
+          /*params*/ {}, /*yields*/ {}, context.TheEmptyTupleType,
           extInfo.build()));
       mainTypes.push_back(FunctionType::get(
-          /*params*/ {}, context.TheEmptyTupleType,
+          /*params*/ {}, /*yields*/ {}, context.TheEmptyTupleType,
           extInfo.withAsync().build()));
     }
     TypeVariableType *mainType =
@@ -5313,6 +5333,7 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo derivedInterfaceInfo;
     derivedInterfaceTy = FunctionType::get(derivedInterfaceFuncTy->getParams(),
+                                           derivedInterfaceFuncTy->getYields(),
                                            derivedInterfaceFuncTy->getResult(),
                                            derivedInterfaceInfo);
     auto overrideInterfaceFuncTy =
@@ -5321,6 +5342,7 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
     FunctionType::ExtInfo overrideInterfaceInfo;
     overrideInterfaceTy = FunctionType::get(
         overrideInterfaceFuncTy->getParams(),
+        overrideInterfaceFuncTy->getYields(),
         overrideInterfaceFuncTy->getResult(), overrideInterfaceInfo);
   }
 
@@ -6944,19 +6966,20 @@ static bool checkFunctionSignature(
 /// Returns an `AnyFunctionType` from the given parameters, result type, and
 /// generic signature.
 static AnyFunctionType *
-makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
+makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters,
+                 ArrayRef<AnyFunctionType::Yield> yields, Type resultType,
                  bool throws, Type thrownError,
                  GenericSignature genericSignature) {
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   if (genericSignature) {
     GenericFunctionType::ExtInfo info;
     info = info.withThrows(throws, thrownError);
-    return GenericFunctionType::get(genericSignature, parameters, resultType,
-                                    info);
+    return GenericFunctionType::get(genericSignature, parameters, yields,
+                                    resultType, info);
   }
   FunctionType::ExtInfo info;
   info = info.withThrows(throws, thrownError);
-  return FunctionType::get(parameters, resultType, info);
+  return FunctionType::get(parameters, yields, resultType, info);
 }
 
 /// Computes the original function type corresponding to the given derivative
@@ -6980,8 +7003,9 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
          "Expected derivative result to be a two-element tuple");
   auto originalResult = derivativeResult->getElement(0).getType();
   auto *originalType = makeFunctionType(
-      curryLevels.back()->getParams(), originalResult,
-      curryLevels.back()->isThrowing(), curryLevels.back()->getThrownError(),
+      curryLevels.back()->getParams(), curryLevels.back()->getYields(),
+      originalResult, curryLevels.back()->isThrowing(),
+      curryLevels.back()->getThrownError(),
       curryLevels.size() == 1 ? derivativeFnTy->getOptGenericSignature()
                               : nullptr);
 
@@ -6991,12 +7015,12 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   for (auto pair : enumerate(llvm::reverse(curryLevelsWithoutLast))) {
     unsigned i = pair.index();
     AnyFunctionType *curryLevel = pair.value();
-    originalType =
-        makeFunctionType(curryLevel->getParams(), originalType,
-                         curryLevel->isThrowing(), curryLevel->getThrownError(),
-                         i == curryLevelsWithoutLast.size() - 1
-                             ? derivativeFnTy->getOptGenericSignature()
-                             : nullptr);
+    originalType = makeFunctionType(
+        curryLevel->getParams(), curryLevel->getYields(), originalType,
+        curryLevel->isThrowing(), curryLevel->getThrownError(),
+        i == curryLevelsWithoutLast.size() - 1
+            ? derivativeFnTy->getOptGenericSignature()
+            : nullptr);
   }
   return originalType;
 }
@@ -7007,6 +7031,7 @@ static AnyFunctionType *
 getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
                                  IndexSubset *linearParamIndices,
                                  bool wrtSelf) {
+  assert(!transposeFnType->isCoroutine());
   unsigned transposeParamsIndex = 0;
 
   // Get the transpose function's parameters and result type.
@@ -7082,23 +7107,24 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   AnyFunctionType *originalType;
   // If the transpose type is curried, the original function type is:
   // `(Self) -> (<original parameters>) -> <original result>`.
+  // TODO: These does not handle yields properly
   if (isCurried) {
     assert(selfType && "`Self` type should be resolved");
-    originalType = makeFunctionType(originalParams, originalResult,
-                                    transposeFnType->isThrowing(),
-                                    transposeFnType->getThrownError(),
-                                    /*genericSignature=*/nullptr);
     originalType = makeFunctionType(
-        AnyFunctionType::Param(selfType), originalType,
+        originalParams, /* yields */ {}, originalResult,
+        transposeFnType->isThrowing(), transposeFnType->getThrownError(),
+        /*genericSignature=*/nullptr);
+    originalType = makeFunctionType(
+        AnyFunctionType::Param(selfType), /* yields */ {}, originalType,
         /*throws=*/false, Type(), transposeFnType->getOptGenericSignature());
   }
   // Otherwise, the original function type is simply:
   // `(<original parameters>) -> <original result>`.
   else {
-    originalType = makeFunctionType(originalParams, originalResult,
-                                    transposeFnType->isThrowing(),
-                                    transposeFnType->getThrownError(),
-                                    transposeFnType->getOptGenericSignature());
+    originalType = makeFunctionType(
+        originalParams, /* yields */ {}, originalResult,
+        transposeFnType->isThrowing(), transposeFnType->getThrownError(),
+        transposeFnType->getOptGenericSignature());
   }
   return originalType;
 }
@@ -9626,36 +9652,18 @@ ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
 FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
                                            const SourceFile *file) const {
   auto &ctx = file->getASTContext();
+  auto mainActor = ctx.getMainActorType();
+
   FileDefaults result;
 
-  std::optional<Decl *> firstNonImportDecl;
-
-  for (auto *D : file->getTopLevelDecls()) {
-    auto *UD = dyn_cast<UsingDecl>(D);
-    if (!UD) {
-      if (!firstNonImportDecl && !isa<ImportDecl>(D)) {
-        firstNonImportDecl = D;
-      }
+  for (auto item : file->getTopLevelItems()) {
+    auto *UD = dyn_cast_or_null<UsingDecl>(item.dyn_cast<Decl *>());
+    if (!UD)
       continue;
-    }
 
-    if (firstNonImportDecl) {
-      UD->diagnose(diag::using_decl_must_precede_other_decls);
-      firstNonImportDecl.value()->diagnose(
-          diag::using_decl_must_precede_other_decls_previous);
-      // TODO: emit a fix-it
-    }
-
-    std::optional<DeclAttrKind> seen;
+    // Generally there will only be one attribute, but @available is allowed and
+    // can produce multiple.
     for (auto *attr : UD->getSpecifiedAttributes()) {
-      // It shouldn't be possible to get here with multiple attributes (it
-      // shouldn't parse), but make sure. @available can end up being multiple
-      // attributes though.
-      ASSERT((!seen || (seen == DeclAttrKind::Available &&
-                        attr->getKind() == DeclAttrKind::Available)) &&
-             "'using' should only have one specified attribute");
-      seen = attr->getKind();
-
       if (isa<DiagnoseAttr>(attr)) {
         // `@diagnose` is handled via the swift-syntax region tree.
         continue;
@@ -9684,6 +9692,8 @@ FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
         continue;
       }
 
+      NominalTypeDecl *invalidNominal = nullptr;
+
       if (auto *custom = dyn_cast<CustomAttr>(attr)) {
         auto type = evaluateOrDefault(
             ctx.evaluator,
@@ -9699,7 +9709,7 @@ FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
             continue;
           }
 
-          if (type->isEqual(ctx.getMainActorType())) {
+          if (mainActor && type->isEqual(mainActor)) {
             setDefaultIsolation(DefaultIsolation::MainActor);
             continue;
           }
@@ -9711,8 +9721,11 @@ FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
                                diag::invalid_actor_for_file_isolation, type);
             ctx.Diags.diagnose(attr->getLocation(),
                                diag::invalid_actor_for_file_isolation_note);
+            nominal->diagnose(diag::decl_declared_here, nominal);
             continue;
           }
+
+          invalidNominal = nominal;
         }
         // Not a global actor (some other illegal attribute) so fall through to
         // the generic diagnostic.
@@ -9722,6 +9735,11 @@ FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
                          diag::using_decl_invalid_attribute, attr);
       ctx.Diags.diagnose(attr->getLocation(),
                          diag::using_decl_invalid_attribute_note);
+      if (invalidNominal)
+        invalidNominal->diagnose(diag::decl_declared_here, invalidNominal);
+      // Some invalid attributes like @backDeployed can expand to multiple
+      // attrs, all of the same kind; just emit one error.
+      break;
     }
   }
 

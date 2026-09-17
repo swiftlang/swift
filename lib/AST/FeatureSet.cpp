@@ -17,12 +17,9 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "clang/AST/DeclObjC.h"
 #include "swift/AST/TypeCheckRequests.h"
-
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 
@@ -183,6 +180,16 @@ UNINTERESTING_FEATURE(TypedAllocation)
 UNINTERESTING_FEATURE(BuiltinAllocRawTyped)
 UNINTERESTING_FEATURE(BuiltinTypedAllocationID)
 UNINTERESTING_FEATURE(MutateAndConsumeInDeinit)
+
+static bool usesFeatureSubscriptParametersWithOwnership(Decl *decl) {
+  auto *SD = dyn_cast<SubscriptDecl>(decl);
+  if (!SD)
+    return false;
+
+  return llvm::any_of(*SD->getIndices(), [](const ParamDecl *index) {
+    return index->getSpecifier() != ParamSpecifier::Default;
+  });
+}
 
 static bool usesFeatureUnderscoreOwned(Decl *D) {
   return D->getAttrs().hasAttribute<OwnedAttr>();
@@ -499,6 +506,7 @@ UNINTERESTING_FEATURE(CxxImplementation)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 UNINTERESTING_FEATURE(DistributedActorResignRemoteID)
+UNINTERESTING_FEATURE(EmbeddedDistributed)
 
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
@@ -522,6 +530,13 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
   default:
     return false;
   }
+}
+
+static bool usesFeatureCoroutineFunctions(Decl *decl) {
+  if (auto *FD = dyn_cast<FuncDecl>(decl))
+    return FD->isCoroutine() && !isa<AccessorDecl>(FD);
+  
+  return false;
 }
 
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)

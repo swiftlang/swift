@@ -105,7 +105,9 @@ target_include_directories(swiftObservation PRIVATE
   "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include"
   # For `swift/runtime/CMakeConfig.h`, which should be generated
   # by the Core build system.
-  "${${PROJECT_NAME}_PATH_TO_SWIFT_RUNTIME_HEADERS}")
+  "${${PROJECT_NAME}_PATH_TO_SWIFT_RUNTIME_HEADERS}"
+  # For llvm/support headers
+  "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(swiftObservation PRIVATE
   swiftShims
   swiftCore

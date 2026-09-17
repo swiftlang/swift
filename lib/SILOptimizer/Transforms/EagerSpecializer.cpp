@@ -34,7 +34,6 @@
 
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -566,7 +565,9 @@ void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
                                          WordTy, SubMap, { GenericMT });
   auto LayoutSize =
       Builder.createIntegerLiteral(Loc, WordTy, Layout->getTrivialSizeInBytes());
-  const char *CmpOpName = Layout->isFixedSizeTrivial() ? "cmp_eq" : "cmp_le";
+  // Use cmp_ule for non LayoutConstraintKind::TrivialOfExactSize constraints,
+  // since the operands are non-negative Word sizes.
+  const char *CmpOpName = Layout->isFixedSizeTrivial() ? "cmp_eq" : "cmp_ule";
   auto Cmp =
     Builder.createBuiltinBinaryFunction(Loc, CmpOpName, WordTy,
                                         BoolTy,

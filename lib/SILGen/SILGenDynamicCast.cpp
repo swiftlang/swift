@@ -16,7 +16,6 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "ExitableFullExpr.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/SIL/DynamicCasts.h"

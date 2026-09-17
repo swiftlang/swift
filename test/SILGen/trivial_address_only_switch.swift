@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -verify -disable-availability-checking %s
+// RUN: %target-swift-emit-silgen -verify -target %target-swift-6.2-abi-triple %s
 
 public enum StreamYieldResult<let count: Int>: Sendable {
     case literal(buffer: InlineArray<count, UInt8>)

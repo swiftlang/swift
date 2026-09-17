@@ -43,7 +43,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 using namespace Lowering;
@@ -1209,6 +1208,18 @@ namespace {
     }
 
     virtual bool isLoadingPure() const override { return true; }
+
+    /// Re-form an l-value referring to the same value, without projecting it.
+    /// See `LValue::copyOfValueReference`.
+    LValue copyAsLValue() const {
+      assert(!hasActorIsolation() &&
+             "projecting an actor-isolated component twice would hop twice");
+      LValue lv;
+      lv.add<ValueComponent>(Value, Enforcement, getTypeData(), IsRValue,
+                             /*actorIso=*/std::nullopt,
+                             IsLazyInitializedGlobal);
+      return lv;
+    }
 
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base) && override {
@@ -2922,6 +2933,24 @@ LValue LValue::forAddress(SGFAccessKind accessKind, ManagedValue address,
   return lv;
 }
 
+LValue LValue::copyOfValueReference() const {
+  assert(isValid());
+  if (Path.size() != 1)
+    return LValue();
+
+  auto &component = *Path.front();
+  if (component.getKind() != PathComponent::ValueKind)
+    return LValue();
+
+  // An actor-isolated component would hop to that actor's isolation domain
+  // every time it is projected, so it must not be projected more than once.
+  auto &valueComponent = static_cast<ValueComponent &>(component);
+  if (valueComponent.hasActorIsolation())
+    return LValue();
+
+  return valueComponent.copyAsLValue();
+}
+
 void LValue::addMemberComponent(SILGenFunction &SGF, SILLocation loc,
                                 AbstractStorageDecl *storage,
                                 SubstitutionMap subs,
@@ -3566,6 +3595,23 @@ namespace {
         FormalRValueType(formalRValueType), AccessKind(accessKind) {}
 
     void emitUsingStrategy(AccessStrategy strategy) {
+      // Foreign COM interfaces provide getters and setters, not Swift
+      // coroutine accessors. Materialize read-write accesses through them.
+      if (AccessKind == SGFAccessKind::ReadWrite &&
+          strategy.getKind() == AccessStrategy::DispatchToAccessor) {
+        auto *protocol = dyn_cast<ProtocolDecl>(Storage->getDeclContext());
+        if (protocol && protocol->isCOMInterface()) {
+          Type selfType = protocol->getSelfInterfaceType().subst(Subs);
+          if (selfType->is<ExistentialArchetypeType>()) {
+            strategy = AccessStrategy::getMaterializeToTemporary(
+                AccessStrategy::getAccessor(AccessorKind::Get,
+                                            /*dispatched=*/true),
+                AccessStrategy::getAccessor(AccessorKind::Set,
+                                            /*dispatched=*/true));
+          }
+        }
+      }
+
       switch (strategy.getKind()) {
       case AccessStrategy::Storage: {
         auto typeData =

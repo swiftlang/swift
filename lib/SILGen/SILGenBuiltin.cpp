@@ -188,7 +188,7 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &SGF,
   auto &ti = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
   
   // Destroy is a no-op for trivial types.
-  if (ti.isTrivial())
+  if (ti.isTrivial(&SGF.F))
     return ManagedValue::forObjectRValueWithoutOwnership(
         SGF.emitEmptyTuple(loc));
 
@@ -578,7 +578,8 @@ static ManagedValue emitBuiltinGepImpl(SILGenFunction &SGF,
                                        SILLocation loc,
                                        SubstitutionMap substitutions,
                                        ArrayRef<ManagedValue> args,
-                                       bool isProjection) {
+                                       bool isProjection,
+                                       bool stackProtected) {
   SILType ElemTy = SGF.getLoweredType(substitutions.getReplacementTypes()[0]);
   SILType RawPtrType = args[0].getUnmanagedValue()->getType();
   SILValue addr = SGF.B.createPointerToAddress(loc,
@@ -587,10 +588,10 @@ static ManagedValue emitBuiltinGepImpl(SILGenFunction &SGF,
                                                /*strict*/ true,
                                                /*invariant*/ false);
   addr = SGF.B.createIndexAddr(loc, addr, args[1].getUnmanagedValue(),
-                               /*needsStackProtection=*/ true,
+                               /*needsStackProtection=*/ stackProtected,
                                isProjection);
   addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType,
-                                      /*needsStackProtection=*/ true);
+                                      /*needsStackProtection=*/ stackProtected);
   return ManagedValue::forObjectRValueWithoutOwnership(addr);
 }
 
@@ -603,7 +604,8 @@ static ManagedValue emitBuiltinGep(SILGenFunction &SGF,
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "gep should have two substitutions");
   assert(args.size() == 3 && "gep should be given three arguments");
-  return emitBuiltinGepImpl(SGF, loc, substitutions, args, /*isProjection=*/ false);
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args,
+                            /*isProjection=*/ false, /*stackProtected=*/ true);
 }
 
 /// Specialized emitter for Builtin.gepProjection.
@@ -615,7 +617,22 @@ static ManagedValue emitBuiltinGepProjection(SILGenFunction &SGF,
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "gepProjection should have two substitutions");
   assert(args.size() == 3 && "gepProjection should be given three arguments");
-  return emitBuiltinGepImpl(SGF, loc, substitutions, args, /*isProjection=*/ true);
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args,
+                            /*isProjection=*/ true, /*stackProtected=*/ true);
+}
+
+/// Specialized emitter for Builtin.unprotectedGepProjection.
+static ManagedValue emitBuiltinUnprotectedGepProjection(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             SubstitutionMap substitutions,
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
+  assert(substitutions.getReplacementTypes().size() == 1 &&
+         "unprotectedGepProjection should have two substitutions");
+  assert(args.size() == 3 &&
+         "unprotectedGepProjection should be given three arguments");
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args,
+                            /*isProjection=*/ true, /*stackProtected=*/ false);
 }
 
 /// Specialized emitter for Builtin.getTailAddr.
@@ -770,7 +787,8 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   auto toTy = substitutions.getReplacementTypes()[1];
   auto &fromTL = SGF.getTypeLowering(fromTy);
   auto &toTL = SGF.getTypeLowering(toTy);
-  assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
+  assert(!fromTL.isTrivial(&SGF.F) && !toTL.isTrivial(&SGF.F)
+         && "expected ref type");
 
   auto arg = args[0];
 
@@ -853,7 +871,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
       return SGF.emitManagedLoadCopy(loc, toAddr, toTL);
     }
     // Leave the cleanup on the original value.
-    if (toTL.isTrivial())
+    if (toTL.isTrivial(&SGF.F))
       return ManagedValue::forTrivialAddressRValue(toAddr);
 
     // Initialize the +1 result buffer without taking the incoming value. The
@@ -1734,7 +1752,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
     // <T> () async throws -> T
     CanType functionTy =
-        GenericFunctionType::get(genericSig, {}, genericResult, extInfo)
+        GenericFunctionType::get(genericSig, {}, {}, genericResult, extInfo)
             ->getCanonicalType();
     AbstractionPattern origParamType(genericSig, functionTy);
     CanType substParamType = fnArg.getSubstRValueType();
@@ -1876,7 +1894,7 @@ SILGenFunction::emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
   bool hasSending = ctx.LangOpts.hasFeature(Feature::SendingArgsAndResults);
   CanType functionType =
       FunctionType::get(
-          {}, ctx.TheEmptyTupleType,
+          {}, {}, ctx.TheEmptyTupleType,
           ASTExtInfo().withAsync().withThrows().withSendable(!hasSending))
           ->getCanonicalType();
 

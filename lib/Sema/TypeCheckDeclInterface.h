@@ -17,6 +17,15 @@
 // `Derived` must provide:
 //   void checkType(Type type, const TypeRepr *typeRepr, const Decl *context);
 //
+// The other `check...` methods are optional customization points. Each one
+// identifies a particular kind of position in a declaration's interface, and
+// each forwards to `checkType` by default, so a `Derived` that draws no
+// distinction between positions needs to override none of them.
+//
+// `checkThrownErrorType` is the position of a typed throws clause. A `Derived`
+// that overrides it must account for the implicit conformance of the thrown
+// error type to `Error`, which no `TypeRepr` in the declaration spells out.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SEMA_TYPE_CHECK_DECL_INTERFACE_H
@@ -253,7 +262,8 @@ public:
     }
 
     if (auto thrownTypeRepr = fn->getThrownTypeRepr()) {
-      asDerived().checkType(fn->getThrownInterfaceType(), thrownTypeRepr, fn);
+      asDerived().checkThrownErrorType(fn->getThrownInterfaceType(),
+                                       thrownTypeRepr, fn);
     }
   }
 
@@ -311,6 +321,15 @@ public:
   /// generic context's trailing where clause.
   void checkGenericRequirementType(Type type, const TypeRepr *typeRepr,
                                    const Decl *context) {
+    asDerived().checkType(type, typeRepr, context);
+  }
+
+  /// The thrown error type written in a function's typed throws clause. Such a
+  /// clause also requires the thrown error type to conform to `Error`, so a
+  /// `Derived` that checks conformances must check that one here. It has no
+  /// `TypeRepr` of its own anywhere in the declaration.
+  void checkThrownErrorType(Type type, const TypeRepr *typeRepr,
+                            const Decl *context) {
     asDerived().checkType(type, typeRepr, context);
   }
 

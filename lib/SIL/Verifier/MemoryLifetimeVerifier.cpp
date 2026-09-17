@@ -406,7 +406,10 @@ bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
         // This can happen if a store to an unused inout has been eliminated at
         // a call site and afterwards the callee is specialized and therefore
         // doesn't have the required side-effects computed, yet.
-        return callee->hasArgumentEffects() && callee->argumentMayRead(op, a);
+        // Note that this must not check `hasArgumentEffects()`: a specialized
+        // function can inherit _escape_ effects from its generic function
+        // without having any side-effects computed.
+        return callee->hasComputedSideEffects() && callee->argumentMayRead(op, a);
       });
 }
 
@@ -419,7 +422,7 @@ bool MemoryLifetimeVerifier::applyMayNotWrite(Operand *argOp, SILValue addr) {
       /*unknownCalleesResult=*/true,
       /*noAddressResult=*/true,
       [](SILFunction *callee, Operand *op, SILValue a) {
-        return !callee->hasArgumentEffects() || callee->argumentMayWrite(op, a);
+        return !callee->hasComputedSideEffects() || callee->argumentMayWrite(op, a);
       });
 }
 

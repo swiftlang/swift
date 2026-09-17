@@ -9,11 +9,11 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -source-filename=x -cxx-interoperability-mode=default -Xcc -DINCMOD | %FileCheck %s
 
 // Test through the use of the bridging header
-// RUN: %target-swift-frontend -emit-ir -I %t -import-objc-header %t/Inputs/header.h -cxx-interoperability-mode=default -DBRIDGING_HEADER_TEST -disable-availability-checking %t/SwiftMod.swift
+// RUN: %target-swift-frontend -emit-ir -I %t -import-objc-header %t/Inputs/header.h -cxx-interoperability-mode=default -DBRIDGING_HEADER_TEST -target %target-swift-5.8-abi-triple %t/SwiftMod.swift
 
 // Precompile the bridging header and test the use of that.
 // RUN: %target-swift-frontend -emit-pch -I %t -pch-output-dir %t/pch %t/Inputs/header.h -cxx-interoperability-mode=default
-// RUN: %target-swift-frontend -emit-ir -I %t -pch-output-dir %t/pch -import-objc-header %t/Inputs/header.h -cxx-interoperability-mode=default -DBRIDGING_HEADER_TEST -disable-availability-checking %t/SwiftMod.swift
+// RUN: %target-swift-frontend -emit-ir -I %t -pch-output-dir %t/pch -import-objc-header %t/Inputs/header.h -cxx-interoperability-mode=default -DBRIDGING_HEADER_TEST -target %target-swift-5.8-abi-triple %t/SwiftMod.swift
 
 
 //--- SwiftMod.swift

@@ -21,11 +21,8 @@
 #include "Initialization.h"
 #include "SILGenFunction.h"
 #include "swift/AST/CanTypeVisitor.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/AbstractionPattern.h"
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
@@ -346,7 +343,7 @@ static void copyOrInitValuesInto(Initialization *init,
 
   if (init->canPerformInPlaceInitialization() &&
       init->isInPlaceInitializationOfGlobal() &&
-      SGF.getTypeLowering(type).isTrivial()) {
+      SGF.getTypeLowering(type).isTrivial(&SGF.F)) {
     // Implode tuples in initialization of globals if they are
     // of trivial types.
     implodeTuple = true;
@@ -744,6 +741,17 @@ RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
   borrowedValues.reserve(values.size());
   for (ManagedValue v : values) {
     borrowedValues.emplace_back(v.borrow(SGF, loc));
+  }
+  return RValue(SGF, std::move(borrowedValues), type, elementsToBeAdded);
+}
+
+RValue RValue::formalAccessBorrow(SILGenFunction &SGF, SILLocation loc) const & {
+  assert((isComplete() || isInSpecialState()) &&
+         "can't borrow incomplete rvalue");
+  std::vector<ManagedValue> borrowedValues;
+  borrowedValues.reserve(values.size());
+  for (ManagedValue v : values) {
+    borrowedValues.emplace_back(v.formalAccessBorrow(SGF, loc));
   }
   return RValue(SGF, std::move(borrowedValues), type, elementsToBeAdded);
 }

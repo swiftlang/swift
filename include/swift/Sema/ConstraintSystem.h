@@ -20,7 +20,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/NameLookup.h"
@@ -51,7 +50,6 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
-#include <functional>
 
 namespace swift {
 
@@ -3156,6 +3154,13 @@ public:
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator);
 
+  /// Match the execution semantics between two functions currently
+  /// represented by `@called(once)` bit.
+  SolutionKind
+  matchFunctionExecutionSemantics(FunctionType *func1, FunctionType *func2,
+                                  ConstraintKind kind, TypeMatchOptions flags,
+                                  ConstraintLocatorBuilder locator);
+
   /// Subroutine of \c matchTypes(), which matches up two function
   /// types.
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
@@ -4076,6 +4081,10 @@ public:
   /// Determine whether given locator represents an argument to declaration
   /// imported from C/ObjectiveC.
   bool isArgumentOfImportedDecl(ConstraintLocatorBuilder locator);
+
+  /// Determine whether the given locator represents an argument to a
+  /// subscript.
+  bool isArgumentOfSubscript(ConstraintLocatorBuilder locator);
 
   /// Visit each subexpression that will be part of the constraint system
   /// of the given expression, including those in closure bodies that will be

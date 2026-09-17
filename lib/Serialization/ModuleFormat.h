@@ -21,10 +21,8 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
-#include "swift/AST/Types.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/Bitcode/BitcodeConvenience.h"
-#include "llvm/Bitstream/BitCodes.h"
 
 namespace swift {
 class ModuleFile;
@@ -58,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1022; // @_target attribute
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1027; // hasOwnershipForTrivialValues bit in SILFunction
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -318,6 +316,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   KeyPathAccessorSetter,
   KeyPathAccessorEquals,
   KeyPathAccessorHash,
+  COMMethod,
 };
 using SILFunctionTypeRepresentationField = BCFixed<5>;
 
@@ -1412,7 +1411,8 @@ namespace decls_block {
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result
-    BCFixed<1>                       // called once
+    BCFixed<1>,                      // called once
+    BCFixed<1>                       // coroutine?
     // trailed by parameters
     // Optionally lifetime dependence info
   );
@@ -1432,6 +1432,12 @@ namespace decls_block {
                      BCFixed<1>,              // constValue
                      BCFixed<1>,              // sending
                      BCFixed<1>               // addressable
+                     >;
+
+  using FunctionYieldLayout =
+      BCRecordLayout<FUNCTION_YIELD,
+                     TypeIDField,             // type
+                     ParamDeclSpecifierField // inout, shared or owned?
                      >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
@@ -1515,6 +1521,7 @@ namespace decls_block {
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result,
     BCFixed<1>,                      // called once
+    BCFixed<1>,                      // coroutine?
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters

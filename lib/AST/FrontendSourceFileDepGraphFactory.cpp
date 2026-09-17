@@ -23,9 +23,6 @@
 #include "swift/AST/AbstractSourceFileDepGraphFactory.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
 #include "swift/AST/Module.h"
@@ -33,17 +30,9 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
-#include "swift/Demangling/Demangle.h"
-#include "swift/Frontend/FrontendOptions.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
 
@@ -336,6 +325,7 @@ private:
                                   const ExtensionDecl *ED = nullptr) {
     allNominals.push_back(NTD);
     potentialMemberHolders.push_back(NTD);
+    // FIXME: Does not handle peer macros.
     findNominalsAndOperatorsInMembers(ED ? ED->getMembers()
                                          : NTD->getMembers());
   }
@@ -417,8 +407,9 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDecls() {
 
   // Many kinds of Decls become top-level depends.
 
-  DeclFinder declFinder(SF->getTopLevelDecls(),
-                        [this](VisibleDeclConsumer &consumer) {
+  SmallVector<Decl *, 32> TopLevelDecls;
+  SF->getTopLevelDeclsWithAuxiliaryDecls(TopLevelDecls);
+  DeclFinder declFinder(TopLevelDecls, [this](VisibleDeclConsumer &consumer) {
     SF->lookupClassMembers({}, consumer);
   });
 
@@ -603,7 +594,7 @@ void ModuleDepGraphFactory::addAllDefinedDecls() {
   // Many kinds of Decls become top-level depends.
 
   SmallVector<Decl *, 32> TopLevelDecls;
-  Mod->getTopLevelDecls(TopLevelDecls);
+  Mod->getTopLevelDeclsWithAuxiliaryDecls(TopLevelDecls);
   DeclFinder declFinder(TopLevelDecls,
                         [this](VisibleDeclConsumer &consumer) {
                           return Mod->lookupClassMembers({}, consumer);

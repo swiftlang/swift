@@ -27,6 +27,12 @@
   // expected-note@-3 {{extension of 'MacOSUnavailableClass3' has been explicitly marked unavailable here}} {{none}}
 }
 
+@available(*, unavailable, message: "use something else")
+@objc @implementation extension MacOSUnavailableClass4 {
+  // expected-error@-1 {{'@objc @implementation' extension cannot implement class 'MacOSUnavailableClass4' because it is unavailable}} {{none}}
+  // expected-note@-3 {{extension of 'MacOSUnavailableClass4' has been explicitly marked unavailable here}} {{none}}
+}
+
 // The class extension in the header does not have availability of its own, so
 // matching the availability of the class is sufficient.
 @available(macOS 99.0, *)

@@ -216,7 +216,7 @@ do {
   struct Test {
     init(_: inout Int...) {} // expected-error {{'inout' must not be used on variadic parameters}}
     func test(_: inout String...) {} // expected-error {{'inout' must not be used on variadic parameters}}
-    subscript(_: inout Double...) -> Bool { true } // expected-error {{'inout' may only be used on function or initializer parameters}}
+    subscript(_: inout Double...) -> Bool { true } // expected-error {{'inout' must not be used on variadic parameters}}
   }
 }
 

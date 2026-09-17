@@ -28,9 +28,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/QuotedString.h"
-#include "llvm/ADT/APInt.h"
 
 using namespace swift;
 

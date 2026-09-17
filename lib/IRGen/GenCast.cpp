@@ -32,7 +32,6 @@
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
