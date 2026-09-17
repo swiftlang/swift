@@ -1163,196 +1163,223 @@ extension Unicode {
   /// otherwise assigned a value take a default based on their code point, so
   /// this classification is defined for every scalar.
   @available(SwiftStdlib 6.5, *)
-  public enum BidiClass: Sendable {
+  @frozen
+  public struct BidiClass: Hashable, RawRepresentable, Sendable {
 
     /// A strong left-to-right character.
     ///
     /// This value corresponds to the bidirectional class `Left_To_Right`
     /// (abbreviated `L`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case leftToRight
+    @export(implementation)
+    public static var leftToRight: BidiClass { BidiClass(rawValue: 0) }
 
     /// A strong right-to-left (non-Arabic-type) character.
     ///
     /// This value corresponds to the bidirectional class `Right_To_Left`
     /// (abbreviated `R`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case rightToLeft
+    @export(implementation)
+    public static var rightToLeft: BidiClass { BidiClass(rawValue: 1) }
 
     /// A strong right-to-left (Arabic-type) character.
     ///
     /// This value corresponds to the bidirectional class `Arabic_Letter`
     /// (abbreviated `AL`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case arabicLetter
+    @export(implementation)
+    public static var arabicLetter: BidiClass { BidiClass(rawValue: 2) }
 
     /// A European number.
     ///
     /// This value corresponds to the bidirectional class `European_Number`
     /// (abbreviated `EN`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case europeanNumber
+    @export(implementation)
+    public static var europeanNumber: BidiClass { BidiClass(rawValue: 3) }
 
     /// A European number separator.
     ///
     /// This value corresponds to the bidirectional class `European_Separator`
     /// (abbreviated `ES`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case europeanSeparator
+    @export(implementation)
+    public static var europeanSeparator: BidiClass { BidiClass(rawValue: 4) }
 
     /// A European number terminator.
     ///
     /// This value corresponds to the bidirectional class `European_Terminator`
     /// (abbreviated `ET`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case europeanTerminator
+    @export(implementation)
+    public static var europeanTerminator: BidiClass { BidiClass(rawValue: 5) }
 
     /// An Arabic number.
     ///
     /// This value corresponds to the bidirectional class `Arabic_Number`
     /// (abbreviated `AN`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case arabicNumber
+    @export(implementation)
+    public static var arabicNumber: BidiClass { BidiClass(rawValue: 6) }
 
     /// A common number separator.
     ///
     /// This value corresponds to the bidirectional class `Common_Separator`
     /// (abbreviated `CS`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case commonSeparator
+    @export(implementation)
+    public static var commonSeparator: BidiClass { BidiClass(rawValue: 7) }
 
     /// A nonspacing mark.
     ///
     /// This value corresponds to the bidirectional class `Nonspacing_Mark`
     /// (abbreviated `NSM`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case nonspacingMark
+    @export(implementation)
+    public static var nonspacingMark: BidiClass { BidiClass(rawValue: 8) }
 
     /// A boundary neutral.
     ///
     /// This value corresponds to the bidirectional class `Boundary_Neutral`
     /// (abbreviated `BN`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case boundaryNeutral
+    @export(implementation)
+    public static var boundaryNeutral: BidiClass { BidiClass(rawValue: 9) }
 
     /// A paragraph separator.
     ///
     /// This value corresponds to the bidirectional class `Paragraph_Separator`
     /// (abbreviated `B`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case paragraphSeparator
+    @export(implementation)
+    public static var paragraphSeparator: BidiClass { BidiClass(rawValue: 10) }
 
     /// A segment separator.
     ///
     /// This value corresponds to the bidirectional class `Segment_Separator`
     /// (abbreviated `S`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case segmentSeparator
+    @export(implementation)
+    public static var segmentSeparator: BidiClass { BidiClass(rawValue: 11) }
 
     /// A whitespace character.
     ///
     /// This value corresponds to the bidirectional class `White_Space`
     /// (abbreviated `WS`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case whitespace
+    @export(implementation)
+    public static var whitespace: BidiClass { BidiClass(rawValue: 12) }
 
     /// A neutral character of another type.
     ///
     /// This value corresponds to the bidirectional class `Other_Neutral`
     /// (abbreviated `ON`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case otherNeutral
+    @export(implementation)
+    public static var otherNeutral: BidiClass { BidiClass(rawValue: 13) }
 
     /// A left-to-right embedding format character.
     ///
     /// This value corresponds to the bidirectional class
     /// `Left_To_Right_Embedding` (abbreviated `LRE`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case leftToRightEmbedding
+    @export(implementation)
+    public static var leftToRightEmbedding: BidiClass {
+      BidiClass(rawValue: 14)
+    }
 
     /// A left-to-right override format character.
     ///
     /// This value corresponds to the bidirectional class
     /// `Left_To_Right_Override` (abbreviated `LRO`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case leftToRightOverride
+    @export(implementation)
+    public static var leftToRightOverride: BidiClass {
+      BidiClass(rawValue: 15)
+    }
 
     /// A right-to-left embedding format character.
     ///
     /// This value corresponds to the bidirectional class
     /// `Right_To_Left_Embedding` (abbreviated `RLE`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case rightToLeftEmbedding
+    @export(implementation)
+    public static var rightToLeftEmbedding: BidiClass {
+      BidiClass(rawValue: 16)
+    }
 
     /// A right-to-left override format character.
     ///
     /// This value corresponds to the bidirectional class
     /// `Right_To_Left_Override` (abbreviated `RLO`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case rightToLeftOverride
+    @export(implementation)
+    public static var rightToLeftOverride: BidiClass {
+      BidiClass(rawValue: 17)
+    }
 
     /// A pop directional format character.
     ///
     /// This value corresponds to the bidirectional class
     /// `Pop_Directional_Format` (abbreviated `PDF`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case popDirectionalFormat
+    @export(implementation)
+    public static var popDirectionalFormat: BidiClass {
+      BidiClass(rawValue: 18)
+    }
 
     /// A left-to-right isolate format character.
     ///
     /// This value corresponds to the bidirectional class
     /// `Left_To_Right_Isolate` (abbreviated `LRI`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case leftToRightIsolate
+    @export(implementation)
+    public static var leftToRightIsolate: BidiClass {
+      BidiClass(rawValue: 19)
+    }
 
     /// A right-to-left isolate format character.
     ///
     /// This value corresponds to the bidirectional class
     /// `Right_To_Left_Isolate` (abbreviated `RLI`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case rightToLeftIsolate
+    @export(implementation)
+    public static var rightToLeftIsolate: BidiClass {
+      BidiClass(rawValue: 20)
+    }
 
     /// A first strong isolate format character.
     ///
     /// This value corresponds to the bidirectional class `First_Strong_Isolate`
     /// (abbreviated `FSI`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case firstStrongIsolate
+    @export(implementation)
+    public static var firstStrongIsolate: BidiClass {
+      BidiClass(rawValue: 21)
+    }
 
     /// A pop directional isolate format character.
     ///
     /// This value corresponds to the bidirectional class
     /// `Pop_Directional_Isolate` (abbreviated `PDI`) in the
     /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
-    case popDirectionalIsolate
+    @export(implementation)
+    public static var popDirectionalIsolate: BidiClass {
+      BidiClass(rawValue: 22)
+    }
 
-    internal init(rawValue: UInt8) {
-      switch rawValue {
-      case 0: self = .leftToRight
-      case 1: self = .rightToLeft
-      case 2: self = .arabicLetter
-      case 3: self = .europeanNumber
-      case 4: self = .europeanSeparator
-      case 5: self = .europeanTerminator
-      case 6: self = .arabicNumber
-      case 7: self = .commonSeparator
-      case 8: self = .nonspacingMark
-      case 9: self = .boundaryNeutral
-      case 10: self = .paragraphSeparator
-      case 11: self = .segmentSeparator
-      case 12: self = .whitespace
-      case 13: self = .otherNeutral
-      case 14: self = .leftToRightEmbedding
-      case 15: self = .leftToRightOverride
-      case 16: self = .rightToLeftEmbedding
-      case 17: self = .rightToLeftOverride
-      case 18: self = .popDirectionalFormat
-      case 19: self = .leftToRightIsolate
-      case 20: self = .rightToLeftIsolate
-      case 21: self = .firstStrongIsolate
-      case 22: self = .popDirectionalIsolate
-      default: fatalError("Unknown bidi class")
-      }
+    /// The raw integer value of the bidirectional class.
+    ///
+    /// The raw values are assigned by the standard library and are stable, but
+    /// are not defined by the Unicode Standard, which assigns no integers to
+    /// `Bidi_Class` values.
+    public let rawValue: UInt8
+
+    /// Creates a new bidirectional class with the given raw integer value.
+    ///
+    /// - Parameter rawValue: The raw integer value of the bidirectional class.
+    public init(rawValue: UInt8) {
+      self.rawValue = rawValue
     }
   }
 }
