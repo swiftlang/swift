@@ -10,7 +10,7 @@
 - ``Swift/Task/init(name:executorPreference:priority:operation:)-81pay``
 - ``Swift/Task/currentPriority``
 - ``Swift/Task/basePriority``
-- ``Swift/withTaskPriorityEscalationHandler(operation:onPriorityEscalated:isolation:)``
+- ``Swift/withTaskPriorityEscalationHandler(operation:onPriorityEscalated:)``
 
 ### Creating a Detached Task
 
@@ -43,12 +43,13 @@
 - ``Swift/Task/isCancelled-swift.property``
 - ``Swift/Task/isCancelled-swift.type.property``
 - ``Swift/Task/checkCancellation()``
-- ``Swift/withTaskCancellationHandler(operation:onCancel:)``
+- ``Swift/withTaskCancellationHandler(operation:onCancel:)-1dnzh``
+- ``Swift/withTaskCancellationHandler(operation:onCancel:)-85m2g``
 - ``Swift/withTaskCancellationHandler(operation:onCancel:isolation:)``
 
 ### Shielding Tasks from Cancellation
 
-- ``Swift/hasActiveCancellationShield``
+- ``Swift/Task/hasActiveCancellationShield``
 - ``Swift/withTaskCancellationShield(operation:)-2lzl8``
 - ``Swift/withTaskCancellationShield(operation:)-8zlgh``
 
