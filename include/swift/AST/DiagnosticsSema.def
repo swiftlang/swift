@@ -9320,6 +9320,15 @@ GROUPED_WARNING(open_existential_in_embedded_swift,
                 "cannot open existential type %0 in Embedded Swift",
                 (Type))
 
+GROUPED_WARNING(open_existential_argument_in_embedded_swift,
+                EmbeddedRestrictions, none,
+                "cannot open existential type %0 when passing it as an "
+                "argument to %kind1 in Embedded Swift",
+                (Type, const ValueDecl *))
+NOTE(open_existential_argument_coerce_in_embedded_swift, none,
+     "coerce the argument to %0 to pass the existential value without opening "
+     "it", (Type))
+
 GROUPED_ERROR(self_referential_superclass_in_embedded_swift,
               EmbeddedRestrictions, none,
               "class %0 cannot inherit from %1 in Embedded Swift because "

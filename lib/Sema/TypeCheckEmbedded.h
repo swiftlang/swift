@@ -25,6 +25,7 @@ class AbstractFunctionDecl;
 class DeclContext;
 struct DiagnosticBehavior;
 class CheckedCastExpr;
+class Expr;
 class SourceLoc;
 class Type;
 class ValueDecl;
@@ -51,6 +52,16 @@ void checkEmbeddedRestrictionsInSignature(const AbstractFunctionDecl *func);
 void diagnoseGenericMemberOfExistentialInEmbedded(
     const DeclContext *dc, SourceLoc loc,
     Type baseType, const ValueDecl *member);
+
+/// Diagnose the implicit opening of an existential argument, which Embedded
+/// Swift cannot support because the callee would have to be specialized for
+/// the opened archetype.
+///
+/// When the existential could have been passed without opening it, suggests
+/// coercing the argument with a fix-it.
+void diagnoseOpenedExistentialArgumentInEmbedded(
+    const DeclContext *dc, Expr *argExpr, Type existentialType,
+    ValueDecl *callee, unsigned paramIdx);
 
 /// Diagnose dynamic casts (is/as?/as!) to a type, which is not always available
 /// in Embedded Swift.
