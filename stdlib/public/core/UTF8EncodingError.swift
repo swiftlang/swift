@@ -257,8 +257,8 @@ extension UTF8 {
               sequenceEnd = adjustedRange.upperBound
             } else {
               let leading = unsafe bufPtr[error.byteOffsets.lowerBound]
-              sequenceEnd =
-                adjustedRange.lowerBound + _utf8ScalarLength(leading)
+              let length = leading > 0xFD ? 1 : _utf8ScalarLength(leading)
+              sequenceEnd = adjustedRange.lowerBound + length
             }
           }
           let adjustedErr = UTF8.ValidationError(kind, adjustedRange)

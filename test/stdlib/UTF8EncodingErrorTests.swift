@@ -272,6 +272,19 @@ suite.test("UTF8Span/encoding errors")
     [.invalidNonSurrogateCodePointByte(at: 1), // FE
     ]
   )
+  test(
+    [0xFD, 0x80, 0x80],
+    [.invalidNonSurrogateCodePointByte(at: 0),                    // FD
+     .invalidNonSurrogateCodePointByte(at: 1, errorStart: false), // 80
+     .invalidNonSurrogateCodePointByte(at: 2, errorStart: false), // 80
+    ]
+  )
+  test(
+    [0xFF, 0x80],
+    [.invalidNonSurrogateCodePointByte(at: 0), // FF
+     .unexpectedContinuationByte(at: 1),       // 80, extra
+    ]
+  )
 
   // Unexpected continuation bytes
   test(
