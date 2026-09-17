@@ -4909,7 +4909,7 @@ function Build-LLBuild([Hashtable] $Platform,
     }
 }
 
-function Test-LLBuild {
+function Test-LLBuild([Hashtable] $Platform) {
   # Build additional llvm executables needed by tests
   Invoke-IsolatingEnvVars {
     Invoke-VsDevShell $BuildPlatform
@@ -4926,12 +4926,15 @@ function Test-LLBuild {
       -Src $SourceCache\llbuild `
       -Bin (Get-ProjectBinaryCache $BuildPlatform LLBuild) `
       -Platform $Platform `
-      -CXXCompiler $Compilers.Host.CXX `
+      -CXXCompiler $Compilers.Stage1.CXX `
       -SwiftCompiler $Compilers.Stage1.Swift `
       -SwiftSDK (Get-SwiftSDK -OS $BuildPlatform.OS) `
       -BuildTargets default,test-llbuild `
       -Defines @{
         BUILD_SHARED_LIBS = "YES";
+        # Build-LLBuild configures this same directory with BUILD_TESTING=NO,
+        # which drops the tests subdirectory and the test-llbuild target.
+        BUILD_TESTING = "YES";
         FILECHECK_EXECUTABLE = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin", "FileCheck.exe"));
         LIT_EXECUTABLE = "$SourceCache\llvm-project\llvm\utils\lit\lit.py";
         LLBUILD_SUPPORT_BINDINGS = "Swift";
