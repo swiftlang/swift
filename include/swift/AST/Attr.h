@@ -969,6 +969,9 @@ private:
   AvailabilityDomainOrIdentifier DomainOrIdentifier;
   const SourceLoc DomainLoc;
 
+  /// Location of the availability macro expanded to create this attribute.
+  SourceLoc MacroLoc;
+
   const StringRef Message;
   const StringRef Rename;
 
@@ -989,6 +992,12 @@ public:
   }
 
   SourceLoc getDomainLoc() const { return DomainLoc; }
+
+  /// Returns the location of the availability macro that was expanded to create
+  /// this attribute, or an invalid location if the attribute did not come from
+  /// a `-define-availability` argument.
+  SourceLoc getMacroLoc() const { return MacroLoc; }
+  void setMacroLoc(SourceLoc loc) { MacroLoc = loc; }
 
   /// Returns the parsed version for `introduced:`.
   std::optional<llvm::VersionTuple> getRawIntroduced() const {

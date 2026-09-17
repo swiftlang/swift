@@ -2607,12 +2607,15 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 }
 
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
-  return new (C) AvailableAttr(
+  auto *attr = new (C) AvailableAttr(
       implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
       DomainOrIdentifier, implicit ? SourceLoc() : DomainLoc, getKind(),
       Message, Rename, Introduced, implicit ? SourceRange() : IntroducedRange,
       Deprecated, implicit ? SourceRange() : DeprecatedRange, Obsoleted,
       implicit ? SourceRange() : ObsoletedRange, implicit, isSPI());
+  if (!implicit)
+    attr->setMacroLoc(MacroLoc);
+  return attr;
 }
 
 bool AvailableAttr::isEquivalent(const AvailableAttr *other,
