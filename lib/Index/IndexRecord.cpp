@@ -705,8 +705,6 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
 
   auto &fileMgr = clangCI.getFileManager();
   bool isSystem = module->isNonUserModule();
-  // Use the identity of the compiler that produced the index unit, independent
-  // of the selected Swift language compatibility mode.
   std::string swiftVersion = version::getSwiftFullVersion();
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
   // For indexing serialized modules 'debug compilation' is irrelevant, so
@@ -767,8 +765,6 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
   if (!mainFile)
     return false;
 
-  // Use the identity of the compiler that produced the index unit, independent
-  // of the selected Swift language compatibility mode.
   std::string swiftVersion = version::getSwiftFullVersion();
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
   IndexUnitWriter unitWriter(
