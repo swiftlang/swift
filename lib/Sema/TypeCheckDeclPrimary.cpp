@@ -2444,10 +2444,10 @@ public:
     }
   }
 
-  void visitUsingDecl(UsingDecl *UD) {
-    if (!UD->getDeclContext()->isModuleScopeContext()) {
-      // 'using' is only valid at file scope.
-      UD->diagnose(diag::decl_inner_scope);
+  void visitFileDefaultDecl(FileDefaultDecl *FDD) {
+    if (!FDD->getDeclContext()->isModuleScopeContext()) {
+      // 'default' is only valid at file scope.
+      FDD->diagnose(diag::decl_inner_scope);
     }
   }
 

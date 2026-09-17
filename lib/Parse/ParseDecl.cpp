@@ -6114,6 +6114,7 @@ bool swift::isKeywordPossibleDeclStart(const LangOptions &options,
   case tok::kw_subscript:
   case tok::kw_typealias:
   case tok::kw_var:
+  case tok::kw_default:
   case tok::pound:
   case tok::pound_if:
   case tok::pound_warning:
@@ -6227,6 +6228,14 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
   // case, not an enum case declaration.
   if (Tok.is(tok::kw_case)) {
     return !isa<AbstractFunctionDecl>(CurDeclContext);
+  }
+
+  // 'default' is a file-level default when it isn't followed by a colon, and is
+  // outside a switch.
+  if (Tok.is(tok::kw_default)) {
+    const Token &Tok2 = peekToken();
+
+    return !Tok2.is(tok::colon);
   }
 
   // The protocol keyword needs more checking to reject "protocol<Int>".
@@ -6417,17 +6426,6 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
       return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
                                 /*hadAttrsOrModifiers=*/true);
     }
-  }
-
-  // `using @<attribute>` or `using <identifier>`.
-  if (Tok.isContextualKeyword("using")) {
-    // `using` declarations don't support attributes or modifiers.
-    if (hadAttrsOrModifiers)
-      return false;
-
-    return !Tok2.isAtStartOfLine() &&
-           (Tok2.is(tok::at_sign) || Tok2.is(tok::identifier) ||
-            Tok2.is(tok::code_complete));
   }
 
   // If the next token is obviously not the start of a decl, bail early.
@@ -6709,6 +6707,9 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
   case tok::kw_func:
     parseFunc(/*HasFuncKeyword=*/true);
     break;
+  case tok::kw_default:
+      DeclResult = parseDeclFileDefault(Flags, Attributes);
+      break;
   case tok::kw_subscript: {
     llvm::SmallVector<Decl *, 4> Entries;
     DeclResult = parseDeclSubscript(StaticLoc, StaticSpelling, Flags,
@@ -6782,17 +6783,6 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
       Tok.setKind(tok::contextual_keyword);
       DeclResult = parseDeclMacro(Attributes);
       break;
-    }
-
-    // `using @<attribute>` or `using <identifier>`
-    if (Tok.isContextualKeyword("using")) {
-      auto nextToken = peekToken();
-      if (!nextToken.isAtStartOfLine() &&
-          (nextToken.is(tok::at_sign) || nextToken.is(tok::identifier) ||
-           nextToken.is(tok::code_complete))) {
-        DeclResult = parseDeclUsing(Flags, Attributes);
-        break;
-      }
     }
 
     if (Flags.contains(PD_HasContainerType) &&
@@ -7169,34 +7159,42 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   return DCC.fixupParserResult(ID);
 }
 
-/// Parse an `using` declaration.
+/// Parse a `default` declaration.
 ///
 /// \verbatim
-///   decl-using:
-///     'using' (@<attribute> | <modifier>)
+///   decl-file-default:
+///     'default' (@<attribute> | <modifier>)
 /// \endverbatim
-ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
-                                               DeclAttributes &Attributes) {
-  assert(Tok.isContextualKeyword("using"));
+ParserResult<FileDefaultDecl>
+Parser::parseDeclFileDefault(ParseDeclOptions Flags,
+                             DeclAttributes &Attributes) {
   DebuggerContextChange DCC(*this);
   ParserStatus Status;
 
+  SourceLoc DefaultLoc = consumeToken(tok::kw_default);
+
   if (!Context.LangOpts.hasFeature(Feature::DefaultIsolationPerFile)) {
-    diagnose(Tok, diag::experimental_using_decl_disabled);
+    diagnose(DefaultLoc, diag::experimental_file_default_disabled);
   }
 
   if (!Attributes.isEmpty()) {
     diagnose((*Attributes.begin())->getStartLoc(),
-             diag::using_decl_rejects_attributes);
+             diag::file_default_rejects_attributes);
   }
 
-  SourceLoc UsingLoc = consumeToken();
+  // We can't go to the next line or we can steal attributes / modifiers from
+  // following decl and introduce cascading errors due to bad recovery.
+  if (Tok.isAtStartOfLine()) {
+    diagnose(Tok, diag::file_default_invalid_specifier);
+    Status.setIsParseError();
+    return Status;
+  }
 
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletionCallbacks) {
-      CodeCompletionCallbacks->completeUsingDecl();
+      CodeCompletionCallbacks->completeFileDefaultDecl();
     }
-    return makeParserCodeCompletionStatus();
+    return makeParserCodeCompletionResult<FileDefaultDecl>();
   }
 
   DeclAttributes specifiedAttributes;
@@ -7212,7 +7210,8 @@ ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
     Status |= parseNewDeclAttribute(specifiedAttributes, /*AtLoc=*/{},
                                     DeclAttrKind::Nonisolated);
   } else {
-    diagnose(Tok, diag::using_decl_invalid_specifier);
+    // A keyword, punctuation, or an identifier that isn't 'nonisolated'.
+    diagnose(Tok, diag::file_default_invalid_specifier);
     Status.setIsParseError();
     return Status;
   }
@@ -7227,9 +7226,9 @@ ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
     return Status;
   }
 
-  auto *UD =
-      UsingDecl::create(Context, UsingLoc, specifiedAttributes, CurDeclContext);
-  return DCC.fixupParserResult(Status, UD);
+  auto *FDD = FileDefaultDecl::create(Context, DefaultLoc, specifiedAttributes,
+                                      CurDeclContext);
+  return DCC.fixupParserResult(Status, FDD);
 }
 
 /// Parse an inheritance clause.

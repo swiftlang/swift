@@ -72,7 +72,7 @@ class PreInverseGenericsAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
 class TypeLoc;
-class UsingDecl;
+class FileDefaultDecl;
 class Witness;
 class TypeResolution;
 struct TypeWitnessAndDecl;
@@ -5754,9 +5754,9 @@ public:
   void cacheResult(std::optional<SemanticAvailabilitySpec> value) const;
 };
 
-/// Gathers the file-level defaults declared by `using ...` at the top of a
+/// Gathers the file-level defaults declared by `default ...` at the top of a
 /// source file, and diagnoses any issues that would affect results. Other
-/// validation in `visitUsingDecl` instead.
+/// validation in `visitFileDefaultDecl` instead.
 class FileDefaultsRequest
     : public SimpleRequest<FileDefaultsRequest,
                            FileDefaults(const SourceFile *),
@@ -5773,7 +5773,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Materializes file-level `using @available(...)` defaults onto \p decl's
+/// Materializes file-level `default @available(...)` defaults onto \p decl's
 /// attribute list by tail-appending implicit clones of each applicable
 /// availability attr. Must only be called on top-level value decls and
 /// extensions.
