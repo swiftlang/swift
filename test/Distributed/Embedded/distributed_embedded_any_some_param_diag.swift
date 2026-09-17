@@ -3,6 +3,7 @@
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedDistributed
+// REQUIRES: optimized_stdlib
 
 // Embedded `@Resolvable` support mirrors the shapes non-embedded accepts:
 // `any P` / `some P` parameters and `any P` returns where `P` is `@Resolvable`
