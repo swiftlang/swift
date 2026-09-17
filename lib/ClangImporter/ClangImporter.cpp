@@ -2323,8 +2323,13 @@ static void publishBuiltPCH(clang::CompilerInstance &instance,
   if (!buffer)
     return;
 
+  // Making an explicit copy of the underlying memory mapped file so any
+  // modification to the PCH file on disk will not affect module cache.
+  auto copy = llvm::MemoryBuffer::getMemBufferCopy(
+      (*buffer)->getBuffer(), (*buffer)->getBufferIdentifier());
+
   instance.getModuleCache().getInMemoryModuleCache().addBuiltPCM(
-      pchPath, std::move(*buffer), status->getSize(),
+      pchPath, std::move(copy), status->getSize(),
       llvm::sys::toTimeT(status->getLastModificationTime()));
 }
 
