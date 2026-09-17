@@ -198,7 +198,7 @@ void simple_display(llvm::raw_ostream &out, ConflictReason reason);
 /// this does not give a completely accurate answer, yet.
 ConflictReason checkConversion(ConformanceCache &cache,
                                Type lhs, Type rhs,
-                               GenericSignature sig);
+                               GenericSignature sig = GenericSignature());
 
 /// More meaningful overload for when you want a boolean result.
 bool canConvertTo(ConformanceCache &cache,
