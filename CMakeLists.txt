@@ -258,6 +258,10 @@ option(SWIFT_BUILD_COMPILER_DYLIB
   "Builds a swift compiler dylib for tools to link against"
   FALSE)
 
+if (SWIFT_BUILD_COMPILER_DYLIB AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  message(FATAL_ERROR "SWIFT_BUILD_COMPILER_DYLIB is only supported on Darwin platforms currently.")
+endif()
+
 # The SDK overlay is provided by the SDK itself on Darwin platforms.
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
   set(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY_default FALSE)
