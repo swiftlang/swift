@@ -1882,6 +1882,7 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   if (NameMatch == Map.Impl.end())
     return makeParserSuccess(); // No match, it could be a standard platform.
 
+  SourceLoc MacroLoc = Tok.getLoc();
   consumeToken();
 
   llvm::VersionTuple Version;
@@ -1901,7 +1902,6 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
 
   // Make a copy of the specs to add the macro source location
   // for the diagnostic about the use of macros in inlinable code.
-  SourceLoc MacroLoc = Tok.getLoc();
   for (auto *Spec : VersionMatch->getSecond()) {
     auto SpecCopy = Spec->clone(Context);
     SpecCopy->setMacroLoc(MacroLoc);
