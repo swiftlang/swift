@@ -3330,9 +3330,78 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
   }
 }
 
+/// Give \p decl the dependencies of the declaration \p source that it forwards
+/// to. A member operator becomes a static function that takes 'self' as its
+/// leading parameter, which shifts the source's dependence indices; every other
+/// forwarding declaration has the same shape as its source.
+static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+forwardLifetimeDependencies(Evaluator &evaluator, ValueDecl *decl,
+                            ValueDecl *source) {
+  auto dependencies = evaluateOrDefault(
+      evaluator, LifetimeDependenceInfoRequest{source}, std::nullopt);
+  if (!dependencies)
+    return std::nullopt;
+
+  auto *forwarding = dyn_cast<AbstractFunctionDecl>(decl);
+  auto *forwarded = dyn_cast<AbstractFunctionDecl>(source);
+  if (!forwarding || !forwarded ||
+      forwarding->hasSelfInLifetimeDependenceIndices() ==
+          forwarded->hasSelfInLifetimeDependenceIndices())
+    return dependencies;
+
+  // 'self' is now the first parameter, so the source's parameters shift up by
+  // one. The result index does not move: the source's parameters plus 'self' is
+  // this declaration's parameter count.
+  unsigned selfIndex = forwarded->getParameters()->size();
+  ASSERT(forwarding->getParameters()->size() == selfIndex + 1 &&
+         "a forwarding declaration that takes 'self' as its first parameter "
+         "must otherwise have the source's parameters");
+  auto mapIndex = [selfIndex](unsigned index) -> unsigned {
+    if (index == selfIndex)
+      return 0;
+    return index < selfIndex ? index + 1 : index;
+  };
+
+  auto &ctx = decl->getASTContext();
+  unsigned indexCount = forwarding->getLifetimeDependenceResultIndex();
+  auto mapIndices = [&](IndexSubset *indices) -> IndexSubset * {
+    if (!indices)
+      return nullptr;
+    SmallBitVector mapped(indexCount);
+    for (unsigned index : indices->getIndices())
+      mapped.set(mapIndex(index));
+    return IndexSubset::get(ctx, mapped);
+  };
+
+  SmallVector<LifetimeDependenceInfo, 1> mappedDependencies;
+  for (auto &dependence : *dependencies)
+    mappedDependencies.emplace_back(
+        mapIndices(dependence.getInheritIndices()),
+        mapIndices(dependence.getScopeIndices()),
+        mapIndex(dependence.getTargetIndex()),
+        mapIndices(dependence.getAddressableIndices()),
+        mapIndices(dependence.getConditionallyAddressableIndices()),
+        dependence.getFlags());
+  return ctx.AllocateCopy(mappedDependencies);
+}
+
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
                                         ValueDecl *decl) const {
+  // A declaration the C++ importer synthesized around another one -- a member
+  // cloned into a derived class, an accessor, an operator function -- hands back
+  // the value that declaration produces, so it depends on the same things. Only
+  // the original carries the C++ annotations, so inferring dependencies here
+  // instead would give a different, and possibly wider, answer.
+  if (auto *loader = decl->getASTContext().getClangModuleLoader()) {
+    if (auto *source = loader->getForwardingSource(decl)) {
+      // The source may have nothing to forward even when this declaration needs
+      // a dependency: an accessor unwraps a pointer, so its ~Escapable result
+      // comes from a source that returns an Escapable one. Infer as usual then.
+      if (auto forwarded = forwardLifetimeDependencies(evaluator, decl, source))
+        return forwarded;
+    }
+  }
   return LifetimeDependenceInfo::get(decl);
 }
 

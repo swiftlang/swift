@@ -6530,6 +6530,18 @@ synthesizeBaseClassFieldAddressSetterBody(AbstractFunctionDecl *afd,
       afd, context, AccessorKind::MutableAddress);
 }
 
+/// A cloned storage declaration's accessors forward to the base's accessors, so
+/// they hand back values with the same lifetime dependencies. The base's
+/// accessor is the only one that knows them: it is either imported from C++ or
+/// synthesized around an imported function.
+static void recordAccessorForwardingSources(
+    ClangImporter::Implementation &Impl, ArrayRef<AccessorDecl *> accessors,
+    AbstractStorageDecl *baseStorage) {
+  for (auto *accessor : accessors)
+    if (auto *baseAccessor = baseStorage->getAccessor(accessor->getAccessorKind()))
+      Impl.recordForwardingSource(accessor, baseAccessor);
+}
+
 static SmallVector<AccessorDecl *, 2>
 makeBaseClassMemberAccessors(DeclContext *declContext,
                              AbstractStorageDecl *computedVar,
@@ -6616,6 +6628,14 @@ static void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl *toDecl) {
   ASTContext &context = fromDecl->getASTContext();
   for (auto attr : fromDecl->getAttrs()) {
     switch (attr->getKind()) {
+    case DeclAttrKind::AddressableSelf: {
+      // The importer gives every imported C++ instance method of a value type
+      // an addressable 'self', and this declaration stands in for one. A
+      // dependency scoped by 'self' borrows the caller's storage, which is only
+      // reachable if 'self' is addressable here too.
+      toDecl->addAttribute(new (context) AddressableSelfAttr(true));
+      break;
+    }
     case DeclAttrKind::Available: {
       toDecl->addAttribute(cast<AvailableAttr>(attr)->clone(context, true));
       break;
@@ -6636,6 +6656,13 @@ static void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl *toDecl) {
     }
     case DeclAttrKind::Final: {
       toDecl->addAttribute(new (context) FinalAttr(true));
+      break;
+    }
+    case DeclAttrKind::Lifetime: {
+      // Keep the author's spelling of what the result depends on: diagnostics
+      // are emitted against the annotation, not against the dependency Swift
+      // derives from it.
+      toDecl->addAttribute(cast<LifetimeAttr>(attr)->clone(context));
       break;
     }
     case DeclAttrKind::Transparent: {
@@ -6723,9 +6750,9 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
         newContext, subscript->getGenericParams());
     out->setAccess(access);
     inheritance.setUnavailableIfNecessary(decl, out);
-    out->setAccessors(SourceLoc(),
-                      makeBaseClassMemberAccessors(newContext, out, subscript),
-                      SourceLoc());
+    auto accessors = makeBaseClassMemberAccessors(newContext, out, subscript);
+    recordAccessorForwardingSources(Impl, accessors, subscript);
+    out->setAccessors(SourceLoc(), accessors, SourceLoc());
     out->setImplInfo(subscript->getImplInfo());
     return out;
   }
@@ -6750,6 +6777,7 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
     inheritance.setUnavailableIfNecessary(decl, out);
     out->getASTContext().evaluator.cacheOutput(HasStorageRequest{out}, false);
     auto accessors = makeBaseClassMemberAccessors(newContext, out, var);
+    recordAccessorForwardingSources(Impl, accessors, var);
     out->setAccessors(SourceLoc(), accessors, SourceLoc());
     auto isMutable = var->getWriteImpl() == WriteImplKind::Immutable
                          ? StorageIsNotMutable : StorageIsMutable;
@@ -8361,6 +8389,10 @@ ClangImporter::importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
 
 ValueDecl *ClangImporter::getOriginalForClonedMember(const ValueDecl *decl) {
   return Impl.getOriginalForClonedMember(decl);
+}
+
+ValueDecl *ClangImporter::getForwardingSource(const ValueDecl *decl) {
+  return Impl.getForwardingSource(decl);
 }
 
 FuncDecl *

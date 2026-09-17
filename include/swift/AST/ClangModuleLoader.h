@@ -249,6 +249,10 @@ public:
   /// reference type, returns the originally-imported (un-thunked) method.
   virtual FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) = 0;
 
+  /// If \param decl is an accessor or operator function the importer
+  /// synthesized around an imported function, returns that function.
+  virtual ValueDecl *getForwardingSource(const ValueDecl *decl) = 0;
+
   /// Returns the forwarding method in the derived class that calls the base
   /// method.
   virtual ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) = 0;
