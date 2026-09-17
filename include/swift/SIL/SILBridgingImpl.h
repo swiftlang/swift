@@ -2216,6 +2216,10 @@ OptionalBridgedDebugScope BridgedSILDebugVariable::getScope() const {
   return {unbridge().Scope};
 }
 
+bool BridgedSILDebugVariable::isLet() const {
+  return unbridge().isLet();
+}
+
 OptionalBridgedDeclObj BridgedInstruction::DebugValue_getDecl() const {
   return {getAs<swift::DebugValueInst>()->getDecl()};
 }

@@ -741,6 +741,7 @@ struct BridgedSILDebugVariable {
   BRIDGED_INLINE BridgedSILDebugVariable &operator=(const BridgedSILDebugVariable &rhs);
   BRIDGED_INLINE swift::SILDebugVariable unbridge() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDebugScope getScope() const;
+  BRIDGED_INLINE bool isLet() const;
 };
 
 struct BridgedInstruction {
