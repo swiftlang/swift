@@ -3814,14 +3814,17 @@ public:
     if (!ctx.LangOpts.DisableAvailabilityChecking) {
       auto availability =
           AvailabilityContext::forLocation(stmt->getForLoc(), dc);
-      bool diagnosed =
-          availability.enumerateUnsatisfiedRestrictionsForConformance(
-              seqConformanceRef,
-              [&](const Decl *decl, AvailabilityRestriction restriction) {
-                emitDiagnosticsForUnavailableConformance(seqType, restriction);
-                return true;
-              });
-      if (diagnosed)
+      bool hadError = false;
+      availability.enumerateUnsatisfiedRestrictionsForConformance(
+          seqConformanceRef,
+          [&](const Decl *decl, const ProtocolDecl *proto,
+              AvailabilityRestriction restriction) {
+            hadError =
+                emitDiagnosticForUnavailableConformance(seqType, proto,
+                                                        restriction);
+            return true;
+          });
+      if (hadError)
         return nullptr;
     }
 
@@ -3842,20 +3845,36 @@ public:
   }
 
 private:
-  void emitDiagnosticsForUnavailableConformance(
-      Type seqType, AvailabilityRestriction restriction) {
+  bool emitDiagnosticForUnavailableConformance(
+      Type seqType, const ProtocolDecl *unavailableProto,
+      AvailabilityRestriction restriction) {
     auto loc = stmt->getForLoc();
     auto protoDecl = seqConformanceRef.getProtocol();
 
     llvm::SmallString<64> scratch;
-    ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
-                       seqType, protoDecl,
-                       restriction.getDiagnosticDescription(scratch, ctx));
+    auto diag =
+        ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
+                           seqType, protoDecl,
+                           restriction.getDiagnosticDescription(scratch, ctx));
+
+    // An unavailable conformance to 'Sendable' must be downgraded to a warning
+    // since previously there may have been code silently working with this violation,
+    // and we don't want to source-break those sites.
+    bool isSendableConformance =
+        unavailableProto &&
+        unavailableProto->isSpecificProtocol(KnownProtocolKind::Sendable);
+
+    if (isSendableConformance)
+      diag.warnUntilLanguageMode(LanguageMode::v6);
 
     // A restriction that is unavailable cannot be satisfied with a runtime
     // availability query, so only offer a fix-it for the other restrictions.
     if (!restriction.isUnavailable())
       fixAvailability(loc, dc, restriction.getFixItDomainAndRange(ctx), ctx);
+
+    // Only return true if we truly emitted an error diagnostic.
+    return !isSendableConformance ||
+           ctx.LangOpts.isLanguageModeAtLeast(LanguageMode::v6);
   }
 
   void buildMakeIteratorVar() {
