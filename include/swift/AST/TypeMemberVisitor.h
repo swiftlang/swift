@@ -41,7 +41,7 @@ public:
   BAD_MEMBER(Operator)
   BAD_MEMBER(PrecedenceGroup)
   BAD_MEMBER(Macro)
-  BAD_MEMBER(Using)
+  BAD_MEMBER(FileDefault)
 
   RetTy visitMacroExpansionDecl(MacroExpansionDecl *D) {
     // Expansion already visited as auxiliary decls.

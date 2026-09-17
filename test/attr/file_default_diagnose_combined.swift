@@ -12,8 +12,8 @@
 // REQUIRES: swift_feature_DefaultIsolationPerFile
 
 //--- defaults.swift
-using @diagnose(DeprecatedDeclaration, as: ignored)
-using @diagnose(StrictMemorySafety, as: error, reason: "I love strict memory safety! <3")
+default @diagnose(DeprecatedDeclaration, as: ignored)
+default @diagnose(StrictMemorySafety, as: error, reason: "I love strict memory safety! <3")
 
 //--- body.swift
 @available(*, deprecated)

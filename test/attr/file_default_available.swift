@@ -8,7 +8,7 @@
 
 //--- defaulted.swift
 #if TOP
-using @available(*, deprecated, message: "legacy")
+default @available(*, deprecated, message: "legacy")
 #endif
 
 public func defaultedFunc() {}
@@ -34,7 +34,7 @@ extension DefaultedClass {
 public func explicitlyDeprecated() {}
 
 #if BOTTOM
-using @available(*, deprecated, message: "legacy")
+default @available(*, deprecated, message: "legacy")
 #endif
 
 //--- caller.swift

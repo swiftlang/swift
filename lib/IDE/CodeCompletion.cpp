@@ -215,7 +215,7 @@ public:
 
   void completePoundAvailablePlatform() override;
   void completeImportDecl(ImportPath::Builder &Path) override;
-  void completeUsingDecl() override;
+  void completeFileDefaultDecl() override;
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
   void completeCallArg(CodeCompletionExpr *E) override;
@@ -478,8 +478,8 @@ void CodeCompletionCallbacksImpl::completeImportDecl(
   Path.pop_back();
 }
 
-void CodeCompletionCallbacksImpl::completeUsingDecl() {
-  Kind = CompletionKind::Using;
+void CodeCompletionCallbacksImpl::completeFileDefaultDecl() {
+  Kind = CompletionKind::FileDefault;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -923,7 +923,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::AttributeBegin:
   case CompletionKind::PoundAvailablePlatform:
   case CompletionKind::Import:
-  case CompletionKind::Using:
+  case CompletionKind::FileDefault:
   case CompletionKind::UnresolvedMember:
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AfterPoundDirective:
@@ -1811,8 +1811,8 @@ void CodeCompletionCallbacksImpl::readyForTypeChecking(SourceFile *SrcFile) {
       Lookup.addImportModuleNames();
     break;
   }
-  case CompletionKind::Using: {
-    Lookup.addUsingSpecifiers();
+  case CompletionKind::FileDefault: {
+    Lookup.addFileDefaultSpecifiers();
     break;
   }
   case CompletionKind::AfterPoundDirective: {
