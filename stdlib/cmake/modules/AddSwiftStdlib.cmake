@@ -3780,18 +3780,26 @@ endfunction()
 # (inside this function's loop) rather than in the caller, since the
 # result depends on ${mod}/${triple}.
 #
+# DETECT_ARC4RANDOM works the same way for SWIFT_STDLIB_HAS_ARC4RANDOM, which
+# reports whether the target's C library declares arc4random_buf(). Only Linux
+# triples are probed, since glibc did not gain arc4random_buf() until 2.36 and
+# every other supported target either has it or is bare metal.
+#
 # SKIP_*_REGEX and ONLY_*_REGEX are both multi-valued. An entry is processed
 # only when *every* ONLY_*_REGEX category that has at least one pattern has
 # at least one match, AND no SKIP_*_REGEX pattern matches.
 function(add_embedded_swift_target_library prefix library_name)
   cmake_parse_arguments(EMBLIB
-    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE;DETECT_MALLOC_TYPE"
+    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE;DETECT_MALLOC_TYPE;DETECT_ARC4RANDOM"
     "INSTALL_IN_COMPONENT;ARCHITECTURE_KEY"
     "GYB_SOURCES;SWIFT_COMPILE_FLAGS;C_COMPILE_FLAGS;FILE_DEPENDS;DEPENDS;SKIP_ARCH_REGEX;SKIP_MOD_REGEX;SKIP_TRIPLE_REGEX;ONLY_ARCH_REGEX;ONLY_MOD_REGEX;ONLY_TRIPLE_REGEX"
     ${ARGN})
 
   if(EMBLIB_DETECT_MALLOC_TYPE)
     include(CheckCSourceCompiles)
+  endif()
+  if(EMBLIB_DETECT_ARC4RANDOM)
+    include(CheckSymbolExists)
   endif()
 
   translate_flag(${EMBLIB_IS_STDLIB}              "IS_STDLIB"
@@ -3936,6 +3944,28 @@ function(add_embedded_swift_target_library prefix library_name)
       set(CMAKE_REQUIRED_DEFINITIONS "${_malloc_type_saved_defs}")
       if(SWIFT_STDLIB_HAS_MALLOC_TYPE_${_malloc_type_mod_id})
         list(APPEND per_target_swift_compile_flags "-D" "SWIFT_STDLIB_HAS_MALLOC_TYPE")
+      endif()
+    endif()
+
+    # Likewise for arc4random_buf(). The embedded sources only consult this on
+    # Linux (see the DETECT_ARC4RANDOM note above), so don't spend configure
+    # time probing the bare-metal triples.
+    if(EMBLIB_DETECT_ARC4RANDOM AND "${triple}" MATCHES "-linux")
+      string(MAKE_C_IDENTIFIER "${mod}" _arc4random_mod_id)
+      set(CMAKE_REQUIRED_FLAGS "-target ${triple}")
+      if(SWIFT_SDK_embedded_ARCH_${arch_key}_PATH)
+        string(APPEND CMAKE_REQUIRED_FLAGS
+          " --sysroot ${SWIFT_SDK_embedded_ARCH_${arch_key}_PATH}")
+      endif()
+      # The answer must depend only on the target's libc.
+      set(CMAKE_REQUIRED_INCLUDES)
+      set(CMAKE_REQUIRED_DEFINITIONS)
+      set(CMAKE_REQUIRED_LIBRARIES)
+      check_symbol_exists(arc4random_buf "stdlib.h"
+        "SWIFT_STDLIB_HAS_ARC4RANDOM_${_arc4random_mod_id}")
+      if(SWIFT_STDLIB_HAS_ARC4RANDOM_${_arc4random_mod_id})
+        list(APPEND per_target_swift_compile_flags
+          "-D" "SWIFT_STDLIB_HAS_ARC4RANDOM")
       endif()
     endif()
 

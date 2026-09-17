@@ -15,6 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckEmbedded.h"
+#include "OpenedExistentials.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticGroups.h"
@@ -22,10 +24,12 @@
 #include "swift/AST/Effects.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Bridging/ASTGen.h"
+#include "swift/Sema/ConstraintSystem.h"
 
 using namespace swift;
 
@@ -162,6 +166,54 @@ void swift::diagnoseGenericMemberOfExistentialInEmbedded(
         baseType)
       .limitBehavior(*behavior);
   }
+}
+
+void swift::diagnoseOpenedExistentialArgumentInEmbedded(
+    const DeclContext *dc, Expr *argExpr, Type existentialType,
+    ValueDecl *callee, unsigned paramIdx) {
+  // If we are not supposed to diagnose Embedded Swift limitations, do nothing.
+  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, argExpr->getLoc());
+  if (!behavior)
+    return;
+
+  auto &ctx = dc->getASTContext();
+  ctx.Diags
+      .diagnose(argExpr->getLoc(),
+                diag::open_existential_argument_in_embedded_swift,
+                existentialType, callee)
+      .limitBehavior(*behavior);
+
+  // Coercing the argument to its own existential type suppresses the implicit
+  // opening, but only helps when the existential satisfies the requirements on
+  // the generic parameter in the first place. When it does not, opening is the
+  // only way the call type checks, so there is nothing to suggest.
+  if (!canPassExistentialArgumentWithoutOpening(callee, paramIdx,
+                                                existentialType))
+    return;
+
+  // The coercion has to bind to the whole argument, which takes parentheses
+  // when the argument binds more loosely than 'as'.
+  auto *mutableDC = const_cast<DeclContext *>(dc);
+  auto *castingPG = TypeChecker::lookupPrecedenceGroup(
+                        mutableDC, ctx.Id_CastingPrecedence, SourceLoc())
+                        .getSingle();
+  bool needsParens =
+      !castingPG ||
+      exprNeedsParensInsideFollowingOperator(mutableDC, argExpr, castingPG);
+
+  SmallString<32> insertAfter;
+  if (needsParens)
+    insertAfter += ")";
+  insertAfter += " as ";
+  insertAfter += existentialType->getString();
+
+  auto note = ctx.Diags.diagnose(
+      argExpr->getLoc(),
+      diag::open_existential_argument_coerce_in_embedded_swift,
+      existentialType);
+  if (needsParens)
+    note.fixItInsert(argExpr->getStartLoc(), "(");
+  note.fixItInsertAfter(argExpr->getEndLoc(), insertAfter);
 }
 
 void swift::diagnoseDynamicCastInEmbedded(
