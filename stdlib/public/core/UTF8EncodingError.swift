@@ -183,6 +183,63 @@ extension UTF8.ValidationError {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
+extension UTF8.ValidationError {
+  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
+  internal var __legacyABI_kind: Kind {
+    get { kind }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvs")
+    set { self = Self(newValue, byteOffsets) }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvM")
+    _modify {
+      var kind = self.kind
+      defer {
+        self = Self(kind, byteOffsets)
+      }
+      yield &kind
+    }
+  }
+
+  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
+  internal var __legacyABI_byteOffsets: Range<Int> {
+    get { byteOffsets }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvs")
+    set { self = Self(kind, newValue) }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvM")
+    _modify {
+      var byteOffsets = self.byteOffsets
+      defer {
+        self = Self(kind, byteOffsets)
+      }
+      yield &byteOffsets
+    }
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension UTF8.ValidationError.Kind {
+  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
+  internal var __legacyABI_rawValue: UInt8 {
+    get { rawValue }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8Vvs")
+    set { self = Self(rawValue: newValue)! }
+    @usableFromInline
+    @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8VvM")
+    _modify {
+      var newValue = rawValue
+      defer {
+        self = Self(rawValue: newValue)!
+      }
+      yield &newValue
+    }
+  }
+}
+
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.2, *)
 extension UTF8.ValidationError.Kind: CustomStringConvertible {
