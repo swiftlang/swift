@@ -4850,6 +4850,10 @@ ConstraintSystem::matchTypesBindTypeVar(
     return SolutionKind::Solved;
   }
 
+  if (kind == ConstraintKind::Equal && type->isVoid() &&
+      typeVar->getImpl().isClosureToVoid())
+    return SolutionKind::Solved;
+
   // When binding a fixed type to a type variable that cannot contain
   // lvalues or noescape types, any type variables within the fixed
   // type cannot contain lvalues or noescape types either.

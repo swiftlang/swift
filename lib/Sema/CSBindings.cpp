@@ -3597,11 +3597,27 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   // We allow a funny function conversion (...) -> T conv (...) -> Void
   // in certain positions. To handle this correctly, we must not attempt
   // a Void binding too soon in this situation. Handle it like a fallback
-  // instead of a real subtype relationship, since it isn't one.
-  if (kind == AllowedBindingKind::Subtypes && type->isVoid()) {
-    auto subkind = CS.getImpliedResultConversionKind(constraint->getLocator());
-    if (subkind == ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
+  // instead of a real subtype or supertype relationship, since it isn't one.
+  if ((kind == AllowedBindingKind::Subtypes ||
+       kind == AllowedBindingKind::Supertypes) &&
+      type->isVoid()) {
+    auto &impl = TypeVar->getImpl();
+    if (impl.isClosureToVoid())
       kind = AllowedBindingKind::Fallback;
+    else {
+      // Not sure how Locator can be null, but saw a crash in testing
+      auto tvRKind = impl.getLocator()
+                         ? CS.getImpliedResultConversionKind(impl.getLocator())
+                         : ConstraintSystem::ImpliedResultConversionKind::None;
+      auto conRKind =
+          CS.getImpliedResultConversionKind(constraint->getLocator());
+      if (tvRKind == ConstraintSystem::ImpliedResultConversionKind::ToVoid ||
+          conRKind == ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
+        // Record that this TypeVar and equivalence class is in this conversion
+        // position
+        TypeVar->getImpl().enableClosureToVoid();
+        kind = AllowedBindingKind::Fallback;
+      }
     }
   }
 
