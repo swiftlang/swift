@@ -141,6 +141,14 @@ struct SMismatchedActors: @MainActor Q {
 
 protocol PSendable: P, Sendable { }
 
+@MainActor
+struct PSendableIsolated: PSendable {
+  // expected-warning@-1{{conformance of 'PSendableIsolated' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+  // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}{{27-27=@preconcurrency }}
+  func f() { } // expected-note{{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+  // expected-note@-1{{mark instance method 'f()' 'nonisolated'}}{{3-3=nonisolated }}
+}
+
 // expected-error@+2{{type 'PSendableS' does not conform to protocol 'PSendable'}}
 // expected-error@+1{{main actor-isolated conformance of 'PSendableS' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter 'Self'}}
 struct PSendableS: @MainActor PSendable { // expected-note{{requirement specified as 'Self' : 'P' [with Self = PSendableS]}}
@@ -154,6 +162,14 @@ protocol R: SendableMetatype {
 // expected-error@+1{{cannot form main actor-isolated conformance of 'RSendableSMainActor' to SendableMetatype-inheriting protocol 'R'}}
 @MainActor struct RSendableSMainActor: @MainActor R {
   func f() { }
+}
+
+@MainActor
+class RWithNonIsolated: R {
+  // expected-warning@-1{{conformance of 'RWithNonIsolated' to protocol 'R' crosses into main actor-isolated code and can cause data races}}
+  // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}{{25-25=@preconcurrency }}
+  func f() { } // expected-note{{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+  // expected-note@-1{{mark instance method 'f()' 'nonisolated'}}{{3-3=nonisolated }}
 }
 
 // ----------------------------------------------------------------------------
