@@ -20,6 +20,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
@@ -169,12 +170,21 @@ static bool isDeploymentTargetPlatformActive(const LangOptions &langOpts,
   return langOpts.checkPlatformCondition(PlatformConditionKind::OS, platform);
 }
 
-static int getDeploymentTargetPlatformPriority(StringRef platform) {
-  if (platform == "anyAppleOS")
-    return 0;
-  if (platform == "macCatalyst")
-    return 2;
-  return 1;
+/// Returns \c true if \p candidate is a more specific platform than
+/// \p incumbent, so that a requirement written for \p candidate takes
+/// precedence when both name the target being compiled for. For example,
+/// \c macCatalyst is more specific than \c iOS.
+static bool isMoreSpecificDeploymentTargetPlatform(StringRef candidate,
+                                                   StringRef incumbent) {
+  auto candidateKind = platformFromString(candidate);
+  if (!candidateKind)
+    return false;
+
+  auto incumbentKind = platformFromString(incumbent);
+  if (!incumbentKind)
+    return true;
+
+  return inheritsAvailabilityFromPlatform(*candidateKind, *incumbentKind);
 }
 
 static StringRef canonicalDeploymentTargetPlatform(StringRef platform) {
@@ -305,7 +315,6 @@ class ValidateIfConfigCondition :
 
     if (CheckBuildConfiguration && !Ctx.LangOpts.getDeploymentTargetVersion()) {
       std::optional<Argument> selectedArgument;
-      int selectedPriority = -1;
       for (auto argument : *args) {
         if (!argument.hasLabel())
           continue;
@@ -314,11 +323,10 @@ class ValidateIfConfigCondition :
         if (!isDeploymentTargetPlatformActive(Ctx.LangOpts, platform))
           continue;
 
-        int priority = getDeploymentTargetPlatformPriority(platform);
-        if (priority > selectedPriority) {
+        if (!selectedArgument ||
+            isMoreSpecificDeploymentTargetPlatform(
+                platform, selectedArgument->getLabel().str()))
           selectedArgument = argument;
-          selectedPriority = priority;
-        }
       }
 
       if (selectedArgument) {
@@ -692,7 +700,7 @@ class EvaluateIfConfigCondition :
 
   bool evaluateDeploymentTargetAtLeast(CallExpr *E) {
     std::optional<version::Version> selectedVersion;
-    int selectedPriority = -1;
+    StringRef selectedPlatform;
 
     for (auto argument : *E->getArgs()) {
       if (!argument.hasLabel())
@@ -702,15 +710,15 @@ class EvaluateIfConfigCondition :
       if (!isDeploymentTargetPlatformActive(Ctx.LangOpts, platform))
         continue;
 
-      int priority = getDeploymentTargetPlatformPriority(platform);
-      if (priority <= selectedPriority)
+      if (!selectedPlatform.empty() &&
+          !isMoreSpecificDeploymentTargetPlatform(platform, selectedPlatform))
         continue;
 
       auto versionString = extractExprSource(Ctx.SourceMgr, argument.getExpr());
       selectedVersion =
           VersionParser::parseVersionString(versionString, SourceLoc(), nullptr)
               .value();
-      selectedPriority = priority;
+      selectedPlatform = platform;
     }
 
     if (!selectedVersion)

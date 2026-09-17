@@ -10,6 +10,7 @@
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target x86_64-pc-windows10.0.19041-msvc -parse-stdlib -D EXPECT_PRIMARY
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-macosx26.0 -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_PRIMARY
 // RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-ios26.0 -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_PRIMARY
+// RUN: %swift -typecheck %s -verify -enable-experimental-feature DeploymentTargetCondition -target arm64-apple-xros2.0 -parse-stdlib -D EXPECT_PRIMARY -D EXPECT_ANY_APPLE_FALLBACK
 
 #if !hasFeature(DeploymentTargetCondition)
   #error("expected DeploymentTargetCondition to be enabled")
@@ -58,6 +59,21 @@
     #if EXPECT_PRIMARY
       #error("expected the macCatalyst-specific requirement")
     #endif
+  #endif
+#endif
+
+// A requirement applies only to the platform it names. Availability checking
+// can apply an iOS requirement to visionOS by remapping the version through the
+// SDK, but that information is not available while '#if' is evaluated, so an
+// iOS requirement does not constrain a visionOS target; '*' applies instead.
+#if os(visionOS)
+  #if !deploymentTargetAtLeast(iOS 99, *)
+    #error("an iOS requirement must not constrain a visionOS target")
+  #endif
+
+  // A requirement naming visionOS is compared against the deployment target.
+  #if deploymentTargetAtLeast(visionOS 99, *)
+    #error("expected the visionOS requirement to be compared")
   #endif
 #endif
 
