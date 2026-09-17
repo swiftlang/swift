@@ -1738,7 +1738,9 @@ public:
     if (arg->getType().isTrivial(F) && argKind == OwnershipKind::None)
       return;
 
-    require(argKind == term->getForwardingOwnershipKind(),
+    require(argKind == term->getForwardingOwnershipKind() ||
+            (argKind == OwnershipKind::None &&
+             term->getForwardingOwnershipKind() == OwnershipKind::Owned),
             "OwnershipForwardingTermInst nontrivial result "
             "must have the same ownership");
   }
