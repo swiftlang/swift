@@ -80,7 +80,6 @@ class LibXML2(cmake_product.CMakeProduct):
         self.cmake_options.define('LIBXML2_WITH_THREADS', 'YES')
         self.cmake_options.define('LIBXML2_WITH_ICONV', 'NO')
         self.cmake_options.define('LIBXML2_WITH_ICU', 'NO')
-        self.cmake_options.define('LIBXML2_WITH_LZMA', 'NO')
         self.cmake_options.define('LIBXML2_WITH_PYTHON', 'NO')
         self.cmake_options.define('LIBXML2_WITH_TESTS', 'NO')
         self.cmake_options.define('LIBXML2_WITH_ZLIB', 'NO')
