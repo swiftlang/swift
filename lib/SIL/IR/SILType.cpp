@@ -605,8 +605,7 @@ SILType::canUseExistentialRepresentation(ExistentialRepresentation repr,
                                          Type containedType) const {
   switch (repr) {
   case ExistentialRepresentation::COM:
-    return isExistentialType() &&
-      getASTType().getExistentialLayout().getCOMInterface();
+    return getASTType().isCOMExistentialType();
   case ExistentialRepresentation::None:
     return !isAnyExistentialType();
   case ExistentialRepresentation::Opaque:
