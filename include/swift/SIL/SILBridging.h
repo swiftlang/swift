@@ -622,6 +622,8 @@ struct BridgedFunction {
   BRIDGED_INLINE void setIsSerialized(bool isSerialized) const;
   BRIDGED_INLINE bool conformanceMatchesActorIsolation(BridgedConformance conformance) const;
   BRIDGED_INLINE bool isSpecialization() const;
+  BRIDGED_INLINE bool hasOwnershipForTrivialValues() const;
+  BRIDGED_INLINE void setOwnershipForTrivialValues(bool hotv) const;
   bool isTrapNoReturn() const;
   bool isConvertPointerToPointerArgument() const;
   bool isAddressor() const;
@@ -942,6 +944,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt SwitchEnumAddrInst_getUniqueCaseForDefault() const;
   BRIDGED_INLINE OptionalBridgedBasicBlock SwitchEnumAddrInst_getSuccessorForDefault() const;
   BRIDGED_INLINE SwiftInt StoreInst_getStoreOwnership() const;
+  BRIDGED_INLINE void StoreInst_setStoreOwnership(SwiftInt rawOwnership) const;
   BRIDGED_INLINE SwiftInt AssignInst_getAssignOwnership() const;
   BRIDGED_INLINE MarkDependenceKind MarkDependenceInst_dependenceKind() const;
   BRIDGED_INLINE void MarkDependenceInstruction_resolveToNonEscaping() const;
