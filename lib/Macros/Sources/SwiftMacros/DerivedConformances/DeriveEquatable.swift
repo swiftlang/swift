@@ -40,11 +40,10 @@ public struct DeriveEquatableMacro: DeclarationMacro {
     // A parameter of noncopyable type must state its ownership. Both operands
     // are only read, so borrow them.
     let ownership = info.isNoncopyable ? "borrowing " : ""
-    return
-      """
-      \(getAttributes())
-      static func \(getFunctionName())(_ lhs: \(raw: ownership)Self, _ rhs: \(raw: ownership)Self) -> Swift::Bool {
-        \(getBody())
+    return """
+      \(raw: getAttributes())
+      static func \(raw: getFunctionName())(_ lhs: \(raw: ownership)Self, _ rhs: \(raw: ownership)Self) -> Swift::Bool {
+        \(raw: getBody())
       }
       """
   }
@@ -52,7 +51,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
   /// Attributes attached to the generated function. if the module is resilient, just a
   /// plain `==`. non-resilient types get the attributes that let the compiler treat it
   /// as the derived conformance witness.
-  func getAttributes() -> AttributeListSyntax {
+  func getAttributes() -> String {
     if isResilient {
       return ""
     }
@@ -65,14 +64,14 @@ public struct DeriveEquatableMacro: DeclarationMacro {
     }
     return
       """
-      \(raw: semantics)
+      \(semantics)
       @_implements(Swift::Equatable, ==(_:_:))
       """
   }
 
   /// Name of the generated function: plain `==` when in a resilient module, otherwise a
   /// derived name.
-  func getFunctionName() -> TokenSyntax {
+  func getFunctionName() -> String {
     if isResilient {
       return "=="
     }
@@ -85,10 +84,11 @@ public struct DeriveEquatableMacro: DeclarationMacro {
   }
 
   /// Dispatches to the right body builder depending on the type's shape.
-  func getBody() -> CodeBlockItemListSyntax {
+  func getBody() -> String {
     switch info.kind {
+    // An uninhabited enum has no cases to compare.
     case .enumLike(let enumInfo) where enumInfo.isUninhabited():
-      Self.getUninhabitedBody()
+      ""
     case .enumLike(let enumInfo):
       Self.getEnumBody(enumInfo)
     case .structLike(let structInfo):
@@ -98,96 +98,80 @@ public struct DeriveEquatableMacro: DeclarationMacro {
 
   /// `a == b` for a struct: compare stored, non-static properties in order,
   /// short-circuiting on the first mismatch.
-  static func getStructBody(_ structInfo: StructTypeInfo) -> CodeBlockItemListSyntax {
-    let comparedProperties = structInfo.properties.filter { !$0.isStatic }
-
-    let guards: [CodeBlockItemSyntax] = comparedProperties.map { property in
+  static func getStructBody(_ structInfo: StructTypeInfo) -> String {
+    let guards = structInfo.properties.filter { !$0.isStatic }.map { property in
       """
-      guard lhs.\(raw: property.name) == rhs.\(raw: property.name) else {
+      guard lhs.\(property.name) == rhs.\(property.name) else {
         return false
       }
       """
     }
 
-    return .init(guards + ["return true"])
+    return (guards + ["return true"]).joined(separator: "\n")
   }
 
   /// `a == b` for an enum, picking the cheapest valid strategy for its shape.
   static func getEnumBody(
     _ enumInfo: EnumTypeInfo
-  ) -> CodeBlockItemListSyntax {
+  ) -> String {
     if enumInfo.hasNoAssociatedValues() {
-      return getNoAssociatedValuesBody(enumInfo)
+      getNoAssociatedValuesBody(enumInfo)
+    } else {
+      getHasAssociatedValuesBody(enumInfo)
     }
-    return getHasAssociatedValuesBody(enumInfo)
-  }
-
-  /// Body for an uninhabited enum: there are no cases to compare.
-  static func getUninhabitedBody() -> CodeBlockItemListSyntax {
-    """
-    """
   }
 
   /// `a == b` for an enum with no associated values: compare discriminants.
   static func getNoAssociatedValuesBody(
     _ enumInfo: EnumTypeInfo
-  ) -> CodeBlockItemListSyntax {
-    var items = getDiscriminant(enumInfo, scrutinee: "lhs", discrName: "index_lhs")
-    items += getDiscriminant(enumInfo, scrutinee: "rhs", discrName: "index_rhs")
-    items += ["return index_lhs == index_rhs"]
-    return items
+  ) -> String {
+    """
+    \(getDiscriminant(enumInfo, scrutinee: "lhs", discrName: "index_lhs"))
+    \(getDiscriminant(enumInfo, scrutinee: "rhs", discrName: "index_rhs"))
+    return index_lhs == index_rhs
+    """
   }
 
   /// `a == b` for an enum with associated values: match `(a, b)` against
   /// each case pairwise and compare bound payloads.
   static func getHasAssociatedValuesBody(
     _ enumInfo: EnumTypeInfo
-  ) -> CodeBlockItemListSyntax {
-    var cases: [SwitchCaseSyntax] = []
-    for caseInfo in enumInfo.cases {
-      var stmtsInCase: [CodeBlockItemSyntax] = []
-
+  ) -> String {
+    var cases = enumInfo.cases.map { caseInfo in
+      let stmtsInCase: [String]
       if caseInfo.isReachable {
-        for i in 0..<caseInfo.associatedValueLabels.count {
-          stmtsInCase.append(
+        stmtsInCase =
+          (0..<caseInfo.associatedValueLabels.count).map { i in
             """
-            guard l\(raw: i) == r\(raw: i) else {
+            guard l\(i) == r\(i) else {
               return false
             }
             """
-          )
-        }
-        stmtsInCase.append("return true")
+          } + ["return true"]
       } else {
-        stmtsInCase.append(getUnreachableStatement())
+        stmtsInCase = [getUnreachableStatement()]
       }
 
       let lPat = getEnumElementPayloadPattern(caseInfo, varPrefix: "l")
       let rPat = getEnumElementPayloadPattern(caseInfo, varPrefix: "r")
 
-      cases.append(
+      return """
+        case (\(lPat), \(rPat)):
+          \(stmtsInCase.joined(separator: "\n"))
         """
-        case (\(lPat), \(rPat)): 
-          \(CodeBlockItemListSyntax(stmtsInCase))
-        """
-      )
     }
 
     // A single-case enum's `(a, b)` switch is already exhaustive without a
     // default. Adding one for multi-case enums avoids an exhaustiveness
     // diagnostic for mismatched-case pairs (e.g. `(.foo, .bar)`).
     if enumInfo.cases.count > 1 {
-      cases.append(
-        """
-        default: return false
-        """
-      )
+      cases.append("default: return false")
     }
 
     return
       """
       switch (lhs, rhs) {
-      \(raw: cases.map { $0.trimmedDescription }.joined(separator: "\n"))
+      \(cases.joined(separator: "\n"))
       }
       """
   }
@@ -211,14 +195,14 @@ func getDiscriminant(
   _ enumInfo: EnumTypeInfo,
   scrutinee: String,
   discrName: String
-) -> CodeBlockItemListSyntax {
+) -> String {
   var nextDiscriminant = 0
   var cases: [String] = []
   for caseInfo in enumInfo.cases {
     if caseInfo.isReachable {
       cases.append(
         """
-        case .\(caseInfo.name): 
+        case .\(caseInfo.name):
           \(discrName) = \(nextDiscriminant)
         """
       )
@@ -235,9 +219,9 @@ func getDiscriminant(
 
   return
     """
-    var \(raw: discrName): Swift::Int
-    switch \(raw: scrutinee) {
-    \(raw: cases.joined(separator: "\n"))
+    var \(discrName): Swift::Int
+    switch \(scrutinee) {
+    \(cases.joined(separator: "\n"))
     }
     """
 }
@@ -248,9 +232,9 @@ func getDiscriminant(
 func getEnumElementPayloadPattern(
   _ caseInfo: EnumCaseInfo,
   varPrefix: String
-) -> PatternSyntax {
+) -> String {
   if caseInfo.associatedValueLabels.isEmpty || !caseInfo.isReachable {
-    return ".\(raw: caseInfo.name)"
+    return ".\(caseInfo.name)"
   }
 
   let vars: [String] = caseInfo.associatedValueLabels.enumerated().map { i, name in
@@ -258,12 +242,12 @@ func getEnumElementPayloadPattern(
     return "\(prefix)let \(varPrefix)\(i)"
   }
 
-  return ".\(raw: caseInfo.name)(\(raw: vars.joined(separator: ", ")))"
+  return ".\(caseInfo.name)(\(vars.joined(separator: ", ")))"
 }
 
 /// A trap used for cases statically known to be unreachable at this call
 /// site (e.g. pruned by availability).
-func getUnreachableStatement() -> CodeBlockItemSyntax {
+func getUnreachableStatement() -> String {
   """
   Swift::fatalError("Unavailable code reached")
   """
