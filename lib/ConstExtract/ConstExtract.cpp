@@ -475,11 +475,21 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
 
     case ExprKind::MemberRef: {
       auto memberExpr = cast<MemberRefExpr>(expr);
+      auto label = memberExpr->getDecl().getDecl()->getBaseIdentifier().str();
+
       if (isa<TypeExpr>(memberExpr->getBase())) {
         auto baseTypeExpr = cast<TypeExpr>(memberExpr->getBase());
-        auto label = memberExpr->getDecl().getDecl()->getBaseIdentifier().str();
         return std::make_shared<MemberReferenceValue>(
             baseTypeExpr->getInstanceType(), label.str());
+      }
+
+      // Non-TypeExpr base: attempt to recursively extract the base and
+      // represent the chain as a ChainedMemberReferenceValue.
+      auto baseValue = extractCompileTimeValue(memberExpr->getBase(),
+                                               declContext);
+      if (!isa<RuntimeValue>(baseValue.get())) {
+        return std::make_shared<ChainedMemberReferenceValue>(label.str(),
+                                                             baseValue);
       }
       break;
     }
@@ -960,6 +970,30 @@ void writeValue(llvm::json::OStream &JSON,
               }
             });
           });
+        }
+      });
+    });
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::ChainedMemberReference: {
+    // Walk the chain collecting member labels.
+    std::vector<std::string> chain;
+    std::shared_ptr<CompileTimeValue> cursor = Value;
+    while (cursor && cursor->getKind() ==
+                         CompileTimeValue::ValueKind::ChainedMemberReference) {
+      auto *cmr = cast<ChainedMemberReferenceValue>(cursor.get());
+      chain.push_back(cmr->getMemberLabel());
+      cursor = cmr->getBaseValue();
+    }
+    std::reverse(chain.begin(), chain.end());
+
+    JSON.attribute("valueKind", "ChainedMemberReference");
+    JSON.attributeObject("value", [&]() {
+      JSON.attributeObject("baseValue", [&] { writeValue(JSON, cursor); });
+      JSON.attributeArray("members", [&] {
+        for (auto &label : chain) {
+          JSON.value(label);
         }
       });
     });
