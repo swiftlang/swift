@@ -10,6 +10,8 @@
 // RUN:     -Xllvm -sil-print-function='$s4main1CCACycfc' \
 // RUN:     2>&1 | %FileCheck %s
 
+// REQUIRES: rdar187793719
+
 // REQUIRES: PTRSIZE=64
 
 // This test expects the stdlib to be in its properly optimized form.
