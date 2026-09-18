@@ -459,6 +459,34 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   return SGF.emitManagedRValueWithCleanup(result, destLowering);
 }
 
+/// Specialized emitter for Builtin.takeFromRawPointer.
+static ManagedValue emitBuiltinTakeFromRawPointer(SILGenFunction &SGF,
+                                                  SILLocation loc,
+                                                  SubstitutionMap substitutions,
+                                                  ArrayRef<ManagedValue> args,
+                                                  SGFContext C) {
+  assert(substitutions.getReplacementTypes().size() == 1 &&
+         "take should have a single substitution");
+  assert(args.size() == 1 && "take should have a single argument");
+
+  auto &lowering = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
+  auto type = lowering.getLoweredType();
+  if (!lowering.isLoadable() ||
+      (!type.isBridgeableObjectType() && !type.is<BuiltinNativeObjectType>())) {
+    SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
+                     "takeFromRawPointer result must be a single reference");
+    return SGF.emitUndef(type);
+  }
+
+  // Adopt the existing reference without the retain implied by
+  // raw_pointer_to_ref.
+  SILValue result =
+      SGF.B.createUncheckedBitwiseCast(loc, args[0].getUnmanagedValue(), type);
+  result = SGF.B.createUncheckedOwnershipConversion(loc, result,
+                                                    OwnershipKind::Owned);
+  return SGF.emitManagedRValueWithCleanup(result, lowering);
+}
+
 static ManagedValue emitBuiltinAddressOfBuiltins(SILGenFunction &SGF,
                                          SILLocation loc,
                                          SubstitutionMap substitutions,
