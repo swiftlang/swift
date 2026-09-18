@@ -400,6 +400,9 @@ public:
            "Forming a CanType out of a non-canonical type!");
   }
 
+  /// Print the AST-level properties that affect abstract type lowering.
+  void printAbstractTypeLayoutInfo(raw_ostream &OS) const;
+
   void visit(llvm::function_ref<void (CanType)> fn) const {
     findIf([&fn](Type t) -> bool {
         fn(CanType(t));
