@@ -11696,6 +11696,8 @@ class UnconditionalCheckedCastAddrInst final
          SILFunction &F);
 
 public:
+  bool isCopy() const { return false; }
+
   CheckedCastInstOptions getCheckedCastOptions() const { return Options; }
 };
 

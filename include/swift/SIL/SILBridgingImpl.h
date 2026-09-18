@@ -2031,6 +2031,10 @@ BridgedInstruction::UnconditionalCheckedCast_getCheckedCastOptions() const {
         .getStorage()};
 }
 
+bool BridgedInstruction::UnconditionalCheckedCastAddr_isCopy() const {
+  return getAs<swift::UnconditionalCheckedCastAddrInst>()->isCopy();
+}
+
 BridgedCanType BridgedInstruction::UnconditionalCheckedCastAddr_getSourceFormalType() const {
   return {getAs<swift::UnconditionalCheckedCastAddrInst>()->getSourceFormalType()};
 }

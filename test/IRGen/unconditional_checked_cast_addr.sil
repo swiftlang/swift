@@ -1,0 +1,17 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-ir %s | %FileCheck %s
+
+sil_stage canonical
+import Swift
+
+// Unconditional | TakeOnSuccess | DestroyOnFailure: existing consuming behavior.
+// CHECK-LABEL: define {{.*}}@take_source(
+// CHECK: call {{.*}}@swift_dynamicCast({{.*}}i{{32|64}} 7)
+// CHECK-NOT: @swift_dynamicCast
+// CHECK: ret void
+sil @take_source : $@convention(thin) <T, U> (@in T) -> @out U {
+bb0(%0 : $*U, %1 : $*T):
+  unconditional_checked_cast_addr T in %1 : $*T to U in %0 : $*U
+  %2 = tuple ()
+  return %2 : $()
+}
