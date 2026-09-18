@@ -409,6 +409,18 @@ static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &SGF,
   // RawPointers do not have ownership semantics, so the cleanup on the
   // argument remains.
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
+  if (args[0].getType().getASTType().isCOMExistentialType()) {
+    auto value = args[0];
+    if (value.getType().isMoveOnlyWrapped()) {
+      if (value.getOwnershipKind() != OwnershipKind::Guaranteed)
+        value = value.borrow(SGF, loc);
+      value = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, value);
+    }
+    auto result = SGF.B.createUncheckedTrivialBitCast(loc, value.getValue(),
+                                                      rawPointerType);
+    return ManagedValue::forObjectRValueWithoutOwnership(result);
+  }
+
   SILValue result = SGF.B.createRefToRawPointer(loc, args[0].getValue(),
                                                 rawPointerType);
   return ManagedValue::forObjectRValueWithoutOwnership(result);
@@ -432,6 +444,12 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   SILType destType = destLowering.getLoweredType();
 
   // Take the raw pointer argument and cast it to the destination type.
+  if (destType.getASTType().isCOMExistentialType()) {
+    SILValue result = SGF.B.createUncheckedBitwiseCast(
+        loc, args[0].getUnmanagedValue(), destType);
+    return SGF.emitManagedCopy(loc, result, destLowering);
+  }
+
   // The instruction is not marked `immortal`, i.e. it produces an owned value.
   // The `immortal` flag is set later by the optimizer if the Swift 5.1 runtime
   // is available on the deployment target.
