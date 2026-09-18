@@ -24,9 +24,6 @@
 #include "llvm/Support/MathExtras.h"
 #include <cassert>
 #include <optional>
-#if __STDC_HOSTED__ && !defined(NDEBUG)
-#include <string>
-#endif // __STDC_HOSTED__ && !defined(NDEBUG)
 
 inline namespace __swift { inline namespace __runtime {
 namespace llvm {
@@ -345,19 +342,6 @@ inline Align max(MaybeAlign Lhs, Align Rhs) {
 inline Align max(Align Lhs, MaybeAlign Rhs) {
   return Rhs && *Rhs > Lhs ? *Rhs : Lhs;
 }
-
-#if __STDC_HOSTED__ && !defined(NDEBUG)
-// For usage in LLVM_DEBUG macros.
-inline std::string DebugStr(const Align &A) {
-  return std::to_string(A.value());
-}
-// For usage in LLVM_DEBUG macros.
-inline std::string DebugStr(const MaybeAlign &MA) {
-  if (MA)
-    return std::to_string(MA->value());
-  return "nullopt";
-}
-#endif // __STDC_HOSTED__ && !defined(NDEBUG)
 
 #undef ALIGN_CHECK_ISPOSITIVE
 
