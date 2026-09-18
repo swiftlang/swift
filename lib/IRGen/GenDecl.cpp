@@ -1209,6 +1209,21 @@ void IRGenerator::emitGlobalTopLevel(
   for (auto &ot : PrimaryIGM->getSILModule().getDefaultOverrideTableList()) {
     ensureRelativeSymbolCollocation(ot);
   }
+
+  // Under multi-threaded WMO the dynamic-replacements table is emitted into the
+  // primary IGM and references each replacement function with a *direct*
+  // relative reference (newFunction = replacement - tableAnchor). Force those
+  // replacement functions to be emitted into the primary IGM as well, so the
+  // reference does not cross an object-file boundary. A cross-object direct
+  // relative reference is unrepresentable on x86_64 Mach-O (an undefined
+  // minuend in an X86_64_RELOC_SUBTRACTOR). See rdar://187511655.
+  if (GenModules.size() > 1) {
+    for (SILFunction &f : PrimaryIGM->getSILModule()) {
+      if (f.isDefinition() && f.getDynamicallyReplacedFunction())
+        DefaultIGMForFunction[&f] = getPrimaryIGM();
+    }
+  }
+
   for (auto &directive: linkerDirectives) {
     createLinkerDirectiveVariable(*PrimaryIGM, directive);
   }
