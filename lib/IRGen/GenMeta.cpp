@@ -4789,7 +4789,7 @@ namespace {
         // It should be never called. We add a pointer to an error function.
         if (afd->hasAsync()) {
           ptr = llvm::ConstantExpr::getBitCast(
-              IGM.getDeletedAsyncMethodErrorAsyncFunctionPointer(),
+              IGM.getOrCreateDeadAsyncMethodErrorFunctionPointer(),
               IGM.FunctionPtrTy);
         } else if (accessor && requiresFeatureCoroutineAccessors(
                                    accessor->getAccessorKind())) {
@@ -8229,6 +8229,32 @@ llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
   builder.addInt32(size.getValue());
   return cast<llvm::GlobalValue>(IGM.defineAsyncFunctionPointer(
       entity, builder.finishAndCreateFuture()));
+}
+
+// AsyncFunctionPointer wrapping getOrCreateDeadMethodErrorAsyncStub(), used
+// to fill dead async-method vtable/witness slots.
+llvm::Constant *IRGenModule::getOrCreateDeadAsyncMethodErrorFunctionPointer() {
+  if (DeadAsyncMethodErrorFunctionPointer)
+    return DeadAsyncMethodErrorFunctionPointer;
+  auto *asyncStub = getOrCreateDeadMethodErrorAsyncStub();
+  // Set up the AsyncFunctionPointer struct, roughly following
+  // emitAsyncFunctionPointer() and getOrCreateDeadMethodErrorStub()
+  ConstantInitBuilder initBuilder(*this);
+  ConstantStructBuilder builder(
+      initBuilder.beginStruct(AsyncFunctionPointerTy));
+  builder.addCompactFunctionReference(asyncStub);
+  builder.addInt32((NumWords_AsyncLet * getPointerSize()).getValue());
+  bool canLinkOnce = !Module.getTargetTriple().isOSBinFormatCOFF();
+  auto *afp = builder.finishAndCreateGlobal(
+      "_swift_dead_async_method_error_afp", getPointerAlignment(),
+      /*constant*/ true,
+      canLinkOnce ? llvm::GlobalValue::LinkOnceODRLinkage
+                  : llvm::GlobalValue::InternalLinkage);
+  ApplyIRLinkage(canLinkOnce ? IRLinkage::InternalLinkOnceODR
+                             : IRLinkage::Internal)
+      .to(afp, /* nonAliasedDefinition */ false);
+  DeadAsyncMethodErrorFunctionPointer = afp;
+  return afp;
 }
 
 llvm::GlobalValue *irgen::emitCoroFunctionPointer(IRGenModule &IGM,

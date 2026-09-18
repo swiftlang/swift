@@ -1631,7 +1631,6 @@ public:
   ClassDecl *getSwiftNativeNSObjectDecl();
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
-  llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
   llvm::Constant *
   getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer();
 
@@ -1640,6 +1639,12 @@ public:
   /// whose witness can never be reached, so that reaching one traps instead of
   /// requiring us to emit a real (dead) implementation.
   llvm::Function *getOrCreateDeadMethodErrorStub();
+
+  /// Like getOrCreateDeadMethodErrorStub(), but async.
+  llvm::Function *getOrCreateDeadMethodErrorAsyncStub();
+
+  /// AsyncFunctionPointer wrapping getOrCreateDeadMethodErrorAsyncStub().
+  llvm::Constant *getOrCreateDeadAsyncMethodErrorFunctionPointer();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -1669,6 +1674,10 @@ private:                                                                       \
   /// A local stub function that simply calls swift_deletedMethodError(),
   /// used to fill dead-method vtable/witness slots (see emitVTableStubs()).
   llvm::Function *DeadMethodErrorStub = nullptr;
+  /// Like DeadMethodErrorStub, but async.
+  llvm::Function *DeadMethodErrorAsyncStub = nullptr;
+  /// A local AsyncFunctionPointer wrapping DeadMethodErrorAsyncStub.
+  llvm::Constant *DeadAsyncMethodErrorFunctionPointer = nullptr;
   /// A Coroutine Function Pointer wrapping the above, suited for
   /// filling vtable/witness slots that point to "callee-allocated"
   /// (new ABI) coroutines.
