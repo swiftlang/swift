@@ -12,6 +12,22 @@ struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:retainNode")))
 __attribute__((swift_attr("release:releaseNode"))) Node {
   int value;
+
+  // Instance methods. A foreign reference type is a class in Swift, so a
+  // non-const method is implemented by a non-mutating method too.
+  int get() const;
+  void add(int d);
+  int overloadedByType(int x) const;
+  double overloadedByType(double x) const;
+  int renamedOverload(int x) const;
+  double renamedOverload(double x) const;
+
+  // A const and a non-const overload have the same parameter types, and a
+  // class has no `mutating` to tell them apart.
+  // expected-note@+1{{found this candidate}}
+  int adjust(int x) const;
+  // expected-note@+1{{found this candidate}}
+  int adjust(int x);
 };
 
 // Parameters
@@ -52,8 +68,40 @@ struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:immortal")))
 __attribute__((swift_attr("release:immortal"))) Singleton {
   int value;
+
+  // Methods: `self` is the immortal reference, and a result of the type needs
+  // no ownership annotation.
+  int read() const;
+  Singleton *_Nonnull itself() const;
 };
 
 Singleton *_Nonnull returnsSingleton(Singleton *_Nonnull s);
+
+// A virtual method of a foreign reference type
+
+struct Polymorphic;
+void retainPolymorphic(Polymorphic *_Nonnull);
+void releasePolymorphic(Polymorphic *_Nonnull);
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:retainPolymorphic")))
+__attribute__((swift_attr("release:releasePolymorphic"))) Polymorphic {
+  // expected-note@+1{{declare a non-inline virtual method before 'virtualMethod' to make that method the key function instead}}
+  virtual int virtualMethod() const;
+  int nonVirtualMethod() const;
+};
+
+// A foreign reference type whose retain and release operations are member
+// functions
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:.retainMethod")))
+__attribute__((swift_attr("release:.releaseMethod"))) Counted {
+  int value;
+
+  void retainMethod() const;
+  void releaseMethod() const;
+  int get() const;
+};
 
 #endif // !TEST_INTEROP_CXX_CXX_IMPL_FOREIGN_REFERENCE_H
