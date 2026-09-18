@@ -939,7 +939,12 @@ struct ImmutableAddressUseVerifier {
         }
         return true;
       }
-      case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+      case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
+        auto *cast = swift::cast<UnconditionalCheckedCastAddrInst>(inst);
+        if (use->get() == cast->getDest() || !cast->isCopy())
+          return true;
+        break;
+      }
       case SILInstructionKind::UncheckedRefCastAddrInst:
         if (isConsumingOrMutatingMoveAddrUse(use)) {
           return true;
