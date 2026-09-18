@@ -17,7 +17,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/DiagnosticsIRGen.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
@@ -25,6 +24,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
+#include "swift/Basic/UUID.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -36,17 +36,21 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/Diagnostic.h"
+#include "clang/Basic/DiagnosticIDs.h"
+#include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/HeaderSearch.h"
-#include "clang/Lex/HeaderSearchOptions.h"
 #include "clang/Lex/Preprocessor.h"
-#include "clang/Lex/PreprocessorOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Frontend/Debug/Options.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
@@ -1061,6 +1065,16 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability
+  EmbeddedDistributedSwiftAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getEmbeddedDistributedSwiftAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability CoroutineAccessorsAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getCoroutineAccessorsAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
@@ -1360,6 +1374,24 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 
 #include "swift/Runtime/RuntimeFunctions.def"
 
+llvm::Constant *
+IRGenModule::getCOMIdentityConstant(StringRef identity) {
+  std::optional<UUID> uuid = UUID::fromString(identity.str().c_str());
+  ASSERT(uuid && "COM interface ID should have been validated by Sema");
+
+  unsigned char bytes[UUID::Size];
+  uuid->getCanonicalBytes(bytes);
+
+  if (!Triple.isLittleEndian())
+    return llvm::ConstantDataArray::get(getLLVMContext(), llvm::ArrayRef(bytes));
+
+  std::reverse(bytes + 0, bytes + 4);
+  std::reverse(bytes + 4, bytes + 6);
+  std::reverse(bytes + 6, bytes + 8);
+
+  return llvm::ConstantDataArray::get(getLLVMContext(), llvm::ArrayRef(bytes));
+}
+
 std::pair<llvm::GlobalVariable *, llvm::Constant *>
 IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
                                   StringRef sectionName, StringRef name) {
@@ -1639,6 +1671,8 @@ void IRGenModule::constructInitialFnAttributes(
   // Add/remove MinSize based on the appropriate setting.
   if (FuncOptMode == OptimizationMode::NotSet)
     FuncOptMode = IRGen.Opts.OptMode;
+  // Mirror Clang (getTrivialDefaultFunctionAttributes): only size-optimized
+  // functions get OptimizeForSize/MinSize; speed functions get neither.
   if (FuncOptMode == OptimizationMode::ForSize) {
     Attrs.addAttribute(llvm::Attribute::OptimizeForSize);
     Attrs.addAttribute(llvm::Attribute::MinSize);
@@ -1669,6 +1703,58 @@ llvm::AttributeList IRGenModule::constructInitialAttributes() {
   llvm::AttrBuilder b(getLLVMContext());
   constructInitialFnAttributes(b);
   return llvm::AttributeList().addFnAttributes(getLLVMContext(), b);
+}
+
+void IRGenModule::addTargetAttrFunctionAttributes(llvm::Function *fn,
+                                                  StringRef targetString) {
+  if (targetString.empty())
+    return;
+  auto *clangImporter =
+      static_cast<ClangImporter *>(Context.getClangModuleLoader());
+  auto &TI = clangImporter->getTargetInfo();
+  clang::ParsedTargetAttr parsed = TI.parseTargetAttr(targetString);
+  StringRef targetCPU = TI.getTargetOpts().CPU;
+  StringRef tuneCPU = TI.getTargetOpts().TuneCPU;
+  if (!parsed.CPU.empty() && TI.isValidCPUName(parsed.CPU)) {
+    targetCPU = parsed.CPU;
+    tuneCPU = ""; // Clear the tune CPU
+  }
+  if (!parsed.Tune.empty() && TI.isValidCPUName(parsed.Tune))
+    tuneCPU = parsed.Tune;
+  llvm::StringMap<bool> featureMap;
+  static clang::DiagnosticOptions diagOpts;
+  clang::DiagnosticsEngine diags(clang::DiagnosticIDs::create(), diagOpts,
+                                 new clang::IgnoringDiagConsumer());
+  TI.initFeatureMap(featureMap, diags, targetCPU, parsed.Features);
+  if (!featureMap.empty()) {
+    std::vector<std::string> features;
+    for (auto &entry : featureMap)
+      features.push_back((entry.getValue() ? "+" : "-") + entry.getKey().str());
+    llvm::sort(features);
+    fn->addFnAttr("target-features", llvm::join(features, ","));
+  }
+  if (!targetCPU.empty())
+    fn->addFnAttr("target-cpu", targetCPU);
+  if (!tuneCPU.empty())
+    fn->addFnAttr("tune-cpu", tuneCPU);
+  if (!parsed.BranchProtection.empty()) {
+    clang::TargetInfo::BranchProtectionInfo BPI;
+    StringRef diagMsg;
+    if (TI.validateBranchProtection(parsed.BranchProtection, parsed.CPU, BPI,
+                                    clangImporter->getClangASTContext().getLangOpts(),
+                                    diagMsg)) {
+      if (BPI.SignReturnAddr != clang::LangOptions::SignReturnAddressScopeKind::None) {
+        fn->addFnAttr("sign-return-address", BPI.getSignReturnAddrStr());
+        fn->addFnAttr("sign-return-address-key", BPI.getSignKeyStr());
+      }
+      if (BPI.BranchTargetEnforcement)
+        fn->addFnAttr("branch-target-enforcement");
+      if (BPI.BranchProtectionPAuthLR)
+        fn->addFnAttr("branch-protection-pauth-lr");
+      if (BPI.GuardedControlStack)
+        fn->addFnAttr("guarded-control-stack");
+    }
+  }
 }
 
 llvm::ConstantInt *IRGenModule::getInt32(uint32_t value) {

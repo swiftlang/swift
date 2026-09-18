@@ -55,6 +55,25 @@ bb0:
   return %0 : $()
 }
 
+// CHECK-LABEL: sil @end_formal_scope :
+sil @end_formal_scope : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK: bb0([[ARG:%[0-9]+]] :
+entry(%arg : $Builtin.Int32):
+  // CHECK: [[LOCAL_LET:%.*]] = integer_literal
+  %local_let = integer_literal $Builtin.Int32, 1
+  // CHECK: [[LOCAL_VAR:%.*]] = alloc_stack
+  %local_var = alloc_stack $Builtin.Int32
+
+  // CHECK: end_formal_scope [[LOCAL_VAR]]
+  end_formal_scope %local_var
+  dealloc_stack %local_var
+  // CHECK: end_formal_scope [[LOCAL_LET]]
+  end_formal_scope %local_let
+  // CHECK: end_formal_scope [[ARG]]
+  end_formal_scope %arg
+  return undef : $()
+}
+
 sil [ossa] @strong_copy_unmanaged_value_test : $@convention(thin) (@sil_unmanaged Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : $@sil_unmanaged Builtin.NativeObject):
   %1 = strong_copy_unmanaged_value %0 : $@sil_unmanaged Builtin.NativeObject

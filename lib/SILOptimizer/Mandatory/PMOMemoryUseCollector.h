@@ -44,8 +44,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILType.h"
-#include "llvm/ADT/APInt.h"
-#include "llvm/Support/Compiler.h"
 
 namespace swift {
 

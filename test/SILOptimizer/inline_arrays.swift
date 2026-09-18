@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -primary-file %s -O -disable-availability-checking -module-name=test -emit-sil | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
+// RUN: %target-swift-frontend  -primary-file %s -O -disable-availability-checking -module-name=test -emit-sil -parse-as-library | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
 
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
@@ -7,7 +7,7 @@
 // CHECK-ONONE:    [[ACC:%.*]] = begin_access [read] [static] %0
 // CHECK-ONONE:    [[S:%.*]] = struct_element_addr [[ACC]], #InlineArray._storage
 // CHECK:          [[BA:%.*]] = vector_base_addr [[S]]
-// CHECK:          [[EA:%.*]] = index_addr [stack_protection] [projection] [[BA]],
+// CHECK:          [[EA:%.*]] = index_addr [projection] [[BA]],
 // CHECK-OPT:      [[E:%.*]] = load [[EA]]
 // CHECK-ONONE:    [[ACC2:%.*]] = begin_access [read] [unsafe] [[EA]]
 // CHECK-ONONE:    [[E:%.*]] = load [[ACC2]]
@@ -35,7 +35,7 @@ public final class C {
   // CHECK:          [[CA:%.*]] = ref_element_addr [immutable] %1, #C.a
   // CHECK:          [[S:%.*]] = struct_element_addr [[CA]], #InlineArray._storage
   // CHECK:          [[BA:%.*]] = vector_base_addr [[S]]
-  // CHECK:          [[EA:%.*]] = index_addr [stack_protection] [projection] [[BA]],
+  // CHECK:          [[EA:%.*]] = index_addr [projection] [[BA]],
   // CHECK-OPT:      [[E:%.*]] = load [[EA]]
   // CHECK-ONONE:    [[ACC2:%.*]] = begin_access [read] [unsafe] [[EA]]
   // CHECK-ONONE:    [[E:%.*]] = load [[ACC2]]
@@ -46,6 +46,19 @@ public final class C {
   }
 }
 
+// rdar://172132851 (Getting a MutableSpan from an InlineArray causes a heap allocation that isn't really used)
+// CHECK-LABEL: sil @$s4test0A11MutableSpanySis11InlineArrayVy$511_SiGzF
+// CHECK-NOT:     alloc{{.*}}InlineArray
+// CHECK-LABEL: } // end sil function '$s4test0A11MutableSpanySis11InlineArrayVy$511_SiGzF'
+public func testMutableSpan(_ value: inout [512 of Int]) -> Int {
+    var sum = 0
+    let span = value.mutableSpan
+    for i in span.indices {
+        sum &+= span[i]
+    }
+    return sum
+}
+
 public struct S {
   let a: InlineArray<7000, UInt8>
 
@@ -53,7 +66,7 @@ public struct S {
   // CHECK:          [[A:%.*]] = struct_element_addr %1, #S.a
   // CHECK:          [[S:%.*]] = struct_element_addr [[A]], #InlineArray._storage
   // CHECK:          [[BA:%.*]] = vector_base_addr [[S]]
-  // CHECK:          [[EA:%.*]] = index_addr [stack_protection] [projection] [[BA]],
+  // CHECK:          [[EA:%.*]] = index_addr [projection] [[BA]],
   // CHECK-OPT:      [[E:%.*]] = load [[EA]]
   // CHECK-ONONE:    [[ACC2:%.*]] = begin_access [read] [unsafe] [[EA]]
   // CHECK-ONONE:    [[E:%.*]] = load [[ACC2]]
@@ -160,7 +173,8 @@ public func dontCopyEveryIterationSmallConditional(a: [2 of Int32], indices: [In
 
 // TODO: Eliminate the redundant store in this case, where the loop is unrolled.
 //
-// CHECK-LABEL: sil @$s4test46dontCopyEveryIterationSmallConditionalUnrolled1a1fs5Int32Vs11InlineArrayVy$1_AFG_SbSiXEtF : $@convention(thin) (InlineArray<2, Int32>, @guaranteed @noescape @callee_guaranteed (Int) -> Bool) -> Int32 {
+// CHECK-LABEL: sil @$s4test46dontCopyEveryIterationSmallConditionalUnrolled1a4conds5Int32Vs11InlineArrayVy$1_AFG_SbtF : $@convention(thin) (InlineArray<2, Int32>, Bool) -> Int32 {
+
 // CHECK:         alloc_stack
 // CHECK:         store
 // CHECK:         store
@@ -168,11 +182,11 @@ public func dontCopyEveryIterationSmallConditional(a: [2 of Int32], indices: [In
 // CHECK-NOT:     alloc_stack
 // CHECK-NOT:     store
 // CHECK-NOT:     dealloc_stack
-// CHECK:       } // end sil function '$s4test46dontCopyEveryIterationSmallConditionalUnrolled1a1fs5Int32Vs11InlineArrayVy$1_AFG_SbSiXEtF'
-public func dontCopyEveryIterationSmallConditionalUnrolled(a: [2 of Int32], f: (Int) -> Bool) -> Int32 {
+// CHECK-LABEL: } // end sil function '$s4test46dontCopyEveryIterationSmallConditionalUnrolled1a4conds5Int32Vs11InlineArrayVy$1_AFG_SbtF'
+public func dontCopyEveryIterationSmallConditionalUnrolled(a: [2 of Int32], cond: Bool) -> Int32 {
   var s: Int32 = 0
   for i in a.indices {
-    if f(i) {
+    if (cond) {
       s += a[i]
     }
   }
@@ -196,3 +210,52 @@ public func equal(_ lhs: borrowing [32 of Int], _ rhs: borrowing [32 of Int]) ->
     }
     return true
 }
+
+// MARK: rdar://183793878 (Reading an InlineArray field of struct in an Array causes a full copy of the struct)
+// Verify that we can use Array.span to avoid copying elements when subscripting.
+
+public struct E {
+    var tag: UInt8 = 0
+    var v: [16 of UInt8] = .init(repeating: 0)
+    var pad: [128 of UInt8] = .init(repeating: 0)
+}
+
+// CHECK-LABEL: sil @$s4test9s_dynamicys5UInt8VSayAA1EVG_S2itF
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test9s_dynamicys5UInt8VSayAA1EVG_S2itF'
+public func s_dynamic(_ a: [E], _ i: Int, _ j: Int) -> UInt8 { a.span[i].v[j] }
+
+
+let gLet = [E](repeating: E(), count: 64)
+var gVar = [E](repeating: E(), count: 64)
+public final class Holder { var p = [E](repeating: E(), count: 64) }
+
+// CHECK-LABEL: sil @$s4test16a_borrowingParamys5UInt8VSayAA1EVG_S2itF
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test16a_borrowingParamys5UInt8VSayAA1EVG_S2itF'
+public func a_borrowingParam(_ a: borrowing [E], _ i: Int, _ j: Int) -> UInt8 { a[i].v[j] }
+
+// CHECK-LABEL: sil {{.*}} @$s4test16a_consumingParamys5UInt8VSayAA1EVGn_S2itF
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test16a_consumingParamys5UInt8VSayAA1EVGn_S2itF'
+public func a_consumingParam(_ a: consuming [E], _ i: Int, _ j: Int) -> UInt8 { a.span[i].v[j] }
+
+// CHECK-LABEL: sil @$s4test11a_globalLetys5UInt8VSi_SitF
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test11a_globalLetys5UInt8VSi_SitF'
+public func a_globalLet(_ i: Int, _ j: Int) -> UInt8 { gLet.span[i].v[j] }
+
+// CHECK-LABEL: sil @$s4test11a_globalVarys5UInt8VSi_SitF
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test11a_globalVarys5UInt8VSi_SitF'
+public func a_globalVar(_ i: Int, _ j: Int) -> UInt8 { gVar.span[i].v[j] }
+
+// CHECK-LABEL: sil @$s4test15a_classPropertyys5UInt8VAA6HolderC_S2itF
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test15a_classPropertyys5UInt8VAA6HolderC_S2itF'
+public func a_classProperty(_ h: borrowing Holder, _ i: Int, _ j: Int) -> UInt8 { h.p.span[i].v[j] }
+
+// specialized a_consumingParam that does not consume the array, called from original a_consumingParam.
+// CHECK-LABEL: sil shared @$s4test16a_consumingParamys5UInt8VSayAA1EVGn_S2itFTf4gnn_n
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function '$s4test16a_consumingParamys5UInt8VSayAA1EVGn_S2itFTf4gnn_n'

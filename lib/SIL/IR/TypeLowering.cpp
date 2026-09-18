@@ -60,12 +60,24 @@ llvm::cl::opt<bool> TypeLoweringDisableVerification(
     "type-lowering-disable-verification", llvm::cl::init(false),
     llvm::cl::desc("Disable the asserts-only verification of lowerings"));
 
+// Treat trivial types like regular loadable types with ownership.
+llvm::cl::opt<bool> TypeLoweringNoTrivialTypes(
+    "type-lowering-no-trivial-types", llvm::cl::init(false),
+    llvm::cl::desc("Force TypeLowering to treat trivial types as nontrivial"));
+
+bool TypeLowering::isTrivial(SILFunction *inFunction) const {
+  if (inFunction->hasOwnershipForTrivialValues())
+    return false;
+  
+  return isTrivial();
+}
+
 namespace {
   /// A CRTP type visitor for deciding whether the metatype for a type
   /// is a singleton type, i.e. whether there can only ever be one
   /// such value.
   struct HasSingletonMetatype : CanTypeVisitor<HasSingletonMetatype, bool> {
-    /// Class metatypes have non-trivial representation due to the
+    /// Class metatypes have non-empty representation due to the
     /// possibility of subclassing.
     bool visitClassType(CanClassType type) {
       if (type->isForeignReferenceType())
@@ -79,7 +91,7 @@ namespace {
       return false;
     }
 
-    /// Dependent types have non-trivial representation in case they
+    /// Dependent types have non-empty representation in case they
     /// instantiate to a class metatype.
     bool visitGenericTypeParamType(CanGenericTypeParamType type) {
       return false;
@@ -91,7 +103,7 @@ namespace {
       return false;
     }
     
-    /// Archetype metatypes have non-trivial representation in case
+    /// Archetype metatypes have non-empty representation in case
     /// they instantiate to a class metatype.
     bool visitArchetypeType(CanArchetypeType type) {
       return false;
@@ -102,7 +114,7 @@ namespace {
       return visit(type.getInstanceType());
     }
 
-    /// Everything else is trivial.  Note that ordinary metatypes of
+    /// Everything else is empty.  Note that ordinary metatypes of
     /// existential types are still singleton.
     bool visitType(CanType type) {
       return true;
@@ -364,9 +376,13 @@ namespace {
     IMPL(AnyMetatype, Trivial)
     IMPL(Module, Trivial)
     IMPL(Integer, Trivial)
-    IMPL(Hidden, Trivial)
 
 #undef IMPL
+
+    RetTy visitHiddenType(CanHiddenType type, AbstractionPattern origType,
+                          IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("must be implemented by derived class");
+    }
 
     RetTy visitBuiltinUnboundGenericType(CanBuiltinUnboundGenericType type,
                                          AbstractionPattern origType,
@@ -643,6 +659,7 @@ namespace {
                          IsTypeExpansionSensitive_t) {
       llvm_unreachable("shouldn't get an inout type here");
     }
+
     RetTy visitErrorType(CanErrorType type,
                          AbstractionPattern origType,
                          IsTypeExpansionSensitive_t isSensitive) {
@@ -791,6 +808,19 @@ namespace {
     RetTy
     visitArchetypeType(CanArchetypeType type, AbstractionPattern origType,
                        IsTypeExpansionSensitive_t isSensitive) {
+      // Opening a COM existential exposes the interface pointer already
+      // stored in that existential. This is distinct from an ordinary
+      // generic parameter constrained to a COM interface, which keeps its
+      // opaque Swift generic representation.
+      if (type->is<ExistentialArchetypeType>() &&
+          llvm::any_of(type->getConformsTo(), [](ProtocolDecl *protocol) {
+            return protocol->isCOMInterface();
+          })) {
+        return asImpl().handleNonTrivialAggregate(
+            type, {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
+                   isSensitive, DoesNotHaveRawPointer, IsLexical});
+      }
+
       // TODO: Add a HasOnlyDefaultDeinit "layout protocol".
       auto LayoutInfo = type->getLayoutConstraint();
       if (LayoutInfo) {
@@ -1032,6 +1062,21 @@ namespace {
       return handleClassificationFromLowering(type, props, isSensitive);
     }
 
+    SILTypeProperties
+    visitHiddenType(CanHiddenType type, AbstractionPattern origType,
+                    IsTypeExpansionSensitive_t isSensitive) {
+      auto *layoutInfo = type->getLayoutInfoDecl();
+      // TODO: Remove this legacy fallback once every HiddenType carries an
+      // abstract layout.
+      if (!layoutInfo)
+        return getTrivialSILTypeProperties(isSensitive);
+
+      assert(layoutInfo->Layout &&
+             "HiddenTypeLayoutInfoDecl should have abstract layout");
+      return mergeIsTypeExpansionSensitive(
+          isSensitive, layoutInfo->Layout->typeProperties);
+    }
+
   private:
     SILTypeProperties
     handleClassificationFromLowering(CanType type,
@@ -1094,6 +1139,9 @@ namespace {
 
   /// A class for trivial, fixed-layout, loadable types.
   class TrivialTypeLowering final : public LoadableTypeLowering {
+    bool hasOwnershipForTrivialValues(SILBuilder &B) const {
+      return B.getFunction().hasOwnershipForTrivialValues();
+    }
   public:
     TrivialTypeLowering(SILType type, SILTypeProperties properties,
                         TypeExpansionContext forExpansion)
@@ -1106,77 +1154,115 @@ namespace {
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
                             IsTake_t isTake) const override {
-      return emitLoad(B, loc, addr, LoadOwnershipQualifier::Trivial);
+      LoadOwnershipQualifier qual;
+      if (hasOwnershipForTrivialValues(B)) {
+        qual = isTake ? LoadOwnershipQualifier::Take
+                      : LoadOwnershipQualifier::Copy;
+      } else {
+        qual = LoadOwnershipQualifier::Trivial;
+      }
+      return emitLoad(B, loc, addr, qual);
     }
 
     void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
                          SILValue value, SILValue addr,
                          IsInitialization_t isInit) const override {
-      emitStore(B, loc, value, addr, StoreOwnershipQualifier::Trivial);
+      StoreOwnershipQualifier qual;
+      if (hasOwnershipForTrivialValues(B)) {
+        qual = isInit ? StoreOwnershipQualifier::Init
+                      : StoreOwnershipQualifier::Assign;
+      } else {
+        qual = StoreOwnershipQualifier::Trivial;
+      }
+      emitStore(B, loc, value, addr, qual);
     }
 
     void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
                    SILValue addr, StoreOwnershipQualifier qual) const override {
-      if (B.getFunction().hasOwnership()) {
-        B.createStore(loc, value, addr, StoreOwnershipQualifier::Trivial);
-        return;
+      if (B.getFunction().hasOwnershipForTrivialValues()) {
+        // take qualifier as given
+      } else if (B.getFunction().hasOwnership()) {
+        qual = StoreOwnershipQualifier::Trivial;
+      } else {
+        qual = StoreOwnershipQualifier::Unqualified;
       }
-      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+      B.createStore(loc, value, addr, qual);
     }
 
     SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                       LoadOwnershipQualifier qual) const override {
-      if (B.getFunction().hasOwnership())
-        return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
-      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      if (B.getFunction().hasOwnershipForTrivialValues()) {
+        // take qualifier as given
+      } else if (B.getFunction().hasOwnership()) {
+        qual = LoadOwnershipQualifier::Trivial;
+      } else {
+        qual = LoadOwnershipQualifier::Unqualified;
+      }
+      return B.createLoad(loc, addr, qual);
     }
 
     SILValue emitLoweredLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                              LoadOwnershipQualifier qual,
                              TypeExpansionKind) const override {
-      if (B.getFunction().hasOwnership())
-        return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
-      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      return emitLoad(B, loc, addr, qual);
     }
 
     void emitLoweredStore(SILBuilder &B, SILLocation loc, SILValue value,
                           SILValue addr, StoreOwnershipQualifier qual,
                           Lowering::TypeLowering::TypeExpansionKind
                               expansionKind) const override {
-      auto storeQual = [&]() -> StoreOwnershipQualifier {
-        if (B.getFunction().hasOwnership())
-          return StoreOwnershipQualifier::Trivial;
-        return StoreOwnershipQualifier::Unqualified;
-      }();
-      B.createStore(loc, value, addr, storeQual);
+      emitStore(B, loc, value, addr, qual);
     }
 
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
-      // Trivial
+      // Trivial types don't need to do any work to destroy, but we mark the
+      // end of value lifetime when trivial value ownership is enabled.
+      if (hasOwnershipForTrivialValues(B)) {
+        SILValue value = emitLoad(B, loc, addr, LoadOwnershipQualifier::Take);
+        emitDestroyValue(B, loc, value);
+      }
     }
 
     void
     emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                             TypeExpansionKind loweringStyle) const override {
-      // Trivial
+      // Trivial types don't need to do any work to destroy, but we mark the
+      // end of value lifetime when trivial value ownership is enabled.
+      if (hasOwnershipForTrivialValues(B)) {
+        emitDestroyValue(B, loc, value);
+      }
     }
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
                                   TypeExpansionKind style) const override {
-      // Trivial
+      // Trivial types don't need to do any work to destroy, but we mark the
+      // introduction of a new value lifetime when trivial value ownership is
+      // enabled.
+      if (hasOwnershipForTrivialValues(B)) {
+        return emitCopyValue(B, loc, value);
+      }
       return value;
     }
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      // Trivial
+      // Trivial types don't need to do any work to destroy, but we mark the
+      // introduction of a new value lifetime when trivial value ownership is
+      // enabled.
+      if (hasOwnershipForTrivialValues(B)) {
+        return B.createCopyValue(loc, value);
+      }
       return value;
     }
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
+      if (hasOwnershipForTrivialValues(B)) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
       if (B.getFunction().hasOwnership()
           && B.getModule().getStage() == SILStage::Raw
           && value->isFromVarDecl()) {
@@ -2312,6 +2398,117 @@ namespace {
     }
   };
 
+  class TrivialOpaqueValueTypeLowering : public LoadableTypeLowering {
+  public:
+    TrivialOpaqueValueTypeLowering(SILType type, SILTypeProperties properties,
+                                   TypeExpansionContext forExpansion)
+        : LoadableTypeLowering(type, properties, IsNotReferenceCounted,
+                               forExpansion) {
+      assert(properties.isTrivial());
+      assert(properties.isAddressOnly());
+    }
+
+    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
+                            IsTake_t isTake) const override {
+      return emitLoad(B, loc, addr, LoadOwnershipQualifier::Trivial);
+    }
+
+    void emitStoreOfCopy(SILBuilder &B, SILLocation loc, SILValue value,
+                         SILValue addr,
+                         IsInitialization_t isInit) const override {
+      emitStore(B, loc, value, addr, StoreOwnershipQualifier::Trivial);
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      if (B.getFunction().hasOwnership()) {
+        B.createStore(loc, value, addr, StoreOwnershipQualifier::Trivial);
+        return;
+      }
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      if (B.getFunction().hasOwnership())
+        return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
+      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+    }
+
+    void emitLoweredStore(SILBuilder &B, SILLocation loc, SILValue value,
+                          SILValue addr, StoreOwnershipQualifier qual,
+                          Lowering::TypeLowering::TypeExpansionKind
+                              expansionKind) const override {
+      if (B.getFunction().hasOwnership()) {
+        B.createStore(loc, value, addr, StoreOwnershipQualifier::Trivial);
+        return;
+      }
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+    }
+
+    SILValue emitLoweredLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                             LoadOwnershipQualifier qual,
+                             TypeExpansionKind) const override {
+      if (B.getFunction().hasOwnership())
+        return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
+      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+    }
+
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+      // Trivial
+    }
+
+    void
+    emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
+                            TypeExpansionKind loweringStyle) const override {
+      // Trivial
+    }
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  TypeExpansionKind style) const override {
+      // Trivial
+      return value;
+    }
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      // Trivial
+      return value;
+    }
+
+    void emitCopyInto(SILBuilder &B, SILLocation loc, SILValue src,
+                      SILValue dest, IsTake_t isTake,
+                      IsInitialization_t isInit) const override {
+      if (B.getFunction().hasLoweredAddresses()) {
+        B.createCopyAddr(loc, src, dest, isTake, isInit);
+      } else {
+        SILValue value = emitLoad(B, loc, src, LoadOwnershipQualifier::Trivial);
+        emitStore(B, loc, value, dest, StoreOwnershipQualifier::Trivial);
+      }
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      if (B.getFunction().hasOwnership() &&
+          B.getModule().getStage() == SILStage::Raw && value->isFromVarDecl()) {
+        // Do not use destroy_value for trivial values. The lifetime introducer
+        // may be implicitly copied and used outside of its original scope,
+        // which violates the invariants of destroy_value.
+        B.createExtendLifetime(loc, value);
+        return;
+      }
+      // Trivial
+    }
+  };
+
+  static bool isImmortalForeignReferenceType(CanType type) {
+    if (type.isForeignReferenceType() || isa<ArchetypeType>(type))
+      return type->getReferenceCounting() == ReferenceCounting::None;
+    return false;
+  }
+
   /// Build the appropriate TypeLowering subclass for the given type,
   /// which is assumed to already have been lowered.
   class LowerType
@@ -2329,6 +2526,13 @@ namespace {
                                 SILTypeProperties properties) {
       properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       auto silType = SILType::getPrimitiveObjectType(type);
+      
+      if (TypeLoweringNoTrivialTypes.getValue()) {
+        properties.setNonTrivial();
+        properties.setLexical(IsLexical);
+        return new (TC) MiscNontrivialTypeLowering(silType, properties, Expansion);
+      }
+      
       return new (TC) TrivialTypeLowering(silType, properties, Expansion);
     }
 
@@ -2336,8 +2540,7 @@ namespace {
                                   SILTypeProperties properties) {
       properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       auto silType = SILType::getPrimitiveObjectType(type);
-      if (type.isForeignReferenceType() &&
-          type->getReferenceCounting() == ReferenceCounting::None)
+      if (isImmortalForeignReferenceType(type))
         return new (TC) TrivialTypeLowering(
             silType, SILTypeProperties::forTrivial(), Expansion);
 
@@ -2386,6 +2589,10 @@ namespace {
       // derived per query by TypeLowering::getLoweredType(bool) from the
       // caller's lowered-addresses state, rather than baked in here.
       auto silType = SILType::getPrimitiveObjectType(type);
+      if (properties.isTrivial()) {
+        return new (TC)
+            TrivialOpaqueValueTypeLowering(silType, properties, Expansion);
+      }
       return new (TC) OpaqueValueTypeLowering(silType, properties, Expansion);
     }
 
@@ -2394,6 +2601,34 @@ namespace {
       properties = mergeHasPack(HasPack_t(T->hasAnyPack()), properties);
       auto type = SILType::getPrimitiveObjectType(T);
       return new (TC) MiscNontrivialTypeLowering(type, properties, Expansion);
+    }
+
+    TypeLowering *
+    visitHiddenType(CanHiddenType type, AbstractionPattern origType,
+                    IsTypeExpansionSensitive_t isSensitive) {
+      auto *layoutInfo = type->getLayoutInfoDecl();
+      // TODO: Remove this legacy fallback once every HiddenType carries an
+      // abstract layout.
+      if (!layoutInfo)
+        return handleTrivial(type,
+                             getTrivialSILTypeProperties(isSensitive));
+
+      assert(layoutInfo->Layout &&
+             "HiddenTypeLayoutInfoDecl should have abstract layout");
+      auto properties = mergeIsTypeExpansionSensitive(
+          isSensitive, layoutInfo->Layout->typeProperties);
+      if (layoutInfo->Layout->referenceCountingSystem) {
+        if (*layoutInfo->Layout->referenceCountingSystem ==
+            ReferenceCounting::None)
+          return handleTrivial(type, properties);
+        return handleReference(type, properties);
+      }
+      if (properties.isAddressOnly())
+        return handleAddressOnly(type, properties);
+      assert(properties.isFixedABI() && "unsupported combination for now");
+      if (properties.isTrivial())
+        return handleTrivial(type, properties);
+      return handleNonTrivialAggregate(type, properties);
     }
 
     TypeLowering *handleInfinite(CanType type,
@@ -2741,7 +2976,7 @@ namespace {
       // Regardless of their member types, Nonescapable values have ownership
       // for lifetime diagnostics.
       if (!origType.isEscapable(structType)) {
-        properties.setNonTrivial();
+        properties.setNonEscapable();
       }
       // Merge the CustomDeinit properties of the type parameters.
       if (hasConditionalDefaultDeinit(structType, D)) {
@@ -2854,7 +3089,7 @@ namespace {
       // Regardless of their member types, Nonescapable values have ownership
       // for lifetime diagnostics.
       if (!origType.isEscapable(enumType)) {
-        properties.setNonTrivial();
+        properties.setNonEscapable();
       }
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);
@@ -3417,6 +3652,9 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                                           AbstractionPattern origType,
                                           CanType substType,
                                           TypeExpansionContext forExpansion) {
+  if (TypeLoweringNoTrivialTypes) {
+    return;
+  }
   auto *bitwiseCopyableProtocol =
       Context.getProtocol(KnownProtocolKind::BitwiseCopyable);
   if (!bitwiseCopyableProtocol)
@@ -3577,6 +3815,13 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             if (constraint && constraint->isTrivial()) {
               return false;
             }
+          }
+
+          // Case (11): an archetype bounded by an immortal foreign reference
+          // superclass. Trivially lowered like the concrete immortal foreign
+          // reference type but doesn't conform to BitwiseCopyable.
+          if (isImmortalForeignReferenceType(ty)) {
+            return false;
           }
 
           auto *nominal = ty.getAnyNominal();
@@ -4074,7 +4319,7 @@ static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   ASTContext &C = varType->getASTContext();
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanFunctionType::ExtInfo info;
-  return CanFunctionType::get({}, C.TheRawPointerType, info);
+  return CanFunctionType::get({}, {}, C.TheRawPointerType, info);
 }
 
 /// Removes @noescape from the given type if it's a function type. Otherwise,
@@ -4120,7 +4365,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
 
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanAnyFunctionType::ExtInfo info;
-  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {},
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {}, {},
                                  canResultTy, info);
 }
 
@@ -4148,8 +4393,8 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
 
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanAnyFunctionType::ExtInfo info;
-  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {}, resultTy,
-                                 info);
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {}, {},
+                                 resultTy, info);
 }
 
 /// Get the type of a property wrapper backing initializer,
@@ -4178,7 +4423,7 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanAnyFunctionType::ExtInfo info;
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},
-                                 resultType, info);
+                                 /* yields */ {}, resultType, info);
 }
 
 static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
@@ -4214,7 +4459,7 @@ static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
   AnyFunctionType::CanParamArrayRef paramRef(params);
   CanAnyFunctionType::ExtInfo extInfo;
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), paramRef,
-                                 resultType, extInfo);
+                                 /* yields */ {}, resultType, extInfo);
 }
 
 /// Get the type of a destructor function.
@@ -4243,12 +4488,13 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
                       : C.TheNativeObjectType);
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanFunctionType::ExtInfo info;
-  CanType methodTy = CanFunctionType::get({}, resultTy, info);
+  CanType methodTy = CanFunctionType::get({}, {}, resultTy, info);
 
   auto sig = dd->getGenericSignatureOfContext();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 llvm::ArrayRef(args), methodTy, extInfo);
+                                 llvm::ArrayRef(args), /* yields */ {},
+                                 methodTy, extInfo);
 }
 
 /// Retrieve the type of the ivar initializer or destroyer method for
@@ -4271,11 +4517,12 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
                                 : SILFunctionTypeRepresentation::Method)
                      .build();
 
-  resultType = CanFunctionType::get({}, resultType, extInfo);
+  resultType = CanFunctionType::get({}, {}, resultType, extInfo);
   auto sig = cd->getGenericSignature();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 llvm::ArrayRef(args), resultType, extInfo);
+                                 llvm::ArrayRef(args), /* yields */ {},
+                                 resultType, extInfo);
 }
 
 static CanAnyFunctionType
@@ -4310,12 +4557,12 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
           .withIsolation(funcType->getIsolation())
           .withLifetimeDependencies(funcType->getLifetimeDependencies())
           .withSendingResult(funcType->hasSendingResult())
+          .withCoroutine(funcType->isCoroutine())
           .build();
 
-  return CanAnyFunctionType::get(
-      getCanonicalSignatureOrNull(sig.genericSig),
-      funcType.getParams(), funcType.getResult(),
-      innerExtInfo);
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig.genericSig),
+                                 funcType.getParams(), funcType.getYields(),
+                                 funcType.getResult(), innerExtInfo);
 }
 
 static CanAnyFunctionType getAsyncEntryPoint(ASTContext &C) {
@@ -4340,7 +4587,7 @@ static CanAnyFunctionType getAsyncEntryPoint(ASTContext &C) {
   CanType returnType = C.getVoidType()->getCanonicalType();
   FunctionType::ExtInfo extInfo =
       FunctionType::ExtInfoBuilder().withAsync(true).build();
-  return CanAnyFunctionType::get(/*genericSig*/ nullptr, {}, returnType,
+  return CanAnyFunctionType::get(/*genericSig*/ nullptr, {}, {}, returnType,
                                  extInfo);
 }
 
@@ -4380,7 +4627,7 @@ static CanAnyFunctionType getEntryPointInterfaceType(ASTContext &C) {
                      .build();
 
   return CanAnyFunctionType::get(/*genericSig*/ nullptr, llvm::ArrayRef(params),
-                                 Int32Ty, extInfo);
+                                 /* yields */ {}, Int32Ty, extInfo);
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
@@ -4423,9 +4670,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
       vd->getInterfaceType()->getCanonicalType());
     auto sig = vd->getDeclContext()->getGenericSignatureOfContext();
     return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                   funcTy->getParams(),
-                                   funcTy.getResult(),
-                                   funcTy->getExtInfo());
+                                   funcTy->getParams(), funcTy->getYields(),
+                                   funcTy.getResult(), funcTy->getExtInfo());
   }
   
   case SILDeclRef::Kind::Allocator: {
@@ -5668,6 +5914,10 @@ uint16_t FunctionType::getPointerAuthDiscriminator(
                                 TypeExpansionContext::minimal());
   auto functionType = typeLowering.getLoweredType().getAs<SILFunctionType>();
   return functionType->getPointerAuthDiscriminator(nullptr);
+}
+
+bool TypeLowering::isLoadableOrOpaque(const SILFunction &F) const {
+  return isLoadable() || !F.hasLoweredAddresses();
 }
 
 void TypeLowering::print(llvm::raw_ostream &os) const {

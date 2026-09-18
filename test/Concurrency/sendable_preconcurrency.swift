@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -swift-version 6 %S/Inputs/StrictModule.swift
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -swift-version 6 %S/Inputs/StrictModule.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
 
-// RUN: %target-swift-frontend -strict-concurrency=targeted -disable-availability-checking -I %t %s -o /dev/null -verify -verify-ignore-unrelated -emit-sil
-// RUN: %target-swift-frontend -disable-availability-checking -I %t %s -o /dev/null -verify -verify-ignore-unrelated -emit-sil -strict-concurrency=complete -verify-additional-prefix tns-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=targeted -I %t %s -o /dev/null -verify -verify-ignore-unrelated -emit-sil
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -I %t %s -o /dev/null -verify -verify-ignore-unrelated -emit-sil -strict-concurrency=complete -verify-additional-prefix tns-
 
 // REQUIRES: concurrency
 

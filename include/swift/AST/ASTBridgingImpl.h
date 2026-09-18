@@ -301,6 +301,11 @@ bool BridgedDeclObj::AbstractFunction_isOverridden() const {
   return getAs<swift::AbstractFunctionDecl>()->isOverridden();
 }
 
+bool BridgedDeclObj::AbstractFunction_isDistributedWitnessWithAdHocSerializationRequirement() const {
+  return getAs<swift::AbstractFunctionDecl>()
+      ->isDistributedWitnessWithAdHocSerializationRequirement();
+}
+
 bool BridgedDeclObj::Constructor_isInheritable() const {
   return getAs<swift::ConstructorDecl>()->isInheritable();
 }
@@ -673,6 +678,10 @@ bool BridgedASTType::isBuiltinFixedArray() const {
   return unbridged()->is<swift::BuiltinFixedArrayType>();
 }
 
+bool BridgedASTType::isBuiltinBridgeObject() const {
+  return unbridged()->is<swift::BuiltinBridgeObjectType>();
+}
+
 bool BridgedASTType::isBox() const {
   return unbridged()->is<swift::SILBoxType>();
 }
@@ -713,6 +722,10 @@ bool BridgedASTType::isOptional() const {
 
 bool BridgedASTType::isUnownedStorageType() const {
   return unbridged()->is<swift::UnownedStorageType>();
+}
+
+bool BridgedASTType::isReferenceStorageType() const {
+  return unbridged()->is<swift::ReferenceStorageType>();
 }
 
 bool BridgedASTType::isBuiltinType() const {
@@ -799,6 +812,8 @@ BridgedASTType::FunctionTypeRepresentation BridgedASTType::getFunctionTypeRepres
   static_assert((int)FunctionTypeRepresentation::KeyPathAccessorSetter == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorSetter);
   static_assert((int)FunctionTypeRepresentation::KeyPathAccessorEquals == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorEquals);
   static_assert((int)FunctionTypeRepresentation::KeyPathAccessorHash == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorHash);
+  static_assert((int)FunctionTypeRepresentation::COMMethod ==
+                (int)swift::SILFunctionTypeRepresentation::COMMethod);
 
   auto fnType = unbridged()->castTo<swift::SILFunctionType>();
   return (FunctionTypeRepresentation)(fnType->getRepresentation());
@@ -1052,6 +1067,11 @@ bool BridgedSubstitutionMap::isEqualTo(BridgedSubstitutionMap rhs) const {
 
 bool BridgedSubstitutionMap::hasAnySubstitutableParams() const {
   return unbridged().hasAnySubstitutableParams();
+}
+
+BridgedSubstitutionMap
+BridgedSubstitutionMap::subst(BridgedSubstitutionMap subMap) const {
+  return unbridged().subst(subMap.unbridged());
 }
 
 SwiftInt BridgedSubstitutionMap::getNumConformances() const {

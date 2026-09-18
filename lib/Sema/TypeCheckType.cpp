@@ -22,13 +22,11 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
-#include "TypeCheckInvertible.h"
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
 
 #include "swift/AST/ASTDemangler.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
@@ -37,7 +35,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ExtInfo.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/Module.h"
@@ -61,18 +58,13 @@
 #include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/SILTypeResolutionContext.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
-#include "clang/AST/ASTContext.h"
-#include "clang/AST/DeclBase.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -2884,27 +2876,29 @@ bool swift::diagnoseMissingOwnership(ParamSpecifier ownership,
   auto loc = repr->getLoc();
   repr->setInvalid();
 
-  // We don't yet support any ownership specifiers for parameters of subscript
-  // decls, give a tailored error message saying you simply can't use a
-  // noncopyable type here.
-  if (options.hasBase(TypeResolverContext::SubscriptDecl)) {
+  // Without SubscriptParametersWithOwnership there is no ownership specifier
+  // to suggest for a subscript parameter, so say that the type simply cannot
+  // be used here.
+  if (options.hasBase(TypeResolverContext::SubscriptDecl) &&
+      !resolution.getASTContext().LangOpts.hasFeature(
+          Feature::SubscriptParametersWithOwnership)) {
     diags.diagnose(loc, diag::noncopyable_parameter_subscript_unsupported);
-  } else {
-    // general error diagnostic
-    diags.diagnose(loc, diag::noncopyable_parameter_requires_ownership, ty);
-
-    diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
-                   "borrowing", "for an immutable reference")
-        .fixItInsert(repr->getStartLoc(), "borrowing ");
-
-    diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
-                   "inout", "for a mutable reference")
-        .fixItInsert(repr->getStartLoc(), "inout ");
-
-    diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
-                   "consuming", "to take the value from the caller")
-        .fixItInsert(repr->getStartLoc(), "consuming ");
+    return true;
   }
+
+  diags.diagnose(loc, diag::noncopyable_parameter_requires_ownership, ty);
+
+  diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
+                 "borrowing", "for an immutable reference")
+      .fixItInsert(repr->getStartLoc(), "borrowing ");
+
+  diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
+                 "inout", "for a mutable reference")
+      .fixItInsert(repr->getStartLoc(), "inout ");
+
+  diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
+                 "consuming", "to take the value from the caller")
+      .fixItInsert(repr->getStartLoc(), "consuming ");
 
   return true;
 }
@@ -4517,6 +4511,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   }
 
   bool sendable = claim<SendableTypeAttr>(attrs);
+  bool coroutine = claim<YieldOnceTypeAttr>(attrs);
 
   auto isolation = FunctionTypeIsolation::forNonIsolated();
 
@@ -4720,8 +4715,31 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                     diag::lifetime_dependence_function_type);
   }
 
+  SmallVector<AnyFunctionType::Yield, 1> yields;
+  if (coroutine) {
+    auto yieldsOptions = options.withoutContext();
+    yieldsOptions.setContext(TypeResolverContext::FunctionResult);
+    yieldsOptions |= TypeResolutionFlags::Coroutine;
+    assert(repr->getYieldsTypeRepr());
+
+    auto yieldTypes = cast<TupleTypeRepr>(repr->getYieldsTypeRepr());
+    for (auto elt : yieldTypes->getElements()) {
+      auto yieldTy = resolveType(elt.Type, yieldsOptions);
+      if (yieldTy->hasError())
+        return ErrorType::get(ctx);
+      if (auto inOutType = yieldTy->getAs<InOutType>()) {
+        yields.emplace_back(inOutType->getObjectType(), ParamSpecifier::InOut);
+      } else {
+        yields.emplace_back(yieldTy, ParamSpecifier::Default);
+      }
+    }
+  }
+
   auto resultOptions = options.withoutContext();
   resultOptions.setContext(TypeResolverContext::FunctionResult);
+  // TODO: Do we still need this here?
+  if (coroutine)
+    resultOptions |= TypeResolutionFlags::Coroutine;
   auto outputTy = resolveType(repr->getResultTypeRepr(), resultOptions);
   if (outputTy->hasError()) {
     return ErrorType::get(ctx);
@@ -4804,15 +4822,16 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                      .withSendable(sendable)
                      .withAsync(repr->isAsync())
                      .withClangFunctionType(clangFnType)
+                     .withCoroutine(coroutine)
                      .build();
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
   AnyFunctionType *aft;
   if (auto genericSig = repr->getGenericSignature()) {
-    aft = GenericFunctionType::get(genericSig, params, outputTy, extInfo);
+    aft = GenericFunctionType::get(genericSig, params, yields, outputTy, extInfo);
   } else {
 
-    auto fnTy = FunctionType::get(params, outputTy, extInfo);
+    auto fnTy = FunctionType::get(params, yields, outputTy, extInfo);
     if (fnTy->hasError())
       return fnTy;
 
@@ -4943,6 +4962,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     default:
       llvm_unreachable("bad TypeAttrKind for TAR_SILCoroutine");
     }
+    options |= TypeResolutionFlags::Coroutine;
   }
 
   ParameterConvention callee = ParameterConvention::Direct_Unowned;
@@ -4962,26 +4982,26 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   auto conventionAttr = claim<ConventionTypeAttr>(attrs);
   if (conventionAttr) {
     auto parsedRep =
-      llvm::StringSwitch<std::optional<SILFunctionType::Representation>>(
+        llvm::StringSwitch<std::optional<SILFunctionType::Representation>>(
             conventionAttr->getConventionName())
-        .Case("thick", SILFunctionType::Representation::Thick)
-        .Case("block", SILFunctionType::Representation::Block)
-        .Case("thin", SILFunctionType::Representation::Thin)
-        .Case("c", SILFunctionType::Representation::CFunctionPointer)
-        .Case("method", SILFunctionType::Representation::Method)
-        .Case("objc_method",
-              SILFunctionType::Representation::ObjCMethod)
-        .Case("witness_method",
-              SILFunctionType::Representation::WitnessMethod)
-        .Case("keypath_accessor_getter",
-              SILFunctionType::Representation::KeyPathAccessorGetter)
-        .Case("keypath_accessor_setter",
-              SILFunctionType::Representation::KeyPathAccessorSetter)
-        .Case("keypath_accessor_equals",
-              SILFunctionType::Representation::KeyPathAccessorEquals)
-        .Case("keypath_accessor_hash",
-              SILFunctionType::Representation::KeyPathAccessorHash)
-        .Default(std::nullopt);
+            .Case("thick", SILFunctionType::Representation::Thick)
+            .Case("block", SILFunctionType::Representation::Block)
+            .Case("thin", SILFunctionType::Representation::Thin)
+            .Case("c", SILFunctionType::Representation::CFunctionPointer)
+            .Case("method", SILFunctionType::Representation::Method)
+            .Case("com_method", SILFunctionType::Representation::COMMethod)
+            .Case("objc_method", SILFunctionType::Representation::ObjCMethod)
+            .Case("witness_method",
+                  SILFunctionType::Representation::WitnessMethod)
+            .Case("keypath_accessor_getter",
+                  SILFunctionType::Representation::KeyPathAccessorGetter)
+            .Case("keypath_accessor_setter",
+                  SILFunctionType::Representation::KeyPathAccessorSetter)
+            .Case("keypath_accessor_equals",
+                  SILFunctionType::Representation::KeyPathAccessorEquals)
+            .Case("keypath_accessor_hash",
+                  SILFunctionType::Representation::KeyPathAccessorHash)
+            .Default(std::nullopt);
     if (!parsedRep) {
       conventionAttr->setInvalid();
       diagnoseInvalid(repr, conventionAttr->getAtLoc(),
@@ -5684,18 +5704,31 @@ NeverNullType
 TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
                                        TypeResolutionOptions options) {
   auto ownershipRepr = dyn_cast<OwnershipTypeRepr>(repr);
-  // ownership is only valid for (non-Subscript and non-EnumCaseDecl)
-  // function parameters.
-  if (!options.is(TypeResolverContext::FunctionInput) ||
-      options.hasBase(TypeResolverContext::SubscriptDecl) ||
-      options.hasBase(TypeResolverContext::EnumElementDecl)) {
 
+  // Ownership is valid on function, initializer, yields, and subscript parameters,
+  // but not on enum case payloads. Subscript parameters are only allowed
+  // ownership under the SubscriptParametersWithOwnership feature.
+  bool ownershipOnSubscriptParams =
+      getASTContext().LangOpts.hasFeature(
+          Feature::SubscriptParametersWithOwnership);
+  bool isCoroutineInOutYield =
+    (options.hasBase(TypeResolverContext::FunctionResult) || // decls
+     options.is(TypeResolverContext::FunctionResult)) && // function types
+    options.contains(TypeResolutionFlags::Coroutine) &&
+    (ownershipRepr &&
+     ownershipRepr->getSpecifier() == ParamSpecifier::InOut);
+  
+  if (!(options.is(TypeResolverContext::FunctionInput) &&
+      !options.hasBase(TypeResolverContext::EnumElementDecl) &&
+      !(options.hasBase(TypeResolverContext::SubscriptDecl) &&
+        !ownershipOnSubscriptParams)) &&
+      !isCoroutineInOutYield) {
     decltype(diag::attr_only_on_parameters) diagID;
-    if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
-        options.hasBase(TypeResolverContext::EnumElementDecl)) {
-      diagID = diag::attr_only_valid_on_func_or_init_params;
-    } else if (options.is(TypeResolverContext::VariadicFunctionInput)) {
+    if (options.is(TypeResolverContext::VariadicFunctionInput)) {
       diagID = diag::attr_not_on_variadic_parameters;
+    } else if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
+               options.hasBase(TypeResolverContext::EnumElementDecl)) {
+      diagID = diag::attr_only_valid_on_func_or_init_params;
     } else {
       diagID = diag::attr_only_on_parameters;
     }
@@ -5717,6 +5750,9 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   auto result = resolveType(repr->getBase(), options);
   if (result->hasError())
     return result;
+
+  if (isCoroutineInOutYield)
+    return InOutType::get(result);
 
   // Check for illegal combinations of ownership specifiers and types.
   switch (ownershipRepr->getSpecifier()) {
@@ -6469,6 +6505,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   auto elementOptions = options;
   if (!repr->isParenType()) {
+    elementOptions = elementOptions.withBaseContext(options.getContext());
     elementOptions = elementOptions.withoutContext(true);
     elementOptions = elementOptions.withContext(TypeResolverContext::TupleElement);
   }
@@ -6491,10 +6528,8 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (!ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples) &&
         !options.contains(TypeResolutionFlags::SILMode) &&
         inStage(TypeResolutionStage::Interface) &&
-        !moveOnlyElementIndex.has_value() &&
-        !ty->hasUnboundGenericType() &&
-        !ty->hasTypeVariable() &&
-        !isa<TupleTypeRepr>(tyR)) {
+        !moveOnlyElementIndex.has_value() && !ty->hasUnboundGenericType() &&
+        !ty->hasTypeVariable() && !isa<TupleTypeRepr>(tyR)) {
       auto contextTy = GenericEnvironment::mapTypeIntoEnvironment(
           resolution.getGenericSignature().getGenericEnvironment(), ty);
       if (!contextTy->hasError() && contextTy->isNoncopyable())
@@ -6574,8 +6609,9 @@ TypeResolver::validateCOMExistential(Type constraintType, TypeRepr *repr,
 
   auto layout = constraintType->getExistentialLayout();
   auto resolution = layout.resolveCOMInterface();
-  if (resolution.containsCOMInterfaceProtocol) {
-    diagnose(repr->getLoc(), diag::com_cominterface_existential);
+  if (resolution.identityProtocol) {
+    diagnose(repr->getLoc(), diag::com_identity_existential,
+             resolution.identityProtocol->getName().str());
     repr->setInvalid();
     return ErrorType::get(ctx);
   }

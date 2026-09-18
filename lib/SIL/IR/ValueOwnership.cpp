@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILModule.h"
@@ -130,6 +129,7 @@ CONSTANT_OWNERSHIP_INST(None, BridgeObjectToWord)
 CONSTANT_OWNERSHIP_INST(None, ClassMethod)
 CONSTANT_OWNERSHIP_INST(None, ClassifyBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, ObjCMethod)
+CONSTANT_OWNERSHIP_INST(None, COMMethod)
 CONSTANT_OWNERSHIP_INST(None, ExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(None, FloatLiteral)
 CONSTANT_OWNERSHIP_INST(None, FunctionRef)
@@ -179,8 +179,13 @@ CONSTANT_OWNERSHIP_INST(None, StoreBorrow)
 CONSTANT_OWNERSHIP_INST(Owned, ConvertEscapeToNoEscape)
 CONSTANT_OWNERSHIP_INST(Unowned, InitBlockStorageHeader)
 CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
-// TODO: It would be great to get rid of these.
-CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
+// `raw_pointer_to_ref` is only used to implement the `bridgeFromRawPointer`
+// builtin, which in turn is only used to create the empty COW buffer singletons
+// (Array, Set, Dictionary) and for the `UnsafeCurrentTask._task` ABI-compat
+// shim. Those objects are immortal, therefore the result doesn't need any
+// ownership.
+CONSTANT_OWNERSHIP_INST(None, RawPointerToRef)
+// TODO: It would be great to get rid of this.
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
 CONSTANT_OWNERSHIP_INST(None, ValueToBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
@@ -314,6 +319,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
+FORWARDING_OWNERSHIP_INST(OpenCOMExistential)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
 FORWARDING_OWNERSHIP_INST(Struct)
 FORWARDING_OWNERSHIP_INST(Tuple)
@@ -400,6 +406,15 @@ static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
   bool isTrivial = ResultType.isTrivial(*f);
   // Quick is trivial check.
   if (isTrivial)
+    return OwnershipKind::None;
+
+  // If the result type is an address, avoid consulting SILFunctionConventions
+  // to determine its ownership; we know it's None.
+  //
+  // This short-cut is needed _during_ AddressLowering for a @guaranteed_address
+  // result, as a new ApplyInst it creates with an address result happens before
+  // the global lowered-addresses flag is changed to influence getOwnershipKind.
+  if (ResultType.isAddress())
     return OwnershipKind::None;
 
   // Per-function conventions (via getSubstCalleeConv): an already-lowered
@@ -590,6 +605,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, OnFastPath)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsOptionalType)
 CONSTANT_OWNERSHIP_BUILTIN(None, Sizeof)
 CONSTANT_OWNERSHIP_BUILTIN(None, Strideof)
+CONSTANT_OWNERSHIP_BUILTIN(None, TypedAllocationID)
 CONSTANT_OWNERSHIP_BUILTIN(None, StringObjectOr)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsPOD)
 CONSTANT_OWNERSHIP_BUILTIN(None, IsConcrete)

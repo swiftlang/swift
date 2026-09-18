@@ -19,10 +19,8 @@
 #include "swift/Basic/Version.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
-#include "clang/CAS/CASOptions.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/MC/MCTargetOptions.h"
 #include <optional>
 
 #include <set>
@@ -287,11 +285,6 @@ public:
   /// Profile changes to stats to files in StatsOutputDir, grouped by source
   /// entity.
   bool ProfileEntities = false;
-
-  /// Emit parseable-output directly from the frontend, instead of relying
-  /// the driver to emit it. This is used in context where frontend jobs are executed by
-  /// clients other than the driver.
-  bool FrontendParseableOutput = false;
 
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).

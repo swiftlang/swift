@@ -460,8 +460,8 @@ func enumLValueHelper(_: inout E, _: inout E) {}
 // CHECK:   apply %6(%3, %5) : $@convention(thin) (@inout E, @inout E) -> ()
 // CHECK:   end_access %4 : $*StructOfEnum
 // CHECK:   end_access %2 : $*StructOfEnum
-// CHECK:   %10 = tuple ()
-// CHECK:   return %10 : $()
+// CHECK:   [[VOID:%.*]] = tuple ()
+// CHECK:   return [[VOID]] : $()
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify14testEnumLValue1syAA08StructOfE0Vz_tF'
 func testEnumLValue(s: inout StructOfEnum) {
   enumLValueHelper(&s.e, &s.f)

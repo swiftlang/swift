@@ -14,7 +14,8 @@ import StdMap
 import CxxStdlib
 
 func useSet(_ s: inout SetOfCInt) {
-  // 'insert' keeps the rename, so CxxUniqueSet.insert(_:) is not shadowed.
+  // 'insert' keeps its name as a disfavored '@unsafe(always)' overload, so
+  // CxxUniqueSet.insert(_:) is still what this resolves to.
   s.insert(1)
   _ = s.contains(1)
   _ = s.remove(1)

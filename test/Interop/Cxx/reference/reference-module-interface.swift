@@ -15,6 +15,11 @@
 // CHECK: func refToTemplate<T>(_ t: inout T) -> UnsafeMutablePointer<T>
 // CHECK: func constRefToTemplate<T>(_ t: T) -> UnsafePointer<T>
 
+// CHECK: func callWithIntRef(_ callback: (@convention(c) (UnsafeMutablePointer<CInt>) -> Void)!)
+// CHECK: func callWithConstIntRef(_ callback: (@convention(c) (CInt) -> Void)!)
+// CHECK: func callWithIntRvalueRef(_ callback: (@convention(c) (CInt) -> Void)!)
+// CHECK: func callWithConstIntRvalueRef(_ callback: (@convention(c) (CInt) -> Void)!)
+
 // CHECK-NOT: refToDependent
 // CHECK-NOT: refToDependentParam
 // CHECK-NOT: dontImportAtomicRef

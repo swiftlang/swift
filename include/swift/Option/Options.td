@@ -280,6 +280,11 @@ def o : JoinedOrSeparate<["-"], "o">,
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Number of commands to execute in parallel">, MetaVarName<"<n>">;
 
+def experimental_use_gnu_jobserver :
+  Flag<["-"], "experimental-use-gnu-jobserver">,
+  Flags<[HelpHidden, DoesNotAffectIncrementalBuild, NewDriverOnlyOption]>,
+  HelpText<"Participate in the GNU make jobserver advertised in MAKEFLAGS, letting its token pool (not -j) bound concurrency across the build">;
+
 def sdk : Separate<["-"], "sdk">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
@@ -493,6 +498,10 @@ def remark_skip_explicit_interface_build : Flag<["-"], "Rskip-explicit-interface
 def remark_module_serialization : Flag<["-"], "Rmodule-serialization">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit remarks about module serialization">;
+
+def remark_hidden_type_layout_serialization : Flag<["-"], "Rhidden-type-layout-serialization">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit remarks about hidden type layout serialization">;
 
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
@@ -2301,7 +2310,7 @@ def emit_module_dependencies_path:
 def use_frontend_parseable_output:
   Flag<["-"], "use-frontend-parseable-output">,
   Flags<[HelpHidden, NewDriverOnlyOption, CacheInvariant]>,
-  HelpText<"Emit parseable-output from swift-frontend jobs instead of from "
+  HelpText<"Deprecated: Emit parseable-output from swift-frontend jobs instead of from "
            "the driver">;
 
 def print_explicit_dependency_graph:
@@ -2466,6 +2475,13 @@ def external_plugin_path : Separate<["-"], "external-plugin-path">, Group<plugin
 def cas_backend: Flag<["-"], "cas-backend">,
   Flags<[FrontendOption, NoDriverOption]>,
   HelpText<"Enable using CASBackend for object file output">;
+
+def print_llvm_backend_diagnostics
+    : Flag<["-"], "print-llvm-backend-diagnostics">,
+      Flags<[FrontendOption, NoDriverOption]>,
+      HelpText<
+          "Print error-severity LLVM backend diagnostics (e.g. object-file "
+          "emission errors) instead of swallowing them">;
 
 def debug_callsite_info: Flag<["-"], "debug-callsite-info">,
   Flags<[FrontendOption, NoDriverOption]>,

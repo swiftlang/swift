@@ -16,7 +16,6 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
-#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/ActorIsolation.h"
@@ -35,7 +34,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/Basic/TypeID.h"
@@ -74,7 +72,7 @@ class PreInverseGenericsAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
 class TypeLoc;
-class UsingDecl;
+class FileDefaultDecl;
 class Witness;
 class TypeResolution;
 struct TypeWitnessAndDecl;
@@ -752,6 +750,11 @@ struct WhereClauseOwner {
   visitRequirements(TypeResolutionStage stage,
                     llvm::function_ref<bool(Requirement, RequirementRepr *)>
                         callback) const &&;
+
+  /// Visit each of the requirements and call \p callback for all of
+  /// their types.
+  void forAllRequirementTypes(
+      llvm::function_ref<void(Type, TypeRepr *)> callback) const &&;
 };
 
 void simple_display(llvm::raw_ostream &out, const WhereClauseOwner &owner);
@@ -2658,6 +2661,26 @@ private:
 
   // Evaluation.
   Type evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
+/// Determines the yield type of a coroutine
+class YieldsTypeRequest
+    : public SimpleRequest<YieldsTypeRequest, Type(FuncDecl *, unsigned),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, FuncDecl *decl, unsigned idx) const;
 
 public:
   // Separate caching.
@@ -5149,11 +5172,12 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @c functions for compatibility with the foreign language.
-class TypeCheckCDeclFunctionRequest
-    : public SimpleRequest<TypeCheckCDeclFunctionRequest,
+/// Check a function that is exported to a foreign language for compatibility
+/// with that language. This covers @c, @_cdecl, and @cxx.
+class TypeCheckForeignFunctionRequest
+    : public SimpleRequest<TypeCheckForeignFunctionRequest,
                            evaluator::SideEffect(FuncDecl *FD,
-                                                 CDeclAttr *attr),
+                                                 DeclAttribute *attr),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5162,7 +5186,7 @@ private:
   friend SimpleRequest;
 
   evaluator::SideEffect
-  evaluate(Evaluator &evaluator, FuncDecl *FD, CDeclAttr *attr) const;
+  evaluate(Evaluator &evaluator, FuncDecl *FD, DeclAttribute *attr) const;
 
 public:
   bool isCached() const { return true; }
@@ -5730,9 +5754,9 @@ public:
   void cacheResult(std::optional<SemanticAvailabilitySpec> value) const;
 };
 
-/// Gathers the file-level defaults declared by `using ...` at the top of a
+/// Gathers the file-level defaults declared by `default ...` at the top of a
 /// source file, and diagnoses any issues that would affect results. Other
-/// validation in `visitUsingDecl` instead.
+/// validation in `visitFileDefaultDecl` instead.
 class FileDefaultsRequest
     : public SimpleRequest<FileDefaultsRequest,
                            FileDefaults(const SourceFile *),
@@ -5749,7 +5773,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Materializes file-level `using @available(...)` defaults onto \p decl's
+/// Materializes file-level `default @available(...)` defaults onto \p decl's
 /// attribute list by tail-appending implicit clones of each applicable
 /// availability attr. Must only be called on top-level value decls and
 /// extensions.

@@ -711,6 +711,9 @@ public:
 
   bool isUnsafeCXXMethod(const FuncDecl *func) override;
 
+  void diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
+                                 SourceLoc useLoc) override;
+
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
 
   bool needsClosureConstructor(
@@ -828,8 +831,27 @@ bool isCxxStdModule(StringRef moduleName, bool IsSystem);
 std::optional<clang::QualType>
 getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 
-/// Returns true if the given type is a C++ `const` reference type.
-bool isCxxConstReferenceType(const clang::Type *type);
+/// How a C++ reference parameter is represented in Swift.
+enum class CxxReferenceParameterKind {
+  /// `const T&` / `const T&&`: `borrowing T`.
+  Borrowed,
+  /// `T&`: `inout T`. Where `inout` is not expressible (inside
+  /// `@convention(c)`) it stays an `UnsafeMutablePointer`.
+  Mutating,
+  /// `T&&`: `consuming T`.
+  Consuming,
+};
+
+struct CxxReferenceParameter {
+  clang::QualType pointeeType;
+  CxxReferenceParameterKind kind;
+};
+
+/// Classifies a C++ reference parameter type, or `None` if \p type is not a
+/// C++ reference type. Every kind but `Mutating` is lowered indirectly, so
+/// those must be imported as the pointee rather than as a pointer.
+std::optional<CxxReferenceParameter>
+classifyCxxReferenceParameter(clang::QualType type);
 
 /// Determine whether the given Clang record declaration has an attribute that
 /// makes it import as a reference types. Does not check its bases, if any.
@@ -901,6 +923,9 @@ bool declIsCxxOnly(const Decl *decl);
 
 /// Is this DeclContext an `enum` that represents a C++ namespace?
 bool isClangNamespace(const DeclContext *dc);
+
+/// Is this DeclContext a nominal type imported from a C++ `struct`/`class`?
+bool isClangCxxRecord(const DeclContext *dc);
 
 /// Enumerate and import all members of the C++ namespace represented by
 /// \p namespaceEnum, invoking \p emit once for each newly imported member.

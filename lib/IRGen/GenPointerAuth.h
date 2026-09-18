@@ -20,7 +20,6 @@
 
 #include "swift/IRGen/ValueWitness.h"
 #include "swift/Basic/ExternalUnion.h"
-#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILDeclRef.h"

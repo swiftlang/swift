@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -swift-version 6 -disable-availability-checking -emit-sil -o /dev/null %s -parse-as-library -enable-experimental-feature SendingArgsAndResults -verify -import-objc-header %S/Inputs/sending.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -swift-version 6 -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null %s -parse-as-library -enable-experimental-feature SendingArgsAndResults -verify -import-objc-header %S/Inputs/sending.h
 
 // expected-warning@<unknown> * {{libc not found for }}
 

@@ -32,6 +32,10 @@ add_library(SymbolicationShims INTERFACE)
 target_include_directories(SymbolicationShims INTERFACE
   Sources/SymbolicationShims)
 
+if(WIN32 OR ANDROID OR LINUX)
+  find_package(SwiftOverlay CONFIG QUIET)
+endif()
+
 if(WIN32)
   add_library(SwiftInspectClientInterface INTERFACE)
   target_include_directories(SwiftInspectClientInterface INTERFACE
@@ -100,6 +104,18 @@ target_link_libraries(swift-inspect PRIVATE
 if(WIN32)
   target_link_libraries(swift-inspect PRIVATE
     SwiftInspectClientInterface)
+  if(TARGET ClangModules)
+    target_link_libraries(swift-inspect PRIVATE
+      ClangModules)
+  endif()
+endif()
+if(ANDROID AND TARGET SwiftAndroid)
+  target_link_libraries(swift-inspect PRIVATE
+    SwiftAndroid)
+endif()
+if(LINUX AND TARGET SwiftGlibcClangOverlay)
+  target_link_libraries(swift-inspect PRIVATE
+    SwiftGlibcClangOverlay)
 endif()
 if(ANDROID)
   target_link_libraries(swift-inspect PRIVATE

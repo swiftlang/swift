@@ -19,8 +19,6 @@
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "clang/AST/Attr.h"
-#include "clang/AST/Decl.h"
 #include "llvm/ADT/SmallSet.h"
 
 using namespace swift;

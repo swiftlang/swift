@@ -1408,8 +1408,15 @@ public:
           parent = nextParent;
         }
         
+        // A subscript only accepts `&` on an argument when its parameters may
+        // be declared `inout`.
+        bool inoutSubscriptArg =
+            isa<SubscriptExpr>(parent) &&
+            Ctx.LangOpts.hasFeature(
+                Feature::SubscriptParametersWithOwnership);
+
         if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent) ||
-            isa<MacroExpansionExpr>(parent)) {
+            isa<MacroExpansionExpr>(parent) || inoutSubscriptArg) {
           // If outermost paren is associated with a call or
           // a member reference, it might be valid to have `&`
           // before all of the parens.
@@ -2533,6 +2540,12 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
       assert(ThrownTypeRepr && "Parser ensures that this never fails");
     }
 
+    TupleTypeRepr *YieldsTypeRepr = nullptr;
+    if (auto yieldsTypeExpr = AE->getYieldsExpr()) {
+      YieldsTypeRepr = extractInputTypeRepr(yieldsTypeExpr);
+      assert(YieldsTypeRepr && "Parser ensures that this never fails");
+    }
+
     TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());
     if (!ResultTypeRepr) {
       Ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
@@ -2540,10 +2553,9 @@ TypeExpr *TypeExprSimplifier::simplifyTypeExpr(Expr *E) {
       ResultTypeRepr = makeErrorTypeRepr(AE->getResultExpr());
     }
 
-    auto NewTypeRepr = new (Ctx)
-        FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getAsyncLoc(),
-                         AE->getThrowsLoc(), ThrownTypeRepr, AE->getArrowLoc(),
-                         ResultTypeRepr);
+    auto NewTypeRepr = new (Ctx) FunctionTypeRepr(
+        nullptr, ArgsTypeRepr, AE->getAsyncLoc(), AE->getThrowsLoc(),
+        ThrownTypeRepr, YieldsTypeRepr, AE->getArrowLoc(), ResultTypeRepr);
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
 

@@ -38,7 +38,7 @@ sil_global @static_array : $TestArrayStorage = {
 
 // CHECK-LABEL: sil_global @static_global_vector : $Int32 = {
 // CHECK:         %initval = vector (%1 : $Int32, %3 : $Int32)
-// CHECK-NEXT:  }       
+// CHECK-NEXT:  }
 sil_global @static_global_vector : $Int32 = {
   %0 = integer_literal $Builtin.Int32, 0
   %1 = struct $Int32 (%0 : $Builtin.Int32)
@@ -1560,6 +1560,8 @@ sil @c_convention : $@convention(c) () -> ()
 sil @method_convention : $@convention(method) (Int) -> ()
 sil @objc_method_convention : $@convention(objc_method) (Int) -> ()
 sil @witness_method_convention : $@convention(witness_method: Bendable) (Fork) -> ()
+// CHECK-LABEL: sil @com_method_convention : $@convention(com_method) (Builtin.RawPointer) -> ()
+sil @com_method_convention : $@convention(com_method) (Builtin.RawPointer) -> ()
 
 // CHECK-LABEL: sil @conventions : $@convention(thin) (() -> (), @convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(method) () -> (), @convention(objc_method) () -> (), @convention(witness_method: Bendable) (Fork) -> ()) -> () {
 sil @conventions : $@convention(thin) (@convention(thick) () -> (),
@@ -1896,6 +1898,25 @@ entry(%addr : $*T):
   return %r : $()
 }
 
+// CHECK-LABEL: sil @end_formal_scope :
+sil @end_formal_scope : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK: bb0([[ARG:%[0-9]+]] :
+entry(%arg : $Builtin.Int32):
+  // CHECK: [[LOCAL_LET:%.*]] = integer_literal
+  %local_let = integer_literal $Builtin.Int32, 1
+  // CHECK: [[LOCAL_VAR:%.*]] = alloc_stack
+  %local_var = alloc_stack $Builtin.Int32
+
+  // CHECK: end_formal_scope [[LOCAL_VAR]]
+  end_formal_scope %local_var
+  dealloc_stack %local_var
+  // CHECK: end_formal_scope [[LOCAL_LET]]
+  end_formal_scope %local_let
+  // CHECK: end_formal_scope [[ARG]]
+  end_formal_scope %arg
+  return undef : $()
+}
+
 class Foo2: Foo, Q {}
 
 // CHECK-LABEL: sil_vtable Foo {
@@ -1904,7 +1925,7 @@ class Foo2: Foo, Q {}
 // CHECK-NEXT:  }
 sil_vtable Foo {
   #Foo.subscript!getter: @Foo_subscript_getter [nonoverridden]
-  #Foo.subscript!setter: @Foo_subscript_setter 
+  #Foo.subscript!setter: @Foo_subscript_setter
 }
 
 // CHECK-LABEL: sil_vtable Foo2 {

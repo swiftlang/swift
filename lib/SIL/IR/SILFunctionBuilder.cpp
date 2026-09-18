@@ -22,7 +22,6 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "clang/AST/Mangle.h"
 
 using namespace swift;
 
@@ -173,7 +172,8 @@ void SILFunctionBuilder::addFunctionAttributes(
   }
 
   // @_silgen_name and @_cdecl functions may be called from C code somewhere.
-  if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
+  if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>() ||
+      Attrs.hasAttribute<CxxDeclAttr>())
     F->setHasCReferences(true);
 
   for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {
@@ -258,6 +258,9 @@ void SILFunctionBuilder::addFunctionAttributes(
       F->setSection(*sectionName);
   }
 
+  if (auto *TA = decl->getAttrs().getAttribute<TargetAttr>())
+    F->setTargetFeatures(TA->Value);
+
   // Only emit replacements for the objc entry point of objc methods.
   // There is one exception: @_dynamicReplacement(for:) of @objc methods in
   // generic classes. In this special case we use native replacement instead of
@@ -292,12 +295,21 @@ void SILFunctionBuilder::addFunctionAttributes(
   } else if (constant.isDistributedThunk()) {
     // It's okay for `decodeFuncDecl` to be null because system could be
     // generic.
-    if (auto decodeFuncDecl =
-            getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
-                decl)) {
-      auto decodeRef = SILDeclRef(decodeFuncDecl);
-      auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
-      F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
+    //
+    // In Embedded Swift, the receiver-side runtime entry that would otherwise
+    // look up `decodeNextArgument` by mangled name (and require the witness
+    // to be alive) is not used: distributed dispatch is fully concrete and
+    // goes through a compile-time-known accessor. Skip the artificial
+    // reference so the generic-over-SerializationRequirement witness can be
+    // DCE'd and is never emitted into IR.
+    if (!mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      if (auto decodeFuncDecl =
+              getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
+                  decl)) {
+        auto decodeRef = SILDeclRef(decodeFuncDecl);
+        auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
+        F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
+      }
     }
   }
 }

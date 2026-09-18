@@ -945,7 +945,18 @@ DECL_ATTR(cxx, CxxDecl,
   178)
 DECL_ATTR_FEATURE_REQUIREMENT(CxxDecl, CxxImplementation)
 
-LAST_DECL_ATTR(CxxDecl)
+DECL_ATTR(_target, Target,
+  OnAbstractFunction,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  179)
+DECL_ATTR_FEATURE_REQUIREMENT(Target, TargetAttribute)
+
+SIMPLE_DECL_ATTR(yield_once, Coroutine,
+  OnFunc,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
+  180)
+
+LAST_DECL_ATTR(Coroutine)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

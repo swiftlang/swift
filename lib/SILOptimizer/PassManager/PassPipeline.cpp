@@ -23,16 +23,11 @@
 
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorOr.h"
@@ -825,6 +820,8 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
 
   // Should be after FunctionSignatureOpts and before the last inliner.
+  P.addClassDestroyDevirtualizer(); // currently a no-op in non-OSSA
+  // TODO: remove the ReleaseDevirtualizer once we have OSSA at this place in the pipeline.
   P.addReleaseDevirtualizer();
 
   addFunctionPasses(P, OptimizationLevelKind::LowLevel);

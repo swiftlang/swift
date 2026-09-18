@@ -13,17 +13,13 @@
 #define DEBUG_TYPE "sil-bcopts"
 
 #include "swift/AST/Builtins.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -38,12 +34,10 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 
-#include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Debug.h"
 
@@ -143,17 +137,20 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
   if (!I->mayHaveSideEffects())
     return ArrayBoundsEffect::kNone;
 
-  // A store to an alloc_stack can't possibly store to the array size which is
-  // stored in a runtime allocated object sub field of an alloca.
   if (auto *SI = dyn_cast<StoreInst>(I)) {
     if (SI->getOwnershipQualifier() == StoreOwnershipQualifier::Assign) {
       // store [assign] can call a destructor with unintended effects
       return ArrayBoundsEffect::kMayChangeAny;
     }
-    auto Ptr = SI->getDest();
-    return isa<AllocStackInst>(Ptr) || isAddressOfArrayElement(SI->getDest())
-               ? ArrayBoundsEffect::kNone
-               : ArrayBoundsEffect::kMayChangeAny;
+    auto dest = SI->getDest();
+    if (isa<AllocStackInst>(dest) &&
+        !dest->getType().isTrivial(*dest->getFunction())) {
+      // A store to a non-trivial alloc_stack holding an Array can replace it
+      // with a smaller array
+      return ArrayBoundsEffect::kMayChangeAny;
+    }
+    return isAddressOfArrayElement(dest) ? ArrayBoundsEffect::kNone
+                                         : ArrayBoundsEffect::kMayChangeAny;
   }
 
   if (isa<LoadInst>(I))

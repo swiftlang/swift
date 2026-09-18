@@ -100,7 +100,8 @@ def backup_module_interface_path_EQ :
   Alias<backup_module_interface_path>;
 
 def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
-  HelpText<"Emit textual output in a parseable format">;
+  Flags<[HelpHidden]>,
+  HelpText<"Deprecated: Emit textual output in a parseable format">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, CacheInvariant]
 
@@ -1691,6 +1692,11 @@ def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
 def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
   HelpText<"Clang Include Tree FileList CASID">, MetaVarName<"<cas-id>">;
+
+def cas_fs_input_overlay: Flag<["-"], "cas-fs-input-overlay">,
+  HelpText<"Read the input files from disk and overlay them on the CAS file "
+           "system. This disables caching, since the content of the input "
+           "files no longer contributes to the cache key">;
 
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,

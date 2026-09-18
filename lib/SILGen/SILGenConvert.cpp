@@ -24,13 +24,9 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -51,7 +47,7 @@ SILGenFunction::emitInjectOptional(SILLocation loc,
 
   // If the value is loadable, just emit and wrap.
   // TODO: honor +0 contexts?
-  if (optTL.isLoadable() || !silConv.useLoweredAddresses()) {
+  if (optTL.isLoadableOrOpaque(F)) {
     ManagedValue objectResult = generator(SGFContext());
     return B.createEnum(loc, objectResult, someDecl, optTy);
   }
@@ -113,7 +109,7 @@ void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
 /// works for loadable enum types.
 SILValue SILGenFunction::getOptionalNoneValue(SILLocation loc,
                                               const TypeLowering &optTL) {
-  assert((optTL.isLoadable() || !silConv.useLoweredAddresses()) &&
+  assert((optTL.isLoadableOrOpaque(F)) &&
          "Address-only optionals cannot use this");
   assert(optTL.getLoweredType().getOptionalObjectType());
 
@@ -126,7 +122,7 @@ SILValue SILGenFunction::getOptionalNoneValue(SILLocation loc,
 ManagedValue SILGenFunction::
 getOptionalSomeValue(SILLocation loc, ManagedValue value,
                      const TypeLowering &optTL) {
-  assert((optTL.isLoadable() || !silConv.useLoweredAddresses()) &&
+  assert((optTL.isLoadableOrOpaque(F)) &&
          "Address-only optionals cannot use this");
   SILType optType = optTL.getLoweredType();
   auto formalOptType = optType.getASTType();
@@ -367,7 +363,7 @@ SILGenFunction::emitOptionalSome(SILLocation loc, SILType optTy,
 
   // If the type is loadable or we're not lowering address-only types
   // in SILGen, use a simple scalar pattern.
-  if (!silConv.useLoweredAddresses() || optTL.isLoadable()) {
+  if (optTL.isLoadableOrOpaque(F)) {
     auto value = produceValue(*this, loc, SGFContext());
     return getOptionalSomeValue(loc, value, optTL);
   }
@@ -420,7 +416,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
   if (auto *EI = dyn_cast<EnumInst>(input.getValue())) {
     if (EI->getElement() == Ctx.getOptionalNoneDecl()) {
-      if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
+      if (resultTL.isLoadableOrOpaque(F)) {
         SILValue none = B.createEnum(loc, SILValue(), EI->getElement(),
                                      resultTy);
         return emitManagedRValueWithCleanup(none);
@@ -446,7 +442,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   // otherwise the result is the BBArgument in the merge point.
   // TODO: use the SGFContext passed in.
   ManagedValue resultAddress;
-  bool addressOnly = resultTL.isAddressOnly() && silConv.useLoweredAddresses();
+  bool addressOnly = !resultTL.isLoadableOrOpaque(F);
   if (addressOnly) {
     resultAddress = emitManagedBufferWithCleanup(
         emitTemporaryAllocation(loc, resultTy), resultTL);
@@ -459,8 +455,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         // transforming the underlying type instead of the optional type. This
         // ensures that we use the more efficient non-generic code paths when
         // possible.
-        if (getTypeLowering(input.getType()).isAddressOnly() &&
-            silConv.useLoweredAddresses()) {
+        if (!getTypeLowering(input.getType()).isLoadableOrOpaque(F)) {
           auto *someDecl = Ctx.getOptionalSomeDecl();
           input = B.createUncheckedInPlaceEnumDataAddr(
               loc, input, someDecl, input.getType().getOptionalObjectType());
@@ -1009,7 +1004,8 @@ SILGenFunction::emitOpenExistential(
   SILType existentialType = existentialValue.getType();
   switch (existentialType.getPreferredExistentialRepresentation()) {
   case ExistentialRepresentation::COM:
-    llvm_unreachable("opening a COM existential is not implemented");
+    assert(existentialType.isObject());
+    return B.createOpenCOMExistential(loc, existentialValue, loweredOpenedType);
   case ExistentialRepresentation::Opaque: {
     // With CoW existentials we can't consume the boxed value inside of
     // the existential. (We could only do so after a uniqueness check on

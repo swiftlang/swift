@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
-// RUN: %target-swift-frontend -disable-availability-checking -emit-silgen -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-silgen -verify %s
 
 public func foo() -> some Any { return 1 }
 

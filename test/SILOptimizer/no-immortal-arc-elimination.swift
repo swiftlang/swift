@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-disable-pass=function-signature-opts -module-name=test -O -target %target-cpu-apple-macos10.14 -emit-sil | %FileCheck %s
 
+// REQUIRES: rdar187793719
+
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib

@@ -29,6 +29,24 @@ PassAsParameterTestSuite.test("pass as const reference") {
   expectEqual(aValue, 321)
 }
 
+PassAsParameterTestSuite.test("pass as rvalue reference") {
+  let a = IntBox.create(456)!
+  let aValue = extractValueFromRvalueRef(consuming: a)
+  expectEqual(aValue, 456)
+}
+
+PassAsParameterTestSuite.test("pass as const rvalue reference") {
+  let a = IntBox.create(654)!
+  let aValue = extractValueFromConstRvalueRef(consuming: a)
+  expectEqual(aValue, 654)
+}
+
+PassAsParameterTestSuite.test("overloaded on reference kind") {
+  let a = IntBox.create(100)!
+  expectEqual(overloadedOnRefKind(a), 100)
+  expectEqual(overloadedOnRefKind(consuming: a), 101)
+}
+
 PassAsParameterTestSuite.test("pass as reference to pointer") {
   var a = IntBox.create(123)
   let aValue = extractValueFromRefToPtr(&a)

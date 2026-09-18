@@ -687,11 +687,19 @@ bb0(%0 : $*Optional<NC>):
   return %1 : $Optional<NC>
 }
 
+// The `switch_enum` simplification forwards the borrow to the owned enum, after which the outer
+// `enum` - `switch_enum` pair folds away completely and `bb2` becomes dead.
+// The `unchecked_enum_data` simplification which used to kick in here (replacing the
+// `unchecked_enum_data` with the trivial `%1` and compensating with a `destroy_value`) is covered
+// in isolation by simplify_unchecked_enum_data.sil.
+//
 // CHECK-LABEL: sil [ossa] @trivial_replacement
-// CHECK:       bb1({{.*}}:
-// CHECK-NEXT:    end_borrow
-// CHECK-NEXT:    destroy_value %2
-// CHECK:         apply {{%[0-9]+}}(%1)
+// CHECK:       bb0(%0 : $Int):
+// CHECK-NEXT:    [[E:%.*]] = enum $E2, #E2.int!enumelt, %0 : $Int
+// CHECK-NEXT:    br bb1([[E]] : $E2)
+// CHECK:       bb1([[ARG:%.*]] : @owned $E2):
+// CHECK:         apply {{%[0-9]+}}([[ARG]])
+// CHECK-NOT:     Optional
 // CHECK:       } // end sil function 'trivial_replacement'
 sil [ossa] @trivial_replacement : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):

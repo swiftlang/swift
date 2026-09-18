@@ -110,7 +110,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   ThreadingError.cpp
   TracingSignpost.cpp
   AsyncStream.cpp
-  linker-support/magic-symbols-for-install-name.c
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
@@ -155,7 +154,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   TaskLocal.swift
   TaskSleep.swift
   AsyncStreamBuffer.swift
-  AsyncStreamShims.swift
   AsyncStream.swift
   AsyncThrowingStream.swift
   Deque/_DequeBuffer.swift
@@ -193,6 +191,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
 
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
   ExecutorImpl.cpp
+  linker-support/magic-symbols-for-install-name.c
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES)
@@ -278,6 +277,9 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   C_COMPILE_FLAGS
     -Dswift_Concurrency_EXPORTS ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
     -I${SWIFT_SOURCE_DIR}/stdlib/include
+  # WASI's libc++abi has no exception runtime, even in non-embedded builds.
+  C_COMPILE_FLAGS_WASI
+    -fno-exceptions
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib

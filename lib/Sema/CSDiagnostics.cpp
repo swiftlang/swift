@@ -48,6 +48,7 @@
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -3595,8 +3596,8 @@ bool ContextualFailure::tryTypeCoercionFixIt(
   // type, let's suggest a force unwrap "!". Otherwise fallback to potential
   // coercion or force cast.
   if (!bothOptional && fromType->getOptionalObjectType()) {
-    if (TypeChecker::isSubtypeOf(fromType->lookThroughAllOptionalTypes(),
-                                 toType, getDC())) {
+    ConformanceCache cache;
+    if (canConvertTo(cache, fromType->lookThroughAllOptionalTypes(), toType)) {
       diagnostic.fixItInsert(
           Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
                                      getSourceRange().End),
@@ -7816,6 +7817,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnoseKeyPathAsFunctionResultMismatch())
     return true;
 
+  if (diagnoseInOutToPointerInSubscript())
+    return true;
+
   auto argType = getFromType();
 
   // Unresolved key path argument requires a tailored diagnostic
@@ -8153,6 +8157,33 @@ bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
   // Suggest importing RegexBuilder.
   auto diag = emitDiagnostic(diag::must_import_regex_builder_module);
   fixItImport(diag, ctx.Id_RegexBuilder, getDC());
+  return true;
+}
+
+bool ArgumentMismatchFailure::diagnoseInOutToPointerInSubscript() const {
+  if (!getASTContext().LangOpts.hasFeature(
+          Feature::SubscriptParametersWithOwnership))
+    return false;
+
+  // Only for `&x` passed where a pointer is expected.
+  auto *argExpr = getAsExpr(getAnchor());
+  if (!argExpr || !argExpr->isSemanticallyInOutExpr())
+    return false;
+
+  PointerTypeKind pointerKind;
+  if (!getToType()->lookThroughAllOptionalTypes()->getAnyPointerElementType(
+          pointerKind))
+    return false;
+
+  // The implicit inout-to-pointer conversion deliberately does not apply to
+  // subscript arguments; `inout` there means the index takes the exclusive
+  // access itself. See `matchTypes` in CSSimplify.cpp.
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!overload || !overload->choice.isDecl() ||
+      !isa<SubscriptDecl>(overload->choice.getDecl()))
+    return false;
+
+  emitDiagnostic(diag::cannot_pass_inout_arg_to_subscript);
   return true;
 }
 
@@ -8884,8 +8915,8 @@ bool KeyPathRootTypeMismatchFailure::diagnoseAsError() {
 
 bool MultiArgFuncKeyPathFailure::diagnoseAsError() {
   // Diagnose use a keypath where a function with multiple arguments is expected
-  emitDiagnostic(diag::expr_keypath_multiparam_func_conversion,
-                 resolveType(functionType));
+  emitDiagnostic(diag::expr_keypath_wrong_param_func_conversion,
+                 resolveType(functionType), resolveType(expectedType));
   return true;
 }
 

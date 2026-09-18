@@ -57,13 +57,11 @@ fooptr_t __sized_by(4) test_fooptr3(int len, fooptr_t __sized_by(len) p);
 // }}
 fooptr_t __single _Nonnull test_fooptr4(int len, fooptr_t __sized_by(len) p);
 
-// expected-expansion@+9:67{{
+// expected-expansion@+7:67{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func test_fooptr5(_ p: UnsafeRawBufferPointer) -> OpaquePointer {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
-//   Diverges due to https://github.com/swiftlang/llvm-project/issues/13277
-//   expected-attr-remark@4{{macro content: |    return unsafe test_fooptr5(len, OpaquePointer(p.baseAddress))|}}
-//   expected-bounds-remark@4{{macro content: |    return unsafe test_fooptr5(len, OpaquePointer(p.baseAddress!))|}}
+//   expected-remark@4{{macro content: |    return unsafe test_fooptr5(len, OpaquePointer(p.baseAddress!))|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 layer2_t __single test_fooptr5(int len, layer2_t __sized_by(len) p);

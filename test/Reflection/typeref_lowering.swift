@@ -9,8 +9,8 @@
 // rdar://100558042
 // UNSUPPORTED: CPU=arm64e
 
-// RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library %no-fixup-chains -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
-// RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift %S/Inputs/main.swift -emit-module -emit-executable %no-fixup-chains -module-name TypeLowering -o %t/TypesToReflect
+// RUN: %target-build-swift -target %target-swift-5.2-abi-triple %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library %no-fixup-chains -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
+// RUN: %target-build-swift -target %target-swift-5.2-abi-triple %S/Inputs/TypeLowering.swift %S/Inputs/main.swift -emit-module -emit-executable %no-fixup-chains -module-name TypeLowering -o %t/TypesToReflect
 
 // RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
 // RUN: %target-swift-reflection-dump %t/TypesToReflect %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
@@ -1306,6 +1306,14 @@ $1_SiBV
 // CHECK-32-NEXT:   (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:     (field name=_value offset=0
 // CHECK-32-NEXT:       (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+
+// A count that overflows the 32-bit size and stride fields is rejected rather
+// than silently wrapping. rdar://185733582
+$2147483646_SiBV
+// CHECK:      (builtin_fixed_array
+// CHECK-NEXT:   (integer value=2147483647)
+// CHECK-NEXT:   (struct Swift.Int))
+// CHECK-NEXT: Invalid lowering
 
 SiBW
 // CHECK-64:      (builtin_borrow

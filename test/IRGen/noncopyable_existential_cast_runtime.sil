@@ -7,6 +7,13 @@
 
 // REQUIRES: executable_test
 
+// This exercises the take-instead-of-copy support added to swift_dynamicCast
+// (tryCastUnwrappingExistentialSource). An older, OS-resident runtime copies
+// the payload instead, which traps in the noncopyable type's copy value
+// witness -- so this cannot run against the OS stdlib or a back-deployed one.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 // TODO: Remove this as soon as we can get all of this working
 // under -O
 // REQUIRES: swift_test_mode_optimize_none

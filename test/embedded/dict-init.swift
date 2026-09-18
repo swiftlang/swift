@@ -3,7 +3,6 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=wasip1
 // REQUIRES: swift_feature_Embedded
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 public func foo() {
     let d = Dictionary<Int, StaticString>.init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])

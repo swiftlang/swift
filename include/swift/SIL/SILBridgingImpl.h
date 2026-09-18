@@ -22,6 +22,7 @@
 #include "SILBridging.h"
 #include "swift/AST/Builtins.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/StorageImpl.h"
@@ -373,6 +374,10 @@ bool BridgedType::isTrivial(BridgedFunction f) const {
   return unbridged().isTrivial(f.getFunction());
 }
 
+bool BridgedType::isNonTrivialOnlyBecauseNonEscapable(BridgedFunction f) const {
+  return unbridged().isNonTrivialOnlyBecauseNonEscapable(*f.getFunction());
+}
+
 bool BridgedType::isNonTrivialOrContainsRawPointer(BridgedFunction f) const {
   return unbridged().isNonTrivialOrContainsRawPointer(f.getFunction());
 }
@@ -522,7 +527,8 @@ swift::Identifier BridgedType::getTupleElementLabel(SwiftInt idx) const {
 
 BridgedType BridgedType::getFunctionTypeWithNoEscape(bool withNoEscape) const {
   auto fnType = unbridged().getAs<swift::SILFunctionType>();
-  auto newTy = fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape(true));
+  auto newTy =
+      fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape(withNoEscape));
   return swift::SILType::getPrimitiveObjectType(newTy);
 }
 
@@ -954,6 +960,34 @@ bool BridgedFunction::isDestructor() const {
 
 bool BridgedFunction::isGeneric() const {
   return getFunction()->isGeneric();
+}
+
+bool BridgedFunction::isDistributedAdHocSerializationRequirementWitness() const {
+  auto *DC = getFunction()->getDeclContext();
+  while (DC) {
+    if (auto *funcDecl = llvm::dyn_cast<swift::AbstractFunctionDecl>(DC)) {
+      if (funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
+        return true;
+
+      auto &ctx = funcDecl->getASTContext();
+      if (funcDecl->getBaseName() == ctx.Id_invokeHandlerOnReturn) {
+        auto *parentDC = funcDecl->getDeclContext();
+        if (parentDC && parentDC->isTypeContext()) {
+          if (auto *systemProto = ctx.getDistributedActorSystemDecl()) {
+            auto *selfNominal = parentDC->getSelfNominalTypeDecl();
+            if (selfNominal &&
+                !swift::lookupConformance(
+                     selfNominal->getDeclaredInterfaceType(), systemProto)
+                     .isInvalid()) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    DC = DC->getParent();
+  }
+  return false;
 }
 
 bool BridgedFunction::hasSemanticsAttr(BridgedStringRef attrName) const {
@@ -1452,6 +1486,14 @@ bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
 
 BridgedGenericEnvironment BridgedInstruction::OpenExistentialRefInst_getDefinedGenericEnvironment() const {
   return {getAs<swift::OpenExistentialRefInst>()->getDefinedOpenedArchetype()->getGenericEnvironment()};
+}
+
+BridgedGenericEnvironment
+BridgedInstruction::OpenCOMExistentialInst_getDefinedGenericEnvironment()
+    const {
+  return {getAs<swift::OpenCOMExistentialInst>()
+              ->getDefinedOpenedArchetype()
+              ->getGenericEnvironment()};
 }
 
 BridgedGlobalVar BridgedInstruction::GlobalAccessInst_getGlobal() const {
@@ -3290,6 +3332,12 @@ BridgedBuilder::createEndCOWMutationAddr(BridgedValue instance) const {
                                                instance.getSILValue())};
 }
 
+BridgedInstruction
+BridgedBuilder::createEndFormalScope(BridgedValue instance) const {
+  return {unbridged().createEndFormalScope(regularLoc(),
+                                               instance.getSILValue())};
+}
+
 BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {
   return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(), swift::MarkDependenceKind(kind))};
 }
@@ -3604,6 +3652,12 @@ OptionalBridgedWitnessTable BridgedContext::lookupWitnessTable(BridgedConformanc
     return {nullptr};
   }
   return {context->getModule()->lookUpWitnessTable(ref.getConcrete())};
+}
+
+BridgedConformance BridgedContext::substOpaqueTypesWithUnderlyingTypes(BridgedConformance conformance) const {
+  swift::SILModule *mod = context->getModule();
+  return {swift::substOpaqueTypesWithUnderlyingTypes(conformance.unbridged(),
+                                                     mod->getMaximalTypeExpansionContext())};
 }
 
 bool BridgedContext::calleesAreStaticallyKnowable(BridgedDeclRef method) const {

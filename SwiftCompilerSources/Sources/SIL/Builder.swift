@@ -31,7 +31,7 @@ public struct Builder {
 
   /// Creates a builder which inserts _before_ `insPnt`, using a custom `location`.
   public init(before insPnt: Instruction, location: Location, _ context: some MutatingContext) {
-    context.verifyIsTransforming(function: insPnt.parentFunction)
+    context.verifyModifying(instruction: insPnt)
     self.init(insertAt: .before(insPnt), location: location, context.notifyInstructionChanged, context._bridged)
   }
 
@@ -42,7 +42,7 @@ public struct Builder {
   /// For replacing an existing meta instruction with another, use
   /// ``Builder.init(replacing:_:)``.
   public init(before insPnt: Instruction, _ context: some MutatingContext) {
-    context.verifyIsTransforming(function: insPnt.parentFunction)
+    context.verifyModifying(instruction: insPnt)
     self.init(insertAt: .before(insPnt), location: insPnt.location,
               context.notifyInstructionChanged, context._bridged)
   }
@@ -51,7 +51,7 @@ public struct Builder {
   /// for the purpose of replacing that meta instruction with an equivalent instruction.
   /// This function does not delete `insPnt`.
   public init(replacing insPnt: MetaInstruction, _ context: some MutatingContext) {
-    context.verifyIsTransforming(function: insPnt.parentFunction)
+    context.verifyModifying(instruction: insPnt)
     self.init(insertAt: .before(insPnt), location: insPnt.location, context.notifyInstructionChanged, context._bridged)
   }
 
@@ -60,7 +60,7 @@ public struct Builder {
   /// TODO: this is usually incorrect for terminator instructions. Instead use
   /// `Builder.insert(after:location:_:insertFunc)` from OptUtils.swift. Rename this to afterNonTerminator.
   public init(after insPnt: Instruction, location: Location, _ context: some MutatingContext) {
-    context.verifyIsTransforming(function: insPnt.parentFunction)
+    context.verifyModifying(instruction: insPnt)
     guard let nextInst = insPnt.next else {
       fatalError("cannot insert an instruction after a block terminator.")
     }

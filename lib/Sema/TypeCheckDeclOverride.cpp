@@ -30,7 +30,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/UnsafeUse.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LanguageMode.h"
 #include "llvm/ADT/SmallVector.h"
 using namespace swift;
@@ -59,17 +58,19 @@ static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
   // Determine the input and result types of this function.
   auto fnType = type->castTo<AnyFunctionType>();
   auto parameters = fnType->getParams();
+  auto yields = fnType->getYields();
   Type resultType =
       dropResultOptionality(fnType->getResult(), uncurryLevel - 1);
 
   // Produce the resulting function type.
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                    parameters, resultType,
+                                    parameters, yields, resultType,
                                     fnType->getExtInfo());
   }
 
-  return FunctionType::get(parameters, resultType, fnType->getExtInfo());
+  return FunctionType::get(parameters, yields, resultType,
+                           fnType->getExtInfo());
 }
 
 Type swift::getMemberTypeForComparison(const ValueDecl *member,
@@ -104,8 +105,8 @@ Type swift::getMemberTypeForComparison(const ValueDecl *member,
     auto funcTy = memberType->castTo<AnyFunctionType>();
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    memberType =
-        FunctionType::get(funcTy->getParams(), funcTy->getResult(), info);
+    memberType = FunctionType::get(funcTy->getParams(), funcTy->getYields(),
+                                   funcTy->getResult(), info);
   } else {
     // For properties, strip off ownership.
     memberType = memberType->getReferenceStorageReferent();
@@ -1127,9 +1128,10 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
       diags.diagnose(decl, diag::override_of_non_open, decl);
     }
   } else if (baseHasOpenAccess &&
-             classDecl->hasOpenAccess(dc) &&
              decl->getFormalAccess() < AccessLevel::Public &&
-             !decl->isSemanticallyFinal()) {
+             !decl->isSemanticallyFinal() &&
+             classDecl->hasOpenAccess(dc) &&
+             classDecl->getFormalAccessScope(dc).isPublic()) {
     {
       auto diag = diags.diagnose(decl, diag::override_not_accessible,
                                  /*setter*/ false, decl,
@@ -1605,6 +1607,7 @@ namespace  {
     UNINTERESTING_ATTR(Called)
     UNINTERESTING_ATTR(Concurrent)
     UNINTERESTING_ATTR(Consuming)
+    UNINTERESTING_ATTR(Coroutine)
     UNINTERESTING_ATTR(CxxDecl)
     UNINTERESTING_ATTR(Documentation)
     UNINTERESTING_ATTR(Dynamic)
@@ -1673,6 +1676,7 @@ namespace  {
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(Used)
     UNINTERESTING_ATTR(Section)
+    UNINTERESTING_ATTR(Target)
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
@@ -2129,7 +2133,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
     // Check for a subtyping relationship.
     switch (compareThrownErrorsForSubtyping(
-                overrideThrownError, baseThrownError, overrideFn)) {
+                overrideThrownError, baseThrownError)) {
     case ThrownErrorSubtyping::DropsThrows:
       diags.diagnose(override, diag::override_with_more_effects, override,
                      "throwing");

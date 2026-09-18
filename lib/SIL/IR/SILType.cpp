@@ -19,14 +19,12 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Type.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Test.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Sema/Concurrency.h"
-#include <tuple>
 
 using namespace swift;
 using namespace swift::Lowering;
@@ -142,9 +140,20 @@ SILType SILType::getUnsafeRawPointer(const ASTContext &ctx) {
 }
 
 bool SILType::isTrivial(const SILFunction &F) const {
+  // If the function uses ownership for trivial values, then no types are
+  // considered trivial in its context.
+  if (F.hasOwnershipForTrivialValues()) {
+    return false;
+  }
   auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
   
   return F.getTypeProperties(contextType).isTrivial();
+}
+
+bool SILType::isNonTrivialOnlyBecauseNonEscapable(const SILFunction &F) const {
+  auto contextType =
+      hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
+  return F.getTypeProperties(contextType).isNonTrivialOnlyBecauseNonEscapable();
 }
 
 bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
@@ -596,8 +605,7 @@ SILType::canUseExistentialRepresentation(ExistentialRepresentation repr,
                                          Type containedType) const {
   switch (repr) {
   case ExistentialRepresentation::COM:
-    return isExistentialType() &&
-      getASTType().getExistentialLayout().getCOMInterface();
+    return getASTType().isCOMExistentialType();
   case ExistentialRepresentation::None:
     return !isAnyExistentialType();
   case ExistentialRepresentation::Opaque:
@@ -692,8 +700,7 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
       return OwnershipKind::None;
     return OwnershipKind::Unowned;
   case ResultConvention::GuaranteedAddress:
-    return isAddressResult(
-               SILAddressConventions::forFunction(F).useLoweredAddresses())
+    return SILAddressConventions::forFunction(F).isAddressResult(*this)
                ? OwnershipKind::None
                : OwnershipKind::Guaranteed;
   case ResultConvention::Inout:

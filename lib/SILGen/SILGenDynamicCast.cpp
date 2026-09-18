@@ -16,7 +16,6 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "ExitableFullExpr.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -262,7 +261,7 @@ namespace {
       }
 
       ManagedValue result;
-      if (!origTargetTL.isAddressOnly() || !SGF.useLoweredAddresses()) {
+      if (origTargetTL.isLoadableOrOpaque(SGF.F)) {
         result = SGF.emitLoad(Loc, buffer, origTargetTL, ctx, IsTake);
       } else {
         result = SGF.emitManagedBufferWithCleanup(buffer, origTargetTL);
@@ -496,7 +495,7 @@ RValue Lowering::emitConditionalCheckedCast(
   SILValue resultObjectBuffer;
   std::optional<TemporaryInitialization> resultObjectTemp;
   SGFContext resultObjectCtx;
-  if ((resultTL.isAddressOnly() && SGF.useLoweredAddresses())
+  if (!resultTL.isLoadableOrOpaque(SGF.F)
       || (C.getEmitInto()
           && C.getEmitInto()->canPerformInPlaceInitialization())) {
     SILType resultTy = resultTL.getLoweredType();

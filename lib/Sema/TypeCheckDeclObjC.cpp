@@ -35,6 +35,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 
 using namespace swift;
@@ -52,6 +53,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
     LLVM_FALLTHROUGH;
 
   case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyCxxDecl:
   case ObjCReason::ExplicitlyUnderscoreCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
@@ -86,6 +88,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
 unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   switch (reason) {
   case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyCxxDecl:
   case ObjCReason::ExplicitlyUnderscoreCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
@@ -138,6 +141,7 @@ void ObjCReason::describe(const Decl *D) const {
 
   case ObjCReason::ExplicitlyObjCByAccessNote:
   case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyCxxDecl:
   case ObjCReason::ExplicitlyUnderscoreCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
@@ -805,6 +809,25 @@ bool swift::isRepresentableInLanguage(
     llvm_unreachable("bad kind");
   }
 
+  // A C++ method receives `this` from its caller, so a `@cxx` implementation
+  // takes `self` with default ownership: `mutating` for a non-const method
+  // and nothing for a const one.
+  if (language == ForeignLanguage::Cxx) {
+    if (auto *FD = dyn_cast<FuncDecl>(AFD); FD && FD->isInstanceMember()) {
+      auto selfAccess = FD->getSelfAccessKind();
+      bool isConsuming = selfAccess == SelfAccessKind::Consuming ||
+                         selfAccess == SelfAccessKind::LegacyConsuming;
+      if (isConsuming || selfAccess == SelfAccessKind::Borrowing) {
+        softenIfAccessNote(AFD, Reason.getAttr(),
+                           AFD->diagnose(diag::cxx_self_ownership_unsupported,
+                                         AFD, isConsuming)
+                               .limitBehavior(behavior));
+        Reason.describe(AFD);
+        return false;
+      }
+    }
+  }
+
   // As a special case, an initializer with a single, named parameter of type
   // '()' is always representable in Objective-C. This allows us to cope with
   // zero-parameter methods with selectors that are longer than "init". For
@@ -948,9 +971,9 @@ bool swift::isRepresentableInLanguage(
     }
 
     Type completionHandlerType = FunctionType::get(
-        completionHandlerParams, TupleType::getEmpty(ctx),
+        completionHandlerParams, {}, TupleType::getEmpty(ctx),
         ASTExtInfoBuilder(FunctionTypeRepresentation::Block, false, Type())
-          .build());
+            .build());
 
     // @objcImpl member implementations need to allow a nil completion handler.
     if (AFD->isObjCMemberImplementation())
@@ -1312,8 +1335,20 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
     return false;
 
   auto IndexParam = SubscriptType->getParams()[0];
-  if (IndexParam.isInOut())
+
+  // Swift inout parameters are not representable in Objective-C.
+  if (IndexParam.isInOut()) {
+    auto *indexDecl = SD->getIndices()->get(0);
+    softenIfAccessNote(
+        SD, Reason.getAttr(),
+        SD->diagnose(diag::objc_invalid_on_func_inout, SD,
+                     getObjCDiagnosticAttrKind(Reason),
+                     ForeignLanguage::ObjectiveC)
+            .highlight(indexDecl->getSourceRange())
+            .limitBehavior(behavior));
+    Reason.describe(SD);
     return false;
+  }
 
   Type IndexType = SubscriptType->getParams()[0].getParameterType();
   if (IndexType->hasError())
@@ -3377,6 +3412,13 @@ class ObjCImplementationChecker {
                             .getAttribute<ObjCAttr>(/*AllowInvalid=*/true))
       return objc->isInvalid();
 
+    // A failed C++ representability check marks the candidate's CxxDeclAttr
+    // invalid.
+    if (auto cxx =
+            cand->getAttrs().getAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
+      if (cxx->isInvalid())
+        return true;
+
     return getAttr()->hasInvalidImplicitLangAttrs() || getAttr()->isInvalid();
   }
 
@@ -3387,6 +3429,12 @@ public:
     assert(!D->hasClangNode() && "passed interface, not impl, to checker");
 
     if (isa<AbstractFunctionDecl>(D)) {
+      // An `@implementation` function whose foreign name resolves to several
+      // overloads with the same Swift signature has nothing definite to match
+      // against; the attribute checker diagnoses the ambiguity.
+      if (D->getAllImplementedObjCDecls().size() > 1)
+        return;
+
       addCandidate(D);
 
       // Unlike the members of an imported interface, which are discovered by
@@ -3602,23 +3650,17 @@ private:
     if (!restriction)
       return;
 
-    auto domainAndRange = restriction->getDomainAndRange(ctx);
-    auto domain = domainAndRange.getDomain();
+    auto domain = restriction->getDomainAndRange(ctx).getDomain();
 
-    auto emit = [&]() -> InFlightDiagnostic {
-      if (restriction->isUnavailable())
-        return diagnose(
-            ext, diag::objc_implementation_extension_unavailable, nominal,
-            restriction->shouldHideDomainNameInDiagnostics(), domain);
-
-      return diagnose(
-          ext, diag::objc_implementation_extension_only_available_in, nominal,
-          domain, domain.isVersioned(), domainAndRange.getRange());
-    };
-
-    emit().warnUntilLanguageModeIf(shouldDowngradeAvailabilityMismatchDiag(
-                                       domain, /*implIsLessAvailable=*/true),
-                                   LanguageMode::future);
+    // The extension implements the class rather than using it, so the
+    // `message:` from the `@available` attribute does not apply here.
+    llvm::SmallString<64> scratch;
+    diagnose(ext, diag::objc_implementation_extension_restricted, nominal,
+             restriction->getDiagnosticDescription(scratch, ctx,
+                                                   /*includeMessage=*/false))
+        .warnUntilLanguageModeIf(shouldDowngradeAvailabilityMismatchDiag(
+                                     domain, /*implIsLessAvailable=*/true),
+                                 LanguageMode::future);
 
     restriction->emitNoteForDecl(ext);
   }
@@ -4119,12 +4161,10 @@ private:
       return MatchOutcome::WrongExplicitObjCName;
 
     if (!hasSwiftNameMatch) {
-      // A `@cxx(...)` implementation may be named differently from the C++
-      // function it implements. The explicit C++ name is the authoritative
-      // match key, so a Swift-name difference is expected and fine.
-      bool cxxExplicitNameMatch =
-          explicitObjCName && cand->getAttrs().hasAttribute<CxxDeclAttr>();
-      if (!cxxExplicitNameMatch)
+      // A `@cxx` implementation is matched by its C++ name (given explicitly,
+      // or its Swift base name), so its Swift name may differ from that of the
+      // imported declaration, which the importer may have renamed.
+      if (!cand->getAttrs().hasAttribute<CxxDeclAttr>())
         return MatchOutcome::WrongSwiftName;
     }
 
@@ -4232,6 +4272,27 @@ private:
       return true;
     }
 
+    if (const auto *method = dyn_cast<clang::CXXMethodDecl>(clangFD)) {
+      // TODO: Not supported yet.
+      if (method->isVirtual()) {
+        diagnose(cand, diag::cxx_virtual_unsupported, cand, clangFD->getName());
+        return true;
+      }
+
+      // The importer maps a const method to a non-mutating Swift method and a
+      // non-const one to a `mutating` method. The implementation must agree
+      // with the imported declaration on this as on the rest of the
+      // signature.
+      auto *reqFD = dyn_cast<FuncDecl>(req);
+      auto *candFD = dyn_cast<FuncDecl>(cand);
+      if (method->isInstance() && reqFD && candFD &&
+          reqFD->isMutating() != candFD->isMutating()) {
+        unsigned which = candFD->isMutating() ? 2 : method->isConst() ? 1 : 0;
+        diagnose(cand, diag::cxx_mutating_mismatch, cand, which, req);
+        return true;
+      }
+    }
+
     // TODO: Not supported yet, ban C++ references for now.
     bool usesReferences = clangFD->getReturnType()->isReferenceType();
     for (const auto *param : clangFD->parameters())
@@ -4260,6 +4321,40 @@ private:
     return false;
   }
 
+  /// Reject a matched `@c` or `@cxx @implementation` pair whose C or C++
+  /// declaration returns a reference-counted foreign reference type at +0.
+  /// Returns true if an error was diagnosed (the match is invalid).
+  bool diagnoseUnretainedForeignResult(ValueDecl *req, ValueDecl *cand) {
+    const auto *clangFD =
+        dyn_cast_or_null<clang::FunctionDecl>(req->getClangDecl());
+    const auto *candFD = dyn_cast<FuncDecl>(cand);
+    if (!clangFD || !candFD)
+      return false;
+
+    // The implementation is lowered with the result convention of the C or
+    // C++ declaration (see getSILFunctionTypeForClangDecl), but its Swift
+    // body always produces an owned (+1) value, which would leak against an
+    // unretained (+0) result, or no annotation.
+    // An immortal foreign reference type is never retained or released, so
+    // its result convention does not matter.
+    // TODO: Support returning a foreign reference type unretained.
+    const auto *resultClass = candFD->getResultInterfaceType()
+                                  ->lookThroughAllOptionalTypes()
+                                  ->getClassOrBoundGenericClass();
+    if (!resultClass || !resultClass->hasRefCountingAnnotations())
+      return false;
+    if (importer::getOwnershipOfReturnedFRT(clangFD, cand->getASTContext()) ==
+        ResultConvention::Owned)
+      return false;
+
+    bool isCxx = cand->getAttrs().hasAttribute<CxxDeclAttr>();
+    unsigned reason =
+        importer::ReturnOwnershipInfo(clangFD).hasReturnsUnretained ? 1 : 0;
+    diagnose(cand, diag::cdecl_unretained_result_unsupported, cand, isCxx,
+             clangFD->getName(), reason);
+    return true;
+  }
+
   void diagnoseOutcome(MatchOutcome outcome, ValueDecl *req, ValueDecl *cand,
                        ObjCSelector explicitObjCName) {
     // If the candidate was invalid, we've already diagnosed the likely cause of
@@ -4279,7 +4374,8 @@ private:
     case MatchOutcome::Match:
     case MatchOutcome::MatchWithExplicitObjCName:
       // Successful outcomes!
-      if (diagnoseInvalidCxxMatch(req, cand))
+      if (diagnoseInvalidCxxMatch(req, cand) ||
+          diagnoseUnretainedForeignResult(req, cand))
         return;
       // If this member will require a vtable entry, diagnose that now.
       diagnoseVTableUse(cand);
@@ -4673,17 +4769,62 @@ evaluate(Evaluator &evaluator, Decl *D) const {
   return evaluator::SideEffect();
 }
 
+/// Diagnose a '@c' or '@cxx' function that would define the retain or release
+/// operation of a foreign reference type it also takes as a parameter.
+///
+/// The C entry point retains and releases its foreign reference type
+/// parameters, so such a function would call itself.
+static void diagnoseForeignRefCountingOperation(FuncDecl *FD,
+                                                DeclAttribute *attr) {
+  auto cName = FD->getCDeclName();
+  if (cName.empty())
+    return;
+
+  auto *loader = FD->getASTContext().getClangModuleLoader();
+  if (!loader)
+    return;
+
+  for (auto *param : *FD->getParameters()) {
+    auto paramTy = param->getInterfaceType()->lookThroughAllOptionalTypes();
+    auto *classDecl = paramTy->getClassOrBoundGenericClass();
+
+    // Immortal foreign reference types have no retain/release to implement.
+    if (!classDecl || !classDecl->hasRefCountingAnnotations())
+      continue;
+
+    auto *record =
+        dyn_cast_or_null<clang::RecordDecl>(classDecl->getClangDecl());
+    if (!record)
+      continue;
+
+    auto ops = loader->getForeignReferenceTypeOperations(record);
+    for (auto [op, isRelease] : {std::make_pair(ops.first, false),
+                                 std::make_pair(ops.second, true)}) {
+      if (!op || !op->getIdentifier() || op->getName() != cName)
+        continue;
+
+      FD->diagnose(diag::cdecl_ref_counting_operation, attr, isRelease,
+                   paramTy);
+      return;
+    }
+  }
+}
+
 evaluator::SideEffect
-TypeCheckCDeclFunctionRequest::evaluate(Evaluator &evaluator,
+TypeCheckForeignFunctionRequest::evaluate(Evaluator &evaluator,
                                         FuncDecl *FD,
-                                        CDeclAttr *attr) const {
+                                        DeclAttribute *attr) const {
   auto &ctx = FD->getASTContext();
 
   auto lang = FD->getCDeclKind();
-  assert(lang && "missing @c?");
-  auto kind = lang == ForeignLanguage::ObjectiveC
-                      ? ObjCReason::ExplicitlyUnderscoreCDecl
-                      : ObjCReason::ExplicitlyCDecl;
+  assert(lang && "missing @c/@cxx?");
+  ObjCReason::Kind kind;
+  if (*lang == ForeignLanguage::ObjectiveC)
+    kind = ObjCReason::ExplicitlyUnderscoreCDecl;
+  else if (*lang == ForeignLanguage::Cxx)
+    kind = ObjCReason::ExplicitlyCxxDecl;
+  else
+    kind = ObjCReason::ExplicitlyCDecl;
   ObjCReason reason(kind, attr);
 
   std::optional<ForeignAsyncConvention> asyncConvention;
@@ -4697,6 +4838,16 @@ TypeCheckCDeclFunctionRequest::evaluate(Evaluator &evaluator,
       FD->setForeignErrorConvention(*errorConvention);
       ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_throws,
                          attr);
+    }
+
+    // For @cxx, async/throws are hard errors that also invalidate the
+    // attribute so downstream matching diagnostics do not pile on.
+    if (*lang == ForeignLanguage::Cxx && (FD->hasAsync() || FD->hasThrows())) {
+      reason.setAttrInvalid();
+    } else {
+      // Check whether this is an infinitely-recursive foreign reference
+      // counting operation.
+      diagnoseForeignRefCountingOperation(FD, attr);
     }
   } else {
     reason.setAttrInvalid();

@@ -876,6 +876,39 @@ entry:
   return %retval : $()
 }
 
+// Test that copy propagation doesn't hoist a destroy_value corresponding to a
+// move_value [lexical] over a yield.
+// CHECK-LABEL: sil [ossa] @dont_hoist_move_value_lexical_destroy_over_yield : {{.*}} {
+// CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical]
+// CHECK:         [[TAKE_GUARANTEED_C:%[^,]+]] = function_ref @takeGuaranteedC
+// CHECK:         apply [[TAKE_GUARANTEED_C]]([[LIFETIME]])
+// CHECK-NOT:     destroy_value
+// CHECK:         yield {{.*}}, resume [[RESUME:bb[0-9]+]], unwind [[UNWIND:bb[0-9]+]]
+// CHECK:       [[RESUME]]:
+// CHECK:         destroy_value [[LIFETIME]]
+// CHECK:       [[UNWIND]]:
+// CHECK:         destroy_value [[LIFETIME]]
+// CHECK:         unwind
+// CHECK-LABEL: } // end sil function 'dont_hoist_move_value_lexical_destroy_over_yield'
+sil [ossa] @dont_hoist_move_value_lexical_destroy_over_yield : $@yield_once @convention(thin) (@inout C) -> @yields @inout C {
+entry(%slot : $*C):
+  %getOwnedC = function_ref @getOwnedC : $@convention(thin) () -> (@owned C)
+  %instance = apply %getOwnedC() : $@convention(thin) () -> (@owned C)
+  %lifetime = move_value [lexical] %instance : $C
+  %takeGuaranteedC = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  apply %takeGuaranteedC(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  yield %slot : $*C, resume resume_bb, unwind unwind_bb
+
+resume_bb:
+  destroy_value %lifetime : $C
+  %retval = tuple ()
+  return %retval : $()
+
+unwind_bb:
+  destroy_value %lifetime : $C
+  unwind
+}
+
 // Canonicalize the moved-from value when a move_value is deemed redundant and
 // eliminated.
 // CHECK-LABEL: sil [ossa] @canonicalize_source_of_redundant_move_value : {{.*}} {

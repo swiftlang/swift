@@ -23,13 +23,11 @@
 #include "SILGenBuilder.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/NoDiscard.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILType.h"
-#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
 
@@ -1074,9 +1072,12 @@ public:
   /// \param selfDecl The 'self' declaration within the current function.
   /// \param field The stored property that has to be initialized.
   /// \param substitutions The substitutions to apply to initializer and setter.
-  void emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
-                             PatternBindingDecl *field,
-                             SubstitutionMap substitutions);
+  /// \param initAccessorSubsumedStorage Stored properties set up through an init
+  /// accessor on another property; their own initializer is skipped.
+  void emitMemberInitializer(
+      DeclContext *dc, VarDecl *selfDecl, PatternBindingDecl *field,
+      SubstitutionMap substitutions,
+      const llvm::SmallPtrSetImpl<VarDecl *> &initAccessorSubsumedStorage);
 
   void emitMemberInitializationViaInitAccessor(DeclContext *dc,
                                                VarDecl *selfDecl,
@@ -3407,6 +3408,23 @@ public:
   /// If context is init accessor, find a mapping between the given type
   /// property and argument declaration synthesized for it.
   ParamDecl *isMappedToInitAccessorArgument(VarDecl *property);
+  
+  /// Arrange for an end-of-formal-scope marker for the given variable
+  /// binding value to be emitted when the current scope is exited.
+  /// 
+  /// This instruction by itself does not have any effects, but serves as a
+  /// marker for lifetime resolution so that it can reason about the formal
+  /// scopes of variables.
+  void enterFormalScopeCleanup(SILLocation loc, SILValue value);
+  
+  /// Arrange for an end-of-formal-scope marker for the given variable
+  /// binding value (which may not yet be determined, but must be bound before
+  /// the cleanup runs) to be emitted when the current scope is exited.
+  /// 
+  /// This instruction by itself does not have any effects, but serves as a
+  /// marker for lifetime resolution so that it can reason about the formal
+  /// scopes of variables.
+  void enterLetBindingFormalScopeCleanup(VarDecl *vd);
 };
 
 

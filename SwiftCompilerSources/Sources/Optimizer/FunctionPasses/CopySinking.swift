@@ -37,7 +37,30 @@ import SIL
 ///     // uses of %4
 /// ```
 ///
-/// 2. Sinks copies over terminator instructions (switch_enum, checked_cast_br):
+/// 2. Sinks copies of a phi over that phi:
+///
+/// ```
+///   bb1:
+///     %1 = copy_value %0
+///     br bb3(%0, %1)
+///   bb2:
+///     %3 = copy_value %2
+///     br bb3(%2, %3)
+///   bb3(%4 : @owned, %5 : @owned):
+///     // uses of %5
+/// ```
+/// ->
+/// ```
+///   bb1:
+///     br bb3(%0)
+///   bb2:
+///     br bb3(%2)
+///   bb3(%4 : @owned):
+///     %6 = copy_value %4
+///     // uses of %6
+/// ```
+///
+/// 3. Sinks copies over terminator instructions (switch_enum, checked_cast_br):
 ///
 /// ```
 ///   %1 = copy_value %0
@@ -58,7 +81,7 @@ import SIL
 ///     // uses of %5
 /// ```
 ///
-/// 3. Also handles `load [copy]` which is replaced by `load_borrow`:
+/// 4. Also handles `load [copy]` which is replaced by `load_borrow`:
 ///
 /// ```
 ///   %1 = load [copy] %addr
@@ -84,7 +107,9 @@ import SIL
 ///
 /// The optimization can be done if:
 /// * The `copy_value` or `load [copy]` has a single use.
-/// * The source operand has guaranteed ownership.
+/// * The source operand has guaranteed ownership. In case 2 the source is a phi of the same block
+///   which the copies are copies of - it can have any ownership, because the new copy is inserted
+///   at the begin of the block where that phi is definitely available.
 /// * The borrow scope can be extended or is already valid across the control flow.
 /// * For loads: no writes to the loaded address occur before the terminator.
 ///
@@ -108,9 +133,12 @@ let copySinking = FunctionPass(name: "copy-sinking") {
     if !context.continueWithNextSubpassRun(for: block.terminator) {
       return
     }
-    for arg in block.arguments {
+
+    for arg in block.arguments.reversed() {
       if let phi = Phi(arg) {
         if trySinkCopiesOverPhi(phi: phi, context) {
+          changed = true
+        } else if trySinkCopiesOfPhiOverPhi(phi: phi, context) {
           changed = true
         }
       }
@@ -158,6 +186,55 @@ private func trySinkCopiesOverPhi(phi: Phi, _ context: FunctionPassContext) -> B
   phi.value.uses.ignore(user: newCopy).replaceAll(with: newCopy, context)
 
   return true
+}
+
+private func trySinkCopiesOfPhiOverPhi(phi: Phi, _ context: FunctionPassContext) -> Bool {
+  let block = phi.value.parentBlock
+  var copiedFrom: Phi? = nil
+
+  for incomingOp in phi.incomingOperands {
+    guard let copy = incomingOp.value as? CopyValueInst,
+          copy.uses.isSingleUse,
+          let fromPhi = copy.fromValue.passedToPhi(via: incomingOp.instruction as! BranchInst)
+    else {
+      return false
+    }
+    if let copiedFrom {
+      if fromPhi.value != copiedFrom.value {
+        return false
+      }
+    } else {
+      copiedFrom = fromPhi
+    }
+  }
+  guard let copiedFrom else {
+    return false
+  }
+
+  // Create a single copy of the copied-from phi in the phi's block and replace the phi with it.
+  let newCopy: Value
+  if let borrowedFrom = copiedFrom.borrowedFrom {
+    newCopy = Builder(after: borrowedFrom, context).createCopyValue(operand: borrowedFrom)
+  } else {
+    newCopy = Builder(atBeginOf: block, context).createCopyValue(operand: copiedFrom.value)
+  }
+  phi.value.uses.replaceAll(with: newCopy, context)
+
+  // Remove the phi operand from all predecessor branches and erase the now-dead incoming copies.
+  erasePhiArgument(phi: phi, erasingIncomingInstructions: true, context)
+
+  return true
+}
+
+private extension Value {
+  func passedToPhi(via branch: BranchInst) -> Phi? {
+    for use in uses {
+      if use.instruction == branch {
+        return branch.getPhi(for: use)
+      }
+    }
+    return nil
+  }
 }
 
 private func trySinkCopiesOver(terminator: ForwardingInstruction & UnaryInstruction & TermInst,

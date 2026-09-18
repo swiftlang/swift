@@ -19,8 +19,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -28,14 +26,12 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/Strings.h"
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
@@ -276,7 +272,7 @@ namespace {
 
     llvm::DenseMap<PointerUnion<const SILDebugScope *, SILFunction *>, DeclID>
         DebugScopeMap;
-    llvm::DenseMap<const void *, unsigned> SourceLocMap;  
+    llvm::DenseMap<const void *, unsigned> SourceLocMap;
 
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock *, unsigned> BasicBlockMap;
@@ -662,6 +658,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // record count above.
   writeExtraStringIfNonEmpty(ExtraStringFlavor::AsmName, F.asmName());
   writeExtraStringIfNonEmpty(ExtraStringFlavor::Section, F.section());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::TargetFeatures,
+                             F.targetFeatures());
   writeExtraStringIfNonEmpty(ExtraStringFlavor::WasmImportModule,
                              F.wasmImportModuleName());
   writeExtraStringIfNonEmpty(ExtraStringFlavor::WasmImportName,
@@ -1000,7 +998,7 @@ void
 SILSerializer::writeKeyPathPatternComponent(
                    const KeyPathPatternComponent &component,
                    SmallVectorImpl<uint64_t> &ListOfValues) {
-  
+
   auto handleComponentCommon = [&](KeyPathComponentKindEncoding kind) {
     ListOfValues.push_back((unsigned)kind);
     ListOfValues.push_back(S.addTypeRef(component.getComponentType()));
@@ -1440,13 +1438,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::ProjectBoxInst: {
     auto PBI = cast<ProjectBoxInst>(&SI);
-    
+
     // Use SILOneTypeOneOperandLayout with the field index crammed in the TypeID
     auto boxOperand = PBI->getOperand();
     auto boxRef = addValueRef(boxOperand);
     auto boxType = boxOperand->getType();
     auto boxTypeRef = S.addTypeRef(boxType.getRawASTType());
-    
+
     SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
           SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
           unsigned(PBI->getKind()), 0,
@@ -1689,7 +1687,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     // Format: continuation, resume block ID, error block ID if given
     SmallVector<ValueID, 3> ListOfValues;
-    
+
     ListOfValues.push_back(addValueRef(AACI->getOperand()));
     ListOfValues.push_back(BasicBlockMap[AACI->getResumeBB()]);
     if (auto errorBB = AACI->getErrorBB()) {
@@ -1864,6 +1862,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::EndCOWMutationAddrInst:
+  case SILInstructionKind::EndFormalScopeInst:
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
@@ -2325,6 +2324,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::Name##ToRefInst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialBoxInst:
   case SILInstructionKind::OpenExistentialValueInst:
@@ -2359,6 +2359,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         attrs |= 0x01;
     } else if (auto *refCast = dyn_cast<UncheckedRefCastInst>(&SI)) {
       attrs = encodeValueOwnership(refCast->getOwnershipKind());
+    } else if (auto *opening = dyn_cast<OpenCOMExistentialInst>(&SI)) {
+      attrs = encodeValueOwnership(opening->getForwardingOwnershipKind());
     } else if (auto *atp = dyn_cast<AddressToPointerInst>(&SI)) {
       attrs = atp->needsStackProtection() ? 1 : 0;
     }
@@ -2948,6 +2950,18 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)Ty.getCategory(), ListOfValues);
     break;
   }
+  case SILInstructionKind::COMMethodInst: {
+    const COMMethodInst *CMI = cast<COMMethodInst>(&SI);
+    SILType Ty = CMI->getType();
+    SmallVector<uint64_t, 8> ListOfValues;
+    handleMethodInst(CMI, CMI->getOperand(), ListOfValues);
+
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        static_cast<unsigned>(SI.getKind()), S.addTypeRef(Ty.getRawASTType()),
+        static_cast<unsigned>(Ty.getCategory()), ListOfValues);
+    break;
+  }
   case SILInstructionKind::ObjCSuperMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel),
@@ -3037,7 +3051,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(
          S.addTypeRef(IBSHI->getBlockStorage()->getType().getRawASTType()));
     // Always an address, don't need to save category
-    
+
     ListOfValues.push_back(addValueRef(IBSHI->getInvokeFunction()));
     ListOfValues.push_back(
        S.addTypeRef(IBSHI->getInvokeFunction()->getType().getRawASTType()));
@@ -3078,7 +3092,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     for (auto &component : pattern->getComponents()) {
       writeKeyPathPatternComponent(component, ListOfValues);
     }
-    
+
     for (auto &operand : KPI->getPatternOperands()) {
       auto value = operand.get();
       ListOfValues.push_back(addValueRef(value));
@@ -3309,7 +3323,7 @@ void SILSerializer::writeIndexTables() {
     Offset.emit(ScratchRecord, sil_index_block::SIL_WITNESS_TABLE_OFFSETS,
                 WitnessTableOffset);
   }
-  
+
   if (!DefaultWitnessTableList.empty()) {
     writeIndexTable(S, List, sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES,
                     DefaultWitnessTableList);
@@ -3504,15 +3518,15 @@ void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
 
 void SILSerializer::writeSILProperty(const SILProperty &prop) {
   PropertyOffset.push_back(Out.GetCurrentBitNo());
-  
+
   SmallVector<uint64_t, 4> componentValues;
-  
+
   if (auto component = prop.getComponent()) {
     writeKeyPathPatternComponent(*component, componentValues);
   } else {
     componentValues.push_back((unsigned)KeyPathComponentKindEncoding::Trivial);
   }
-  
+
   PropertyLayout::emitRecord(
     Out, ScratchRecord,
     SILAbbrCodes[PropertyLayout::Code],

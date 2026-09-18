@@ -1147,6 +1147,12 @@ public:
     return !scheduledForDeletion.empty();
   }
 
+  /// The number of instructions which are removed from their basic blocks, but
+  /// not deleted for real yet. See scheduledForDeletion for details.
+  size_t getNumInstructionsScheduledForDeletion() const {
+    return scheduledForDeletion.size();
+  }
+
   /// Looks up the llvm intrinsic ID and type for the builtin function.
   ///
   /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an

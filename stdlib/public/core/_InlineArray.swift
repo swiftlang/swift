@@ -174,12 +174,14 @@ extension _InlineArray where Element: ~Copyable {
 
       for i in 0 ..< count {
         do throws(E) {
-          try unsafe buffer.initializeElement(at: i, to: body(i))
+          // `i` comes from `0 ..< count` so it's in bounds and doesn't need
+          // a stack-protection guard.
+          try unsafe buffer._unprotectedInitializeElement(at: i, to: body(i))
         } catch {
           // The closure threw an error. We need to deinitialize every element
           // we've initialized up to this point.
           for j in 0 ..< i {
-            unsafe buffer.deinitializeElement(at: j)
+            unsafe buffer._unprotectedDeinitializeElement(at: j)
           }
 
           // Throw the error we were given back out to the caller.
@@ -226,19 +228,23 @@ extension _InlineArray where Element: ~Copyable {
         return
       }
 
-      unsafe buffer.initializeElement(
+      // `count > 0` was just checked, so index 0 is in bounds and doesn't need
+      // a stack-protection guard.
+      unsafe buffer._unprotectedInitializeElement(
         at: 0,
         to: o.take()._consumingUncheckedUnwrapped()
       )
 
       for i in 1 ..< count {
         do throws(E) {
-          try unsafe buffer.initializeElement(at: i, to: next(buffer[i &- 1]))
+          // `i` comes from `1 ..< count` so it's in bounds and doesn't need
+          // a stack-protection guard.
+          try unsafe buffer._unprotectedInitializeElement(at: i, to: next(buffer[i &- 1]))
         } catch {
           // The closure threw an error. We need to deinitialize every element
           // we've initialized up to this point.
           for j in 0 ..< i {
-            unsafe buffer.deinitializeElement(at: j)
+            unsafe buffer._unprotectedDeinitializeElement(at: j)
           }
 
           // Throw the error we were given back out to the caller.
@@ -256,6 +262,8 @@ extension _InlineArray where Element: ~Copyable {
       let buffer = unsafe Self._initializationBuffer(start: rawPtr)
       _internalInvariant(Self.count == buffer.count)
       var output = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+      // no need to finalize in a `defer` block, since throwing will cause
+      // changes to be deinitialized when the output span is deinited.
       try initializer(&output)
       let initialized = unsafe output.finalize(for: buffer)
       _precondition(count == initialized, "_InlineArray initialization underflow")
@@ -386,15 +394,34 @@ extension _InlineArray where Element: ~Copyable {
   @export(implementation)
   internal subscript(_ i: Index) -> Element {
     @_transparent
+    // Needed because the compiler cannot verify on its own that this `pointee`
+    // deref lifetime depends on self.
+    @_unsafeSelfDependentResult
     borrow {
       _checkIndex(i)
-      return unsafe self[unchecked: i]
+      let p: UnsafePointer<Element>
+      if _isFastAssertConfiguration() {
+        // Use protected project when -Ounchecked
+        unsafe p = _address.project(i)
+      } else {
+        unsafe p = _address.unprotectedProject(i)
+      }
+      return unsafe p.pointee
     }
 
     @_transparent
+    // see the borrow accessor above
+    @_unsafeSelfDependentResult
     mutate {
       _checkIndex(i)
-      return unsafe &self[unchecked: i]
+      let p: UnsafeMutablePointer<Element>
+      if _isFastAssertConfiguration() {
+        // Use protected project when -Ounchecked
+        unsafe p = _mutableAddress.project(i)
+      } else {
+        unsafe p = _mutableAddress.unprotectedProject(i)
+      }
+      return unsafe &p.pointee
     }
   }
 
@@ -414,13 +441,13 @@ extension _InlineArray where Element: ~Copyable {
     @_transparent
     @_unsafeSelfDependentResult
     borrow {
-      unsafe (_protectedAddress + i).pointee
+      unsafe _protectedAddress.project(i).pointee
     }
 
     @_transparent
     @_unsafeSelfDependentResult
     mutate {
-      unsafe &(_protectedMutableAddress + i).pointee
+      unsafe &_protectedMutableAddress.project(i).pointee
     }
   }
 }
@@ -464,26 +491,101 @@ extension _InlineArray where Element: ~Copyable {
 //===----------------------------------------------------------------------===//
 
 extension _InlineArray where Element: ~Copyable {
+  /// A span over the elements of this array.
+  ///
+  /// - Returns: A `Span` over the elements of this array.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   internal var span: Span<Element> {
     @_lifetime(borrow self)
     @_transparent
     borrowing get {
-      let span = unsafe Span(_unsafeStart: _protectedAddress, count: count)
+      guard count > 0 else {
+        let span = Span<Element>()
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+      let span = unsafe Span(_unchecked: _protectedAddress, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 
+  /// A mutable span over the elements of this array.
+  ///
+  /// - Returns: A `MutableSpan` over the elements of this array.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   internal var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
     @_transparent
     mutating get {
+      guard count > 0 else {
+        let span = MutableSpan<Element>()
+        return unsafe _overrideLifetime(span, mutating: &self)
+      }
       let span = unsafe MutableSpan(
-        _unsafeStart: _protectedMutableAddress,
+        _unchecked: _protectedMutableAddress,
         count: count
       )
       return unsafe _overrideLifetime(span, mutating: &self)
     }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: - Iterable & Other Conformances
+//===----------------------------------------------------------------------===//
+
+extension _InlineArray: Iterable where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  internal typealias BorrowingIterator = Span<Element>.BorrowingIterator
+
+  internal typealias Failure = Never
+
+  @export(implementation)
+  internal var underestimatedCount: Int {
+    self.count
+  }
+
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_lifetime(borrow self)
+  internal func makeBorrowingIterator() -> BorrowingIterator {
+    Span.BorrowingIterator(self.span)
+  }
+}
+
+extension _InlineArray: ConvertibleToBytes
+  where Element: ConvertibleToBytes {}
+extension _InlineArray: ConvertibleFromBytes
+  where Element: ConvertibleFromBytes {}
+
+extension _InlineArray: Equatable where Element: ~Copyable & Equatable { }
+
+extension _InlineArray: Hashable where Element: ~Copyable & Hashable { }
+
+// _Implementations_ for Equatable and Hashable are defined in a separate
+// extension just as in InlineArray to maintain parity for ease of editing.
+extension _InlineArray where Element: ~Copyable & Equatable {
+  /// Returns a Boolean value indicating whether two inline arrays contain
+  /// the same elements in the same order.
+  ///
+  /// You can use the equal-to operator (`==`) to compare two inline
+  /// arrays when the element type is `Equatable`.
+  ///
+  /// - Parameters:
+  ///   - lhs: An array to compare.
+  ///   - rhs: Another array to compare.
+  @_alwaysEmitIntoClient
+  internal static func ==(lhs: borrowing Self, rhs: borrowing Self) -> Bool {
+    lhs.span._elementsEqual(to: rhs.span)
+  }
+}
+
+extension _InlineArray where Element: ~Copyable & Hashable {
+  @_alwaysEmitIntoClient
+  internal func hash(into hasher: inout Hasher) {
+    span._hashContents(into: &hasher)
   }
 }

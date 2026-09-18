@@ -30,6 +30,7 @@ func takeAny(_ arg: Any) {}
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
 // CHECK:       bb3:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func testIgnoredTuple<each T>(_ args: repeat each T) {
@@ -73,6 +74,7 @@ public struct Container<each T> {
 // CHECK:       bb3:
 //   Clean up.
 // CHECK-NEXT:    dealloc_stack [[FIELD_COPY]] : $*(repeat Stored<each T>)
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 
@@ -109,6 +111,8 @@ public struct Container<each T> {
 // CHECK-NEXT:    end_access [[ACCESS]]
 //   Clean up.
 // CHECK-NEXT:    dealloc_stack [[COPY2]]
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    dealloc_stack [[ARG_COPY]]
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
@@ -164,6 +168,7 @@ func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T
   // CHECK: dealloc_stack [[TEMP]] : $*(repeat each T)
   // CHECK: destroy_addr [[VAR]] : $*(repeat each T)
   // CHECK: dealloc_stack [[VAR]] : $*(repeat each T)
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT:    [[RET:%.*]] = tuple ()
   // CHECK-NEXT:    return [[RET]] : $()
 }
@@ -197,8 +202,10 @@ func projectTupleElements<each T>(_ value: repeat Wrapper<each T>) {
   // CHECK-NEXT: br bb1([[NEXT_INDEX]] : $Builtin.Word)
 
   // CHECK: bb3:
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_addr [[VAR]] : $*(repeat each T)
   // CHECK-NEXT: dealloc_stack [[VAR]] : $*(repeat each T)
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: [[RET:%.*]] = tuple ()
   // CHECK-NEXT: return [[RET]] : $()
 

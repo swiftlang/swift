@@ -1738,7 +1738,9 @@ public:
     if (arg->getType().isTrivial(F) && argKind == OwnershipKind::None)
       return;
 
-    require(argKind == term->getForwardingOwnershipKind(),
+    require(argKind == term->getForwardingOwnershipKind() ||
+            (argKind == OwnershipKind::None &&
+             term->getForwardingOwnershipKind() == OwnershipKind::Owned),
             "OwnershipForwardingTermInst nontrivial result "
             "must have the same ownership");
   }
@@ -2694,8 +2696,7 @@ public:
       require(!BI->getSubstitutions(),
               "zeroInitializer has no generic arguments as a SIL builtin");
       if (arguments.size() == 0) {
-        require(!fnConv.useLoweredAddresses()
-                || BI->getType().isLoadable(*BI->getFunction()),
+        require(BI->getType().isLoadableOrOpaque(*BI->getFunction()),
                 "scalar zeroInitializer must have a loadable result type");
       } else {
         require(arguments.size() == 1,
@@ -2999,8 +3000,7 @@ public:
 
   void checkLoadInst(LoadInst *LI) {
     require(LI->getType().isObject(), "Result of load must be an object");
-    require(!fnConv.useLoweredAddresses()
-                || LI->getType().isLoadable(*LI->getFunction()),
+    require(LI->getType().isLoadableOrOpaque(*LI->getFunction()),
             "Load must have a loadable type");
     require(LI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
@@ -3043,8 +3043,7 @@ public:
         F.hasOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
     require(LBI->getType().isObject(), "Result of load must be an object");
-    require(!fnConv.useLoweredAddresses()
-            || LBI->getType().isLoadable(*LBI->getFunction()),
+    require(LBI->getType().isLoadableOrOpaque(*LBI->getFunction()),
             "Load must have a loadable type");
     require(LBI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
@@ -3215,6 +3214,11 @@ public:
       if (deadEndBlocks && deadEndBlocks->isDeadEnd(user->getParent())) {
         continue;
       }
+      // A debug use does not require its operand to be alive, so it is allowed
+      // to be outside of the scope.
+      if (use->getOperandOwnership() == OperandOwnership::DebugUse) {
+        continue;
+      }
       if (scopedAddress.isScopeEndingUse(use)) {
         continue;
       }
@@ -3356,8 +3360,7 @@ public:
   void checkStoreInst(StoreInst *SI) {
     require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
-    require(!fnConv.useLoweredAddresses()
-                || SI->getSrc()->getType().isLoadable(*SI->getFunction()),
+    require(SI->getSrc()->getType().isLoadableOrOpaque(*SI->getFunction()),
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
@@ -3402,8 +3405,7 @@ public:
     // used by store_borrows (and dealloc_stacks).
     require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
-    require(!fnConv.useLoweredAddresses()
-                || SI->getSrc()->getType().isLoadable(*SI->getFunction()),
+    require(SI->getSrc()->getType().isLoadableOrOpaque(*SI->getFunction()),
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
@@ -4132,6 +4134,16 @@ public:
             "value_metatype instruction must have a metatype representation");
     require(MI->getOperand()->getType().isAnyExistentialType(),
             "existential_metatype operand must be of protocol type");
+    // Only an opaque existential container can be inspected in place. A class,
+    // boxed, or metatype container is read as a value, and IRGen has no way to
+    // interpret an address as one of those.
+    require(!MI->getOperand()->getType().isAddress() ||
+                MI->getOperand()
+                        ->getType()
+                        .getPreferredExistentialRepresentation() ==
+                    ExistentialRepresentation::Opaque,
+            "existential_metatype operand may only be an address when the "
+            "existential uses opaque representation");
 
     // The result of an existential_metatype instruction is an existential
     // metatype with the same constraint type as its existential operand.
@@ -4791,6 +4803,35 @@ public:
 #endif
   }
 
+  void checkCOMMethodInst(COMMethodInst *CMI) {
+    auto member = CMI->getMember();
+    auto *protocol = dyn_cast<ProtocolDecl>(member.getDecl()->getDeclContext());
+    require(protocol && protocol->isCOMInterface(),
+            "com_method must reference a COM interface requirement");
+
+    auto methodType =
+        requireObjectType(SILFunctionType, CMI, "result of com_method");
+    require(!methodType->getExtInfo().hasContext(),
+            "result method must be of a context-free function type");
+    require(methodType->getRepresentation() ==
+                SILFunctionTypeRepresentation::COMMethod,
+            "wrong function type representation");
+
+    auto operandType = CMI->getOperand()->getType();
+    // The receiver may be a value or the address of a materialized interface
+    // value.
+    auto archetype = operandType.getASTType()->getAs<ArchetypeType>();
+    require(archetype &&
+                llvm::any_of(archetype->getConformsTo(),
+                             [&](ProtocolDecl *constraint) {
+                               return constraint == protocol ||
+                                      constraint->inheritsFrom(protocol);
+                             }),
+            "com_method operand must be an archetype constrained to the "
+            "declaring COM interface");
+    verifyLocalArchetype(CMI, operandType.getASTType());
+  }
+
   void checkObjCSuperMethodInst(ObjCSuperMethodInst *OMI) {
     auto member = OMI->getMember();
     auto overrideTy =
@@ -4871,6 +4912,31 @@ public:
     require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_ref should be registered in "
+            "SILFunction");
+  }
+
+  void checkOpenCOMExistentialInst(OpenCOMExistentialInst *OCE) {
+    SILType operandType = OCE->getOperand()->getType();
+    require(operandType.isObject(),
+            "open_com_existential operand must not be address");
+    require(operandType.canUseExistentialRepresentation(
+                ExistentialRepresentation::COM),
+            "open_com_existential operand must be a COM existential");
+
+    require(OCE->getType().isObject(),
+            "open_com_existential result must not be an address");
+
+    auto archetype =
+        dyn_cast<ExistentialArchetypeType>(OCE->getType().getASTType());
+    require(
+        archetype,
+        "open_com_existential result must be an opened existential archetype");
+    require(
+        archetype->getExistentialType()->isEqual(operandType.getASTType()),
+        "open_com_existential result must open the operand existential type");
+    require(OCE->getModule().getRootLocalArchetypeDefInst(
+                archetype, OCE->getFunction()) == OCE,
+            "Archetype opened by open_com_existential should be registered in "
             "SILFunction");
   }
 
@@ -6906,6 +6972,13 @@ public:
 
       // If we do not have qualified ownership, do not check ownership.
       if (!F.hasOwnership()) {
+        return;
+      }
+      
+      // For arguments of trivial type, allow the internal ownership to vary
+      // if the function has ownership for trivial values enabled.
+      if (F.hasOwnershipForTrivialValues()
+          && F.getTypeProperties(bbarg->getType()).isTrivial()) {
         return;
       }
 

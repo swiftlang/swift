@@ -12,12 +12,7 @@
 
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 #include "swift/AST/AutoDiff.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Demangling/ManglingMacros.h"
-#include "swift/SIL/SILGlobalVariable.h"
 
 using namespace swift;
 using namespace Mangle;

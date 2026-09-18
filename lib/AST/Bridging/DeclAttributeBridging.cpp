@@ -17,7 +17,6 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -760,6 +759,14 @@ BridgedSemanticsAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
   return new (cContext.unbridged())
       SemanticsAttr(cValue.unbridged(), atLoc, range,
                     /*Implicit=*/false);
+}
+
+BridgedTargetAttr
+BridgedTargetAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                               SourceRange range, BridgedStringRef cValue) {
+  return new (cContext.unbridged())
+      TargetAttr(cValue.unbridged(), atLoc, range,
+                /*Implicit=*/false);
 }
 
 BridgedSetterAccessAttr

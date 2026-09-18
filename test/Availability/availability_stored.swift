@@ -216,6 +216,13 @@ public enum PublicReferenceEnum {
 }
 
 struct SuppressedMemberwiseInit { // expected-error {{cannot automatically synthesize memberwise initializer for 'SuppressedMemberwiseInit'}}
+  // Ok, available at the deployment target.
+  @available(macOS 10.9, *)
+  var oldComputedWithInit: Int {
+    init { _ = newValue }
+    get { 0 }
+  }
+
   @available(macOS 50, *)
   var computedWithInit: NewStruct { // expected-note {{potentially unavailable property 'computedWithInit' with init accessor prevents automatic synthesis of memberwise initializer}}
     init { _ = newValue }

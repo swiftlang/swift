@@ -36,7 +36,6 @@
 #include "swift/AST/TypeTransform.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSFix.h"
@@ -348,8 +347,8 @@ getDynamicResultSignature(ValueDecl *decl) {
     // for methods, and ensures that we don't take a protocol's generic
     // signature into account for a subscript requirement.
     if (auto *genericFn = ty->getAs<GenericFunctionType>()) {
-      ty = FunctionType::get(genericFn->getParams(), genericFn->getResult(),
-                             genericFn->getExtInfo());
+      ty = FunctionType::get(genericFn->getParams(), genericFn->getYields(),
+                             genericFn->getResult(), genericFn->getExtInfo());
     }
 
     // Handle properties and subscripts, anchored by the getter's selector.
@@ -1773,6 +1772,17 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
 
     // Otherwise we've flattened the dependence, evaluate Sendable.
     return std::make_pair(Type(), isSendableCapture(ty));
+  }
+
+  std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
+    ty = simplify(ty);
+
+    // If we still have type variables, we keep the dependence.
+    if (ty->hasTypeVariable())
+      return std::pair(ty, false);
+
+    // Otherwise we've flattened the dependence, evaluate @called(once).
+    return std::make_pair(Type(), ty->isNoncopyable());
   }
 };
 
@@ -3703,7 +3713,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::GlobalActorType:
     case ConstraintLocator::ContextualType:
-    case ConstraintLocator::FunctionSendability: {
+    case ConstraintLocator::FunctionSendability:
+    case ConstraintLocator::FunctionExecutionSemantics: {
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
@@ -3831,6 +3842,9 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::GenericArgument:
     case ConstraintLocator::FunctionArgument:
     case ConstraintLocator::SynthesizedArgument:
+      break;
+
+    case ConstraintLocator::FunctionYield:
       break;
 
     case ConstraintLocator::FunctionResult:
@@ -4463,6 +4477,23 @@ bool ConstraintSystem::isArgumentOfImportedDecl(
   return choice->hasClangNode();
 }
 
+bool ConstraintSystem::isArgumentOfSubscript(
+    ConstraintLocatorBuilder locator) {
+  SmallVector<LocatorPathElt, 4> path;
+  auto anchor = locator.getLocatorParts(path);
+
+  if (path.empty())
+    return false;
+
+  auto *application = getCalleeLocator(getConstraintLocator(anchor, path));
+
+  auto overload = findSelectedOverloadFor(application);
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  return isa<SubscriptDecl>(overload->choice.getDecl());
+}
+
 ConversionEphemeralness
 ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
                                         ConstraintLocatorBuilder locator) {
@@ -5078,20 +5109,6 @@ bool ConstraintSystem::isArgumentGenericFunction(Type argType, Expr *argExpr) {
   }
 
   return false;
-}
-
-ProtocolConformanceRef
-ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
-  auto cacheKey = std::make_pair(type.getPointer(), protocol);
-
-  auto cachedConformance = Conformances.find(cacheKey);
-  if (cachedConformance != Conformances.end())
-    return cachedConformance->second;
-
-  auto conformance =
-      swift::lookupConformance(type, protocol, /*allowMissing=*/true);
-  Conformances[cacheKey] = conformance;
-  return conformance;
 }
 
 std::pair<bool, std::optional<KeyPathCapability>>

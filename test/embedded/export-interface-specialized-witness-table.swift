@@ -39,7 +39,7 @@ extension C: P {
 // ... but exactly one is emitted, and it is the specialized one: the witness for
 // `predicate()` carries a specialization suffix rather than being the generic
 // default implementation's thunk.
-// IR: @"$e4main1CCAA1PAAWP" ={{.*}} constant [{{[0-9]+}} x ptr] [{{.*}}@"$e4main1CCAA1PA2aDP9predicateSbyFTWAC_Tg{{[a-z]*}}5"{{.*}}]
+// IR: @"$e4main1CCAA1PAAWP" ={{.*}} constant [{{[0-9]+}} x ptr] [{{.*}}@"$e4main1CCAA1PA2aDP9predicateSbyFTWAC_Tg{{[a-z]*}}5{{(\.ptrauth)?}}"{{.*}}]
 // IR-NOT: @"$e4main1CCAA1PAAWP" =
 
 var g: any P = C()

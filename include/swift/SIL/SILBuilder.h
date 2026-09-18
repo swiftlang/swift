@@ -636,7 +636,7 @@ public:
     return insert(new (getModule()) EndApplyInst(getSILDebugLocation(loc),
                                                  beginApply, ResultType));
   }
-  
+
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionMap Subs,
                              ArrayRef<SILValue> Args) {
@@ -827,7 +827,7 @@ public:
     return insert(new (getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
-  
+
   KeyPathInst *createKeyPath(SILLocation Loc,
                              KeyPathPattern *Pattern,
                              SubstitutionMap Subs,
@@ -2162,6 +2162,12 @@ public:
                                          Member, MethodTy, &getFunction()));
   }
 
+  COMMethodInst *createCOMMethod(SILLocation Loc, SILValue Operand,
+                                 SILDeclRef Member, SILType MethodTy) {
+    return insert(COMMethodInst::create(getSILDebugLocation(Loc), Operand,
+                                        Member, MethodTy, &getFunction()));
+  }
+
   ObjCSuperMethodInst *createObjCSuperMethod(SILLocation Loc, SILValue Operand,
                                              SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) ObjCSuperMethodInst(
@@ -2215,6 +2221,20 @@ public:
                            ValueOwnershipKind forwardingOwnershipKind) {
     return insert(new (getModule()) OpenExistentialRefInst(
         getSILDebugLocation(Loc), Operand, Ty, forwardingOwnershipKind));
+  }
+
+  OpenCOMExistentialInst *
+  createOpenCOMExistential(SILLocation Loc, SILValue Operand, SILType Ty) {
+    return createOpenCOMExistential(Loc, Operand, Ty,
+                                    Operand->getOwnershipKind());
+  }
+
+  OpenCOMExistentialInst *
+  createOpenCOMExistential(SILLocation Loc, SILValue Operand, SILType Ty,
+                           ValueOwnershipKind forwardingOwnershipKind) {
+    auto instruction = new (getModule()) OpenCOMExistentialInst(
+        getSILDebugLocation(Loc), Operand, Ty, forwardingOwnershipKind);
+    return insert(instruction);
   }
 
   OpenExistentialBoxInst *
@@ -2544,6 +2564,11 @@ public:
     return insert(new (getModule()) EndCOWMutationAddrInst(
         getSILDebugLocation(Loc), operand));
   }
+  EndFormalScopeInst *createEndFormalScope(SILLocation Loc,
+                                           SILValue operand) {
+    return insert(new (getModule()) EndFormalScopeInst(
+        getSILDebugLocation(Loc), operand));
+  }
   DestroyNotEscapedClosureInst *createDestroyNotEscapedClosure(SILLocation Loc,
                                                  SILValue operand,
                                                  unsigned VerificationType) {
@@ -2809,7 +2834,7 @@ public:
         YieldInst::create(getSILDebugLocation(loc), yieldedValues,
                           resumeBB, unwindBB, getFunction()));
   }
-  
+
   AwaitAsyncContinuationInst *createAwaitAsyncContinuation(SILLocation loc,
                                                            SILValue continuation,
                                                            SILBasicBlock *resumeBB,
@@ -2819,7 +2844,7 @@ public:
                                                      continuation,
                                                      resumeBB, errorBB));
   }
-  
+
   CondBranchInst *
   createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,
                    SILBasicBlock *Target2,
@@ -2919,7 +2944,7 @@ public:
                           CheckedCastInstOptions options,
                           SILValue op,
                           CanType srcFormalTy, SILType destLoweredTy,
-                          CanType destFormalTy, SILBasicBlock *successBB, 
+                          CanType destFormalTy, SILBasicBlock *successBB,
                           SILBasicBlock *failureBB,
                           ValueOwnershipKind forwardingOwnershipKind,
                           ProfileCounter Target1Count = ProfileCounter(),

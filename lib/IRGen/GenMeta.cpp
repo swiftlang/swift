@@ -40,7 +40,6 @@
 #include "swift/Strings.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -67,7 +66,6 @@
 #include "GenStruct.h"
 #include "GenValueWitness.h"
 #include "GenericArguments.h"
-#include "HeapTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
@@ -75,7 +73,6 @@
 #include "MetadataRequest.h"
 #include "MetatypeMetadataVisitor.h"
 #include "ProtocolInfo.h"
-#include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 #include "StructMetadataVisitor.h"
 #include "TupleMetadataVisitor.h"
@@ -925,6 +922,7 @@ namespace {
       NumRequirementsInSignature = B.addPlaceholderWithSize(IGM.Int32Ty);
       NumRequirements = B.addPlaceholderWithSize(IGM.Int32Ty);
       asImpl().addAssociatedTypeNames();
+      asImpl().addCOMInterfaceID();
       asImpl().addRequirementSignature();
       asImpl().addRequirements();
       auto addr = IGM.getAddrOfProtocolDescriptor(Proto,
@@ -939,6 +937,16 @@ namespace {
       auto nameStr = IGM.getAddrOfGlobalIdentifierString(Proto->getName().str(),
                                            /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(nameStr);
+    }
+
+    void addCOMInterfaceID() {
+      if (!Proto->isCOMInterface())
+        return;
+
+      const COMDeclInfo *info = Proto->getCOMDeclInfo();
+      ASSERT(info && info->isInterface());
+
+      B.add(IGM.getCOMIdentityConstant(info->getInterfaceID()));
     }
 
     void addRequirementSignature() {
@@ -7705,6 +7713,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
   case KnownProtocolKind::COMInterface:
+  case KnownProtocolKind::COMActivatable:
+  case KnownProtocolKind::COMAggregatable:
     return SpecialProtocol::None;
   }
 

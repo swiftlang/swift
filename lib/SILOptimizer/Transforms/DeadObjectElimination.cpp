@@ -24,9 +24,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dead-object-elim"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/IndexTrie.h"
-#include "swift/AST/ResilienceExpansion.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -1089,7 +1087,7 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
   if (!KPI->getFunction()->hasOwnership()) {
     // In non-ossa, bail out if we have non-trivial pattern operands.
     for (const Operand &Op : KPI->getPatternOperands()) {
-      if (Op.get()->getType().isTrivial(*KPI->getFunction()))
+      if (!Op.get()->getType().isTrivial(*KPI->getFunction()))
         return false;
     }
   } else {

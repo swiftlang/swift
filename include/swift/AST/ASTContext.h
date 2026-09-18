@@ -143,6 +143,7 @@ namespace swift {
   class SearchPathOptions;
   class SILBoxType;
   class SILTransform;
+  class StructDecl;
   class TypeAliasDecl;
   class VarDecl;
   class UnifiedStatsReporter;
@@ -788,7 +789,13 @@ public:
   /// promises to return non-null.
   bool hasArrayLiteralIntrinsics() const;
 
-  /// Retrieve the declaration of Swift.CGFloat.init(_: Double).
+  /// Retrieve the declaration of the CGFloat struct.
+  StructDecl *getCGFloatDecl() const;
+
+  /// Retrieve the type of the CGFloat struct.
+  Type getCGFloatType() const;
+
+  /// Retrieve the declaration of CGFloat.init(_: Double).
   ConcreteDeclRef getCGFloatInitDecl() const;
 
   /// Retrieve the declaration of Swift.Double.init(_: CGFloat).
@@ -834,6 +841,9 @@ public:
 
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
+
+  // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast_AEIC.
+  FuncDecl *getIsOSVersionAtLeastAEICDecl() const;
 
   // Retrieve the declaration of Swift._stdlib_isVariantOSVersionAtLeast.
   FuncDecl *getIsVariantOSVersionAtLeastDecl() const;

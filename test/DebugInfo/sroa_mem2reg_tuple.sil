@@ -40,12 +40,12 @@ bb0(%0 : $Int64, %1 : $Int64):
   %7 = integer_literal $Builtin.Int64, 0, loc "sroa.swift":2:20, scope 4
   %8 = struct $Int64 (%7 : $Builtin.Int64), loc "sroa.swift":2:20, scope 4
   // CHECK-MEM2REG: %[[FIELD_X:[0-9]+]] = destructure_struct %[[INT_X:[0-9]+]] : $Int64, loc "sroa.swift":2:20
-  // CHECK-MEM2REG: debug_value %[[FIELD_X]] : $Builtin.Int64, var, (name "my_tup", loc "sroa.swift":2:7, scope 3), type $(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):0:op_fragment:#Int64._value
+  // CHECK-MEM2REG: debug_value %[[FIELD_X]] : $Builtin.Int64, var, (name "my_tup", loc "sroa.swift":2:7), type $(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):0:op_fragment:#Int64._value, loc "sroa.swift":2:20, scope 3
   store %8 to [trivial] %5 : $*Int64, loc "sroa.swift":2:20, scope 4
   %10 = integer_literal $Builtin.Int64, 0, loc "sroa.swift":2:26, scope 4
   %11 = struct $Int64 (%10 : $Builtin.Int64), loc "sroa.swift":2:26, scope 4
   // CHECK-MEM2REG: %[[FIELD_Y:[0-9]+]] = destructure_struct %[[INT_Y:[0-9]+]] : $Int64, loc "sroa.swift":2:26
-  // CHECK-MEM2REG: debug_value %[[FIELD_Y]] : $Builtin.Int64, var, (name "my_tup", loc "sroa.swift":2:7, scope 3), type $(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):1:op_fragment:#Int64._value
+  // CHECK-MEM2REG: debug_value %[[FIELD_Y]] : $Builtin.Int64, var, (name "my_tup", loc "sroa.swift":2:7), type $(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):1:op_fragment:#Int64._value, loc "sroa.swift":2:26, scope 3
   store %11 to [trivial] %6 : $*Int64, loc "sroa.swift":2:26, scope 4
 
   %14 = tuple_element_addr %4 : $*(x: Int64, y: Int64), 0, loc "sroa.swift":3:12, scope 3

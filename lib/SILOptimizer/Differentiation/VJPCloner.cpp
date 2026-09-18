@@ -19,7 +19,6 @@
 
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
@@ -1727,9 +1726,9 @@ bool VJPCloner::Implementation::run() {
 
   // Generate pullback code.
   PullbackCloner PullbackCloner(cloner);
-  if (PullbackCloner.run()) {
+  if (PullbackCloner.run())
     errorOccurred = true;
-  }
+
   if (!errorOccurred) {
     auto *pm = &context.getPassManager();
     pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(vjp);

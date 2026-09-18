@@ -292,6 +292,12 @@ public protocol P : AnyObject {
   func boo() -> Int32
 }
 
+// Not class-constrained, so an existential of this type is address-only and
+// `existential_metatype` can read it in place.
+public protocol OpaqueP {
+  func foo() -> Int32
+}
+
 // Check that LICM does not hoist a metatype instruction before
 // the open_existential instruction which creates the archetype,
 // because this would break the dominance relation between them.
@@ -337,22 +343,22 @@ bb4:
 // CHECK: existential_metatype
 // CHECK: cond_br
 // CHECK: bb2:
-sil @dont_hoist_existential_meta_type : $@convention(thin) (@in P) -> () {
-bb0(%0 : $*P):
-  %1 = alloc_stack $P
+sil @dont_hoist_existential_meta_type : $@convention(thin) (@in OpaqueP) -> () {
+bb0(%0 : $*OpaqueP):
+  %1 = alloc_stack $OpaqueP
   br bb1
 
 bb1:
-  copy_addr %0 to [init] %1 : $*P
-  %2 = existential_metatype $@thick P.Type, %1 : $*P
+  copy_addr %0 to [init] %1 : $*OpaqueP
+  %2 = existential_metatype $@thick OpaqueP.Type, %1 : $*OpaqueP
   cond_br undef, bb3, bb2
 
 bb3:
   br bb1
 
 bb2:
-  dealloc_stack %1 : $*P
-  destroy_addr %0 : $*P
+  dealloc_stack %1 : $*OpaqueP
+  destroy_addr %0 : $*OpaqueP
   %52 = tuple ()
   return %52 : $()
 }

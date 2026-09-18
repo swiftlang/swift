@@ -1,4 +1,4 @@
-// RUN: %swift-frontend -O -emit-ir -module-name foo %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-ir -module-name foo %s -o - | %FileCheck %s
 
 // CHECK-LABEL: define internal void @"$s3foo3FooVwxx"(ptr noalias %object, ptr {{(nofree )?}}readonly captures(none) %"Foo<T>")
 // CHECK-NEXT: entry:

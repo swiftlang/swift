@@ -17,6 +17,7 @@ struct ThrowingMain {
 // CHECK: bb1
 // CHECK: return
 // CHECK: bb2([[ERR:%.*]] : $Err):
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  throw [[ERR]] : $Err 
 
 // CHECK-LABEL: sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32

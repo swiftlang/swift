@@ -20,6 +20,7 @@
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
+#include <climits>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -199,8 +200,26 @@ int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
   return 0;
 }
 
+bool swift::Demangle::isAsyncMainEntryPointSymbol(llvm::StringRef mangledName) {
+  return getAsyncMainEntryPointNameLength(mangledName) != 0;
+}
+
+int swift::Demangle::getAsyncMainEntryPointNameLength(
+    llvm::StringRef mangledName) {
+  llvm::StringRef name = ASYNC_MAIN_ENTRY_POINT_NAME;
+  if (mangledName.starts_with(name))
+    return name.size();
+  // Mach-O prefixes symbols with an underscore, just like for "_$s" names.
+  if (mangledName.consume_front("_") && mangledName.starts_with(name))
+    return name.size() + 1;
+  return 0;
+}
+
 bool swift::Demangle::isSwiftSymbol(llvm::StringRef mangledName) {
   if (isOldFunctionTypeMangling(mangledName))
+    return true;
+
+  if (isAsyncMainEntryPointSymbol(mangledName))
     return true;
 
   return getManglingPrefixLength(mangledName) != 0;
@@ -804,14 +823,21 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
 #endif
 
   unsigned PrefixLength = getManglingPrefixLength(MangledName);
-  if (PrefixLength == 0)
-    return nullptr;
+  if (PrefixLength == 0) {
+    // Stand a node in for the unmangled base name so the mangled funclet
+    // suffixes that follow it can be parsed.
+    int NameLength = getAsyncMainEntryPointNameLength(MangledName);
+    if (NameLength == 0)
+      return nullptr;
+    Pos += NameLength;
+    pushNode(createNode(Node::Kind::AsyncMainEntryPoint));
+  } else {
+    if (MangledName.starts_with(MANGLING_PREFIX_EMBEDDED_STR))
+      Flavor = ManglingFlavor::Embedded;
 
-  if (MangledName.starts_with(MANGLING_PREFIX_EMBEDDED_STR))
-    Flavor = ManglingFlavor::Embedded;
-
-  IsOldFunctionTypeMangling = isOldFunctionTypeMangling(MangledName);
-  Pos += PrefixLength;
+    IsOldFunctionTypeMangling = isOldFunctionTypeMangling(MangledName);
+    Pos += PrefixLength;
+  }
 
   // If any other prefixes are accepted, please update Mangler::verify.
 
@@ -1195,15 +1221,14 @@ recur:
 int Demangler::demangleNatural() {
   if (!isDigit(peekChar()))
     return -1000;
-  int num = 0;
+  uint64_t num = 0;
   while (true) {
     char c = peekChar();
     if (!isDigit(c))
-      return num;
-    int newNum = (10 * num) + (c - '0');
-    if (newNum < num)
+      return (int)num;
+    num = (10 * num) + (c - '0');
+    if (num > INT_MAX)
       return -1000;
-    num = newNum;
     nextChar();
   }
 }
@@ -1212,7 +1237,7 @@ int Demangler::demangleIndex() {
   if (nextIf('_'))
     return 0;
   int num = demangleNatural();
-  if (num >= 0 && nextIf('_'))
+  if (num >= 0 && num < INT_MAX && nextIf('_'))
     return num + 1;
   return -1000;
 }
@@ -1767,6 +1792,9 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
 
   // params-type
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
+
+  // yields?
+  addChild(FuncType, popNode(Node::Kind::YieldTypes));
 
   // result-type
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ReturnType));
@@ -2524,6 +2552,9 @@ NodePointer Demangler::demangleImplFunctionType() {
   case 'O': FConv = "objc_method"; break;
   case 'K': FConv = "closure"; break;
   case 'W': FConv = "witness_method"; break;
+  case 'V':
+    FConv = "com_method";
+    break;
   default: pushBack(); break;
   }
   if (FConv) {
@@ -4008,6 +4039,15 @@ NodePointer Demangler::demangleSpecialType() {
       return demangleExtendedExistentialShape(specialChar);
     case 'j':
       return demangleSymbolicExtendedExistentialType();
+    case 'y': {
+      NodePointer YieldsType = nullptr;
+      if (popNode(Node::Kind::EmptyList)) {
+        YieldsType = createType(createNode(Node::Kind::Tuple));
+      } else {
+        YieldsType = popNode(Node::Kind::Type);
+      }
+      return createWithChild(Node::Kind::YieldTypes, YieldsType);
+    }
     case 'z':
       switch (nextChar()) {
       case 'B':

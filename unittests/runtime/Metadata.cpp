@@ -224,25 +224,27 @@ ProtocolDescriptor ProtocolError{
     .withSpecialProtocol(SpecialProtocol::Error)
 };
 
-ProtocolDescriptor ProtocolCOM{
-  "_TMp8Metadata11ProtocolCOM",
-  nullptr,
-  ProtocolDescriptorFlags()
-    .withSwift(true)
-    .withClassConstraint(ProtocolClassConstraint::Any)
-    .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
-    .withSpecialProtocol(SpecialProtocol::COM)
+struct COMProtocolDescriptorStorage {
+  ProtocolDescriptor Descriptor;
+  TargetCOMInterfaceID<InProcess> InterfaceID{};
+
+  COMProtocolDescriptorStorage(const char *name)
+      : Descriptor{name, nullptr,
+                   ProtocolDescriptorFlags()
+                     .withSwift(true)
+                     .withClassConstraint(ProtocolClassConstraint::Any)
+                     .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
+                     .withSpecialProtocol(SpecialProtocol::COM)} {
+    }
 };
 
-ProtocolDescriptor ProtocolCOMBase{
-  "_TMp8Metadata15ProtocolCOMBase",
-  nullptr,
-  ProtocolDescriptorFlags()
-    .withSwift(true)
-    .withClassConstraint(ProtocolClassConstraint::Any)
-    .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
-    .withSpecialProtocol(SpecialProtocol::COM)
-};
+COMProtocolDescriptorStorage
+ProtocolCOMStorage{"_TMp8Metadata11ProtocolCOM"};
+ProtocolDescriptor &ProtocolCOM = ProtocolCOMStorage.Descriptor;
+
+COMProtocolDescriptorStorage
+ProtocolCOMBaseStorage{"_TMp8Metadata15ProtocolCOMBase"};
+ProtocolDescriptor &ProtocolCOMBase = ProtocolCOMBaseStorage.Descriptor;
 
 ProtocolDescriptor ProtocolClassConstrained{
   "_TMp8Metadata24ProtocolClassConstrained",
@@ -475,6 +477,12 @@ TEST(MetadataTest, getExistentialMetadata) {
                 special->getSuperclassConstraint());
       return special;
     });
+}
+
+TEST(MetadataTest, getCOMInterfaceID) {
+  EXPECT_EQ(ProtocolCOMStorage.InterfaceID.Bytes,
+            ProtocolCOM.getCOMInterfaceID());
+  EXPECT_EQ(nullptr, ProtocolA.getCOMInterfaceID());
 }
 
 namespace {

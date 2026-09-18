@@ -13,8 +13,6 @@
 #define DEBUG_TYPE "sil-access-utils"
 
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/NodeDatastructures.h"
@@ -2637,7 +2635,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       // SIL address.
       // visitor(&builtin->getAllOperands()[0]);
       return;
-      
+
     // zeroInitializer with an address operand zeroes the address.
     case BuiltinValueKind::ZeroInitializer:
     case BuiltinValueKind::PrepareInitialization:
@@ -2752,7 +2750,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::DereferenceBorrowAddrInst:
     visitor(&I->getAllOperands()[0]);
     return;
-    
+
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst:
@@ -2824,6 +2822,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::EndCOWMutationAddrInst:
+  case SILInstructionKind::EndFormalScopeInst:
   case SILInstructionKind::BeginUnpairedAccessInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:

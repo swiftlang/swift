@@ -43,6 +43,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -3139,6 +3140,8 @@ namespace {
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
+      checkIsolatedConformancesInPattern(pattern);
+
       // Walking into patterns leads to nothing good because then we
       // end up visiting the AccessorDecls of a top-level
       // PatternBindingDecl twice.
@@ -3189,6 +3192,18 @@ namespace {
       if (!expr->getType() || expr->getType()->hasError())
         return Action::SkipNode(expr);
 
+      if (auto *T = dyn_cast<TypeExpr>(expr)) {
+        if (!T->isImplicit()) {
+          checkIsolatedConformancesInType(T->getType(), T->getTypeRepr(),
+                                          expr->getLoc());
+        }
+      }
+
+      if (auto *cast = dyn_cast<ExplicitCastExpr>(expr)) {
+        checkIsolatedConformancesInType(
+            cast->getCastType(), cast->getCastTypeRepr(), expr->getLoc());
+      }
+
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
         opaqueValues.push_back({
             openExistential->getOpaqueValue(),
@@ -3222,6 +3237,33 @@ namespace {
 
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         determineClosureIsolationInContext(closure, Parent.getAsExpr());
+
+        if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+          if (auto globalActor = getExplicitGlobalActor(explicitClosure)) {
+            checkIsolatedConformancesInType(globalActor,
+                                            /*TR=*/nullptr, expr->getLoc());
+          }
+
+          for (auto *param : *explicitClosure->getParameters()) {
+            checkIsolatedConformancesInType(param->getInterfaceType(),
+                                            param->getTypeRepr(),
+                                            expr->getLoc());
+          }
+
+          if (auto *thrownTypeRepr =
+                  explicitClosure->getExplicitThrownTypeRepr()) {
+            checkIsolatedConformancesInType(
+                explicitClosure->getExplicitThrownType(), thrownTypeRepr,
+                thrownTypeRepr->getLoc());
+          }
+
+          checkIsolatedConformancesInType(
+              explicitClosure->getResultType(),
+              explicitClosure->hasExplicitResultType()
+                  ? explicitClosure->getExplicitResultTypeRepr()
+                  : nullptr,
+              expr->getLoc());
+        }
 
         checkLocalCaptures(closure);
         contextStack.push_back(closure);
@@ -4777,6 +4819,35 @@ namespace {
       return Type();
     }
 
+    void checkIsolatedConformancesInPattern(Pattern *P) {
+      class Walker : public ASTWalker {
+      public:
+        PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+          if (P->isImplicit())
+            return Action::Continue(P);
+
+          if (auto *I = dyn_cast<IsPattern>(P)) {
+            checkIsolatedConformancesInType(I->getCastType(),
+                                            I->getCastTypeRepr(), I->getLoc());
+          }
+
+          if (auto *E = dyn_cast<EnumElementPattern>(P)) {
+            checkIsolatedConformancesInType(
+                E->getParentType(), E->getParentTypeRepr(), E->getLoc());
+          }
+
+          return Action::Continue(P);
+        }
+      };
+
+      Walker W;
+      P->walk(W);
+    }
+
+    static void checkIsolatedConformancesInType(Type T, TypeRepr *TR, SourceLoc loc) {
+      TypeChecker::checkIsolatedConformancesInType(T, TR ? TR->getLoc() : loc);
+    }
+
   public:
     /// Determine the isolation of a particular closure.
     ///
@@ -5280,7 +5351,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true) {
 /// Determine the default isolation for the given declaration context.
 ///
 /// Only the module-level setting (`-default-isolation`) is returned here.
-/// File-level `using` defaults are inferred in `ActorIsolationRequest`.
+/// File-level `default` defaults are inferred in `ActorIsolationRequest`.
 static DefaultIsolation getDefaultIsolationForContext(const DeclContext *dc) {
   // If we're in the main module, check the language option.
   ASTContext &ctx = dc->getASTContext();
@@ -5503,7 +5574,8 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedConcurrent:
       if (inferredIsolation.source.effectivelyExplicit() &&
-          explicitNonisolatedIsSpecial(nominal)) {
+          getDefaultIsolationForContext(nominal) ==
+              DefaultIsolation::Nonisolated) {
         if (!foundIsolation) {
           // We found an explicitly 'nonisolated' protocol.
           foundIsolation = {
@@ -5698,7 +5770,8 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::EnumElement:
   case DeclKind::Macro:
   case DeclKind::MacroExpansion:
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
+  case DeclKind::HiddenTypeLayoutInfo:
     return std::nullopt;
 
   case DeclKind::PatternBinding:
@@ -7811,41 +7884,42 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
   ASTContext &ctx = nominal->getASTContext();
   llvm::VersionTuple noVersion;
 
-  // Add platform-version-specific @available attributes. Search from nominal
-  // type declaration through its enclosing declarations to find the first one
-  // with platform-specific attributes.
+  // Add @available(<Domain>, unavailable) attributes for each domain the
+  // declaration has explicit availability in.
   for (Decl *enclosing = nominal;
        enclosing;
        enclosing = enclosing->getDeclContext()
            ? enclosing->getDeclContext()->getAsDecl()
            : nullptr) {
-    bool anyPlatformSpecificAttrs = false;
+    bool addedAvailabilityAttributes = false;
     for (auto available : enclosing->getSemanticAvailableAttrs()) {
-      // FIXME: [availability] Generalize to AvailabilityDomain.
-      auto platform = available.getPlatform();
-      if (!platform)
+      auto domain = available.getDomain();
+
+      // The blanket "unavailable" attribute added below already covers the
+      // universal domain.
+      if (domain.isUniversal())
         continue;
 
+      auto kind = domain.isVersioned() ? AvailableAttr::Kind::Unavailable
+                                       : available.getParsedAttr()->getKind();
+
       auto attr = new (ctx) AvailableAttr(
-          SourceLoc(), SourceRange(),
-          AvailabilityDomain::forPlatform(*platform), SourceLoc(),
-          AvailableAttr::Kind::Unavailable, available.getMessage(),
+          SourceLoc(), SourceRange(), domain, SourceLoc(), kind,
+          available.getMessage(),
           /*Rename=*/"", available.getIntroduced().value_or(noVersion),
           SourceRange(), available.getDeprecated().value_or(noVersion),
           SourceRange(), available.getObsoleted().value_or(noVersion),
           SourceRange(),
           /*Implicit=*/true, available.getParsedAttr()->isSPI());
       ext->addAttribute(attr);
-      anyPlatformSpecificAttrs = true;
+      addedAvailabilityAttributes = true;
     }
 
-    // If we found any platform-specific availability attributes, we're done.
-    if (anyPlatformSpecificAttrs)
+    if (addedAvailabilityAttributes)
       break;
   }
 
-  // Add the blanket "unavailable".
-
+  // Add the blanket '@available(*, unavailable)' attribute.
   ext->addAttribute(
       AvailableAttr::createUniversallyUnavailable(ctx, /*Message=*/""));
 }
@@ -8214,8 +8288,8 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   }
 
   // Rebuild the (inner) function type.
-  fnType = FunctionType::get(
-      newTypeParams, newResultType, fnType->getExtInfo());
+  fnType = FunctionType::get(newTypeParams, /* yields */ {}, newResultType,
+                             fnType->getExtInfo());
 
   if (!outerFnType)
     return fnType;
@@ -8224,11 +8298,11 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   if (auto genericFnType = dyn_cast<GenericFunctionType>(outerFnType)) {
     return GenericFunctionType::get(
         genericFnType->getGenericSignature(), outerFnType->getParams(),
-        Type(fnType), outerFnType->getExtInfo());
+        outerFnType->getYields(), Type(fnType), outerFnType->getExtInfo());
   }
 
-  return FunctionType::get(
-      outerFnType->getParams(), Type(fnType), outerFnType->getExtInfo());
+  return FunctionType::get(outerFnType->getParams(), outerFnType->getYields(),
+                           Type(fnType), outerFnType->getExtInfo());
 }
 
 AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
@@ -8319,13 +8393,13 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
 
   // Rebuild the outer function type around it.
   if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
-    return GenericFunctionType::get(
-        genericFnType->getGenericSignature(), fnType->getParams(),
-        Type(innerFnType), fnType->getExtInfo());
+    return GenericFunctionType::get(genericFnType->getGenericSignature(),
+                                    fnType->getParams(), fnType->getYields(),
+                                    Type(innerFnType), fnType->getExtInfo());
   }
 
-  return FunctionType::get(
-      fnType->getParams(), Type(innerFnType), fnType->getExtInfo());
+  return FunctionType::get(fnType->getParams(), fnType->getYields(),
+                           Type(innerFnType), fnType->getExtInfo());
 }
 
 bool swift::completionContextUsesConcurrencyFeatures(const DeclContext *dc) {
@@ -8541,7 +8615,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::PrefixOperator:
   case DeclKind::TopLevelCode:
   case DeclKind::MacroExpansion:
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
     return true;
 
   case DeclKind::EnumElement:
@@ -8554,6 +8628,9 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::Subscript:
   case DeclKind::Macro:
     return false;
+
+  case DeclKind::HiddenTypeLayoutInfo:
+    llvm_unreachable("hidden layout declarations are not value references");
 
   case DeclKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleDecl should not show up here");

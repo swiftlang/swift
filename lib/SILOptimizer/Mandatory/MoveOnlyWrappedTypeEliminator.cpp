@@ -29,26 +29,19 @@
 
 #define DEBUG_TYPE "sil-move-only-type-eliminator"
 
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 
 using namespace swift;
 
@@ -215,6 +208,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(Builtin)
   NO_UPDATE_NEEDED(CheckedCastBranch)
   NO_UPDATE_NEEDED(ClassMethod)
+  NO_UPDATE_NEEDED(COMMethod)
   NO_UPDATE_NEEDED(ConvertFunction)
   NO_UPDATE_NEEDED(CopyAddr)
   NO_UPDATE_NEEDED(DeallocBox)
@@ -236,6 +230,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(OpenExistentialAddr)
   NO_UPDATE_NEEDED(OpenExistentialBox)
   NO_UPDATE_NEEDED(OpenExistentialRef)
+  NO_UPDATE_NEEDED(OpenCOMExistential)
   NO_UPDATE_NEEDED(ProjectBox)
   NO_UPDATE_NEEDED(RefElementAddr)
   NO_UPDATE_NEEDED(RefToBridgeObject)
@@ -245,6 +240,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(UncheckedTakeEnumDataAddr)
   NO_UPDATE_NEEDED(UncheckedBorrowEnumDataAddr)
   NO_UPDATE_NEEDED(UncheckedInPlaceEnumDataAddr)
+  NO_UPDATE_NEEDED(ValueMetatype)
   NO_UPDATE_NEEDED(MakeBorrow)
   NO_UPDATE_NEEDED(MakeAddrBorrow)
   NO_UPDATE_NEEDED(InitBorrowAddr)

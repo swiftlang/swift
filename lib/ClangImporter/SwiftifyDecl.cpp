@@ -34,7 +34,6 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
-#include "clang/AST/DeclTemplate.h"
 #include "clang/AST/DeclarationName.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/RecursiveASTVisitor.h"
@@ -887,11 +886,6 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       DLOG("Found both std::span and lifetime info for return value\n");
       attachMacro = true;
     }
-
-    if (!attachMacro && CAT == nullptr)
-      // The return type is not imported eagerly (unlike parameter types). Exit
-      // early to avoid unnecessarily importing types we might not need.
-      return false;
 
     Type swiftReturnTy;
     if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))

@@ -195,6 +195,12 @@ module FriendFunction {
   export *
 }
 
+module FriendType {
+  header "friend-type.h"
+  requires cplusplus
+  export *
+}
+
 module NoncopyableNonmovableGlobal {
   header "noncopyable-nonmovable-global.h"
   requires cplusplus
@@ -202,5 +208,15 @@ module NoncopyableNonmovableGlobal {
 
 module BitFields {
   header "bit-fields.h"
+  requires cplusplus
+}
+
+module StaticFactoryAsInit {
+  header "static-factory-as-init.h"
+  requires cplusplus
+}
+
+module StaticFactoryAsInitGeneric {
+  header "static-factory-as-init-generic.h"
   requires cplusplus
 }

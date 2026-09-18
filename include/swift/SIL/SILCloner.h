@@ -196,7 +196,7 @@ public:
   void setTrackingList(SmallVectorImpl<SILInstruction*> *II) {
     getBuilder().setTrackingList(II);
   }
-  
+
   SmallVectorImpl<SILInstruction*> *getTrackingList() {
     return getBuilder().getTrackingList();
   }
@@ -696,13 +696,6 @@ protected:
   /// overridden.
   void postFixUp(SILFunction *F) {}
 
-  /// Whether cloning produces a whole new function that is a clone of the
-  /// source, so the clone is in the same lowered-address form as the source.
-  ///
-  /// The inliner overrides this to false: it splices a callee into an existing
-  /// caller, whose lowered-address form is its own and must not be overwritten.
-  bool isWholeFunctionClone() const { return true; }
-
 private:
   /// MARK: SILCloner implementation details hidden from CRTP extensions.
 
@@ -1114,18 +1107,15 @@ void SILCloner<ImplClass>::commonFixUp(SILFunction *F) {
   // Call any cleanup specific to the CRTP extensions.
   asImpl().preFixUp(F);
 
-  // A whole-function clone is in the same lowered-address form as its source.
-  // Copy it so the clone's conventions and verification observe the right form.
-  // A partial clone (e.g. inlining) instead relies on source and destination
-  // already agreeing: AddressLowering runs before any inliner and visits
-  // functions bottom-up, so a callee is lowered before its caller is inlined.
-  if (asImpl().isWholeFunctionClone() && !getBuilder().isInsertingIntoGlobal())
-    getBuilder().getFunction().setHasLoweredAddresses(F->hasLoweredAddresses());
-  else
-    ASSERT((getBuilder().isInsertingIntoGlobal() ||
-            getBuilder().getFunction().hasLoweredAddresses() ==
-                F->hasLoweredAddresses()) &&
-           "cloning between functions in different address-lowering forms");
+  // Every instruction inserted while cloning derives its conventions from the
+  // destination function, so the two forms must already agree. A whole-function
+  // clone gets the form copied when its declaration is created; a partial clone
+  // (e.g. inlining) relies on AddressLowering running before any inliner and
+  // visiting functions bottom-up, so a callee is lowered before its caller is.
+  ASSERT((getBuilder().isInsertingIntoGlobal() ||
+          getBuilder().getFunction().hasLoweredAddresses() ==
+              F->hasLoweredAddresses()) &&
+         "cloning between functions in different address-lowering forms");
 
   // If our source function is in ossa form, but the function into which we are
   // cloning is not in ossa, after we clone, eliminate default arguments.
@@ -2376,7 +2366,7 @@ void SILCloner<ImplClass>::visitCopyValueInst(CopyValueInst *Inst) {
         return recordFoldedValue(Inst, getOpValue(Inst->getOperand()));
       }
     }
-  
+
     SILValue newValue = getBuilder().emitCopyValueOperation(
         getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()));
     return recordFoldedValue(Inst, newValue);
@@ -2576,7 +2566,7 @@ void SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
             getBuilder().createDeallocStack(getOpLocation(Inst->getLoc()),
                                             getOpValue(origPA)));
         }
-        
+
         return;
       }
     }
@@ -2737,7 +2727,7 @@ SILCloner<ImplClass>::visitEnumInst(EnumInst *Inst) {
               ? Inst->getForwardingOwnershipKind()
               : ValueOwnershipKind(OwnershipKind::None)));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitInitEnumDataAddrInst(InitEnumDataAddrInst *Inst) {
@@ -2747,7 +2737,7 @@ SILCloner<ImplClass>::visitInitEnumDataAddrInst(InitEnumDataAddrInst *Inst) {
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
                 Inst->getElement(), getOpType(Inst->getType())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitUncheckedEnumDataInst(UncheckedEnumDataInst *Inst) {
@@ -2760,7 +2750,7 @@ SILCloner<ImplClass>::visitUncheckedEnumDataInst(UncheckedEnumDataInst *Inst) {
                     ? Inst->getForwardingOwnershipKind()
                     : ValueOwnershipKind(OwnershipKind::None)));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *Inst) {
@@ -2770,7 +2760,7 @@ SILCloner<ImplClass>::visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAd
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
                 Inst->getElement(), getOpType(Inst->getType())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnumDataAddrInst *Inst) {
@@ -2780,7 +2770,7 @@ SILCloner<ImplClass>::visitUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnum
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
                 Inst->getElement(), getOpType(Inst->getType())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDataAddrInst *Inst) {
@@ -2792,7 +2782,7 @@ SILCloner<ImplClass>::visitUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDa
                 getOpValue(Inst->getScratch()),
                 Inst->getElement(), getOpType(Inst->getType())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitInjectEnumAddrInst(InjectEnumAddrInst *Inst) {
@@ -2802,7 +2792,7 @@ SILCloner<ImplClass>::visitInjectEnumAddrInst(InjectEnumAddrInst *Inst) {
                                               getOpValue(Inst->getOperand()),
                                               Inst->getElement()));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitMetatypeInst(MetatypeInst *Inst) {
@@ -2982,6 +2972,16 @@ SILCloner<ImplClass>::visitObjCMethodInst(ObjCMethodInst *Inst) {
                 Inst->getMember(), getOpType(Inst->getType())));
 }
 
+template <typename T>
+void SILCloner<T>::visitCOMMethodInst(COMMethodInst *Inst) {
+  auto &B = getBuilder();
+  B.setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto clone = B.createCOMMethod(getOpLocation(Inst->getLoc()),
+                                 getOpValue(Inst->getOperand()),
+                                 Inst->getMember(), getOpType(Inst->getType()));
+  recordClonedInstruction(Inst, clone);
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitObjCSuperMethodInst(ObjCSuperMethodInst *Inst) {
@@ -3087,6 +3087,20 @@ visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
                 getBuilder().hasOwnership()
                     ? Inst->getForwardingOwnershipKind()
                     : ValueOwnershipKind(OwnershipKind::None)));
+}
+
+template <typename T>
+void SILCloner<T>::visitOpenCOMExistentialInst(OpenCOMExistentialInst *Inst) {
+  remapRootOpenedType(Inst->getDefinedOpenedArchetype());
+
+  auto &B = getBuilder();
+  B.setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto ownership = B.hasOwnership() ? Inst->getForwardingOwnershipKind()
+                                    : ValueOwnershipKind(OwnershipKind::None);
+  auto clone = B.createOpenCOMExistential(
+      getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+      getOpType(Inst->getType()), ownership);
+  recordClonedInstruction(Inst, clone);
 }
 
 template<typename ImplClass>
@@ -3643,6 +3657,14 @@ void SILCloner<ImplClass>::visitEndCOWMutationAddrInst(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitEndFormalScopeInst(
+    EndFormalScopeInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createEndFormalScope(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitDestroyNotEscapedClosureInst(
     DestroyNotEscapedClosureInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -3949,7 +3971,7 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
                                     SrcType, DestValue, TargetType, OpSuccBB,
                                     OpFailBB, TrueCount, FalseCount));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitSwitchValueInst(SwitchValueInst *Inst) {
@@ -4015,7 +4037,7 @@ SILCloner<ImplClass>::visitSelectEnumInst(SelectEnumInst *Inst) {
   for (unsigned i = 0, e = Inst->getNumCases(); i != e; ++i)
     CaseResults.push_back(std::make_pair(Inst->getCase(i).first,
                                          getOpValue(Inst->getCase(i).second)));
-  
+
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createSelectEnum(
@@ -4034,7 +4056,7 @@ SILCloner<ImplClass>::visitSelectEnumAddrInst(SelectEnumAddrInst *Inst) {
   for (unsigned i = 0, e = Inst->getNumCases(); i != e; ++i)
     CaseResults.push_back(std::make_pair(Inst->getCase(i).first,
                                          getOpValue(Inst->getCase(i).second)));
-  
+
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createSelectEnumAddr(
                                     getOpLocation(Inst->getLoc()),

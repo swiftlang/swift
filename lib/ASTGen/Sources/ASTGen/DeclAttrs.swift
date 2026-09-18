@@ -206,6 +206,8 @@ extension ASTGenVisitor {
         return handle(self.generateSwiftNativeObjCRuntimeBaseAttr(attribute: node)?.asDeclAttribute)
       case .Diagnose:
         return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
+      case .Target:
+        return handle(self.generateTargetAttr(attribute: node)?.asDeclAttribute)
       case .Transpose:
         return handle(self.generateTransposeAttr(attribute: node)?.asDeclAttribute)
       case .TypeEraser:
@@ -222,6 +224,8 @@ extension ASTGenVisitor {
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Concurrent))
       case .Called:
         return handle(self.generateCalledAttr(attribute: node)?.asDeclAttribute)
+      case .Coroutine:
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Coroutine))
       case nil where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 
@@ -2025,6 +2029,25 @@ extension ASTGenVisitor {
   ///   ```
   ///   @semantics("semantics_name")
   func generateSemanticsAttr(attribute node: AttributeSyntax) -> BridgedSemanticsAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      guard let value = self.generateConsumingSimpleStringLiteralAttrOption(args: &args) else {
+        return nil
+      }
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        value: value
+      )
+    }
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @_target("avx2")
+  ///   ```
+  func generateTargetAttr(attribute node: AttributeSyntax) -> BridgedTargetAttr? {
     self.generateWithLabeledExprListArguments(attribute: node) { args in
       guard let value = self.generateConsumingSimpleStringLiteralAttrOption(args: &args) else {
         return nil

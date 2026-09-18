@@ -566,6 +566,31 @@ bool WhereClauseOwner::visitRequirements(
   return false;
 }
 
+void WhereClauseOwner::forAllRequirementTypes(
+    llvm::function_ref<void(Type, TypeRepr *)> callback) const && {
+  std::move(*this).visitRequirements(
+      TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr *reqRepr) {
+        switch (req.getKind()) {
+        case RequirementKind::SameShape:
+        case RequirementKind::Conformance:
+        case RequirementKind::SameType:
+        case RequirementKind::Superclass:
+          callback(req.getFirstType(),
+                   RequirementRepr::getFirstTypeRepr(reqRepr));
+          callback(req.getSecondType(),
+                   RequirementRepr::getSecondTypeRepr(reqRepr));
+          break;
+
+        case RequirementKind::Layout:
+          callback(req.getFirstType(),
+                   RequirementRepr::getFirstTypeRepr(reqRepr));
+          break;
+        }
+        return false;
+      });
+}
+
 RequirementRepr &RequirementRequest::getRequirement() const {
   auto owner = std::get<0>(getStorage());
   auto index = std::get<1>(getStorage());
@@ -1123,6 +1148,46 @@ void ResultTypeRequest::cacheResult(Type type) const {
   } else {
     cast<MacroDecl>(decl)->resultType.setType(type);
   }
+}
+
+//----------------------------------------------------------------------------//
+// YieldTypeRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<Type> YieldsTypeRequest::getCachedResult() const {
+  auto *const funcDecl = std::get<0>(getStorage());
+  unsigned idx = std::get<1>(getStorage());
+
+  auto *bodyYields = funcDecl->getYields();
+  ASSERT(bodyYields && idx < bodyYields->size());
+
+  const auto &yield = bodyYields->get(idx);
+  Type type = yield.typeAndFlags.getPointer();
+
+  if (type.isNull())
+    return std::nullopt;
+
+  YieldTypeFlags flags = yield.getFlags();
+  if (flags.isInOut())
+    type = InOutType::get(type);
+
+  return type;
+}
+
+void YieldsTypeRequest::cacheResult(Type type) const {
+  auto *const funcDecl = std::get<0>(getStorage());
+  unsigned idx = std::get<1>(getStorage());
+
+  auto *bodyYields = funcDecl->getYields();
+  ASSERT(bodyYields && idx < bodyYields->size());
+
+  auto &yield = bodyYields->get(idx);
+  YieldTypeFlags flags = yield.getFlags();
+  if (auto inoutType = type->getAs<InOutType>()) {
+    flags = flags.withInOut(true);
+    type = inoutType->getObjectType();
+  }
+
+  yield.setType(type, flags);
 }
 
 //----------------------------------------------------------------------------//
@@ -2643,7 +2708,7 @@ DeclAttributes SemanticDeclAttrsRequest::evaluate(Evaluator &evaluator,
     (void)asd->hasStorage();
   }
 
-  // Materialize file-level `using ...` attributes onto top-level decls.
+  // Materialize file-level `default ...` attributes onto top-level decls.
   mutableDecl->applyFileDefaults();
 
   return decl->getAttrs();

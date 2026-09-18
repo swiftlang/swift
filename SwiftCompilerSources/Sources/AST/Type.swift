@@ -153,6 +153,7 @@ extension TypeProperties {
   public var isBuiltinFloat: Bool { rawType.bridged.isBuiltinFloat() }
   public var isBuiltinVector: Bool { rawType.bridged.isBuiltinVector() }
   public var isBuiltinFixedArray: Bool { rawType.bridged.isBuiltinFixedArray() }
+  public var isBuiltinBridgeObject: Bool { rawType.bridged.isBuiltinBridgeObject() }
 
   public var isClass: Bool {
     if let nominal = nominal, nominal is ClassDecl {
@@ -186,6 +187,7 @@ extension TypeProperties {
   public var isClassExistential: Bool { rawType.bridged.isClassExistential() }
   public var isGenericTypeParameter: Bool { rawType.bridged.isGenericTypeParam() }
   public var isUnownedStorageType: Bool { return rawType.bridged.isUnownedStorageType() }
+  public var isReferenceStorageType: Bool { rawType.bridged.isReferenceStorageType() }
   public var isMetatype: Bool { rawType.bridged.isMetatypeType() }
   public var isExistentialMetatype: Bool { rawType.bridged.isExistentialMetatypeType() }
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
@@ -255,6 +257,7 @@ extension TypeProperties {
       case .ObjCMethod:            return .objCMethod
       case .WitnessMethod:         return .witnessMethod
       case .Closure:               return .closure
+      case .COMMethod:             return .comMethod
       case .CXXMethod:             return .cxxMethod
       case .KeyPathAccessorGetter: return .keyPathAccessorGetter
       case .KeyPathAccessorSetter: return .keyPathAccessorSetter
@@ -375,6 +378,9 @@ public enum FunctionTypeRepresentation {
   /// A closure invocation function that has not been bound to a context.
   case closure
 
+  /// A COM interface method with a foreign self-first calling convention.
+  case comMethod
+
   /// A C++ method that takes a "this" argument (not a static C++ method or constructor).
   /// Except for handling the "this" argument, has the same behavior as "CFunctionPointer".
   case cxxMethod
@@ -394,6 +400,7 @@ public enum FunctionTypeRepresentation {
       case .objCMethod:            return .ObjCMethod
       case .witnessMethod:         return .WitnessMethod
       case .closure:               return .Closure
+      case .comMethod:             return .COMMethod
       case .cxxMethod:             return .CXXMethod
       case .keyPathAccessorGetter: return .KeyPathAccessorGetter
       case .keyPathAccessorSetter: return .KeyPathAccessorSetter

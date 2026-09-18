@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-silgen -I %t/Inputs -cxx-interoperability-mode=default %t/test.swift | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -I %t/Inputs -cxx-interoperability-mode=default -target %target-swift-5.1-abi-triple %t/test.swift | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency

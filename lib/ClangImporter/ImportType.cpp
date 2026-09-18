@@ -39,7 +39,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
@@ -305,7 +304,7 @@ namespace {
                                                     const Type &pointeeType) {
     auto funcTy = pointeeType->castTo<FunctionType>();
     return {FunctionType::get(
-                funcTy->getParams(), funcTy->getResult(),
+                funcTy->getParams(), funcTy->getYields(), funcTy->getResult(),
                 funcTy->getExtInfo()
                     .intoBuilder()
                     .withRepresentation(
@@ -631,8 +630,8 @@ namespace {
               .withRepresentation(FunctionType::Representation::Block)
               .withClangFunctionType(type)
               .build();
-      auto funcTy =
-          FunctionType::get(fTy->getParams(), fTy->getResult(), extInfo);
+      auto funcTy = FunctionType::get(fTy->getParams(), fTy->getYields(),
+                                      fTy->getResult(), extInfo);
       return { funcTy, ImportHint::Block };
     }
 
@@ -778,9 +777,13 @@ namespace {
         }
 
         auto paramQualType = *param;
-        if (paramQualType->isReferenceType() &&
-            paramQualType->getPointeeType().isConstQualified())
-          paramQualType = paramQualType->getPointeeType();
+        // `inout` is not expressible in `@convention(c)`, so a mutable lvalue
+        // reference stays a pointer; SIL passes it directly to match. Every
+        // other reference kind is lowered indirectly, so it has to be
+        // flattened to the pointee here.
+        if (auto ref = classifyCxxReferenceParameter(paramQualType))
+          if (ref->kind != CxxReferenceParameterKind::Mutating)
+            paramQualType = ref->pointeeType;
 
         // Mark any `sending` parameters if need be.
         ImportTypeAttrs paramAttributes;
@@ -820,7 +823,7 @@ namespace {
       }
 
       // Form the function type.
-      return FunctionType::get(params, resultTy, extInfo);
+      return FunctionType::get(params, /* yields */ {}, resultTy, extInfo);
     }
 
     ImportResult
@@ -834,7 +837,7 @@ namespace {
 
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      return FunctionType::get({}, resultTy, info);
+      return FunctionType::get({}, /* yields */ {}, resultTy, info);
     }
 
     ImportResult VisitParenType(const clang::ParenType *type) {
@@ -2425,6 +2428,20 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     }
   }
 
+  // Instantiate the return type (via clang::Sema::isCompleteType()) before
+  // importing, using the FunctionDecl's return location to improve diagnostics.
+  //
+  // Exempt operators for now, since these are imported too eagerly and can
+  // lead to spurious template instantiation failures.
+  if (auto *tagDecl = returnType->getAsTagDecl();
+      tagDecl && !tagDecl->isCompleteDefinition() &&
+      !clangDecl->isOverloadedOperator()) {
+    auto loc = clangDecl->getReturnTypeSourceRange().getBegin();
+    loc = loc.isValid() ? loc : clangDecl->getLocation();
+    if (loc.isValid())
+      (void)getClangSema().isCompleteType(loc, returnType);
+  }
+
   // Import the result type.
   return importType(
       returnType,
@@ -2468,21 +2485,43 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   bool allowNSUIntegerAsInt =
       shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
 
-  // Only eagerly import the return type if it's not too expensive (the current
-  // heuristic for that is if it's not a record type).
   ImportDiagnosticAdder addDiag(*this, clangDecl,
                                 clangDecl->getSourceRange().getBegin());
   clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
   returnType = desugarIfBoundsAttributed(returnType);
 
+  // An explicit nullability specifier on a dependent return type, such as
+  // `T _Nullable` or `T *_Nullable`, decides the optionality of the generic
+  // result. Strip it so the template type parameter can be matched below.
+  OptionalTypeKind optionalityOfDependentReturn = OTK_None;
+  if (auto attributedTy = dyn_cast<clang::AttributedType>(returnType)) {
+    if (auto nullability = attributedTy->getImmediateNullability();
+        nullability && attributedTy->getModifiedType()->isDependentType()) {
+      optionalityOfDependentReturn = translateNullability(*nullability);
+      clang::AttributedType::stripOuterNullability(returnType);
+    }
+  }
+  auto wrapDependentReturn = [&](Type type) -> ImportedType {
+    if (!type)
+      return {type, false};
+    switch (optionalityOfDependentReturn) {
+    case OTK_None:
+      return {type, false};
+    case OTK_Optional:
+      return {OptionalType::get(type), false};
+    case OTK_ImplicitlyUnwrappedOptional:
+      return {OptionalType::get(type), true};
+    }
+    llvm_unreachable("invalid optionality");
+  };
+
   ImportedType importedType = importer::findOptionSetEnum(returnType, *this);
 
   if (auto templateType =
           dyn_cast<clang::TemplateTypeParmType>(returnType)) {
-    importedType = {findGenericTypeInGenericDecls(
-                        *this, templateType, genericParams,
-                        getImportTypeAttrs(clangDecl), addDiag),
-                    false};
+    importedType = wrapDependentReturn(findGenericTypeInGenericDecls(
+        *this, templateType, genericParams, getImportTypeAttrs(clangDecl),
+        addDiag));
   } else if ((isa<clang::PointerType>(returnType) ||
           isa<clang::ReferenceType>(returnType)) &&
          isa<clang::TemplateTypeParmType>(returnType->getPointeeType())) {
@@ -2497,23 +2536,36 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
     auto genericPointerType = genericType->wrapInPointer(pointerKind);
     if (!genericPointerType)
       addDiag(Diagnostic(diag::bridged_pointer_type_not_found, pointerKind));
-    importedType = {genericPointerType, false};
-  } else if (!(isa<clang::RecordType>(returnType) ||
-               isa<clang::TemplateSpecializationType>(returnType)) ||
-             // TODO: we currently don't lazily load operator return types, but
-             // this should be trivial to add.
-             clangDecl->isOverloadedOperator() ||
-             // Dependant types are trivially mapped as Any.
-             returnType->isDependentType()) {
+    importedType = wrapDependentReturn(genericPointerType);
+  } else if (!importedType) {
     // If importedType is already initialized, it means we found the enum that
     // was supposed to be used (instead of the typedef type).
+    importedType =
+        importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
     if (!importedType) {
-      importedType =
-          importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
-      if (!importedType) {
+      // If we reach here, it means we can't import this function's return type.
+      // Sometimes, instead of skipping this function entirely, we import the
+      // function but we mark it as unavailable and map its return type to
+      // 'Never' so that it doesn't just get diagnosed as a missing member.
+      //
+      // TODO: unify the policy around unimportable/semi-unimportable types and
+      // decls, and replace this confusingly ad hoc logic.
+      //
+      // The condition below preserves historical compiler behavior for
+      // different kinds of decls.
+      bool importAsUnavailable =
+          isa<clang::RecordType, clang::TemplateSpecializationType>(
+              returnType) &&
+          !clangDecl->isOverloadedOperator() && !returnType->isDependentType();
+      if (!importAsUnavailable) {
+        // Emit diagnostic and return without assigning to parameterList, to
+        // signal that the function decl should not be imported.
         addDiag(Diagnostic(diag::return_type_not_imported));
         return {Type(), false};
       }
+      // Fall through with an empty result type. The path below assigns to
+      // parameterList, which causes importFunctionDecl() to import the function
+      // but mark it unavailable and map the return type to 'Never'.
     }
   }
 
@@ -2568,13 +2620,40 @@ ClangImporter::Implementation::importParameterType(
   // If this type has a _Nullable/_Nonnull attribute, drop it, since we already
   // have that information in optionalityOfParam.
   if (auto attributedTy = dyn_cast<clang::AttributedType>(paramTy)) {
-    if (attributedTy->getImmediateNullability())
+    if (attributedTy->getImmediateNullability()) {
       clang::AttributedType::stripOuterNullability(paramTy);
+      // In a function template specialization, the substituted template
+      // argument can carry its own specifier underneath, e.g. `T _Nullable`
+      // instantiated with `FRT *_Nonnull`. The outer specifier wins, so drop
+      // the inner one as well.
+      while (auto substTy =
+                 dyn_cast<clang::SubstTemplateTypeParmType>(paramTy)) {
+        paramTy = substTy->desugar();
+        clang::AttributedType::stripOuterNullability(paramTy);
+      }
+    }
   }
 
   ImportTypeKind importKind = paramIsCompletionHandler
                                   ? ImportTypeKind::CompletionHandlerParameter
                                   : ImportTypeKind::Parameter;
+
+  // Instantiate the parameter type (via clang::Sema::isCompleteType()) before
+  // importing, using the parameter's location to improve diagnostics.
+  //
+  // Exempt operators for now, since these are imported too eagerly and can
+  // lead to spurious template instantiation failures.
+  if (auto *tagDecl = paramTy->getAsTagDecl();
+      tagDecl && !tagDecl->isCompleteDefinition()) {
+    if (auto *parentFn = dyn_cast<clang::FunctionDecl>(parent);
+        !parentFn || !parentFn->isOverloadedOperator()) {
+      auto loc = param->getSourceRange().getBegin();
+      loc = loc.isValid() ? loc : param->getLocation();
+      loc = loc.isValid() ? loc : parent->getLocation();
+      if (loc.isValid())
+        (void)getClangSema().isCompleteType(loc, paramTy);
+    }
+  }
 
   // Import the parameter type into Swift.
   auto attrs = getImportTypeAttrs(param, /*isParam=*/true);
@@ -2638,31 +2717,37 @@ ClangImporter::Implementation::importParameterType(
                  dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
     swiftParamTy = findGenericTypeInGenericDecls(
         *this, templateParamType, genericParams, attrs, addImportDiagnosticFn);
+    // A template type parameter is only optional when it carries an explicit
+    // nullability specifier (`T _Nullable x`).
+    if (param->getType()->getNullability()) {
+      switch (optionalityOfParam) {
+      case OTK_Optional:
+        swiftParamTy = OptionalType::get(swiftParamTy);
+        break;
+      case OTK_ImplicitlyUnwrappedOptional:
+        swiftParamTy = OptionalType::get(swiftParamTy);
+        isParamTypeImplicitlyUnwrapped = true;
+        break;
+      case OTK_None:
+        break;
+      }
+    }
   }
 
   Bridgeability bridging = Bridgeability::Full;
   if (!swiftParamTy) {
     // C++ reference types are brought in as direct
     // types most commonly.
-    if (auto refPointeeType =
-            getCxxReferencePointeeTypeOrNone(paramTy.getTypePtr())) {
+    if (auto ref = classifyCxxReferenceParameter(paramTy)) {
       // We don't support reference type to a dependent type, just bail.
-      if ((*refPointeeType)->isDependentType()) {
+      if (ref->pointeeType->isDependentType())
         return std::nullopt;
-      }
 
-      bool isRvalueRef = paramTy->isRValueReferenceType();
-      // A C++ parameter of type `const <type> &` or `<type> &` becomes `<type>`
-      // or `inout <type>`. Moreover, `const <type> &&` or `<type> &&`
-      // becomes `<type>` or `consuming <type>`. Note that SILGen will use the
-      // indirect parameter convention for such a type.
-      paramTy = *refPointeeType;
-      if (!paramTy.isConstQualified()) {
-        if (isRvalueRef)
-          isConsuming = true;
-        else
-          isInOut = true;
-      }
+      // Note that SILGen will use the indirect parameter convention for such
+      // a type.
+      paramTy = ref->pointeeType;
+      isInOut |= ref->kind == CxxReferenceParameterKind::Mutating;
+      isConsuming |= ref->kind == CxxReferenceParameterKind::Consuming;
       bridging = Bridgeability::None;
     }
   }
@@ -2718,14 +2803,17 @@ ClangImporter::Implementation::importParameterType(
     swiftParamTy = importedType.getType();
   }
 
-  // `isInOut` is set above if we stripped off a mutable `&` before importing
-  // the type. Normally, we want to use an `inout` parameter in this situation.
-  // However, if the parameter belongs to a foreign reference type *and* the
-  // reference we stripped out was directly to that type (rather than to a
-  // pointer to that type), the foreign reference type should "eat" the
-  // indirection of the `&`, so we *don't* want to use an `inout` parameter.
-  if (isInOut && isDirectUseOfForeignReferenceType(paramTy, swiftParamTy))
+  // `isInOut`/`isConsuming` is set above if we stripped off a mutable `&` or an
+  // `&&` before importing the type. Normally, we want an `inout`/`consuming`
+  // parameter in that situation. However, if the parameter belongs to a foreign
+  // reference type *and* the reference we stripped out was directly to that type
+  // (rather than to a pointer to that type), the foreign reference type should
+  // "eat" the indirection of the reference, so we don't want either.
+  if ((isInOut || isConsuming) &&
+      isDirectUseOfForeignReferenceType(paramTy, swiftParamTy)) {
     isInOut = false;
+    isConsuming = false;
+  }
 
   return ImportParameterTypeResult{swiftParamTy, isInOut, isConsuming,
                                    isParamTypeImplicitlyUnwrapped};

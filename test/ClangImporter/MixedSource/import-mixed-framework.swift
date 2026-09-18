@@ -19,6 +19,11 @@ instance.categoryMethod(clangStruct)
 
 let x: BogusClass? = nil // expected-error {{'BogusClass' is unavailable: cannot find Swift declaration for this class}}
 
+// A generated_declaration marker whose defined_in names a module other than the one
+// that owns the decl has leaked in (clang merges the attribute from another module's
+// forward-declaration); it must not make the type unavailable.
+let _: LeakedMarkerClass? = nil
+
 _ = PureSwiftClass.verify()
 _ = Mixed.PureSwiftClass.verify()
 

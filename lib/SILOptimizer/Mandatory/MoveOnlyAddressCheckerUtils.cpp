@@ -224,18 +224,13 @@
 
 #define DEBUG_TYPE "sil-move-only-checker"
 
-#include "swift/AST/AccessScope.h"
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Consumption.h"
@@ -255,7 +250,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
@@ -264,8 +258,6 @@
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -2704,6 +2696,34 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       }
     }
     return true;
+  }
+
+  // For TakeOnSuccess, only a successful cast consumes Src.  A failed cast
+  // leaves Src in place. Model this by recording the take at the entry of the
+  // success block rather than at the branch itself, so liveness treats Src as
+  // consumed starting there while still live from the branch to the failure
+  // edge. CopyOnSuccess never consumes Src, so it is only a liveness use.
+  // Both casts write to Dest, which must not be mistaken for a write to Src.
+  if (auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user)) {
+    auto consumption = ccabi->getConsumptionKind();
+    if (ccabi->getSrc() == op->get() &&
+        (consumption == CastConsumptionKind::TakeOnSuccess ||
+         consumption == CastConsumptionKind::CopyOnSuccess)) {
+      LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br Src: " << *user);
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+        return false;
+      }
+
+      for (auto leafRange : leafRanges) {
+        if (consumption == CastConsumptionKind::TakeOnSuccess)
+          useState.recordTakeUse(&ccabi->getSuccessBB()->front(), leafRange);
+        useState.recordLivenessUse(user, leafRange);
+      }
+      return true;
+    }
   }
 
   // Now that we have handled or loadTakeOrCopy, we need to now track our

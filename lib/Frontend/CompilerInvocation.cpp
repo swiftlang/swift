@@ -413,8 +413,8 @@ void CompilerInvocation::computeCXXStdlibOptions() {
         ClangImporter::createClangDriver(LangOpts, ClangImporterOpts);
     auto clangDriverArgs = ClangImporter::createClangArgs(
         ClangImporterOpts, SearchPathOpts, clangDriver);
-    auto &clangToolchain =
-        clangDriver.getToolChain(clangDriverArgs, LangOpts.Target);
+    auto &clangToolchain = clangDriver.getToolChain(
+        clangDriverArgs, llvm::Triple(LangOpts.Target.normalize()));
     auto cxxStdlibKind = clangToolchain.GetCXXStdlibType(clangDriverArgs);
     auto cxxDefaultStdlibKind = clangToolchain.GetDefaultCXXStdlibType();
 
@@ -894,6 +894,15 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
 
   if (!Opts.ClangIncludeTree.empty() || !Opts.ClangIncludeTreeFileList.empty())
     Opts.HasImmutableFileSystem = true;
+
+  Opts.CASFSInputOverlay |= Args.hasArg(OPT_cas_fs_input_overlay);
+  if (Opts.CASFSInputOverlay && Opts.EnableCaching) {
+    // The content of the input files is read from disk, so it no longer
+    // contributes to the cache key.
+    Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+                   "-cas-fs-input-overlay", "-cache-compile-job");
+    return true;
+  }
 
   return false;
 }
@@ -1608,6 +1617,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableModuleRecoveryRemarks = Args.hasArg(OPT_remark_module_recovery);
   Opts.EnableModuleSerializationRemarks =
       Args.hasArg(OPT_remark_module_serialization);
+  Opts.EnableHiddenTypeLayoutSerializationRemarks =
+      Args.hasArg(OPT_remark_hidden_type_layout_serialization);
   Opts.EnableModuleApiImportRemarks = Args.hasArg(OPT_remark_module_api_import);
   Opts.EnableMacroLoadingRemarks = Args.hasArg(OPT_remark_macro_loading);
   Opts.EnableIndexingSystemModuleRemarks = Args.hasArg(OPT_remark_indexing_system_module);
@@ -4356,6 +4367,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.UseCASBackend |= Args.hasArg(OPT_cas_backend);
   Opts.EmitCASIDFile |= Args.hasArg(OPT_cas_emit_casid_file);
+  Opts.PrintLLVMBackendDiagnostics |=
+      Args.hasArg(OPT_print_llvm_backend_diagnostics);
 
   if (CASOpts.WriteOutputHashXAttr && Opts.UseCASBackend) {
     Diags.diagnose(SourceLoc(), diag::error_option_incompatible,
@@ -4369,6 +4382,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.DebugCallsiteInfo |= Args.hasArg(OPT_debug_callsite_info);
+  // These are the conditions clang uses to emit call site info for optimized
+  // binaries.
+  if (Opts.shouldOptimize() &&
+      Opts.DebugInfoLevel >= IRGenDebugInfoLevel::ASTTypes &&
+      Triple.supportsDebugEntryValues())
+    Opts.DebugCallsiteInfo = true;
 
   if (Args.hasArg(OPT_mergeable_symbols))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,

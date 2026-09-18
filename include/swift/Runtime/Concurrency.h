@@ -1008,17 +1008,19 @@ void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
 #endif
 
 // Declare all the hooks
-#define SWIFT_CONCURRENCY_HOOK(returnType, name, ...)                   \
-  typedef SWIFT_CC(swift) returnType (*name##_original)(__VA_ARGS__);   \
-  typedef SWIFT_CC(swift) returnType                                    \
-    (*name##_hook_t)(__VA_ARGS__, name##_original original);            \
-  SWIFT_EXPORT_FROM(swift_Concurrency) name##_hook_t name##_hook
+#define SWIFT_CONCURRENCY_HOOK(returnType, name, ...)                          \
+  typedef SWIFT_CC(swift) returnType (*name##_original)(__VA_ARGS__);          \
+  typedef SWIFT_CC(swift)                                                      \
+      returnType (*name##_hook_t)(__VA_ARGS__, name##_original original);      \
+  SWIFT_EXPORT_FROM(swift_Concurrency)                                         \
+  name##_hook_t __ptrauth_swift_concurrency_hook name##_hook
 
-#define SWIFT_CONCURRENCY_HOOK0(returnType, name)                       \
-  typedef SWIFT_CC(swift) returnType (*name##_original)();              \
-  typedef SWIFT_CC(swift) returnType                                    \
-    (*name##_hook_t)(name##_original original);                         \
-  SWIFT_EXPORT_FROM(swift_Concurrency) name##_hook_t name##_hook
+#define SWIFT_CONCURRENCY_HOOK0(returnType, name)                              \
+  typedef SWIFT_CC(swift) returnType (*name##_original)();                     \
+  typedef SWIFT_CC(swift)                                                      \
+      returnType (*name##_hook_t)(name##_original original);                   \
+  SWIFT_EXPORT_FROM(swift_Concurrency)                                         \
+  name##_hook_t __ptrauth_swift_concurrency_hook name##_hook
 
 #include "ConcurrencyHooks.def"
 
@@ -1027,7 +1029,8 @@ typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_original)();
 typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_override)(
     swift_task_asyncMainDrainQueue_original original);
 SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_hook)(
+SWIFT_CC(swift)
+void (*__ptrauth_swift_concurrency_hook swift_task_asyncMainDrainQueue_hook)(
     swift_task_asyncMainDrainQueue_original original,
     swift_task_asyncMainDrainQueue_override compatOverride);
 
@@ -1052,9 +1055,25 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *actor);
 
 /// Create and initialize the runtime storage for a distributed remote actor.
+/// This is dynamic because a distributed actor may have dynamic size,
+/// dependent on generic parameters etc.
+///
+/// Unavailable in Embedded: the size and alignment cannot be computed from
+/// minimal class metadata, so in Embedded we compute them in IRGen
+/// and use `swift_distributedActor_remote_initialize_embedded` instead.
+#if !SWIFT_CONCURRENCY_EMBEDDED
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
 swift_distributedActor_remote_initialize(const Metadata *actorType);
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
+
+#if SWIFT_CONCURRENCY_EMBEDDED
+/// Embedded-only variant of `swift_distributedActor_remote_initialize`.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+OpaqueValue*
+swift_distributedActor_remote_initialize_embedded(
+    const Metadata *actorType, size_t allocSize, size_t alignMask);
+#endif // SWIFT_CONCURRENCY_EMBEDDED
 
 /// Enqueue a job on the default actor implementation.
 ///

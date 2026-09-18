@@ -29,7 +29,6 @@
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
-#include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/SuccessorMap.h"
@@ -40,7 +39,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -53,6 +51,7 @@
 #include "llvm/Target/TargetMachine.h"
 
 #include <atomic>
+#include "swift/Basic/ClusteredBitVector.h"
 
 namespace llvm {
   class Constant;
@@ -1142,6 +1141,7 @@ public:
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
   const TypeInfo &getTypeInfoForLowered(CanType T);
   const TypeInfo &getTypeInfo(SILType T);
+  const TypeInfo &adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
@@ -1708,6 +1708,9 @@ public:
 public:
   llvm::LLVMContext &getLLVMContext() const { return *LLVMContext; }
 
+  /// Form the target-native bytes for a COM identity.
+  llvm::Constant *getCOMIdentityConstant(llvm::StringRef identity);
+
   void emitSourceFile(SourceFile &SF);
   void emitSynthesizedFileUnit(SynthesizedFileUnit &SFU);
 
@@ -1729,6 +1732,9 @@ public:
   void setMustHaveFramePointer(llvm::Function *F);
   llvm::AttributeList constructInitialAttributes();
   StackProtectorMode shouldEmitStackProtector(SILFunction *f);
+
+  void addTargetAttrFunctionAttributes(llvm::Function *fn,
+                                       StringRef targetString);
 
   llvm::ConstantInt *getMallocTypeId(llvm::Function *fn);
 

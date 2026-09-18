@@ -7,12 +7,16 @@
 // RUN: %target-codesign %t/main.out
 //
 // RUN: %target-run %t/main.out %t/%target-library-name(variadic_generic_opaque_type_other)
+//
+// RUN: %target-build-swift %s -Xfrontend -enable-sil-opaque-values -I %t -o %t/main-opaque-values.out -L %t %target-rpath(%t) -lvariadic_generic_opaque_type_other
+// RUN: %target-codesign %t/main-opaque-values.out
+//
+// RUN: %target-run %t/main-opaque-values.out %t/%target-library-name(variadic_generic_opaque_type_other)
 
 // REQUIRES: executable_test
 
 // This test needs a Swift 5.9 runtime or newer.
 // UNSUPPORTED: back_deployment_runtime
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import variadic_generic_opaque_type_other
 import StdlibUnittest

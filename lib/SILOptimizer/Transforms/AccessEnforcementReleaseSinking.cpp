@@ -25,7 +25,6 @@
 
 #define DEBUG_TYPE "access-enforcement-release"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -118,6 +117,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::IsBitwiseTakable:
     case BuiltinValueKind::IsSameMetatype:
     case BuiltinValueKind::Alignof:
+    case BuiltinValueKind::TypedAllocationID:
     case BuiltinValueKind::OnFastPath:
     case BuiltinValueKind::ExtractElement:
     case BuiltinValueKind::InsertElement:

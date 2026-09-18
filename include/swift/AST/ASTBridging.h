@@ -379,6 +379,7 @@ struct BridgedDeclObj {
   BRIDGED_INLINE SwiftInt ProtocolDecl_getNumInheritedProtocols() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj ProtocolDecl_getInheritedProtocols(SwiftInt index) const;
   BRIDGED_INLINE bool AbstractFunction_isOverridden() const;
+  BRIDGED_INLINE bool AbstractFunction_isDistributedWitnessWithAdHocSerializationRequirement() const;
   BRIDGED_INLINE bool Constructor_isInheritable() const;
   BRIDGED_INLINE bool Destructor_isIsolated() const;
   BRIDGED_INLINE bool EnumElementDecl_hasAssociatedValues() const;
@@ -1366,6 +1367,11 @@ BridgedSemanticsAttr BridgedSemanticsAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedStringRef cValue);
 
+SWIFT_NAME("BridgedTargetAttr.createParsed(_:atLoc:range:value:)")
+BridgedTargetAttr BridgedTargetAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range, BridgedStringRef cValue);
+
 SWIFT_NAME("BridgedSetterAccessAttr.createParsed(_:range:accessLevel:)")
 BridgedSetterAccessAttr
 BridgedSetterAccessAttr_createParsed(BridgedASTContext cContext,
@@ -1556,7 +1562,8 @@ void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,
 SWIFT_NAME("BridgedFuncDecl.createParsed(_:declContext:staticLoc:"
            "staticSpelling:funcKeywordLoc:"
            "name:nameLoc:genericParamList:parameterList:asyncSpecifierLoc:"
-           "throwsSpecifierLoc:thrownType:returnType:genericWhereClause:)")
+           "throwsSpecifierLoc:thrownType:yieldList:"
+           "returnType:genericWhereClause:)")
 BridgedFuncDecl BridgedFuncDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     swift::SourceLoc staticLoc, BridgedStaticSpelling cStaticSpelling,
@@ -1564,7 +1571,7 @@ BridgedFuncDecl BridgedFuncDecl_createParsed(
     swift::SourceLoc nameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedParameterList parameterList, swift::SourceLoc asyncLoc,
     swift::SourceLoc throwsLoc, BridgedNullableTypeRepr thrownType,
-    BridgedNullableTypeRepr returnType,
+    BridgedNullableYieldList yieldList, BridgedNullableTypeRepr returnType,
     BridgedNullableTrailingWhereClause opaqueGenericWhereClause);
 
 SWIFT_NAME(
@@ -1755,13 +1762,13 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     swift::SourceLoc importKeywordLoc, BridgedImportKind cImportKind,
     swift::SourceLoc importKindLoc, BridgedArrayRef cImportPathElements);
 
-SWIFT_NAME("BridgedUsingDecl.createParsed(_:declContext:usingKeywordLoc:"
-           "specifiedAttributes:)")
-BridgedUsingDecl
-BridgedUsingDecl_createParsed(BridgedASTContext cContext,
-                              BridgedDeclContext cDeclContext,
-                              swift::SourceLoc usingKeywordLoc,
-                              BridgedDeclAttributes cSpecifiedAttributes);
+SWIFT_NAME("BridgedFileDefaultDecl.createParsed(_:declContext:"
+           "defaultKeywordLoc:specifiedAttributes:)")
+BridgedFileDefaultDecl
+BridgedFileDefaultDecl_createParsed(BridgedASTContext cContext,
+                                    BridgedDeclContext cDeclContext,
+                                    swift::SourceLoc defaultKeywordLoc,
+                                    BridgedDeclAttributes cSpecifiedAttributes);
 
 SWIFT_NAME("BridgedSubscriptDecl.createParsed(_:declContext:staticLoc:"
            "staticSpelling:subscriptKeywordLoc:genericParamList:parameterList:"
@@ -2752,12 +2759,12 @@ BridgedErrorTypeRepr BridgedErrorTypeRepr_create(BridgedASTContext cContext,
                                                  swift::SourceRange range);
 
 SWIFT_NAME("BridgedFunctionTypeRepr.createParsed(_:argsType:asyncLoc:throwsLoc:"
-           "thrownType:arrowLoc:resultType:)")
+           "thrownType:yieldsType:arrowLoc:resultType:)")
 BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr argsTy,
     swift::SourceLoc asyncLoc, swift::SourceLoc throwsLoc,
-    BridgedNullableTypeRepr thrownType, swift::SourceLoc arrowLoc,
-    BridgedTypeRepr resultType);
+    BridgedNullableTypeRepr thrownType, BridgedNullableTypeRepr yieldsType,
+    swift::SourceLoc arrowLoc, BridgedTypeRepr resultType);
 
 SWIFT_NAME("BridgedUnqualifiedIdentTypeRepr.createParsed(_:name:nameLoc:"
            "genericArgs:leftAngleLoc:rightAngleLoc:)")
@@ -3082,6 +3089,13 @@ SWIFT_NAME("BridgedParameterList.get(self:_:)")
 BridgedParamDecl BridgedParameterList_get(BridgedParameterList cParameterList,
                                           size_t i);
 
+SWIFT_NAME("BridgedYieldList.createParsed(_:leftParenLoc:yieldTypes:"
+           "rightParenLoc:)")
+BridgedYieldList BridgedYieldList_createParsed(BridgedASTContext cContext,
+                                               swift::SourceLoc leftParenLoc,
+                                               BridgedArrayRef cYieldTypes,
+                                               swift::SourceLoc rightParenLoc);
+
 //===----------------------------------------------------------------------===//
 // MARK: Misc
 //===----------------------------------------------------------------------===//
@@ -3135,7 +3149,8 @@ struct BridgedASTType {
     KeyPathAccessorGetter,
     KeyPathAccessorSetter,
     KeyPathAccessorEquals,
-    KeyPathAccessorHash
+    KeyPathAccessorHash,
+    COMMethod,
   };
 
   swift::TypeBase * _Nullable type;
@@ -3163,6 +3178,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isNoEscape() const;
   BRIDGED_INLINE bool isInteger() const;
   BRIDGED_INLINE bool isUnownedStorageType() const;
+  BRIDGED_INLINE bool isReferenceStorageType() const;
   BRIDGED_INLINE bool isMetatypeType() const;
   BRIDGED_INLINE bool isExistentialMetatypeType() const;
   BRIDGED_INLINE bool isTuple() const;
@@ -3176,6 +3192,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinFloat() const;
   BRIDGED_INLINE bool isBuiltinVector() const;
   BRIDGED_INLINE bool isBuiltinFixedArray() const;
+  BRIDGED_INLINE bool isBuiltinBridgeObject() const;
   BRIDGED_INLINE bool isBox() const;
   BRIDGED_INLINE bool isPack() const;
   BRIDGED_INLINE bool isSILPack() const;
@@ -3283,6 +3300,8 @@ struct BridgedSubstitutionMap {
   BRIDGED_INLINE bool isEmpty() const;
   BRIDGED_INLINE bool isEqualTo(BridgedSubstitutionMap rhs) const;
   BRIDGED_INLINE bool hasAnySubstitutableParams() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedSubstitutionMap subst(BridgedSubstitutionMap subMap) const;
   BRIDGED_INLINE SwiftInt getNumConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getConformance(SwiftInt index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getReplacementTypes() const;

@@ -2882,6 +2882,13 @@ public:
     if (count < 0)
       count = 0;
 
+    // Size and Stride are 32 bits. Ensure we don't overflow them.
+    uint64_t totalSize = (uint64_t)elementTI->getStride() * (uint64_t)count;
+    if (totalSize > UINT32_MAX) {
+      TC.setError("FixedArray size overflows", BA);
+      return nullptr;
+    }
+
     return TC.makeTypeInfo<ArrayTypeInfo>(count, BA->getElementType(),
                                           elementTI);
   }

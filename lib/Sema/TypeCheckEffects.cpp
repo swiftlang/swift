@@ -26,13 +26,13 @@
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/UnsafeUse.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -680,10 +680,10 @@ public:
                                       /*isImplicitlyAsync=*/false,
                                       /*isImplicitlyThrows=*/false);
     } else if (auto ECE = dyn_cast<ExplicitCastExpr>(E)) {
-      recurse = asImpl().checkType(E, ECE->getCastTypeRepr(), ECE->getCastType());
+      recurse = asImpl().checkType(E, ECE->getCastTypeRepr(), ECE->getCastType(), /*isMetatype=*/false);
     } else if (auto TE = dyn_cast<TypeExpr>(E)) {
       if (!TE->isImplicit()) {
-        recurse = asImpl().checkType(TE, TE->getTypeRepr(), TE->getInstanceType());
+        recurse = asImpl().checkType(TE, TE->getTypeRepr(), TE->getInstanceType(), /*isMetatype=*/true);
       }
     } else if (auto KPE = dyn_cast<KeyPathExpr>(E)) {
       for (auto &component : KPE->getComponents()) {
@@ -1154,7 +1154,8 @@ public:
     if (isNeverThrownError(thrownError))
       return result;
 
-    assert(!thrownError->hasError());
+    if (thrownError->hasError())
+      return forInvalidCode();
 
     result.ThrowKind = conditionalKind;
     result.ThrowReason = reason;
@@ -2275,7 +2276,8 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type,
+                              bool isMetatype) {
       return ShouldRecurse;
     }
 
@@ -2428,7 +2430,8 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type,
+                              bool isMetatype) {
       return ShouldRecurse;
     }
 
@@ -2542,8 +2545,9 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
-      if (!assumedSafeArguments.contains(E)) {
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type,
+                              bool isMetatype) {
+      if (!assumedSafeArguments.contains(E) && !isMetatype) {
         SourceLoc loc = typeRepr ? typeRepr->getLoc() : E->getLoc();
         classification.merge(
             Classification::forType(type, loc).onlyUnsafe());
@@ -4098,13 +4102,13 @@ private:
     return ShouldRecurse;
   }
 
-  ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+  ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type, bool isMetatype) {
     SourceLoc loc = typeRepr ? typeRepr->getLoc() : E->getLoc();
     auto classification = Classification::forType(type, loc);
 
-    // If this expression is covered as a safe argument, drop the unsafe
-    // classification.
-    if (assumedSafeArguments.contains(E))
+    // If this expression is covered as a safe argument or this is a metatype,
+    // drop the unsafe classification.
+    if (assumedSafeArguments.contains(E) || isMetatype)
       classification = classification.withoutUnsafe();
 
     checkEffectSite(E, /*requiresTry=*/false, classification);
@@ -5313,12 +5317,11 @@ static ThrownErrorClassification classifyThrownErrorType(Type type) {
 
 ThrownErrorSubtyping
 swift::compareThrownErrorsForSubtyping(
-    Type subThrownError, Type superThrownError, DeclContext *dc
+    Type subThrownError, Type superThrownError
 ) {
   // Deal with NULL errors. This should only occur when there is no standard
   // library.
   if (!subThrownError || !superThrownError) {
-    assert(!dc->getASTContext().getStdlibModule() && "NULL thrown error type");
     return ThrownErrorSubtyping::ExactMatch;
   }
 
@@ -5392,7 +5395,9 @@ swift::compareThrownErrorsForSubtyping(
 
   // Check whether the subtype's thrown error type is convertible to the
   // supertype's thrown error type.
-  if (TypeChecker::isConvertibleTo(subThrownError, superThrownError, dc))
+  constraints::ConformanceCache cache;
+
+  if (canConvertTo(cache, subThrownError, superThrownError))
     return ThrownErrorSubtyping::Subtype;
 
   // We know it doesn't work.

@@ -1,8 +1,8 @@
 // RUN: %target-run-simple-swift(-Xfrontend -disable-concrete-type-metadata-mangled-name-accessors)
 // RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -enable-sil-opaque-values)
 
 // REQUIRES: executable_test
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 

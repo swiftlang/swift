@@ -53,10 +53,12 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"  // for COM
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -426,6 +428,7 @@ public:
   void visitExternAttr(ExternAttr *attr);
   void visitUsedAttr(UsedAttr *attr);
   void visitSectionAttr(SectionAttr *attr);
+  void visitTargetAttr(TargetAttr *attr);
 
   void visitDynamicCallableAttr(DynamicCallableAttr *attr);
 
@@ -545,6 +548,7 @@ public:
   void visitUnsafeSelfDependentResultAttr(UnsafeSelfDependentResultAttr *attr);
 
   void visitCalledAttr(CalledAttr *attr);
+  void visitCoroutineAttr(CoroutineAttr *attr);
 };
 
 } // end anonymous namespace
@@ -1762,6 +1766,18 @@ static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
   return SourceRange();
 }
 
+/// Whether \p D is a `@cxx` instance method of an imported C++ foreign
+/// reference type.
+static bool isCxxForeignReferenceInstanceMethod(const Decl *D) {
+  if (!D->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
+    return false;
+  const auto *FD = dyn_cast<FuncDecl>(D);
+  if (!FD || FD->isStatic())
+    return false;
+  const auto *classDecl = FD->getDeclContext()->getSelfClassDecl();
+  return classDecl && classDecl->isForeignReferenceType();
+}
+
 void AttributeChecker::
 visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   // If `D` is ABI-only, let ABIDeclChecker diagnose the bad attribute.
@@ -1896,12 +1912,37 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
       attr->setCategoryNameInvalid();
     }
 
-    if (!AFD->getImplementedObjCDecl()) {
-      StringRef name = AFD->getCDeclName();
-      if (name.empty())
-        name = AFD->getNameStr();
-      diagnose(attr->getLocation(),
-               diag::attr_objc_implementation_func_not_found, name, AFD);
+    auto interfaces = AFD->getAllImplementedObjCDecls();
+    if (interfaces.size() != 1) {
+      // A @cxx function whose signature is not representable in C++ cannot
+      // match anything; the representability diagnostics explain the failure
+      // better than "not found" would, so check them first and stand down if
+      // they fire.
+      if (auto *cxxAttr = AFD->getAttrs().getAttribute<CxxDeclAttr>(
+              /*AllowInvalid=*/true)) {
+        auto *FD = dyn_cast<FuncDecl>(AFD);
+        if (FD && !cxxAttr->isInvalid())
+          evaluateOrDefault(Ctx.evaluator,
+                            TypeCheckForeignFunctionRequest{FD, cxxAttr}, {});
+        if (cxxAttr->isInvalid() || isCxxForeignReferenceInstanceMethod(AFD))
+          return;
+      }
+
+      if (interfaces.empty()) {
+        StringRef name = AFD->getCDeclName();
+        if (name.empty())
+          name = AFD->getNameStr();
+        diagnose(attr->getLocation(),
+                 diag::attr_objc_implementation_func_not_found, name, AFD);
+      } else {
+        // Several imported overloads have the same signature in Swift, so the
+        // function could implement any of them.
+        diagnose(attr->getLocation(),
+                 diag::attr_objc_implementation_func_ambiguous_overload, AFD,
+                 AFD->getCDeclName());
+        for (auto *interface : interfaces)
+          interface->diagnose(diag::found_candidate);
+      }
     }
   }
 }
@@ -2493,9 +2534,19 @@ void AttributeChecker::visitCxxDeclAttr(CxxDeclAttr *attr) {
     diagnose(attr->getLocation(), diag::cxx_attr_requires_cxx_interop,
              attr->getAttrName());
 
-  // Only top-level func decls are currently supported.
-  if (D->getDeclContext()->isTypeContext())
-    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level, attr);
+  // @cxx may appear on a global function or on a function declared in a Swift
+  // extension of an imported C++ namespace or C++ record.
+  auto *dc = D->getDeclContext();
+  if (dc->isTypeContext() && !importer::isClangNamespace(dc) &&
+      !importer::isClangCxxRecord(dc))
+    diagnose(attr->getLocation(), diag::cxx_invalid_context, attr);
+
+  // TODO: Instance methods of foreign reference types are not supported yet.
+  if (isCxxForeignReferenceInstanceMethod(D)) {
+    diagnose(attr->getLocation(), diag::cxx_foreign_reference_instance_method,
+             attr);
+    attr->setInvalid();
+  }
 
   // Reject using both @cxx and @objc on the same decl.
   if (D->getAttrs().getAttribute<ObjCAttr>())
@@ -2777,6 +2828,10 @@ void AttributeChecker::visitSILGenNameAttr(SILGenNameAttr *A) {
   }
 }
 
+void AttributeChecker::visitCoroutineAttr(CoroutineAttr *attr) {
+  // FIXME: allow only on @differentiable for modify accessorts
+}
+
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
   if (D->getDeclContext()->isLocalContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope, attr);
@@ -2819,6 +2874,63 @@ void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
   } else if (!VarD->hasStorageOrWrapsStorage()) {
     diagnose(attr->getLocation(), diag::attr_not_on_computed_properties, attr);
   }
+}
+
+void AttributeChecker::visitTargetAttr(TargetAttr *attr) {
+  if (attr->Value.empty()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_empty_string);
+    return;
+  }
+  if (attr->Value.contains("fpmath=")) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_unsupported_feature,
+                          "fpmath=");
+    return;
+  }
+  auto *clangImporter =
+      static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  // This can only be null in unit tests.
+  if (!clangImporter)
+    return;
+  auto *TI = &clangImporter->getTargetInfo();
+  clang::ParsedTargetAttr Parsed = TI->parseTargetAttr(attr->Value);
+  if (!Parsed.Duplicate.empty()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_duplicate_option,
+                          Parsed.Duplicate);
+    return;
+  }
+  if (!Parsed.CPU.empty() && !TI->isValidCPUName(Parsed.CPU)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_unsupported_cpu, Parsed.CPU);
+    return;
+  }
+  if (!Parsed.Tune.empty() && !TI->isValidCPUName(Parsed.Tune)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_target_unsupported_cpu, Parsed.Tune);
+    return;
+  }
+  for (StringRef feature : Parsed.Features) {
+    StringRef bare = feature.drop_front(); // remove leading + or -
+    if (!TI->isValidFeatureName(bare)) {
+      diagnoseAndRemoveAttr(attr, diag::attr_target_unsupported_feature, bare);
+      return;
+    }
+  }
+  if (!Parsed.BranchProtection.empty()) {
+    clang::TargetInfo::BranchProtectionInfo BPI;
+    StringRef DiagMsg;
+    auto &langOpts = clangImporter->getClangASTContext().getLangOpts();
+    if (!TI->validateBranchProtection(Parsed.BranchProtection, Parsed.CPU,
+                                      BPI, langOpts, DiagMsg)) {
+      diagnoseAndRemoveAttr(
+          attr, diag::attr_target_invalid_branch_protection,
+          DiagMsg.empty() ? Parsed.BranchProtection : DiagMsg);
+      return;
+    }
+  }
+
+  // Need to disallow @_transparent because it bypasses the ordinary
+  // performance-inliner feature compatibility guard.
+  if (auto *transparent = D->getAttrs().getAttribute<TransparentAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr,
+                          transparent);
 }
 
 void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
@@ -3335,15 +3447,16 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   // `@MainActor () async throws(E) -> Void`
   {
     llvm::SmallVector<Type, 4> mainTypes = {
-        FunctionType::get(/*params*/ {}, context.TheEmptyTupleType,
-                          ASTExtInfoBuilder().withThrows(
-                            true, throwsTypeVar
-                          ).build()),
+        FunctionType::get(
+            /*params*/ {}, /*yields*/ {}, context.TheEmptyTupleType,
+            ASTExtInfoBuilder().withThrows(true, throwsTypeVar).build()),
 
         FunctionType::get(
-            /*params*/ {}, context.TheEmptyTupleType,
-            ASTExtInfoBuilder().withAsync()
-                .withThrows(true, throwsTypeVar).build())};
+            /*params*/ {}, /*yields*/ {}, context.TheEmptyTupleType,
+            ASTExtInfoBuilder()
+                .withAsync()
+                .withThrows(true, throwsTypeVar)
+                .build())};
 
     Type mainActor = context.getMainActorType();
     if (mainActor) {
@@ -3355,10 +3468,10 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
                   Feature::GlobalActorIsolatedTypesUsability));
 
       mainTypes.push_back(FunctionType::get(
-          /*params*/ {}, context.TheEmptyTupleType,
+          /*params*/ {}, /*yields*/ {}, context.TheEmptyTupleType,
           extInfo.build()));
       mainTypes.push_back(FunctionType::get(
-          /*params*/ {}, context.TheEmptyTupleType,
+          /*params*/ {}, /*yields*/ {}, context.TheEmptyTupleType,
           extInfo.withAsync().build()));
     }
     TypeVariableType *mainType =
@@ -5239,6 +5352,7 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo derivedInterfaceInfo;
     derivedInterfaceTy = FunctionType::get(derivedInterfaceFuncTy->getParams(),
+                                           derivedInterfaceFuncTy->getYields(),
                                            derivedInterfaceFuncTy->getResult(),
                                            derivedInterfaceInfo);
     auto overrideInterfaceFuncTy =
@@ -5247,6 +5361,7 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
     FunctionType::ExtInfo overrideInterfaceInfo;
     overrideInterfaceTy = FunctionType::get(
         overrideInterfaceFuncTy->getParams(),
+        overrideInterfaceFuncTy->getYields(),
         overrideInterfaceFuncTy->getResult(), overrideInterfaceInfo);
   }
 
@@ -6870,19 +6985,20 @@ static bool checkFunctionSignature(
 /// Returns an `AnyFunctionType` from the given parameters, result type, and
 /// generic signature.
 static AnyFunctionType *
-makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
+makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters,
+                 ArrayRef<AnyFunctionType::Yield> yields, Type resultType,
                  bool throws, Type thrownError,
                  GenericSignature genericSignature) {
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   if (genericSignature) {
     GenericFunctionType::ExtInfo info;
     info = info.withThrows(throws, thrownError);
-    return GenericFunctionType::get(genericSignature, parameters, resultType,
-                                    info);
+    return GenericFunctionType::get(genericSignature, parameters, yields,
+                                    resultType, info);
   }
   FunctionType::ExtInfo info;
   info = info.withThrows(throws, thrownError);
-  return FunctionType::get(parameters, resultType, info);
+  return FunctionType::get(parameters, yields, resultType, info);
 }
 
 /// Computes the original function type corresponding to the given derivative
@@ -6906,8 +7022,9 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
          "Expected derivative result to be a two-element tuple");
   auto originalResult = derivativeResult->getElement(0).getType();
   auto *originalType = makeFunctionType(
-      curryLevels.back()->getParams(), originalResult,
-      curryLevels.back()->isThrowing(), curryLevels.back()->getThrownError(),
+      curryLevels.back()->getParams(), curryLevels.back()->getYields(),
+      originalResult, curryLevels.back()->isThrowing(),
+      curryLevels.back()->getThrownError(),
       curryLevels.size() == 1 ? derivativeFnTy->getOptGenericSignature()
                               : nullptr);
 
@@ -6917,12 +7034,12 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   for (auto pair : enumerate(llvm::reverse(curryLevelsWithoutLast))) {
     unsigned i = pair.index();
     AnyFunctionType *curryLevel = pair.value();
-    originalType =
-        makeFunctionType(curryLevel->getParams(), originalType,
-                         curryLevel->isThrowing(), curryLevel->getThrownError(),
-                         i == curryLevelsWithoutLast.size() - 1
-                             ? derivativeFnTy->getOptGenericSignature()
-                             : nullptr);
+    originalType = makeFunctionType(
+        curryLevel->getParams(), curryLevel->getYields(), originalType,
+        curryLevel->isThrowing(), curryLevel->getThrownError(),
+        i == curryLevelsWithoutLast.size() - 1
+            ? derivativeFnTy->getOptGenericSignature()
+            : nullptr);
   }
   return originalType;
 }
@@ -6933,6 +7050,7 @@ static AnyFunctionType *
 getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
                                  IndexSubset *linearParamIndices,
                                  bool wrtSelf) {
+  assert(!transposeFnType->isCoroutine());
   unsigned transposeParamsIndex = 0;
 
   // Get the transpose function's parameters and result type.
@@ -7008,23 +7126,24 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   AnyFunctionType *originalType;
   // If the transpose type is curried, the original function type is:
   // `(Self) -> (<original parameters>) -> <original result>`.
+  // TODO: These does not handle yields properly
   if (isCurried) {
     assert(selfType && "`Self` type should be resolved");
-    originalType = makeFunctionType(originalParams, originalResult,
-                                    transposeFnType->isThrowing(),
-                                    transposeFnType->getThrownError(),
-                                    /*genericSignature=*/nullptr);
     originalType = makeFunctionType(
-        AnyFunctionType::Param(selfType), originalType,
+        originalParams, /* yields */ {}, originalResult,
+        transposeFnType->isThrowing(), transposeFnType->getThrownError(),
+        /*genericSignature=*/nullptr);
+    originalType = makeFunctionType(
+        AnyFunctionType::Param(selfType), /* yields */ {}, originalType,
         /*throws=*/false, Type(), transposeFnType->getOptGenericSignature());
   }
   // Otherwise, the original function type is simply:
   // `(<original parameters>) -> <original result>`.
   else {
-    originalType = makeFunctionType(originalParams, originalResult,
-                                    transposeFnType->isThrowing(),
-                                    transposeFnType->getThrownError(),
-                                    transposeFnType->getOptGenericSignature());
+    originalType = makeFunctionType(
+        originalParams, /* yields */ {}, originalResult,
+        transposeFnType->isThrowing(), transposeFnType->getThrownError(),
+        transposeFnType->getOptGenericSignature());
   }
   return originalType;
 }
@@ -8289,13 +8408,27 @@ void AttributeChecker::visitActorAttr(ActorAttr *attr) {
 void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
   auto dc = D->getDeclContext();
 
-  // distributed can be applied to actor definitions and their methods
+  // distributed can be applied to actor definitions and their funcs or vars
   if (auto varDecl = dyn_cast<VarDecl>(D)) {
     if (varDecl->isDistributed()) {
+      // distributed var must be declared inside a distributed actor
+      auto selfTy = dc->isTypeContext() ? dc->getSelfTypeInContext() : Type();
+      if (!selfTy || !selfTy->isDistributedActor()) {
+        auto diagnostic = diagnoseAndRemoveAttr(
+            attr, diag::distributed_actor_func_not_in_distributed_actor,
+            /*isComputedProperty=*/true);
+
+        if (auto *protoDecl = dc->getSelfProtocolDecl()) {
+          diagnoseDistributedFunctionInNonDistributedActorProtocol(protoDecl,
+                                                                   diagnostic);
+        }
+        return;
+      }
+
       if (checkDistributedActorProperty(varDecl, /*diagnose=*/true))
         return;
     } else {
-      // distributed can not be applied to stored properties
+      // distributed can not be applied to local properties
       diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
       return;
     }
@@ -8310,9 +8443,10 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       // good: `distributed actor`
       return;
     }
-  } else if (dyn_cast<StructDecl>(D) || dyn_cast<EnumDecl>(D)) {
+  } else if (isa<StructDecl>(D) || isa<EnumDecl>(D)) {
     diagnoseAndRemoveAttr(
-        attr, diag::distributed_actor_func_not_in_distributed_actor);
+        attr, diag::distributed_actor_func_not_in_distributed_actor,
+        /*isComputedProperty=*/false);
     return;
   }
 
@@ -8333,10 +8467,20 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
     }
 
     // distributed func must be declared inside an distributed actor
+    // A 'distributed func' at file scope, or in any other non-type context,
+    // has no 'Self' type to inspect, so reject it before asking for one
+    if (!dc->isTypeContext()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::distributed_actor_func_not_in_distributed_actor,
+          /*isComputedProperty=*/false);
+      return;
+    }
+
     auto selfTy = dc->getSelfTypeInContext();
-    if (!selfTy->isDistributedActor()) {
+    if (!selfTy || !selfTy->isDistributedActor()) {
       auto diagnostic = diagnoseAndRemoveAttr(
-        attr, diag::distributed_actor_func_not_in_distributed_actor);
+        attr, diag::distributed_actor_func_not_in_distributed_actor,
+        /*isComputedProperty=*/false);
 
       if (auto *protoDecl = dc->getSelfProtocolDecl()) {
         diagnoseDistributedFunctionInNonDistributedActorProtocol(protoDecl,
@@ -9527,36 +9671,18 @@ ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
 FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
                                            const SourceFile *file) const {
   auto &ctx = file->getASTContext();
+  auto mainActor = ctx.getMainActorType();
+
   FileDefaults result;
 
-  std::optional<Decl *> firstNonImportDecl;
-
-  for (auto *D : file->getTopLevelDecls()) {
-    auto *UD = dyn_cast<UsingDecl>(D);
-    if (!UD) {
-      if (!firstNonImportDecl && !isa<ImportDecl>(D)) {
-        firstNonImportDecl = D;
-      }
+  for (auto item : file->getTopLevelItems()) {
+    auto *FDD = dyn_cast_or_null<FileDefaultDecl>(item.dyn_cast<Decl *>());
+    if (!FDD)
       continue;
-    }
 
-    if (firstNonImportDecl) {
-      UD->diagnose(diag::using_decl_must_precede_other_decls);
-      firstNonImportDecl.value()->diagnose(
-          diag::using_decl_must_precede_other_decls_previous);
-      // TODO: emit a fix-it
-    }
-
-    std::optional<DeclAttrKind> seen;
-    for (auto *attr : UD->getSpecifiedAttributes()) {
-      // It shouldn't be possible to get here with multiple attributes (it
-      // shouldn't parse), but make sure. @available can end up being multiple
-      // attributes though.
-      ASSERT((!seen || (seen == DeclAttrKind::Available &&
-                        attr->getKind() == DeclAttrKind::Available)) &&
-             "'using' should only have one specified attribute");
-      seen = attr->getKind();
-
+    // Generally there will only be one attribute, but @available is allowed and
+    // can produce multiple.
+    for (auto *attr : FDD->getSpecifiedAttributes()) {
       if (isa<DiagnoseAttr>(attr)) {
         // `@diagnose` is handled via the swift-syntax region tree.
         continue;
@@ -9572,11 +9698,11 @@ FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
 
       auto setDefaultIsolation = [&](DefaultIsolation isolation) {
         if (result.isolation) {
-          UD->diagnose(diag::invalid_redecl_of_file_isolation);
+          FDD->diagnose(diag::invalid_redecl_of_file_isolation);
           result.isolation.value().source->diagnose(
               diag::invalid_redecl_of_file_isolation_prev);
         } else {
-          result.isolation = {isolation, UD};
+          result.isolation = {isolation, FDD};
         }
       };
 
@@ -9585,10 +9711,12 @@ FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
         continue;
       }
 
+      NominalTypeDecl *invalidNominal = nullptr;
+
       if (auto *custom = dyn_cast<CustomAttr>(attr)) {
         auto type = evaluateOrDefault(
             ctx.evaluator,
-            CustomAttrTypeRequest{custom, UD->getDeclContext(),
+            CustomAttrTypeRequest{custom, FDD->getDeclContext(),
                                   CustomAttrTypeKind::GlobalActor},
             Type());
         if (type) {
@@ -9596,11 +9724,11 @@ FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
             // CustomAttrTypeRequest already produced an error. Instead of
             // piling on, we can attach a note.
             ctx.Diags.diagnose(attr->getLocation(),
-                               diag::using_decl_invalid_attribute_note);
+                               diag::file_default_invalid_attribute_note);
             continue;
           }
 
-          if (type->isEqual(ctx.getMainActorType())) {
+          if (mainActor && type->isEqual(mainActor)) {
             setDefaultIsolation(DefaultIsolation::MainActor);
             continue;
           }
@@ -9612,17 +9740,25 @@ FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
                                diag::invalid_actor_for_file_isolation, type);
             ctx.Diags.diagnose(attr->getLocation(),
                                diag::invalid_actor_for_file_isolation_note);
+            nominal->diagnose(diag::decl_declared_here, nominal);
             continue;
           }
+
+          invalidNominal = nominal;
         }
         // Not a global actor (some other illegal attribute) so fall through to
         // the generic diagnostic.
       }
 
       ctx.Diags.diagnose(attr->getLocation(),
-                         diag::using_decl_invalid_attribute, attr);
+                         diag::file_default_invalid_attribute, attr);
       ctx.Diags.diagnose(attr->getLocation(),
-                         diag::using_decl_invalid_attribute_note);
+                         diag::file_default_invalid_attribute_note);
+      if (invalidNominal)
+        invalidNominal->diagnose(diag::decl_declared_here, invalidNominal);
+      // Some invalid attributes like @backDeployed can expand to multiple
+      // attrs, all of the same kind; just emit one error.
+      break;
     }
   }
 

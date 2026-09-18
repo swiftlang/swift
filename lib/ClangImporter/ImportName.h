@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -173,6 +174,9 @@ public:
   static constexpr inline ImportNameVersion forTypes() {
     return ImportNameVersion::maxVersion();
   }
+
+  void dump(llvm::raw_ostream &out) const;
+  SWIFT_DEBUG_DUMP;
 };
 
 /// Describes a name that was imported from Clang.

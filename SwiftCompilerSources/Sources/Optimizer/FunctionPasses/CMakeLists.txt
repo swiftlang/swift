@@ -13,6 +13,7 @@ swift_compiler_sources(Optimizer
   AsyncDemotion.swift
   AutoDiffBranchTracingEnumUtilities.swift
   BooleanLiteralFolding.swift
+  ClassDestroyDevirtualizer.swift
   ConstantCapturePropagation.swift
   CleanupDebugSteps.swift
   ClosureSpecialization.swift
@@ -44,6 +45,7 @@ swift_compiler_sources(Optimizer
   MergeCondFails.swift
   NamedReturnValueOptimization.swift
   RedundantLoadElimination.swift
+  RedundantOverflowCheckRemoval.swift
   ReleaseDevirtualizer.swift
   RemoveSILGenLifetimes.swift
   SimplificationPasses.swift

@@ -825,11 +825,12 @@ Deinit barriers (see Instruction.isDeinitBarrier(_:)) are instructions
 which would be affected by the side effects of deinitializers. To
 maintain the order of effects that is visible to the programmer,
 destroys of lexical values cannot be reordered with respect to them.
-There are three kinds:
+There are four kinds:
 
 1.  synchronization points (locks, memory barriers, syscalls, etc.)
 2.  loads of weak or unowned values
 3.  accesses of pointers
+4.  accesses of exclusive variables defined globally or as a class member
 
 Examples:
 
@@ -852,6 +853,9 @@ Examples:
     instance is defined behavior. Hoisting the destroy of the instance
     above the access to the memory would result in accessing a freed
     pointer.
+4.  Given an instance (`a`) of a class which references another class instance (`b`). A destroy of `a` cannot be hoisted
+    above an access to a property of `b` via a potentially aliasing reference to `b`. Such accesses to aliasable state are
+    protected by dynamic exclusivity checks.
 
 ## Dead End Blocks
 

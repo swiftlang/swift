@@ -13,7 +13,7 @@ func test_some(p: some MyProtocol) {
 
 public func test_any(p: any MyProtocol) {
   test_some(p: p)
-  // expected-warning@-1{{cannot use generic global function 'test_some(p:)' on a value of type 'any MyProtocol' in Embedded Swift}}
+  // expected-warning@-1{{cannot open existential type 'any MyProtocol' when passing it as an argument to global function 'test_some(p:)' in Embedded Swift}}
 }
 
 // The same, but where the caller of the generic requirement does get

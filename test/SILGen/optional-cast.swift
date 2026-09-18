@@ -37,9 +37,11 @@ class B : A {}
 //
 //   Finish.
 // CHECK:    [[RETURN_BB]]:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: end_borrow [[X_LIFETIME]]
 // CHECK-NEXT: destroy_value [[X]]
 // CHECK-NOT: destroy_value [[ARG]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 //
@@ -114,6 +116,7 @@ func foo(_ y : A?) {
 // CHECK-NEXT: enum $Optional<Optional<Optional<B>>>, #Optional.some!enumelt,
 // CHECK:      br [[DONE_DEPTH2:bb[0-9]+]]
 // CHECK:    [[DONE_DEPTH2]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: end_borrow [[X_LIFETIME]]
 // CHECK-NEXT: destroy_value [[X]]
 // CHECK-NOT: destroy_value %0
@@ -163,6 +166,7 @@ func baz(_ y : AnyObject?) {
 // CHECK-LABEL: sil hidden [ossa] @$s4main07opt_to_B8_trivialySiSgACF
 // CHECK:       bb0(%0 : $Optional<Int>):
 // CHECK-NEXT:  debug_value %0 : $Optional<Int>, let, name "x"
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  return %0 : $Optional<Int>
 // CHECK-NEXT:}
 func opt_to_opt_trivial(_ x: Int?) -> Int! {
@@ -205,6 +209,7 @@ public struct TestAddressOnlyStruct<T> {
 // CHECK-NEXT: [[L:%.*]] = begin_borrow [var_decl] [[X]]
 // CHECK-NEXT: [[PB:%.*]] = project_box [[L]]
 // CHECK-NEXT: store %0 to [trivial] [[PB]] : $*Optional<Int>
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: end_borrow [[L]]
 // CHECK-NEXT: destroy_value [[X]] : ${ var Optional<Int> }
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {

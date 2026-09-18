@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-build-swift -I %S/Inputs %t/main.swift %t/second.swift -cxx-interoperability-mode=default -Xfrontend -disable-availability-checking
+// RUN: %target-build-swift -I %S/Inputs %t/main.swift %t/second.swift -cxx-interoperability-mode=default -target %target-swift-5.8-abi-triple
 
 //--- main.swift
 import ReferenceCounted
