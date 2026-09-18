@@ -490,7 +490,7 @@ swiftide_completion_result_get_kind(swiftide_completion_response_t _response) {
   case CompletionKind::Import:
     return SWIFTIDE_COMPLETION_KIND_IMPORT;
   case CompletionKind::FileDefault:
-    return SWIFTIDE_COMPLETION_KIND_USING;
+    return SWIFTIDE_COMPLETION_KIND_FILEDEFAULT;
   case CompletionKind::UnresolvedMember:
     return SWIFTIDE_COMPLETION_KIND_UNRESOLVEDMEMBER;
   case CompletionKind::DotExpr:

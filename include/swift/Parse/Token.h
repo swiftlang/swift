@@ -195,7 +195,6 @@ public:
 #include "swift/AST/DeclAttr.def"
 #undef CONTEXTUAL_CASE
         .Case("macro", true)
-        .Case("using", true)
         .Default(false);
   }
 
