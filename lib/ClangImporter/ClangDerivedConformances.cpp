@@ -522,12 +522,7 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
 void swift::simple_display(llvm::raw_ostream &out,
                            const CxxRecordDeclDescriptor &desc) {
   out << "Inferring C++ iterator info for '";
-  if (desc.decl->getIdentifier())
-    out << desc.decl->getName();
-  else if (desc.decl->isAnonymousStructOrUnion())
-    out << "(anonymous record)";
-  else
-    out << "(unnamed record)";
+  importer::printRecordName(out, desc.decl);
   out << "'\n";
 }
 

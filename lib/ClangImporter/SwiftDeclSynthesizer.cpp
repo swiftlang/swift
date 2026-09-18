@@ -48,6 +48,16 @@
 using namespace swift;
 using namespace importer;
 
+ParamDecl *importer::createNewValueParam(ASTContext &ctx, Type type,
+                                         DeclContext *dc) {
+  auto *param =
+      new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                          ctx.getIdentifier("newValue"), dc);
+  param->setSpecifier(ParamSpecifier::Default);
+  param->setInterfaceType(type);
+  return param;
+}
+
 /// Build forwarding argument expressions for a set of clang parameters.
 /// Parameters with rvalue reference types or move-only value types are wrapped
 /// in a static_cast to preserve move semantics.
@@ -1861,11 +1871,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
 
   AccessorDecl *setterDecl = nullptr;
   if (setterImpl) {
-    auto paramVarDecl =
-        new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                            ctx.getIdentifier("newValue"), dc);
-    paramVarDecl->setSpecifier(ParamSpecifier::Default);
-    paramVarDecl->setInterfaceType(elementTy);
+    auto paramVarDecl = createNewValueParam(ctx, elementTy, dc);
 
     SmallVector<ParamDecl *> setterParams;
     if (!useAddress)
@@ -1980,11 +1986,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
 
   AccessorDecl *setterDecl = nullptr;
   if (setterImpl) {
-    auto paramVarDecl =
-        new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                            ctx.getIdentifier("newValue"), dc);
-    paramVarDecl->setSpecifier(ParamSpecifier::Default);
-    paramVarDecl->setInterfaceType(elementTy);
+    auto paramVarDecl = createNewValueParam(ctx, elementTy, dc);
 
     auto setterParamList = useAddress
                                ? ParameterList::create(ctx, {})
@@ -2608,10 +2610,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
   AccessorDecl *setterDecl = nullptr;
   if (setter) {
     auto paramVarDecl =
-        new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                            ctx.getIdentifier("newValue"), dc);
-    paramVarDecl->setSpecifier(ParamSpecifier::Default);
-    paramVarDecl->setInterfaceType(getter->getResultInterfaceType());
+        createNewValueParam(ctx, getter->getResultInterfaceType(), dc);
 
     auto setterParamList = ParameterList::create(ctx, {paramVarDecl});
 
@@ -3399,33 +3398,23 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
        !decl->getDestructor()->isDefaulted()))
     return false;
 
-  auto checkType = [](clang::QualType t) {
+  // Whether a base or field of this type makes the record non-trivial.
+  auto isNonTrivial = [](clang::QualType t) {
     if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
       if (auto cxxRecord =
               dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
         if (hasImportReferenceAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
             hasUnsafeAPIAttr(cxxRecord))
-          return true;
-
-        if (!isSufficientlyTrivial(cxxRecord))
           return false;
+
+        return !isSufficientlyTrivial(cxxRecord);
       }
     }
 
-    return true;
+    return false;
   };
 
-  for (auto field : decl->fields()) {
-    if (!checkType(field->getType()))
-      return false;
-  }
-
-  for (auto base : decl->bases()) {
-    if (!checkType(base.getType()))
-      return false;
-  }
-
-  return true;
+  return !anySubobjectTypeSatisfies(decl, isNonTrivial);
 }
 
 /// Find an explicitly-provided "destroy" operation specified for the

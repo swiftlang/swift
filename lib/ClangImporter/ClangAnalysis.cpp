@@ -22,6 +22,7 @@
 #include <algorithm>
 
 using namespace swift;
+using namespace importer;
 
 bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, {"import_reference"});
@@ -46,9 +47,7 @@ bool importer::isForeignReferenceRecord(const clang::RecordDecl *decl,
         .isReference();
 
   // Without one, a direct annotation is all there is to go on.
-  return llvm::any_of(decl->redecls(), [](const clang::Decl *redecl) {
-    return hasImportReferenceAttr(cast<clang::RecordDecl>(redecl));
-  });
+  return hasSwiftAttributeOnAnyRedecl(decl, {"import_reference"});
 }
 
 bool importer::hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl) {
@@ -135,22 +134,15 @@ bool isDirectViewTypeImpl(const clang::Type *type, Evaluator &eval,
     if (!seen.insert(recordDecl).second)
       return true;
 
-    auto isSelfContainedOrDirectView = [&](clang::QualType t) {
+    // A base or field that is neither self-contained nor itself a direct view
+    // can dangle, which disqualifies the enclosing record.
+    auto canDangle = [&](clang::QualType t) {
       const clang::Type *ty = t.getTypePtr();
-      return isSelfContainedForDirectView(ty, eval) ||
-             isDirectViewTypeImpl(ty, eval, seen);
+      return !isSelfContainedForDirectView(ty, eval) &&
+             !isDirectViewTypeImpl(ty, eval, seen);
     };
 
-    if (const auto *cxxRecordDecl =
-            dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
-      for (auto base : cxxRecordDecl->bases())
-        if (!isSelfContainedOrDirectView(base.getType()))
-          return false;
-    }
-    for (auto *field : recordDecl->fields())
-      if (!isSelfContainedOrDirectView(field->getType()))
-        return false;
-    return true;
+    return !anySubobjectTypeSatisfies(recordDecl, canDangle);
   }
 
   // (C) Anything else is not itself a direct view.
@@ -468,12 +460,7 @@ public:
 void swift::simple_display(llvm::raw_ostream &out,
                            const ForeignReferenceTypeInfoDescriptor &desc) {
   out << "Checking foreign reference type info for '";
-  if (desc.decl->getIdentifier())
-    out << desc.decl->getName();
-  else if (desc.decl->isAnonymousStructOrUnion())
-    out << "(anonymous record)";
-  else
-    out << "(unnamed record)";
+  printRecordName(out, desc.decl);
   out << "'\n";
 }
 
@@ -644,14 +631,9 @@ void ClangImporter::checkCalledClangFunction(const ValueDecl *func,
   diagnoseMissingReturnsRetained(Impl, func, callSiteLoc);
 }
 
-static bool isOSObject(const clang::CXXRecordDecl *record) {
-  return record && record->getIdentifier() && record->getName() == "OSObject" &&
-         record->getDeclContext()->getRedeclContext()->isTranslationUnit();
-}
-
-static bool isOSIterator(const clang::CXXRecordDecl *record) {
-  return record && record->getIdentifier() &&
-         record->getName() == "OSIterator" &&
+/// Whether \p record is the top-level libkern class named \p name.
+static bool isLibkernClass(const clang::CXXRecordDecl *record, StringRef name) {
+  return record && record->getIdentifier() && record->getName() == name &&
          record->getDeclContext()->getRedeclContext()->isTranslationUnit();
 }
 
@@ -666,13 +648,13 @@ LibkernSubclass ClangImporter::Implementation::getLibkernSubclass(
     return it->second;
 
   // OSIterator is the strongest answer there is, so no base can change it.
-  if (isOSIterator(record)) {
+  if (isLibkernClass(record, "OSIterator")) {
     libkernSubclasses[record] = LibkernSubclass::OSIterator;
     return LibkernSubclass::OSIterator;
   }
 
-  auto result =
-      isOSObject(record) ? LibkernSubclass::OSObject : LibkernSubclass::None;
+  auto result = isLibkernClass(record, "OSObject") ? LibkernSubclass::OSObject
+                                                   : LibkernSubclass::None;
 
   for (const auto &base : record->bases()) {
     auto baseSubclass =
@@ -1234,17 +1216,7 @@ static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
     return false;
   };
 
-  for (auto field : decl->fields()) {
-    if (checkType(field->getType()))
-      return true;
-  }
-
-  for (auto base : decl->bases()) {
-    if (checkType(base.getType()))
-      return true;
-  }
-
-  return false;
+  return anySubobjectTypeSatisfies(decl, checkType);
 }
 
 std::optional<importer::CxxUnsafetyReason>
