@@ -666,7 +666,6 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::FoldingSet<IntegerType> IntegerTypes;
   llvm::FoldingSet<HiddenType> HiddenTypes;
-  llvm::DenseMap<CanType, StringRef> TypesToHideWhenEmittingModule;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -4127,11 +4126,10 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
 }
 
 HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,
-                            ModuleDecl *definingModule,
                             HiddenTypeLayoutInfoDecl *layoutInfoDecl,
                             CanType parent) {
   llvm::FoldingSetNodeID id;
-  HiddenType::Profile(id, mangledName, definingModule, layoutInfoDecl, parent);
+  HiddenType::Profile(id, mangledName, layoutInfoDecl, parent);
 
   llvm::FoldingSetInsertToken insertToken;
   if (auto *hidden = ctx.getImpl().HiddenTypes.lookup(id, insertToken)) {
@@ -4141,32 +4139,10 @@ HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,
   auto nameCopy = ctx.AllocateCopy(mangledName);
 
   auto *hidden = new (ctx, AllocationArena::Permanent)
-      HiddenType(nameCopy, definingModule, layoutInfoDecl, parent, ctx);
+      HiddenType(nameCopy, layoutInfoDecl, parent, ctx);
 
   ctx.getImpl().HiddenTypes.insert(hidden, insertToken);
   return hidden;
-}
-
-void ASTContext::recordTypeToHideWhenEmittingModule(CanType type,
-                                                    StringRef mangledName) {
-  // Allocate a stable copy so the StringRef survives even if the caller's
-  // storage for the mangled name is later moved or freed.
-  auto nameCopy = AllocateCopy(mangledName);
-  auto result =
-      getImpl().TypesToHideWhenEmittingModule.try_emplace(type, nameCopy);
-  if (!result.second) {
-    ASSERT(result.first->second == nameCopy &&
-           "conflicting hide-on-emit mangled names for the same type");
-  }
-}
-
-std::optional<StringRef>
-ASTContext::lookupTypeToHideWhenEmittingModule(CanType type) const {
-  auto &map = getImpl().TypesToHideWhenEmittingModule;
-  auto it = map.find(type);
-  if (it == map.end())
-    return std::nullopt;
-  return it->second;
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,

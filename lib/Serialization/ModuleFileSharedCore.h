@@ -314,8 +314,6 @@ private:
   std::unique_ptr<SerializedDeclMemberNamesTable> DeclMemberNames;
   std::unique_ptr<SerializedDeclFingerprintsTable> DeclFingerprints;
 
-  llvm::StringMap<AbstractTypeLayout> HiddenTypeLayouts;
-
   class ObjCMethodTableInfo;
   using SerializedObjCMethodTable =
     llvm::OnDiskIterableChainedHashTable<ObjCMethodTableInfo>;
@@ -527,11 +525,6 @@ private:
   ///
   /// Returns false if there was an error.
   bool readIndexBlock(llvm::BitstreamCursor &cursor);
-
-  /// Reads the hidden-type layouts block, populating HiddenTypeLayouts.
-  ///
-  /// Returns false if there was an error.
-  bool readHiddenTypeLayoutsBlock(llvm::BitstreamCursor &cursor);
 
   /// Read an on-disk decl hash table stored in
   /// \c comment_block::DeclCommentListLayout format.
