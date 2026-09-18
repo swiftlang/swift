@@ -6735,6 +6735,7 @@ static unsigned encodeLLVMTypeID(llvm::Type::TypeID kind) {
   case llvm::Type::ArrayTyID:
   case llvm::Type::FixedVectorTyID:
   case llvm::Type::StructTyID:
+  case llvm::Type::ByteTyID:
     return static_cast<unsigned>(kind);
   case llvm::Type::VoidTyID:
   case llvm::Type::LabelTyID:
@@ -6745,7 +6746,6 @@ static unsigned encodeLLVMTypeID(llvm::Type::TypeID kind) {
   case llvm::Type::ScalableVectorTyID:
   case llvm::Type::TypedPointerTyID:
   case llvm::Type::TargetExtTyID:
-  case llvm::Type::ByteTyID:
     llvm_unreachable("unsupported serialized LLVM type");
   }
   llvm_unreachable("unhandled LLVM type kind");
