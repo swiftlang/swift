@@ -499,7 +499,7 @@ legacyVisitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
 }
 
 SILInstruction *
-SILCombiner::visitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
+SILCombiner::legacyVisitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
   // (raw_pointer_to_ref (ref_to_raw_pointer x X->Y) Y->Z)
   //   ->
   // (unchecked_ref_cast x X->Z)
