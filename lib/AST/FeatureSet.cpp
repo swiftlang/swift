@@ -509,6 +509,9 @@ UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 UNINTERESTING_FEATURE(DistributedActorResignRemoteID)
 UNINTERESTING_FEATURE(EmbeddedDistributed)
 
+// FIXME: Detect `_scope` and `@_scoped()`.
+static bool usesFeatureScopeRestrictions(Decl *decl) { return false; }
+
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
     return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());
