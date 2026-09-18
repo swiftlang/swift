@@ -3,6 +3,7 @@
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedDistributed
+// REQUIRES: optimized_stdlib
 
 // Pseudo code of the synthesized func:
 //

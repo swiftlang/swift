@@ -4,6 +4,7 @@
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedDistributed
+// REQUIRES: optimized_stdlib
 
 // The SAME distributed-actor source below type-checks in both Embedded and
 // ordinary Swift. The mode-specific machinery (the actor system, its
