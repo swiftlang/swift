@@ -18,12 +18,14 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/SynthesizedDeclBuilder.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
@@ -1120,10 +1122,26 @@ swift::deriveRequirementViaMacro(DerivedConformance &derived,
   }
   ASSERT(expansion);
 
+  auto *macro = C.getBuiltinDerivedConformanceMacroDecl(macroKind);
+
+  auto external = macro->getDefinition().getExternalMacro();
+  auto externalDef =
+      evaluateOrDefault(C.evaluator,
+                        ExternalMacroDefinitionRequest{&C, external.moduleName,
+                                                       external.macroTypeName},
+                        ExternalMacroDefinition::error(""));
+  if (externalDef.isError()) {
+    derived.ConformanceDecl->diagnose(
+        diag::derivation_macro_could_not_be_loaded,
+        external.macroTypeName.str(), requirement->getName(), external.moduleName.str());
+    derived.ConformanceDecl->diagnose(
+        diag::failed_to_expand_derived_conformance, derived.getProtocolType());
+    return nullptr;
+  }
+
   // Resolve the macro reference directly to the builtin MacroDecl, bypassing
   // name lookup.
-  expansion->setMacroRef(
-      ConcreteDeclRef(C.getBuiltinDerivedConformanceMacroDecl(macroKind)));
+  expansion->setMacroRef(ConcreteDeclRef(macro));
 
   // Find the expanded `ValueDecl *` and return it. There should only ever be a
   // single one.
