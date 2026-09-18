@@ -286,6 +286,8 @@ struct ASTContext::Implementation {
   /// DenseMap.
   llvm::MapVector<Identifier, ModuleDecl *> LoadedModules;
 
+  llvm::SmallSetVector<CanType, 4> RecoveredHiddenTypes;
+
   /// The map from a module's name to a vector of modules that share that name.
   /// The name can be either the module's real name of the module's ABI name.
   llvm::DenseMap<Identifier, llvm::SmallVector<ModuleDecl *, 1>> NameToModules;
@@ -937,6 +939,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
                                 << llvm::capacity_in_bytes(Name) << "\n"
 
   SIZE(LoadedModules);
+  SIZE(RecoveredHiddenTypes);
   SIZE(NameToModules);
   SIZE(IdentifierTable);
   SIZE(Cleanups);
@@ -2719,6 +2722,15 @@ ModuleDecl *ASTContext::getLoadedModule(
 iterator_range<llvm::MapVector<Identifier, ModuleDecl *>::const_iterator>
 ASTContext::getLoadedModules() const {
   return {getImpl().LoadedModules.begin(), getImpl().LoadedModules.end()};
+}
+
+void ASTContext::recordRecoveredHiddenType(CanType type) {
+  assert(isa<HiddenType>(type));
+  getImpl().RecoveredHiddenTypes.insert(type);
+}
+
+ArrayRef<CanType> ASTContext::getRecoveredHiddenTypes() const {
+  return getImpl().RecoveredHiddenTypes.getArrayRef();
 }
 
 ModuleDecl *ASTContext::getLoadedModule(Identifier ModuleName) const {
