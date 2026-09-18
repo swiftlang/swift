@@ -2,6 +2,7 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: optimized_stdlib
 
 // Distributed actors in Embedded Swift are gated behind the experimental
 // feature `EmbeddedDistributed`.
