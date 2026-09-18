@@ -1878,6 +1878,16 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   // Figure out if we need the value to be in a temporary.
   bool requiresAddress;
   switch (computeCastStrategy(SGF, sourceType, targetType)) {
+  case CastStrategy::COM: {
+    ManagedValue value =
+        prepareCOMCastSource(SGF, loc, src.getFinalManagedValue());
+    if (!value.getType().isAddress()) {
+      auto temporary = SGF.emitTemporaryAllocation(loc, value.getType());
+      value = SGF.B.createStoreBorrowOrTrivial(loc, value.borrow(SGF, loc),
+                                               temporary);
+    }
+    return {value, CastConsumptionKind::CopyOnSuccess};
+  }
   case CastStrategy::Address:
     requiresAddress = true;
     break;
