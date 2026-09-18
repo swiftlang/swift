@@ -25,6 +25,7 @@
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/shims/_SwiftCOMShims.h"
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
 #include "SwiftObject.h"
@@ -1840,9 +1841,8 @@ tryCastUnwrappingExistentialSource(
     break;
   }
   case ExistentialTypeRepresentation::COM:
-    // QueryInterface-backed COM casts are supplied by the COM runtime. Until
-    // that path is connected, do not reinterpret an interface pointer as a
-    // Swift existential payload.
+    // COM interface pointers do not carry a Swift dynamic type to unwrap.
+    // Interface-to-interface casts are handled by tryCastToCOMExistential.
     srcFailureType = srcType;
     destFailureType = destType;
     return DynamicCastResult::Failure;
@@ -2323,18 +2323,55 @@ tryCastToExistentialMetatype(
   }
 }
 
-static DynamicCastResult
-tryCastToCOMExistential(OpaqueValue *destLocation, const Metadata *destType,
-                        OpaqueValue *srcValue, const Metadata *srcType,
-                        const Metadata *&destFailureType,
-                        const Metadata *&srcFailureType,
-                        bool takeOnSuccess, bool mayDeferChecks,
-                        bool prohibitIsolatedConformances) {
-  // The representation alone cannot implement a COM cast: doing so requires
-  // the interface IID and QueryInterface entry point.
+static DynamicCastResult tryCastToCOMExistential(
+    OpaqueValue *destLocation, const Metadata *destType, OpaqueValue *srcValue,
+    const Metadata *srcType, const Metadata *&destFailureType,
+    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks,
+    bool prohibitIsolatedConformances) {
   srcFailureType = srcType;
   destFailureType = destType;
-  return DynamicCastResult::Failure;
+
+  // Query an interface pointer directly. The cast driver unwraps other
+  // source representations, such as an interface stored in Any.
+  if (srcType->getKind() != MetadataKind::Existential)
+    return DynamicCastResult::Failure;
+
+  auto srcExistentialType = cast<ExistentialTypeMetadata>(srcType);
+  if (srcExistentialType->getRepresentation() !=
+      ExistentialTypeRepresentation::COM)
+    return DynamicCastResult::Failure;
+
+  auto destExistentialType = cast<ExistentialTypeMetadata>(destType);
+
+  // Canonicalization leaves only the most-derived interface, and marker
+  // protocols are omitted from existential metadata.
+  assert(destExistentialType->NumProtocols == 1 &&
+         "COM existential must contain exactly one interface");
+  auto protocol = destExistentialType->getProtocols().front();
+  assert(protocol.getSpecialProtocol() == SpecialProtocol::COM &&
+         "COM existential must contain a COM interface");
+  auto *interfaceProtocol = protocol.getSwiftProtocol();
+
+  auto iid = interfaceProtocol->getCOMInterfaceID();
+  auto sourceInterface = *reinterpret_cast<void **>(srcValue);
+  if (!sourceInterface)
+    return DynamicCastResult::Failure;
+
+  auto **vtable = *reinterpret_cast<void ***>(sourceInterface);
+  auto queryInterface =
+      reinterpret_cast<_SwiftCOMQueryInterfaceFunction>(vtable[0]);
+
+  void *resultInterface = nullptr;
+  auto result = queryInterface(sourceInterface, iid, &resultInterface);
+  if (result < 0 || !resultInterface)
+    return DynamicCastResult::Failure;
+
+  *reinterpret_cast<void **>(destLocation) = resultInterface;
+
+  // `QueryInterface` returns an owned (+1) interface pointer. Report a copy
+  // even when the caller requested a take: the top-level cast driver will then
+  // destroy the independent source ownership exactly once.
+  return DynamicCastResult::SuccessViaCopy;
 }
 
 /******************************************************************************/
