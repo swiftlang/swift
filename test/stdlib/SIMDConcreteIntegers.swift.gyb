@@ -83,6 +83,28 @@ ${Scalar}x${n}_TestSuite.test("comparisons") {
   expectEqual(ge, a .>= b)
 }
 
+${Scalar}x${n}_TestSuite.test("scalar comparisons") {
+  let a = ${Vector}.random(in: ${Scalar}.min ... .max)
+  for s in [${Scalar}.random(in: .min ... .max), a[0], .min, .max] {
+    let v = ${Vector}(repeating: s)
+    var (eq,ne,lt,le,gt,ge) = genericComparisons(a, v)
+    expectEqual(eq, a .== s)
+    expectEqual(ne, a .!= s)
+    expectEqual(lt, a .<  s)
+    expectEqual(le, a .<= s)
+    expectEqual(gt, a .>  s)
+    expectEqual(ge, a .>= s)
+
+    (eq,ne,lt,le,gt,ge) = genericComparisons(v, a)
+    expectEqual(eq, s .== a)
+    expectEqual(ne, s .!= a)
+    expectEqual(lt, s .<  a)
+    expectEqual(le, s .<= a)
+    expectEqual(gt, s .>  a)
+    expectEqual(ge, s .>= a)
+  }
+}
+
 ${Scalar}x${n}_TestSuite.test("arithmetic") {
   let a = ${Vector}.random(in: ${Scalar}.min ... .max)
   let b = ${Vector}.random(in: ${Scalar}.min ... .max)
