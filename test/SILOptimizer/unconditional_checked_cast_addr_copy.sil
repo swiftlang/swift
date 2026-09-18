@@ -1,0 +1,17 @@
+// RUN: %target-sil-opt -sil-print-types -sil-combine -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage canonical
+import Swift
+
+// The consuming identity form still takes the source.
+// CHECK-LABEL: sil [ossa] @taking_identity
+// CHECK: copy_addr [take] %1 to [init] %0 : $*T
+// CHECK: return
+sil [ossa] @taking_identity : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  unconditional_checked_cast_addr T in %1 : $*T to T in %0 : $*T
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
