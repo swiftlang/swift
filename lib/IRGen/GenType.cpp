@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1870,60 +1871,6 @@ namespace {
     }
   };
 
-  /// A TypeInfo for a HiddenType placeholder. The placeholder stands in for a
-  /// real C-imported type whose identity has been elided from the importing
-  /// Layout is recovered from the defining module's HiddenTypeLayouts table.
-  ///
-  /// Address-only: clients lack the clang::RecordDecl required to derive a
-  /// correct register-passing schema for the hidden field, so values are
-  /// always passed indirectly. 
-  class TrivialHiddenTypeInfo final
-      : public IndirectTypeInfo<TrivialHiddenTypeInfo, FixedTypeInfo> {
-  public:
-    TrivialHiddenTypeInfo(llvm::Type *storage, Size size, Alignment align)
-      : IndirectTypeInfo(storage, size,
-                         SpareBitVector::getConstant(size.getValueInBits(),
-                                                     false),
-                         align,
-                         IsTriviallyDestroyable, IsBitwiseTakableAndBorrowable,
-                         IsCopyable,
-                         IsFixedSize, IsABIAccessible) {}
-
-    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-    createSerializableHiddenTypeInfoRepresentation(
-        IRGenModule &) const override {
-      unsupportedSerializableHiddenTypeInfoRepresentation();
-    }
-
-    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        SILType T, bool isOutlined) const override {
-      IGF.emitMemCpy(dest, src, getFixedSize());
-    }
-    void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
-      IGF.emitMemCpy(dest, src, getFixedSize());
-    }
-    void destroy(IRGenFunction &IGF, Address addr, SILType T,
-                 bool isOutlined) const override {
-      // Trivial destructor under the plain-C assumption.
-    }
-
-    TypeLayoutEntry *
-    buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
-                         bool useStructLayouts) const override {
-      if (!useStructLayouts)
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(
-          *this, T, ScalarKind::TriviallyDestroyable);
-    }
-
-    unsigned getFixedExtraInhabitantCount(IRGenModule &) const override {
-      return 0;
-    }
-    bool mayHaveExtraInhabitants(IRGenModule &) const override {
-      return false;
-    }
-  };
 } // end anonymous namespace
 
 static std::unique_ptr<TypeInfo>
@@ -2991,25 +2938,13 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for the type info an IntegerType");
   case TypeKind::Hidden: {
     auto hidden = cast<HiddenType>(ty);
-    if (auto *layoutInfo = hidden->getLayoutInfoDecl()) {
-      assert(layoutInfo->Layout &&
-             layoutInfo->Layout->typeInfoRepresentation &&
-             "hidden layout declaration has no TypeInfo representation");
-      return createTypeInfoFromSerializableRepresentation(
-                 IGM, *layoutInfo->Layout->typeInfoRepresentation)
-          .release();
-    }
-
-    auto *defining = hidden->getDefiningModule();
-    assert(defining &&
-           "HiddenType must carry a defining module after deserialization");
-    auto layout = defining->lookupHiddenTypeLayout(hidden->getMangledName());
-    assert(layout &&
-           "no HIDDEN_TYPE_LAYOUTS_BLOCK entry for this mangled name");
-
-    auto *storage = llvm::ArrayType::get(IGM.Int8Ty, layout->size);
-    return new TrivialHiddenTypeInfo(storage, Size(layout->size),
-                              Alignment(layout->alignment));
+    auto *layoutInfo = hidden->getLayoutInfoDecl();
+    assert(layoutInfo && layoutInfo->Layout &&
+           layoutInfo->Layout->typeInfoRepresentation &&
+           "HiddenType must carry a serialized TypeInfo representation");
+    return createTypeInfoFromSerializableRepresentation(
+               IGM, *layoutInfo->Layout->typeInfoRepresentation)
+        .release();
   }
   }
   }

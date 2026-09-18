@@ -18,6 +18,7 @@
 
 #include "clang/AST/Type.h"
 #include "ForeignRepresentationInfo.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Concurrency.h"
@@ -265,12 +266,7 @@ Type TypeBase::findAlwaysUnsafeType() const {
 static std::optional<ReferenceCounting>
 getHiddenTypeReferenceCounting(CanHiddenType type) {
   auto *layoutInfoDecl = type->getLayoutInfoDecl();
-  // TODO: Remove this legacy fallback once every HiddenType carries an
-  // abstract layout.
-  if (!layoutInfoDecl)
-    return std::nullopt;
-
-  assert(layoutInfoDecl->Layout &&
+  assert(layoutInfoDecl && layoutInfoDecl->Layout &&
          "HiddenTypeLayoutInfoDecl should have abstract layout");
   return layoutInfoDecl->Layout->referenceCountingSystem;
 }

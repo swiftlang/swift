@@ -662,10 +662,6 @@ LANGUAGE_FEATURE(BorrowingSequence, 516, "Iterable protocol")
 /// Turns some source breaking access control warnings into errors.
 EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 
-/// Allow stored properties of types from an internal bridging header in
-/// non-resilient modules. Layout will be encoded in the .swiftmodule.
-EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
-
 /// Allow use of macros to derive various conformances
 EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, true)
 
