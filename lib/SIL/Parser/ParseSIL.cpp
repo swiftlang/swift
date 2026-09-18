@@ -41,6 +41,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/Subsystems.h"
@@ -715,6 +716,7 @@ struct DeclSILOptional {
     bool *isSpecialized = nullptr;
     AvailabilityRange *availability = nullptr;
     bool *isWithoutActuallyEscapingThunk = nullptr;
+    bool *hasOwnershipForTrivial = nullptr;
     SmallVectorImpl<std::string> *Semantics = nullptr;
     SmallVectorImpl<ParsedSpecAttr> *SpecAttrs = nullptr;
     ValueDecl **ClangDecl = nullptr;
@@ -763,6 +765,8 @@ static bool parseDeclSILOptional(
       *options.isCanonical = true;
     else if (options.hasOwnershipSSA && SP.P.Tok.getText() == "ossa")
       *options.hasOwnershipSSA = true;
+    else if (options.hasOwnershipForTrivial && SP.P.Tok.getText() == "ownership_for_trivial")
+      *options.hasOwnershipForTrivial = true;
     else if (options.hasLoweredAddresses && SP.P.Tok.getText() == "opaque")
       *options.hasLoweredAddresses = false;
     else if (options.needStackProtection && SP.P.Tok.getText() == "stack_protection")
@@ -7622,11 +7626,19 @@ bool SILParser::parseSILBasicBlockArgList(SILBasicBlock *BB, bool isEntry) {
         // want incompatibilities in between @any and other types of ownership
         // to be ignored.
         if (F->hasOwnership() && Arg->getOwnershipKind() != OwnershipKind) {
-          auto diagID =
-              diag::silfunc_and_silarg_have_incompatible_sil_value_ownership;
-          P.diagnose(NameLoc, diagID, Arg->getOwnershipKind().asString(),
-                     OwnershipKind.asString());
-          return true;
+          // If the function has ownership for trivial values enabled, then
+          // the body is allowed to set ownership kind independently from the
+          // outer function type.
+          if (F->hasOwnershipForTrivialValues()
+              && F->getTypeProperties(Arg->getType()).isTrivial()) {
+            fArg->setOwnershipKind(OwnershipKind);
+          } else {
+            auto diagID =
+                diag::silfunc_and_silarg_have_incompatible_sil_value_ownership;
+            P.diagnose(NameLoc, diagID, Arg->getOwnershipKind().asString(),
+                      OwnershipKind.asString());
+            return true;
+          }
         }
       } else {
         Arg = BB->createPhiArgument(Ty, OwnershipKind, /*decl*/ nullptr,
@@ -7688,6 +7700,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   PerformanceConstraints perfConstr = PerformanceConstraints::None;
   bool isPerformanceConstraint = false;
   bool markedAsUsed = false;
+  bool hasOwnershipForTrivial = false;
   StringRef asmName;
   StringRef section;
   SmallVector<std::string, 1> Semantics;
@@ -7709,7 +7722,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &inlineStrategy, &optimizationMode, &perfConstr,
           &isPerformanceConstraint, &markedAsUsed, &asmName, &section, nullptr,
           &isWeakImported, &codeGenerationModel, &needStackProtection, nullptr,
-          &availability, &isWithoutActuallyEscapingThunk, &Semantics,
+          &availability, &isWithoutActuallyEscapingThunk,
+          &hasOwnershipForTrivial, &Semantics,
           &SpecAttrs, &ClangDecl, &MRK, &actorIsolation}, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, /*diagnoseDollarPrefix=*/false,
@@ -7748,6 +7762,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setUseStackForPackMetadata(useStackForPackMetadata);
     FunctionState.F->setHasUnsafeNonEscapableResult(
       hasUnsafeNonEscapableResult);
+    FunctionState.F->setOwnershipForTrivialValues(hasOwnershipForTrivial);
     FunctionState.F->setIsExactSelfClass(isExactSelfClass);
     FunctionState.F->setDynamicallyReplacedFunction(
         DynamicallyReplacedFunction);
