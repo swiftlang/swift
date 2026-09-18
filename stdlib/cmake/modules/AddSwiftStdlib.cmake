@@ -743,6 +743,21 @@ function(_add_swift_lipo_target)
   endif()
 endfunction()
 
+# Determine whether the embedded Swift libraries for ${triple} are built under
+# CodeGenerationModel=interface, storing TRUE/FALSE into ${result_var_name} in
+# the caller's scope.
+function(embedded_triple_uses_interface_cgm triple result_var_name)
+  set(result FALSE)
+
+  if(SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX
+     AND triple
+     AND "${triple}" MATCHES "${SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX}")
+    set(result TRUE)
+  endif()
+
+  set("${result_var_name}" "${result}" PARENT_SCOPE)
+endfunction()
+
 # Add a single variant of a new Swift library.
 #
 # Usage:
@@ -1120,12 +1135,8 @@ function(add_swift_target_library_single target name)
       set(_emblib_triple
         "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}")
 
-      set(_emblib_interface_cgm FALSE)
-      if(SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX
-         AND _emblib_triple
-         AND "${_emblib_triple}" MATCHES "${SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX}")
-        set(_emblib_interface_cgm TRUE)
-      endif()
+      embedded_triple_uses_interface_cgm("${_emblib_triple}"
+                                         _emblib_interface_cgm)
 
       set(_emblib_lto FALSE)
       if(SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX
@@ -3746,7 +3757,6 @@ endfunction()
 #   add_embedded_swift_target_library(<prefix> <library_name>
 #     [IS_STDLIB] [IS_STDLIB_CORE] [IS_SDK_OVERLAY]
 #     [PARTIAL_SOURCES_INTENDED]
-#     [INSTALL_BINARY]
 #     [NO_FREESTANDING_CXX]
 #     [NON_EMPTY_OBJECT_FILE]
 #     [DETECT_MALLOC_TYPE]
@@ -3797,7 +3807,7 @@ endfunction()
 # at least one match, AND no SKIP_*_REGEX pattern matches.
 function(add_embedded_swift_target_library prefix library_name)
   cmake_parse_arguments(EMBLIB
-    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE;DETECT_MALLOC_TYPE;DETECT_ARC4RANDOM"
+    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE;DETECT_MALLOC_TYPE;DETECT_ARC4RANDOM"
     "INSTALL_IN_COMPONENT;ARCHITECTURE_KEY"
     "GYB_SOURCES;SWIFT_COMPILE_FLAGS;C_COMPILE_FLAGS;FILE_DEPENDS;DEPENDS;SKIP_ARCH_REGEX;SKIP_MOD_REGEX;SKIP_TRIPLE_REGEX;ONLY_ARCH_REGEX;ONLY_MOD_REGEX;ONLY_TRIPLE_REGEX"
     ${ARGN})
@@ -3997,25 +4007,22 @@ function(add_embedded_swift_target_library prefix library_name)
       INSTALL_IN_COMPONENT ${EMBLIB_INSTALL_IN_COMPONENT}
     )
 
-    # Install the produced archive into lib/swift/embedded/${mod}/. Used by
-    # embedded libraries that produce a static archive consumed by clients
-    # at link time (e.g. swiftEmbeddedPlatformPOSIX, swiftUnicodeDataTables,
-    # swift_Concurrency).
-    if(EMBLIB_INSTALL_BINARY)
-      swift_install_in_component(
-        TARGETS ${prefix}-${mod}
-        DESTINATION "lib/swift/embedded/${mod}"
-        COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
-      )
-      swift_install_in_component(
-        FILES "${SWIFTLIB_DIR}/embedded/${mod}/lib${library_name}.a"
-        DESTINATION "lib/swift/embedded/${mod}/"
-        COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
-        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                    GROUP_READ GROUP_EXECUTE
-                    WORLD_READ WORLD_EXECUTE
-      )
-    endif()
+    # Install the produced archive into lib/swift/embedded/${mod}/. Depending
+    # on the compilation model, it might be empty (and can be ignored), but it
+    # will always be there.
+    swift_install_in_component(
+      TARGETS ${prefix}-${mod}
+      DESTINATION "lib/swift/embedded/${mod}"
+      COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
+    )
+    swift_install_in_component(
+      FILES "${SWIFTLIB_DIR}/embedded/${mod}/lib${library_name}.a"
+      DESTINATION "lib/swift/embedded/${mod}/"
+      COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
+      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                  GROUP_READ GROUP_EXECUTE
+                  WORLD_READ WORLD_EXECUTE
+    )
 
     # When building the per-target archive on macOS, point CMake at the
     # specific architecture so it doesn't try to build a fat archive.
