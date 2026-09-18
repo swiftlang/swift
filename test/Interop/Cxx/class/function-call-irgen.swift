@@ -6,11 +6,11 @@ import Closure
 
 // CHECK: define{{( protected)?}} swiftcc void @"$s4main14testNonTrivialyyF"()
 // CHECK: %[[V0:.*]] = alloca %{{.*}}, align 8
-// CHECK: call void @llvm.lifetime.start.p0(i64 8, ptr %[[V0]])
+// CHECK: call void @llvm.lifetime.start.p0(ptr %[[V0]])
 // CHECK: call {{(void|ptr)}} @__swift_cxx_ctor_ZN10NonTrivialC1Ev(ptr %[[V0]])
 // CHECK: call void @_Z5cfunc10NonTrivial(ptr %[[V0]])
 // CHECK: call {{(void|ptr)}} @_ZN10NonTrivialD{{1|2}}Ev(ptr %[[V0]])
-// CHECK: call void @llvm.lifetime.end.p0(i64 8, ptr %[[V0]])
+// CHECK: call void @llvm.lifetime.end.p0(ptr %[[V0]])
 // CHECK: ret void
 
 public func testNonTrivial() {
@@ -23,14 +23,14 @@ public func testNonTrivial() {
 // CHECK: %[[V0:.*]] = alloca %{{.*}}, align 8
 // CHECK: %[[V1:.*]] = call ptr @_Z8getFnPtrv()
 // CHECK: store ptr %[[V1]], ptr %[[F_DEBUG]], align 8
-// CHECK: call void @llvm.lifetime.start.p0(i64 8, ptr %[[V0]])
+// CHECK: call void @llvm.lifetime.start.p0(ptr %[[V0]])
 // CHECK: call {{(void|ptr)}} @__swift_cxx_ctor_ZN10NonTrivialC1Ev(ptr %[[V0]])
 // CHECK: invoke void %[[V1]](ptr %[[V0]])
 // CHECK: to label %[[INVOKE_CONT:.*]] unwind label %{{.*}}
 
 // CHECK: [[INVOKE_CONT]]:
 // CHECK: call {{(void|ptr)}} @_ZN10NonTrivialD{{1|2}}Ev(ptr %[[V0]])
-// CHECK: call void @llvm.lifetime.end.p0(i64 8, ptr %[[V0]])
+// CHECK: call void @llvm.lifetime.end.p0(ptr %[[V0]])
 // CHECK: ret void
 
 public func testNonTrivialFunctionPointer() {

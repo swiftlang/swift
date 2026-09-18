@@ -203,7 +203,7 @@ AbstractionPattern AbstractionPattern::getCXXFunctionalConstructor(
       clangImporter->extractCXXFunctionType(functionalTypeDecl);
   auto ctorClangType =
       clangCtx
-          .getFunctionType(clangCtx.getRecordType(functionalTypeDecl),
+          .getFunctionType(clangCtx.getCanonicalTagType(functionalTypeDecl),
                            {clang::QualType(clangFunctionType, 0)},
                            clang::FunctionProtoType::ExtProtoInfo())
           .getTypePtr();

@@ -209,7 +209,7 @@ public:
 
 // Implementation for TYPE_LOOKUP_ERROR_FMT. Don't call directly.
 template <typename... Args>
-static TypeLookupError TypeLookupErrorImpl(const char *fmt, Args... args) {
+inline TypeLookupError TypeLookupErrorImpl(const char *fmt, Args... args) {
   return TypeLookupError([=] {
     char *str;
 #pragma clang diagnostic push

@@ -2456,6 +2456,10 @@ FUNCTION(TaskAlloc,
          MEMEFFECTS(InaccessibleMemOnly))
 
 // void swift_task_dealloc(void *ptr);
+//
+// The argument memory has to be part of the memory effects: deallocation
+// invalidates the pointed-to storage, and LLVM will otherwise happily move
+// accesses to it across the call (this is also how LLVM models `free`).
 FUNCTION(TaskDealloc,
          _Concurrency, swift_task_dealloc, SwiftCC,
          ConcurrencyAvailability,
@@ -2463,7 +2467,7 @@ FUNCTION(TaskDealloc,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(InaccessibleMemOnly))
+         MEMEFFECTS(InaccessibleOrArgMemOnly))
 
 // void swift_task_dealloc_through(void *ptr);
 FUNCTION(TaskDeallocThrough,
@@ -2473,7 +2477,7 @@ FUNCTION(TaskDeallocThrough,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(InaccessibleMemOnly))
+         MEMEFFECTS(InaccessibleOrArgMemOnly))
 
 // void swift_task_cancel(AsyncTask *task);
 FUNCTION(TaskCancel,

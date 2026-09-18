@@ -243,7 +243,7 @@ public var irm: Int {
 // CHECK:             [[UNWIND]]:
 // CHECK:               br label %coro.end
 // CHECK:             coro.end:
-// CHECK:               call i1 @llvm.coro.end(
+// CHECK:               call void @llvm.coro.end(
 // CHECK-SAME:              ptr [[HANDLE]],
 // CHECK-SAME:              i1 false,
 // CHECK-SAME:              token none
@@ -286,7 +286,7 @@ public var irm: Int {
 // CHECK:             [[UNWIND]]:
 // CHECK:               br label %coro.end
 // CHECK:             coro.end:
-// CHECK:               [[REGISTER_8:%[^,]+]] = call i1 @llvm.coro.end(ptr [[HANDLE]], i1 false, token none)
+// CHECK:               call void @llvm.coro.end(ptr [[HANDLE]], i1 false, token none)
 // CHECK:               unreachable
 // CHECK:           }
   yielding mutate {
@@ -307,7 +307,8 @@ public var irm: Int {
 // CHECK-64:      [[SIZE_64:%[^,]+]] = zext i32 {{%[^,]+}} to i64
 // CHECK-64:      [[FRAME:%[^,]+]] = alloca i8, [[INT]] [[SIZE_64]]
 // CHECK-32:      [[FRAME:%[^,]+]] = alloca i8, [[INT]] {{%[^,]+}}
-// CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
+//                The frame is not a static alloca, so it carries no lifetime
+//                markers; those are only valid on static allocas.
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s19coroutine_accessors1SV3irmSivx")
 // CHECK:         [[RETVAL:%[^,]+]] = call swiftcc { ptr, ptr } [[RAMP]](
 // CHECK-SAME:         [[FRAME]],
@@ -322,7 +323,6 @@ public var irm: Int {
 // CHECK-SAME:        [[FRAME]],
 // CHECK-SAME:        _swift_coro_malloc_allocator
 // CHECK-SAME:    )
-// CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
 // CHECK:       }
 @_silgen_name("increment_irm")
 public mutating func increment_irm() {
@@ -345,7 +345,8 @@ public mutating func increment_irm() {
 // CHECK-32:      [[SIZE_1:%[^,]+]] = add [[INT]] {{%[^,]+}}, 15
 // CHECK:         [[SIZE:%[^,]+]] = and [[INT]] [[SIZE_1]], -16
 // CHECK:         [[FRAME:%[^,]+]] = call swiftcc ptr @swift_task_alloc([[INT]] [[SIZE]])
-// CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
+//                The frame is not a static alloca, so it carries no lifetime
+//                markers; those are only valid on static allocas.
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s19coroutine_accessors1SV3irmSivx")
 // CHECK:         [[RETVAL:%[^,]+]] = call swiftcc { ptr, ptr } [[RAMP]](
 // CHECK-SAME:         [[FRAME]],
@@ -360,7 +361,6 @@ public mutating func increment_irm() {
 // CHECK-SAME:        [[FRAME]],
 // CHECK-SAME:        _swift_coro_async_allocator
 // CHECK-SAME:    )
-// CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         call swiftcc void @{{(_)?}}swift_task_dealloc_through(ptr [[FRAME]])
 // CHECK:       }
 @_silgen_name("increment_irm_async")
@@ -395,7 +395,8 @@ public var force_yield_once_convention : () {
 // CHECK-64:      [[ALLOCATION:%[^,]+]] = call token{{.*}} @llvm.coro.alloca.alloc.frame.i64(i64 [[SIZE_64]], i32 16, i64 [[TYPE_ID]])
 // CHECK-32:      [[ALLOCATION:%[^,]+]] = call token{{.*}} @llvm.coro.alloca.alloc.frame.i32(i32 {{%[^,]+}}, i32 16, i64 [[TYPE_ID]])
 // CHECK:         [[FRAME:%[^,]+]] = call ptr @llvm.coro.alloca.get(token [[ALLOCATION]])
-// CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
+//                The frame is not a static alloca, so it carries no lifetime
+//                markers; those are only valid on static allocas.
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s19coroutine_accessors1SV3irmSivx")
 // CHECK:         [[RETVAL:%[^,]+]] = call swiftcc { ptr, ptr } [[RAMP]](
 // CHECK-SAME:         [[FRAME]],
@@ -410,7 +411,6 @@ public var force_yield_once_convention : () {
 // CHECK-SAME:        [[FRAME]],
 // CHECK-SAME:        [[ALLOCATOR]]
 // CHECK-SAME:    )
-// CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
 // CHECK:       }
   @_silgen_name("increment_irm_yield_once")
@@ -445,7 +445,8 @@ public var force_yield_once_2_convention : () {
 // CHECK-64:      [[ALLOCATION:%[^,]+]] = call token{{.*}} @llvm.coro.alloca.alloc.frame.i64(i64 [[SIZE_64]], i32 16, i64 [[TYPE_ID]])
 // CHECK-32:      [[ALLOCATION:%[^,]+]] = call token{{.*}} @llvm.coro.alloca.alloc.frame.i32(i32 {{%[^,]+}}, i32 16, i64 [[TYPE_ID]])
 // CHECK:         [[FRAME:%[^,]+]] = call ptr @llvm.coro.alloca.get(token [[ALLOCATION]])
-// CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
+//                The frame is not a static alloca, so it carries no lifetime
+//                markers; those are only valid on static allocas.
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s19coroutine_accessors1SV3irmSivx")
 // CHECK:         [[RETVAL:%[^,]+]] = call swiftcc { ptr, ptr } [[RAMP]](
 // CHECK-SAME:         [[FRAME]],
@@ -460,7 +461,6 @@ public var force_yield_once_2_convention : () {
 // CHECK-SAME:        [[FRAME]],
 // CHECK-SAME:        [[ALLOCATOR]]
 // CHECK-SAME:    )
-// CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
 // CHECK:       }
   @_silgen_name("increment_irm_yield_once_2")
