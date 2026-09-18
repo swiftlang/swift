@@ -76,6 +76,7 @@
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "GenType.h"
+#include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
 #include "ProtocolInfo.h"
@@ -1249,11 +1250,6 @@ llvm::Constant *swift::getRuntimeFn(
   return cache;
 }
 
-llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
-  return getAddrOfLLVMVariableOrGOTEquivalent(
-      LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
-}
-
 llvm::Constant *IRGenModule::
     getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer() {
   // A callee-allocated (yield_once_2) coroutine accessor method that is removed
@@ -1300,6 +1296,56 @@ llvm::Function *IRGenModule::getOrCreateDeadMethodErrorStub() {
   new llvm::UnreachableInst(getLLVMContext(), entry);
 
   DeadMethodErrorStub = stub;
+  return stub;
+}
+
+// Local async stub that tail-calls into swift_deletedAsyncMethodError()
+llvm::Function *IRGenModule::getOrCreateDeadMethodErrorAsyncStub() {
+  if (DeadMethodErrorAsyncStub)
+    return DeadMethodErrorAsyncStub;
+  // Set up the stub, roughly following getOrCreateDeadMethodErrorStub()
+  bool canLinkOnce = !Module.getTargetTriple().isOSBinFormatCOFF();
+  auto *fnTy = llvm::FunctionType::get(VoidTy, {Int8PtrTy}, false);
+  auto *stub = llvm::Function::Create(
+      fnTy,
+      canLinkOnce ? llvm::GlobalValue::LinkOnceODRLinkage
+                  : llvm::GlobalValue::InternalLinkage,
+      "_swift_dead_method_async_stub", &Module);
+  ApplyIRLinkage(canLinkOnce ? IRLinkage::InternalLinkOnceODR
+                             : IRLinkage::Internal)
+      .to(stub, /* nonAliasedDefinition */ false);
+  stub->setAttributes(constructInitialAttributes().addParamAttribute(
+      getLLVMContext(), 0, llvm::Attribute::SwiftAsync));
+  stub->setCallingConv(SwiftAsyncCC);
+  DeadMethodErrorAsyncStub = stub;  // cache before recursing for AFP below
+  // Emit async function entry code, roughly following emitAsyncFunctionEntry()
+  IRGenFunction IGF(*this, stub);  // emitPrologue() sets up the entry block
+  auto &Builder = IGF.Builder;
+  Size contextSize = NumWords_AsyncLet * getPointerSize();
+  auto *afpPtr = Builder.CreateBitOrPointerCast(
+      getOrCreateDeadAsyncMethodErrorFunctionPointer(), Int8PtrTy);
+  auto *id = Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_id_async,
+      {llvm::ConstantInt::get(Int32Ty, contextSize.getValue()),
+       llvm::ConstantInt::get(Int32Ty, 16),
+       llvm::ConstantInt::get(Int32Ty, 0), afpPtr});
+  auto *hdl = Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_begin,
+      {id, llvm::ConstantPointerNull::get(Int8PtrTy)});
+  // Emit async function tail call, roughly following emitAsyncReturn()
+  llvm::Value *context = stub->getArg(0);
+  Signature calleeSig(fnTy, llvm::AttributeList(), SwiftAsyncCC);
+  auto *calleeFn =
+      Builder.CreateBitOrPointerCast(getDeletedAsyncMethodErrorFn(), Int8PtrTy);
+  auto fnPtr = FunctionPointer::createUnsigned(FunctionPointer::Kind::Function,
+                                               calleeFn, calleeSig);
+  auto *dispatchFn = IGF.createAsyncDispatchFn(fnPtr, {context});
+  auto *rawFnPtr =
+      Builder.CreateBitOrPointerCast(fnPtr.getRawPointer(), Int8PtrTy);
+  Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_end_async,
+      {hdl, Builder.getFalse(), dispatchFn, rawFnPtr, context});
+  Builder.CreateUnreachable();
   return stub;
 }
 

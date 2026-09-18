@@ -1721,7 +1721,7 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
         // It should be never called. We add a pointer to an error function.
         if (isAsyncRequirement) {
           witness = llvm::ConstantExpr::getBitCast(
-              IGM.getDeletedAsyncMethodErrorAsyncFunctionPointer(),
+              IGM.getOrCreateDeadAsyncMethodErrorFunctionPointer(),
               IGM.FunctionPtrTy);
         } else if (isCalleeAllocatedCoroutineRequirement) {
           witness = llvm::ConstantExpr::getBitCast(
