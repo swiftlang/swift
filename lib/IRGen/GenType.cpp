@@ -2611,6 +2611,36 @@ const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
   return Types.getCompleteTypeInfo(T);
 }
 
+void IRGenModule::dumpAbstractTypeLayoutInfo(CanType type,
+                                             StringRef mangledName,
+                                             StringRef origin) {
+  auto dumpKind = getOptions().DumpAbstractTypeLayoutInfo;
+  auto shouldDump =
+      [dumpKind](IRGenOptions::AbstractTypeLayoutInfoDumpKind kind) {
+        return dumpKind ==
+                   IRGenOptions::AbstractTypeLayoutInfoDumpKind::All ||
+               dumpKind == kind;
+      };
+
+  auto &OS = llvm::outs();
+  OS << "=== Abstract type layout information ===\n"
+     << "mangledName: " << mangledName << "\n"
+     << "origin: " << origin << "\n";
+
+  auto &minimalLowering = getSILTypes().getTypeLowering(
+      AbstractionPattern(type), type, TypeExpansionContext::minimal());
+  if (shouldDump(
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::TypeLowering))
+    minimalLowering.printForAbstractTypeLayoutInfo(getSILTypes(), OS);
+
+  auto loweredType = minimalLowering.getLoweredType();
+  if (shouldDump(IRGenOptions::AbstractTypeLayoutInfoDumpKind::SILType))
+    loweredType.printForAbstractTypeLayoutInfo(
+        OS, getSILModule(), minimalLowering.getExpansionContext());
+  if (shouldDump(IRGenOptions::AbstractTypeLayoutInfoDumpKind::TypeInfo))
+    getTypeInfo(loweredType).printForAbstractTypeLayoutInfo(*this, OS);
+}
+
 /// 
 const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
   return *getTypeEntry(T);
