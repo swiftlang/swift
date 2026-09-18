@@ -667,7 +667,7 @@ bb0(%0 : @owned $HeapBufferStorage<T_0_0, T_0_1>):
 // CHECK-NEXT: return
 sil [ossa] @raw_pointer_to_ref_ref_to_raw_pointer_round_trip : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer):
-  %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
+  %1 = raw_pointer_to_ref [immortal] %0 : $Builtin.RawPointer to $C
   %2 = ref_to_raw_pointer %1 : $C to $Builtin.RawPointer
   return %2 : $Builtin.RawPointer
 }
@@ -1598,10 +1598,10 @@ bb0(%0 : @owned $B):
 sil [ossa] @unchecked_ref_cast_formation_owned : $@convention(thin) (@owned B) -> @owned F {
 bb0(%0 : @owned $B):
   %1 = ref_to_raw_pointer %0 : $B to $Builtin.RawPointer
+  // The result of a non-immortal `raw_pointer_to_ref` is owned.
   %2 = raw_pointer_to_ref %1 : $Builtin.RawPointer to $F
-  %3 = copy_value %2 : $F
   destroy_value %0 : $B
-  return %3 : $F
+  return %2 : $F
 }
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_formation_guaranteed : $@convention(thin) (@guaranteed B) -> @owned F {
@@ -1612,9 +1612,9 @@ bb0(%0 : @owned $B):
 sil [ossa] @unchecked_ref_cast_formation_guaranteed : $@convention(thin) (@guaranteed B) -> @owned F {
 bb0(%0 : @guaranteed $B):
   %1 = ref_to_raw_pointer %0 : $B to $Builtin.RawPointer
+  // The result of a non-immortal `raw_pointer_to_ref` is owned.
   %2 = raw_pointer_to_ref %1 : $Builtin.RawPointer to $F
-  %3 = copy_value %2 : $F
-  return %3 : $F
+  return %2 : $F
 }
 
 // CHECK-LABEL: sil [ossa] @upcast_unchecked_ref_cast_roundtrip : $@convention(thin) (@owned B) -> @owned B {

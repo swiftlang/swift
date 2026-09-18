@@ -978,6 +978,16 @@ final public class UnownedToRefInst : SingleValueInstruction, UnaryInstruction {
 final public
 class RawPointerToRefInst : SingleValueInstruction, UnaryInstruction {
   public var pointer: Value { operand.value }
+
+  /// If true, the resulting object is immortal and therefore doesn't need to be
+  /// retained or released.
+  public var isImmortal: Bool { bridged.RawPointerToRefInst_isImmortal() }
+
+  public func set(isImmortal: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.RawPointerToRefInst_setIsImmortal(isImmortal)
+    context.notifyInstructionChanged(self)
+  }
 }
 
 final public
