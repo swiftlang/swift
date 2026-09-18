@@ -168,9 +168,6 @@ bool TypeBase::isSendableExistential() {
   if (auto existential = constraint->getAs<ExistentialType>())
     constraint = existential->getConstraintType();
 
-  if (!constraint->isConstraintType())
-    return false;
-
   return constraint->getKnownProtocol() == KnownProtocolKind::Sendable;
 }
 

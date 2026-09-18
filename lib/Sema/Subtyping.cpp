@@ -207,6 +207,34 @@ std::optional<bool>
 swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {
   if (!lhs->hasTypeVariable() && !lhs->hasTypeParameter() &&
       !rhs->hasTypeVariable() && !rhs->hasTypeParameter()) {
+    // Hack to deal with matchSendableExistentialToAnyInGenericArgumentPosition().
+    {
+      auto hasAnySendable = [](Type t) -> bool {
+        return t.findIf([](Type t) -> bool {
+          // Don't recurse into protocol compositions.
+          if (t->is<ProtocolCompositionType>())
+            return false;
+          return t->getKnownProtocol() == KnownProtocolKind::Sendable;
+        });
+      };
+
+      auto rewriteAnySendableToAny = [](Type t) -> Type {
+        return t.transformRec([](TypeBase *t) -> std::optional<Type> {
+          // Don't recurse into protocol compositions.
+          if (t->is<ProtocolCompositionType>())
+            return t;
+          if (t->getKnownProtocol() == KnownProtocolKind::Sendable)
+            return t->getASTContext().TheAnyType;
+          return std::nullopt;
+        });
+      };
+
+      if (hasAnySendable(lhs))
+        lhs = rewriteAnySendableToAny(lhs);
+      if (hasAnySendable(rhs))
+        rhs = rewriteAnySendableToAny(rhs);
+    }
+
     return lhs->isEqual(rhs);
   }
 
@@ -738,16 +766,9 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
         return ConflictFlag::TupleArity;
 
       for (unsigned i : indices(lhsTuple->getElements())) {
-        auto lhsElt = lhsTuple->getElement(i);
-        auto rhsElt = rhsTuple->getElement(i);
-        if (lhsElt.hasName() && rhsElt.hasName() &&
-            lhsElt.getName() != rhsElt.getName()) {
-          return ConflictFlag::TupleLabel;
-        }
-
-        auto result = checkConversion(cache,
-                                      lhsElt.getType(),
-                                      rhsElt.getType(), sig);
+        auto lhsElt = lhsTuple->getElementType(i);
+        auto rhsElt = rhsTuple->getElementType(i);
+        auto result = checkConversion(cache, lhsElt, rhsElt, sig);
         if (result)
           return result | ConflictFlag::TupleElement;
       }
@@ -1822,8 +1843,6 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " conformance";
   if (reason.contains(ConflictFlag::TupleArity))
     out << " tuple_arity";
-  if (reason.contains(ConflictFlag::TupleLabel))
-    out << " tuple_label";
   if (reason.contains(ConflictFlag::TupleElement))
     out << " tuple_element";
   if (reason.contains(ConflictFlag::Existential))
