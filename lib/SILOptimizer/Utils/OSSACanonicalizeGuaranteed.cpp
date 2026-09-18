@@ -276,13 +276,25 @@ bool OSSACanonicalizeGuaranteed::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::TrivialUse:
         llvm_unreachable("this operand cannot handle ownership");
 
-      case OperandOwnership::InteriorPointer:
-      case OperandOwnership::AnyInteriorPointer:
       case OperandOwnership::EndBorrow:
       case OperandOwnership::Reborrow:
         // Ignore uses that must be within the borrow scope.
         // Rewriting does not look through reborrowed values--it considers them
         // part of a separate lifetime.
+        break;
+
+      case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer:
+        // Interior pointer uses must be within the borrow scope, so they can
+        // usually be ignored, unless the operand is an intermediate (i.e.
+        // non-persistent) copy. Rewriting looks through copies and moves, so we
+        // cannot skip in this case.
+        if (findDefInBorrowScope(use->get()) == use->get())
+          break;
+
+        if (!visitor.visitUse(use)) {
+          return false;
+        }
         break;
 
       case OperandOwnership::ForwardingUnowned:
@@ -356,6 +368,25 @@ public:
     // A guaranteed use can never be outside this borrow scope
     if (use->get()->getOwnershipKind() == OwnershipKind::Guaranteed)
       return true;
+
+    // visitBorrowScopeUses only hands over an interior pointer use when its
+    // operand is an intermediate copy. Rewriting it would narrow the dependency
+    // base from that copy to this borrow scope's def, but the interior
+    // pointer's transitive address uses may outlive the scope, which the
+    // ownership verifier rejects. Handling that correctly means recording those
+    // transitive uses here, honoring them in RewriteOuterBorrowUses::visitUse,
+    // and including them in cleanupOuterValue's lifetime analysis. Until then,
+    // give up on this borrow scope. This is only analysis, so nothing has been
+    // rewritten and the function is left untouched.
+    //
+    // TODO: Rewrite these uses instead of giving up on the borrow scope.
+    switch (use->getOperandOwnership()) {
+    case OperandOwnership::InteriorPointer:
+    case OperandOwnership::AnyInteriorPointer:
+      return false;
+    default:
+      break;
+    }
 
     auto *user = use->getUser();
     if (!isUserInLiveOutBlock(user)) {

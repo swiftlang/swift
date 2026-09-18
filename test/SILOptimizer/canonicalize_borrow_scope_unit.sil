@@ -9,6 +9,10 @@ class D : C {}
 struct S {
   @_hasStorage var guts: SGuts
 }
+struct Box {
+  @_hasStorage var guts: SGuts
+  @_hasStorage var ptr: Builtin.RawPointer
+}
 class SGuts {}
 
 sil @getD : $() -> (@owned D)
@@ -146,6 +150,49 @@ right:
   br exit
 
 exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// The base of a 'mark_dependence [nonescaping]' with an address result has
+// AnyInteriorPointer ownership. When that base is an intermediate copy, the use
+// is handed to the visitor so the inner rewriter can retarget it (see
+// canonicalize_function_argument_unit.sil). On the outer-use path it must not be
+// retargeted: here the dependent address is used after the end_borrow, so
+// narrowing the base from the copy to the begin_borrow would put that use
+// outside the base's lifetime. Canonicalization bails out and leaves the scope
+// alone instead.
+//
+// CHECK-LABEL: begin {{.*}} on dont_narrow_interior_pointer_base: ossa_canonicalize_guaranteed
+// CHECK-LABEL: sil [ossa] @dont_narrow_interior_pointer_base : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[BOX:%[^,]+]] :
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[BOX]]
+//                The copy survives...
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[BORROW]]
+// CHECK:         [[PTR:%[^,]+]] = struct_extract [[BORROW]] : $Box, #Box.ptr
+// CHECK:         [[ADR:%[^,]+]] = pointer_to_address [[PTR]] : $Builtin.RawPointer to [strict] $*SGuts
+//                ...and is still the dependency base, not [[BORROW]].
+// CHECK:         [[MD:%[^,]+]] = mark_dependence [nonescaping] [[ADR]] : $*SGuts on [[COPY]]
+// CHECK:         end_borrow [[BORROW]]
+// CHECK:         apply undef([[MD]])
+// CHECK:         destroy_value [[COPY]]
+// CHECK-LABEL: } // end sil function 'dont_narrow_interior_pointer_base'
+// CHECK-LABEL: end {{.*}} on dont_narrow_interior_pointer_base: ossa_canonicalize_guaranteed
+sil [ossa] @dont_narrow_interior_pointer_base : $@convention(thin) (@owned Box) -> () {
+bb0(%box : @owned $Box):
+  specify_test "ossa_canonicalize_guaranteed @instruction"
+  %borrow = begin_borrow %box : $Box
+  %copy = copy_value %borrow : $Box
+  %ptr = struct_extract %borrow : $Box, #Box.ptr
+  %adr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*SGuts
+  %md = mark_dependence [nonescaping] %adr : $*SGuts on %copy : $Box
+  // An outer use, so that the RewriteOuterBorrowUses path is taken.
+  %outer = copy_value %borrow : $Box
+  end_borrow %borrow : $Box
+  apply undef(%md) : $@convention(thin) (@in_guaranteed SGuts) -> ()
+  destroy_value %copy : $Box
+  apply undef(%outer) : $@convention(thin) (@owned Box) -> ()
+  destroy_value %box : $Box
   %retval = tuple ()
   return %retval : $()
 }
