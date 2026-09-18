@@ -2331,6 +2331,8 @@ swift::getSingleInitAllocStackUse(AllocStackInst *asi,
       // Break!
       if (use->get() == uccai->getDest())
         break;
+      if (!shouldTakeOnSuccess(uccai->getConsumptionKind()))
+        continue;
       // Ok, we are the Src and are performing a take. Treat it as a destroy!
       if (destroyingUses)
         destroyingUses->push_back(use);

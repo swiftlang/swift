@@ -553,7 +553,9 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
       case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
         SILValue src = I.getOperand(CopyLikeInstruction::Src);
         SILValue dest = I.getOperand(CopyLikeInstruction::Dest);
-        killBits(state, src);
+        auto *cast = dyn_cast<UnconditionalCheckedCastAddrInst>(&I);
+        if (!cast || shouldTakeOnSuccess(cast->getConsumptionKind()))
+          killBits(state, src);
         genBits(state, dest);
         break;
       }
@@ -903,7 +905,9 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         SILValue src = I.getOperand(CopyLikeInstruction::Src);
         SILValue dest = I.getOperand(CopyLikeInstruction::Dest);
         requireBitsSet(bits, src, &I);
-        locations.clearBits(bits, src);
+        auto *cast = dyn_cast<UnconditionalCheckedCastAddrInst>(&I);
+        if (!cast || shouldTakeOnSuccess(cast->getConsumptionKind()))
+          locations.clearBits(bits, src);
         requireBitsClear(bits & nonTrivialLocations, dest, &I);
         locations.setBits(bits, dest);
         requireNoStoreBorrowLocation(dest, &I);
