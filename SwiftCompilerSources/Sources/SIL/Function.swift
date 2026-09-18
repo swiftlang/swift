@@ -49,6 +49,13 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var shouldOptimize: Bool { bridged.shouldOptimize() }
 
   public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
+  
+  public var hasOwnershipForTrivialValues: Bool {
+    bridged.hasOwnership()
+  }
+  public func set(hasOwnershipForTrivialValues: Bool, _ context: some MutatingContext) {
+    bridged.setOwnershipForTrivialValues(hasOwnershipForTrivialValues)
+  }
 
   /// The module which defines this function, or nil if it's not known.
   ///

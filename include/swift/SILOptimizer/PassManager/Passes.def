@@ -167,6 +167,8 @@ PASS(DeadObjectElimination, "dead-object-elimination",
      "Removes dead object, stack and array allocations")
 PASS(MandatoryDeadObjectElimination, "mandatory-dead-object-elimination",
      "Removes dead stack allocations")
+PASS(TrivialOwnershipElimination, "trivial-ownership-elimination",
+     "Eliminates ownership markers from trivial values")
 
 PASS(ClosureSpecialization, "closure-specialization",
      "Specialize functions with closure arguments")
