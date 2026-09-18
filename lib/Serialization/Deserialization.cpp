@@ -7988,8 +7988,11 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
     CanType parent = parentTy.get()
                          ? parentTy.get()->getCanonicalType()
                          : CanType();
-    return HiddenType::get(MF.getContext(), hidden->MangledName,
-                           MF.getAssociatedModule(), hidden, parent);
+    CanType type = CanType(
+        HiddenType::get(MF.getContext(), hidden->MangledName,
+                        MF.getAssociatedModule(), hidden, parent));
+    MF.getContext().recordRecoveredHiddenType(type);
+    return type;
   }
 
   // Look through compatibility aliases.

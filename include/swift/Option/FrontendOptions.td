@@ -1360,6 +1360,11 @@ def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
 
+def dump_abstract_type_layout_info_EQ :
+  Joined<["-"], "dump-abstract-type-layout-info=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Dump the selected compiler-facing layout information for serialized and recovered hidden types; one of 'sil-type', 'type-lowering', 'type-info', or 'all'">;
+
 def swift_async_frame_pointer_EQ : Joined<["-"], "swift-async-frame-pointer=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'auto', 'always' or 'never'">;
