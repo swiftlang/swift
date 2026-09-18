@@ -173,39 +173,28 @@ bool importer::isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx) {
 }
 
 namespace {
-/// The retain:/release: attributes written directly on a record.
+/// The retain:/release: attributes written on any declaration of a record.
 struct RetainReleaseInfo {
   RetainReleaseInfo(const clang::RecordDecl *decl) : decl(decl) {
-    // Only the first swift_attr is propagated to a redeclaration, so
-    // retain:/release: are often missing from the declaration at hand even
-    // though the type is annotated. Read them from the declaration that spells
-    // them, and from that one alone, so inherited copies are not counted twice.
-    auto spellsRetainRelease = [](const clang::RecordDecl *record) {
-      return llvm::any_of(record->specific_attrs<clang::SwiftAttrAttr>(),
-                          [](const clang::SwiftAttrAttr *attr) {
-                            return attr->getAttribute().starts_with("retain:") ||
-                                   attr->getAttribute().starts_with("release:");
-                          });
-    };
-    const clang::RecordDecl *carrier = decl;
-    if (!spellsRetainRelease(carrier)) {
-      for (auto *redecl : decl->redecls()) {
-        auto *record = cast<clang::RecordDecl>(redecl);
-        if (spellsRetainRelease(record)) {
-          carrier = record;
-          break;
+    // The annotation can sit on any declaration of the record, so gather from
+    // the whole chain. Key on the attribute string, so that a copy inherited by
+    // a later redeclaration is not counted as a second annotation.
+    llvm::SmallDenseSet<StringRef, 2> seen;
+    for (auto *redecl : decl->redecls()) {
+      for (auto *attr : redecl->specific_attrs<clang::SwiftAttrAttr>()) {
+        StringRef attrStr = attr->getAttribute();
+        StringRef name = attrStr;
+        if (name.consume_front("retain:")) {
+          if (seen.insert(attrStr).second) {
+            retainAttrs.push_back(attr);
+            retainName = name;
+          }
+        } else if (name.consume_front("release:")) {
+          if (seen.insert(attrStr).second) {
+            releaseAttrs.push_back(attr);
+            releaseName = name;
+          }
         }
-      }
-    }
-
-    for (auto *attr : carrier->specific_attrs<clang::SwiftAttrAttr>()) {
-      StringRef attrStr = attr->getAttribute();
-      if (attrStr.consume_front("retain:")) {
-        retainAttrs.push_back(attr);
-        retainName = attrStr;
-      } else if (attrStr.consume_front("release:")) {
-        releaseAttrs.push_back(attr);
-        releaseName = attrStr;
       }
     }
   }
@@ -484,13 +473,13 @@ swift::extractNearestSourceLoc(const ForeignReferenceTypeInfoDescriptor &desc) {
 
 ForeignReferenceTypeInfo
 importer::getUncachedForeignReferenceTypeInfo(const clang::RecordDecl *decl) {
-  // A swift_attr propagates to later redeclarations only, so an earlier
-  // declaration does not see the annotation, and the retain/release parameters
-  // of SWIFT_SHARED_REFERENCE declare the type before the annotated declaration
-  // is reached. Answer for the declaration that carries the information: the
-  // definition when there is one, since reference-ness can also be inherited
-  // from a base class, and otherwise the declaration spelling the annotation.
-  // Clients can then use the request without walking the chain themselves.
+  // The annotation can sit on any declaration of the record: within a
+  // translation unit a swift_attr is inherited by later redeclarations only,
+  // and a chain assembled across modules is not merged at all. Answer for the
+  // declaration that carries the information: the definition when there is one,
+  // since reference-ness can also be inherited from a base class, and otherwise
+  // the declaration spelling the annotation. Clients can then use the request
+  // without walking the chain themselves.
   if (auto *definition = decl->getDefinition()) {
     decl = definition;
   } else if (!importer::hasImportReferenceAttr(decl)) {
