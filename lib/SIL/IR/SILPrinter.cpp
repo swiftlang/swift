@@ -2330,6 +2330,8 @@ public:
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
     printCheckedCastInstOptions(CI->getCheckedCastOptions());
+    if (CI->getConsumptionKind() != CastConsumptionKind::TakeAlways)
+      *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' ';
     *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());

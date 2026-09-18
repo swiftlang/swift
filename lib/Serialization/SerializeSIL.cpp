@@ -2414,7 +2414,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
-    unsigned flags = CI->getCheckedCastOptions().getStorage();
+    unsigned flags =
+        CI->getCheckedCastOptions().getStorage() |
+        (toStableCastConsumptionKind(CI->getConsumptionKind()) << 8);
     ValueID listOfValues[] = {
       S.addTypeRef(CI->getSourceFormalType()),
       addValueRef(CI->getSrc()),

@@ -11682,23 +11682,22 @@ class UnconditionalCheckedCastAddrInst final
                UnconditionalCheckedCastAddrInst, NonValueInstruction> {
   friend SILBuilder;
   CheckedCastInstOptions Options;
+  CastConsumptionKind ConsumptionKind;
 
   UnconditionalCheckedCastAddrInst(SILDebugLocation Loc,
                                    CheckedCastInstOptions options,
+                                   CastConsumptionKind consumptionKind,
                                    SILValue src, CanType sourceType,
                                    SILValue dest, CanType targetType,
                                    ArrayRef<SILValue> TypeDependentOperands);
 
   static UnconditionalCheckedCastAddrInst *
   create(SILDebugLocation DebugLoc, CheckedCastInstOptions options,
-         SILValue src, CanType sourceType,
-         SILValue dest, CanType targetType,
-         SILFunction &F);
+         CastConsumptionKind consumptionKind, SILValue src, CanType sourceType,
+         SILValue dest, CanType targetType, SILFunction &F);
 
 public:
-  CastConsumptionKind getConsumptionKind() const {
-    return CastConsumptionKind::TakeAlways;
-  }
+  CastConsumptionKind getConsumptionKind() const { return ConsumptionKind; }
 
   CheckedCastInstOptions getCheckedCastOptions() const { return Options; }
 };

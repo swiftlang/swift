@@ -370,11 +370,17 @@ public struct Builder {
   @discardableResult
   public func createUnconditionalCheckedCastAddr(
     options: CheckedCastInstOptions,
+    consumptionKind: CastConsumptionKind = .TakeAlways,
     source: Value, sourceFormalType: CanonicalType,
     destination: Value, targetFormalType: CanonicalType
   ) -> UnconditionalCheckedCastAddrInst {
+    let bridgedConsumption: BridgedInstruction.CastConsumptionKind = switch consumptionKind {
+    case .TakeAlways: .TakeAlways
+    case .TakeOnSuccess: .TakeOnSuccess
+    case .CopyOnSuccess: .CopyOnSuccess
+    }
     let cast = bridged.createUnconditionalCheckedCastAddr(
-        options.bridged, source.bridged, sourceFormalType.bridged,
+        options.bridged, bridgedConsumption, source.bridged, sourceFormalType.bridged,
         destination.bridged, targetFormalType.bridged
     )
     return notifyNew(cast.getAs(UnconditionalCheckedCastAddrInst.self))

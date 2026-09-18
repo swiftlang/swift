@@ -1391,10 +1391,12 @@ struct BridgedBuilder{
       BridgedInstruction::CheckedCastInstOptions options,
       BridgedInstruction::CastConsumptionKind consumptionKind,
       BridgedBasicBlock successBlock, BridgedBasicBlock failureBlock) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUnconditionalCheckedCastAddr(
-        BridgedInstruction::CheckedCastInstOptions options,
-        BridgedValue source, BridgedCanType sourceFormalType,
-        BridgedValue destination, BridgedCanType targetFormalType) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
+  createUnconditionalCheckedCastAddr(
+      BridgedInstruction::CheckedCastInstOptions options,
+      BridgedInstruction::CastConsumptionKind consumptionKind,
+      BridgedValue source, BridgedCanType sourceFormalType,
+      BridgedValue destination, BridgedCanType targetFormalType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedOwnershipConversion(
         BridgedValue op, BridgedValue::Ownership ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createLoad(BridgedValue op, SwiftInt ownership) const;

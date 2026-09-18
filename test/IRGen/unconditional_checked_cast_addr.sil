@@ -4,6 +4,18 @@
 sil_stage canonical
 import Swift
 
+// Unconditional alone: preserve the source, and diagnose failure in the runtime.
+// CHECK-LABEL: define {{.*}}@copy_source(
+// CHECK: call {{.*}}@swift_dynamicCast({{.*}}i{{32|64}} 1)
+// CHECK-NOT: @swift_dynamicCast
+// CHECK: ret void
+sil @copy_source : $@convention(thin) <T, U> (@in_guaranteed T) -> @out U {
+bb0(%0 : $*U, %1 : $*T):
+  unconditional_checked_cast_addr copy_on_success T in %1 : $*T to U in %0 : $*U
+  %2 = tuple ()
+  return %2 : $()
+}
+
 // Unconditional | TakeOnSuccess | DestroyOnFailure: existing consuming behavior.
 // CHECK-LABEL: define {{.*}}@take_source(
 // CHECK: call {{.*}}@swift_dynamicCast({{.*}}i{{32|64}} 7)
