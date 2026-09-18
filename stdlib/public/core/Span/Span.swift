@@ -713,7 +713,9 @@ extension Span where Element: ~Copyable  {
   ///
   /// The buffer pointer passed as an argument to `body` is valid only
   /// during the execution of `withUnsafeBufferPointer(_:)`.
-  /// Do not store or return the pointer for later use.
+  /// Do not store or return the pointer for later use. To derive a value that
+  /// stores the pointer and outlives the call, use
+  /// `borrowWithUnsafeBufferPointer(_:)`.
   ///
   /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter
   ///   that points to the viewed contiguous storage. If `body` has
@@ -734,6 +736,42 @@ extension Span where Element: ~Copyable  {
       buffer throws(E) -> Result in
       try unsafe body(buffer)
     }
+  }
+
+  /// Calls the given closure with a pointer to the viewed contiguous storage.
+  ///
+  /// Use this method to derive a new non-escapable value with shared access to
+  /// the memory represented by this span. It is an alternative to `Span`'s
+  /// `extracting` methods for deriving values of types other than `Span`.
+  ///
+  /// Unlike `withUnsafeBufferPointer(_:)`, a non-escapable result of `body` may
+  /// outlive the call; its lifetime is tied to the source of this span and its
+  /// dependence is a read access. An escapable result has no dependency; hence,
+  /// return an escapable value only if it does not store the pointer. Also, any
+  /// pointer `body` derives must lie within the region it was given, and the
+  /// viewed memory must already be bound to `Element`. This method can verify
+  /// none of these requirements; therefore, it is an unsafe operation.
+  ///
+  /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter
+  ///   that points to the viewed contiguous storage. If `body` has
+  ///   a return value, that value is also used as the return value
+  ///   for the `borrowWithUnsafeBufferPointer(_:)` method.
+  /// - Returns: The return value of the `body` closure parameter.
+  @unsafe
+  @export(implementation)
+  @_transparent
+  @_lifetime(copy self)
+  public func borrowWithUnsafeBufferPointer<
+    E: Error, Result: ~Copyable & ~Escapable
+  >(
+    _ body: @_lifetime(borrow buffer) (
+      _ buffer: UnsafeBufferPointer<Element>
+    ) throws(E) -> Result
+  ) throws(E) -> Result {
+    let buffer = unsafe UnsafeBufferPointer<Element>(
+      start: _pointer?.assumingMemoryBound(to: Element.self), count: _count
+    )
+    return unsafe _overrideLifetime(try unsafe body(buffer), copying: self)
   }
 }
 
@@ -765,6 +803,42 @@ extension Span where Element: BitwiseCopyable {
       start: _pointer, count: _count &* MemoryLayout<Element>.stride
     )
     return try unsafe body(bytes)
+  }
+
+  /// Calls the given closure with a pointer to the underlying bytes of
+  /// the viewed contiguous storage.
+  ///
+  /// Use this method to derive a new non-escapable value with shared access to
+  /// the memory represented by this span. It is an alternative to `Span`'s
+  /// `extracting` methods for deriving values of types other than `Span`.
+  ///
+  /// Unlike `withUnsafeBytes(_:)`, a non-escapable result of `body` may outlive
+  /// the call; its lifetime is tied to the source of this span and its dependence
+  /// is a read access. An escapable result has no dependency; hence, return an
+  /// escapable value only if it does not store the pointer. Also, any pointer
+  /// `body` derives must lie within the region it was given. This method can
+  /// verify none of these requirements; therefore, it is an unsafe operation.
+  ///
+  /// - Parameter body: A closure with an `UnsafeRawBufferPointer`
+  ///   parameter that points to the viewed contiguous storage.
+  ///   If `body` has a return value, that value is also used as the return value
+  ///   for the `borrowWithUnsafeBytes(_:)` method.
+  /// - Returns: The return value of the `body` closure parameter.
+  @unsafe
+  @export(implementation)
+  @_transparent
+  @_lifetime(copy self)
+  public func borrowWithUnsafeBytes<
+    E: Error, Result: ~Copyable & ~Escapable
+  >(
+    _ body: @_lifetime(borrow bytes) (
+      _ bytes: UnsafeRawBufferPointer
+    ) throws(E) -> Result
+  ) throws(E) -> Result {
+    let bytes = unsafe UnsafeRawBufferPointer(
+      start: _pointer, count: _count &* MemoryLayout<Element>.stride
+    )
+    return unsafe _overrideLifetime(try unsafe body(bytes), copying: self)
   }
 }
 
