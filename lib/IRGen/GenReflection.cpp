@@ -349,6 +349,21 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
           ? genericEnv->mapTypeIntoEnvironment(t)->getCanonicalType()
           : t;
 
+        // weak/unowned are storage qualifiers and have no type
+        // metadata of their own (only their referent does), and this
+        // getTypeRefByFunction fallback on older deployment targets
+        // (when the plain mangled string doesn't work, e.g.,
+        // ~Copyable types) would require type metadata, so it won't
+        // work (and will hit the abort in
+        // visitReferenceStorageType). Lie that the field is an empty
+        // tuple instead, as we do below for noncopyable types old
+        // runtimes can't understand.
+        if (isa<ReferenceStorageType>(substT)) {
+          auto phonyRet = IGF.emitTypeMetadataRef(IGM.Context.TheEmptyTupleType);
+          IGF.Builder.CreateRet(phonyRet);
+          goto done_building_function;
+        }
+
         // If a type is noncopyable, lie about the resolved type to reflection
         // APIs unless the runtime is sufficiently aware of noncopyable types.
         bool shouldHideNoncopyableTypeFromOldRuntimes;
