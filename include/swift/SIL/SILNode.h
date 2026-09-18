@@ -217,6 +217,7 @@ protected:
     SHARED_FIELD(ConvertFunctionInst, bool withoutActuallyEscaping);
     SHARED_FIELD(BeginCOWMutationInst, bool native);
     SHARED_FIELD(GlobalValueInst, bool isBare);
+    SHARED_FIELD(RawPointerToRefInst, bool immortal);
 
     SHARED_FIELD(SILArgument, uint8_t
                  valueOwnershipKind : NumVOKindBits,

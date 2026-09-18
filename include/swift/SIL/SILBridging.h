@@ -842,6 +842,8 @@ struct BridgedInstruction {
   BRIDGED_INLINE uint64_t PointerToAddressInst_getAlignment() const;
   BRIDGED_INLINE void PointerToAddressInst_setAlignment(uint64_t alignment) const;
   BRIDGED_INLINE bool AddressToPointerInst_needsStackProtection() const;
+  BRIDGED_INLINE bool RawPointerToRefInst_isImmortal() const;
+  BRIDGED_INLINE void RawPointerToRefInst_setIsImmortal(bool isImmortal) const;
   BRIDGED_INLINE bool IndexAddrInst_needsStackProtection() const;
   BRIDGED_INLINE bool IndexAddrInst_isProjection() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray AllocExistentialBoxInst_getConformances() const;

@@ -803,7 +803,7 @@ namespace {
     }
 
     bool visitRawPointerToRefInst(RawPointerToRefInst *RHS) {
-      return true;
+      return cast<RawPointerToRefInst>(LHS)->isImmortal() == RHS->isImmortal();
     }
 
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
