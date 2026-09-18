@@ -774,6 +774,11 @@ namespace {
       IGF.emit##Name##Destroy(addr, Refcounting); \
     } \
     StringRef getStructNameSuffix() const { return "." #name "ref"; } \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
+    } \
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
     createSerializableHiddenTypeInfoRepresentation( \
         IRGenModule &) const override { \
@@ -848,6 +853,11 @@ namespace {
     getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const { \
       llvm_unreachable("should have overridden all actual uses of this"); \
     } \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
+    } \
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
     createSerializableHiddenTypeInfoRepresentation( \
         IRGenModule &) const override { \
@@ -919,6 +929,11 @@ namespace {
     void emitValueRelease(IRGenFunction &IGF, llvm::Value *value, \
                           Atomicity atomicity) const {} \
     void emitValueFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {} \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
+    } \
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
     createSerializableHiddenTypeInfoRepresentation( \
         IRGenModule &) const override { \
@@ -976,6 +991,12 @@ class OpaqueExistentialTypeInfo final :
             IsFixedSize, IsABIAccessible) {}
 
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1148,6 +1169,12 @@ class ClassExistentialTypeInfo final
     assert(refcounting == ReferenceCounting::Native ||
            refcounting == ReferenceCounting::Unknown ||
            refcounting == ReferenceCounting::ObjC);
+  }
+
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
   }
 
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -1490,6 +1517,12 @@ class ExistentialMetatypeTypeInfo final
       MetatypeTI(metatypeTI) {}
 
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1535,6 +1568,12 @@ class ErrorExistentialTypeInfo : public HeapTypeInfo<ErrorExistentialTypeInfo>
   ReferenceCounting Refcounting;
 
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1630,6 +1669,12 @@ class COMExistentialTypeInfo final
   }
 
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
