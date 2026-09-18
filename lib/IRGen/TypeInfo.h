@@ -161,6 +161,10 @@ private:
 public:
   virtual ~TypeInfo();
 
+  /// Print the IRGen-level properties that affect abstract type lowering.
+  void printAbstractTypeLayoutInfo(IRGenModule &IGM,
+                                   llvm::raw_ostream &OS) const;
+
   virtual std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const = 0;
 

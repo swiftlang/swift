@@ -258,6 +258,145 @@ TypeInfo::~TypeInfo() {
     delete nativeParameterSchema;
 }
 
+static StringRef getSpecialTypeInfoKindName(SpecialTypeInfoKind kind) {
+  switch (kind) {
+  case SpecialTypeInfoKind::Unimplemented:
+    return "unimplemented";
+  case SpecialTypeInfoKind::None:
+    return "none";
+  case SpecialTypeInfoKind::Fixed:
+    return "fixed";
+  case SpecialTypeInfoKind::Weak:
+    return "weak";
+  case SpecialTypeInfoKind::Loadable:
+    return "loadable";
+  case SpecialTypeInfoKind::Reference:
+    return "reference";
+  }
+  llvm_unreachable("unhandled special TypeInfo kind");
+}
+
+static StringRef getReferenceCountingName(ReferenceCounting kind) {
+  switch (kind) {
+  case ReferenceCounting::Native:
+    return "native";
+  case ReferenceCounting::ObjC:
+    return "objc";
+  case ReferenceCounting::None:
+    return "none";
+  case ReferenceCounting::Custom:
+    return "custom";
+  case ReferenceCounting::Block:
+    return "block";
+  case ReferenceCounting::Unknown:
+    return "unknown";
+  case ReferenceCounting::Bridge:
+    return "bridge";
+  case ReferenceCounting::Error:
+    return "error";
+  }
+  llvm_unreachable("unhandled reference-counting kind");
+}
+
+static void printLLVMType(llvm::raw_ostream &OS, llvm::Type *type) {
+  type->print(OS, /*IsForDebug=*/false, /*NoDetails=*/false);
+}
+
+static void printExplosionSchema(llvm::raw_ostream &OS,
+                                 const ExplosionSchema &schema) {
+  OS << "  explosionSchema:\n";
+  for (const auto &[index, element] : llvm::enumerate(schema)) {
+    OS << "    - index: " << index << "\n"
+       << "      kind: " << (element.isScalar() ? "scalar" : "aggregate")
+       << "\n"
+       << "      type: ";
+    printLLVMType(OS, element.isScalar() ? element.getScalarType()
+                                         : element.getAggregateType());
+    OS << "\n";
+    if (element.isAggregate())
+      OS << "      alignment: " << element.getAggregateAlignment().getValue()
+         << "\n";
+  }
+}
+
+static void printNativeConventionSchema(llvm::raw_ostream &OS, StringRef name,
+                                        const NativeConventionSchema &schema) {
+  OS << "  " << name << ":\n"
+     << "    requiresIndirect: "
+     << (schema.requiresIndirect() ? "true" : "false") << "\n"
+     << "    components:\n";
+  unsigned index = 0;
+  schema.enumerateComponents(
+      [&](clang::CharUnits begin, clang::CharUnits end, llvm::Type *type) {
+        OS << "      - index: " << index++ << "\n"
+           << "        begin: " << begin.getQuantity() << "\n"
+           << "        end: " << end.getQuantity() << "\n"
+           << "        type: ";
+        printLLVMType(OS, type);
+        OS << "\n";
+      });
+}
+
+void TypeInfo::printAbstractTypeLayoutInfo(IRGenModule &IGM,
+                                           llvm::raw_ostream &OS) const {
+  auto printFlag = [&](StringRef name, bool value) {
+    OS << "  " << name << ": " << (value ? "true" : "false") << "\n";
+  };
+
+  OS << "TypeInfo:\n"
+     << "  storageType: ";
+  printLLVMType(OS, getStorageType());
+  OS << "\n"
+     << "  kind: " << getSpecialTypeInfoKindName(getSpecialTypeInfoKind())
+     << "\n"
+     << "  bestKnownAlignment: " << getBestKnownAlignment().getValue()
+     << "\n";
+  printFlag("abiAccessible", isABIAccessible() == IsABIAccessible);
+  printFlag("triviallyDestroyable",
+            isTriviallyDestroyable(ResilienceExpansion::Maximal) ==
+                IsTriviallyDestroyable);
+  printFlag("copyable", isCopyable(ResilienceExpansion::Maximal) == IsCopyable);
+  printFlag("bitwiseTakable",
+            isBitwiseTakable(ResilienceExpansion::Maximal));
+  printFlag("bitwiseBorrowable",
+            isBitwiseBorrowable(ResilienceExpansion::Maximal));
+  printFlag("fixedSizeMinimal",
+            isFixedSize(ResilienceExpansion::Minimal) == IsFixedSize);
+  printFlag("fixedSizeMaximal",
+            isFixedSize(ResilienceExpansion::Maximal) == IsFixedSize);
+  printFlag("loadable", isLoadable() == IsLoadable);
+
+  ReferenceCounting referenceCounting;
+  bool singleRetainablePointer = isSingleRetainablePointer(
+      ResilienceExpansion::Maximal, &referenceCounting);
+  printFlag("singleRetainablePointer", singleRetainablePointer);
+  if (singleRetainablePointer)
+    OS << "  referenceCounting: " << getReferenceCountingName(referenceCounting)
+       << "\n";
+
+  if (auto *fixed = dyn_cast<FixedTypeInfo>(this)) {
+    OS << "  fixedSize: " << fixed->getFixedSize().getValue() << "\n"
+       << "  fixedAlignment: " << fixed->getFixedAlignment().getValue()
+       << "\n"
+       << "  fixedStride: " << fixed->getFixedStride().getValue() << "\n";
+    auto spareBits = fixed->getSpareBits().asAPInt();
+    OS << "  spareBits: ";
+    spareBits.print(OS, /*isSigned=*/false);
+    OS << "\n"
+       << "  extraInhabitantCount: "
+       << fixed->getFixedExtraInhabitantCount(IGM) << "\n"
+       << "  extraInhabitantMask: ";
+    fixed->getFixedExtraInhabitantMask(IGM).print(OS, /*isSigned=*/false);
+    OS << "\n";
+  }
+
+  printExplosionSchema(OS, getSchema());
+  printNativeConventionSchema(OS, "nativeParameterSchema",
+                              nativeParameterValueSchema(IGM));
+  printNativeConventionSchema(OS, "nativeReturnSchema",
+                              nativeReturnValueSchema(IGM));
+}
+
 TypeInfo::TypeInfo(
     IRGenModule &IGM,
     const SerializableHiddenTypeInfoRepresentation &representation)
