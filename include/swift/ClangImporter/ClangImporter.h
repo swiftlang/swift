@@ -858,9 +858,9 @@ classifyCxxReferenceParameter(clang::QualType type);
 bool hasImportReferenceAttr(const clang::RecordDecl *decl);
 
 /// Whether any declaration of \p decl carries one of the given swift_attrs.
-/// A swift_attr propagates to later redeclarations only, and Clang carries just
-/// the first one, so an attribute is not necessarily visible on the declaration
-/// at hand.
+/// Within a translation unit a swift_attr propagates to later redeclarations
+/// only, and a chain assembled across modules is not merged at all, so an
+/// attribute is not necessarily visible on the declaration at hand.
 bool hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
                                   ArrayRef<StringRef> attrs);
 
