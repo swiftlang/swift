@@ -150,6 +150,12 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-Xcc" "-DPURE_BRIDGING_MODE")
   endif()
 
+  # LLVM_VERSION_MAJOR for Swift sources in the compiler, should they ever
+  # need it.
+  foreach(condition ${SWIFT_LLVM_VERSION_MAJOR_SWIFT_COMPILE_DEFINITIONS})
+    list(APPEND swift_compile_options "-D${condition}")
+  endforeach()
+
   if(NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
     list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")
   endif()
