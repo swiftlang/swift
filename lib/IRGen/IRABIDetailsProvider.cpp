@@ -28,6 +28,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AbstractLayout.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SerializableHiddenTypeInfoRepresentation.h"
 #include "swift/AST/Types.h"
@@ -105,6 +106,13 @@ public:
   AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
     auto &typeInfo =
         IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
+
+    if (IGM.getOptions().DumpAbstractTypeLayoutInfo) {
+      auto type = TD->getDeclaredTypeInContext()->getCanonicalType();
+      auto mangledName =
+          Mangle::ASTMangler(TD->getASTContext()).mangleNominalType(TD);
+      IGM.dumpAbstractTypeLayoutInfo(type, mangledName, "serialization");
+    }
 
     AbstractTypeLayout layout;
     auto type = TD->getDeclaredInterfaceType();

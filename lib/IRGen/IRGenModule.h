@@ -1142,6 +1142,9 @@ public:
   const TypeInfo &getTypeInfoForLowered(CanType T);
   const TypeInfo &getTypeInfo(SILType T);
   const TypeInfo &adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo);
+
+  void dumpAbstractTypeLayoutInfo(CanType type, StringRef mangledName,
+                                  StringRef origin);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();

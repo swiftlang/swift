@@ -4137,6 +4137,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.DumpAbstractTypeLayoutInfo =
+      Args.hasArg(OPT_dump_abstract_type_layout_info);
+
   auto getRuntimeCompatVersion = [&]() -> std::optional<llvm::VersionTuple> {
     std::optional<llvm::VersionTuple> runtimeCompatibilityVersion;
     if (auto versionArg = Args.getLastArg(

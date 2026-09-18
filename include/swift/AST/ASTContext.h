@@ -1287,6 +1287,12 @@ public:
   iterator_range<llvm::MapVector<Identifier, ModuleDecl *>::const_iterator>
   getLoadedModules() const;
 
+  /// Record a type whose declaration was recovered from serialized abstract
+  /// layout information after its cross-reference could not be resolved.
+  void recordRecoveredHiddenType(CanType type);
+
+  ArrayRef<CanType> getRecoveredHiddenTypes() const;
+
   /// Returns the number of loaded modules known by this context to be loaded.
   unsigned getNumLoadedModules() const {
     auto eltRange = getLoadedModules();
