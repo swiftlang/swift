@@ -2179,7 +2179,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(BridgeObjectToWord)
   ONEOPERAND_ONETYPE_INST(Upcast)
   ONEOPERAND_ONETYPE_INST(RefToRawPointer)
-  ONEOPERAND_ONETYPE_INST(RawPointerToRef)
   ONEOPERAND_ONETYPE_INST(ThinToThickFunction)
   ONEOPERAND_ONETYPE_INST(ThickToObjCMetatype)
   ONEOPERAND_ONETYPE_INST(ObjCToThickMetatype)
@@ -2199,6 +2198,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
             getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
         /*needsStackProtection=*/Attr != 0);
+    break;
+  }
+  case SILInstructionKind::RawPointerToRefInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultInst = Builder.createRawPointerToRef(
+        Loc,
+        getLocalValue(
+            Builder.maybeGetFunction(), ValID,
+            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
+        /*isImmortal=*/Attr != 0);
     break;
   }
   case SILInstructionKind::ProjectBoxInst: {

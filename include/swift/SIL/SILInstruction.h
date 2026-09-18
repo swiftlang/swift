@@ -6641,9 +6641,27 @@ class RawPointerToRefInst
     : public UnaryInstructionBase<SILInstructionKind::RawPointerToRefInst,
                                   SingleValueInstruction> {
   friend SILBuilder;
+  USE_SHARED_UINT8;
 
-  RawPointerToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+  RawPointerToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+                      bool isImmortal)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty) {
+    sharedUInt8().RawPointerToRefInst.immortal = isImmortal;
+  }
+
+public:
+  /// True if the resulting object is immortal, i.e. its lifetime is not
+  /// managed by reference counting.
+  ///
+  /// An immortal result does not need to be released, therefore it has
+  /// OwnershipKind::None instead of OwnershipKind::Owned.
+  bool isImmortal() const {
+    return sharedUInt8().RawPointerToRefInst.immortal;
+  }
+
+  void setImmortal(bool isImmortal) {
+    sharedUInt8().RawPointerToRefInst.immortal = isImmortal;
+  }
 };
 
 /// Transparent reference storage to underlying reference type conversion.

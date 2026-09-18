@@ -4456,6 +4456,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     bool not_guaranteed = false;
     bool without_actually_escaping = false;
     bool needsStackProtection = false;
+    bool isImmortal = false;
     if (Opcode == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
@@ -4466,6 +4467,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
     } if (Opcode == SILInstructionKind::AddressToPointerInst) {
       if (parseSILOptional(needsStackProtection, *this, "stack_protection"))
+        return true;
+    } if (Opcode == SILInstructionKind::RawPointerToRefInst) {
+      if (parseSILOptional(isImmortal, *this, "immortal"))
         return true;
     }
 
@@ -4545,7 +4549,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       ResultVal = B.createRefToRawPointer(InstLoc, Val, Ty);
       break;
     case SILInstructionKind::RawPointerToRefInst:
-      ResultVal = B.createRawPointerToRef(InstLoc, Val, Ty);
+      ResultVal = B.createRawPointerToRef(InstLoc, Val, Ty, isImmortal);
       break;
 #define LOADABLE_REF_STORAGE(Name, ...)                                        \
   case SILInstructionKind::RefTo##Name##Inst:                                  \

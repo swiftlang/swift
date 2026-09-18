@@ -1433,9 +1433,9 @@ public:
   }
 
   RawPointerToRefInst *createRawPointerToRef(SILLocation Loc, SILValue Op,
-                                             SILType Ty) {
-    return insert(new (getModule())
-                      RawPointerToRefInst(getSILDebugLocation(Loc), Op, Ty));
+                                             SILType Ty, bool isImmortal) {
+    return insert(new (getModule()) RawPointerToRefInst(
+        getSILDebugLocation(Loc), Op, Ty, isImmortal));
   }
 
   ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,

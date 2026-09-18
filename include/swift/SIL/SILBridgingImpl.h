@@ -1429,6 +1429,14 @@ bool BridgedInstruction::AddressToPointerInst_needsStackProtection() const {
   return getAs<swift::AddressToPointerInst>()->needsStackProtection();
 }
 
+bool BridgedInstruction::RawPointerToRefInst_isImmortal() const {
+  return getAs<swift::RawPointerToRefInst>()->isImmortal();
+}
+
+void BridgedInstruction::RawPointerToRefInst_setIsImmortal(bool isImmortal) const {
+  getAs<swift::RawPointerToRefInst>()->setImmortal(isImmortal);
+}
+
 bool BridgedInstruction::IndexAddrInst_needsStackProtection() const {
   return getAs<swift::IndexAddrInst>()->needsStackProtection();
 }

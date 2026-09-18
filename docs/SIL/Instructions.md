@@ -4667,7 +4667,7 @@ does not have ownership semantics. It is undefined behavior to cast a
 ### raw_pointer_to_ref
 
 ```
-sil-instruction ::= 'raw_pointer_to_ref' sil-operand 'to' sil-type
+sil-instruction ::= 'raw_pointer_to_ref' '[immortal]'? sil-operand 'to' sil-type
 
 %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
 // $C must be a class type, or Builtin.NativeObject, or AnyObject
@@ -4681,6 +4681,14 @@ ownership semantics for the object on its own). It is undefined behavior
 to cast a `RawPointer` to a type unrelated to the dynamic type of the
 heap object. It is also undefined behavior to cast a `RawPointer` from
 an address to any heap object type.
+
+The `immortal` flag means that the resulting object is immortal, i.e. it is
+never deallocated and therefore doesn't need to be retained or released. In
+OSSA the result of an `immortal` `raw_pointer_to_ref` has `none` ownership,
+whereas the result of a non-`immortal` `raw_pointer_to_ref` is `owned` - the
+instruction "creates" a new reference which must be consumed exactly once.
+Accordingly, lowering out of OSSA inserts a
+[strong_retain](#strong_retain) after a non-`immortal` `raw_pointer_to_ref`.
 
 ### ref_to_unowned
 

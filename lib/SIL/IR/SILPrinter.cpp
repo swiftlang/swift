@@ -2437,6 +2437,8 @@ public:
     printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitRawPointerToRefInst(RawPointerToRefInst *CI) {
+    if (CI->isImmortal())
+      *this << "[immortal] ";
     printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
 
