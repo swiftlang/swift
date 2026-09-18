@@ -1,3 +1,24 @@
+# Early swift-driver is built adjacent to the compiler (swift build dir)
+if(SWIFT_EARLY_SWIFT_DRIVER_BUILD)
+  get_filename_component(driver_package_dir "${SWIFT_EARLY_SWIFT_DRIVER_BUILD}" DIRECTORY)
+else()
+  if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    set(driver_package_configuration_dir "release")
+  else()
+    set(driver_package_configuration_dir "debug")
+  endif()
+  set(driver_package_dir
+      "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}")
+endif()
+
+set(SwiftDriver_DIR
+    "${driver_package_dir}/cmake/modules/")
+set(TSC_DIR
+    "${driver_package_dir}/dependencies/swift-tools-support-core/cmake/modules/")
+find_package(TSC CONFIG)
+find_package(SwiftDriver CONFIG)
+
+
 add_swift_host_tool(swift-ide-test
   swift-ide-test.cpp
   ModuleAPIDiff.cpp
@@ -6,14 +27,26 @@ add_swift_host_tool(swift-ide-test
   THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
   HAS_SWIFT_MODULES
 )
+
+set_property(
+  TARGET swift-ide-test
+  APPEND PROPERTY INSTALL_RPATH "${driver_package_dir}/lib/"
+)
+set_property(
+  TARGET swift-ide-test
+  APPEND PROPERTY INSTALL_RPATH "${driver_package_dir}/dependencies/swift-tools-support-core/lib/"
+)
+
 target_link_libraries(swift-ide-test
                       PRIVATE
                         swiftAST
                         swiftDriver
+                        SwiftDriver
                         swiftFrontend
                         swiftIDE
                         swiftIDETool
-                        swiftCompilerModules)
+                        swiftCompilerModules
+                        libSwiftScanDependencies)
 
 # If libxml2 is available, make it available for swift-ide-test.
 if(SWIFT_HAVE_LIBXML2)
