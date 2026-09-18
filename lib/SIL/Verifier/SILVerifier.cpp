@@ -5496,15 +5496,18 @@ public:
             "cast cannot be used to remove move only wrapped?!");
     checkNoTrivialToReferenceCast(UI);
     if (UI->getType().is<MetatypeType>()) {
-      CanType instTy(UI->getType().castTo<MetatypeType>()->getInstanceType());
+      auto metaTy = UI->getType().castTo<MetatypeType>();
+      CanType instTy(metaTy->getInstanceType());
       require(UI->getOperand()->getType().is<MetatypeType>(),
               "upcast operand must be a class or class metatype instance");
-      CanType opInstTy(UI->getOperand()->getType().castTo<MetatypeType>()
-                         ->getInstanceType());
+      auto opMetaTy = UI->getOperand()->getType().castTo<MetatypeType>();
+      CanType opInstTy(opMetaTy->getInstanceType());
+      require(metaTy->getRepresentation() == opMetaTy->getRepresentation(),
+              "upcast cannot change metatype representation");
       auto instClass = instTy->getClassOrBoundGenericClass();
       require(instClass,
               "upcast must convert a class metatype to a class metatype");
-      
+
       if (instClass->isTypeErasedGenericClass()) {
         require(instClass->getDeclaredTypeInContext()
                   ->isBindableToSuperclassOf(opInstTy),
