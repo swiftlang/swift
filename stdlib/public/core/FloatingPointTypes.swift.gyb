@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -789,11 +789,7 @@ extension ${Self}: BinaryFloatingPoint {
 
   @_transparent
   public mutating func formSquareRoot( ) {
-% if bits == 16:
-    self = Float16(_stdlib_squareRootf(Float(self)))
-% else:
-    self = _stdlib_squareRoot${cFuncSuffix}(self)
-% end
+    _value = Builtin.int_sqrt_FPIEEE${bits}(_value)
   }
 
   @_transparent
