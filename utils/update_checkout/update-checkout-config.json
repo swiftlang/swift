@@ -144,10 +144,10 @@
     "default-branch-scheme": "main",
     "branch-schemes": {
         "main": {
-            "aliases": ["swift/main", "main", "stable/21.x"],
+            "aliases": ["swift/main", "main", "stable/23.x"],
             "repos": {
-                "llvm-project": "stable/21.x",
-                "swift-llvm-bindings": "stable/21.x",
+                "llvm-project": "stable/23.x",
+                "swift-llvm-bindings": "stable/23.x",
                 "swift": "main",
                 "cmark": "gfm",
                 "llbuild": "main",
