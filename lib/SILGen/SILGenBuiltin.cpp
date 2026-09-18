@@ -1362,9 +1362,11 @@ static ManagedValue emitBuiltinApplyDerivative(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
     ArrayRef<ManagedValue> args, SGFContext C) {
   auto *callExpr = loc.castToASTNode<CallExpr>();
-  auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
-      cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
-          ->getDecl());
+
+  // Peel off function conversions (e.g. implicitly added @Sendable conversion)
+  auto *directCallee = callExpr->getCalledValue(/*skipFunctionConversions=*/ true);
+  auto builtinDecl = cast<FuncDecl>(directCallee);
+
   const auto builtinName = builtinDecl->getBaseIdentifier().str();
   AutoDiffDerivativeFunctionKind kind;
   unsigned arity;
