@@ -136,6 +136,11 @@ namespace {
           ValueTypeAndIsOptional.getPointer()->getContext(), \
           getFixedSize().getValueInBits()); \
     } \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
+    } \
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
     createSerializableHiddenTypeInfoRepresentation( \
         IRGenModule &) const override { \
@@ -219,6 +224,11 @@ namespace {
                                                ReferenceOwnership::Name, \
                                                ReferenceCounting::Nativeness); \
     } \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
+    } \
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
     createSerializableHiddenTypeInfoRepresentation( \
         IRGenModule &) const override { \
@@ -267,6 +277,11 @@ namespace {
                               Address dest, SILType T, bool isOutlined) \
     const override { \
       return storeHeapObjectExtraInhabitant(IGF, index, dest); \
+    } \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
     } \
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
     createSerializableHiddenTypeInfoRepresentation( \
@@ -713,6 +728,12 @@ namespace {
   class BuiltinNativeObjectTypeInfo
     : public HeapTypeInfo<BuiltinNativeObjectTypeInfo> {
   public:
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -1654,6 +1675,12 @@ public:
 /// Common implementation for empty box type info.
 class EmptyBoxTypeInfo final : public BoxTypeInfo {
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1688,6 +1715,12 @@ public:
 /// Common implementation for non-fixed box type info.
 class NonFixedBoxTypeInfo final : public BoxTypeInfo {
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1802,6 +1835,12 @@ static HeapLayout getHeapLayoutForSingleTypeInfo(IRGenModule &IGM,
 /// Common implementation for POD boxes of a known stride and alignment.
 class PODBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1817,6 +1856,12 @@ public:
 /// Common implementation for single-refcounted boxes.
 class SingleRefcountedBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1862,6 +1907,12 @@ class FixedBoxTypeInfo final : public FixedBoxTypeInfoBase {
   }
 
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {

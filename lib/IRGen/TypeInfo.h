@@ -31,6 +31,7 @@
 #include "swift/AST/TypeInfoStorage.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/Support/TypeName.h"
 #include <memory>
 
 namespace llvm {
@@ -123,6 +124,23 @@ protected:
       IRGenModule &IGM,
       SerializableHiddenTypeInfoRepresentation &representation) const;
 
+  void printForAbstractTypeLayoutInfoBaseImpl(
+      IRGenModule &IGM, llvm::raw_ostream &OS, unsigned indentation,
+      llvm::StringRef concreteTypeName) const;
+
+  template <typename ConcreteType>
+  void printForAbstractTypeLayoutInfoBase(
+      IRGenModule &IGM, llvm::raw_ostream &OS, unsigned indentation,
+      const ConcreteType *) const {
+    // This is debugging output, so derive the concrete class name rather than
+    // duplicating it at every call site.
+    auto typeName = llvm::getTypeName<ConcreteType>();
+    if (auto separator = typeName.rfind("::");
+        separator != llvm::StringRef::npos)
+      typeName = typeName.drop_front(separator + 2);
+    printForAbstractTypeLayoutInfoBaseImpl(IGM, OS, indentation, typeName);
+  }
+
   [[noreturn]] void unsupportedSerializableHiddenTypeInfoRepresentation() const;
 
   bool CreatedFromSerializableHiddenTypeInfoRepresentation;
@@ -160,6 +178,11 @@ private:
 
 public:
   virtual ~TypeInfo();
+
+  /// Print the IRGen-level properties that affect abstract type lowering.
+  virtual void printForAbstractTypeLayoutInfo(IRGenModule &IGM,
+                                           llvm::raw_ostream &OS,
+                                           unsigned indentation = 0) const = 0;
 
   virtual std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const = 0;

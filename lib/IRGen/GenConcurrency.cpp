@@ -49,6 +49,12 @@ public:
                                   align, IsTriviallyDestroyable,
                                   IsCopyable, IsFixedSize, IsABIAccessible) {}
 
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1021,6 +1027,12 @@ public:
       : ScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
                            IsNotTriviallyDestroyable, IsCopyable, IsFixedSize,
                            IsABIAccessible) {}
+
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
 
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
