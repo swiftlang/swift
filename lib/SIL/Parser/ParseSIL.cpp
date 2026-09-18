@@ -4678,14 +4678,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
 
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
-    CheckedCastInstOptions options = parseCheckedCastInstOptions(nullptr);
+    bool isCopy = false;
+    CheckedCastInstOptions options =
+        parseCheckedCastInstOptions(nullptr, &isCopy);
 
     if (parseSourceAndDestAddress() || parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createUnconditionalCheckedCastAddr(
-        InstLoc, options, SourceAddr, SourceType,
-        DestAddr, TargetType);
+        InstLoc, options, SourceAddr, SourceType, DestAddr, TargetType, isCopy);
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastInst: {
@@ -8469,7 +8470,8 @@ ProtocolConformanceRef SILParser::parseProtocolConformance(
   return parseProtocolConformanceHelper(proto, genericSig, genericParams);
 }
 
-CheckedCastInstOptions SILParser::parseCheckedCastInstOptions(bool *isExact) {
+CheckedCastInstOptions SILParser::parseCheckedCastInstOptions(bool *isExact,
+                                                              bool *isCopy) {
   CheckedCastInstOptions options;
   StringRef attrName;
 
@@ -8481,6 +8483,8 @@ CheckedCastInstOptions SILParser::parseCheckedCastInstOptions(bool *isExact) {
 
     if (attrName == "exact" && isExact)
       *isExact = true;
+    if (attrName == "copy" && isCopy)
+      *isCopy = true;
   }
 
   return options;

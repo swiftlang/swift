@@ -371,11 +371,12 @@ public struct Builder {
   public func createUnconditionalCheckedCastAddr(
     options: CheckedCastInstOptions,
     source: Value, sourceFormalType: CanonicalType,
-    destination: Value, targetFormalType: CanonicalType
+    destination: Value, targetFormalType: CanonicalType,
+    isCopy: Bool = false
   ) -> UnconditionalCheckedCastAddrInst {
     let cast = bridged.createUnconditionalCheckedCastAddr(
         options.bridged, source.bridged, sourceFormalType.bridged,
-        destination.bridged, targetFormalType.bridged
+        destination.bridged, targetFormalType.bridged, isCopy
     )
     return notifyNew(cast.getAs(UnconditionalCheckedCastAddrInst.self))
   }

@@ -5414,6 +5414,14 @@ public:
     }
   }
 
+  void checkUnconditionalCheckedCastAddrInst(
+      UnconditionalCheckedCastAddrInst *cast) {
+    require(cast->getSrc()->getType().isAddress(),
+            "unconditional_checked_cast_addr src must be an address");
+    require(cast->getDest()->getType().isAddress(),
+            "unconditional_checked_cast_addr dest must be an address");
+  }
+
   void checkCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
     require(CCABI->getSrc()->getType().isAddress(),
             "checked_cast_addr_br src must be an address");

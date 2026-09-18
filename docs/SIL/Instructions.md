@@ -5020,17 +5020,21 @@ ownership are unsupported.
 ```
 sil-instruction ::= 'unconditional_checked_cast_addr'
                     sil-prohibit-isolated-conformances?
+                    '[copy]'?
                     sil-type 'in' sil-operand 'to'
                     sil-type 'in' sil-operand
 
-unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in %1 : $*@thick B
-// $A and $B must be both addresses
-// %1 will be of type $*B
-// $A is destroyed during the conversion. There is no implicit copy.
+unconditional_checked_cast_addr A in %0 : $*A to B in %1 : $*B
+// %0 and %1 must both be addresses.
+// Without [copy], %0 is consumed during the conversion.
+// With [copy], %0 remains initialized and is not consumed.
 ```
 
-Performs a checked indirect conversion, causing a runtime failure if the
-conversion fails.
+Performs a checked indirect conversion, initializing the destination on success
+and causing a runtime failure if the conversion fails. The destination must be
+uninitialized. By default, the source value is consumed. `[copy]` preserves
+it and produces an independently owned destination value. Both forms
+terminate execution on failure rather than continuing along a failure edge.
 
 ## Runtime Failures
 
