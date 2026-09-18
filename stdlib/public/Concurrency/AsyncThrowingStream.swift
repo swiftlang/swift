@@ -342,7 +342,72 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
   }
-  
+
+  /// Constructs an asynchronous stream for an element type, using the
+  /// specified buffering policy and element-producing closure.
+  ///
+  /// - Parameters:
+  ///   - elementType: The type of element the `AsyncThrowingStream`
+  ///   produces.
+  ///   - limit: The maximum number of elements to
+  ///   hold in the buffer. By default, this value is unlimited. Use a
+  ///   `Continuation.BufferingPolicy` to buffer a specified number of oldest
+  ///   or newest elements.
+  ///   - build: A custom closure that yields values to the
+  ///   `AsyncThrowingStream`. This closure receives an
+  ///   `AsyncThrowingStream.Continuation` instance that it uses to provide
+  ///   elements to the stream and terminate the stream when finished.
+  ///
+  /// The `AsyncStream.Continuation` received by the `build` closure is
+  /// appropriate for use in concurrent contexts. It is thread safe to send and
+  /// finish; all calls to the continuation are serialized. However, calling
+  /// this from multiple concurrent contexts could result in out-of-order
+  /// delivery.
+  ///
+  /// The following example shows an `AsyncStream` created with this
+  /// initializer that produces 100 random numbers on a one-second interval,
+  /// calling `yield(_:)` to deliver each element to the awaiting call point.
+  /// When the `for` loop exits, the stream finishes by calling the
+  /// continuation's `finish()` method. If the random number is divisible by 5
+  /// with no remainder, the stream throws a `MyRandomNumberError`.
+  ///
+  ///     let stream = AsyncThrowingStream<Int, Error>(Int.self,
+  ///                                                  bufferingPolicy: .bufferingNewest(5)) { continuation in
+  ///         Task.detached {
+  ///             for _ in 0..<100 {
+  ///                 await Task.sleep(1 * 1_000_000_000)
+  ///                 let random = Int.random(in: 1...10)
+  ///                 if random % 5 == 0 {
+  ///                     continuation.finish(throwing: MyRandomNumberError())
+  ///                     return
+  ///                 } else {
+  ///                     continuation.yield(random)
+  ///                 }
+  ///             }
+  ///             continuation.finish()
+  ///         }
+  ///     }
+  ///
+  ///     // Call point:
+  ///     do {
+  ///         for try await random in stream {
+  ///             print(random)
+  ///         }
+  ///     } catch {
+  ///         print(error)
+  ///     }
+  ///
+  @available(SwiftStdlib 6.5, *)
+  public init(
+    _ elementType: Element.Type = Element.self,
+    bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
+    _ build: (Continuation) -> Void
+  ) {
+    let storage: _Storage = .create(limit: limit)
+    context = _Context(storage: storage, produce: storage.next)
+    build(Continuation(storage: storage))
+  }
+
   /// Constructs an asynchronous throwing stream from a given element-producing
   /// closure.
   ///
@@ -388,6 +453,63 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       = .create(produce)
     context = _Context {
       return try await withTaskCancellationHandler {
+        guard let result = try await storage.value?() else {
+          storage.value = nil
+          return nil
+        }
+        return result
+      } onCancel: {
+        storage.value = nil
+      }
+    }
+  }
+
+  /// Constructs an asynchronous throwing stream from a given element-producing
+  /// closure.
+  ///
+  /// - Parameters:
+  ///   - produce: A closure that asynchronously produces elements for the
+  ///    stream.
+  ///
+  /// Use this convenience initializer when you have an asynchronous function
+  /// that can produce elements for the stream, and don't want to invoke
+  /// a continuation manually. This initializer "unfolds" your closure into
+  /// a full-blown asynchronous stream. The created stream handles adherence to
+  /// the `AsyncSequence` protocol automatically. To terminate the stream with
+  /// an error, throw the error from your closure.
+  ///
+  /// The following example shows an `AsyncThrowingStream` created with this
+  /// initializer that produces random numbers on a one-second interval. If the
+  /// random number is divisible by 5 with no remainder, the stream throws a
+  /// `MyRandomNumberError`.
+  ///
+  ///     let stream = AsyncThrowingStream<Int, Error> {
+  ///         await Task.sleep(1 * 1_000_000_000)
+  ///         let random = Int.random(in: 1...10)
+  ///         if random % 5 == 0 {
+  ///             throw MyRandomNumberError()
+  ///         }
+  ///         return random
+  ///     }
+  ///
+  ///     // Call point:
+  ///     do {
+  ///         for try await random in stream {
+  ///             print(random)
+  ///         }
+  ///     } catch {
+  ///         print(error)
+  ///     }
+  ///
+  @available(SwiftStdlib 6.5, *)
+  @preconcurrency
+  public init(
+    unfolding produce: @escaping @Sendable () async throws(Failure) -> Element?
+  ) {
+    let storage: _AsyncStreamCriticalStorage<Optional<() async throws(Failure) -> Element?>>
+      = .create(produce)
+    context = _Context { () async throws(Failure) -> Element? in
+      return try await withTaskCancellationHandler { () async throws(Failure) -> Element? in
         guard let result = try await storage.value?() else {
           storage.value = nil
           return nil
@@ -516,10 +638,29 @@ extension AsyncThrowingStream {
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 5.9)
   public static func makeStream(
-      of elementType: Element.Type = Element.self,
-      throwing failureType: Failure.Type = Failure.self,
-      bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded
+    of elementType: Element.Type = Element.self,
+    throwing failureType: Failure.Type = Failure.self,
+    bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded
   ) -> (stream: AsyncThrowingStream<Element, Failure>, continuation: AsyncThrowingStream<Element, Failure>.Continuation) where Failure == Error {
+    var continuation: AsyncThrowingStream<Element, Failure>.Continuation!
+    let stream = AsyncThrowingStream<Element, Failure>(bufferingPolicy: limit) { continuation = $0 }
+    return (stream: stream, continuation: continuation!)
+  }
+
+  /// Initializes a new ``AsyncThrowingStream`` and an ``AsyncThrowingStream/Continuation``.
+  ///
+  /// - Parameters:
+  ///   - elementType: The element type of the stream.
+  ///   - failureType: The failure type of the stream.
+  ///   - limit: The buffering policy that the stream should use.
+  /// - Returns: A tuple containing the stream and its continuation. The continuation should be passed to the
+  /// producer while the stream should be passed to the consumer.
+  @available(SwiftStdlib 6.5, *)
+  public static func makeStream(
+    of elementType: Element.Type = Element.self,
+    throwing failureType: Failure.Type = Failure.self,
+    bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded
+  ) -> (stream: AsyncThrowingStream<Element, Failure>, continuation: AsyncThrowingStream<Element, Failure>.Continuation) {
     var continuation: AsyncThrowingStream<Element, Failure>.Continuation!
     let stream = AsyncThrowingStream<Element, Failure>(bufferingPolicy: limit) { continuation = $0 }
     return (stream: stream, continuation: continuation!)
@@ -606,11 +747,27 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ) where Failure == Error {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
+  @available(SwiftStdlib 6.5, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(
+    _ elementType: Element.Type = Element.self,
+    bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
+    _ build: (Continuation) -> Void
+  ) {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
   @available(SwiftStdlib 5.1, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
     unfolding produce: @escaping () async throws -> Element?
   ) where Failure == Error {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+  @available(SwiftStdlib 6.5, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(
+    unfolding produce: @escaping () async throws(Failure) -> Element?
+  ) {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
 }

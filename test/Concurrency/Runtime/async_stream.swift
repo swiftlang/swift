@@ -19,6 +19,10 @@ struct SomeError: Error, Equatable {
   var value = Int.random(in: 0..<100)
 }
 
+enum HomeworkError: Error {
+  case dogAteIt
+}
+
 class NotSendable {}
 
 @MainActor func testWarnings() {
@@ -34,10 +38,57 @@ class NotSendable {}
   }
 }
 
+@available(SwiftStdlib 6.5, *)
+@MainActor func testContinuationInitTypedThrows() {
+  _ = AsyncThrowingStream<Void, SomeError> { _ in }
+}
+
+@available(SwiftStdlib 6.5, *)
+@MainActor func testUnfoldingInitTypedThrows() {
+  _ = AsyncThrowingStream<Void, SomeError>.init(unfolding: {})
+}
+
+@available(SwiftStdlib 6.5, *)
+@MainActor func testMakeStreamTypedThrows() {
+  _ = AsyncThrowingStream.makeStream(of: Void.self, throwing: SomeError.self)
+  _ = AsyncThrowingStream<Void, SomeError>.makeStream()
+}
+
 @MainActor var tests = TestSuite("AsyncStream")
 
 @main struct Main {
   static func main() async {
+    if #available(SwiftStdlib 6.5, *) {
+      tests.test("continuation typed throws") {
+        let stream = AsyncThrowingStream<Void, HomeworkError> { continuation in
+          continuation.finish(throwing: HomeworkError.dogAteIt)
+        }
+        do throws(HomeworkError) {
+          for try await _ in stream {}
+          expectUnreachable("unexpected no error thrown")
+        } catch .dogAteIt {
+
+        } catch {
+          expectUnreachable("unexpected error thrown")
+        }
+      }
+
+      tests.test("unfolding typed throws") {
+        let stream = AsyncThrowingStream { () throws(HomeworkError) in
+          throw HomeworkError.dogAteIt
+        }
+
+        do throws(HomeworkError) {
+          for try await _ in stream {}
+          expectUnreachable("unexpected no error thrown")
+        } catch .dogAteIt {
+
+        } catch {
+          expectUnreachable("unexpected error thrown")
+        }
+      }
+    }
+
     if #available(SwiftStdlib 6.2, *) {
       final class Expectation: @unchecked Sendable {
         var fulfilled = false
