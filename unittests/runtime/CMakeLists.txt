@@ -108,6 +108,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     CompatibilityOverrideRuntime.cpp
     CompatibilityOverrideConcurrency.cpp
     Concurrent.cpp
+    COMDynamicCast.cpp
     COMMetadata.cpp
     CrashReporter.cpp
     Metadata.cpp
