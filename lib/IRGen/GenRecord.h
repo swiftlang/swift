@@ -160,6 +160,20 @@ protected:
     }
   }
 
+  void printRecordTypeInfoAbstractLayoutInfo(IRGenModule &IGM,
+                                             llvm::raw_ostream &OS,
+                                             unsigned indentation,
+                                             StringRef concreteTypeName) const {
+    this->printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                          concreteTypeName);
+    OS.indent(indentation + 2) << "fieldTypeInfos:\n";
+    for (const auto &[index, field] : llvm::enumerate(getFields())) {
+      OS.indent(indentation + 4) << "- index: " << index << "\n";
+      field.getTypeInfo().printForAbstractTypeLayoutInfo(IGM, OS,
+                                                      indentation + 6);
+    }
+  }
+
   template <class... As> 
   RecordTypeInfoImpl(ArrayRef<FieldImpl> fields,
                      FieldsAreABIAccessible_t fieldsABIAccessible,

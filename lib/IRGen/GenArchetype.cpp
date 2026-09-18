@@ -132,6 +132,13 @@ public:
     return new OpaqueArchetypeTypeInfo(type, abiAccessible);
   }
 
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                    "OpaqueArchetypeTypeInfo");
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -184,6 +191,13 @@ public:
          ReferenceCounting refCount, const ClassTypeInfo *customRefCountingTI) {
     return new ClassArchetypeTypeInfo(storageType, size, spareBits, align,
                                       refCount, customRefCountingTI);
+  }
+
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                    "ClassArchetypeTypeInfo");
   }
 
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -247,6 +261,13 @@ public:
   create(llvm::Type *type, Size size, Alignment align,
          const SpareBitVector &spareBits) {
     return new FixedSizeArchetypeTypeInfo(type, size, align, spareBits);
+  }
+
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                    "FixedSizeArchetypeTypeInfo");
   }
 
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>

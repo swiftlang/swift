@@ -258,6 +258,158 @@ TypeInfo::~TypeInfo() {
     delete nativeParameterSchema;
 }
 
+static StringRef getSpecialTypeInfoKindName(SpecialTypeInfoKind kind) {
+  switch (kind) {
+  case SpecialTypeInfoKind::Unimplemented:
+    return "unimplemented";
+  case SpecialTypeInfoKind::None:
+    return "none";
+  case SpecialTypeInfoKind::Fixed:
+    return "fixed";
+  case SpecialTypeInfoKind::Weak:
+    return "weak";
+  case SpecialTypeInfoKind::Loadable:
+    return "loadable";
+  case SpecialTypeInfoKind::Reference:
+    return "reference";
+  }
+  llvm_unreachable("unhandled special TypeInfo kind");
+}
+
+static StringRef getReferenceCountingName(ReferenceCounting kind) {
+  switch (kind) {
+  case ReferenceCounting::Native:
+    return "native";
+  case ReferenceCounting::ObjC:
+    return "objc";
+  case ReferenceCounting::None:
+    return "none";
+  case ReferenceCounting::Custom:
+    return "custom";
+  case ReferenceCounting::Block:
+    return "block";
+  case ReferenceCounting::Unknown:
+    return "unknown";
+  case ReferenceCounting::Bridge:
+    return "bridge";
+  case ReferenceCounting::Error:
+    return "error";
+  }
+  llvm_unreachable("unhandled reference-counting kind");
+}
+
+static void printLLVMType(llvm::raw_ostream &OS, llvm::Type *type) {
+  type->print(OS, /*IsForDebug=*/false, /*NoDetails=*/false);
+}
+
+static void printExplosionSchema(llvm::raw_ostream &OS,
+                                 const ExplosionSchema &schema,
+                                 unsigned indentation) {
+  OS.indent(indentation) << "explosionSchema:\n";
+  for (const auto &[index, element] : llvm::enumerate(schema)) {
+    OS.indent(indentation + 2) << "- index: " << index << "\n";
+    OS.indent(indentation + 4)
+        << "kind: " << (element.isScalar() ? "scalar" : "aggregate") << "\n";
+    OS.indent(indentation + 4) << "type: ";
+    printLLVMType(OS, element.isScalar() ? element.getScalarType()
+                                         : element.getAggregateType());
+    OS << "\n";
+    if (element.isAggregate())
+      OS.indent(indentation + 4)
+          << "alignment: " << element.getAggregateAlignment().getValue()
+          << "\n";
+  }
+}
+
+static void printNativeConventionSchema(llvm::raw_ostream &OS, StringRef name,
+                                        const NativeConventionSchema &schema,
+                                        unsigned indentation) {
+  OS.indent(indentation) << name << ":\n";
+  OS.indent(indentation + 2)
+      << "requiresIndirect: "
+      << (schema.requiresIndirect() ? "true" : "false") << "\n";
+  OS.indent(indentation + 2) << "components:\n";
+  unsigned index = 0;
+  schema.enumerateComponents(
+      [&](clang::CharUnits begin, clang::CharUnits end, llvm::Type *type) {
+        OS.indent(indentation + 4) << "- index: " << index++ << "\n";
+        OS.indent(indentation + 6) << "begin: " << begin.getQuantity() << "\n";
+        OS.indent(indentation + 6) << "end: " << end.getQuantity() << "\n";
+        OS.indent(indentation + 6) << "type: ";
+        printLLVMType(OS, type);
+        OS << "\n";
+      });
+}
+
+void TypeInfo::printForAbstractTypeLayoutInfoBase(IRGenModule &IGM,
+                                               llvm::raw_ostream &OS,
+                                               unsigned indentation,
+                                               StringRef concreteTypeName) const {
+  auto printFlag = [&](StringRef name, bool value) {
+    OS.indent(indentation + 2)
+        << name << ": " << (value ? "true" : "false") << "\n";
+  };
+
+  OS.indent(indentation) << "TypeInfo:\n";
+  OS.indent(indentation + 2) << "class: " << concreteTypeName << "\n";
+  OS.indent(indentation + 2) << "storageType: ";
+  printLLVMType(OS, getStorageType());
+  OS << "\n";
+  OS.indent(indentation + 2)
+      << "kind: " << getSpecialTypeInfoKindName(getSpecialTypeInfoKind())
+      << "\n";
+  OS.indent(indentation + 2)
+      << "bestKnownAlignment: " << getBestKnownAlignment().getValue() << "\n";
+  printFlag("abiAccessible", isABIAccessible() == IsABIAccessible);
+  printFlag("triviallyDestroyable",
+            isTriviallyDestroyable(ResilienceExpansion::Maximal) ==
+                IsTriviallyDestroyable);
+  printFlag("copyable", isCopyable(ResilienceExpansion::Maximal) == IsCopyable);
+  printFlag("bitwiseTakable",
+            isBitwiseTakable(ResilienceExpansion::Maximal));
+  printFlag("bitwiseBorrowable",
+            isBitwiseBorrowable(ResilienceExpansion::Maximal));
+  printFlag("fixedSizeMinimal",
+            isFixedSize(ResilienceExpansion::Minimal) == IsFixedSize);
+  printFlag("fixedSizeMaximal",
+            isFixedSize(ResilienceExpansion::Maximal) == IsFixedSize);
+  printFlag("loadable", isLoadable() == IsLoadable);
+
+  ReferenceCounting referenceCounting;
+  bool singleRetainablePointer = isSingleRetainablePointer(
+      ResilienceExpansion::Maximal, &referenceCounting);
+  printFlag("singleRetainablePointer", singleRetainablePointer);
+  if (singleRetainablePointer)
+    OS.indent(indentation + 2)
+        << "referenceCounting: " << getReferenceCountingName(referenceCounting)
+        << "\n";
+
+  if (auto *fixed = dyn_cast<FixedTypeInfo>(this)) {
+    OS.indent(indentation + 2)
+        << "fixedSize: " << fixed->getFixedSize().getValue() << "\n";
+    OS.indent(indentation + 2)
+        << "fixedAlignment: " << fixed->getFixedAlignment().getValue() << "\n";
+    OS.indent(indentation + 2)
+        << "fixedStride: " << fixed->getFixedStride().getValue() << "\n";
+    auto spareBits = fixed->getSpareBits().asAPInt();
+    OS.indent(indentation + 2) << "spareBits: ";
+    spareBits.print(OS, /*isSigned=*/false);
+    OS << "\n";
+    OS.indent(indentation + 2)
+        << "extraInhabitantCount: "
+        << fixed->getFixedExtraInhabitantCount(IGM) << "\n";
+    OS.indent(indentation + 2) << "extraInhabitantMask: ";
+    fixed->getFixedExtraInhabitantMask(IGM).print(OS, /*isSigned=*/false);
+    OS << "\n";
+  }
+
+  printExplosionSchema(OS, getSchema(), indentation + 2);
+  printNativeConventionSchema(OS, "nativeParameterSchema",
+                              nativeParameterValueSchema(IGM), indentation + 2);
+  printNativeConventionSchema(OS, "nativeReturnSchema",
+                              nativeReturnValueSchema(IGM), indentation + 2);
+}
+
 TypeInfo::TypeInfo(
     IRGenModule &IGM,
     const SerializableHiddenTypeInfoRepresentation &representation)
@@ -1206,6 +1358,12 @@ namespace {
                        IsCopyable,
                        IsFixedSize, IsABIAccessible) {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, "EmptyTypeInfo");
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -1269,6 +1427,13 @@ namespace {
             "serialized PrimitiveTypeInfo has an invalid explosion schema");
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "PrimitiveTypeInfo");
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &IGM) const override {
@@ -1296,6 +1461,13 @@ namespace {
                               Alignment align, Alignment pointeeAlign)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align),
         PointeeAlign(pointeeAlign) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "AlignedRawPointerTypeInfo");
+    }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
@@ -1351,6 +1523,13 @@ namespace {
           storage, size,
           SpareBitVector::getConstant(size.getValueInBits(), false),
           align) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "RawPointerTypeInfo");
+    }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
@@ -1433,6 +1612,13 @@ namespace {
               "opaque storage explosion element is not an integer");
         ScalarTypes.push_back(scalarType);
       }
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "OpaqueStorageTypeInfo");
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -1633,6 +1819,13 @@ namespace {
                               IsNotCopyable,
                               IsFixedSize, IsABIAccessible) {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "ImmovableTypeInfo");
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -1652,6 +1845,13 @@ namespace {
                               IsNotFixedSize,
                               IsNotABIAccessible,
                               SpecialTypeInfoKind::None) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                      "OpaqueImmovableTypeInfo");
+    }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
@@ -3019,6 +3219,12 @@ public:
                     IsFixedSize /* irrelevant */,
                     IsABIAccessible),
       NumExtraInhabitants(node.NumExtraInhabitants) {}
+
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, "LegacyTypeInfo");
+  }
 
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
