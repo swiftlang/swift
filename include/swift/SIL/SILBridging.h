@@ -329,6 +329,12 @@ struct BridgedType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::Identifier
   getTupleElementLabel(SwiftInt idx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getFunctionTypeWithNoEscape(bool withNoEscape) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType
+  getFunctionTypeWithRepresentation(
+      BridgedASTType::FunctionTypeRepresentation representation) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType
+  getFunctionTypeWithCalleeConvention(
+      BridgedArgumentConvention convention) const;
   BRIDGED_INLINE BridgedArgumentConvention getCalleeConvention() const;
 
   BRIDGED_INLINE SwiftInt getNumPackElements() const;
