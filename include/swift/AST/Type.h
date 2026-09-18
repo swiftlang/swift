@@ -382,6 +382,7 @@ class CanType : public Type {
   static bool isConstraintTypeImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
+  static bool isCOMExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
   static bool isTypeErasedGenericClassTypeImpl(CanType type);
   static CanType getOptionalObjectTypeImpl(CanType type);
@@ -472,6 +473,10 @@ public:
 
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
+
+  /// Is this an existential type represented by a single COM interface?
+  /// Does not look through optional types or existential metatypes.
+  bool isCOMExistentialType() const { return isCOMExistentialTypeImpl(*this); }
 
   /// Is this an ObjC-compatible existential type?
   bool isObjCExistentialType() const {

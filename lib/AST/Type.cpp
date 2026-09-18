@@ -589,6 +589,15 @@ bool ExistentialLayout::needsExtendedShape(
   return !allowedInverses.empty();
 }
 
+bool TypeBase::isCOMExistentialType() {
+  return getCanonicalType().isCOMExistentialType();
+}
+
+bool CanType::isCOMExistentialTypeImpl(CanType type) {
+  return type.isExistentialType() &&
+         type.getExistentialLayout().getCOMInterface();
+}
+
 bool TypeBase::isObjCExistentialType() {
   return getCanonicalType().isObjCExistentialType();
 }
@@ -3255,8 +3264,7 @@ bool TypeBase::hasCCompatibleForeignReferenceRepresentation() {
   if (auto existential = type->getAs<ExistentialType>())
     type = existential->getConstraintType();
 
-  return type->isExistentialType() &&
-         type->getExistentialLayout().getCOMInterface();
+  return type->isCOMExistentialType();
 }
 
 bool TypeBase::isBridgeableObjectType() {

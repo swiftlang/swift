@@ -997,6 +997,10 @@ public:
   /// isErrorExistentialType - Determines whether this type is 'any Error'.
   bool isErrorExistentialType();
 
+  /// Whether this is an existential type represented by a single COM interface.
+  /// Does not look through optional types or existential metatypes.
+  bool isCOMExistentialType();
+
   /// isObjCExistentialType - Determines whether this type is an
   /// class-bounded existential type whose required conformances are
   /// all @objc.  Such types are compatible with ObjC.
