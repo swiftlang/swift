@@ -5442,6 +5442,20 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
         llvm_unreachable("requirement cannot have erased isolation");
 
       case ActorIsolation::NonisolatedNonsending: {
+        // Let's not propagate default `nonisolated(nonsending)` isolation
+        // to the witnesses. It should be possible for the witness to either
+        // infer isolation from its type or use the same default directly
+        // if there is no other  isolation inference source available.
+        if (dc->getASTContext().LangOpts.hasFeature(
+                Feature::NonisolatedNonsendingByDefault)) {
+          if (auto *nonisolated =
+                  requirement->getAttrs().getAttribute<NonisolatedAttr>()) {
+            assert(nonisolated->isNonSending());
+            if (nonisolated->isImplicit())
+              continue;
+          }
+        }
+
         if (value->isAsync())
           break;
 

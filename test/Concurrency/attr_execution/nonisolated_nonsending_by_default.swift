@@ -21,3 +21,29 @@ do {
     // expected-note@-1 {{candidate has non-matching type '(nonisolated(nonsending) () async -> Void) -> ()'}}
   }
 }
+
+protocol P {
+  // nonisolated(nonsending) by default
+  func run() async throws
+  nonisolated(nonsending) func runWithoutHop() async throws
+}
+
+@MainActor
+final class C : P {
+  // @MainActor from the type
+  func run() async throws {
+    let _ = Self.computeAnswer() // Ok
+  }
+
+  // nonisolated(nonsending) from the explicitly isolated requirement
+  func runWithoutHop() async throws {
+    let _ = Self.computeAnswer()
+    // expected-error@-1 {{main actor-isolated static method 'computeAnswer()' cannot be called from outside of the actor}}
+  }
+}
+
+extension C {
+  static func computeAnswer() -> Int {
+    42
+  }
+}
