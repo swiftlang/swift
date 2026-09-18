@@ -3,6 +3,7 @@
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedDistributed
+// REQUIRES: optimized_stdlib
 
 // Verify that in Embedded Swift, distributed-actor code does NOT pull in
 // the standard runtime entry points that rely on demangling, metadata
