@@ -5929,6 +5929,7 @@ void TypeLowering::print(llvm::raw_ostream &os) const {
   os << "Type Lowering for lowered type: " << LoweredType << ".\n"
      << "Expansion: " << getResilienceExpansion() << "\n"
      << "isTrivial: " << BOOL(Properties.isTrivial()) << ".\n"
+     << "isReferenceCounted: " << BOOL(isReferenceCounted()) << ".\n"
      << "isFixedABI: " << BOOL(Properties.isFixedABI()) << ".\n"
      << "isAddressOnly: " << BOOL(Properties.isAddressOnly()) << ".\n"
      << "isResilient: " << BOOL(Properties.isResilient()) << ".\n"
@@ -5946,6 +5947,10 @@ void TypeLowering::print(llvm::raw_ostream &os) const {
      << "definitelyIsAddressableForDependencies: " << BOOL(Properties.definitelyIsAddressableForDependencies()) << ".\n"
      << "definitelyIsOrContainsRawLayout: " << BOOL(Properties.definitelyIsOrContainsRawLayout()) << ".\n"
      << "\n";
+}
+
+void TypeLowering::printAbstractTypeLayoutInfo(llvm::raw_ostream &os) const {
+  print(os);
 }
 
 void TypeLowering::dump() const {
