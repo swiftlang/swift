@@ -30,3 +30,12 @@ public func borrow(_ value: borrowing any IItem) -> UnsafeRawPointer {
 public func retain(_ pointer: UnsafeRawPointer) -> any IItem {
   Builtin.bridgeFromRawPointer(pointer._rawValue)
 }
+
+// CHECK-LABEL: define{{.*}} swiftcc ptr @"$s{{.*}}4take
+// CHECK-SAME: (ptr{{[^%]*}} [[POINTER:%[^,)]+]])
+// CHECK-NOT: load ptr
+// CHECK-NOT: call{{.*}} @swift_
+// CHECK: ret ptr [[POINTER]]
+public func take(_ pointer: UnsafeRawPointer) -> any IItem {
+  Builtin.takeFromRawPointer(pointer._rawValue)
+}

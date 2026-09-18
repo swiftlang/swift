@@ -77,3 +77,76 @@ exerciseProperty()
 checkDestruction()
 print("copy balanced")
 // CHECK-NEXT: copy balanced
+
+@inline(never)
+func take(_ pointer: UnsafeRawPointer) -> any IValue {
+  Builtin.takeFromRawPointer(pointer._rawValue)
+}
+
+@inline(never)
+func takeProperty(_ pointer: UnsafeRawPointer) -> any IProperty {
+  Builtin.takeFromRawPointer(pointer._rawValue)
+}
+
+@inline(never)
+func takeOptional(_ pointer: UnsafeRawPointer?) -> (any IValue)? {
+  guard let pointer else { return nil }
+  return .some(Builtin.takeFromRawPointer(pointer._rawValue))
+}
+
+@inline(never)
+func exerciseTake() {
+  let object = ForeignCOMObject_Create(42)!
+  let pointer = ForeignCOMObject_GetValueStorage(object)!.load(as: UnsafeRawPointer.self)
+  let value = take(pointer)
+  precondition(GetForeignCOMAddRefCalls() == 0)
+  precondition(GetForeignCOMReleaseCalls() == 0)
+  precondition(borrow(value) == pointer)
+  precondition(value.value(0) == 42)
+  withExtendedLifetime(value) {}
+}
+exerciseTake()
+checkDestruction()
+print("adoption balanced")
+// CHECK-NEXT: adoption balanced
+
+// Ownership follows the secondary interface pointer, without an adjustment
+// back to the primary interface or a QueryInterface call.
+@inline(never)
+func exerciseTakeProperty() {
+  let object = ForeignCOMObject_Create(42)!
+  let primary = ForeignCOMObject_GetValueStorage(object)!.load(as: UnsafeRawPointer.self)
+  let secondary = ForeignCOMObject_GetPropertyStorage(object)!.load(as: UnsafeRawPointer.self)
+  precondition(primary != secondary)
+  let value = takeProperty(secondary)
+  precondition(GetForeignCOMAddRefCalls() == 0)
+  precondition(GetForeignCOMReleaseCalls() == 0)
+  precondition(GetForeignCOMQueryInterfaceCalls() == 0)
+  precondition(UnsafeRawPointer(Builtin.bridgeToRawPointer(value)) == secondary)
+  precondition(value.value == 42)
+  withExtendedLifetime(value) {}
+}
+exerciseTakeProperty()
+checkDestruction()
+print("secondary adoption balanced")
+// CHECK-NEXT: secondary adoption balanced
+
+@inline(never)
+func exerciseTakeOptional() {
+  let object = ForeignCOMObject_Create(42)!
+  let pointer = ForeignCOMObject_GetValueStorage(object)!.load(as: UnsafeRawPointer.self)
+  let value = takeOptional(pointer)
+  precondition(GetForeignCOMAddRefCalls() == 0)
+  precondition(GetForeignCOMReleaseCalls() == 0)
+  precondition(value!.value(0) == 42)
+  withExtendedLifetime(value) {}
+}
+exerciseTakeOptional()
+checkDestruction()
+let retains = GetForeignCOMAddRefCalls()
+let releases = GetForeignCOMReleaseCalls()
+precondition(takeOptional(nil) == nil)
+precondition(GetForeignCOMAddRefCalls() == retains)
+precondition(GetForeignCOMReleaseCalls() == releases)
+print("optional adoption balanced")
+// CHECK-NEXT: optional adoption balanced

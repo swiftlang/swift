@@ -58,3 +58,21 @@ func retainClass(_ pointer: Builtin.RawPointer) -> any IClassItem {
 func pass(_ value: any IItem) -> Builtin.RawPointer {
   Builtin.bridgeToRawPointer(value)
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}4take
+// CHECK: [[REFERENCE:%.*]] = unchecked_bitwise_cast %0 : $Builtin.RawPointer to $any IItem
+// CHECK-NEXT: [[OWNED:%.*]] = unchecked_ownership_conversion [[REFERENCE]] : $any IItem, @unowned to @owned
+// CHECK-NOT: copy_value
+// CHECK: return [[OWNED]]
+func take(_ pointer: Builtin.RawPointer) -> any IItem {
+  Builtin.takeFromRawPointer(pointer)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}9takeClass
+// CHECK: [[REFERENCE:%.*]] = unchecked_bitwise_cast %0 : $Builtin.RawPointer to $any IClassItem
+// CHECK-NEXT: [[OWNED:%.*]] = unchecked_ownership_conversion [[REFERENCE]] : $any IClassItem, @unowned to @owned
+// CHECK-NOT: copy_value
+// CHECK: return [[OWNED]]
+func takeClass(_ pointer: Builtin.RawPointer) -> any IClassItem {
+  Builtin.takeFromRawPointer(pointer)
+}
