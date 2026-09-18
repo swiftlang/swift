@@ -718,7 +718,7 @@ extension MutableSpan {
   }
 
 #if !SPAN_COMPATIBILITY_STUB
-  /// Copies every element of source into this span, starting at index.
+  /// Copies every element of the source into this span, starting at index.
   ///
   /// This span must have enough space between `index` and its end for every
   /// element `source` provides.
@@ -750,7 +750,7 @@ extension MutableSpan {
     _precondition(next.isEmpty)
   }
 
-  /// Copies every element of source into this span, starting at index.
+  /// Copies every element of the source into this span, starting at index.
   ///
   /// This span must have space between `index` and its end for every element
   /// `source` provides.
