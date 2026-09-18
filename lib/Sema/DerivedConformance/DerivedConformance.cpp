@@ -139,10 +139,9 @@ bool DerivedConformance::derivesProtocolConformance(
         // conformance.
       case KnownDerivableProtocolKind::Equatable:
         return canDeriveEquatable(DC, Nominal);
-      
+
       case KnownDerivableProtocolKind::Comparable:
-        return !enumDecl->hasPotentiallyUnavailableCaseValue()
-            && canDeriveComparable(DC, enumDecl); 
+        return canDeriveComparable(DC, enumDecl);
 
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
