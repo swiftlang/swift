@@ -240,9 +240,6 @@ class Remangler : public RemanglerBase {
     Words.push_back(word, Factory);
   }
 
-  template <typename Mangler>
-  friend void mangleIdentifier(Mangler &M, StringRef ident);
-
   class EntityContext {
     bool AsContext = false;
   public:

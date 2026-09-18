@@ -3472,8 +3472,9 @@ private:
       auto it =
           TypeCache.find({getAddress(metadata), skipArtificialSubclasses});
       if (it != TypeCache.end()) {
+        BuiltType cached = it->second;
         TypeCache.erase({getAddress(origMetadata), skipArtificialSubclasses});
-        return it->second;
+        return cached;
       }
     }
 

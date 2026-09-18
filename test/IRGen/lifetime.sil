@@ -24,7 +24,8 @@ bb0(%x : $*T):
 // CHECK-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 8
 // CHECK-NEXT: [[SIZE:%.*]] = load [[INT]], ptr [[SIZE_ADDR]]
 // CHECK-NEXT: [[Y_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
-// CHECK-NEXT: call void @llvm.lifetime.start.p0({{(i32|i64)}} -1, ptr [[Y_ALLOCA]])
+//   No lifetime marker: 'y' is a dynamic alloca, and lifetime markers are
+//   only valid on static allocas.
 //   Copy 'x' into 'y'.
 // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 2
 // CHECK-NEXT: [[T4:%.*]] = load ptr, ptr [[T3]], align
@@ -39,7 +40,6 @@ bb0(%x : $*T):
 // CHECK-NEXT: call void [[T4]](ptr noalias [[Y_ALLOCA]], ptr %T)
 //   Destroy 'x'.
 // CHECK-NEXT: call void [[T4]](ptr noalias [[X]], ptr %T)
-// CHECK-NEXT: call void @llvm.lifetime.end.p0({{(i32|i64)}} -1, ptr [[Y_ALLOCA]])
 //   Return.
 // CHECK-NEXT: ret void
 
@@ -64,7 +64,8 @@ bb0(%x : $*T):
 // CHECK-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 8
 // CHECK-NEXT: [[SIZE:%.*]] = load [[INT]], ptr [[SIZE_ADDR]]
 // CHECK-NEXT: [[Y_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
-// CHECK-NEXT: call void @llvm.lifetime.start.p0({{(i32|i64)}} -1, ptr [[Y_ALLOCA]])
+//   No lifetime marker: 'y' is a dynamic alloca, and lifetime markers are
+//   only valid on static allocas.
 //   Copy 'x' into 'y'.
 // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 2
 // CHECK-NEXT: [[T4:%.*]] = load ptr, ptr [[T3]], align
@@ -85,7 +86,6 @@ bb0(%x : $*T):
 // CHECK-NEXT: call ptr [[T5]](ptr noalias [[Y_ALLOCA]], ptr noalias [[X]], ptr %T)
 //   Destroy 'y'.
 // CHECK-NEXT: call void [[T4]](ptr noalias [[Y_ALLOCA]], ptr %T)
-// CHECK-NEXT: call void @llvm.lifetime.end.p0({{(i32|i64)}} -1, ptr [[Y_ALLOCA]])
 //   Return.
 // CHECK-NEXT: ret void
 
@@ -101,8 +101,8 @@ bb0(%x : $*Builtin.Int64):
 }
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @fixed_size(ptr noalias captures(none) dereferenceable(8) %0)
 // CHECK:         [[XBUF:%.*]] = alloca i64
-// CHECK-NEXT:    call void @llvm.lifetime.start.p0({{(i32|i64)}} 8, ptr [[XBUF]])
+// CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[XBUF]])
 // CHECK-NEXT:    load
 // CHECK-NEXT:    store
-// CHECK-NEXT:    call void @llvm.lifetime.end.p0({{(i32|i64)}} 8, ptr [[XBUF]])
+// CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[XBUF]])
 

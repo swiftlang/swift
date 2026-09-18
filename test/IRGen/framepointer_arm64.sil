@@ -34,7 +34,7 @@ entry(%i : $Int32):
 // CHECK:   ret i32 %1
 // CHECK: }
 
-// CHECK: attributes [[ATTR]] = {{{.*}}"frame-pointer"="non-leaf"
+// CHECK: attributes [[ATTR]] = {{{.*}}"frame-pointer"="non-leaf-no-reserve"
 
 // CHECK-ALL: define{{.*}} swiftcc i32 @leaf_function_no_frame_pointer(i32 %0) [[ATTR:#.*]] {
 // CHECK-ALL: entry:

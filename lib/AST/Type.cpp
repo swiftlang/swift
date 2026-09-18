@@ -4955,7 +4955,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
 
     // It is still possible for an FRT to be involved in an archetype or
     // protocol type, so only short-circuit for cases other than those
-    if (!isa<ArchetypeType, ProtocolType, ProtocolCompositionType>(type))
+    if (!isa<ArchetypeType>(type) && !isa<ProtocolType>(type) &&
+        !isa<ProtocolCompositionType>(type))
       return isa<BuiltinBridgeObjectType>(type) ? ReferenceCounting::Bridge
                                                 : ReferenceCounting::Native;
   }
