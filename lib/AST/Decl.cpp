@@ -11476,6 +11476,35 @@ bool AbstractFunctionDecl::isObjCInstanceMethod() const {
   return isInstanceMember() || isa<ConstructorDecl>(this);
 }
 
+bool ValueDecl::isObjCDirectDispatched() const {
+  // Written @objcDirect in Swift. The attribute is OnFunc | OnConstructor, so
+  // only an AbstractFunctionDecl can be carrying it.
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(this))
+    if (AFD->isObjCDirect())
+      return true;
+
+  // Imported from a Clang declaration marked objc_direct. An accessor may
+  // carry either the imported getter/setter method or, failing that, the
+  // property itself, so check the storage too.
+  auto isDirectClangDecl = [](const clang::Decl *clangDecl) {
+    if (!clangDecl)
+      return false;
+    if (auto *method = dyn_cast<clang::ObjCMethodDecl>(clangDecl))
+      return method->isDirectMethod();
+    if (auto *property = dyn_cast<clang::ObjCPropertyDecl>(clangDecl))
+      return property->isDirectProperty();
+    return false;
+  };
+
+  if (isDirectClangDecl(getClangDecl()))
+    return true;
+
+  if (auto *accessor = dyn_cast<AccessorDecl>(this))
+    return isDirectClangDecl(accessor->getStorage()->getClangDecl());
+
+  return false;
+}
+
 std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
   if (getAttrs().hasAttribute<CxxDeclAttr>())
     return ForeignLanguage::Cxx;

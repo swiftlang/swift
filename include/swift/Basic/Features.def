@@ -696,6 +696,11 @@ EXPERIMENTAL_FEATURE(TargetAttribute, true)
 /// Enable distributed actors in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDistributed, false)
 
+/// Allow `@objcDirect` to export a method as an Objective-C direct method.
+/// Enabling this implies Clang's `-fobjc-direct-precondition-thunk`, which is
+/// the ABI the exported symbol is mangled for; see ParseClangImporterArgs.
+EXPERIMENTAL_FEATURE(ObjCDirect, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

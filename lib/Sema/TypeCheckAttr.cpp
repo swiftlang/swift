@@ -416,6 +416,7 @@ public:
   void visitNonObjCAttr(NonObjCAttr *attr);
   void visitObjCImplementationAttr(ObjCImplementationAttr *attr);
   void visitObjCMembersAttr(ObjCMembersAttr *attr);
+  void visitObjCDirectAttr(ObjCDirectAttr *attr);
 
   void visitOptionalAttr(OptionalAttr *attr);
 
@@ -1954,6 +1955,119 @@ void AttributeChecker::visitObjCMembersAttr(ObjCMembersAttr *attr) {
   auto reason = ObjCReason(ObjCReason::ExplicitlyObjCMembers, attr);
   auto behavior = behaviorLimitForObjCReason(reason, Ctx);
   diagnoseObjCAttrWithoutFoundation(attr, D, reason, behavior);
+}
+
+// Note the Feature::ObjCDirect requirement is not checked here: DeclAttr.def
+// declares it with DECL_ATTR_FEATURE_REQUIREMENT, so checkDeclAttributes()
+// diagnoses and strips the attribute before this ever runs. That is also what
+// keeps the feature gate ahead of every applicability rule below.
+void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
+  // DeclAttr.def restricts the attribute to OnFunc | OnConstructor |
+  // OnDestructor, so accessors and subscripts are already rejected by the
+  // applicability check and this cast cannot fail.
+  auto *fn = cast<AbstractFunctionDecl>(D);
+
+  // Disallow on deinit. This is kept as its own rule, rather than folded into
+  // the applicability mask, so that the diagnostic names the actual problem.
+  if (isa<DestructorDecl>(fn)) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_on_deinit);
+    return;
+  }
+
+  // Must be in a class, not a protocol.
+  if (isa<ProtocolDecl>(fn->getDeclContext())) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_in_protocol);
+    return;
+  }
+
+  // The direct symbol's class-name segment is the printed @interface name, so
+  // the method has to belong to a class that is actually printed. A global
+  // function, or a member of a struct or enum, has no such name.
+  auto *classDecl = fn->getDeclContext()->getSelfClassDecl();
+  if (!classDecl) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_not_in_class);
+    return;
+  }
+
+  // A generic class is never printed to the generated header, so a direct
+  // symbol on one could not be referenced from Objective-C even though the
+  // standard @objc check permits the member. Reject it rather than emit a
+  // symbol nothing can call.
+  if (classDecl->isGenericContext()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_in_generic_class);
+    return;
+  }
+
+  // Reject anything that requires the method to be reachable by selector at
+  // runtime. A direct method is absent from the class's Objective-C method
+  // list, so such a dispatch would find nothing.
+  //
+  // 'dynamic' is checked semantically rather than as an attribute: the 'final'
+  // requirement below does not exclude it, because IsDynamicRequest honours an
+  // explicit 'dynamic' before it consults isSemanticallyFinal() -- 'final' only
+  // blocks *inference* of 'dynamic'. Asking isDynamic() also covers @NSManaged,
+  // which implies 'dynamic'. This must precede the 'final' check so that a
+  // non-final 'dynamic' method reports the real conflict.
+  if (fn->isDynamic()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_dynamic);
+    return;
+  }
+
+  // An action is wired up by selector from a nib or storyboard, which is not
+  // visible to the compiler at all, so this has to be rejected outright.
+  if (D->getAttrs().hasAttribute<IBActionAttr>() ||
+      D->getAttrs().hasAttribute<IBSegueActionAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_ibaction);
+    return;
+  }
+
+  // Must be final (except for initializers, which can't be overridden the
+  // same way).
+  if (!isa<ConstructorDecl>(fn) && !fn->isFinal()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_not_final);
+    return;
+  }
+
+  // Required initializers must be inherited - incompatible with direct.
+  if (auto *ctor = dyn_cast<ConstructorDecl>(fn)) {
+    if (ctor->isRequired()) {
+      diagnoseAndRemoveAttr(attr, diag::objc_direct_required_init);
+      return;
+    }
+  }
+
+  // Cannot override a superclass method.
+  if (fn->getOverriddenDecl()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_override);
+    return;
+  }
+
+  // Access level must be at least internal.
+  if (fn->getFormalAccess() < AccessLevel::Internal) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_access_level);
+    return;
+  }
+
+  // No async support yet.
+  if (fn->hasAsync()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_with_async);
+    return;
+  }
+
+  // @objcDirect implies @objc. Add an implicit unnamed @objc if the decl does
+  // not already have one, and let the normal @objc machinery validate it, so a
+  // signature that is not representable in Objective-C is still rejected by the
+  // standard @objc diagnostics rather than slipping through. An explicit
+  // @objc(name:) rename is left alone: the mangler uses the renamed selector
+  // and the generated header prints the same name, so a rename flows through
+  // end to end.
+  if (!fn->getAttrs().hasAttribute<ObjCAttr>())
+    fn->getAttrs().add(ObjCAttr::createUnnamedImplicit(Ctx));
+
+  // Force the standard @objc checking now, so any representability error is
+  // diagnosed as part of applying @objcDirect. The request is memoized, so this
+  // does not double-diagnose against the later natural evaluation.
+  (void)fn->isObjC();
 }
 
 void AttributeChecker::visitOptionalAttr(OptionalAttr *attr) {

@@ -1773,6 +1773,8 @@ public:
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
   ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
+  ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type,
+                                             bool isDirect);
 
   void
   ensureImplicitCXXDestructorBodyIsDefined(clang::CXXDestructorDecl *cxxDtor);

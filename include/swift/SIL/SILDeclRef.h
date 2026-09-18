@@ -516,6 +516,9 @@ struct SILDeclRef {
 
   ActorIsolation getActorIsolation() const;
 
+  /// True if this references an @objcDirect method's foreign entry point.
+  bool isObjCDirect() const;
+
   /// True if the decl ref references a thunk from a natively foreign
   /// declaration to Swift calling convention.
   bool isForeignToNativeThunk() const;
