@@ -14,6 +14,7 @@
 #include "DeserializationErrors.h"
 #include "ModuleFile.h"
 #include "ModuleFormat.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
@@ -7971,8 +7972,7 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
                          ? parentTy.get()->getCanonicalType()
                          : CanType();
     CanType type = CanType(
-        HiddenType::get(MF.getContext(), hidden->MangledName,
-                        MF.getAssociatedModule(), hidden, parent));
+        HiddenType::get(MF.getContext(), hidden->MangledName, hidden, parent));
     MF.getContext().recordRecoveredHiddenType(type);
     return type;
   }
@@ -9060,16 +9060,6 @@ Expected<Type> DESERIALIZE_TYPE(INTEGER_TYPE)(ModuleFile &MF,
   return IntegerType::get(blobData, isNegative, ctx);
 }
 
-Expected<Type> DESERIALIZE_TYPE(HIDDEN_TYPE)(ModuleFile &MF,
-                                             SmallVectorImpl<uint64_t> &scratch,
-                                             StringRef blobData) {
-  auto &ctx = MF.getContext();
-
-  decls_block::HiddenTypeLayout::readRecord(scratch);
-
-  return HiddenType::get(ctx, blobData, MF.getAssociatedModule(), nullptr,
-                         CanType());
-}
 } // namespace decls_block
 } // namespace serialization
 }
