@@ -2031,6 +2031,12 @@ BridgedInstruction::UnconditionalCheckedCast_getCheckedCastOptions() const {
         .getStorage()};
 }
 
+BridgedInstruction::CastConsumptionKind
+BridgedInstruction::UnconditionalCheckedCastAddr_getConsumptionKind() const {
+  auto *inst = getAs<swift::UnconditionalCheckedCastAddrInst>();
+  return static_cast<CastConsumptionKind>(inst->getConsumptionKind());
+}
+
 BridgedCanType BridgedInstruction::UnconditionalCheckedCastAddr_getSourceFormalType() const {
   return {getAs<swift::UnconditionalCheckedCastAddrInst>()->getSourceFormalType()};
 }

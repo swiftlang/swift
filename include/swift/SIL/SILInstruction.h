@@ -11696,6 +11696,10 @@ class UnconditionalCheckedCastAddrInst final
          SILFunction &F);
 
 public:
+  CastConsumptionKind getConsumptionKind() const {
+    return CastConsumptionKind::TakeAlways;
+  }
+
   CheckedCastInstOptions getCheckedCastOptions() const { return Options; }
 };
 

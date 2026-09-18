@@ -8083,12 +8083,9 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
                                    swift::UnconditionalCheckedCastAddrInst *i) {
   Address dest = getLoweredAddress(i->getDest());
   Address src = getLoweredAddress(i->getSrc());
-  emitCheckedCast(*this,
-                  src, i->getSourceFormalType(),
-                  dest, i->getTargetFormalType(),
-                  CastConsumptionKind::TakeAlways,
-                  CheckedCastMode::Unconditional,
-                  i->getCheckedCastOptions());
+  emitCheckedCast(*this, src, i->getSourceFormalType(), dest,
+                  i->getTargetFormalType(), i->getConsumptionKind(),
+                  CheckedCastMode::Unconditional, i->getCheckedCastOptions());
 }
 
 void IRGenSILFunction::visitCheckedCastBranchInst(

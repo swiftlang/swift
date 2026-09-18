@@ -989,6 +989,8 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType UnconditionalCheckedCast_getTargetFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CheckedCastInstOptions
       UnconditionalCheckedCast_getCheckedCastOptions() const;
+  BRIDGED_INLINE CastConsumptionKind
+  UnconditionalCheckedCastAddr_getConsumptionKind() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType UnconditionalCheckedCastAddr_getSourceFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType UnconditionalCheckedCastAddr_getTargetFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CheckedCastInstOptions

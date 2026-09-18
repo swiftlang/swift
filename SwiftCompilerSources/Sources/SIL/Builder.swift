@@ -347,7 +347,7 @@ public struct Builder {
     source: Value, sourceFormalType: CanonicalType,
     destination: Value, targetFormalType: CanonicalType,
     options: CheckedCastInstOptions,
-    consumptionKind: CheckedCastAddrBranchInst.CastConsumptionKind,
+    consumptionKind: CastConsumptionKind,
     successBlock: BasicBlock,
     failureBlock: BasicBlock
   ) -> CheckedCastAddrBranchInst {
