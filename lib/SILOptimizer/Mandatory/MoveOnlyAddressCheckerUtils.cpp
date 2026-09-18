@@ -2702,12 +2702,14 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // leaves Src in place. Model this by recording the take at the entry of the
   // success block rather than at the branch itself, so liveness treats Src as
   // consumed starting there while still live from the branch to the failure
-  // edge.
+  // edge. CopyOnSuccess never consumes Src, so it is only a liveness use.
+  // Both casts write to Dest, which must not be mistaken for a write to Src.
   if (auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user)) {
+    auto consumption = ccabi->getConsumptionKind();
     if (ccabi->getSrc() == op->get() &&
-        ccabi->getConsumptionKind() == CastConsumptionKind::TakeOnSuccess) {
-      LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br "
-                                 "take_on_success Src: " << *user);
+        (consumption == CastConsumptionKind::TakeOnSuccess ||
+         consumption == CastConsumptionKind::CopyOnSuccess)) {
+      LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br Src: " << *user);
       SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
       TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
       if (!leafRanges.size()) {
@@ -2715,9 +2717,9 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         return false;
       }
 
-      auto *successEntry = &ccabi->getSuccessBB()->front();
       for (auto leafRange : leafRanges) {
-        useState.recordTakeUse(successEntry, leafRange);
+        if (consumption == CastConsumptionKind::TakeOnSuccess)
+          useState.recordTakeUse(&ccabi->getSuccessBB()->front(), leafRange);
         useState.recordLivenessUse(user, leafRange);
       }
       return true;
