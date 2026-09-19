@@ -349,6 +349,19 @@ fixed_storage.check_index(position: Index)
   storage mutations. This semantic is implemented by the ``_checkIndex``
   method in Span, MutableSpan, and InlineArray.
 
+fixed_storage.check_range(lowerBound: Index, upperBound: Index)
+
+  Ensures the range ``lowerBound...upperBound`` lies within the valid
+  bounds of the fixed storage. Similar to fixed_storage.check_index, this aids
+  in SIL's bounds check optimizations.
+
+fixed_storage.check_range_offset(offset: Index, length: Index)
+
+  Ensures the range ``offset...offset + length`` lies within the valid
+  bounds of the fixed storage. Similar to fixed_storage.check_range, this aids
+  in SIL's bounds check optimizations. It is used where a range is described by
+  a starting offset and a length, such as loading a value of a given size from a
+  raw span.
 
 @_effects attribute
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
