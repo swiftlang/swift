@@ -685,6 +685,19 @@ static ExecutablePath getExecutablePath(void) {
   return "";
 }
 #elif defined(__OpenBSD__)
+#include <sys/param.h>
+
+#if OpenBSD >= 202610
+static ExecutablePath getExecutablePath(void) {
+  char buffer[PATH_MAX];
+  if (getexecpath(buffer, sizeof(buffer)) != 0) {
+    // Could not get the path to the current executable, e.g. the directory
+    // it was launched from is no longer reachable.
+    return "";
+  }
+  return buffer;
+}
+#else
 /// Storage for ``captureEarlyCWD()``.
 static std::atomic<const char *> earlyCWD { nullptr };
 
@@ -747,6 +760,7 @@ static ExecutablePath getExecutablePath(void) {
 
   return result;
 }
+#endif
 #else // Add your favorite OS's executable path getter here.
 static ExecutablePath getExecutablePath(void) {
   swift::fatalError(
