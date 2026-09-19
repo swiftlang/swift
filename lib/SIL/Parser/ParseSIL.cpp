@@ -4680,12 +4680,25 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     CheckedCastInstOptions options = parseCheckedCastInstOptions(nullptr);
 
+    auto consumptionKind = CastConsumptionKind::TakeAlways;
+    if (P.Tok.isContextualKeyword("copy_on_success")) {
+      consumptionKind = CastConsumptionKind::CopyOnSuccess;
+      P.consumeToken();
+    } else if (P.Tok.isContextualKeyword("take_always")) {
+      P.consumeToken();
+    } else if (P.Tok.isContextualKeyword("take_on_success") ||
+               P.Tok.isContextualKeyword("borrow_always")) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,
+                 "cast consumption kind");
+      return true;
+    }
+
     if (parseSourceAndDestAddress() || parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createUnconditionalCheckedCastAddr(
-        InstLoc, options, SourceAddr, SourceType,
-        DestAddr, TargetType);
+        InstLoc, options, consumptionKind, SourceAddr, SourceType, DestAddr,
+        TargetType);
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastInst: {

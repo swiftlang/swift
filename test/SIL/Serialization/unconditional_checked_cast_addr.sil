@@ -1,0 +1,63 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt -sil-print-types -emit-sorted-sil -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -emit-sorted-sil %s -emit-sib -o %t/casts.sib -module-name casts
+// RUN: %target-sil-opt -sil-print-types -emit-sorted-sil -enable-sil-verify-all %t/casts.sib -module-name casts | %FileCheck %s
+
+sil_stage canonical
+import Swift
+
+// Copying a borrowed source preserves it through the cast and its read access.
+// Serialization retains the isolation option alongside the consumption kind.
+// CHECK-LABEL: sil [serialized] [ossa] @copy_source
+// CHECK: [[SRC:%.*]] = begin_access [read] [static]
+// CHECK: unconditional_checked_cast_addr [prohibit_isolated_conformances] copy_on_success T in [[SRC]] : $*T to U in %0 : $*U
+// CHECK-NEXT: fix_lifetime [[SRC]] : $*T
+// CHECK-NEXT: end_access [[SRC]] : $*T
+sil [serialized] [ossa] @copy_source : $@convention(thin) <T, U> (@in_guaranteed T) -> @out U {
+bb0(%0 : $*U, %1 : $*T):
+  %2 = begin_access [read] [static] %1 : $*T
+  unconditional_checked_cast_addr [prohibit_isolated_conformances] copy_on_success T in %2 : $*T to U in %0 : $*U
+  fix_lifetime %2 : $*T
+  end_access %2 : $*T
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// An omitted consumption kind retains the original consuming semantics.
+// CHECK-LABEL: sil [serialized] [ossa] @default_take
+// CHECK: unconditional_checked_cast_addr T in %1 : $*T to U in %0 : $*U
+sil [serialized] [ossa] @default_take : $@convention(thin) <T, U> (@in T) -> @out U {
+bb0(%0 : $*U, %1 : $*T):
+  unconditional_checked_cast_addr T in %1 : $*T to U in %0 : $*U
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// The printer canonicalizes an explicit take_always to the existing spelling.
+// CHECK-LABEL: sil [serialized] [ossa] @explicit_take
+// CHECK: unconditional_checked_cast_addr T in %1 : $*T to U in %0 : $*U
+sil [serialized] [ossa] @explicit_take : $@convention(thin) <T, U> (@in T) -> @out U {
+bb0(%0 : $*U, %1 : $*T):
+  unconditional_checked_cast_addr take_always T in %1 : $*T to U in %0 : $*U
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Both local buffers remain initialized and must each be destroyed.
+// CHECK-LABEL: sil [serialized] [ossa] @local_lifetimes
+// CHECK: unconditional_checked_cast_addr copy_on_success
+// CHECK: destroy_addr
+// CHECK: destroy_addr
+sil [serialized] [ossa] @local_lifetimes : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> () {
+bb0(%0 : $*T, %1 : $@thick U.Type):
+  %2 = alloc_stack $T
+  %3 = alloc_stack $U
+  copy_addr %0 to [init] %2 : $*T
+  unconditional_checked_cast_addr copy_on_success T in %2 : $*T to U in %3 : $*U
+  destroy_addr %3 : $*U
+  destroy_addr %2 : $*T
+  dealloc_stack %3 : $*U
+  dealloc_stack %2 : $*T
+  %4 = tuple ()
+  return %4 : $()
+}

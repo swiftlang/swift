@@ -2698,6 +2698,19 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
 
+  if (auto *cast = dyn_cast<UnconditionalCheckedCastAddrInst>(user)) {
+    if (cast->getSrc() == op->get() &&
+        cast->getConsumptionKind() == CastConsumptionKind::CopyOnSuccess) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (leafRanges.empty())
+        return false;
+      for (auto leafRange : leafRanges)
+        useState.recordLivenessUse(user, leafRange);
+      return true;
+    }
+  }
+
   // For TakeOnSuccess, only a successful cast consumes Src.  A failed cast
   // leaves Src in place. Model this by recording the take at the entry of the
   // success block rather than at the branch itself, so liveness treats Src as

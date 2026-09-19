@@ -213,8 +213,9 @@ public:
     // checked_cast_value_br yet. Should we ever support it, please
     // review this code.
     case SILDynamicCastKind::CheckedCastBranchInst:
-    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return CastConsumptionKind::TakeAlways;
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+      return cast<UnconditionalCheckedCastAddrInst>(inst)->getConsumptionKind();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
       return CastConsumptionKind::CopyOnSuccess;
     }

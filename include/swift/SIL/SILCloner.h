@@ -2315,10 +2315,10 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
   CanType SrcType = getOpASTType(Inst->getSourceFormalType());
   CanType TargetType = getOpASTType(Inst->getTargetFormalType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst,
-                          getBuilder().createUnconditionalCheckedCastAddr(
-                              OpLoc, Inst->getCheckedCastOptions(),
-                              SrcValue, SrcType, DestValue, TargetType));
+  recordClonedInstruction(Inst, getBuilder().createUnconditionalCheckedCastAddr(
+                                    OpLoc, Inst->getCheckedCastOptions(),
+                                    Inst->getConsumptionKind(), SrcValue,
+                                    SrcType, DestValue, TargetType));
 }
 
 template <typename ImplClass>

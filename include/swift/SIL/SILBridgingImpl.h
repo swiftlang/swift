@@ -2031,6 +2031,12 @@ BridgedInstruction::UnconditionalCheckedCast_getCheckedCastOptions() const {
         .getStorage()};
 }
 
+BridgedInstruction::CastConsumptionKind
+BridgedInstruction::UnconditionalCheckedCastAddr_getConsumptionKind() const {
+  auto *inst = getAs<swift::UnconditionalCheckedCastAddrInst>();
+  return static_cast<CastConsumptionKind>(inst->getConsumptionKind());
+}
+
 BridgedCanType BridgedInstruction::UnconditionalCheckedCastAddr_getSourceFormalType() const {
   return {getAs<swift::UnconditionalCheckedCastAddrInst>()->getSourceFormalType()};
 }
@@ -2873,14 +2879,14 @@ BridgedInstruction BridgedBuilder::createCheckedCastAddrBranch(
 
 BridgedInstruction BridgedBuilder::createUnconditionalCheckedCastAddr(
     BridgedInstruction::CheckedCastInstOptions options,
+    BridgedInstruction::CastConsumptionKind consumptionKind,
     BridgedValue source, BridgedCanType sourceFormalType,
-    BridgedValue destination, BridgedCanType targetFormalType) const
-{
+    BridgedValue destination, BridgedCanType targetFormalType) const {
   return {unbridged().createUnconditionalCheckedCastAddr(
-            regularLoc(),
-            swift::CheckedCastInstOptions(options.storage),
-            source.getSILValue(), sourceFormalType.unbridged(),
-            destination.getSILValue(), targetFormalType.unbridged())};
+      regularLoc(), swift::CheckedCastInstOptions(options.storage),
+      static_cast<swift::CastConsumptionKind>(consumptionKind),
+      source.getSILValue(), sourceFormalType.unbridged(),
+      destination.getSILValue(), targetFormalType.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createLoad(BridgedValue op, SwiftInt ownership) const {

@@ -1628,9 +1628,18 @@ public:
                                      CheckedCastInstOptions options,
                                      SILValue src, CanType sourceFormalType,
                                      SILValue dest, CanType targetFormalType) {
+    return createUnconditionalCheckedCastAddr(
+        Loc, options, CastConsumptionKind::TakeAlways, src, sourceFormalType,
+        dest, targetFormalType);
+  }
+
+  UnconditionalCheckedCastAddrInst *createUnconditionalCheckedCastAddr(
+      SILLocation Loc, CheckedCastInstOptions options,
+      CastConsumptionKind consumptionKind, SILValue src,
+      CanType sourceFormalType, SILValue dest, CanType targetFormalType) {
     return insert(UnconditionalCheckedCastAddrInst::create(
-        getSILDebugLocation(Loc), options, src, sourceFormalType,
-        dest, targetFormalType, getFunction()));
+        getSILDebugLocation(Loc), options, consumptionKind, src,
+        sourceFormalType, dest, targetFormalType, getFunction()));
   }
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,

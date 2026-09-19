@@ -1,0 +1,16 @@
+// RUN: %target-sil-opt -verify %s
+
+sil_stage canonical
+import Swift
+
+sil @invalid_consumption : $@convention(thin) <T, U> (@in T) -> @out U {
+bb0(%0 : $*U, %1 : $*T):
+  // expected-error@+1 {{expected 'cast consumption kind' in SIL instruction}}
+  unconditional_checked_cast_addr take_on_success T in %1 : $*T to U in %0 : $*U
+}
+
+sil @invalid_borrow : $@convention(thin) <T, U> (@in T) -> @out U {
+bb0(%0 : $*U, %1 : $*T):
+  // expected-error@+1 {{expected 'cast consumption kind' in SIL instruction}}
+  unconditional_checked_cast_addr borrow_always T in %1 : $*T to U in %0 : $*U
+}

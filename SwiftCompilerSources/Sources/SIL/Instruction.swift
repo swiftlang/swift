@@ -738,6 +738,21 @@ final public class DebugStepInst : Instruction {}
 
 final public class SpecifyTestInst : Instruction {}
 
+public enum CastConsumptionKind {
+  /// The source value is always taken, regardless of whether the cast
+  /// succeeds.  That is, if the cast fails, the source value is
+  /// destroyed.
+  case TakeAlways
+
+  /// The source value is taken only on a successful cast; otherwise,
+  /// it is left in place.
+  case TakeOnSuccess
+
+  /// The source value is always left in place, and the destination
+  /// value is copied into on success.
+  case CopyOnSuccess
+}
+
 final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAddrInstruction {
   public var sourceFormalType: CanonicalType {
     CanonicalType(bridged: bridged.UnconditionalCheckedCastAddr_getSourceFormalType())
@@ -746,7 +761,22 @@ final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAdd
     CanonicalType(bridged: bridged.UnconditionalCheckedCastAddr_getTargetFormalType())
   }
 
-  public var isTakeOfSource: Bool { true }
+  public var consumptionKind: CastConsumptionKind {
+    return switch bridged.UnconditionalCheckedCastAddr_getConsumptionKind() {
+    case .TakeAlways: .TakeAlways
+    case .TakeOnSuccess: .TakeOnSuccess
+    case .CopyOnSuccess: .CopyOnSuccess
+    @unknown default:
+      fatalError("invalid cast consumption kind")
+    }
+  }
+
+  public var isTakeOfSource: Bool {
+    switch consumptionKind {
+    case .TakeAlways, .TakeOnSuccess: return true
+    case .CopyOnSuccess: return false
+    }
+  }
   public var isInitializationOfDestination: Bool { true }
   public override var mayTrap: Bool { true }
 
@@ -2494,21 +2524,6 @@ final public class CheckedCastAddrBranchInst : TermInst {
 
   public var successBlock: BasicBlock { bridged.CheckedCastAddrBranch_getSuccessBlock().block }
   public var failureBlock: BasicBlock { bridged.CheckedCastAddrBranch_getFailureBlock().block }
-
-  public enum CastConsumptionKind {
-    /// The source value is always taken, regardless of whether the cast
-    /// succeeds.  That is, if the cast fails, the source value is
-    /// destroyed.
-    case TakeAlways
-
-    /// The source value is taken only on a successful cast; otherwise,
-    /// it is left in place.
-    case TakeOnSuccess
-
-    /// The source value is always left in place, and the destination
-    /// value is copied into on success.
-    case CopyOnSuccess
-  }
 
   public var consumptionKind: CastConsumptionKind {
     switch bridged.CheckedCastAddrBranch_getConsumptionKind() {

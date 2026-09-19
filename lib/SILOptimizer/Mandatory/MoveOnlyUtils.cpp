@@ -311,11 +311,11 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
   }
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
     return true;
-  case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-    // Src is always taken, unconditionally (the instruction traps on
-    // failure, so if we're still executing, Src was consumed).
-    return cast<UnconditionalCheckedCastAddrInst>(memInst)->getSrc() ==
-           address;
+  case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
+    auto *cast = swift::cast<UnconditionalCheckedCastAddrInst>(memInst);
+    return cast->getSrc() == address &&
+           shouldTakeOnSuccess(cast->getConsumptionKind());
+  }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
     auto *ccabi = cast<CheckedCastAddrBranchInst>(memInst);
     // Only a source operand consumed under TakeAlways is unconditionally

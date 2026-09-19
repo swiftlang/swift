@@ -423,6 +423,7 @@ private extension AllocStackInst {
         let builder = Builder(before: ucca, context)
         builder.createUnconditionalCheckedCastAddr(
           options: ucca.checkedCastOptions,
+          consumptionKind: ucca.consumptionKind,
           source: newAlloc, sourceFormalType: concreteFormalType,
           destination: ucca.destination, targetFormalType: ucca.targetFormalType)
         context.erase(instruction: ucca)
