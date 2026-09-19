@@ -878,6 +878,14 @@ function set_build_options_for_host() {
         # Limit the number of parallel tests
         lldb_lit_args+=" -j $(sysctl hw.physicalcpu | awk -v N=${LIT_JOBS} '{ print (N < int($2/1.5)) ? N : int($2/1.5) }')"
     fi
+    if [[ "$(sw_vers -productVersion 2>/dev/null)" =~ ^26(\.|$) ]]; then
+        # Work around a problem where macOS 26 unpredictably denies a bunch of
+        # concurrently running debugserver instances the permission to attach
+        # to a process, by re-running only these failures in series. CMake's
+        # separate_arguments() splits LLVM_LIT_ARGS on whitespace without
+        # honoring quotes, hence the `.` standing in for spaces.
+        lldb_lit_args+=" --rerun-failed-serially cannot.get.permission.to.debug.processes\\|Process.launch.failed"
+    fi
     lldb_cmake_options+=(
         -DLLVM_LIT_ARGS="${lldb_lit_args}"
     )
