@@ -1,0 +1,71 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all=true -enable-experimental-feature SplitContinuations %s | %target-sil-opt -sil-print-types -enable-sil-verify-all=true -enable-experimental-feature SplitContinuations | %FileCheck %s
+// REQUIRES: concurrency
+// REQUIRES: swift_feature_SplitContinuations
+
+import Builtin
+import Swift
+import _Concurrency
+
+// CHECK-LABEL: sil @split_create : $@convention(thin) () -> Builtin.RawUnsafeContinuation {
+sil @split_create : $@convention(thin) () -> Builtin.RawUnsafeContinuation {
+bb0:
+  // CHECK: [[MT:%.*]] = metatype $@thin Builtin.Int32.Type
+  %mt = metatype $@thin Builtin.Int32.Type
+  // CHECK: [[TOK:%.*]] = builtin "createSplitContinuation"<Builtin.Int32>([[MT]] : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
+  %tok = builtin "createSplitContinuation"<Builtin.Int32>(%mt : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
+  // CHECK: return [[TOK]]
+  return %tok : $Builtin.RawUnsafeContinuation
+}
+
+// CHECK-LABEL: sil @split_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
+sil @split_await : $@async (Builtin.RawUnsafeContinuation) -> () {
+// CHECK: bb0([[TOK:%.*]] : $Builtin.RawUnsafeContinuation):
+entry(%continuation : $Builtin.RawUnsafeContinuation):
+  // CHECK: [[SLOT:%.*]] = alloc_stack $Builtin.Int32
+  %a = alloc_stack $Builtin.Int32
+  // CHECK: [[CONT:%.*]] = builtin "getSplitContinuationAddr"<Builtin.Int32>([[TOK]] : $Builtin.RawUnsafeContinuation, [[SLOT]] : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  // The line ends after the resume successor, i.e. there is no error successor.
+  // CHECK: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]] // id:
+  await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1
+  // CHECK: [[RESUME]]:
+bb1:
+  // CHECK: dealloc_stack [[SLOT]]
+  dealloc_stack %a : $*Builtin.Int32
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @split_await_throws : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
+sil @split_await_throws : $@async (Builtin.RawUnsafeContinuation) -> () {
+// CHECK: bb0([[TOK:%.*]] : $Builtin.RawUnsafeContinuation):
+entry(%continuation : $Builtin.RawUnsafeContinuation):
+  // CHECK: [[SLOT:%.*]] = alloc_stack $Builtin.Int32
+  %a = alloc_stack $Builtin.Int32
+  // CHECK: [[CONT:%.*]] = builtin "getSplitContinuationAddr"<Builtin.Int32>([[TOK]] : $Builtin.RawUnsafeContinuation, [[SLOT]] : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  // CHECK: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1, error bb2
+  // CHECK: [[RESUME]]:
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+  // CHECK: [[ERROR]]({{%.*}} : $any Error):
+bb2(%e : $Error):
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+
+bb3:
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @split_resume : $@convention(thin) (Builtin.RawUnsafeContinuation, @in Builtin.Int32) -> () {
+sil @split_resume : $@convention(thin) (Builtin.RawUnsafeContinuation, @in Builtin.Int32) -> () {
+bb0(%continuation : $Builtin.RawUnsafeContinuation, %val : $*Builtin.Int32):
+  %v = load %val : $*Builtin.Int32
+  // CHECK: builtin "resumeThrowingContinuationReturning"<Builtin.Int32>({{%.*}} : $Builtin.RawUnsafeContinuation, {{%.*}} : $Builtin.Int32) : $()
+  %r = builtin "resumeThrowingContinuationReturning"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %v : $Builtin.Int32) : $()
+  // CHECK: builtin "destroySplitContinuation"({{%.*}} : $Builtin.RawUnsafeContinuation) : $()
+  %d = builtin "destroySplitContinuation"(%continuation : $Builtin.RawUnsafeContinuation) : $()
+  %t = tuple ()
+  return %t : $()
+}

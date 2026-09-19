@@ -1996,6 +1996,64 @@ static ManagedValue emitBuiltinWithUnsafeThrowingContinuation(
                                            /*throws=*/true);
 }
 
+// Emit SIL for the named builtin: awaitSplitThrowingContinuation.
+static ManagedValue emitBuiltinAwaitSplitThrowingContinuation(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  // Allocate space to receive the resume value when the continuation is
+  // resumed.
+  auto substResultType = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto opaqueResumeType =
+      SGF.getLoweredType(AbstractionPattern::getOpaque(), substResultType);
+  auto resumeBuf = SGF.emitTemporaryAllocation(loc, opaqueResumeType);
+
+  // The continuation, not yet bound to this frame (a
+  // Builtin.RawUnsafeContinuation).
+  SILValue unboundContinuation = args[0].getValue();
+
+  // Bind the continuation to this frame's resume buffer.
+  // `getSplitContinuationAddr` takes the same single generic parameter as
+  // this builtin, so the substitutions carry over unchanged.
+  auto &ctx = SGF.getASTContext();
+  auto continuation = SGF.B.createBuiltin(
+      loc, BuiltinNames::GetSplitContinuationAddr,
+      SILType::getPrimitiveObjectType(ctx.TheRawUnsafeContinuationType), subs,
+      {unboundContinuation, resumeBuf});
+
+  SILBasicBlock *resumeBlock = SGF.createBasicBlock();
+  SILBasicBlock *errorBlock = SGF.createBasicBlock(FunctionSection::Postmatter);
+
+  SGF.B.createAwaitAsyncContinuation(loc, continuation, resumeBlock, errorBlock);
+
+  // Propagate an error if we have one.
+  {
+    SGF.B.emitBlock(errorBlock);
+
+    // Hop back to the expected executor after resuming with a failure (see
+    // emitBuiltinWithUnsafeContinuation for why this matters).
+    ExecutorBreadcrumb(/*mustReturnToExecutor=*/true).emit(SGF, loc);
+
+    Scope errorScope(SGF, loc);
+
+    auto errorTy = SGF.getASTContext().getErrorExistentialType();
+    auto errorVal = SGF.B.createTermResult(
+        SILType::getPrimitiveObjectType(errorTy), OwnershipKind::Owned);
+
+    SGF.emitThrow(loc, errorVal, true);
+  }
+
+  SGF.B.emitBlock(resumeBlock);
+
+  // Hop back to the expected executor after resuming.
+  ExecutorBreadcrumb(/*mustReturnToExecutor=*/true).emit(SGF, loc);
+
+  // Move the value out of the resume buffer, reabstracting it to the
+  // substituted type.
+  return SGF.emitLoad(loc, resumeBuf, AbstractionPattern::getOpaque(),
+                      substResultType, SGF.getTypeLowering(substResultType),
+                      C, IsTake);
+}
+
 static ManagedValue emitBuiltinHopToActor(SILGenFunction &SGF, SILLocation loc,
                                           SubstitutionMap subs,
                                           ArrayRef<ManagedValue> args,

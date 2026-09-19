@@ -184,6 +184,7 @@ SWIFT_CC(swift)
 void
 swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task, JobPriority newPriority);
 
+
 /*************** Methods for Status records manipulation ******************/
 
 /// This function grabs the status record lock of the input task and invokes
@@ -257,6 +258,7 @@ bool addStatusRecordToSelf(TaskStatusRecord *record,
 SWIFT_CC(swift)
 bool addStatusRecordToSelf(TaskStatusRecord *record,  ActiveTaskStatus& taskStatus,
      llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> testAddRecord);
+
 
 /// Remove the status record from input task which may not be the current task.
 /// This may be called asynchronously from the current task.  After this call
@@ -2087,6 +2089,27 @@ inline bool AsyncTask::hasTaskExecutorPreferenceRecord() const {
 inline void AsyncTask::flagAsDestroyed() {
   SWIFT_TASK_DEBUG_LOG("task destroyed %p", this);
 }
+
+// ==== Executor comparison ---------------------------------------------------
+
+/// Whether running a task on `newSerialExecutor` requires switching away from
+/// `currentSerialExecutor`, i.e. whether the current thread may run it directly.
+bool mustSwitchToRun(SerialExecutorRef currentSerialExecutor,
+                     SerialExecutorRef newSerialExecutor,
+                     TaskExecutorRef currentTaskExecutor,
+                     TaskExecutorRef newTaskExecutor);
+
+// ==== Split continuations ---------------------------------------------------
+
+/// Resume `continuation` if it is a split continuation, storing `error` as the
+/// result first when it is non-null.
+///
+/// A raw continuation is either a task or the task-shaped storage of a split
+/// continuation; this tells them apart by reading the marker word. Returns
+/// false for an ordinary task, leaving it untouched, so that the ordinary
+/// swift_continuation_*Resume* entry points can fall through to their own
+/// implementation.
+bool tryResumeSplitContinuation(void *continuation, SwiftError *error);
 
 // ==== Task Local Values -----------------------------------------------------
 
