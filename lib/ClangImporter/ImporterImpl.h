@@ -276,8 +276,10 @@ struct ImportDiagnostic {
 /// In either case we end up losing sugar at some uses sites, so this is more
 /// about what the right default is.
 static inline Bridgeability
-getTypedefBridgeability(const clang::TypedefNameDecl *decl) {
-  if (decl->hasAttr<clang::SwiftBridgedTypedefAttr>() ||
+getTypedefBridgeability(const clang::TypedefNameDecl *decl,
+                        const importer::ImportNameVersion &importVersion) {
+  if (swift::importer::hasSwiftAttr<clang::SwiftBridgedTypedefAttr>(
+          decl, importVersion) ||
       decl->getUnderlyingType()->isBlockPointerType()) {
     return Bridgeability::Full;
   }
@@ -338,6 +340,7 @@ private:
   /// The platform that compilation is targeting, or `nullopt` if the target
   /// triple does not correspond to a platform.
   std::optional<PlatformKind> platformKind;
+  const ImportNameVersion currentVersion;
 
 public:
   /// Returns a non-optional `PlatformKind` corresponding to the platform name
@@ -2177,7 +2180,8 @@ bool isForwardDeclOfType(const clang::Decl *decl);
 bool isBoolOrBoolEnumType(Type ty);
 
 /// Whether we should suppress the import of the given Clang declaration.
-bool shouldSuppressDeclImport(const clang::Decl *decl);
+bool shouldSuppressDeclImport(const clang::Decl *decl,
+                              ImportNameVersion importVersion);
 
 /// Identifies certain UIKit constants that used to have overlay equivalents,
 /// but are now renamed using the swift_name attribute.
@@ -2335,11 +2339,12 @@ findAnonymousEnumForTypedef(const ASTContext &ctx,
       EffectiveClangContext());
 
   auto swiftPrivateFound =
-      llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
+      llvm::find_if(foundDecls, [&ctx](SwiftLookupTable::SingleEntry decl) {
         return isa<clang::NamedDecl *>(decl) &&
                isa<clang::EnumDecl>(cast<clang::NamedDecl *>(decl)) &&
-               cast<clang::NamedDecl *>(decl)
-                   ->hasAttr<clang::SwiftPrivateAttr>();
+               swift::importer::hasSwiftAttr<clang::SwiftPrivateAttr>(
+                   cast<clang::NamedDecl *>(decl),
+                   ImportNameVersion::fromOptions(ctx.LangOpts));
       });
 
   if (swiftPrivateFound != foundDecls.end()) {

@@ -998,7 +998,8 @@ namespace {
       // would because we're in a non-bridgeable context, and therefore
       // the underlying type is different from the mapping of the typedef,
       // use the underlying type.
-      if (Bridging != getTypedefBridgeability(type->getDecl()) &&
+      if (Bridging !=
+              getTypedefBridgeability(type->getDecl(), Impl.CurrentVersion) &&
           !underlyingResult.AbstractType->isEqual(mappedType)) {
         return underlyingResult;
       }
@@ -1138,8 +1139,11 @@ namespace {
       // Check whether there is a swift_bridge attribute.
       if (Impl.DisableSwiftBridgeAttr)
         return Type();
-      auto bridgeAttr = clangDecl->getAttr<clang::SwiftBridgeAttr>();
-      if (!bridgeAttr) return Type();
+
+      auto bridgeAttr =
+          getSwiftAttr<clang::SwiftBridgeAttr>(clangDecl, Impl.CurrentVersion);
+      if (!bridgeAttr)
+        return Type();
 
       // Determine the module and Swift declaration names.
       StringRef moduleName;
@@ -1983,7 +1987,7 @@ ImportedType ClangImporter::Implementation::importPropertyType(
   ImportTypeKind importKind;
   // HACK: Certain decls are always imported using bridged types,
   // because that's what a standalone method would do.
-  if (shouldImportPropertyAsAccessors(decl)) {
+  if (shouldImportPropertyAsAccessors(decl, CurrentVersion)) {
     importKind = ImportTypeKind::Property;
   } else {
     switch (decl->getSetterKind()) {
@@ -2898,6 +2902,14 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
         break;
       }
     }
+    if (!paramInfo->isSending()) {
+      if (auto *attr =
+              getSwiftAttr<clang::SwiftAttrAttr>(param, impl->CurrentVersion)) {
+        if (attr->getAttribute() == "sending") {
+          paramInfo->setSending();
+        }
+      }
+    }
   }
 
   // C++ types taking a reference might return a reference/pointer to a
@@ -2969,7 +2981,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
     // Check nullability of the parameter.
     OptionalTypeKind optionalityOfParam =
-        getParamOptionality(param, knownNonNull);
+        getParamOptionality(param, CurrentVersion, knownNonNull);
 
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
 
@@ -3515,7 +3527,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     // Check nullability of the parameter.
     bool knownNonNull = !nonNullArgs.empty() && nonNullArgs[paramIndex];
     OptionalTypeKind optionalityOfParam =
-        getParamOptionality(param, knownNonNull);
+        getParamOptionality(param, CurrentVersion, knownNonNull);
 
     bool allowNSUIntegerAsIntInParam = isFromSystemModule;
     if (allowNSUIntegerAsIntInParam) {
