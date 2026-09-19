@@ -35,6 +35,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -1592,9 +1593,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 DeferredDiags swift::findSyntacticErrorForConsume(
     ModuleDecl *module, SourceLoc loc, Expr *subExpr,
     llvm::function_ref<Type(Expr *)> getType) {
+  DeferredDiags result;
+
+  // LifetimeResolution can handle all kinds of consumes, such as those on
+  // copyable types and results of functions, without restrictions.
+  if (module->getASTContext().SILOpts.EnableLifetimeResolution)
+    return result;
+
   assert(!isa<ConsumeExpr>(subExpr) && "operates on the sub-expr of a consume");
 
-  DeferredDiags result;
   const bool noncopyable =
       getType(subExpr)->isNoncopyable();
 

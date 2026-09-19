@@ -10,7 +10,9 @@ swift_compiler_sources(SIL
   AccessUtils.swift
   BorrowUtils.swift
   Cloner.swift
+  FieldIndexTrie.swift
   ForwardingUtils.swift
+  FullProjectionPath.swift
   PhiUpdater.swift
   SequenceUtilities.swift
   SmallProjectionPath.swift

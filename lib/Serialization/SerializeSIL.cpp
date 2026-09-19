@@ -1944,6 +1944,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     writeOneOperandExtraAttributeLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }
+  case SILInstructionKind::DiagnoseInst: {
+    unsigned Attr = unsigned(cast<DiagnoseInst>(&SI)->getKind());
+    writeOneOperandExtraAttributeLayout(SI.getKind(), Attr, SI.getOperand(0));
+    break;
+  }
   case SILInstructionKind::UncheckedOwnershipInst: {
     llvm_unreachable("Invalid unchecked_ownership during serialzation");
   }

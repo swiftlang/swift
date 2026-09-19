@@ -1,0 +1,109 @@
+// RUN: %target-sil-opt -test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
+
+// Unit tests for Type.subelementCount(in:) and FieldIndexTrie. Each function builds the trie from
+// the type of the specified value, prints the leaf count and every node's leaf range, and probes a
+// few conservative-fallback paths.
+
+sil_stage raw
+
+import Builtin
+
+class Klass {}
+
+struct SPair {
+  var a: Klass
+  var b: Klass
+}
+
+struct SNest {
+  var p: SPair
+  var c: Klass
+}
+
+// A flat 3-tuple: three leaves, one per element.
+// CHECK-LABEL: begin running test {{.*}} on test_tuple_flat: field_index_trie
+// CHECK: leafCount: 3
+// CHECK: <root> -> 0..<3
+// CHECK: 0 -> 0..<1
+// CHECK: 1 -> 1..<2
+// CHECK: 2 -> 2..<3
+// CHECK-LABEL: end running test {{.*}} on test_tuple_flat: field_index_trie
+sil @test_tuple_flat : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
+  %t = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64)
+  specify_test "field_index_trie %t"
+  %r = tuple ()
+  return %r : $()
+}
+
+// A nested tuple ((Int, Int), Int): element 0 spans two leaves, element 1 is the third.
+// CHECK-LABEL: begin running test {{.*}} on test_tuple_nested: field_index_trie
+// CHECK: leafCount: 3
+// CHECK: <root> -> 0..<3
+// CHECK: 0 -> 0..<2
+// CHECK: 0.0 -> 0..<1
+// CHECK: 0.1 -> 1..<2
+// CHECK: 1 -> 2..<3
+// CHECK-LABEL: end running test {{.*}} on test_tuple_nested: field_index_trie
+sil @test_tuple_nested : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
+  %inner = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+  %t = tuple (%inner : $(Builtin.Int64, Builtin.Int64), %2 : $Builtin.Int64)
+  specify_test "field_index_trie %t"
+  %r = tuple ()
+  return %r : $()
+}
+
+// A nested struct SNest { p: SPair { a, b }, c }: field p spans two leaves (its two Klass fields),
+// field c is the third. Klass is a class, so it is a single opaque leaf.
+// CHECK-LABEL: begin running test {{.*}} on test_struct: field_index_trie
+// CHECK: leafCount: 3
+// CHECK: <root> -> 0..<3
+// CHECK: s0 -> 0..<2
+// CHECK: s0.s0 -> 0..<1
+// CHECK: s0.s1 -> 1..<2
+// CHECK: s1 -> 2..<3
+// CHECK-LABEL: end running test {{.*}} on test_struct: field_index_trie
+sil @test_struct : $@convention(thin) (@in_guaranteed SNest) -> () {
+bb0(%0 : $*SNest):
+  specify_test "field_index_trie %0"
+  %r = tuple ()
+  return %r : $()
+}
+
+// A bare class reference: a single opaque leaf, no children.
+// CHECK-LABEL: begin running test {{.*}} on test_opaque: field_index_trie
+// CHECK: leafCount: 1
+// CHECK: <root> -> 0..<1
+// CHECK-LABEL: end running test {{.*}} on test_opaque: field_index_trie
+sil @test_opaque : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  specify_test "field_index_trie %0"
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_empty_tuple: field_index_trie
+// CHECK: leafCount: 1
+// CHECK: <root> -> 0..<1
+// CHECK-LABEL: end running test {{.*}} on test_empty_tuple: field_index_trie
+sil @test_empty_tuple : $@convention(thin) () -> () {
+bb0:
+  %e = tuple ()
+  specify_test "field_index_trie %e"
+  return %e : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_empty_tuple_nested: field_index_trie
+// CHECK: leafCount: 2
+// CHECK: <root> -> 0..<2
+// CHECK: 0 -> 0..<1
+// CHECK: 1 -> 1..<2
+// CHECK-LABEL: end running test {{.*}} on test_empty_tuple_nested: field_index_trie
+sil @test_empty_tuple_nested : $@convention(thin) () -> () {
+bb0:
+  %e = tuple ()
+  %nested = tuple (%e : $(), %e : $())
+  specify_test "field_index_trie %nested"
+  return %e : $()
+}

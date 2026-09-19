@@ -3187,6 +3187,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         CKind, Strict);
     break;
   }
+  case SILInstructionKind::DiagnoseInst: {
+    using DiagnoseKind = DiagnoseInst::DiagnoseKind;
+    auto Ty = MF->getType(TyID);
+    auto Kind = DiagnoseKind(Attr);
+    ResultInst = Builder.createDiagnose(
+        Loc,
+        getLocalValue(Builder.maybeGetFunction(), ValID,
+                      getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
+        Kind);
+    break;
+  }
   case SILInstructionKind::UncheckedOwnershipInst: {
     llvm_unreachable("Invalid unchecked_ownership in deserialization");
   }

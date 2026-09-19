@@ -773,6 +773,12 @@ public struct Builder {
     return notifyNew(store.getAs(StoreInst.self))
   }
 
+  @discardableResult
+  public func createAssign(source: Value, destination: Value, ownership: AssignInst.AssignOwnership) -> AssignInst {
+    let assign = bridged.createAssign(source.bridged, destination.bridged, ownership.rawValue)
+    return notifyNew(assign.getAs(AssignInst.self))
+  }
+
   public func createStoreBorrow(source: Value, destination: Value) -> StoreBorrowInst {
     let storeBorrow = bridged.createStoreBorrow(source.bridged, destination.bridged)
     return notifyNew(storeBorrow.getAs(StoreBorrowInst.self))
@@ -916,6 +922,12 @@ public struct Builder {
   public func createFixLifetime(operand: Value) -> FixLifetimeInst {
     let fixLifetime = bridged.createFixLifetime(operand.bridged)
     return notifyNew(fixLifetime.getAs(FixLifetimeInst.self))
+  }
+
+  @discardableResult
+  public func createDiagnose(operand: Value, kind: DiagnoseInst.DiagnoseKind) -> DiagnoseInst {
+    let diagnose = bridged.createDiagnose(operand.bridged, kind.rawValue)
+    return notifyNew(diagnose.getAs(DiagnoseInst.self))
   }
 
   public func createDropDeinit(of value: Value) -> DropDeinitInst {

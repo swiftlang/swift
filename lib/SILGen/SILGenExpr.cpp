@@ -7420,6 +7420,64 @@ RValue RValueEmitter::visitErrorExpr(ErrorExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
+  if (SGF.getASTContext().SILOpts.EnableLifetimeResolution) {
+    auto *subExpr = E->getSubExpr();
+    auto subASTType = subExpr->getType()->getCanonicalType();
+    auto subType = SGF.getLoweredType(subASTType);
+
+    ManagedValue mv;
+    std::optional<FormalEvaluationScope> writeback;
+
+    // Ignore the load and pretend we applied the consume to the LValue.
+    if (auto *li = dyn_cast<LoadExpr>(subExpr)) {
+      writeback.emplace(SGF);
+      auto consumingAccess = subType.isAddress()
+                                 ? SGFAccessKind::OwnedAddressConsume
+                                 : SGFAccessKind::OwnedObjectConsume;
+      LValue lv = SGF.emitLValue(li->getSubExpr(), consumingAccess);
+      mv = SGF.emitConsumedLValue(E, std::move(lv));
+    } else {
+      mv = SGF.emitRValue(subExpr, SGFContext())
+          .getAsSingleValue(SGF, subExpr);
+    }
+
+    // Now, consume `mv` whether it is an object or address.
+
+    if (mv.getType().isAddress()) {
+      if (mv.getType().getObjectType().isLoadableOrOpaque(SGF.F)) {
+        // load [take] the value out of the address and return it.
+        ManagedValue value =
+          SGF.B.createLoadTake(E, mv);
+        return RValue(SGF, {value}, subType.getASTType());
+      }
+
+      // Emit a copy_addr [take] into a temporary location.
+      // This deinitializes the address, which is the goal here.
+      // TODO: is it fine to ignore the SGFContext?
+      TemporaryInitializationPtr optTemp;
+      optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
+      SILValue dest = optTemp->getAddressForInPlaceInitialization(SGF, E);
+      SGF.B.createCopyAddr(E, mv.getValue(), dest, IsTake, IsInitialization);
+      optTemp->finishInitialization(SGF);
+      return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+    }
+
+    if (mv.getType().isTrivial(SGF.F))
+      return RValue(SGF, {mv}, subType.getASTType());
+
+    // Otherwise, it's an object.
+
+    // NOTE: we only ensurePlusOne to satisfy SILBuilder.
+    // We expect RemoveSILGenLifetimes to delete the copy if emitted.
+    mv = SGF.B.createMoveValue(E, mv.ensurePlusOne(SGF, E));
+
+    // Set the [allows_diagnostics] flag to indicate this move originated from
+    // an explicit 'consume' at the language level.
+    cast<MoveValueInst>(mv.getValue())->setAllowsDiagnostics(true);
+    return RValue(SGF, {mv}, subType.getASTType());
+  }
+
+
   auto *subExpr = E->getSubExpr();
   auto subASTType = subExpr->getType()->getCanonicalType();
   auto subType = SGF.getLoweredType(subASTType);

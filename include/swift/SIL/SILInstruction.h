@@ -9253,6 +9253,34 @@ class ExtendLifetimeInst
       : UnaryInstructionBase(loc, operand) {}
 };
 
+/// Marks a value as needing a diagnostic of the given kind to be emitted for it
+/// by a later diagnostic pass. Produces no result and does not consume its
+/// operand. Only valid in Raw SIL.
+class DiagnoseInst
+    : public UnaryInstructionBase<SILInstructionKind::DiagnoseInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+public:
+  // The raw values must match Instruction.DiagnoseInst.DiagnoseKind in SwiftCompilerSources
+  enum class DiagnoseKind : unsigned {
+    /// Sentinel for an unrecognized attribute string.
+    Invalid = 0,
+
+    /// The marked value is a copy that is not permitted by the language model.
+    UnpermittedCopy,
+  };
+
+private:
+  DiagnoseKind kind;
+
+  DiagnoseInst(SILDebugLocation loc, SILValue operand, DiagnoseKind kind)
+      : UnaryInstructionBase(loc, operand), kind(kind) {}
+
+public:
+  DiagnoseKind getKind() const { return kind; }
+};
+
 /// An unsafe conversion in between ownership kinds.
 ///
 /// This is used today in destructors where due to Objective-C legacy
