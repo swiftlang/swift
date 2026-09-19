@@ -20,6 +20,13 @@ public func returnsNullableRetainedNode(_ n: Node, _ null: Int32) -> Node? {
   return null != 0 ? nil : n
 }
 
+extension Node {
+  // static Node *_Nonnull Node::passThrough(Node *_Nonnull n)
+  //     __attribute__((swift_attr("returns_retained")));
+  @cxx @implementation
+  public static func passThrough(_ n: Node) -> Node { return n }
+}
+
 // Leaf *_Nonnull returnsRetainedLeaf(Leaf *_Nonnull l)
 //     __attribute__((swift_attr("returns_retained")));
 @cxx @implementation

@@ -12,6 +12,9 @@ struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:retainNode")))
 __attribute__((swift_attr("release:releaseNode"))) Node {
   int value;
+
+  static Node *_Nonnull passThrough(Node *_Nonnull n)
+      __attribute__((swift_attr("returns_retained")));
 };
 
 // Parameters
