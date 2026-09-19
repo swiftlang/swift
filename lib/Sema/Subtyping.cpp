@@ -207,6 +207,34 @@ std::optional<bool>
 swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {
   if (!lhs->hasTypeVariable() && !lhs->hasTypeParameter() &&
       !rhs->hasTypeVariable() && !rhs->hasTypeParameter()) {
+    // Hack to deal with matchSendableExistentialToAnyInGenericArgumentPosition().
+    {
+      auto hasAnySendable = [](Type t) -> bool {
+        return t.findIf([](Type t) -> bool {
+          // Don't recurse into protocol compositions.
+          if (t->is<ProtocolCompositionType>())
+            return false;
+          return t->getKnownProtocol() == KnownProtocolKind::Sendable;
+        });
+      };
+
+      auto rewriteAnySendableToAny = [](Type t) -> Type {
+        return t.transformRec([](TypeBase *t) -> std::optional<Type> {
+          // Don't recurse into protocol compositions.
+          if (t->is<ProtocolCompositionType>())
+            return t;
+          if (t->getKnownProtocol() == KnownProtocolKind::Sendable)
+            return t->getASTContext().TheAnyType;
+          return std::nullopt;
+        });
+      };
+
+      if (hasAnySendable(lhs))
+        lhs = rewriteAnySendableToAny(lhs);
+      if (hasAnySendable(rhs))
+        rhs = rewriteAnySendableToAny(rhs);
+    }
+
     return lhs->isEqual(rhs);
   }
 
@@ -669,11 +697,13 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
       auto *lhsFunc = lhs->castTo<FunctionType>();
       auto *rhsFunc = rhs->castTo<FunctionType>();
 
-      // Note: getConversionBehavior() guarantees the function types don't
-      // contain any parameter packs, so we may assume their lengths are
-      // known.
-      if (lhsFunc->getNumParams() != rhsFunc->getNumParams())
-        return ConflictReason(ConflictFlag::FunctionParamCount);
+      auto lhsInfo = lhsFunc->getExtInfo();
+      auto rhsInfo = rhsFunc->getExtInfo();
+      auto reason = checkExtInfoConversion(cache,
+                                           lhsFunc, rhsFunc,
+                                           lhsInfo, rhsInfo, sig);
+      if (reason)
+        return reason;
 
       auto result = checkConversion(cache,
                                     lhsFunc->getResult(),
@@ -682,9 +712,54 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
       if (result)
         return result | ConflictFlag::FunctionResult;
 
-      for (unsigned i : indices(lhsFunc->getParams())) {
-        auto lhsParam = lhsFunc->getParams()[i];
-        auto rhsParam = rhsFunc->getParams()[i];
+      auto lhsParams = lhsFunc->getParams();
+      auto rhsParams = rhsFunc->getParams();
+
+      // Note: getConversionBehavior() guarantees the function types don't
+      // contain any parameter packs, so we may assume their lengths are
+      // known.
+      if (lhsFunc->getNumParams() != rhsFunc->getNumParams()) {
+        // Handle the "tuple splat" special case.
+        if (isSingleTupleParam(rhsParams) &&
+            AnyFunctionType::canComposeTuple(lhsParams)) {
+          // Implode the left-hand side arguments into a tuple and compare
+          // against the right-hand side parameter type.
+          auto lhsType = AnyFunctionType::composeTuple(
+              lhsFunc->getASTContext(),
+              lhsParams,
+              ParameterFlagHandling::IgnoreNonEmpty);
+          auto rhsType = rhsParams[0].getPlainType();
+          auto result = checkConversion(cache, lhsType, rhsType, sig);
+          if (result)
+            return result | ConflictFlag::FunctionTupleSplat;
+
+          // Success.
+          break;
+        } else if (isSingleTupleParam(lhsParams) &&
+                   AnyFunctionType::canComposeTuple(rhsParams)) {
+          // Implode the right-hand side parameters into a tuple and
+          // compare against the left-hand side argument type.
+          auto lhsType = lhsParams[0].getPlainType();
+          auto rhsType = AnyFunctionType::composeTuple(
+              lhsFunc->getASTContext(),
+              lhsParams,
+              ParameterFlagHandling::IgnoreNonEmpty);
+          auto result = checkConversion(cache, lhsType, rhsType, sig);
+          if (result)
+            return result | ConflictFlag::FunctionTupleSplat;
+
+          // Success.
+
+        }
+
+        // Otherwise, it's a conflict.
+        return ConflictReason(ConflictFlag::FunctionParamCount);
+      }
+
+      // Check each parameter against each argument.
+      for (unsigned i : indices(lhsParams)) {
+        auto lhsParam = lhsParams[i];
+        auto rhsParam = rhsParams[i];
 
         if (lhsParam.isInOut() != rhsParam.isInOut())
           return ConflictReason(ConflictFlag::FunctionParamFlags);
@@ -708,14 +783,6 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
         }
       }
 
-      auto lhsInfo = lhsFunc->getExtInfo();
-      auto rhsInfo = rhsFunc->getExtInfo();
-      auto reason = checkExtInfoConversion(cache,
-                                           lhsFunc, rhsFunc,
-                                           lhsInfo, rhsInfo, sig);
-      if (reason)
-        return reason;
-
       break;
     }
 
@@ -738,16 +805,9 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
         return ConflictFlag::TupleArity;
 
       for (unsigned i : indices(lhsTuple->getElements())) {
-        auto lhsElt = lhsTuple->getElement(i);
-        auto rhsElt = rhsTuple->getElement(i);
-        if (lhsElt.hasName() && rhsElt.hasName() &&
-            lhsElt.getName() != rhsElt.getName()) {
-          return ConflictFlag::TupleLabel;
-        }
-
-        auto result = checkConversion(cache,
-                                      lhsElt.getType(),
-                                      rhsElt.getType(), sig);
+        auto lhsElt = lhsTuple->getElementType(i);
+        auto rhsElt = rhsTuple->getElementType(i);
+        auto result = checkConversion(cache, lhsElt, rhsElt, sig);
         if (result)
           return result | ConflictFlag::TupleElement;
       }
@@ -1793,6 +1853,48 @@ Type swift::constraints::openTypeJoinsAndMeets(ConstraintSystem &cs, Type type,
   return openTypeJoinsAndMeetsRec(cs, type, locator);
 }
 
+bool swift::constraints::isPackExpansionType(Type type) {
+  if (type->is<PackExpansionType>())
+    return true;
+
+  if (auto *typeVar = type->getAs<TypeVariableType>())
+    return typeVar->getImpl().isPackExpansion();
+
+  return false;
+}
+
+/// Check whether given parameter list represents a single tuple
+/// or type variable which could be later resolved to tuple.
+/// This is useful for SE-0110 related fixes in `matchFunctionTypes`.
+bool swift::constraints::isSingleTupleParam(ArrayRef<AnyFunctionType::Param> params) {
+  if (params.size() != 1)
+    return false;
+
+  const auto &param = params.front();
+  if ((param.isVariadic() || isPackExpansionType(param.getPlainType())) ||
+      param.isInOut() || param.hasLabel() || param.isIsolated())
+    return false;
+
+  auto paramType = param.getPlainType();
+
+  // Support following case which was allowed until 5:
+  //
+  // func bar(_: (Int, Int) -> Void) {}
+  // let foo: ((Int, Int)?) -> Void = { _ in }
+  //
+  // bar(foo) // Ok
+  if (!paramType->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
+    paramType = paramType->lookThroughAllOptionalTypes();
+
+  // Parameter type should either a tuple or something that can become a
+  // tuple later on. Note that type parameters can appear here when we're
+  // called from disjunction selection to compare a function argument
+  // type against an unopened overload's parameter type.
+  return (paramType->is<TupleType>() ||
+          paramType->isTypeVariableOrMember() ||
+          paramType->isTypeParameter());
+}
+
 void swift::constraints::simple_display(llvm::raw_ostream &out,
                                         ConflictReason reason) {
   if (!reason)
@@ -1822,8 +1924,6 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " conformance";
   if (reason.contains(ConflictFlag::TupleArity))
     out << " tuple_arity";
-  if (reason.contains(ConflictFlag::TupleLabel))
-    out << " tuple_label";
   if (reason.contains(ConflictFlag::TupleElement))
     out << " tuple_element";
   if (reason.contains(ConflictFlag::Existential))
@@ -1844,4 +1944,6 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " function_throws";
   if (reason.contains(ConflictFlag::FunctionSendable))
     out << " function_sendable";
+  if (reason.contains(ConflictFlag::FunctionTupleSplat))
+    out << " function_tuple_splat";
 }
