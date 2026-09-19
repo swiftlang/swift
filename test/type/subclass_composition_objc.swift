@@ -59,5 +59,5 @@ func testMetatypeSelfConformance(m1: (ObjCClass & ObjCProtocol).Protocol,
   _ = m1 as? (ObjCClass & ObjCProtocol).Type // expected-warning {{always succeeds}}
 
   _ = m2 as (ObjCClass & StaticObjCProtocol).Type // expected-error {{cannot convert value of type '(any ObjCClass & StaticObjCProtocol).Type' to type 'any (ObjCClass & StaticObjCProtocol).Type' in coercion}}
-  _ = m2 as? (ObjCClass & StaticObjCProtocol).Type // FIXME should 'always fail'
+  _ = m2 as? (ObjCClass & StaticObjCProtocol).Type // expected-warning {{cast from '(any ObjCClass & StaticObjCProtocol).Type' to unrelated type 'any (ObjCClass & StaticObjCProtocol).Type' always fails}}
 }
