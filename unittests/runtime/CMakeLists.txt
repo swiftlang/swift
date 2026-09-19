@@ -137,7 +137,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   target_compile_definitions(SwiftRuntimeTests
                              PRIVATE
                                swiftCore_EXPORTS
-                               SWIFT_INLINE_NAMESPACE=__runtime)
+                               SWIFT_INLINE_NAMESPACE=__runtime
+                               $<$<BOOL:${SWIFT_STDLIB_ASSERTIONS}>:SWIFT_RUNTIME_TESTS_ENABLE_ASSERTIONS>)
 
   if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
     target_compile_definitions(SwiftRuntimeTests
