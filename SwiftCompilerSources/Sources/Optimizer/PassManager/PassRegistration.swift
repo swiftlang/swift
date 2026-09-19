@@ -128,6 +128,7 @@ private func registerSwiftPasses() {
   registerPass(killInvalidDebugValuesPass, { killInvalidDebugValuesPass.run($0) })
   registerPass(deadDebugVariableEliminationPass, { deadDebugVariableEliminationPass.run($0) })
   registerPass(packSpecialization, { packSpecialization.run($0) })
+  registerPass(trivialOwnershipElimination, { trivialOwnershipElimination.run($0) })
 
   // Instruction passes
   registerForSILCombine(BeginBorrowInst.self,      { run(BeginBorrowInst.self, $0) })
