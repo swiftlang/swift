@@ -1555,7 +1555,7 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
           importer->Impl.BridgingHeaderLookupTable, importer->Impl.LookupTables,
           importer->Impl.SwiftContext,
           importer->Impl.getBufferImporterForDiagnostics(),
-          importer->Impl.platformAvailability, &importer->Impl));
+          importer->Impl.platformAvailability));
 
   // Create a compiler instance.
   {
@@ -1716,7 +1716,7 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
 
   importer->Impl.nameImporter.reset(new NameImporter(
       importer->Impl.SwiftContext, importer->Impl.platformAvailability,
-      importer->Impl.getClangSema(), &importer->Impl));
+      importer->Impl.getClangSema()));
 
   // FIXME: These decls are not being parsed correctly since (a) some of the
   // callbacks are still being added, and (b) the logic to parse them has
@@ -2406,10 +2406,6 @@ void ClangImporter::collectSubModuleNames(
   }
   for (auto sub : submodule->submodules())
     names.push_back(sub->Name);
-}
-
-bool ClangImporter::isModuleImported(const clang::Module *M) {
-  return M->NameVisibility == clang::Module::NameVisibilityKind::AllVisible;
 }
 
 static llvm::VersionTuple getCurrentVersionFromTBD(llvm::vfs::FileSystem &FS,
@@ -6575,10 +6571,7 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
     return {getterDecl};
 
   auto newValueParam =
-      new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                          ctx.getIdentifier("newValue"), declContext);
-  newValueParam->setSpecifier(ParamSpecifier::Default);
-  newValueParam->setInterfaceType(computedType);
+      importer::createNewValueParam(ctx, computedType, declContext);
 
   SmallVector<ParamDecl *, 2> setterParamDecls;
   if (!useAddress)
@@ -7884,6 +7877,36 @@ static Argument createSelfArg(FuncDecl *fnDecl) {
   return Argument::implicitInOut(ctx, selfRefExpr);
 }
 
+/// Build a reference to \p specializedFuncDecl for a call from \p thunkDecl,
+/// binding 'self' (or the metatype, for a static member) when it is a member.
+static Expr *createSpecializedCalleeRef(ASTContext &ctx, FuncDecl *thunkDecl,
+                                        FuncDecl *specializedFuncDecl) {
+  Expr *declRef = new (ctx) DeclRefExpr(ConcreteDeclRef(specializedFuncDecl),
+                                        DeclNameLoc(), /*Implicit=*/true);
+  declRef->setType(specializedFuncDecl->getInterfaceType());
+
+  bool isInstance = specializedFuncDecl->isInstanceMember();
+  if (!isInstance && !specializedFuncDecl->isStatic())
+    return declRef;
+
+  Argument selfArg = [&] {
+    if (isInstance)
+      return createSelfArg(thunkDecl);
+    auto selfType =
+        cast<NominalTypeDecl>(thunkDecl->getDeclContext()->getAsDecl())
+            ->getDeclaredInterfaceType();
+    return Argument::unlabeled(TypeExpr::createImplicit(selfType, ctx));
+  }();
+
+  auto *memberCall =
+      DotSyntaxCallExpr::create(ctx, declRef, SourceLoc(), selfArg);
+  memberCall->setThrows(nullptr);
+  memberCall->setType(
+      specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()
+          ->getResult());
+  return memberCall;
+}
+
 // Synthesize a thunk body for the function created in
 // "addThunkForDependentTypes". This will just cast all params and forward them
 // along to the specialized function. It will also cast the result before
@@ -7930,29 +7953,8 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
     paramIndex++;
   }
 
-  Expr *specializedFuncDeclRef = new (ctx) DeclRefExpr(ConcreteDeclRef(specializedFuncDecl),
-                                                       DeclNameLoc(), true);
-  specializedFuncDeclRef->setType(specializedFuncDecl->getInterfaceType());
-
-  if (specializedFuncDecl->isInstanceMember()) {
-    auto selfArg = createSelfArg(thunkDecl);
-    auto *memberCall = DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef,
-                                                 SourceLoc(), selfArg);
-    memberCall->setThrows(nullptr);
-    auto resultType = specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()->getResult();
-    specializedFuncDeclRef = memberCall;
-    specializedFuncDeclRef->setType(resultType);
-  } else if (specializedFuncDecl->isStatic()) {
-    auto resultType = specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()->getResult();
-    auto selfType = cast<NominalTypeDecl>(thunkDecl->getDeclContext()->getAsDecl())->getDeclaredInterfaceType();
-    auto selfTypeExpr = TypeExpr::createImplicit(selfType, ctx);
-    auto *memberCall =
-        DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef, SourceLoc(),
-                                  Argument::unlabeled(selfTypeExpr));
-    memberCall->setThrows(nullptr);
-    specializedFuncDeclRef = memberCall;
-    specializedFuncDeclRef->setType(resultType);
-  }
+  Expr *specializedFuncDeclRef =
+      createSpecializedCalleeRef(ctx, thunkDecl, specializedFuncDecl);
 
   auto argList = ArgumentList::createImplicit(ctx, forwardingParams);
   auto *specializedFuncCallExpr = CallExpr::createImplicit(ctx, specializedFuncDeclRef, argList);
@@ -8061,29 +8063,8 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
     forwardingParams.push_back(arg);
   }
 
-  Expr *specializedFuncDeclRef = new (ctx) DeclRefExpr(ConcreteDeclRef(specializedFuncDecl),
-                                                       DeclNameLoc(), true);
-  specializedFuncDeclRef->setType(specializedFuncDecl->getInterfaceType());
-
-  if (specializedFuncDecl->isInstanceMember()) {
-    auto selfArg = createSelfArg(thunkDecl);
-    auto *memberCall = DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef,
-                                                 SourceLoc(), selfArg);
-    memberCall->setThrows(nullptr);
-    auto resultType = specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()->getResult();
-    specializedFuncDeclRef = memberCall;
-    specializedFuncDeclRef->setType(resultType);
-  } else if (specializedFuncDecl->isStatic()) {
-    auto resultType = specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()->getResult();
-    auto selfType = cast<NominalTypeDecl>(thunkDecl->getDeclContext()->getAsDecl())->getDeclaredInterfaceType();
-    auto selfTypeExpr = TypeExpr::createImplicit(selfType, ctx);
-    auto *memberCall =
-        DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef, SourceLoc(),
-                                  Argument::unlabeled(selfTypeExpr));
-    memberCall->setThrows(nullptr);
-    specializedFuncDeclRef = memberCall;
-    specializedFuncDeclRef->setType(resultType);
-  }
+  Expr *specializedFuncDeclRef =
+      createSpecializedCalleeRef(ctx, thunkDecl, specializedFuncDecl);
 
   auto argList = ArgumentList::createImplicit(ctx, forwardingParams);
   auto *specializedFuncCallExpr = CallExpr::createImplicit(ctx, specializedFuncDeclRef, argList);
@@ -8699,17 +8680,7 @@ static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
     return false;
   };
 
-  for (auto field : decl->fields()) {
-    if (checkType(field->getType()))
-      return true;
-  }
-
-  for (auto base : decl->bases()) {
-    if (checkType(base.getType()))
-      return true;
-  }
-
-  return false;
+  return anySubobjectTypeSatisfies(decl, checkType);
 }
 
 bool importer::isViewType(const clang::CXXRecordDecl *decl) {
