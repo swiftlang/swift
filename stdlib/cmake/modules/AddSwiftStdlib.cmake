@@ -736,6 +736,21 @@ function(_add_swift_lipo_target)
   endif()
 endfunction()
 
+# Determine whether the embedded Swift libraries for ${triple} are built under
+# CodeGenerationModel=interface, storing TRUE/FALSE into ${result_var_name} in
+# the caller's scope.
+function(embedded_triple_uses_interface_cgm triple result_var_name)
+  set(result FALSE)
+
+  if(SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX
+     AND triple
+     AND "${triple}" MATCHES "${SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX}")
+    set(result TRUE)
+  endif()
+
+  set("${result_var_name}" "${result}" PARENT_SCOPE)
+endfunction()
+
 # Add a single variant of a new Swift library.
 #
 # Usage:
@@ -1113,12 +1128,8 @@ function(add_swift_target_library_single target name)
       set(_emblib_triple
         "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}")
 
-      set(_emblib_interface_cgm FALSE)
-      if(SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX
-         AND _emblib_triple
-         AND "${_emblib_triple}" MATCHES "${SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX}")
-        set(_emblib_interface_cgm TRUE)
-      endif()
+      embedded_triple_uses_interface_cgm("${_emblib_triple}"
+                                         _emblib_interface_cgm)
 
       set(_emblib_lto FALSE)
       if(SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX
@@ -3772,6 +3783,9 @@ endfunction()
 # whose swiftmodule is never imported by clients but whose object code must
 # be linked in (e.g. the EmbeddedPlatform shim archives).
 #
+# When INSTALL_BINARY is set, the per-target static archive is installed into
+# lib/swift/embedded/${mod}/.
+#
 # When DETECT_MALLOC_TYPE is set, each per-target build checks (via
 # check_c_source_compiles against swift/Runtime/Config.h, using that
 # target's own triple/sysroot) whether SWIFT_STDLIB_HAS_MALLOC_TYPE is
@@ -3990,11 +4004,9 @@ function(add_embedded_swift_target_library prefix library_name)
       INSTALL_IN_COMPONENT ${EMBLIB_INSTALL_IN_COMPONENT}
     )
 
-    # Install the produced archive into lib/swift/embedded/${mod}/. Used by
-    # embedded libraries that produce a static archive consumed by clients
-    # at link time (e.g. swiftEmbeddedPlatformPOSIX, swiftUnicodeDataTables,
-    # swift_Concurrency).
-    if(EMBLIB_INSTALL_BINARY)
+    # Install the produced archive into lib/swift/embedded/${mod}/ when needed.
+    embedded_triple_uses_interface_cgm("${triple}" _emblib_interface_cgm)
+    if(EMBLIB_INSTALL_BINARY OR _emblib_interface_cgm)
       swift_install_in_component(
         TARGETS ${prefix}-${mod}
         DESTINATION "lib/swift/embedded/${mod}"
