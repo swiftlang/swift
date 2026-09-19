@@ -3809,6 +3809,10 @@ protected:
   }
 
 public:
+  /// Whether composeTuple() can be called with this parameter list, that is,
+  /// whether it can be the *source* of a tuple splat.
+  static bool canComposeTuple(ArrayRef<Param> params);
+
   /// Take an array of parameters and turn it into a tuple or paren type.
   ///
   /// \param paramFlagHandling How to handle the parameter flags.
