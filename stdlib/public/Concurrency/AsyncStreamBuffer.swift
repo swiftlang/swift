@@ -289,7 +289,7 @@ extension AsyncThrowingStream {
     }
 
     @unsafe struct State {
-      var continuation: UnsafeContinuation<Element?, Error>?
+      var continuation: UnsafeContinuation<Element?, Failure>?
       var pending = _Deque<Element>()
       let limit: Continuation.BufferingPolicy
       var onTermination: TerminationHandler?
@@ -483,7 +483,7 @@ extension AsyncThrowingStream {
       }
     }
 
-    func next(_ continuation: UnsafeContinuation<Element?, Error>) {
+    func next(_ continuation: UnsafeContinuation<Element?, Failure>) {
       lock()
       if unsafe state.continuation == nil {
         if unsafe state.pending.count > 0 {
@@ -509,8 +509,8 @@ extension AsyncThrowingStream {
       }
     }
 
-    func next() async throws -> Element? {
-      try await withTaskCancellationHandler {
+    func next() async throws(Failure) -> Element? {
+      try await withTaskCancellationHandler { () throws(Failure) in
         try unsafe await withUnsafeThrowingContinuation {
           unsafe next($0)
         }
