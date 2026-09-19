@@ -80,10 +80,10 @@ public struct S0 {
 // CHECK:};
 
 // Out-of-line definitions section.
-// CHECK: SWIFT_INLINE_THUNK swift::String C0::getDescription() {
+// CHECK: SWIFT_INLINE_THUNK swift::String C0::getDescription() noexcept {
 // CHECK: skip emitting accessor method for 'description'. 'getDescription' already declared.
 // CHECK-NOT: getDescription()
 // CHECK-NOT: getFeat()
-// CHECK: SWIFT_INLINE_THUNK swift::Int C1::getFeat() {
+// CHECK: SWIFT_INLINE_THUNK swift::Int C1::getFeat() noexcept {
 // CHECK: skip emitting accessor method for 'Feat'. 'getFeat' already declared.
 // CHECK-NOT: getFeat()
