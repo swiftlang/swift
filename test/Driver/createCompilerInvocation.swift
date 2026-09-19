@@ -10,7 +10,7 @@
 
 // RUN: %swift-ide-test_plain -test-createCompilerInvocation \
 // RUN:   -swift-version 5 -module-name foo -emit-module -emit-module-path %t/foo.swiftmodule -emit-objc-header -emit-objc-header-path %t/foo.h -enable-library-evolution -emit-module-interface -emit-module-interface-path %t/foo.swiftinterface -emit-library -emit-tbd -emit-tbd-path %t/foo.tbd -emit-dependencies -serialize-diagnostics %s \
-// RUN:   2>&1 | %FileCheck %s --check-prefix=NORMAL_ARGS --implicit-check-not="error: "
+// RUN:   2>&1 | %FileCheck %s --check-prefix=NORMAL_ARGS --check-prefix=NEW_NORMAL_ARGS --implicit-check-not="error: "
 // NORMAL_ARGS: Frontend Arguments BEGIN
 // NORMAL_ARGS-DAG: -o{{$}}
 // NORMAL_ARGS-DAG: foo-{{[a-z0-9]+}}.o
@@ -26,10 +26,25 @@
 // NORMAL_ARGS-DAG: -serialize-diagnostics-path
 // NORMAL_ARGS: Frontend Arguments END
 
+// NEW_NORMAL_ARGS: SwiftDriver (new) Frontend Arguments BEGIN
+// NEW_NORMAL_ARGS-DAG: -o{{$}}
+// NEW_NORMAL_ARGS-DAG: foo-{{[a-zA-Z0-9]+}}.o
+// NEW_NORMAL_ARGS-DAG: -c{{$}}
+// NEW_NORMAL_ARGS-DAG: -swift-version
+// NEW_NORMAL_ARGS-DAG: -module-name
+// NEW_NORMAL_ARGS-DAG: -emit-module-path
+// NEW_NORMAL_ARGS-DAG: -emit-module-doc-path
+// NEW_NORMAL_ARGS-DAG: -emit-module-source-info-path
+// NEW_NORMAL_ARGS-DAG: -emit-module-interface-path
+// NEW_NORMAL_ARGS-DAG: -emit-objc-header-path
+// NEW_NORMAL_ARGS-DAG: -emit-tbd-path
+// NEW_NORMAL_ARGS-DAG: -serialize-diagnostics-path
+// NEW_NORMAL_ARGS: SwiftDriver (new) Frontend Arguments END
+
 // RUN: %swift-ide-test_plain -test-createCompilerInvocation -force-no-outputs \
 // RUN:   -swift-version 5 -module-name foo -emit-module -emit-module-path %t/foo.swiftmodule -emit-objc-header -emit-objc-header-path %t/foo.h -enable-library-evolution -emit-module-interface -emit-module-interface-path %t/foo.swiftinterface -emit-library -emit-tbd -emit-tbd-path %t/foo.tbd -emit-dependencies -serialize-diagnostics %s \
 // RUN:   2>&1 > %t.nooutput_args
-// RUN: %FileCheck %s --check-prefix=NOOUTPUT_ARGS --implicit-check-not="error: " < %t.nooutput_args
+// RUN: %FileCheck %s --check-prefix=NOOUTPUT_ARGS --check-prefix=NEW_NOOUTPUT_ARGS --implicit-check-not="error: " < %t.nooutput_args
 // RUN: %FileCheck %s --check-prefix=NOOUTPUT_ARGS_NEG --implicit-check-not="error: " < %t.nooutput_args
 // NOOUTPUT_ARGS_NEG-NOT: -o{{$}}
 // NOOUTPUT_ARGS_NEG-NOT: foo-{{[a-z0-9]+}}.o
@@ -41,6 +56,11 @@
 // NOOUTPUT_ARGS-DAG: -typecheck
 // NOOUTPUT_ARGS-DAG: -module-name
 // NOOUTPUT_ARGS: Frontend Arguments END
+
+// NEW_NOOUTPUT_ARGS: SwiftDriver (new) Frontend Arguments BEGIN
+// NEW_NOOUTPUT_ARGS-DAG: -typecheck
+// NEW_NOOUTPUT_ARGS-DAG: -module-name
+// NEW_NOOUTPUT_ARGS: SwiftDriver (new) Frontend Arguments END
 
 // Make sure that '-incremental' is ignored, we don't want SourceKit to run with
 // reference dependency tracking enabled. The legacy driver simply doesn't
