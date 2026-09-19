@@ -5003,9 +5003,20 @@ ActorIsolationChecker::determineClosureIsolation(AbstractClosureExpr *closure,
         computeClosureIsolationFromParent(closure, parentIsolation,
                                           checkIsolatedCapture);
 
+    bool isSendableKeyPathConversion = false;
+    if (auto *autoClosure = dyn_cast<AutoClosureExpr>(closure);
+        autoClosure &&
+        isa<KeyPathApplicationExpr>(autoClosure->getSingleExpressionBody())) {
+      if (auto *fce = dyn_cast_or_null<FunctionConversionExpr>(context)) {
+        isSendableKeyPathConversion =
+            fce->getType()->castTo<FunctionType>()->isSendable();
+      }
+    }
+
     bool isIsolationBoundary =
         isIsolationInferenceBoundaryClosure(closure,
-                                            /*canInheritActorContext=*/true);
+                                            /*canInheritActorContext=*/true) ||
+        isSendableKeyPathConversion;
 
     bool isArgumentOfNonisolatedNonsendingApply = false;
     if (auto *apply = dyn_cast_or_null<CallExpr>(getImmediateApply())) {
