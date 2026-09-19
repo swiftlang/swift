@@ -315,6 +315,20 @@ bb0(%0 : $Builtin.NativeObject, %1 : $X):
   return %r : $()
 }
 
+// The assume builtin's conservative memory effects only keep it from being moved or
+// removed. It must not show up in the function's side effect summary.
+// CHECK-LABEL: sil @test_assume_builtin
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_assume_builtin : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = builtin "cmp_sgt_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %3 = builtin "assume_Int1"(%2 : $Builtin.Int1) : $Builtin.Int1
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil @test_project_box
 // CHECK-NEXT:  [%0: read c0.v**]
 // CHECK-NEXT:  [global: ]

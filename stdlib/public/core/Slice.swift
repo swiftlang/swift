@@ -170,6 +170,7 @@ extension Slice: Collection {
   @inlinable // generic-performance
   public subscript(bounds: Range<Index>) -> Slice<Base> {
     get {
+      bounds._assumeValid()
       _failEarlyRangeCheck(bounds, bounds: _bounds)
       return Slice(base: _base, bounds: bounds)
     }
