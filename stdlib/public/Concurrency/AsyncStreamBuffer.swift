@@ -108,16 +108,7 @@ extension AsyncStream {
     }
 
     @Sendable func cancel() {
-      lock()
-      // swap out the handler before we invoke it to prevent double cancel
-      let handler = unsafe state.onTermination
-      unsafe state.onTermination = nil
-      unlock()
-
-      // handler must be invoked before yielding nil for termination
-      handler?(.cancelled)
-
-      finish()
+      terminate(reason: .cancelled)
     }
 
     func yield(_ value: __owned Element) -> Continuation.YieldResult {
@@ -207,15 +198,15 @@ extension AsyncStream {
       return result
     }
 
-    func finish() {
+    func terminate(reason terminationReason: Continuation.Termination) {
       lock()
-      let handler = unsafe state.onTermination
-      unsafe state.onTermination = nil
+      // swap out the handler before we call it to prevent multiple invocations
+      let handler = unsafe state.onTermination.take()
       unsafe state.terminal = true
 
       guard unsafe !state.continuations.isEmpty else {
         unlock()
-        handler?(.finished)
+        handler?(terminationReason)
         return
       }
 
@@ -224,7 +215,7 @@ extension AsyncStream {
       unsafe state.continuations.removeAll()
 
       unlock()
-      handler?(.finished)
+      handler?(terminationReason)
 
       for unsafe continuation in unsafe continuations {
         unsafe continuation.resume(returning: nil)
@@ -338,16 +329,7 @@ extension AsyncThrowingStream {
     }
 
     @Sendable func cancel() {
-      lock()
-      // swap out the handler before we invoke it to prevent double cancel
-      let handler = unsafe state.onTermination
-      unsafe state.onTermination = nil
-      unlock()
-
-      // handler must be invoked before yielding nil for termination
-      handler?(.cancelled)
-
-      finish()
+      terminate(reason: .cancelled)
     }
 
     func yield(_ value: __owned Element) -> Continuation.YieldResult {
@@ -444,12 +426,12 @@ extension AsyncThrowingStream {
       return result
     }
 
-    func finish(throwing error: __owned Failure? = nil) {
+    func terminate(reason terminationReason: Continuation.Termination) {
       lock()
-      let handler = unsafe state.onTermination
-      unsafe state.onTermination = nil
+      // swap out the handler before we call it to prevent multiple invocations
+      let handler = unsafe state.onTermination.take()
       if unsafe state.terminal == nil {
-        if let failure = error {
+        if case .finished(let failure?) = terminationReason {
           unsafe state.terminal = .failed(failure)
         } else {
           unsafe state.terminal = .finished
@@ -461,12 +443,12 @@ extension AsyncThrowingStream {
           unsafe state.continuation = nil
           let toSend = unsafe state.pending.removeFirst()
           unlock()
-          handler?(.finished(error))
+          handler?(terminationReason)
           unsafe continuation.resume(returning: toSend)
         } else if let terminal = unsafe state.terminal {
           unsafe state.continuation = nil
           unlock()
-          handler?(.finished(error))
+          handler?(terminationReason)
           switch terminal {
           case .finished:
             unsafe continuation.resume(returning: nil)
@@ -475,11 +457,11 @@ extension AsyncThrowingStream {
           }
         } else {
           unlock()
-          handler?(.finished(error))
+          handler?(terminationReason)
         }
       } else {
         unlock()
-        handler?(.finished(error))
+        handler?(terminationReason)
       }
     }
 
