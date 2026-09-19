@@ -217,6 +217,30 @@ extension MutableRawSpan {
     _precondition(byteOffsets.contains(position), "Index out of bounds")
   }
 
+  // SILOptimizer looks for fixed_storage.check_range semantics
+  // for bounds checking optimizations.
+  @_semantics("fixed_storage.check_range")
+  @export(implementation) @inline(__always)
+  internal func _checkRange(lowerBound: Int, upperBound: Int) {
+    _precondition(
+      UInt(bitPattern: lowerBound) <= _assumeNonNegative(_count) &&
+      UInt(bitPattern: upperBound) <= _assumeNonNegative(_count),
+      "Byte offset range out of bounds"
+    )
+  }
+
+  // SILOptimizer looks for fixed_storage.check_range_offset semantics
+  // for bounds checking optimizations.
+  @_semantics("fixed_storage.check_range_offset")
+  @export(implementation) @inline(__always)
+  internal func _checkRange(offset: Int, length: Int) {
+    _precondition(
+      UInt(bitPattern: offset) <= _assumeNonNegative(_count) &&
+      UInt(bitPattern: offset &+ length) <= _assumeNonNegative(_count),
+      "Byte offset range out of bounds"
+    )
+  }
+
   /// Accesses the byte at the specified offset in the span.
   ///
   /// - Parameter byteOffset: The offset of the byte to access. `byteOffset`
@@ -384,11 +408,7 @@ extension MutableRawSpan {
   public func unsafeLoad<T>(
     fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
-    _precondition(
-      UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
-      MemoryLayout<T>.size <= (_count &- offset),
-      "Byte offset range out of bounds"
-    )
+    _checkRange(offset: offset, length: MemoryLayout<T>.size)
     return unsafe unsafeLoad(fromUncheckedByteOffset: offset, as: T.self)
   }
 
@@ -439,11 +459,7 @@ extension MutableRawSpan {
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
     fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
-    _precondition(
-      UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
-      MemoryLayout<T>.size <= (_count &- offset),
-      "Byte offset range out of bounds"
-    )
+    _checkRange(offset: offset, length: MemoryLayout<T>.size)
     return unsafe unsafeLoadUnaligned(fromUncheckedByteOffset: offset, as: T.self)
   }
 
@@ -540,11 +556,7 @@ extension MutableRawSpan {
   internal mutating func _storeBytes<T: BitwiseCopyable>(
     of value: T, toByteOffset offset: Int, as type: T.Type
   ) {
-    _precondition(
-      UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
-      MemoryLayout<T>.size <= (_count &- offset),
-      "Byte offset range out of bounds"
-    )
+    _checkRange(offset: offset, length: MemoryLayout<T>.size)
     unsafe storeBytes(of: value, toUncheckedByteOffset: offset, as: T.self)
   }
 
@@ -721,11 +733,7 @@ extension MutableRawSpan {
   @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(_ bounds: Range<Int>) -> Self {
-    _precondition(
-      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
-      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Byte offset range out of bounds"
-    )
+    _checkRange(lowerBound: bounds.lowerBound, upperBound: bounds.upperBound)
     return unsafe _mutatingExtracting(unchecked: bounds)
   }
 
@@ -763,11 +771,7 @@ extension MutableRawSpan {
   @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(_ bounds: Range<Int>) -> Self {
-    _precondition(
-      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
-      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Byte offset range out of bounds"
-    )
+    _checkRange(lowerBound: bounds.lowerBound, upperBound: bounds.upperBound)
     return unsafe _consumingExtracting(unchecked: bounds)
   }
 
