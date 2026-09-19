@@ -1,4 +1,11 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=100000
+// Passes:
+// RUN: %target-swift-frontend -typecheck %s -solver-scope-threshold=40000 -solver-enable-promote-supertypes
+
+// Fails:
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=100000 -solver-disable-promote-supertypes
+
+// At one point, this was the slowest expression (by number of scopes)
+// in the source compatibility suite.
 
 struct ID: CustomStringConvertible {
   var n: Int
