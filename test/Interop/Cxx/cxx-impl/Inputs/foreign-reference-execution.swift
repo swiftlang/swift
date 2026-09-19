@@ -8,6 +8,14 @@ public func takesNode(_ n: Node) -> Int32 { return n.value }
 @cxx @implementation
 public func takesNullableNode(_ n: Node?) -> Int32 { return n?.value ?? -1 }
 
+// void reseatNode(Node *_Nonnull &p, Node *_Nonnull to);
+@cxx @implementation
+public func reseatNode(_ p: UnsafeMutablePointer<Node>, _ to: Node) { p.pointee = to }
+
+// int readNodePtr(Node *_Nonnull const &p);
+@cxx @implementation
+public func readNodePtr(_ p: UnsafePointer<Node>) -> Int32 { return p.pointee.value }
+
 // Node *_Nonnull returnsRetainedNode(Node *_Nonnull n)
 //     __attribute__((swift_attr("returns_retained")));
 @cxx @implementation
@@ -20,6 +28,24 @@ public func returnsNullableRetainedNode(_ n: Node, _ null: Int32) -> Node? {
   return null != 0 ? nil : n
 }
 
+extension Node {
+  // int Node::get() const;
+  @cxx @implementation
+  public func get() -> Int32 { return value }
+
+  // void Node::add(int d);
+  @cxx @implementation
+  public func add(_ d: Int32) { value += d }
+
+  // int Node::overloadedByType(int x) const;
+  @cxx @implementation
+  public func overloadedByType(_ x: Int32) -> Int32 { return value + x }
+
+  // double Node::overloadedByType(double x) const;
+  @cxx @implementation
+  public func overloadedByType(_ x: Double) -> Double { return Double(value) + x }
+}
+
 // Leaf *_Nonnull returnsRetainedLeaf(Leaf *_Nonnull l)
 //     __attribute__((swift_attr("returns_retained")));
 @cxx @implementation
@@ -28,3 +54,13 @@ public func returnsRetainedLeaf(_ l: Leaf) -> Leaf { return l }
 // Singleton *_Nonnull returnsSingleton(Singleton *_Nonnull s);
 @cxx @implementation
 public func returnsSingleton(_ s: Singleton) -> Singleton { return s }
+
+extension Singleton {
+  // int Singleton::read() const;
+  @cxx @implementation
+  public func read() -> Int32 { return value }
+
+  // Singleton *_Nonnull Singleton::itself() const;
+  @cxx @implementation
+  public func itself() -> Singleton { return self }
+}

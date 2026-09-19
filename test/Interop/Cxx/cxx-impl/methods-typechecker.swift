@@ -144,7 +144,7 @@ extension Rejections {
 // Virtual
 
 extension Polymorphic {
-  // expected-error@+2{{instance method 'virtualMethod()' cannot implement C++ function 'virtualMethod' because virtual methods are not yet supported}}
+  // expected-error@+2{{instance method 'virtualMethod()' cannot implement C++ function 'virtualMethod' because it is its class's key function, and Swift cannot yet emit the class's vtable, which C++ emits in the translation unit that defines the key function; declare another out-of-line virtual method earlier in the class to make that method the key function}}
   @cxx @implementation
   func virtualMethod() -> Int32 { return 0 }
 }
@@ -162,16 +162,15 @@ extension Derived {
 }
 
 
-// Instance methods of foreign reference types are not supported yet; static
-// methods are.
+// Methods of a foreign reference type match like those of a value type.
 
 @available(SwiftStdlib 5.8, *)
 extension Widget {
-  // expected-error@+1{{@cxx cannot yet be applied to instance methods of C++ foreign reference types}}
   @cxx @implementation
   func tag() -> Int32 { return id }
 
-  // expected-error@+1{{@cxx cannot yet be applied to instance methods of C++ foreign reference types}}
+  // The type's only out-of-line virtual method is its key function.
+  // expected-error@+2{{instance method 'describe()' cannot implement C++ function 'describe' because it is its class's key function, and Swift cannot yet emit the class's vtable, which C++ emits in the translation unit that defines the key function; declare another out-of-line virtual method earlier in the class to make that method the key function}}
   @cxx @implementation
   func describe() -> Int32 { return id }
 
