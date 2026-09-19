@@ -276,15 +276,23 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
         continue;
       }
 
-      // We cannot emit the witness table symbol if the protocol is imported
-      // from another module and it's resilient, because initialization of that
-      // protocol is necessary in this case
-      if (Ctx.getOpts().FragileResilientProtocols ||
-          !rootConformance->getProtocol()->isResilient(
-              IDC->getAsGenericContext()->getParentModule(),
-              ResilienceExpansion::Maximal))
-        Visitor.addProtocolWitnessTable(rootConformance);
-      Visitor.addProtocolConformanceDescriptor(rootConformance);
+      // A COM interface conformance has no runtime witness table or
+      // conformance descriptor; IRGen emits only the native COM vtables for it.
+      // Match that here so the TBD does not advertise symbols the IR omits.
+      if (!protocol->isCOMInterface()) {
+        // We cannot emit the witness table symbol if the protocol is imported
+        // from another module and it's resilient, because initialization of that
+        // protocol is necessary in this case
+        if (Ctx.getOpts().FragileResilientProtocols ||
+            !rootConformance->getProtocol()->isResilient(
+                IDC->getAsGenericContext()->getParentModule(),
+                ResilienceExpansion::Maximal))
+          Visitor.addProtocolWitnessTable(rootConformance);
+        Visitor.addProtocolConformanceDescriptor(rootConformance);
+      }
+
+      auto *CD = rootConformance->getType()->getClassOrBoundGenericClass();
+      bool hasCOMEntries = protocol->isCOMInterface() && CD;
 
       // FIXME: the logic around visibility in extensions is confusing, and
       // sometimes witness thunks need to be manually made public.
@@ -309,6 +317,15 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
         Visitor.addProtocolWitnessThunk(rootConformance, requirementDecl);
       };
 
+      auto addCOMSymbolIfNecessary = [&](ValueDecl *requirementDecl) {
+        if (!hasCOMEntries)
+          return;
+        if (Ctx.getOpts().PublicOrPackageSymbolsOnly &&
+            CD->getEffectiveAccess() != AccessLevel::Open)
+          return;
+        Visitor.addCOMMethodWitnessThunk(rootConformance, requirementDecl);
+      };
+
       rootConformance->forEachValueWitness([&](ValueDecl *valueReq,
                                                Witness witness) {
         auto witnessDecl = witness.getDecl();
@@ -317,6 +334,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
 
         if (isa<AbstractFunctionDecl>(valueReq)) {
           addSymbolIfNecessary(valueReq, witnessDecl);
+          addCOMSymbolIfNecessary(valueReq);
         } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
           if (auto witnessStorage =
                   dyn_cast<AbstractStorageDecl>(witnessDecl)) {
@@ -324,10 +342,12 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
               auto witnessAccessor = witnessStorage->getSynthesizedAccessor(
                   reqtAccessor->getAccessorKind());
               addSymbolIfNecessary(reqtAccessor, witnessAccessor);
+              addCOMSymbolIfNecessary(reqtAccessor);
             });
           } else if (isa<EnumElementDecl>(witnessDecl)) {
             auto getter = storage->getSynthesizedAccessor(AccessorKind::Get);
             addSymbolIfNecessary(getter, witnessDecl);
+            addCOMSymbolIfNecessary(getter);
           }
         }
       }, /*useResolver=*/true);
@@ -860,7 +880,8 @@ public:
       public:
         WitnessVisitor(SILSymbolVisitorImpl &V, ProtocolDecl *PD)
             : Visitor{V.Visitor}, PD{PD},
-              Resilient{PD->getParentModule()->isResilient()},
+              Resilient{PD->getParentModule()->isResilient() &&
+                        !PD->isCOMInterface()},
               WitnessMethodElimination{
                   V.Ctx.getOpts().WitnessMethodElimination} {}
 

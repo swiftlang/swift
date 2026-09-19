@@ -178,6 +178,9 @@ protected:
   }
 
   std::vector<std::pair<SymbolicReferent, unsigned>> SymbolicReferences;
+
+  void appendWitnessThunkEntity(const ProtocolConformance *Conformance,
+                                const ValueDecl *Requirement);
   
 public:
   enum class SymbolKind {
@@ -279,6 +282,10 @@ public:
 
   std::string mangleWitnessThunk(const ProtocolConformance *Conformance,
                                  const ValueDecl *Requirement);
+
+  std::string
+  mangleCOMMethodWitnessThunk(const ProtocolConformance *Conformance,
+                              const ValueDecl *Requirement);
 
   std::string mangleClosureWitnessThunk(const ProtocolConformance *Conformance,
                                         const AbstractClosureExpr *Closure);

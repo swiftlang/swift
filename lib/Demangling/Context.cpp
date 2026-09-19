@@ -124,6 +124,7 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
         MangledName.ends_with("TO") ||  // ObjC-as-swift thunk
         MangledName.ends_with("TR") ||  // reabstraction thunk helper function
         MangledName.ends_with("Tr") ||  // reabstraction thunk
+        MangledName.ends_with("TWV") || // COM method witness thunk
         MangledName.ends_with("TW") ||  // protocol witness thunk
         MangledName.ends_with("fC")) {  // allocating constructor
 
@@ -140,6 +141,7 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
         case Node::Kind::PartialApplyForwarder:
         case Node::Kind::ReabstractionThunkHelper:
         case Node::Kind::ReabstractionThunk:
+        case Node::Kind::COMMethodWitness:
         case Node::Kind::ProtocolWitness:
         case Node::Kind::Allocator:
           return true;
@@ -178,6 +180,7 @@ std::string Context::getThunkTarget(llvm::StringRef MangledName) {
     // The targets of those thunks not derivable from the mangling.
     if (MangledName.ends_with("TR") ||
         MangledName.ends_with("Tr") ||
+        MangledName.ends_with("TWV") ||
         MangledName.ends_with("TW") )
       return std::string();
 
@@ -217,6 +220,7 @@ bool Context::hasSwiftCallingConvention(llvm::StringRef MangledName) {
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
     case Node::Kind::BaseWitnessTableAccessor:
+    case Node::Kind::COMMethodWitness:
     case Node::Kind::ObjCAttribute:
       return false;
     default:

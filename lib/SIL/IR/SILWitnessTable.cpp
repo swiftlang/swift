@@ -138,6 +138,8 @@ SILWitnessTable::~SILWitnessTable() {
       if (entry.getMethodWitness().Witness) {
         entry.getMethodWitness().Witness->decrementRefCount();
       }
+      if (entry.getMethodWitness().InterfaceEntry)
+        entry.getMethodWitness().InterfaceEntry->decrementRefCount();
       break;
     case AssociatedType:
     case AssociatedConformance:
@@ -146,6 +148,17 @@ SILWitnessTable::~SILWitnessTable() {
       break;
     }
   }
+}
+
+bool SILWitnessTable::hasOpenInterfaceEntries() const {
+  auto *CD = dyn_cast_or_null<ClassDecl>(getConformingNominal());
+  if (!CD || CD->getEffectiveAccess() != AccessLevel::Open)
+    return false;
+
+  return llvm::any_of(getEntries(), [](const Entry &entry) {
+    return entry.getKind() == Method &&
+           entry.getMethodWitness().InterfaceEntry;
+  });
 }
 
 void SILWitnessTable::convertToDefinition(
@@ -166,6 +179,8 @@ void SILWitnessTable::convertToDefinition(
       if (entry.getMethodWitness().Witness) {
         entry.getMethodWitness().Witness->incrementRefCount();
       }
+      if (entry.getMethodWitness().InterfaceEntry)
+        entry.getMethodWitness().InterfaceEntry->incrementRefCount();
       break;
     case AssociatedType:
     case AssociatedConformance:

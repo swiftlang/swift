@@ -2326,7 +2326,8 @@ public:
                        SILDeclRef methodConstant,
                        SubstitutionMap subMap);
   
-  SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
+  SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr,
+                               CanType resultType = CanType());
 
   void emitReturnExpr(SILLocation loc, Expr *ret);
 

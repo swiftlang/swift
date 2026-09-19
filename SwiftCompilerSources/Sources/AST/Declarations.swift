@@ -168,6 +168,9 @@ final public class ClassDecl: NominalTypeDecl {
   }
 
   public var isForeign: Bool { bridged.Class_isForeign() }
+  public var isCOMImplementation: Bool {
+    bridged.Class_isCOMImplementation()
+  }
 
   /// A sequence that iterates through this class and all its superclasses in order.
   /// Starts with this class and proceeds up the inheritance hierarchy.
