@@ -510,7 +510,7 @@ extension AsyncThrowingStream {
     }
 
     func next() async throws(Failure) -> Element? {
-      try await withTaskCancellationHandler { () async throws(Failure) -> Element? in
+      try await withTaskCancellationHandler { () throws(Failure) in
         try unsafe await withUnsafeThrowingContinuation {
           unsafe next($0)
         }

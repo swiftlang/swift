@@ -508,8 +508,8 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ) {
     let storage: _AsyncStreamCriticalStorage<Optional<() async throws(Failure) -> Element?>>
       = .create(produce)
-    context = _Context { () async throws(Failure) -> Element? in
-      return try await withTaskCancellationHandler { () async throws(Failure) -> Element? in
+    context = _Context { () throws(Failure) in
+      return try await withTaskCancellationHandler { () throws(Failure) in
         guard let result = try await storage.value?() else {
           storage.value = nil
           return nil

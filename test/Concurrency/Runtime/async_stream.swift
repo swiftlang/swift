@@ -19,10 +19,6 @@ struct SomeError: Error, Equatable {
   var value = Int.random(in: 0..<100)
 }
 
-enum HomeworkError: Error {
-  case dogAteIt
-}
-
 class NotSendable {}
 
 @MainActor func testWarnings() {
@@ -60,31 +56,28 @@ class NotSendable {}
   static func main() async {
     if #available(SwiftStdlib 6.5, *) {
       tests.test("continuation typed throws") {
-        let stream = AsyncThrowingStream<Void, HomeworkError> { continuation in
-          continuation.finish(throwing: HomeworkError.dogAteIt)
+        let stream = AsyncThrowingStream<Void, SomeError> { continuation in
+          continuation.finish(throwing: SomeError())
         }
-        do throws(HomeworkError) {
+        do throws(SomeError) {
           for try await _ in stream {}
-          expectUnreachable("unexpected no error thrown")
-        } catch .dogAteIt {
-
+          expectUnreachable("stream should have thrown")
         } catch {
-          expectUnreachable("unexpected error thrown")
+          // access member of `SomeError`
+          _ = error.value
         }
       }
 
       tests.test("unfolding typed throws") {
-        let stream = AsyncThrowingStream { () throws(HomeworkError) in
-          throw HomeworkError.dogAteIt
+        let stream = AsyncThrowingStream { () throws(SomeError) in
+          throw SomeError()
         }
-
-        do throws(HomeworkError) {
+        do throws(SomeError) {
           for try await _ in stream {}
-          expectUnreachable("unexpected no error thrown")
-        } catch .dogAteIt {
-
+          expectUnreachable("stream should have thrown")
         } catch {
-          expectUnreachable("unexpected error thrown")
+          // access member of `SomeError`
+          _ = error.value
         }
       }
     }
