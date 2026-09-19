@@ -13,6 +13,8 @@
 #include "swift/Index/Index.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -438,6 +440,7 @@ struct MappedLoc {
 class IndexSwiftASTWalker : public SourceEntityWalker {
   IndexDataConsumer &IdxConsumer;
   SourceManager &SrcMgr;
+  SourceFile *SF;
   std::optional<unsigned> BufferID;
   bool enableWarnings;
 
@@ -468,6 +471,13 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 
   // Already handled references that should be suppressed if found later.
   llvm::DenseSet<SourceLoc> RefsToSuppress;
+
+  // Availability domain references that have already been reported. One
+  // `@available` attribute reaches the walker once per declaration it is
+  // attached to, as in `@available(SomeDomain) var x = 1, y = 2`, so the decl
+  // is part of the key. That spelling is an error for a custom domain, but the
+  // indexer still runs over code that does not compile.
+  llvm::DenseSet<std::pair<SourceLoc, ValueDecl *>> ReportedDomainRefs;
 
   // Contains a mapping for captures of the form [x], from the declared "x"
   // to the captured "x" in the enclosing scope. Also includes shorthand if
@@ -600,7 +610,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
                       SourceFile *SF = nullptr)
-      : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr),
+      : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr), SF(SF),
         BufferID(SF ? std::optional(SF->getBufferID()) : std::nullopt),
         enableWarnings(IdxConsumer.enableWarnings()) {}
 
@@ -630,6 +640,9 @@ private:
       return false;
 
     if (!handleCustomAttrInitRefs(D))
+      return false;
+
+    if (!handleAvailabilityDomainRefs(D))
       return false;
 
     if (auto *AD = dyn_cast<AccessorDecl>(D)) {
@@ -683,6 +696,74 @@ private:
             return false;
         }
       }
+    }
+    return true;
+  }
+
+  /// Reports a reference to the declaration that defines \p domain, if the
+  /// domain has one. Only a custom availability domain does.
+  ///
+  /// \p loc must name the domain in the file being indexed. For a domain that
+  /// came from an availability macro that is the location of the macro, since
+  /// the domain itself is written in a `-define-availability` argument.
+  bool reportAvailabilityDomainRef(AvailabilityDomain domain, SourceLoc loc) {
+    auto *domainDecl = domain.getDecl();
+    if (!domainDecl)
+      return true;
+
+    // An imported or deserialized `@available` attribute has no location in the
+    // file, so a binary module contributes nothing here.
+    if (loc.isInvalid() || !isLocInIndexedBuffer(loc))
+      return true;
+
+    if (!ReportedDomainRefs.insert({loc, domainDecl}).second)
+      return true;
+
+    if (!shouldIndex(domainDecl, /*IsRef=*/true))
+      return true;
+
+    IndexSymbol Info;
+    if (initIndexSymbol(domainDecl, loc, /*IsRef=*/true, Info))
+      return true;
+    if (!startEntity(domainDecl, Info, /*IsRef=*/true) || !finishCurrentEntity())
+      return false;
+
+    return true;
+  }
+
+  /// Reports refs to the declarations behind the custom availability domains
+  /// named by the `@available` attributes attached to \p D, as in
+  /// `\@available(SomeDomain)`.
+  bool handleAvailabilityDomainRefs(Decl *D) {
+    for (auto *attr : D->getAttrs().getAttributes<AvailableAttr, true>()) {
+      if (attr->isImplicit())
+        continue;
+
+      // Resolve the domain with the singular request rather than
+      // `getSemanticAvailableAttrs()`, which synthesizes attributes as a side
+      // effect.
+      auto semanticAttr = D->getSemanticAvailableAttr(attr);
+      if (!semanticAttr)
+        continue;
+
+      auto macroLoc = attr->getMacroLoc();
+      auto loc = macroLoc.isValid() ? macroLoc : attr->getDomainLoc();
+      if (!reportAvailabilityDomainRef(semanticAttr->getDomain(), loc))
+        return false;
+    }
+    return true;
+  }
+
+  /// Reports refs to the declarations behind the custom availability domains
+  /// queried by an `if #available` or `if #unavailable` condition.
+  bool handleAvailabilityDomainRefs(PoundAvailableInfo *info,
+                                    const DeclContext *declContext) {
+    for (auto spec : info->getSemanticAvailabilitySpecs(declContext)) {
+      auto *parsedSpec = spec.getParsedSpec();
+      auto macroLoc = parsedSpec->getMacroLoc();
+      auto loc = macroLoc.isValid() ? macroLoc : parsedSpec->getStartLoc();
+      if (!reportAvailabilityDomainRef(spec.getDomain(), loc))
+        return false;
     }
     return true;
   }
@@ -808,6 +889,25 @@ private:
     if (auto *condition = dyn_cast<LabeledConditionalStmt>(stmt)) {
       for (auto shadows : getShorthandShadows(condition)) {
         sameNamedCaptures[shadows.first] = shadows.second;
+      }
+
+      // `PoundAvailableInfo` is neither a `Stmt` nor an `Expr`, so the walker
+      // never reaches it on its own.
+      //
+      // The enclosing decl is the best decl context, but top level code has
+      // none, so fall back to the file. Domain lookup is module scoped, so the
+      // distinction only matters for getting a context at all.
+      const DeclContext *declContext = SF;
+      if (auto *parent = getParentDecl())
+        declContext = parent->getInnermostDeclContext();
+
+      if (declContext) {
+        for (auto &elt : condition->getCond()) {
+          if (elt.getKind() != StmtConditionElement::CK_Availability)
+            continue;
+          if (!handleAvailabilityDomainRefs(elt.getAvailability(), declContext))
+            return false;
+        }
       }
     }
     return true;
@@ -1182,6 +1282,25 @@ private:
 
     auto [line, col] = SrcMgr.getLineAndColumnInBuffer(loc, bufferID);
     return {{line, col, inGeneratedBuffer}};
+  }
+
+  /// Returns true if \p loc belongs to the buffer being indexed, or to a
+  /// generated buffer that `getMappedLocation` can map back into it.
+  ///
+  /// A location in any other buffer, such as the one holding a
+  /// `-define-availability` argument, has no meaningful line and column in the
+  /// indexed file, so it must not reach `getMappedLocation`.
+  bool isLocInIndexedBuffer(SourceLoc loc) const {
+    if (loc.isInvalid() || !BufferID.has_value())
+      return false;
+
+    auto bufferID = BufferID.value();
+    if (SrcMgr.rangeContainsTokenLoc(SrcMgr.getRangeForBuffer(bufferID), loc))
+      return true;
+
+    auto unexpandedRange = getUnexpandedMacroRange(SrcMgr, loc);
+    return unexpandedRange.isValid() &&
+           SrcMgr.findBufferContainingLoc(unexpandedRange.Start) == bufferID;
   }
 
   bool shouldIndexImplicitDecl(const ValueDecl *D, bool IsRef) const {
