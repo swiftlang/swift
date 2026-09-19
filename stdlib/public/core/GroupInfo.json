@@ -212,6 +212,21 @@
     "RawSpan.swift",
     "Span.swift"
   ],
+  "FilePath": [
+    "FilePath.swift",
+    "FilePathAnchor.swift",
+    "FilePathCodeUnits.swift",
+    "FilePathComponent.swift",
+    "FilePathComponentView.swift",
+    "FilePathDarwin.swift",
+    "FilePathDecomposition.swift",
+    "FilePathInternals.swift",
+    "FilePathParsing.swift",
+    "FilePathResolve.swift",
+    "FilePathStringBridging.swift",
+    "FilePathSystemString.swift",
+    "FilePathWindows.swift"
+  ],
   "UTF8Span": [ 
     "UTF8EncodingError.swift",
     "UTF8Span.swift",
