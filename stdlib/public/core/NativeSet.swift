@@ -767,11 +767,28 @@ extension _NativeSet {
     try unsafe _UnsafeBitset.withTemporaryBitset(capacity: bucketCount) {
       [s = consume self] bitset throws(E) -> _NativeSet<Element> in
       var count = 0
-      for unsafe bucket in unsafe s.hashTable {
-        if try isIncluded(unsafe s.uncheckedElement(at: bucket)) {
-          unsafe bitset.uncheckedInsert(bucket.offset)
-          count += 1
+      // word-major iteration so that the read-modify-write of the
+      // result bitset word happens once per word instead of once per element.
+      let hashTable = unsafe s.hashTable
+      for wordIndex in unsafe 0 ..< hashTable.wordCount {
+        var w = unsafe hashTable.words[wordIndex]
+        if unsafe hashTable.bucketCount < _UnsafeBitset.Word.capacity {
+          // `bucketCount` is a power of two, so this means there is exactly one
+          // word and it is partial. `_HashTable.clear()` sets such a word's
+          // out-of-bounds bits to *one* (so that `occupiedBucket(after:)` and
+          // `nextHole(atOrAfter:)` need no special case), so they must be masked
+          // off here. For `bucketCount >= Word.capacity` every word is full.
+          w = unsafe w.intersecting(elementsBelow: hashTable.bucketCount)
         }
+        var acc = _UnsafeBitset.Word.empty
+        while let bit = w.next() {
+          let bucket = _HashTable.Bucket(word: wordIndex, bit: bit)
+          if try isIncluded(unsafe s.uncheckedElement(at: bucket)) {
+            acc.uncheckedInsert(bit)
+            count += 1
+          }
+        }
+        unsafe bitset.words[wordIndex] = acc
       }
       return unsafe s.extractSubset(using: bitset, count: count)
     }
