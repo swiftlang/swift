@@ -1038,6 +1038,11 @@ bool BridgedSubstitutionMap::hasAnySubstitutableParams() const {
   return unbridged().hasAnySubstitutableParams();
 }
 
+BridgedSubstitutionMap
+BridgedSubstitutionMap::subst(BridgedSubstitutionMap subMap) const {
+  return unbridged().subst(subMap.unbridged());
+}
+
 SwiftInt BridgedSubstitutionMap::getNumConformances() const {
   return (SwiftInt)unbridged().getConformances().size();
 }
