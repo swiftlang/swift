@@ -6135,15 +6135,18 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     attr->setInvalid();
   }
 
-  // Embedded Swift prohibits weak/unowned but allows unowned(unsafe).
-  if (auto behavior = shouldDiagnoseEmbeddedLimitations(
-          dc, attr->getLocation(),
-          /*wasAlwaysEmbeddedError=*/true)) {
-    if (ownershipKind == ReferenceOwnership::Weak ||
-        ownershipKind == ReferenceOwnership::Unowned) {
-      Diags.diagnose(attr->getLocation(), diag::weak_unowned_in_embedded_swift,
-               ownershipKind)
-        .limitBehavior(*behavior);
+  // Embedded Swift always allows unowned(unsafe), but only allows weak/unowned
+  // on 64-bit targets.
+  if (!ctx.LangOpts.Target.isArch64Bit()) {
+    if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+            dc, attr->getLocation(),
+            /*wasAlwaysEmbeddedError=*/true)) {
+      if (ownershipKind == ReferenceOwnership::Weak ||
+          ownershipKind == ReferenceOwnership::Unowned) {
+        Diags.diagnose(attr->getLocation(), diag::weak_unowned_in_embedded_swift,
+                 ownershipKind)
+          .limitBehavior(*behavior);
+      }
     }
   }
 
