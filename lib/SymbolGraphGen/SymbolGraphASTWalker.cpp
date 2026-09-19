@@ -200,12 +200,13 @@ static bool isUnavailableOrObsoletedOnPlatform(const Decl *D) {
   return false;
 }
 
-bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
+ASTWalker::PreWalkAction
+SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   if (SynthesizedChildrenBaseDecl && D == SynthesizedChildrenBaseDecl)
-    return true;
+    return Action::Continue();
 
   if (isUnavailableOrObsoletedOnPlatform(D)) {
-    return false;
+    return Action::SkipNode();
   }
 
   switch (D->getKind()) {
@@ -227,7 +228,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 
   // We'll descend into everything else.
   default:
-    return true;
+    return Action::Continue();
   }
 
   auto SG = getModuleSymbolGraph(D);
@@ -243,15 +244,15 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     auto ExtendedSG = getModuleSymbolGraph(ExtendedNominal);
     // Ignore effectively private decls.
     if (ExtendedSG->isImplicitlyPrivate(Extension)) {
-      return false;
+      return Action::SkipNode();
     }
 
     if (SG->isUnconditionallyUnavailableOnAllPlatforms(Extension)) {
-      return false;
+      return Action::SkipNode();
     }
 
     if (isUnavailableOrObsoletedOnPlatform(ExtendedNominal)) {
-      return false;
+      return Action::SkipNode();
     }
 
     // We only treat extensions to external types as extensions. Extensions to
@@ -338,13 +339,13 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     }
 
     // Continue looking into the extension.
-    return true;
+    return Action::Continue();
   }
 
   auto *VD = cast<ValueDecl>(D);
 
   if (!BaseDecl && !SG->canIncludeDeclAsNode(VD)) {
-    return false;
+    return Action::SkipNode();
   }
 
   // An implicit Objective-C protocol requirement that is inherited onto a
@@ -365,7 +366,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
       auto ExtendedSG = getModuleSymbolGraph(ExtendedNominal);
       if (!isOurModule(ExtendedModule)) {
         ExtendedSG->recordNode(Symbol(ExtendedSG, VD, nullptr));
-        return true;
+        return Action::Continue();
       }
     }
   }
@@ -382,7 +383,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     }
     if (Parent) {
       SG->recordNode(Symbol(SG, VD, Parent));
-      return true;
+      return Action::Continue();
     }
   }
 
@@ -415,7 +416,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   // Otherwise, record this in the main module `M`'s symbol graph.
   SG->recordNode(Symbol(SG, VD, BaseDecl));
 
-  return true;
+  return Action::Continue();
 }
 
 bool SymbolGraphASTWalker::isConsideredExportedImported(const Decl *D) const {
