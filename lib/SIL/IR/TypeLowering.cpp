@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "libsil"
 
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CanTypeVisitor.h"
@@ -1066,12 +1067,7 @@ namespace {
     visitHiddenType(CanHiddenType type, AbstractionPattern origType,
                     IsTypeExpansionSensitive_t isSensitive) {
       auto *layoutInfo = type->getLayoutInfoDecl();
-      // TODO: Remove this legacy fallback once every HiddenType carries an
-      // abstract layout.
-      if (!layoutInfo)
-        return getTrivialSILTypeProperties(isSensitive);
-
-      assert(layoutInfo->Layout &&
+      assert(layoutInfo && layoutInfo->Layout &&
              "HiddenTypeLayoutInfoDecl should have abstract layout");
       return mergeIsTypeExpansionSensitive(
           isSensitive, layoutInfo->Layout->typeProperties);
@@ -2607,13 +2603,7 @@ namespace {
     visitHiddenType(CanHiddenType type, AbstractionPattern origType,
                     IsTypeExpansionSensitive_t isSensitive) {
       auto *layoutInfo = type->getLayoutInfoDecl();
-      // TODO: Remove this legacy fallback once every HiddenType carries an
-      // abstract layout.
-      if (!layoutInfo)
-        return handleTrivial(type,
-                             getTrivialSILTypeProperties(isSensitive));
-
-      assert(layoutInfo->Layout &&
+      assert(layoutInfo && layoutInfo->Layout &&
              "HiddenTypeLayoutInfoDecl should have abstract layout");
       auto properties = mergeIsTypeExpansionSensitive(
           isSensitive, layoutInfo->Layout->typeProperties);
@@ -2848,15 +2838,6 @@ namespace {
       }
 
       if (handleResilience(structType, D, properties)) {
-        return handleAddressOnly(structType, properties);
-      }
-
-      // Force address-only when the struct has hidden stored properties from
-      // an internal bridging header.
-      if (D->getAttrs().hasAttribute<HasHiddenStoredPropertiesAttr>()) {
-        properties.setAddressOnly();
-        properties.setNonTrivial();
-        properties.setLexical(IsLexical);
         return handleAddressOnly(structType, properties);
       }
 
@@ -5929,6 +5910,7 @@ void TypeLowering::print(llvm::raw_ostream &os) const {
   os << "Type Lowering for lowered type: " << LoweredType << ".\n"
      << "Expansion: " << getResilienceExpansion() << "\n"
      << "isTrivial: " << BOOL(Properties.isTrivial()) << ".\n"
+     << "isReferenceCounted: " << BOOL(isReferenceCounted()) << ".\n"
      << "isFixedABI: " << BOOL(Properties.isFixedABI()) << ".\n"
      << "isAddressOnly: " << BOOL(Properties.isAddressOnly()) << ".\n"
      << "isResilient: " << BOOL(Properties.isResilient()) << ".\n"
@@ -5946,6 +5928,10 @@ void TypeLowering::print(llvm::raw_ostream &os) const {
      << "definitelyIsAddressableForDependencies: " << BOOL(Properties.definitelyIsAddressableForDependencies()) << ".\n"
      << "definitelyIsOrContainsRawLayout: " << BOOL(Properties.definitelyIsOrContainsRawLayout()) << ".\n"
      << "\n";
+}
+
+void TypeLowering::printAbstractTypeLayoutInfo(llvm::raw_ostream &os) const {
+  print(os);
 }
 
 void TypeLowering::dump() const {

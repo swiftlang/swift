@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -256,6 +257,145 @@ TypeInfo::~TypeInfo() {
     delete nativeReturnSchema;
   if (nativeParameterSchema)
     delete nativeParameterSchema;
+}
+
+static StringRef getSpecialTypeInfoKindName(SpecialTypeInfoKind kind) {
+  switch (kind) {
+  case SpecialTypeInfoKind::Unimplemented:
+    return "unimplemented";
+  case SpecialTypeInfoKind::None:
+    return "none";
+  case SpecialTypeInfoKind::Fixed:
+    return "fixed";
+  case SpecialTypeInfoKind::Weak:
+    return "weak";
+  case SpecialTypeInfoKind::Loadable:
+    return "loadable";
+  case SpecialTypeInfoKind::Reference:
+    return "reference";
+  }
+  llvm_unreachable("unhandled special TypeInfo kind");
+}
+
+static StringRef getReferenceCountingName(ReferenceCounting kind) {
+  switch (kind) {
+  case ReferenceCounting::Native:
+    return "native";
+  case ReferenceCounting::ObjC:
+    return "objc";
+  case ReferenceCounting::None:
+    return "none";
+  case ReferenceCounting::Custom:
+    return "custom";
+  case ReferenceCounting::Block:
+    return "block";
+  case ReferenceCounting::Unknown:
+    return "unknown";
+  case ReferenceCounting::Bridge:
+    return "bridge";
+  case ReferenceCounting::Error:
+    return "error";
+  }
+  llvm_unreachable("unhandled reference-counting kind");
+}
+
+static void printLLVMType(llvm::raw_ostream &OS, llvm::Type *type) {
+  type->print(OS, /*IsForDebug=*/false, /*NoDetails=*/false);
+}
+
+static void printExplosionSchema(llvm::raw_ostream &OS,
+                                 const ExplosionSchema &schema) {
+  OS << "  explosionSchema:\n";
+  for (const auto &[index, element] : llvm::enumerate(schema)) {
+    OS << "    - index: " << index << "\n"
+       << "      kind: " << (element.isScalar() ? "scalar" : "aggregate")
+       << "\n"
+       << "      type: ";
+    printLLVMType(OS, element.isScalar() ? element.getScalarType()
+                                         : element.getAggregateType());
+    OS << "\n";
+    if (element.isAggregate())
+      OS << "      alignment: " << element.getAggregateAlignment().getValue()
+         << "\n";
+  }
+}
+
+static void printNativeConventionSchema(llvm::raw_ostream &OS, StringRef name,
+                                        const NativeConventionSchema &schema) {
+  OS << "  " << name << ":\n"
+     << "    requiresIndirect: "
+     << (schema.requiresIndirect() ? "true" : "false") << "\n"
+     << "    components:\n";
+  unsigned index = 0;
+  schema.enumerateComponents(
+      [&](clang::CharUnits begin, clang::CharUnits end, llvm::Type *type) {
+        OS << "      - index: " << index++ << "\n"
+           << "        begin: " << begin.getQuantity() << "\n"
+           << "        end: " << end.getQuantity() << "\n"
+           << "        type: ";
+        printLLVMType(OS, type);
+        OS << "\n";
+      });
+}
+
+void TypeInfo::printAbstractTypeLayoutInfo(IRGenModule &IGM,
+                                           llvm::raw_ostream &OS) const {
+  auto printFlag = [&](StringRef name, bool value) {
+    OS << "  " << name << ": " << (value ? "true" : "false") << "\n";
+  };
+
+  OS << "TypeInfo:\n"
+     << "  storageType: ";
+  printLLVMType(OS, getStorageType());
+  OS << "\n"
+     << "  kind: " << getSpecialTypeInfoKindName(getSpecialTypeInfoKind())
+     << "\n"
+     << "  bestKnownAlignment: " << getBestKnownAlignment().getValue()
+     << "\n";
+  printFlag("abiAccessible", isABIAccessible() == IsABIAccessible);
+  printFlag("triviallyDestroyable",
+            isTriviallyDestroyable(ResilienceExpansion::Maximal) ==
+                IsTriviallyDestroyable);
+  printFlag("copyable", isCopyable(ResilienceExpansion::Maximal) == IsCopyable);
+  printFlag("bitwiseTakable",
+            isBitwiseTakable(ResilienceExpansion::Maximal));
+  printFlag("bitwiseBorrowable",
+            isBitwiseBorrowable(ResilienceExpansion::Maximal));
+  printFlag("fixedSizeMinimal",
+            isFixedSize(ResilienceExpansion::Minimal) == IsFixedSize);
+  printFlag("fixedSizeMaximal",
+            isFixedSize(ResilienceExpansion::Maximal) == IsFixedSize);
+  printFlag("loadable", isLoadable() == IsLoadable);
+
+  ReferenceCounting referenceCounting;
+  bool singleRetainablePointer = isSingleRetainablePointer(
+      ResilienceExpansion::Maximal, &referenceCounting);
+  printFlag("singleRetainablePointer", singleRetainablePointer);
+  if (singleRetainablePointer)
+    OS << "  referenceCounting: " << getReferenceCountingName(referenceCounting)
+       << "\n";
+
+  if (auto *fixed = dyn_cast<FixedTypeInfo>(this)) {
+    OS << "  fixedSize: " << fixed->getFixedSize().getValue() << "\n"
+       << "  fixedAlignment: " << fixed->getFixedAlignment().getValue()
+       << "\n"
+       << "  fixedStride: " << fixed->getFixedStride().getValue() << "\n";
+    auto spareBits = fixed->getSpareBits().asAPInt();
+    OS << "  spareBits: ";
+    spareBits.print(OS, /*isSigned=*/false);
+    OS << "\n"
+       << "  extraInhabitantCount: "
+       << fixed->getFixedExtraInhabitantCount(IGM) << "\n"
+       << "  extraInhabitantMask: ";
+    fixed->getFixedExtraInhabitantMask(IGM).print(OS, /*isSigned=*/false);
+    OS << "\n";
+  }
+
+  printExplosionSchema(OS, getSchema());
+  printNativeConventionSchema(OS, "nativeParameterSchema",
+                              nativeParameterValueSchema(IGM));
+  printNativeConventionSchema(OS, "nativeReturnSchema",
+                              nativeReturnValueSchema(IGM));
 }
 
 TypeInfo::TypeInfo(
@@ -1731,60 +1871,6 @@ namespace {
     }
   };
 
-  /// A TypeInfo for a HiddenType placeholder. The placeholder stands in for a
-  /// real C-imported type whose identity has been elided from the importing
-  /// Layout is recovered from the defining module's HiddenTypeLayouts table.
-  ///
-  /// Address-only: clients lack the clang::RecordDecl required to derive a
-  /// correct register-passing schema for the hidden field, so values are
-  /// always passed indirectly. 
-  class TrivialHiddenTypeInfo final
-      : public IndirectTypeInfo<TrivialHiddenTypeInfo, FixedTypeInfo> {
-  public:
-    TrivialHiddenTypeInfo(llvm::Type *storage, Size size, Alignment align)
-      : IndirectTypeInfo(storage, size,
-                         SpareBitVector::getConstant(size.getValueInBits(),
-                                                     false),
-                         align,
-                         IsTriviallyDestroyable, IsBitwiseTakableAndBorrowable,
-                         IsCopyable,
-                         IsFixedSize, IsABIAccessible) {}
-
-    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-    createSerializableHiddenTypeInfoRepresentation(
-        IRGenModule &) const override {
-      unsupportedSerializableHiddenTypeInfoRepresentation();
-    }
-
-    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        SILType T, bool isOutlined) const override {
-      IGF.emitMemCpy(dest, src, getFixedSize());
-    }
-    void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
-      IGF.emitMemCpy(dest, src, getFixedSize());
-    }
-    void destroy(IRGenFunction &IGF, Address addr, SILType T,
-                 bool isOutlined) const override {
-      // Trivial destructor under the plain-C assumption.
-    }
-
-    TypeLayoutEntry *
-    buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
-                         bool useStructLayouts) const override {
-      if (!useStructLayouts)
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(
-          *this, T, ScalarKind::TriviallyDestroyable);
-    }
-
-    unsigned getFixedExtraInhabitantCount(IRGenModule &) const override {
-      return 0;
-    }
-    bool mayHaveExtraInhabitants(IRGenModule &) const override {
-      return false;
-    }
-  };
 } // end anonymous namespace
 
 static std::unique_ptr<TypeInfo>
@@ -2415,6 +2501,30 @@ const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
   return Types.getCompleteTypeInfo(T);
 }
 
+void IRGenModule::dumpAbstractTypeLayoutInfo(CanType type,
+                                             StringRef mangledName,
+                                             StringRef origin) {
+  auto &OS = llvm::outs();
+  OS << "=== Abstract type layout information ===\n"
+     << "mangledName: " << mangledName << "\n"
+     << "origin: " << origin << "\n";
+  type.printAbstractTypeLayoutInfo(OS);
+
+  auto &minimalLowering = getSILTypes().getTypeLowering(
+      AbstractionPattern(type), type, TypeExpansionContext::minimal());
+  OS << "Minimal ";
+  minimalLowering.printAbstractTypeLayoutInfo(OS);
+
+  auto &irgenLowering = getSILTypes().getTypeLowering(
+      AbstractionPattern(type), type,
+      TypeExpansionContext::maximalResilienceExpansionOnly());
+  OS << "IRGen ";
+  irgenLowering.printAbstractTypeLayoutInfo(OS);
+
+  getTypeInfo(irgenLowering.getLoweredType())
+      .printAbstractTypeLayoutInfo(*this, OS);
+}
+
 /// 
 const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
   return *getTypeEntry(T);
@@ -2828,25 +2938,13 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for the type info an IntegerType");
   case TypeKind::Hidden: {
     auto hidden = cast<HiddenType>(ty);
-    if (auto *layoutInfo = hidden->getLayoutInfoDecl()) {
-      assert(layoutInfo->Layout &&
-             layoutInfo->Layout->typeInfoRepresentation &&
-             "hidden layout declaration has no TypeInfo representation");
-      return createTypeInfoFromSerializableRepresentation(
-                 IGM, *layoutInfo->Layout->typeInfoRepresentation)
-          .release();
-    }
-
-    auto *defining = hidden->getDefiningModule();
-    assert(defining &&
-           "HiddenType must carry a defining module after deserialization");
-    auto layout = defining->lookupHiddenTypeLayout(hidden->getMangledName());
-    assert(layout &&
-           "no HIDDEN_TYPE_LAYOUTS_BLOCK entry for this mangled name");
-
-    auto *storage = llvm::ArrayType::get(IGM.Int8Ty, layout->size);
-    return new TrivialHiddenTypeInfo(storage, Size(layout->size),
-                              Alignment(layout->alignment));
+    auto *layoutInfo = hidden->getLayoutInfoDecl();
+    assert(layoutInfo && layoutInfo->Layout &&
+           layoutInfo->Layout->typeInfoRepresentation &&
+           "HiddenType must carry a serialized TypeInfo representation");
+    return createTypeInfoFromSerializableRepresentation(
+               IGM, *layoutInfo->Layout->typeInfoRepresentation)
+        .release();
   }
   }
   }

@@ -132,6 +132,9 @@ public:
   /// Print out the internal state of this type lowering into \p os.
   void print(llvm::raw_ostream &os) const;
 
+  /// Print the SIL-level properties that affect abstract type lowering.
+  void printAbstractTypeLayoutInfo(llvm::raw_ostream &os) const;
+
   /// Dump out the internal state of this type lowering to llvm::dbgs().
   SWIFT_DEBUG_DUMP;
 

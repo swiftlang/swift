@@ -8542,40 +8542,32 @@ class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   StringRef MangledName;
-  ModuleDecl *DefiningModule;
   HiddenTypeLayoutInfoDecl *LayoutInfoDecl = nullptr;
   CanType Parent;
 
-  HiddenType(StringRef mangledName, ModuleDecl *definingModule,
-             HiddenTypeLayoutInfoDecl *layoutInfoDecl, CanType parent,
-             const ASTContext &ctx)
+  HiddenType(StringRef mangledName, HiddenTypeLayoutInfoDecl *layoutInfoDecl,
+             CanType parent, const ASTContext &ctx)
       : TypeBase(TypeKind::Hidden, &ctx,
                  parent ? parent->getRecursiveProperties()
                         : RecursiveTypeProperties()),
-        MangledName(mangledName), DefiningModule(definingModule),
-        LayoutInfoDecl(layoutInfoDecl), Parent(parent) {}
+        MangledName(mangledName), LayoutInfoDecl(layoutInfoDecl), Parent(parent) {}
 
 public:
   static HiddenType *get(const ASTContext &ctx, StringRef mangledName,
-                         ModuleDecl *definingModule,
                          HiddenTypeLayoutInfoDecl *layoutInfoDecl,
                          CanType parent);
 
   StringRef getMangledName() const { return MangledName; }
-  ModuleDecl *getDefiningModule() const { return DefiningModule; }
   HiddenTypeLayoutInfoDecl *getLayoutInfoDecl() const { return LayoutInfoDecl; }
   CanType getParent() const { return Parent; }
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
-    Profile(ID, getMangledName(), getDefiningModule(), getLayoutInfoDecl(),
-            getParent());
+    Profile(ID, getMangledName(), getLayoutInfoDecl(), getParent());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName,
-                      ModuleDecl *definingModule,
                       HiddenTypeLayoutInfoDecl *layoutInfoDecl,
                       CanType parent) {
     ID.AddString(mangledName);
-    ID.AddPointer(definingModule);
     ID.AddPointer(layoutInfoDecl);
     ID.AddPointer(parent.getPointer());
   }

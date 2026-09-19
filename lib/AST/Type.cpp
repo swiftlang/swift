@@ -18,6 +18,7 @@
 
 #include "clang/AST/Type.h"
 #include "ForeignRepresentationInfo.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Concurrency.h"
@@ -262,14 +263,67 @@ Type TypeBase::findAlwaysUnsafeType() const {
 static std::optional<ReferenceCounting>
 getHiddenTypeReferenceCounting(CanHiddenType type) {
   auto *layoutInfoDecl = type->getLayoutInfoDecl();
-  // TODO: Remove this legacy fallback once every HiddenType carries an
-  // abstract layout.
-  if (!layoutInfoDecl)
-    return std::nullopt;
-
-  assert(layoutInfoDecl->Layout &&
+  assert(layoutInfoDecl && layoutInfoDecl->Layout &&
          "HiddenTypeLayoutInfoDecl should have abstract layout");
   return layoutInfoDecl->Layout->referenceCountingSystem;
+}
+
+static StringRef getReferenceCountingName(ReferenceCounting referenceCounting) {
+  switch (referenceCounting) {
+  case ReferenceCounting::Native:
+    return "native";
+  case ReferenceCounting::ObjC:
+    return "objc";
+  case ReferenceCounting::None:
+    return "none";
+  case ReferenceCounting::Custom:
+    return "custom";
+  case ReferenceCounting::Block:
+    return "block";
+  case ReferenceCounting::Unknown:
+    return "unknown";
+  case ReferenceCounting::Bridge:
+    return "bridge";
+  case ReferenceCounting::Error:
+    return "error";
+  }
+  llvm_unreachable("unhandled reference-counting kind");
+}
+
+void CanType::printAbstractTypeLayoutInfo(raw_ostream &OS) const {
+  auto printFlag = [&](StringRef name, bool value) {
+    OS << "  " << name << ": " << (value ? "true" : "false") << "\n";
+  };
+
+  OS << "CanType:\n";
+  OS << "  type: ";
+  print(OS);
+  OS << "\n";
+
+  bool referenceSemantics = hasReferenceSemantics();
+  printFlag("hasTypeParameter", (*this)->hasTypeParameter());
+  printFlag("hasArchetype", (*this)->hasArchetype());
+  printFlag("hasPrimaryArchetype", (*this)->hasPrimaryArchetype());
+  printFlag("hasLocalArchetype", (*this)->hasLocalArchetype());
+  printFlag("hasOpaqueArchetype", (*this)->hasOpaqueArchetype());
+  printFlag("hasOpenedExistential", (*this)->hasOpenedExistential());
+  printFlag("hasElementArchetype", (*this)->hasElementArchetype());
+  printFlag("hasParameterPack", (*this)->hasParameterPack());
+  printFlag("hasPack", (*this)->hasPack());
+  printFlag("hasPackArchetype", (*this)->hasPackArchetype());
+  printFlag("hasParameterizedExistential",
+            (*this)->hasParameterizedExistential());
+  printFlag("hasDynamicSelf", (*this)->hasDynamicSelfType());
+  printFlag("hasUnboundGeneric", (*this)->hasUnboundGenericType());
+  printFlag("hasError", (*this)->hasError());
+  printFlag("hasBareError", (*this)->hasBareError());
+  printFlag("hasReferenceSemantics", referenceSemantics);
+  printFlag("isAnyClassReferenceType", isAnyClassReferenceType());
+  printFlag("isConstraintType", isConstraintType());
+  printFlag("isExistentialType", isExistentialType());
+  if (referenceSemantics)
+    OS << "  referenceCounting: "
+       << getReferenceCountingName((*this)->getReferenceCounting()) << "\n";
 }
 
 bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,

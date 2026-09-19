@@ -785,13 +785,6 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
   HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
            "stderr">;
 
-def dump_abstract_layout : Flag<["-"], "dump-abstract-layout">,
-  HelpText<"Dump abstract layout information for Clang-backed types">;
-
-def dump_hidden_type_layouts : Flag<["-"], "dump-hidden-type-layouts">,
-  HelpText<"Dump every hidden-type layout known to this compilation, "
-           "including those deserialized from imported swiftmodules">;
-
 def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
                                HelpText<"Dump availability scopes to stderr">;
 
@@ -1353,6 +1346,10 @@ def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
+
+def dump_abstract_type_layout_info : Flag<["-"], "dump-abstract-type-layout-info">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Dump compiler-facing layout information for serialized and recovered hidden types">;
 
 def swift_async_frame_pointer_EQ : Joined<["-"], "swift-async-frame-pointer=">,
   Flags<[FrontendOption]>,
