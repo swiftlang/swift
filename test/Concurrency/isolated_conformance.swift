@@ -156,6 +156,13 @@ protocol R: SendableMetatype {
   func f() { }
 }
 
+@MainActor
+class RWithNonIsolated: R {
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{25-25=@preconcurrency }}
+  func f() { } // expected-note{{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+  // expected-note@-1{{mark instance method 'f()' 'nonisolated'}}{{3-3=nonisolated }}
+}
+
 // ----------------------------------------------------------------------------
 // Use checking of isolated conformances.
 // ----------------------------------------------------------------------------
