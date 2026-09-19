@@ -813,6 +813,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_Dependencies:
   case file_types::TY_SwiftModuleDocFile:
   case file_types::TY_SerializedDiagnostics:
+  case file_types::TY_SARIFDiagnostics:
   case file_types::TY_ClangHeader:
   case file_types::TY_Image:
   case file_types::TY_SwiftDeps:
@@ -1096,6 +1097,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_Dependencies:
     case file_types::TY_SwiftModuleDocFile:
     case file_types::TY_SerializedDiagnostics:
+    case file_types::TY_SARIFDiagnostics:
     case file_types::TY_ClangHeader:
     case file_types::TY_Image:
     case file_types::TY_SwiftDeps:

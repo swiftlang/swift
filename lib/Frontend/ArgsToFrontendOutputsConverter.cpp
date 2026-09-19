@@ -448,7 +448,8 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.ModuleDocOutputPath = (*moduleDocOutput)[moduleIndex];
     sop.DependenciesFilePath = (*dependenciesFile)[moduleIndex];
     sop.ReferenceDependenciesFilePath = (*referenceDependenciesFile)[moduleIndex];
-    sop.SerializedDiagnosticsPath = (*serializedDiagnostics)[moduleIndex];
+    sop.LLVMBitcodeDiagnosticsPath = (*serializedDiagnostics)[moduleIndex];
+    sop.SARIFDiagnosticsPath = (*serializedDiagnostics)[moduleIndex];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[moduleIndex];
     sop.TBDPath = (*TBD)[moduleIndex];
     sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[moduleIndex];
@@ -566,6 +567,14 @@ static bool shouldEmitFineModuleTrace(FrontendOptions::ActionType action) {
   }
 }
 
+/// Whether diagnostics are serialized as SARIF rather than in the binary
+/// format, as requested by -serialize-diagnostics=<format>.
+static bool serializesDiagnosticsAsSARIF(const llvm::opt::ArgList &Args) {
+  const llvm::opt::Arg *A =
+      Args.getLastArg(options::OPT_serialize_diagnostics_EQ);
+  return A && StringRef(A->getValue()) == "sarif";
+}
+
 std::optional<SupplementaryOutputPaths>
 SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
     StringRef outputFile, const SupplementaryOutputPaths &pathsFromArguments,
@@ -592,10 +601,26 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       file_types::TY_ConstValues, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
-  auto serializedDiagnosticsPath = determineSupplementaryOutputFilename(
-      OPT_serialize_diagnostics, pathsFromArguments.SerializedDiagnosticsPath,
-      file_types::TY_SerializedDiagnostics, "",
-      defaultSupplementaryOutputPathExcludingExtension);
+  // Diagnostics are serialized in one format per invocation, so only the
+  // requested format contributes a path. The other is left empty, so that it
+  // is not reported as an output of the compilation.
+  const bool serializeAsSARIF = serializesDiagnosticsAsSARIF(Args);
+
+  auto serializedDiagnosticsPath =
+      serializeAsSARIF ? std::string()
+                       : determineSupplementaryOutputFilename(
+                             OPT_serialize_diagnostics,
+                             pathsFromArguments.LLVMBitcodeDiagnosticsPath,
+                             file_types::TY_SerializedDiagnostics, "",
+                             defaultSupplementaryOutputPathExcludingExtension);
+
+  auto sarifDiagnosticsPath =
+      serializeAsSARIF ? determineSupplementaryOutputFilename(
+                             OPT_serialize_diagnostics,
+                             pathsFromArguments.SARIFDiagnosticsPath,
+                             file_types::TY_SARIFDiagnostics, "",
+                             defaultSupplementaryOutputPathExcludingExtension)
+                       : std::string();
 
   // There is no non-path form of -emit-fixits-path
   auto fixItsOutputPath = pathsFromArguments.FixItsOutputPath;
@@ -695,7 +720,8 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.ModuleDocOutputPath = moduleDocOutputPath;
   sop.DependenciesFilePath = dependenciesFilePath;
   sop.ReferenceDependenciesFilePath = referenceDependenciesFilePath;
-  sop.SerializedDiagnosticsPath = serializedDiagnosticsPath;
+  sop.LLVMBitcodeDiagnosticsPath = serializedDiagnosticsPath;
+  sop.SARIFDiagnosticsPath = sarifDiagnosticsPath;
   sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
   sop.FineModuleTracePath = FineModuleTracePath.str().str();
@@ -741,6 +767,9 @@ SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
       return true;
     if (emitOpt == options::OPT_save_optimization_record &&
         Args.hasArg(options::OPT_save_optimization_record_EQ))
+      return true;
+    if (emitOpt == options::OPT_serialize_diagnostics &&
+        Args.hasArg(options::OPT_serialize_diagnostics_EQ))
       return true;
     return false;
   };
