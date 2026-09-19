@@ -5929,6 +5929,7 @@ static std::optional<llvm::Type::TypeID> decodeLLVMTypeID(uint64_t rawKind) {
   case llvm::Type::ArrayTyID:
   case llvm::Type::FixedVectorTyID:
   case llvm::Type::StructTyID:
+  case llvm::Type::ByteTyID:
     return kind;
   case llvm::Type::VoidTyID:
   case llvm::Type::LabelTyID:
@@ -5939,7 +5940,6 @@ static std::optional<llvm::Type::TypeID> decodeLLVMTypeID(uint64_t rawKind) {
   case llvm::Type::ScalableVectorTyID:
   case llvm::Type::TypedPointerTyID:
   case llvm::Type::TargetExtTyID:
-  case llvm::Type::ByteTyID:
     return std::nullopt;
   }
   llvm_unreachable("unhandled LLVM type kind");

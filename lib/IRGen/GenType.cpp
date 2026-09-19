@@ -88,6 +88,9 @@ static std::unique_ptr<SerializableLLVMType> serializeLLVMTypeImpl(
   case llvm::Type::IntegerTyID:
     return create(type->getTypeID(),
                   cast<llvm::IntegerType>(type)->getBitWidth());
+
+  case llvm::Type::ByteTyID:
+    return create(type->getTypeID(), cast<llvm::ByteType>(type)->getBitWidth());
   case llvm::Type::PointerTyID:
     return create(type->getTypeID(),
                   cast<llvm::PointerType>(type)->getAddressSpace());
@@ -131,7 +134,6 @@ static std::unique_ptr<SerializableLLVMType> serializeLLVMTypeImpl(
   case llvm::Type::ScalableVectorTyID:
   case llvm::Type::TypedPointerTyID:
   case llvm::Type::TargetExtTyID:
-  case llvm::Type::ByteTyID:
     llvm::report_fatal_error("unsupported LLVM storage type");
   }
 
@@ -164,6 +166,8 @@ deserializeLLVMTypeImpl(llvm::LLVMContext &ctx,
     return llvm::Type::getPPC_FP128Ty(ctx);
   case llvm::Type::IntegerTyID:
     return llvm::IntegerType::get(ctx, representation.payload);
+  case llvm::Type::ByteTyID:
+    return llvm::ByteType::get(ctx, representation.payload);
   case llvm::Type::PointerTyID:
     return llvm::PointerType::get(ctx, representation.payload);
   case llvm::Type::ArrayTyID:
@@ -191,7 +195,6 @@ deserializeLLVMTypeImpl(llvm::LLVMContext &ctx,
   case llvm::Type::ScalableVectorTyID:
   case llvm::Type::TypedPointerTyID:
   case llvm::Type::TargetExtTyID:
-  case llvm::Type::ByteTyID:
     llvm::report_fatal_error("unsupported serialized LLVM storage type");
   }
 
