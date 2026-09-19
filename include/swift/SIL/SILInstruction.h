@@ -11507,6 +11507,11 @@ public:
 };
 
 /// Base class for cast instructions with address-type operands.
+///
+/// The operand list is `[src, dest?, typeDependentOperands...]`. The
+/// destination is present unless the derived class says otherwise by shadowing
+/// `hasDest()`; see `CheckedCastAddrBranchInst`, whose `test_only` form
+/// produces no value and therefore has no destination to write.
 template<SILInstructionKind Kind,
          typename Derived,
          typename Base>
@@ -11520,6 +11525,16 @@ protected:
   using TrailingObjects =
       InstructionBaseWithTrailingOperands<Kind, Derived, Operand>;
 
+  const Derived *asDerived() const {
+    return static_cast<const Derived *>(this);
+  }
+
+  /// The number of operands before the type-dependent ones: the source, plus
+  /// the destination if there is one.
+  unsigned getNumFixedOperands() const {
+    return asDerived()->hasDest() ? 2 : 1;
+  }
+
 public:
   template <typename... Args>
   AddrCastInstBase(SILDebugLocation debugLoc,
@@ -11532,20 +11547,43 @@ public:
                                               debugLoc, srcType, targetType,
                                               std::forward<Args>(args)...) {}
 
+  /// Construct from an already-assembled operand list, laid out as
+  /// `[src, dest?, typeDependentOperands...]`. For derived classes that may
+  /// omit the destination.
+  template <typename... Args>
+  AddrCastInstBase(ArrayRef<SILValue> allOperands, SILDebugLocation debugLoc,
+                   CanType srcType, CanType targetType, Args &&...args)
+      : InstructionBaseWithTrailingOperands<Kind, Derived, TypesForAddrCasts<Base>> (
+                                              allOperands,
+                                              debugLoc, srcType, targetType,
+                                              std::forward<Args>(args)...) {}
+
+  /// Does this instruction have a destination operand?
+  ///
+  /// Shadowed by derived classes that can omit it.
+  bool hasDest() const { return true; }
+
   unsigned getNumTypeDependentOperands() const {
-    return this->getAllOperands().size() - 2;
+    return this->getAllOperands().size() - getNumFixedOperands();
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return this->getAllOperands().slice(2);
+    return this->getAllOperands().slice(getNumFixedOperands());
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return this->getAllOperands().slice(2);
+    return this->getAllOperands().slice(getNumFixedOperands());
   }
 
   SILValue getSrc() const { return this->getAllOperands()[Src].get(); }
-  SILValue getDest() const { return this->getAllOperands()[Dest].get(); }
+
+  /// The destination address, or an invalid SILValue if this instruction has
+  /// no destination operand. Check `hasDest()` before using it.
+  SILValue getDest() const {
+    if (!asDerived()->hasDest())
+      return SILValue();
+    return this->getAllOperands()[Dest].get();
+  }
 
   SILType getSourceLoweredType() const { return getSrc()->getType(); }
   SILType getTargetLoweredType() const { return getDest()->getType(); }
@@ -11612,6 +11650,9 @@ public:
 
 /// Perform a checked cast operation and branch on whether the cast succeeds.
 /// The result of the checked cast is left in the destination address.
+///
+/// A `test_only` cast is the exception: it reports only whether the cast would
+/// have succeeded, produces no value, and so has no destination operand at all.
 class CheckedCastAddrBranchInst final
     : public AddrCastInstBase<
               SILInstructionKind::CheckedCastAddrBranchInst,
@@ -11619,15 +11660,25 @@ class CheckedCastAddrBranchInst final
   friend SILBuilder;
   CheckedCastInstOptions Options;
 
+  /// The lowered type of the cast's target.
+  ///
+  /// Stored rather than read back from the destination operand, because a
+  /// `test_only` cast has no destination. `CheckedCastBranchInst` stores its
+  /// target type the same way.
+  SILType DestLoweredTy;
+
+  /// \param allOperands `[src, dest?, typeDependentOperands...]`.
   CheckedCastAddrBranchInst(SILDebugLocation DebugLoc,
                             CheckedCastInstOptions Options,
-                            CastConsumptionKind consumptionKind, SILValue src,
-                            CanType srcType, SILValue dest, CanType targetType,
-                            ArrayRef<SILValue> TypeDependentOperands,
+                            CastConsumptionKind consumptionKind,
+                            ArrayRef<SILValue> allOperands, CanType srcType,
+                            SILType destLoweredType, CanType targetType,
                             SILBasicBlock *successBB, SILBasicBlock *failureBB,
                             ProfileCounter Target1Count,
                             ProfileCounter Target2Count);
 
+  /// \param dest The destination address. Must be null for a `test_only` cast
+  ///             and non-null for every other consumption kind.
   static CheckedCastAddrBranchInst *
   create(SILDebugLocation DebugLoc,
          CheckedCastInstOptions options,
@@ -11639,6 +11690,16 @@ class CheckedCastAddrBranchInst final
 
 public:
   CheckedCastInstOptions getCheckedCastOptions() const { return Options; }
+
+  /// A `test_only` cast produces no value, so it has no destination operand;
+  /// `getDest()` returns an invalid SILValue for it.
+  bool hasDest() const {
+    return producesDestinationValue(getConsumptionKind());
+  }
+
+  /// Shadows AddrCastInstBase::getTargetLoweredType(), which reads the type
+  /// back from the destination operand this instruction may not have.
+  SILType getTargetLoweredType() const { return DestLoweredTy; }
 };
 
 /// Converts a heap object reference to a different type without any runtime

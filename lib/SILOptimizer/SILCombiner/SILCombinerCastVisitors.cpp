@@ -680,7 +680,9 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
   SILValue val = getConcreteValueOfExistentialBoxAddr(CCABI->getSrc(), CCABI);
   while (auto *cvi = dyn_cast_or_null<CopyValueInst>(val))
     val = cvi->getOperand();
-  if (canBeUsedAsCastDestination(val, CCABI, DA)) {
+  // A test_only cast has no destination to fold the value into; the rewrite
+  // below would have nowhere to store and would leak the copy it makes.
+  if (CCABI->hasDest() && canBeUsedAsCastDestination(val, CCABI, DA)) {
     // We need to insert the copy after the defining instruction of val or at
     // the top of the block if val is an argument.
     {
@@ -703,6 +705,8 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
         break;
       case CastConsumptionKind::BorrowAlways:
         llvm_unreachable("BorrowAlways is not supported on addresses");
+      case CastConsumptionKind::TestOnly:
+        llvm_unreachable("test_only is rejected above");
     }
     builder.emitStoreValueOperation(loc, val, CCABI->getDest(),
                                     StoreOwnershipQualifier::Init);

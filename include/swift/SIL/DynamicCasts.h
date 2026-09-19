@@ -305,7 +305,9 @@ public:
     llvm_unreachable("covered switch");
   }
 
-  // Returns the success value.
+  // Returns the success value. Invalid if the cast produces no value, which
+  // is the case for `checked_cast_addr_br test_only` as well as the two scalar
+  // forms below.
   SILValue getDest() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
@@ -369,7 +371,7 @@ public:
   SILType getTargetLoweredType() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
-      return cast<CheckedCastAddrBranchInst>(inst)->getDest()->getType();
+      return cast<CheckedCastAddrBranchInst>(inst)->getTargetLoweredType();
     case SILDynamicCastKind::CheckedCastBranchInst:
       return cast<CheckedCastBranchInst>(inst)->getTargetLoweredType();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:

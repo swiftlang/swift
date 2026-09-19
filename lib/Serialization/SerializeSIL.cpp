@@ -90,6 +90,8 @@ static unsigned toStableCastConsumptionKind(CastConsumptionKind kind) {
     return SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS;
   case CastConsumptionKind::BorrowAlways:
     return SIL_CAST_CONSUMPTION_BORROW_ALWAYS;
+  case CastConsumptionKind::TestOnly:
+    return SIL_CAST_CONSUMPTION_TEST_ONLY;
   }
   llvm_unreachable("bad cast consumption kind");
 }
