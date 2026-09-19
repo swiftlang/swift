@@ -24,6 +24,7 @@ swift_compiler_sources(Optimizer
   CopyToBorrowOptimization.swift
   DeadAccessScopeElimination.swift
   DeadDebugVariableElimination.swift
+  Debugify.swift
   DeadObjectElimination.swift
   DeadStoreElimination.swift
   DeinitDevirtualizer.swift

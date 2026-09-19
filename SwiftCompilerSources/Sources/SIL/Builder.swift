@@ -507,6 +507,14 @@ public struct Builder {
   }
 
   @discardableResult
+  public func createDebugifyDebugValue(value: Value) -> DebugValueInst? {
+    guard let debugValue = bridged.createDebugifyDebugValue(value.bridged).instruction else {
+      return nil
+    }
+    return notifyNew(debugValue as! DebugValueInst)
+  }
+
+  @discardableResult
   public func createDebugStep() -> DebugStepInst {
     return notifyNew(bridged.createDebugStep().getAs(DebugStepInst.self))
   }
