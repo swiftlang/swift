@@ -574,6 +574,22 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       return .continueWalk
     case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
       return .continueWalk
+    case let bi as BuiltinInst:
+      switch bi.id {
+      case .PrepareInitialization, .ZeroInitializer:
+        return .continueWalk
+      case .AddressOfRawLayout:
+        for user in bi.users {
+          guard let pta = user as? PointerToAddressInst,
+                walkDownUses(ofAddress: pta, path: path.forPointerToAddress(pta)) == .continueWalk
+          else {
+            return isEscaping
+          }
+        }
+        return .continueWalk
+      default:
+        return isEscaping
+      }
     case let uac as UncheckedAddrCastInst:
       if uac.type != uac.fromAddress.type {
         // It's dangerous to continue walking over an `unchecked_addr_cast` which casts between two different types.
