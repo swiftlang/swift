@@ -12,6 +12,9 @@
 
 // REQUIRES: swift_feature_CxxImplementation
 
+// Disable for 32-bit armv7 until we figure out a solution in #92467
+// XFAIL: OS=linux-androideabi
+
 import Methods
 
 
