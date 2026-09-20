@@ -21,8 +21,8 @@ public struct UsesStructsStruct {
     public let x: StructSeveralI64
 }
 
-// CHECK:      SWIFT_INLINE_THUNK Structs::StructSeveralI64 passThroughStructSeveralI64(const Structs::StructSeveralI64& y) const SWIFT_SYMBOL("s:11UsesStructs0aB6StructV011passThroughC10SeveralI64y0B00cfG0VAGF");
-// CHECK-NEXT: SWIFT_INLINE_THUNK Structs::StructSeveralI64 getX() const SWIFT_SYMBOL("s:11UsesStructs0aB6StructV1x0B00C10SeveralI64Vvp");
+// CHECK:      SWIFT_INLINE_THUNK Structs::StructSeveralI64 passThroughStructSeveralI64(const Structs::StructSeveralI64& y) const noexcept SWIFT_SYMBOL("s:11UsesStructs0aB6StructV011passThroughC10SeveralI64y0B00cfG0VAGF");
+// CHECK-NEXT: SWIFT_INLINE_THUNK Structs::StructSeveralI64 getX() const noexcept SWIFT_SYMBOL("s:11UsesStructs0aB6StructV1x0B00C10SeveralI64Vvp");
 
 
 public func passThroughStructSeveralI64(_ x: StructSeveralI64) -> StructSeveralI64 {
@@ -54,13 +54,13 @@ public func passThroughStructSmallDirect(_ x: SmallStructDirectPassing) -> Small
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
-// CHECK: SWIFT_INLINE_THUNK Structs::StructSeveralI64 UsesStructsStruct::passThroughStructSeveralI64(const Structs::StructSeveralI64& y) const {
+// CHECK: SWIFT_INLINE_THUNK Structs::StructSeveralI64 UsesStructsStruct::passThroughStructSeveralI64(const Structs::StructSeveralI64& y) const noexcept {
 // CHECK-NEXT: return Structs::_impl::_impl_StructSeveralI64::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   UsesStructs::_impl::$s11UsesStructs0aB6StructV011passThroughC10SeveralI64y0B00cfG0VAGF(result, Structs::_impl::_impl_StructSeveralI64::getOpaquePointer(y), _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
-// CHECK: SWIFT_INLINE_THUNK Structs::StructSeveralI64 UsesStructsStruct::getX() const {
+// CHECK: SWIFT_INLINE_THUNK Structs::StructSeveralI64 UsesStructsStruct::getX() const noexcept {
 // CHECK-NEXT: return Structs::_impl::_impl_StructSeveralI64::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   UsesStructs::_impl::$s11UsesStructs0aB6StructV1x0B00C10SeveralI64Vvg(result, _getOpaquePointer());
 // CHECK-NEXT: });
