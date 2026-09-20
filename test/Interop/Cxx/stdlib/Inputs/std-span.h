@@ -389,7 +389,7 @@ struct IMMORTAL_FRT DependsOnSelfFRT {
 };
 
 // CHECK: class DependsOnSelfFRT {
-// CHECK-NEXT:   init()
+// CHECK-NEXT:   convenience init()
 // CHECK-NEXT:   var v: std.{{.*}}vector<CInt, std.{{.*}}allocator<CInt>>
 // CHECK-NEXT:   borrowing func get() -> ConstSpanOfInt
 // CHECK-NEXT:   borrowing func {{(__)?}}getMutable{{(Unsafe)?}}() -> SpanOfInt
