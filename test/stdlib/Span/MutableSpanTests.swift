@@ -422,7 +422,10 @@ private struct NC: ~Copyable {
 
 suite.test("updateAll(moving:)")
 .require(.minimumStdlib(.stdlib_6_5))
-.xfail(.always("rdar://187733648 (assignWithTake drops the element's deinit)"))
+.xfail(.custom(
+  { if #available(SwiftStdlib 6.4, *) { true } else { false } },
+  reason: "rdar://187733648 (assignWithTake drops the element's deinit)"
+))
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
@@ -458,7 +461,10 @@ suite.test("updateAll(moving:)")
 
 suite.test("updateSubrange(_:moving:)")
 .require(.minimumStdlib(.stdlib_6_5))
-.xfail(.always("rdar://187733648 (assignWithTake drops the element's deinit)"))
+.xfail(.custom(
+  { if #available(SwiftStdlib 6.4, *) { true } else { false } },
+  reason: "rdar://187733648 (assignWithTake drops the element's deinit)"
+))
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
