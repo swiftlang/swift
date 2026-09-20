@@ -3750,7 +3750,6 @@ endfunction()
 #   add_embedded_swift_target_library(<prefix> <library_name>
 #     [IS_STDLIB] [IS_STDLIB_CORE] [IS_SDK_OVERLAY]
 #     [PARTIAL_SOURCES_INTENDED]
-#     [INSTALL_BINARY]
 #     [NO_FREESTANDING_CXX]
 #     [NON_EMPTY_OBJECT_FILE]
 #     [DETECT_MALLOC_TYPE]
@@ -3783,9 +3782,6 @@ endfunction()
 # whose swiftmodule is never imported by clients but whose object code must
 # be linked in (e.g. the EmbeddedPlatform shim archives).
 #
-# When INSTALL_BINARY is set, the per-target static archive is installed into
-# lib/swift/embedded/${mod}/.
-#
 # When DETECT_MALLOC_TYPE is set, each per-target build checks (via
 # check_c_source_compiles against swift/Runtime/Config.h, using that
 # target's own triple/sysroot) whether SWIFT_STDLIB_HAS_MALLOC_TYPE is
@@ -3804,7 +3800,7 @@ endfunction()
 # at least one match, AND no SKIP_*_REGEX pattern matches.
 function(add_embedded_swift_target_library prefix library_name)
   cmake_parse_arguments(EMBLIB
-    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE;DETECT_MALLOC_TYPE;DETECT_ARC4RANDOM"
+    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE;DETECT_MALLOC_TYPE;DETECT_ARC4RANDOM"
     "INSTALL_IN_COMPONENT;ARCHITECTURE_KEY"
     "GYB_SOURCES;SWIFT_COMPILE_FLAGS;C_COMPILE_FLAGS;FILE_DEPENDS;DEPENDS;SKIP_ARCH_REGEX;SKIP_MOD_REGEX;SKIP_TRIPLE_REGEX;ONLY_ARCH_REGEX;ONLY_MOD_REGEX;ONLY_TRIPLE_REGEX"
     ${ARGN})
@@ -4004,23 +4000,22 @@ function(add_embedded_swift_target_library prefix library_name)
       INSTALL_IN_COMPONENT ${EMBLIB_INSTALL_IN_COMPONENT}
     )
 
-    # Install the produced archive into lib/swift/embedded/${mod}/ when needed.
-    embedded_triple_uses_interface_cgm("${triple}" _emblib_interface_cgm)
-    if(EMBLIB_INSTALL_BINARY OR _emblib_interface_cgm)
-      swift_install_in_component(
-        TARGETS ${prefix}-${mod}
-        DESTINATION "lib/swift/embedded/${mod}"
-        COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
-      )
-      swift_install_in_component(
-        FILES "${SWIFTLIB_DIR}/embedded/${mod}/lib${library_name}.a"
-        DESTINATION "lib/swift/embedded/${mod}/"
-        COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
-        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                    GROUP_READ GROUP_EXECUTE
-                    WORLD_READ WORLD_EXECUTE
-      )
-    endif()
+    # Install the produced archive into lib/swift/embedded/${mod}/. Depending
+    # on the compilation model, it might be empty (and can be ignored), but it
+    # will always be there.
+    swift_install_in_component(
+      TARGETS ${prefix}-${mod}
+      DESTINATION "lib/swift/embedded/${mod}"
+      COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
+    )
+    swift_install_in_component(
+      FILES "${SWIFTLIB_DIR}/embedded/${mod}/lib${library_name}.a"
+      DESTINATION "lib/swift/embedded/${mod}/"
+      COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
+      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                  GROUP_READ GROUP_EXECUTE
+                  WORLD_READ WORLD_EXECUTE
+    )
 
     # When building the per-target archive on macOS, point CMake at the
     # specific architecture so it doesn't try to build a fat archive.
