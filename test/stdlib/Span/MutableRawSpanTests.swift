@@ -465,7 +465,7 @@ suite.test("updateAll(moving:)")
     byteCount: byteCount, alignment: 8
   )
   defer { storage.deallocate() }
-  storage.initializeMemory(as: UInt8.self, fromContentsOf: 0..<8)
+  _ = storage.initializeMemory(as: UInt8.self, fromContentsOf: 0..<8)
   var source = OutputRawSpan(buffer: storage, initializedCount: 8)
   expectEqual(source.isFull, true)
 
