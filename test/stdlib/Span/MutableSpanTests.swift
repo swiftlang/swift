@@ -532,13 +532,14 @@ suite.test("updateFromIndex(_:copying:), Iterable overflows source")
 suite.test("updateFromIndex(_:copying:), bad index")
 .require(.minimumStdlib(.stdlib_6_5))
 .require(.crashTesting)
-.crashOutputMatches("Index out of bounds", when: _isDebugAssertConfiguration())
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   var a = ContiguousArray(repeating: 0, count: 4)
   var span = a.mutableSpan
-  expectCrashLater()
+  expectCrashLater(
+    withMessage: _isDebugAssertConfiguration() ? "Index out of bounds" : ""
+  )
   _ = span.updateFromIndex(5, copying: Span())
 }
 
