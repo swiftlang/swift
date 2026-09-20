@@ -538,13 +538,14 @@ suite.test("updateFromIndex(_:copying:), Iterable overflows source")
 suite.test("updateFromIndex(_:copying:), bad index")
 .require(.minimumStdlib(.stdlib_6_5))
 .require(.crashTesting)
-.crashOutputMatches("Byte offset out of bounds", when: _isDebugAssertConfiguration())
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   var a = ContiguousArray<UInt8>(repeating: 0, count: 4)
   var span = MutableRawSpan(elements: a.mutableSpan)
-  expectCrashLater()
+  expectCrashLater(
+    withMessage: _isDebugAssertConfiguration() ? "Byte offset out of bounds" : ""
+  )
   _ = span.updateFromIndex(5, copying: Span<UInt8>())
 }
 
