@@ -81,10 +81,6 @@
 #include <unwind.h>
 #endif
 
-#if defined(__ELF__)
-#include <sys/syscall.h>
-#endif
-
 #if defined(_WIN32)
 #include <io.h>
 #endif
