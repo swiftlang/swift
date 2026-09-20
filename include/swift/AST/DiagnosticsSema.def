@@ -2239,10 +2239,11 @@ ERROR(cdecl_incompatible_with_objc,none,
       "cannot apply both '@c' and '@objc' to %kindonly0",
       (const Decl *))
 ERROR(cdecl_ref_counting_operation,none,
-      "%0 function implementing the %select{retain|release}1 operation of "
-      "foreign reference type %2 will cause infinite recursion; "
-      "use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`",
-      (DeclAttribute, unsigned, Type))
+      "%0 %select{function|instance method}3 implementing the "
+      "%select{retain|release}1 operation of foreign reference type %2 will "
+      "cause infinite recursion%select{; use `Unmanaged` or a pointer type "
+      "like `UnsafeMutableRawPointer`|}3",
+      (DeclAttribute, unsigned, Type, unsigned))
 ERROR(cdecl_unretained_result_unsupported,none,
       "%kind0 cannot implement %select{C|C++}1 function '%2' because it "
       "returns a foreign reference type %select{without a "
@@ -2272,9 +2273,6 @@ ERROR(cxx_self_ownership_unsupported,none,
 ERROR(cxx_invalid_context,none,
       "%0 can only be applied to global functions or functions in extensions "
       "of C++ namespaces, structs, and classes", (DeclAttribute))
-ERROR(cxx_foreign_reference_instance_method,none,
-      "%0 cannot yet be applied to instance methods of C++ foreign reference "
-      "types", (DeclAttribute))
 ERROR(cxx_func_defined,none,
       "%kind0 cannot implement C++ function '%1' because it "
       "%select{already has a definition|is declared 'inline'|is 'constexpr' (implicitly 'inline')}2",
