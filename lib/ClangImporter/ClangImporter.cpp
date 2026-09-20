@@ -2323,8 +2323,13 @@ static void publishBuiltPCH(clang::CompilerInstance &instance,
   if (!buffer)
     return;
 
+  // Making an explicit copy of the underlying memory mapped file so any
+  // modification to the PCH file on disk will not affect module cache.
+  auto copy = llvm::MemoryBuffer::getMemBufferCopy(
+      (*buffer)->getBuffer(), (*buffer)->getBufferIdentifier());
+
   instance.getModuleCache().getInMemoryModuleCache().addBuiltPCM(
-      pchPath, std::move(*buffer), status->getSize(),
+      pchPath, std::move(copy), status->getSize(),
       llvm::sys::toTimeT(status->getLastModificationTime()));
 }
 
@@ -5779,15 +5784,23 @@ getConditionalCopyableAttrParams(const clang::RecordDecl *decl) {
   return getConditionalAttrParams(decl, "copyable_if:");
 }
 
-// For certain types when the special member functions just forward to the
-// members' special member functions we can derive escapability from the
-// constituents.
+// Whether we can infer anything about a type from its constituents.
 static bool canDeriveEscapabilityFromMembers(const clang::CXXRecordDecl *decl) {
   // Do not do any inference for polymoprhic types as we might not know the
   // semantics of the derived types that can be used through base pointers.
-  if (decl->isPolymorphic())
-    return false;
+  return !decl->isPolymorphic();
+}
 
+// A non-escapable member only makes the whole type non-escapable when the
+// special member functions forward to the members'. A type that owns a buffer
+// and keeps a member pointing into it is self-contained, and fixing that member
+// up on copy is why it would provide its own copy constructor, so it is at most
+// unknown.
+//
+// Escapability needs no such guard: a view needs a pointer, a reference, or a
+// non-escapable member, and the first two already force unknown.
+static bool
+canDeriveNonEscapabilityFromMembers(const clang::CXXRecordDecl *decl) {
   for (auto *ctor : decl->ctors()) {
     if ((ctor->isCopyConstructor() || ctor->isMoveConstructor()) &&
         ctor->isUserProvided())
@@ -5842,19 +5855,29 @@ computeClangTypeEscapability(Evaluator &evaluator,
   // as such
   // - a record type is escapable if it is annotated with SWIFT_ESCAPABLE_IF()
   // and none of the annotation arguments are non-escapable
-  // - a non-cxx record, or a CxxRecordDecl where the special member functions
-  // are forwarding to the fields' special member functions, is escapable if
+  // - a non-cxx record, or a non-polymorphic CxxRecordDecl, is escapable if
   // none of their fields or bases are non-escapable (as long as they have a
   // definition)
-  //   * for more complex CxxRecordDecls, we rely solely on escapability
-  //   annotations
+  //   * a non-escapable field or base only makes the record non-escapable when
+  //   the record's copy, move and destruction forward to its members'
   // - in all other cases, the record has unknown escapability (e.g. no
   // escapability annotations, malformed escapability annotations)
 
   bool hasUnknown = false;
   llvm::SmallVector<const clang::Type *, 4> stack;
-  // Keep track of Types we've seen to avoid cycles
-  llvm::SmallDenseSet<const clang::Type *, 4> seen;
+  // Keep track of Types we've seen to avoid cycles, mapped to the record whose
+  // copy, move or destruction demoted the path we reached them by, or null if
+  // we reached them without demotion. Demotion only improves, and an
+  // improvement re-queues the type.
+  llvm::SmallDenseMap<const clang::Type *, const clang::CXXRecordDecl *, 4>
+      seen;
+
+  // The record that demoted the path to the type being visited, if any: a
+  // non-escapable type found from here can only make the answer unknown, and it
+  // is that record the user has to annotate. See
+  // canDeriveNonEscapabilityFromMembers. Demotion is a property of the path, so
+  // everything reached from here inherits it.
+  const clang::CXXRecordDecl *demotedBy = nullptr;
 
   // Which member put a type on the stack, and which record that member belongs
   // to. The traversal is flattened, so a reason may be found several levels below
@@ -5865,31 +5888,60 @@ computeClangTypeEscapability(Evaluator &evaluator,
     const clang::RecordDecl *owner;
   };
   llvm::SmallDenseMap<const clang::Type *, Provenance, 4> pushedBy;
-  auto maybePushToStack = [&](const clang::Type *type, bool unused=false) {
+  auto push = [&](const clang::Type *type,
+                  const clang::CXXRecordDecl *demoter,
+                  std::optional<Provenance> provenance) {
     auto desugared = type->getUnqualifiedDesugaredType();
-    if (seen.insert(desugared).second)
-      stack.push_back(desugared);
-  };
-  auto pushMember = [&](const clang::Type *type, const clang::NamedDecl *member,
-                        const clang::RecordDecl *owner) {
-    auto desugared = type->getUnqualifiedDesugaredType();
-    if (seen.insert(desugared).second) {
-      stack.push_back(desugared);
-      pushedBy[desugared] = {member, owner};
+    auto [it, inserted] = seen.try_emplace(desugared, demoter);
+    if (!inserted) {
+      // Nothing new unless we can now settle what we could not before.
+      if (demoter || !it->second)
+        return;
+      it->second = nullptr;
     }
+    stack.push_back(desugared);
+    if (provenance)
+      pushedBy.try_emplace(desugared, *provenance);
+  };
+  // Pushes along the current path. The conditional-parameter path uses this:
+  // SWIFT_ESCAPABLE_IF is a promise about the arguments, so the annotated
+  // record's own copy, move or destruction must not demote them.
+  auto maybePushToStack = [&](const clang::Type *type, bool isBase=false) {
+    push(type, demotedBy, std::nullopt);
+  };
+  auto pushMember = [&](const clang::Type *type,
+                        const clang::CXXRecordDecl *demoter,
+                        const clang::NamedDecl *member,
+                        const clang::RecordDecl *owner) {
+    push(type, demoter, Provenance{member, owner});
   };
 
-  maybePushToStack(desc.type);
+  push(desc.type, /*demoter=*/nullptr, std::nullopt);
   while (!stack.empty()) {
     auto type = stack.back();
     stack.pop_back();
+    demotedBy = seen.lookup(type);
     if (const auto *recordType = type->getAs<clang::RecordType>()) {
       // N.B. RecordType::getDecl() can be any declaration of the record, and
       // Swift attributes are not propagated across redeclarations, so look at
       // the definition.
       auto recordDecl = recordType->getDecl()->getDefinitionOrSelf();
-      if (hasNonEscapableAttr(recordDecl))
-        return {CxxEscapability::NonEscapable, std::nullopt};
+      if (hasNonEscapableAttr(recordDecl)) {
+        if (!demotedBy)
+          return {CxxEscapability::NonEscapable, std::nullopt};
+        // Blame the record that demoted us, since that is the one whose
+        // escapability is unknown and the one an annotation would settle. Name
+        // the member only when it belongs to that record; otherwise the
+        // non-escapable type sits deeper and naming it would misattribute.
+        auto provenance = pushedBy.lookup(type);
+        bool ownedByDemoter =
+            provenance.owner && provenance.owner->getCanonicalDecl() ==
+                                    demotedBy->getCanonicalDecl();
+        hasUnknown = unknownBecause(
+            importer::CxxUnknownEscapabilityReason::NonEscapableMember,
+            ownedByDemoter ? provenance.member : nullptr, demotedBy);
+        continue;
+      }
       if (hasEscapableAttr(recordDecl))
         continue;
       // A foreign reference type is imported as a Swift class, which is always
@@ -5898,10 +5950,13 @@ computeClangTypeEscapability(Evaluator &evaluator,
       // where the type is imported.
       if (importer::isForeignReferenceRecord(recordDecl, evaluator))
         continue;
-      if (hasSwiftAttribute(recordDecl, {"unsafe", "unsafe(always)"}))
-        // Reached without recording a reason, so there is nothing to explain:
-        // the annotation in the header already says it.
-        return {CxxEscapability::Unknown, std::nullopt};
+      if (hasSwiftAttribute(recordDecl, {"unsafe", "unsafe(always)"})) {
+        // Keep walking rather than returning, so that a non-escapable type
+        // elsewhere in the graph still settles the answer instead of losing to
+        // whichever member came first.
+        hasUnknown = true;
+        continue;
+      }
       llvm::ArrayRef<int> STLParams;
       if (recordDecl->isInStdNamespace()) {
         STLParams = getSTLConditionalParams(recordDecl->getName());
@@ -5925,18 +5980,23 @@ computeClangTypeEscapability(Evaluator &evaluator,
       auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
       if (recordDecl->getDefinition() &&
           (!cxxRecordDecl || canDeriveEscapabilityFromMembers(cxxRecordDecl))) {
+        const clang::CXXRecordDecl *demoteMembersBy = demotedBy;
+        if (!demoteMembersBy && cxxRecordDecl &&
+            !canDeriveNonEscapabilityFromMembers(cxxRecordDecl))
+          demoteMembersBy = cxxRecordDecl;
         if (cxxRecordDecl) {
           for (auto base : cxxRecordDecl->bases())
             pushMember(base.getType()->getUnqualifiedDesugaredType(),
-                       base.getType()->getAsRecordDecl(), recordDecl);
+                       demoteMembersBy, base.getType()->getAsRecordDecl(),
+                       recordDecl);
         }
         for (auto field : recordDecl->fields())
-          pushMember(field->getType()->getUnqualifiedDesugaredType(), field,
-                     recordDecl);
+          pushMember(field->getType()->getUnqualifiedDesugaredType(),
+                     demoteMembersBy, field, recordDecl);
       } else {
-        // We only infer escapability for simple types, such as aggregates and
-        // RecordDecls that are not CxxRecordDecls. For more complex
-        // CxxRecordDecls, we rely solely on escapability annotations.
+        // We only infer escapability for types whose semantics we understand as
+        // a whole. For polymorphic CxxRecordDecls, and records without a
+        // definition, we rely solely on escapability annotations.
         hasUnknown = unknownBecause(
             importer::CxxUnknownEscapabilityReason::CannotDeriveFromMembers,
             recordDecl, recordDecl);
@@ -7173,12 +7233,20 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
     return dyn_cast<AbstractFunctionDecl>(result);
   };
 
+  auto *clangLoader = func->getASTContext().getClangModuleLoader();
   for (ValueDecl *result : results) {
     AbstractFunctionDecl *resultFunc = asFunc(result);
     if (!resultFunc)
       continue;
 
-    if (resultFunc->getCDeclName() != clangName)
+    // A virtual method of a foreign reference type is imported as a
+    // synthesized `__synthesizedVirtualCall_` dynamic-dispatch thunk; it is
+    // known by the name of the virtual method it forwards to.
+    const ValueDecl *named = resultFunc;
+    if (auto *thunk = dyn_cast<FuncDecl>(resultFunc))
+      if (auto *original = clangLoader->getOriginalForVirtualThunk(thunk))
+        named = original;
+    if (named->getCDeclName() != clangName)
       continue;
 
     if (resultFunc->hasClangNode())

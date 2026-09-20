@@ -2245,6 +2245,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_type_var_joins,
                    Opts.SolverEnableTypeVariableJoins);
 
+  Opts.SolverEnablePromoteSupertypes =
+      Args.hasFlag(OPT_solver_enable_promote_supertypes,
+                   OPT_solver_disable_promote_supertypes,
+                   Opts.SolverEnablePromoteSupertypes);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 

@@ -56,6 +56,9 @@ enum class CxxUnknownEscapabilityReason {
   ConditionalArgument,
   /// A record too complex to infer from, so only an annotation would settle it.
   CannotDeriveFromMembers,
+  /// A non-escapable member or base of a record that provides its own copy,
+  /// move or destruction, so it cannot settle whether the record is a view.
+  NonEscapableMember,
   /// A pointer or reference, which is deliberately treated as unknown.
   Pointer,
 };

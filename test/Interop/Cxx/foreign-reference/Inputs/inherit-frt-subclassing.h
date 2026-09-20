@@ -7,7 +7,9 @@ _Pragma("clang assume_nonnull begin")
   __attribute__((swift_attr("retain:" #_retain)))                              \
   __attribute__((swift_attr("release:" #_release)))
 
-    struct SubclassableShared {
+#define SWIFT_RETURNS_RETAINED __attribute__((swift_attr("returns_retained")))
+
+struct SubclassableShared {
   int refcount = 1;
 
   virtual ~SubclassableShared() {}
@@ -83,6 +85,42 @@ inline void retainDeletedDtorShared(DeletedDtorShared *t) { ++t->refcount; }
 inline void releaseDeletedDtorShared(DeletedDtorShared *t) {
   if (--t->refcount <= 0)
     (void)"DELETION PLACEHOLDER";
+}
+
+struct SharedConstructed {
+  int refcount = 1;
+  int a = 0;
+  long b = 0;
+
+  SWIFT_RETURNS_RETAINED SharedConstructed() {}
+  SWIFT_RETURNS_RETAINED SharedConstructed(int a) : a(a) {}
+  SWIFT_RETURNS_RETAINED SharedConstructed(int a, long b) : a(a), b(b) {}
+
+  int getA() const { return a; }
+  long getB() const { return b; }
+
+  virtual ~SharedConstructed() {}
+} SWIFT_SHARED_REFERENCE(retainSharedConstructed, releaseSharedConstructed);
+
+inline void retainSharedConstructed(SharedConstructed *t) { ++t->refcount; }
+inline void releaseSharedConstructed(SharedConstructed *t) {
+  if (--t->refcount <= 0)
+    delete t;
+}
+
+struct ArgOnlyConstructed {
+  int refcount = 1;
+  int a = 0;
+
+  SWIFT_RETURNS_RETAINED ArgOnlyConstructed(int a) : a(a) {}
+
+  virtual ~ArgOnlyConstructed() {}
+} SWIFT_SHARED_REFERENCE(retainArgOnlyConstructed, releaseArgOnlyConstructed);
+
+inline void retainArgOnlyConstructed(ArgOnlyConstructed *t) { ++t->refcount; }
+inline void releaseArgOnlyConstructed(ArgOnlyConstructed *t) {
+  if (--t->refcount <= 0)
+    delete t;
 }
 
 #if __has_feature(nullability)
