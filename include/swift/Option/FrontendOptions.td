@@ -1051,6 +1051,12 @@ def solver_disable_enumerate_supertypes : Flag<["-"], "solver-disable-enumerate-
 def solver_enable_enumerate_supertypes : Flag<["-"], "solver-enable-enumerate-supertypes">,
   HelpText<"Enable an inefficient form of inference in the solver, which prevents certain optimizations">;
 
+def solver_enable_promote_supertypes : Flag<["-"], "solver-enable-promote-supertypes">,
+  HelpText<"Enable an experimental optimization which will be on by default at some point">;
+
+def solver_disable_promote_supertypes : Flag<["-"], "solver-disable-promote-supertypes">,
+  HelpText<"Disable an experimental optimization which will be on by default at some point">;
+
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
 

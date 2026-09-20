@@ -2603,6 +2603,14 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
   
   auto ctor = otherCtorRef->getDecl();
   if (!ctor->isDesignatedInit()) {
+    // A Swift subclass of a C++ FRT calls the base's imported constructor.
+    // There is no designated initializer to chain to.
+    if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
+      auto &ctx = fromCtor->getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
+          classDecl->isForeignReferenceType())
+        return false;
+    }
     if (!implicitlyGenerated) {
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
       if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
