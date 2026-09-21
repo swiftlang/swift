@@ -1828,8 +1828,9 @@ uint16_t SILGenFunction::emitBasicProlog(
   // conventions; do the same for the `$error` debug placeholder, which
   // must only appear in a function whose SIL type has an error result
   // (SIL verifier enforces this invariant).
-  if (errorType && !(*errorType)->isNever() && IndirectErrorResult == nullptr &&
-      F.getLoweredFunctionType()->hasErrorResult()) {
+  if (errorType && !(*errorType)->isNever() &&
+      F.getLoweredFunctionType()->hasErrorResult() &&
+      !F.getLoweredFunctionType()->hasIndirectErrorResult()) {
     CanType errorTypeInContext =
       DC->mapTypeIntoEnvironment(*errorType)->getCanonicalType();
     auto loweredErrorTy = getLoweredType(*origErrorType, errorTypeInContext);
